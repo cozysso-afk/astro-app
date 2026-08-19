@@ -114,53 +114,16 @@ SIGNS_KO = [
 ]
 
 PLANET_KEYS = {
-    # DE440s에는 일부 행성의 center target이 없고 barycenter만 있는 경우가 있어
-    # 후보를 순서대로 시도해 커널별 차이를 안전하게 흡수한다.
-    "Sun": ("sun",),
-    "Moon": ("moon",),
-    "Mercury": ("mercury", "mercury barycenter"),
-    "Venus": ("venus", "venus barycenter"),
-    "Mars": ("mars", "mars barycenter"),
-    "Jupiter": ("jupiter", "jupiter barycenter"),
-    "Saturn": ("saturn", "saturn barycenter"),
-    "Uranus": ("uranus", "uranus barycenter"),
-    "Neptune": ("neptune", "neptune barycenter"),
-    "Pluto": ("pluto", "pluto barycenter"),
-}
-
-# 개인용 앱에서 위도/경도를 직접 칠 필요가 없도록 만든 국내 주요 출생지 목록.
-# 좌표는 도시 중심부의 대표 좌표이며, 아주 정밀한 출생지 좌표를 알고 있다면
-# 아래 '직접 좌표 입력(고급)' 옵션으로 덮어쓸 수 있다.
-KOREA_BIRTHPLACES = {
-    "전라남도 여수시": (34.7604, 127.6622),
-    "전라남도 순천시": (34.9507, 127.4872),
-    "전라남도 광양시": (34.9407, 127.6959),
-    "광주광역시": (35.1595, 126.8526),
-    "전라북도 전주시": (35.8242, 127.1480),
-    "전라북도 군산시": (35.9677, 126.7366),
-    "서울특별시": (37.5665, 126.9780),
-    "부산광역시": (35.1796, 129.0756),
-    "대구광역시": (35.8714, 128.6014),
-    "인천광역시": (37.4563, 126.7052),
-    "대전광역시": (36.3504, 127.3845),
-    "울산광역시": (35.5384, 129.3114),
-    "세종특별자치시": (36.4800, 127.2890),
-    "경기도 수원시": (37.2636, 127.0286),
-    "경기도 성남시": (37.4200, 127.1265),
-    "경기도 고양시": (37.6584, 126.8320),
-    "경기도 용인시": (37.2411, 127.1776),
-    "강원특별자치도 춘천시": (37.8813, 127.7300),
-    "강원특별자치도 강릉시": (37.7519, 128.8761),
-    "충청북도 청주시": (36.6424, 127.4890),
-    "충청남도 천안시": (36.8151, 127.1139),
-    "충청남도 공주시": (36.4465, 127.1190),
-    "경상북도 포항시": (36.0190, 129.3435),
-    "경상북도 경주시": (35.8562, 129.2247),
-    "경상남도 창원시": (35.2279, 128.6811),
-    "경상남도 진주시": (35.1800, 128.1076),
-    "경상남도 통영시": (34.8544, 128.4332),
-    "제주특별자치도 제주시": (33.4996, 126.5312),
-    "제주특별자치도 서귀포시": (33.2541, 126.5601),
+    "Sun": "sun",
+    "Moon": "moon",
+    "Mercury": "mercury",
+    "Venus": "venus",
+    "Mars": "mars",
+    "Jupiter": "jupiter barycenter",
+    "Saturn": "saturn barycenter",
+    "Uranus": "uranus barycenter",
+    "Neptune": "neptune barycenter",
+    "Pluto": "pluto barycenter",
 }
 
 PLANET_KO = {
@@ -292,30 +255,6 @@ ts, eph, EPHEMERIS_USED, EPHEMERIS_FALLBACK_REASON = load_ephemeris()
 earth = eph["earth"]
 
 
-def resolve_planet_targets():
-    """Resolve the first body key actually present in the loaded SPK kernel."""
-    targets = {}
-    used_keys = {}
-    for body, candidates in PLANET_KEYS.items():
-        last_error = None
-        for candidate in candidates:
-            try:
-                targets[body] = eph[candidate]
-                used_keys[body] = candidate
-                break
-            except (KeyError, ValueError) as exc:
-                last_error = exc
-        else:
-            raise KeyError(
-                f"{EPHEMERIS_USED}에서 {body} target을 찾지 못했습니다. "
-                f"시도한 키: {candidates}. 마지막 오류: {last_error}"
-            )
-    return targets, used_keys
-
-
-BODY_TARGETS, BODY_TARGET_KEYS = resolve_planet_targets()
-
-
 def sf_time(dt_aware):
     """Timezone-aware datetime -> Skyfield Time."""
     return ts.from_datetime(dt_aware.astimezone(UTC))
@@ -336,14 +275,14 @@ def to_jd_ut(dt_utc):
 # ============================================================
 def get_tropical_ecliptic_lon(body_name, time_obj):
     """Geocentric apparent longitude in true ecliptic/equinox of date."""
-    target = BODY_TARGETS[body_name]
+    target = eph[PLANET_KEYS[body_name]]
     apparent = earth.at(time_obj).observe(target).apparent()
     _, lon, _ = apparent.frame_latlon(ecliptic_frame)
     return float(lon.degrees % 360.0)
 
 
 def get_tropical_ecliptic_lons(body_name, time_objs):
-    target = BODY_TARGETS[body_name]
+    target = eph[PLANET_KEYS[body_name]]
     apparent = earth.at(time_objs).observe(target).apparent()
     _, lon, _ = apparent.frame_latlon(ecliptic_frame)
     return np.mod(np.asarray(lon.degrees, dtype=float), 360.0)
@@ -839,24 +778,10 @@ with st.sidebar:
     user_name = st.text_input("성함 (호칭)", value="다현")
 
     st.subheader("📍 출생 정보 (Natal)")
-    birth_date = st.date_input("출생일", datetime(1991, 3, 21))
-    birth_time = st.time_input("출생 시간", dt_time(7, 26), step=60)
-
-    place_options = list(KOREA_BIRTHPLACES.keys()) + ["직접 좌표 입력(고급)"]
-    birth_place = st.selectbox(
-        "출생 지역",
-        place_options,
-        index=place_options.index("전라남도 여수시"),
-        help="지역명만 고르면 위도·경도는 자동 입력됩니다.",
-    )
-
-    if birth_place == "직접 좌표 입력(고급)":
-        with st.expander("정밀 좌표 직접 입력", expanded=True):
-            lat = st.number_input("출생지 위도(N)", value=34.7604, format="%.6f")
-            lon = st.number_input("출생지 경도(E)", value=127.6622, format="%.6f")
-    else:
-        lat, lon = KOREA_BIRTHPLACES[birth_place]
-        st.caption(f"📌 {birth_place} · 자동 좌표 {lat:.4f}°N, {lon:.4f}°E")
+    birth_date = st.date_input("출생일", datetime(2000, 8, 19))
+    birth_time = st.time_input("출생 시간", dt_time(14, 30), step=60)
+    lat = st.number_input("출생지 위도(N)", value=37.5665, format="%.6f")
+    lon = st.number_input("출생지 경도(E)", value=126.9780, format="%.6f")
 
     st.markdown("---")
     st.subheader("📅 운세 조회 시점")
@@ -1128,7 +1053,6 @@ with tabs[3]:
     st.markdown("#### 엔진 상태")
     status_items = [
         f"Ephemeris: {EPHEMERIS_USED}",
-        f"SPK target: Mars → {BODY_TARGET_KEYS['Mars']}",
         "Planet longitude: geocentric apparent + true ecliptic/equinox of date",
         "Time: KST input → timezone-aware UTC → Skyfield timescale",
         "ASC/MC/Vertex + Placidus: Swiss Ephemeris house geometry",
