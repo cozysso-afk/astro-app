@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime, time
 import astronomy
+import math
 
 # 페이지 설정
 st.set_page_config(page_title="별빛의 운명", page_icon="✨", layout="centered")
@@ -30,10 +31,10 @@ st.markdown("""
         margin-bottom: 22px;
     }
     
-    /* 운세 메인 카드: 연핑크/연보라 글래스모피즘 + 골드 테두리 */
+    /* 운세 메인 카드 */
     .fortune-card {
-        background: rgba(255, 255, 255, 0.82);
-        border: 1.5px solid #E8D3B9; /* 샴페인 골드 테두리 */
+        background: rgba(255, 255, 255, 0.85);
+        border: 1.5px solid #E8D3B9;
         border-radius: 26px;
         padding: 24px 20px;
         box-shadow: 0 10px 30px rgba(214, 185, 210, 0.28);
@@ -49,7 +50,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
     
-    /* 점수 텍스트: 로즈골드 그라데이션 */
     .score-number {
         font-size: 54px;
         font-weight: 800;
@@ -66,7 +66,6 @@ st.markdown("""
         margin-bottom: 12px;
     }
     
-    /* 우주 메시지 박스: 소프트 라벤더 + 민트 포인트 */
     .advice-box {
         background: rgba(246, 240, 252, 0.9);
         border: 1px dashed #D6C2E2;
@@ -78,7 +77,6 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    /* 럭키 칩 컨테이너 */
     .lucky-container {
         display: flex;
         justify-content: space-between;
@@ -86,7 +84,6 @@ st.markdown("""
         gap: 12px;
     }
     
-    /* 민트 포인트 럭키 칩 */
     .lucky-chip-mint {
         background: rgba(235, 250, 247, 0.85);
         border: 1.2px solid #C2EAE2;
@@ -96,7 +93,6 @@ st.markdown("""
         text-align: center;
     }
     
-    /* 골드 포인트 럭키 칩 */
     .lucky-chip-gold {
         background: rgba(255, 250, 240, 0.85);
         border: 1.2px solid #EEDBBF;
@@ -120,24 +116,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 헤더 타이틀
+# 헤더 렌더링
 st.markdown('<div class="main-title">✦ 별빛의 운명 ✦</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">너의 별이 속삭이는 오늘의 이야기</div>', unsafe_allow_html=True)
 
-# --- 사이드바: 출생 정보 입력 ---
+# --- 사이드바 ---
 with st.sidebar:
-    st.header("🔮 출생 정보")
+    st.header("🔮 출생 정보 설정")
     birth_date = st.date_input("생년월일", datetime(2000, 1, 1))
     birth_time = st.time_input("출생 시간", time(12, 0))
     lat = st.number_input("출생지 위도 (서울: 37.56)", value=37.56, format="%.2f")
     lon = st.number_input("출생지 경도 (서울: 126.97)", value=126.97, format="%.2f")
     house_mode = st.radio("하우스 모드", ["통합 (홀사인 + 플라시두스)", "홀사인", "플라시두스"])
 
-# --- 천체 계산 엔진 (오차 0%) ---
-def get_astro_data(b_date, b_time, target_dt, lat, lon):
-    b_hour = b_time.hour + (b_time.minute / 60.0) - 9.0  # KST -> UTC
-    t_birth = astronomy.Time(datetime(b_date.year, b_date.month, b_date.day), b_hour)
-    t_now = astronomy.Time(datetime(target_dt.year, target_dt.month, target_dt.day), 3.0)
+# --- 천체 계산 함수 (Type Safe) ---
+def get_astro_data(b_date, b_time, target_dt):
+    # KST -> UTC 시차 변환 (-9시간)
+    utc_hour = b_time.hour - 9
+    b_day = b_date.day
+    if utc_hour < 0:
+        utc_hour += 24
+        b_day -= 1
+        
+    t_birth = astronomy.Time.Make(b_date.year, b_date.month, max(1, b_day), utc_hour, b_time.minute, 0)
+    t_now = astronomy.Time.Make(target_dt.year, target_dt.month, target_dt.day, 3, 0, 0)
     
     bodies = {
         "Sun": astronomy.Body.Sun, "Moon": astronomy.Body.Moon,
@@ -147,9 +149,15 @@ def get_astro_data(b_date, b_time, target_dt, lat, lon):
         "Pluto": astronomy.Body.Pluto
     }
     
-    natal_pos = {name: astronomy.Ecliptic(astronomy.GeoVector(b, t_birth, False)).elon for name, b in bodies.items()}
-    transit_pos = {name: astronomy.Ecliptic(astronomy.GeoVector(b, t_now, False)).elon for name, b in bodies.items()}
+    natal_pos = {}
+    transit_pos = {}
+    for name, b in bodies.items():
+        v_natal = astronomy.GeoVector(b, t_birth, astronomy.Aberration.Corrected)
+        v_transit = astronomy.GeoVector(b, t_now, astronomy.Aberration.Corrected)
+        natal_pos[name] = astronomy.Ecliptic(v_natal).elon
+        transit_pos[name] = astronomy.Ecliptic(v_transit).elon
 
+    # 애스펙트 추출
     aspects = []
     aspect_defs = [(0, "합", 1.0), (60, "육합", 0.6), (90, "사각", -0.8), (120, "삼합", 0.8), (180, "충", -0.9)]
     
@@ -167,9 +175,9 @@ def get_astro_data(b_date, b_time, target_dt, lat, lon):
     return natal_pos, transit_pos, aspects
 
 today = datetime.now()
-natal_pos, transit_pos, aspects = get_astro_data(birth_date, birth_time, today, lat, lon)
+natal_pos, transit_pos, aspects = get_astro_data(birth_date, birth_time, today)
 
-# 점수화 로직
+# 점수 계산
 activity_score = min(98, 45 + len(aspects) * 11)
 pos_sum = sum([a["weight"] for a in aspects if a["weight"] > 0])
 neg_sum = sum([abs(a["weight"]) for a in aspects if a["weight"] < 0])
@@ -202,7 +210,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 근거 로그
+# 활성 트리거 목록
 st.markdown("##### 🌙 오늘의 활성 천체 트리거")
 if aspects:
     for asp in aspects[:4]:
