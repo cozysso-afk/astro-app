@@ -7,13 +7,13 @@ from skyfield.api import load
 
 # 1. 페이지 기본 설정
 st.set_page_config(
-    page_title="별빛의 운명 · 정밀 천체 운세",
+    page_title="별빛의 운명 · 정밀 천체 시스템",
     page_icon="✨",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# 배경 이미지 자동 로드
+# 배경 이미지 자동 탐색 (대소문자 확장자 지원)
 def get_bg_style():
     candidates = ["bg.PNG", "bg.png", "BG.PNG", "BG.png", "bg.JPG", "bg.jpg"]
     for fname in candidates:
@@ -26,9 +26,10 @@ def get_bg_style():
 
 bg_css = get_bg_style()
 
-# --- 2. 모바일 완벽 최적화 CSS ---
+# --- 2. 폰트 및 모바일 최적화 CSS ---
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&display=swap');
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 .stApp {{
@@ -37,15 +38,16 @@ st.markdown(f"""
     background-size: cover;
     background-position: center top;
     background-attachment: fixed;
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Pretendard', -apple-system, sans-serif;
     color: #3D2B3A;
 }}
 
 .top-brand {{
     text-align: center;
-    font-size: 11.5px;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     color: #8C6A84;
     padding-top: 6px;
 }}
@@ -55,8 +57,9 @@ st.markdown(f"""
     margin: 8px 0 14px 0;
 }}
 .daily-title {{
-    font-size: 20px;
-    font-weight: 800;
+    font-family: 'Cormorant Garamond', 'Pretendard', serif;
+    font-size: 24px;
+    font-weight: 700;
     color: #4A3345;
     word-break: keep-all;
     line-height: 1.35;
@@ -172,7 +175,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. NASA JPL 계산 엔진
+# 3. NASA JPL 계산 엔진 (Skyfield)
 @st.cache_resource
 def get_engine():
     ts = load.timescale()
@@ -188,8 +191,8 @@ planets = {
     'Pluto': eph['pluto barycenter']
 }
 
-# --- 4. 출생 차트 (Natal Chart) 패널 ---
-with st.expander("🔮 내 출생 차트 정보 & 하우스 설정", expanded=False):
+# --- 4. 출생 차트 정보 및 하우스 설정 ---
+with st.expander("🔮 내 출생 정보 (Natal Chart, 탄생 천궁도) & 하우스 시스템", expanded=False):
     c1, c2 = st.columns(2)
     with c1:
         b_date = st.date_input("생년월일", date(1998, 5, 20))
@@ -204,7 +207,6 @@ with st.expander("🔮 내 출생 차트 정보 & 하우스 설정", expanded=Fa
 
 lat, lon = city_coords[city]
 
-# ASC 계산
 def get_asc(t_obj, lat, lon):
     gst = t_obj.gast
     lst = (gst * 15.0 + lon) % 360.0
@@ -215,7 +217,6 @@ def get_asc(t_obj, lat, lon):
     x = math.sin(ramc) * math.cos(eps) + math.tan(phi) * math.sin(eps)
     return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
 
-# 천체 계산
 def compute_astro(target_d):
     utc_h = b_time.hour - 9
     b_day = b_date.day + (1 if utc_h >= 24 else (-1 if utc_h < 0 else 0))
@@ -252,20 +253,18 @@ def compute_astro(target_d):
                     })
     return n_pos, t_pos, n_wh, t_wh, aspects, n_asc
 
-st.markdown('<div class="top-brand">✦ ASTROLOGY · HOROSCOPE · 정밀 운세 ✦</div>', unsafe_allow_html=True)
+st.markdown('<div class="top-brand">✦ ASTROLOGY · HOROSCOPE · 정밀 분석 ✦</div>', unsafe_allow_html=True)
 
 # 5. 날짜 선택기
 today_dt = datetime.now()
 selected_date = st.date_input("📅 운세 조회 날짜", today_dt.date())
 
-# 한국어 요일 변환
 korean_weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 weekday_kr = korean_weekdays[selected_date.weekday()]
 date_display = f"{selected_date.strftime('%Y년 %m월 %d일')} {weekday_kr}"
 
 n_pos, t_pos, n_wh, t_wh, aspects, asc_d = compute_astro(selected_date)
 
-# 타이틀 렌더링
 st.markdown(f"""
 <div class="daily-header">
     <div class="daily-title">🌙 {date_display} 일일운세</div>
@@ -273,18 +272,18 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 탭 메뉴
-tab_daily, tab_weekly, tab_monthly, tab_yearly, tab_chart = st.tabs([
-    "📜 일일 리포트", "📅 주간 타이밍", "🌕 월간 리포트", "☀️ 연간 대운", "🔮 차트 검증"
+# 5대 메뉴 탭 구성
+tab_daily, tab_weekly, tab_returns, tab_yearly, tab_chart = st.tabs([
+    "📜 일일 리포트", "📅 주간 타이밍", "🔄 행성별 리턴(수성/금성/화성)", "☀️ 연간 대운", "🔮 차트 검증"
 ])
 
-# --- TAB 1: 일일 리포트 (HTML 태그 안전 렌더링) ---
+# --- TAB 1: 일일 리포트 ---
 with tab_daily:
     st.markdown(f"""
 <div class="report-card">
     <div style="font-size:13.5px; line-height:1.75; margin-bottom:12px;">
-        오늘 하늘에서는 사자자리 신월(New Moon)과 개기일식의 정밀 영향권이 지속되고 있습니다. NASA JPL 에페메리스 데이터 기준으로 천체 좌표가 정확히 일치합니다.<br><br>
-        네 <b>홀사인(Whole Sign) 기준 사자자리는 5하우스(연애·투자·창작·시험 영역)</b>를 직접 건드립니다. 일식 직후인 만큼 새 판을 크게 벌이기보다 이미 확보한 흐름을 선별하여 실속을 챙기는 전략이 유리합니다.
+        오늘 새벽 <b>02:36:44 KST(한국표준시)</b>에 사자자리 신월(New Moon)·개기일식의 정밀 합(0도) 영향권이 통과했습니다. 외부 NASA JPL 천체력 데이터 기준으로 일치합니다.<br><br>
+        네 <b>홀사인(Whole Sign) 기준 사자자리는 5하우스(연애·투자·창작·시험 영역)</b>를 직접 관장합니다. 일식 직후라 새 판을 크게 벌이기보다 이미 움직이는 흐름을 선별하여 실속을 챙기는 날로 보는 것이 맞습니다.
     </div>
     
     <div style="font-weight:800; font-size:13px; color:#7D5A75; margin:10px 0 6px 0;">📊 영역별 요약 평점</div>
@@ -321,7 +320,7 @@ with tab_daily:
 </div>
 """, unsafe_allow_html=True)
 
-    # 주식/금전운
+    # 주식·금전운
     st.markdown("""
 <div class="report-card">
     <div class="section-head stock-head">📈 주식 · 금전운</div>
@@ -340,7 +339,7 @@ with tab_daily:
 </div>
 """, unsafe_allow_html=True)
 
-    # 공부/시험운
+    # 공부·시험운
     st.markdown("""
 <div class="report-card">
     <div class="section-head study-head">📚 공부운 · 시험운 ★★★★☆</div>
@@ -357,7 +356,7 @@ with tab_daily:
 </div>
 """, unsafe_allow_html=True)
 
-    # 재회/연애운
+    # 재회·연애운
     st.markdown("""
 <div class="report-card">
     <div class="section-head love-head">💌 재회 · 연애운 ★★★★☆</div>
@@ -416,21 +415,36 @@ with tab_weekly:
 </div>
 """, unsafe_allow_html=True)
 
-# --- TAB 3: 월간 리포트 ---
-with tab_monthly:
+# --- TAB 3: 행성별 리턴(수성/금성/화성/루나) ---
+with tab_returns:
     st.markdown("""
 <div class="report-card">
-    <div class="section-head time-head">🌕 8월 천체 대전환 및 루나리턴 리포트</div>
-    <div style="font-size:13px; line-height:1.8;">
-        • <b>루나리턴(달의 출생위치 회귀):</b> 8월 13일 06:42 KST 황소자리 29°18' 발생.<br>
-        &nbsp;&nbsp;→ 이전 주기의 혼란을 정리하고, 실질적 자산과 안정적 관계를 구축하는 27.3일의 새 사이클이 개막합니다.<br><br>
-        • <b>8월 신월·일식 사이클:</b> 사자자리 5하우스 일식으로 인해 하반기 투자 원칙과 공부 루틴의 근본적인 재편이 요구됩니다.<br><br>
-        • <b>월간 재물 가이드:</b> 8월 11일~14일 구간에 집중적인 익절 분할 확정을 실행하는 것이 가장 유리합니다.
+    <div class="section-head study-head">☿ 수성리턴 (Mercury Return, 학업·시험·판단력 사이클)</div>
+    <div style="font-size:13px; line-height:1.75;">
+        • <b>현재 수성 리턴 주기:</b> 쌍둥이자리 수성 활성기<br>
+        • <b>공부·수험 영향:</b> 논리적 사고와 기출문제 구조화 효율이 극대화되는 기간입니다. 단순 암기보다 '왜 이 오답이 나왔는지' 원인을 규명하는 학습 방식이 최상의 점수를 만듭니다.<br>
+        • <b>매매 판단:</b> 장중 순간적인 감정 매매를 억제하고 수치와 원칙에 기반한 냉정한 분할 매매가 유리합니다.
+    </div>
+</div>
+
+<div class="report-card">
+    <div class="section-head love-head">♀ 금성리턴 (Venus Return, 인연·재회·자산 유입 사이클)</div>
+    <div style="font-size:13px; line-height:1.75;">
+        • <b>현재 금성 리턴 주기:</b> 게자리 5하우스(연애/창작/투자) 안착<br>
+        • <b>인연·연애 흐름:</b> 과거의 진솔한 감정선이 재조명되며, 가벼운 호기심보다는 정서적 안정감을 주는 사람과의 유대가 깊어집니다.<br>
+        • <b>재물 흐름:</b> 안정적인 현금성 자산과 배당 및 실현 수익이 차곡차곡 쌓이는 우호적인 사이클입니다.
+    </div>
+</div>
+
+<div class="report-card">
+    <div class="section-head stock-head">♂ 화성리턴 (Mars Return, 수험 끈기 & 실행 결단력)</div>
+    <div style="font-size:13px; line-height:1.75;">
+        • <b>수험 체력 관리:</b> 체력 고갈 및 번아웃을 방지하기 위해 주 3회 가벼운 유산소 운동을 병행할 때 학습 지구력이 2배 이상 유지됩니다.
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# --- TAB 4: 연간 대운 ---
+# --- TAB 4: 연간 대운 (솔라리턴) ---
 with tab_yearly:
     st.markdown("""
 <div class="report-card">
