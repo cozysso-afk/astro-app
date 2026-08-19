@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8edf7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="별빛의 운명">
+  <title>별빛의 운명</title>
+
+  <link rel="apple-touch-icon" href="./icon.PNG?v=42">
+  <link rel="icon" type="image/png" href="./icon.PNG?v=42">
+  <link rel="manifest" href="./manifest.webmanifest?v=42">
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#f8edf7; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif; }
+    .shell { position:fixed; inset:0; background:linear-gradient(135deg,#fff5f7,#f5f0fa 55%,#f0f7f7); }
+    iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#fff; }
+    .loading {
+      position:absolute; inset:0; display:grid; place-items:center; z-index:2;
+      color:#55485d; text-align:center; background:linear-gradient(135deg,#fff5f7,#f5f0fa 55%,#f0f7f7);
+      transition:opacity .25s ease;
+    }
+    .loading.hidden { opacity:0; pointer-events:none; }
+    .orb {
+      width:56px; height:56px; border-radius:50%; margin:0 auto 14px;
+      background:radial-gradient(circle at 35% 30%,#fff,#e2c9ff 36%,#a47dd3 70%,#6d4a92);
+      box-shadow:0 0 30px rgba(164,125,211,.38);
+    }
+    .title { font-weight:800; font-size:20px; }
+    .sub { margin-top:7px; color:#7b6f82; font-size:13px; }
+    .fallback {
+      position:fixed; left:12px; right:12px; bottom:calc(10px + env(safe-area-inset-bottom));
+      z-index:3; display:none; padding:10px 12px; border-radius:14px;
+      background:rgba(255,255,255,.94); box-shadow:0 5px 22px rgba(50,35,55,.14);
+      color:#5a4d62; font-size:12px; text-align:center;
+    }
+    .fallback a { color:#75589b; font-weight:800; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div id="loading" class="loading">
+      <div>
+        <div class="orb"></div>
+        <div class="title">별빛의 운명</div>
+        <div class="sub">정밀 운세를 불러오는 중…</div>
+      </div>
+    </div>
+
+    <iframe
+      id="app"
+      title="별빛의 운명"
+      src="https://astro-app-wmz23ohfmhmhrhrz2gg3kej.streamlit.app/?embed=true&embed_options=hide_loading_screen"
+      allow="clipboard-read; clipboard-write"
+      loading="eager"></iframe>
+
+    <div id="fallback" class="fallback">
+      화면이 뜨지 않으면 <a href="https://astro-app-wmz23ohfmhmhrhrz2gg3kej.streamlit.app/">Streamlit 앱 직접 열기</a>
+    </div>
+  </div>
+
+  <script>
+    const frame = document.getElementById('app');
+    const loading = document.getElementById('loading');
+    const fallback = document.getElementById('fallback');
+
+    frame.addEventListener('load', () => {
+      setTimeout(() => loading.classList.add('hidden'), 500);
+    });
+
+    setTimeout(() => {
+      loading.classList.add('hidden');
+      fallback.style.display = 'block';
+    }, 12000);
+  </script>
+</body>
+</html>
