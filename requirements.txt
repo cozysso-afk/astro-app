@@ -1,2 +1,5 @@
-streamlit
-skyfield
+streamlit>=1.35.0
+skyfield>=1.48
+scipy>=1.11.0
+numpy>=1.24.0
+pytz>=2024.1
