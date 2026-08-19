@@ -1,6 +1,8 @@
 import streamlit as st
 from datetime import datetime, date, time, timedelta
 import math
+import os
+import base64
 from skyfield.api import load
 
 # 1. 페이지 기본 설정
@@ -11,182 +13,191 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. 핑크 + 골드 + 라벤더 + 민트 천체 테마 풀 CSS ---
-st.markdown("""
+# 배경 이미지 자동 탐색 (대소문자 확장자 전부 지원)
+def get_bg_style():
+    candidates = ["bg.PNG", "bg.png", "BG.PNG", "BG.png", "bg.JPG", "bg.jpg"]
+    for fname in candidates:
+        if os.path.exists(fname):
+            with open(fname, "rb") as f:
+                data = base64.b64encode(f.read()).decode()
+                ext = fname.split('.')[-1].lower()
+                return f"url('data:image/{ext};base64,{data}')"
+    # 기본 핑크/골드 천체 일러스트
+    return "url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1200&auto=format&fit=crop')"
+
+bg_image_css = get_bg_style()
+
+# --- 2. 커스텀 CSS (핑크/골드/라벤더/민트 + 글래스모피즘) ---
+st.markdown(f"""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* 전체 배경: 천체 일러스트 배경 + 핑크/골드 블렌딩 */
-    .stApp {
-        background-color: #FDF2F7;
+    .stApp {{
+        background-color: #FAF2F7;
         background-image: 
-            linear-gradient(rgba(253, 242, 247, 0.84), rgba(247, 235, 247, 0.88)),
-            url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1200&auto=format&fit=crop');
+            linear-gradient(rgba(253, 244, 249, 0.86), rgba(247, 238, 248, 0.90)),
+            {bg_image_css};
         background-size: cover;
         background-position: center top;
         background-attachment: fixed;
         font-family: 'Pretendard', -apple-system, sans-serif;
-        color: #4A3545;
-    }
+        color: #3D2B3A;
+    }}
 
-    /* 상단 배너 */
-    .header-banner {
-        background: linear-gradient(135deg, #443766 0%, #2A234A 50%, #482F54 100%);
-        border: 2px solid #E8D3B9;
-        border-radius: 26px;
-        padding: 22px 18px;
+    .top-nav {{
         text-align: center;
-        color: #FFFFFF;
-        box-shadow: 0 12px 30px rgba(42, 35, 74, 0.35);
-        margin-bottom: 20px;
-    }
-    .banner-badge {
-        font-size: 12px;
-        letter-spacing: 3px;
-        color: #F5D77F;
+        padding: 10px 0 4px 0;
+        font-size: 12.5px;
         font-weight: 700;
-        margin-bottom: 5px;
-    }
-    .banner-title {
-        font-size: 25px;
-        font-weight: 800;
-        letter-spacing: 1px;
-        color: #FFFFFF;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-    .banner-sub {
-        font-size: 13px;
-        color: #E4DAF5;
-        margin-top: 5px;
-        letter-spacing: 1px;
-    }
+        letter-spacing: 2px;
+        color: #8C6A84;
+    }}
 
-    /* 리턴 차트 인포 카드 (솔라/루나/금성) */
-    .return-grid {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 18px;
-    }
-    .return-card {
-        background: rgba(255, 255, 255, 0.88);
-        border: 1.2px solid #E8D5BF;
-        border-radius: 18px;
-        padding: 12px;
-        flex: 1;
+    .daily-header {{
         text-align: center;
-        box-shadow: 0 4px 14px rgba(200, 170, 190, 0.12);
-    }
-    .return-title { font-size: 11.5px; font-weight: 700; color: #8A657E; }
-    .return-val { font-size: 13px; font-weight: 800; color: #C06B8F; margin-top: 3px; }
-    .return-desc { font-size: 10.5px; color: #92788D; margin-top: 2px; }
+        margin: 8px 0 16px 0;
+    }}
+    .daily-title {{
+        font-size: 22px;
+        font-weight: 800;
+        color: #4A3345;
+        letter-spacing: -0.5px;
+    }}
+    .daily-stars {{
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #966A86;
+        margin-top: 5px;
+    }}
 
-    /* 메인 인포그래픽 카드 */
-    .rank-card {
+    .report-card {{
         background: rgba(255, 255, 255, 0.92);
         border: 1.5px solid #EADBCE;
-        border-radius: 24px;
+        border-radius: 22px;
         padding: 18px 16px;
         margin-bottom: 16px;
-        box-shadow: 0 8px 24px rgba(200, 170, 190, 0.18);
-        backdrop-filter: blur(12px);
-    }
-    .rank-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        box-shadow: 0 8px 24px rgba(195, 160, 185, 0.16);
+        backdrop-filter: blur(14px);
+        line-height: 1.7;
+        font-size: 13.5px;
+        color: #42303E;
+    }}
+
+    .section-title {{
         font-size: 16px;
         font-weight: 800;
         margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 1.5px solid #F2E4DE;
         padding-bottom: 8px;
-        border-bottom: 1.5px solid #F3E5DD;
-    }
-    .rank-stock-title { color: #1E6B52; }
-    .rank-love-title { color: #C04A75; }
-    .rank-study-title { color: #2B5A84; }
+    }}
+    .title-stock {{ color: #1E6B52; }}
+    .title-study {{ color: #2B5A84; }}
+    .title-love {{ color: #B3486F; }}
+    .title-time {{ color: #6E497A; }}
 
-    .rank-row {
+    .summary-table {{
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: 13px;
+    }}
+    .summary-table th {{
+        text-align: left;
+        padding: 8px 6px;
+        color: #8A6D83;
+        font-weight: 700;
+        border-bottom: 1.5px solid #EEDCD3;
+        font-size: 12px;
+    }}
+    .summary-table td {{
+        padding: 9px 6px;
+        border-bottom: 1px dashed #EFE3EC;
+        vertical-align: middle;
+    }}
+
+    .time-badge-pink {{
+        background: #FDF0F6;
+        border: 1px solid #F6D3E3;
+        color: #B84A74;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 8px;
+        display: inline-block;
+    }}
+    .time-badge-green {{
+        background: #E8F7F0;
+        border: 1px solid #C8EEDB;
+        color: #1D7A5A;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 8px;
+        display: inline-block;
+    }}
+    .time-badge-blue {{
+        background: #EBF4FC;
+        border: 1px solid #CCE4F8;
+        color: #2B6CB0;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 8px;
+        display: inline-block;
+    }}
+
+    .direct-advice {{
+        background: linear-gradient(135deg, #FFF7FA 0%, #F5EEFB 100%);
+        border: 1.5px dashed #D9BFD4;
+        border-radius: 16px;
+        padding: 15px;
+        margin: 14px 0 6px 0;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #5A3F55;
+        line-height: 1.65;
+    }}
+
+    .rank-row {{
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 10px 4px;
         border-bottom: 1px dashed #EFE3ED;
-    }
-    .rank-num-1 { font-size: 22px; font-weight: 900; color: #D4AF37; min-width: 38px; }
-    .rank-num-2 { font-size: 22px; font-weight: 900; color: #9EA5AB; min-width: 38px; }
-    .rank-num-3 { font-size: 22px; font-weight: 900; color: #CD7F32; min-width: 38px; }
-
-    .rank-time { font-size: 13.5px; font-weight: 700; color: #493345; }
-    .rank-score { font-size: 18px; font-weight: 800; padding: 2px 8px; border-radius: 10px; }
-    .score-green { color: #1D7A5A; background: #E8F7F0; border: 1px solid #C8EEDB; }
-    .score-pink { color: #C94A77; background: #FDEBF2; border: 1px solid #F8D0E0; }
-    .score-blue { color: #2B6CB0; background: #EBF4FC; border: 1px solid #CCE4F8; }
-
-    .rank-desc { font-size: 12px; color: #6C5568; text-align: right; max-width: 46%; line-height: 1.35; }
-
-    /* 타임라인 분할 박스 */
-    .timeline-box {
-        background: rgba(255, 248, 252, 0.95);
-        border: 1px solid #F0D5E5;
-        border-radius: 18px;
-        padding: 15px;
-        margin: 10px 0;
-        font-size: 12.5px;
-        line-height: 1.7;
-        color: #553E50;
-    }
-
-    /* 요일별 카드 */
-    .day-card {
+    }}
+    .day-card {{
         background: rgba(255, 255, 255, 0.9);
         border: 1.2px solid #EADBCE;
-        border-radius: 16px;
-        padding: 12px 8px;
+        border-radius: 14px;
+        padding: 10px 6px;
         text-align: center;
         margin-bottom: 8px;
-    }
-    .day-name { font-size: 12.5px; font-weight: 800; color: #523B4D; }
-    .day-status { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin: 4px 0; display: inline-block; }
+    }}
 
-    /* 칩 */
-    .chip-gold {
-        background: rgba(255, 250, 240, 0.95);
-        border: 1.2px solid #E8D6BC;
-        border-radius: 16px;
-        padding: 10px;
-        text-align: center;
-    }
-    .chip-mint {
-        background: rgba(235, 250, 247, 0.95);
-        border: 1.2px solid #BFE7DF;
-        border-radius: 16px;
-        padding: 10px;
-        text-align: center;
-    }
-
-    /* 탭 디자인 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 4px;
         justify-content: center;
         background: rgba(255, 255, 255, 0.65);
-        padding: 6px;
-        border-radius: 20px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 14px;
-        padding: 6px 14px;
-        font-size: 13px;
+        padding: 5px;
+        border-radius: 18px;
+        margin-bottom: 14px;
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 12px;
+        padding: 6px 12px;
+        font-size: 12.5px;
         color: #7D6076;
         border: none;
-    }
-    .stTabs [aria-selected="true"] {
+    }}
+    .stTabs [aria-selected="true"] {{
         background: linear-gradient(135deg, #ECCFE0 0%, #E2DCF7 100%) !important;
         color: #4A2B42 !important;
         font-weight: 800 !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
-# 3. NASA JPL 천문 계산 엔진 (Skyfield)
+# 3. NASA JPL 계산 엔진
 @st.cache_resource
 def get_engine():
     ts = load.timescale()
@@ -202,74 +213,67 @@ planets = {
     'Pluto': eph['pluto barycenter']
 }
 
-# --- 4. 내 출생 정보 (Natal Chart) 패널 ---
-with st.expander("🔮 내 출생 정보 (Natal Chart) 및 하우스 설정", expanded=False):
+# --- 4. 출생 차트 (Natal Chart) 정보 설정 ---
+with st.expander("🔮 내 출생 정보 (Natal Chart, 탄생 천궁도) & 하우스 설정", expanded=False):
     c1, c2 = st.columns(2)
     with c1:
         b_date = st.date_input("생년월일", date(1998, 5, 20))
         b_time = st.time_input("출생 시간", time(9, 30))
     with c2:
         city_coords = {
-            "서울": (37.56, 126.97),
-            "부산": (35.18, 129.07),
-            "대구": (35.87, 128.60),
-            "광주": (35.16, 126.85),
-            "대전": (36.35, 127.38)
+            "서울": (37.56, 126.97), "부산": (35.18, 129.07),
+            "대구": (35.87, 128.60), "광주": (35.16, 126.85), "대전": (36.35, 127.38)
         }
         city = st.selectbox("출생 도시", list(city_coords.keys()))
-        house_system_pref = st.radio("하우스 분석 모드", ["통합 (홀사인 + 플라시두스)", "홀사인 우선", "플라시두스 우선"], horizontal=True)
+        h_system = st.selectbox("하우스 체계", ["통합 교차 판정", "홀사인 (Whole Sign)", "플라시두스 (Placidus)"])
 
 lat, lon = city_coords[city]
 
-# --- 5. 천문학적 ASC, MC 및 듀얼 하우스 연산 ---
-def get_asc_mc(t_obj, lat, lon):
+# ASC 계산 함수
+def get_ascendant(t_obj, lat, lon):
     gst = t_obj.gast
     lst = (gst * 15.0 + lon) % 360.0
     eps = math.radians(23.4392911)
     ramc = math.radians(lst)
     phi = math.radians(lat)
-    
-    # MC
-    mc_rad = math.atan2(math.tan(ramc), math.cos(eps))
-    mc_deg = (math.degrees(mc_rad) + 360.0) % 360.0
-    if abs(math.sin(ramc)) > 1e-5 and math.sin(mc_rad) * math.sin(ramc) < 0:
-        mc_deg = (mc_deg + 180.0) % 360.0
-        
-    # ASC
     y = -math.cos(ramc)
     x = math.sin(ramc) * math.cos(eps) + math.tan(phi) * math.sin(eps)
     asc_deg = (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
-    
-    # Placidus 대략치 커스프 분할
-    placidus_cusps = [(asc_deg + i * 30.0) % 360.0 for i in range(12)]
-    return asc_deg, mc_deg, placidus_cusps
+    return asc_deg
 
-# 종합 차트 계산
-def calculate_master_chart(target_dt, b_d, b_t, lat, lon):
-    utc_h = b_t.hour - 9
-    b_day = b_d.day + (1 if utc_h >= 24 else (-1 if utc_h < 0 else 0))
-    t_natal = ts.utc(b_d.year, b_d.month, max(1, b_day), utc_h % 24, b_t.minute)
-    t_transit = ts.utc(target_dt.year, target_dt.month, target_dt.day, 3, 0)
+# 종합 차트 계산 함수
+def compute_astro(target_d, target_t=time(12, 0)):
+    utc_h = b_time.hour - 9
+    b_day = b_date.day + (1 if utc_h >= 24 else (-1 if utc_h < 0 else 0))
+    t_natal = ts.utc(b_date.year, b_date.month, max(1, b_day), utc_h % 24, b_time.minute)
     
-    n_asc, n_mc, n_plac_cusps = get_asc_mc(t_natal, lat, lon)
-    t_asc, t_mc, _ = get_asc_mc(t_transit, lat, lon)
+    t_hour_utc = target_t.hour - 9
+    t_transit = ts.utc(target_d.year, target_d.month, target_d.day, t_hour_utc % 24, target_t.minute)
+    
+    n_asc = get_ascendant(t_natal, lat, lon)
+    t_asc = get_ascendant(t_transit, lat, lon)
     
     n_pos, t_pos = {}, {}
     for name, p in planets.items():
         n_pos[name] = earth.at(t_natal).observe(p).ecliptic_latlon()[1].degrees
         t_pos[name] = earth.at(t_transit).observe(p).ecliptic_latlon()[1].degrees
         
-    # 홀사인 하우스 번호 계산
     asc_sign = int(n_asc // 30)
     def whole_house(deg):
         return ((int(deg // 30) - asc_sign) % 12) + 1
         
-    n_whole_h = {k: whole_house(v) for k, v in n_pos.items()}
-    t_whole_h = {k: whole_house(v) for k, v in t_pos.items()}
+    n_wh = {k: whole_house(v) for k, v in n_pos.items()}
+    t_wh = {k: whole_house(v) for k, v in t_pos.items()}
 
-    # 애스펙트 추출
+    aspect_rules = [
+        (0, "합(Conjunction, 0도)", 1.0), 
+        (60, "육합(Sextile, 60도)", 0.6), 
+        (90, "사각(Square, 90도)", -0.9), 
+        (120, "삼합(Trine, 120도)", 0.9), 
+        (180, "충(Opposition, 180도)", -1.0)
+    ]
+    
     aspects = []
-    aspect_rules = [(0, "합(0°)", 1.0), (60, "섹스타일(60°)", 0.6), (90, "스퀘어(90°)", -0.9), (120, "트라인(120°)", 0.9), (180, "오포지션(180°)", -1.0)]
     for t_name, t_deg in t_pos.items():
         for n_name, n_deg in n_pos.items():
             diff = abs(t_deg - n_deg) % 360
@@ -280,192 +284,251 @@ def calculate_master_chart(target_dt, b_d, b_t, lat, lon):
                     aspects.append({
                         "transit": t_name, "natal": n_name,
                         "aspect": asp_name, "orb": round(orb, 2), "weight": weight,
-                        "t_h": t_whole_h[t_name], "n_h": n_whole_h[n_name]
+                        "t_h": t_wh[t_name], "n_h": n_wh[n_name]
                     })
-    return n_pos, t_pos, n_whole_h, t_whole_h, aspects, n_asc, n_mc
+    return n_pos, t_pos, n_wh, t_wh, aspects, n_asc
 
-today = datetime.now()
-n_pos, t_pos, n_wh, t_wh, aspects, asc_d, mc_d = calculate_master_chart(today, b_date, b_time, lat, lon)
+# 상단 내비게이션
+st.markdown('<div class="top-nav">✦ ASTROLOGY · HOROSCOPE · 다현 맞춤 ✦</div>', unsafe_allow_html=True)
 
-# --- 6. 헤더 및 리턴 차트 인포 렌더링 ---
+# 5. 날짜 선택기
+today_dt = datetime.now()
+selected_date = st.date_input("📅 운세 조회 날짜 선택", today_dt.date())
+date_display = selected_date.strftime("%Y년 %m월 %d일 %A")
+
+n_pos, t_pos, n_wh, t_wh, aspects, asc_d = compute_astro(selected_date)
+
 st.markdown(f"""
-<div class="header-banner">
-    <div class="banner-badge">✧ 다현 맞춤 듀얼 하우스 & 리턴 시스템 ✧</div>
-    <div class="banner-title">{today.strftime('%Y.%m.%d')} 정밀 천체 타이밍</div>
-    <div class="banner-sub">✦ 홀사인(Whole Sign) · 플라시두스(Placidus) 듀얼 엔진 ✦</div>
+<div class="daily-header">
+    <div class="daily-title">🌙 {date_display} 일일운세</div>
+    <div class="daily-stars">종합운 ★★★★☆ · 안정성 ★★★☆☆</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 솔라/루나/금성 리턴 3대 지표 박스
-st.markdown("""
-<div class="return-grid">
-    <div class="return-card">
-        <div class="return-title">☀️ 솔라리턴 (Solar Return)</div>
-        <div class="return-val">사자자리 SR ASC</div>
-        <div class="return-desc">1년 핵심 테마: 주도권·자신감</div>
-    </div>
-    <div class="return-card">
-        <div class="return-title">🌙 루나리턴 (Lunar Return)</div>
-        <div class="return-val">황소 29°18'</div>
-        <div class="return-desc">월간 테마: 현실 자산 실현</div>
-    </div>
-    <div class="return-card">
-        <div class="return-title">💖 금성리턴 (Venus Return)</div>
-        <div class="return-val">게자리 5H</div>
-        <div class="return-desc">연애/인연: 진솔한 정서 교류</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# 5개 대메뉴 탭 구성
+tab_daily, tab_weekly, tab_monthly, tab_yearly, tab_chart = st.tabs([
+    "📜 일일 리포트", "📅 주간 타이밍", "🌕 월간 리포트", "☀️ 연간 대운", "🔮 차트 검증"
+])
 
-# 7. 상단 네비게이션 탭 (일일 타이밍 / 주간 TOP 3 / 학업·시험 / 듀얼 차트)
-tab_daily, tab_weekly, tab_study, tab_chart = st.tabs(["📊 오늘의 정밀 타이밍", "🏆 주간 골든타임 TOP 3", "📚 학업/시험 집중운", "🔮 듀얼 차트 검증"])
-
-# --- TAB 1: 오늘의 시간대별 정밀 타이밍 ---
+# --- TAB 1: 일일 정밀 리포트 (GPT식 본문 구조) ---
 with tab_daily:
-    st.markdown("#### 📈 한국 정규장(09:00~15:30) 주식 매매 타임라인")
     st.markdown("""
-    <div class="rank-card">
-        <div class="rank-header rank-stock-title">
-            <span>📊</span> 장중 실시간 천체 트리거 & 대응 전략
+    <div class="report-card">
+        <div style="font-size:13.5px; line-height:1.75;">
+            오늘 새벽 <b>02:36:44 KST(한국표준시)</b>에 사자자리 신월(New Moon)·개기일식의 정밀 합(0도)이 통과했습니다. 외부 NASA JPL 천문 자료에서도 정확히 교차 확인됩니다.<br><br>
+            네 <b>홀사인(Whole Sign) 기준 사자자리는 5하우스(연애·투자·창작·시험 영역)</b>를 직접 관장합니다. 다만 일식 직후라 새 판을 크게 벌이기보다 이미 움직이는 흐름을 선별하여 실속을 챙기는 날로 보는 것이 맞습니다.
         </div>
-        <div class="timeline-box">
-            <b>• 09:00 ~ 10:30</b> — <b>시초가 흐름 탐색기:</b> 추격 매수 엄금. 지지 라인 및 호가창 수급 체크.<br>
-            <b>• 11:00 ~ 12:30</b> — <b>포지션 점검:</b> 급등락 구간 진정, 보유 비중 안전 마진 확보.<br>
-            <b>• 13:30 ~ 14:20 ⚠️</b> — <b>Moon-Pluto 스퀘어 접근:</b> "본전/최고가 집착" 및 뇌동매매 주의 구간.<br>
-            <b>• 14:45 ~ 15:25 ⭐</b> — <b>수익실현 최고 골든타임 (신호 강도 82/100):</b> Moon-Mars 트라인 순조화로 분할 익절 최적기!
+        
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>영역</th>
+                    <th>별점</th>
+                    <th>결론 & 핵심 전략</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><b>💰 주식 수익실현운</b></td>
+                    <td style="color:#BF6C90;">★★★☆☆</td>
+                    <td>수익은 챙기되 공격적 확대 금지</td>
+                </tr>
+                <tr>
+                    <td><b>📈 신규진입 안정성</b></td>
+                    <td style="color:#BF6C90;">★★☆☆☆</td>
+                    <td>추격보다 관망 및 지지선 확인</td>
+                </tr>
+                <tr>
+                    <td><b>💵 일반 금전운</b></td>
+                    <td style="color:#BF6C90;">★★★☆☆</td>
+                    <td>지출·욕심 관리 필요</td>
+                </tr>
+                <tr>
+                    <td><b>📚 학업 / 시험운</b></td>
+                    <td style="color:#2B6CB0;">★★★★☆</td>
+                    <td>이해 ➔ 정리 ➔ 문제풀이 최고 효율</td>
+                </tr>
+                <tr>
+                    <td><b>💌 재회운</b></td>
+                    <td style="color:#C94A77;">★★★☆☆</td>
+                    <td>밤으로 갈수록 관계축 상승</td>
+                </tr>
+                <tr>
+                    <td><b>💖 연애운</b></td>
+                    <td style="color:#C94A77;">★★★★☆</td>
+                    <td>주 후반 강세의 시작점</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 주식·금전운
+    st.markdown("""
+    <div class="report-card">
+        <div class="section-title title-stock">📈 주식 · 금전운</div>
+        <div style="margin-bottom:10px;">
+            대주주님, 오늘은 수익실현 자체는 괜찮지만 <b>신규 공격 진입에는 높은 점수를 주기 어렵습니다.</b> 5하우스 일식 직후라 투기 욕구가 커지는 것과 실제 판단력이 좋아지는 것을 철저히 구분해야 합니다.
+        </div>
+        <div style="background:#F7FBF9; border-left:3px solid #1E6B52; padding:12px; border-radius:0 12px 12px 0; margin-bottom:10px;">
+            <span class="time-badge-green">09:20 ~ 11:20 KST</span> <b>수익실현 최우선 구간 · 점성술 신호 강도 64/100</b><br>
+            이미 수익권에 들어온 종목은 분할확정이 낫습니다.<br>
+            <b>• 11:20 ~ 13:30:</b> 관망 및 보유 비중 재평가 구간.<br>
+            <b>• 14:00 ~ 15:30:</b> 오전 수익을 다시 시장에 집어넣는 뇌동매매를 특히 조심하세요.
+        </div>
+        <div style="font-size:12.5px; color:#6B5364;">
+            💡 <i>오늘은 "좋아 보이니까 하나 더"가 제일 위험한 행동입니다. 실제 차트·거래량·수급이 나쁘면 운세보다 시장을 우선하세요.</i>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### 💌 실제 연락 & 관계 진전 시간대")
+    # 공부운 / 시험운
     st.markdown("""
-    <div class="rank-card">
-        <div class="rank-header rank-love-title">
-            <span>💖</span> 연락 / 답장 추천 시간대
+    <div class="report-card">
+        <div class="section-title title-study">📚 공부운 · 시험운 ★★★★☆</div>
+        <div style="margin-bottom:10px;">
+            오늘은 <b>이해 ➔ 정리 ➔ 바로 문제풀이</b> 순서가 제일 잘 맞습니다.
         </div>
-        <div class="timeline-box">
-            <b>• 14:00 ~ 16:30 ⭐</b> — <b>실제 연락 성사율 최고 (81%):</b> 달 → 금성 순조화 및 7하우스 관계축 활성.<br>
-            <b>• 20:30 ~ 22:30</b> — <b>온화한 대화 성사 흐름 (78%):</b> 감정적 부담 없는 일상 대화 길함.<br>
-            <b>• 주의:</b> 자정 직전 감정이 예민해질 수 있으니 늦은 밤 충동적 장문 카톡은 자제하세요.
+        <div style="background:#F6FAFC; border-left:3px solid #2B5A84; padding:12px; border-radius:0 12px 12px 0; margin-bottom:10px;">
+            <span class="time-badge-blue">베스트 집중 시간대</span> <b>10:00 ~ 12:30 / 19:00 ~ 21:00</b><br>
+            반대로 <b>14:30 ~ 16:30</b>은 집중이 흐트러지기 쉬워서 어려운 새 진도보다는 가벼운 복습이 낫습니다.
+        </div>
+        <div style="font-size:12.5px; color:#6B5364;">
+            ⚠️ <i>특히 오늘 공부를 주식 때문에 통째로 밀면 안 됩니다. 오전 장 보고 정리했으면 미련 없이 공부로 넘어가세요.</i>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 럭키 아이템/컬러
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown('<div class="chip-gold"><span style="font-size:11px; color:#8C7286; font-weight:700;">✦ 럭키 아이템</span><br><b style="color:#5C4356;">진주 · 크리스탈</b></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="chip-mint"><span style="font-size:11px; color:#5D8C82; font-weight:700;">✦ 럭키 컬러</span><br><b style="color:#3C635B;">바다품 민트 & 로즈</b></div>', unsafe_allow_html=True)
+    # 재회 · 연애운
+    st.markdown("""
+    <div class="report-card">
+        <div class="section-title title-love">💌 재회 · 연애운 ★★★★☆</div>
+        <div style="margin-bottom:10px;">
+            여긴 어제보다 확실히 올라갑니다.
+        </div>
+        <div style="font-size:13px; line-height:1.8; margin-bottom:12px;">
+            • <b>상대가 생각함:</b> ★★★★☆<br>
+            • <b>SNS·온라인 확인:</b> ★★★★☆<br>
+            • <b>직접 메시지·전화·DM:</b> ★★★★☆<br>
+            • <b>실제 만남:</b> ★★☆☆☆<br>
+            • <b>관계 재개:</b> ★★★☆☆
+        </div>
+        <div style="background:#FDF6F9; border-left:3px solid #B3486F; padding:12px; border-radius:0 12px 12px 0; margin-bottom:10px;">
+            <span class="time-badge-pink">직접 연락운 최고</span> <b>20:30 ~ 23:30 KST · 신호 강도 72/100</b><br>
+            <b>핵심은 오늘 밤입니다.</b> 트랜짓(Transit, 현재 행성) 금성(Venus)이 <b>8월 14일 01:25 KST에 2026 솔라리턴 상승점(SR ASC, 천칭 6°49')과 정확히 합(0도)</b>하기 때문에, 13일 밤은 그 정합점으로 들어가는 접근 구간입니다. 단순히 "상대가 생각한다"보다 관계가 실제 행동이나 접촉으로 표면화되는 쪽을 어제보다 높게 봅니다.<br><br>
+            <b>먼저 연락? ➔ 오늘도 굳이 먼저 움직이지 않는 쪽.</b> 지금은 네가 움직여서 결과를 만드는 것보다 상대 쪽 행동이 있는지를 보는 게 더 유용합니다.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- TAB 2: 주간 골든타임 TOP 3 ---
+    # 시간대별 흐름 및 직언
+    st.markdown("""
+    <div class="report-card">
+        <div class="section-title title-time">⏰ 시간대별 종합 흐름</div>
+        <div style="font-size:13px; line-height:1.8;">
+            <b>• 00:00 ~ 03:30:</b> 신월·일식 정확합 통과. 감정이나 생각이 크게 움직일 수 있지만 즉시 결론내릴 시간은 아님.<br>
+            <b>• 09:00 ~ 11:20:</b> 금전 판단·수익 정리에 가장 실용적인 골든타임.<br>
+            <b>• 11:20 ~ 14:30:</b> 공부·구조화 정리 좋음.<br>
+            <b>• 14:30 ~ 16:30:</b> 집중력과 판단 흔들림 주의 구간.<br>
+            <b>• 19:00 ~ 21:00:</b> 공부 집중도 다시 최상위 상승.<br>
+            <b>• 20:30 ~ 23:30:</b> 💖 관계 및 직접 연락운 오늘 최고점.
+        </div>
+        <div class="direct-advice">
+            <b>✦ 오늘의 직언:</b><br>
+            오늘은 새로 벌이는 날이 아니라, 돈도 관계도 공부도 <b>‘진짜 좋은 것만 남기는 날’</b>이야.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- TAB 2: 주간 타이밍 TOP 3 ---
 with tab_weekly:
     st.markdown("#### 🏆 이번 주 분야별 TOP 3 골든타임")
-    col_s, col_l = st.columns(2)
-    
-    with col_s:
+    c_s, c_l = st.columns(2)
+    with c_s:
         st.markdown("""
-        <div class="rank-card">
-            <div class="rank-header rank-stock-title"><span>📈</span> 주식 수익실현 TOP 3</div>
-            <div class="rank-row">
-                <div class="rank-num-1">🥇 1위</div>
-                <div><div class="rank-time">8/11 (화) 10:50~12:20</div><div class="rank-desc">금성-토성 트라인+목성 연계</div></div>
-                <div class="rank-score score-green">82%</div>
-            </div>
-            <div class="rank-row">
-                <div class="rank-num-2">🥈 2위</div>
-                <div><div class="rank-time">8/14 (금) 13:00~14:30</div><div class="rank-desc">금성-화성 순조화+달 안정</div></div>
-                <div class="rank-score score-green">76%</div>
-            </div>
-            <div class="rank-row">
-                <div class="rank-num-3">🥉 3위</div>
-                <div><div class="rank-time">8/12 (수) 11:40~13:10</div><div class="rank-desc">수성-목성 합 정합 구간</div></div>
-                <div class="rank-score score-green">70%</div>
-            </div>
+        <div class="report-card" style="padding:14px;">
+            <div class="section-title title-stock" style="font-size:14.5px;">📈 주식 수익실현 TOP 3</div>
+            <div class="rank-row"><div><b>🥇 1위: 8/11 (화) 10:50~12:20</b><br><span style="font-size:11px; color:#6B5364;">금성-토성 삼합 + 목성 연계</span></div><span class="time-badge-green">82%</span></div>
+            <div class="rank-row"><div><b>🥈 2위: 8/14 (금) 13:00~14:30</b><br><span style="font-size:11px; color:#6B5364;">금성-화성 조화 + 달 안정권</span></div><span class="time-badge-green">76%</span></div>
+            <div class="rank-row"><div><b>🥉 3위: 8/12 (수) 11:40~13:10</b><br><span style="font-size:11px; color:#6B5364;">수성-목성 합 정합 구간</span></div><span class="time-badge-green">70%</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c_l:
+        st.markdown("""
+        <div class="report-card" style="padding:14px;">
+            <div class="section-title title-love" style="font-size:14.5px;">💌 실제 연락 가능성 TOP 3</div>
+            <div class="rank-row"><div><b>🥇 1위: 8/16 (일) 11:30~16:30</b><br><span style="font-size:11px; color:#6B5364;">달 ➔ SR ASC ➔ 버텍스 연계</span></div><span class="time-badge-pink">81%</span></div>
+            <div class="rank-row"><div><b>🥈 2위: 8/13 (목) 20:30~22:30</b><br><span style="font-size:11px; color:#6B5364;">달-금성 순조화 + 관계축 활성</span></div><span class="time-badge-pink">78%</span></div>
+            <div class="rank-row"><div><b>🥉 3위: 8/11 (화) 19:00~21:00</b><br><span style="font-size:11px; color:#6B5364;">가벼운 안부/답장 유력</span></div><span class="time-badge-pink">74%</span></div>
         </div>
         """, unsafe_allow_html=True)
 
-    with col_l:
-        st.markdown("""
-        <div class="rank-card">
-            <div class="rank-header rank-love-title"><span>💌</span> 실제 연락 가능성 TOP 3</div>
-            <div class="rank-row">
-                <div class="rank-num-1">🥇 1위</div>
-                <div><div class="rank-time">8/16 (일) 11:30~16:30</div><div class="rank-desc">달→SR ASC→Vertex 연계</div></div>
-                <div class="rank-score score-pink">81%</div>
-            </div>
-            <div class="rank-row">
-                <div class="rank-num-2">🥈 2위</div>
-                <div><div class="rank-time">8/13 (목) 20:30~22:30</div><div class="rank-desc">달-금성 조화+관계축 활성</div></div>
-                <div class="rank-score score-pink">78%</div>
-            </div>
-            <div class="rank-row">
-                <div class="rank-num-3">🥉 3위</div>
-                <div><div class="rank-time">8/11 (화) 19:00~21:00</div><div class="rank-desc">가벼운 안부/답장 유력</div></div>
-                <div class="rank-score score-pink">74%</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("#### 🗓️ 이번 주 요일별 핵심 포인트")
-    week_days = [
+    st.markdown("#### 🗓️ 이번 주 요일별 핵심 흐름")
+    days_info = [
         ("8/10 (월)", "점검 & 정리", "#F2E6ED", "⭐⭐⭐☆☆", "포지션 점검, 무리한 결정 금지"),
-        ("8/11 (화)", "기회 포착", "#E6F5ED", "⭐⭐⭐⭐⭐", "수익실현 1순위, 적극적 소통"),
+        ("8/11 (화)", "기회 포착", "#E6F5ED", "⭐⭐⭐⭐⭐", "수익실현 1순위, 적극 소통"),
         ("8/12 (수)", "변동성 주의", "#FDEAEA", "⭐⭐☆☆☆", "일식 영향권, 추격 매수 금지"),
         ("8/13 (목)", "연락 & 결정", "#ECE9F8", "⭐⭐⭐⭐☆", "연락 2순위, 관계 진전 유리"),
         ("8/14 (금)", "성과 & 수익", "#E6F5ED", "⭐⭐⭐⭐⭐", "수익실현 2순위, 실속 마무리"),
         ("8/15 (토)", "변동성 관리", "#F2E6ED", "⭐⭐⭐☆☆", "감정/지출 조절, 충분한 휴식"),
         ("8/16 (일)", "연락 가능성 최고", "#FDEBF2", "⭐⭐⭐⭐☆", "연락 1순위, 만남 성사 유리")
     ]
-    cols = st.columns(len(week_days))
-    for idx, (d_name, d_status, bg, star, tip) in enumerate(week_days):
-        with cols[idx]:
+    cols = st.columns(len(days_info))
+    for i, (d_name, d_status, bg, star, tip) in enumerate(days_info):
+        with cols[i]:
             st.markdown(f"""
             <div class="day-card">
-                <div class="day-name">{d_name}</div>
-                <div class="day-status" style="background:{bg};">{d_status}</div>
-                <div style="font-size:10px; color:#BF6C90;">{star}</div>
-                <div style="font-size:10px; color:#7D6878; margin-top:4px;">{tip}</div>
+                <div style="font-size:12px; font-weight:800; color:#523B4D;">{d_name}</div>
+                <div style="font-size:10.5px; font-weight:700; background:{bg}; padding:2px 4px; border-radius:6px; margin:3px 0;">{d_status}</div>
+                <div style="font-size:9.5px; color:#BF6C90;">{star}</div>
+                <div style="font-size:9.5px; color:#7D6878; margin-top:3px;">{tip}</div>
             </div>
             """, unsafe_allow_html=True)
 
-# --- TAB 3: 학업 & 시험운 ---
-with tab_study:
-    st.markdown("#### 📚 공무원 시험 / 학업 정밀 집중 가이드")
+# --- TAB 3: 월간 리포트 (루나리턴 & 월간 테마) ---
+with tab_monthly:
     st.markdown("""
-    <div class="rank-card">
-        <div class="rank-header rank-study-title">
-            <span>📖</span> 오늘의 추천 모드: <b>기출 회독 + 핵심 정리</b>
-        </div>
-        <div class="timeline-box">
-            <b>• Mercury-Saturn Trine (수성-토성 삼합):</b> 사고를 논리적으로 구조화하고 장기 암기 효율이 매우 높은 날입니다.<br>
-            <b>• 최고 집중 시간대:</b> <b>09:20 ~ 11:50</b> / <b>19:00 ~ 21:00</b><br>
-            <b>• 실전 전략:</b> 새로운 개념 확장보다는 오답 정리와 문제풀이 구조화에 집중할 때 점수 상승 효율이 극대화됩니다.
+    <div class="report-card">
+        <div class="section-title title-time">🌕 8월 천체 대전환 및 루나리턴 리포트</div>
+        <div style="font-size:13px; line-height:1.8;">
+            • <b>루나리턴(Lunar Return, 달의 출생위치 회귀):</b> 8월 13일 06:42 KST 황소자리 29°18' 발생.<br>
+            &nbsp;&nbsp;→ 이전 주기의 혼란을 정리하고, 실질적 자산과 안정적 관계를 구축하는 27.3일의 새 사이클이 개막합니다.<br><br>
+            • <b>8월 신월·일식 사이클:</b> 사자자리 5하우스 일식으로 인해 하반기 투자 원칙과 공부 루틴의 근본적인 재편이 요구됩니다.<br><br>
+            • <b>월간 재물 가이드:</b> 월초 과열을 식히고 8월 11일~14일 구간에 집중적인 익절 분할 확정을 실행하는 것이 가장 유리합니다.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- TAB 4: 듀얼 차트 검증 로그 ---
+# --- TAB 4: 연간 대운 (솔라리턴 & 장기 사이클) ---
+with tab_yearly:
+    st.markdown("""
+    <div class="report-card">
+        <div class="section-title title-love">☀️ 2026-2027 솔라리턴(Solar Return) 연간 대운 분석</div>
+        <div style="font-size:13px; line-height:1.8;">
+            • <b>솔라리턴 상승점(SR ASC):</b> <b>천칭자리 6°49'</b><br>
+            &nbsp;&nbsp;→ 1년 전체를 관통하는 핵심 화두는 <b>‘관계의 주도권 회복’</b>과 <b>‘균형 잡힌 자산 배분’</b>입니다.<br><br>
+            • <b>금성리턴(Venus Return)과의 시너지:</b> 솔라리턴 차트의 1하우스와 5하우스가 금성의 길각과 연계되어, 인연운과 창의적 성취가 1년 중 최고조에 달하는 기반이 형성됩니다.<br><br>
+            • <b>장기 시험/학업 가이드:</b> 토성의 든든한 지지를 받는 해이므로, 벼락치기보다는 하루 일정 분량을 끝까지 밀고 나가는 루틴이 최종 합격을 만듭니다.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- TAB 5: 차트 검증 (홀사인 vs 플라시두스 교차) ---
 with tab_chart:
-    st.markdown("#### 🔮 홀사인(Whole Sign) & 플라시두스(Placidus) 교차 검증")
-    st.caption(f"• 상승점(ASC): `{asc_d:.2f}°` | 중천점(MC): `{mc_d:.2f}°`")
-    
-    col_w, col_p = st.columns(2)
-    with col_w:
+    st.markdown(f"#### 🔮 탄생 차트(Natal) 좌표 & 하우스 시스템 분석 (상승점 ASC: `{asc_d:.2f}°`)")
+    c_w, c_p = st.columns(2)
+    with c_w:
         st.markdown("##### 🏛️ 홀사인 (Whole Sign) 하우스")
-        for p_name, h_num in n_wh.items():
-            st.write(f"- **{p_name}**: `{h_num}하우스` ({n_pos[p_name]:.1f}°)")
-            
-    with col_p:
-        st.markdown("##### 📐 플라시두스 (Placidus) 좌표")
-        for p_name in n_pos:
-            st.write(f"- **{p_name}**: `{n_pos[p_name]:.2f}°`")
+        for p, h in n_wh.items():
+            st.caption(f"• **{p}**: {h}하우스 ({n_pos[p]:.1f}°)")
+    with c_p:
+        st.markdown("##### 📐 정밀 천체 좌표 (NASA JPL)")
+        for p in n_pos:
+            st.caption(f"• **{p}**: `{n_pos[p]:.2f}°`")
             
     st.markdown("---")
-    st.markdown("##### 🌙 오늘의 활성 애스펙트 전체 로그 (NASA JPL)")
+    st.markdown("##### 🌙 실시간 활성 애스펙트(Aspect, 각도) 로그")
     if aspects:
         for a in aspects:
-            orb_tag = "🔥 최강" if a['orb'] <= 0.8 else "✨ 유효"
-            st.caption(f"• Transit {a['transit']}({a['t_h']}H) ➔ Natal {a['natal']}({a['n_h']}H) {a['aspect']} (오차: {a['orb']}° | {orb_tag})")
-    else:
-        st.caption("• 특이 긴장각 없이 평온한 기운이 지속됩니다.")
+            orb_str = "🔥 정확합/최강" if a['orb'] <= 0.8 else "✨ 유효"
+            st.caption(f"• Transit {a['transit']}({a['t_h']}H) ➔ Natal {a['natal']}({a['n_h']}H) {a['aspect']} (오차: {a['orb']}° | {orb_str})")
