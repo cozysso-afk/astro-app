@@ -1,3 +1,1 @@
-astronomy-engine
 streamlit
-google-genai
