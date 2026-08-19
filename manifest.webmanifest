@@ -1,0 +1,17 @@
+{
+  "name": "별빛의 운명",
+  "short_name": "별빛의 운명",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8edf7",
+  "theme_color": "#f8edf7",
+  "icons": [
+    {
+      "src": "./icon.PNG?v=43",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
