@@ -1,6 +1,10 @@
+import base64
 import calendar
+import hashlib
 import hmac
+import json
 import math
+import secrets
 import time
 from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
@@ -20,6 +24,11 @@ try:
     import exchange_calendars as xcals
 except Exception:
     xcals = None
+
+try:
+    import extra_streamlit_components as stx
+except Exception:
+    stx = None
 
 # ============================================================
 # 0. PAGE / DESIGN
@@ -195,8 +204,13 @@ header [data-testid="stToolbar"] { opacity: .18; }
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ============================================================
-# 0-B. PRIVATE PIN LOCK / SECRET PROFILE DEFAULTS
+# 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME
 # ============================================================
+REMEMBER_COOKIE_NAME = "astro_remember_v1"
+REMEMBER_DAYS = 30
+REMEMBER_TOKEN_AUDIENCE = "cozysso-astro-app"
+
+
 def _secret_text(key, default=""):
     try:
         value = st.secrets.get(key, default)
@@ -209,11 +223,135 @@ def _configured_app_pin():
     return _secret_text("APP_PIN", "")
 
 
+def _remember_secret():
+    return _secret_text("REMEMBER_ME_SECRET", "")
+
+
+try:
+    COOKIE_MANAGER = stx.CookieManager(key="astro_cookie_manager_v1") if stx is not None else None
+except Exception:
+    COOKIE_MANAGER = None
+
+
+def _b64url_encode(raw):
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(value):
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
+
+
+def _pin_fingerprint(pin):
+    # PIN 원문은 쿠키에 저장하지 않음. PIN이 바뀌면 기존 자동로그인도 자동 무효화.
+    return hashlib.sha256(pin.encode("utf-8")).hexdigest()[:20]
+
+
+def _make_remember_token(pin, signing_secret, now_ts=None):
+    now_ts = int(time.time() if now_ts is None else now_ts)
+    payload = {
+        "aud": REMEMBER_TOKEN_AUDIENCE,
+        "v": 1,
+        "iat": now_ts,
+        "exp": now_ts + REMEMBER_DAYS * 86400,
+        "pin_fp": _pin_fingerprint(pin),
+        "nonce": secrets.token_urlsafe(12),
+    }
+    payload_bytes = json.dumps(
+        payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    signature = hmac.new(
+        signing_secret.encode("utf-8"),
+        payload_bytes,
+        hashlib.sha256,
+    ).digest()
+    return f"{_b64url_encode(payload_bytes)}.{_b64url_encode(signature)}"
+
+
+def _verify_remember_token(token, pin, signing_secret, now_ts=None):
+    if not token or not signing_secret or len(signing_secret) < 32:
+        return False
+    try:
+        payload_part, sig_part = token.split(".", 1)
+        payload_bytes = _b64url_decode(payload_part)
+        supplied_sig = _b64url_decode(sig_part)
+        expected_sig = hmac.new(
+            signing_secret.encode("utf-8"),
+            payload_bytes,
+            hashlib.sha256,
+        ).digest()
+        if not hmac.compare_digest(supplied_sig, expected_sig):
+            return False
+
+        payload = json.loads(payload_bytes.decode("utf-8"))
+        now_ts = int(time.time() if now_ts is None else now_ts)
+
+        if payload.get("aud") != REMEMBER_TOKEN_AUDIENCE:
+            return False
+        if payload.get("v") != 1:
+            return False
+        if payload.get("pin_fp") != _pin_fingerprint(pin):
+            return False
+
+        iat = int(payload.get("iat", 0))
+        exp = int(payload.get("exp", 0))
+        if iat <= 0 or exp <= iat:
+            return False
+        # 클라이언트/서버 시계 오차는 5분까지만 허용.
+        if iat > now_ts + 300:
+            return False
+        if exp <= now_ts:
+            return False
+        if exp - iat > (REMEMBER_DAYS * 86400 + 300):
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _delete_remember_cookie(manager):
+    try:
+        manager.delete(REMEMBER_COOKIE_NAME, key="astro_remember_delete")
+    except Exception:
+        pass
+
+
+def _try_cookie_unlock(configured_pin, signing_secret):
+    if not configured_pin or not signing_secret or len(signing_secret) < 32:
+        return False
+    if COOKIE_MANAGER is None:
+        return False
+    try:
+        manager = COOKIE_MANAGER
+        token = manager.get(cookie=REMEMBER_COOKIE_NAME)
+    except Exception:
+        return False
+
+    if not token:
+        return False
+
+    if _verify_remember_token(token, configured_pin, signing_secret):
+        st.session_state["_astro_unlocked"] = True
+        st.session_state["_astro_unlocked_via_cookie"] = True
+        return True
+
+    _delete_remember_cookie(manager)
+    return False
+
+
 def require_app_unlock():
     if st.session_state.get("_astro_unlocked", False):
         return
 
     configured_pin = _configured_app_pin()
+    signing_secret = _remember_secret()
+
+    if _try_cookie_unlock(configured_pin, signing_secret):
+        return
+
     st.markdown("<div style='text-align:center;font-size:2.4rem;margin-top:7vh'>🌙</div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center;color:#4A3E56'>별빛의 운명</h2>", unsafe_allow_html=True)
     st.caption("개인 운세 데이터 보호를 위해 PIN을 입력해 주세요.")
@@ -226,6 +364,13 @@ def require_app_unlock():
         st.error("APP_PIN은 6자리 이상으로 설정해 주세요.")
         st.stop()
 
+    remember_enabled = COOKIE_MANAGER is not None and len(signing_secret) >= 32
+    if not remember_enabled:
+        st.info(
+            "📱 30일 로그인 유지를 쓰려면 Streamlit Secrets에 "
+            "REMEMBER_ME_SECRET(32자 이상)을 한 번만 추가해 주세요."
+        )
+
     now = time.time()
     blocked_until = float(st.session_state.get("_astro_lock_until", 0.0) or 0.0)
     if now < blocked_until:
@@ -233,13 +378,43 @@ def require_app_unlock():
         st.stop()
 
     with st.form("astro_private_pin_form", clear_on_submit=True):
-        entered_pin = st.text_input("PIN", type="password", label_visibility="collapsed", placeholder="PIN 입력")
+        entered_pin = st.text_input(
+            "PIN",
+            type="password",
+            label_visibility="collapsed",
+            placeholder="PIN 입력",
+        )
+        remember_device = st.checkbox(
+            f"이 기기에서 {REMEMBER_DAYS}일 동안 로그인 유지",
+            value=True,
+            disabled=not remember_enabled,
+            help="개인 기기에서만 사용해. 공용 기기에서는 체크를 꺼두는 게 좋아.",
+        )
         submitted = st.form_submit_button("🌙 별빛의 운명 열기", use_container_width=True)
+
     if submitted:
         if hmac.compare_digest(entered_pin.strip(), configured_pin):
             st.session_state["_astro_unlocked"] = True
             st.session_state["_astro_pin_failures"] = 0
             st.session_state["_astro_lock_until"] = 0.0
+            st.session_state["_astro_unlocked_via_cookie"] = False
+
+            if remember_device and remember_enabled:
+                try:
+                    manager = COOKIE_MANAGER
+                    token = _make_remember_token(configured_pin, signing_secret)
+                    manager.set(
+                        REMEMBER_COOKIE_NAME,
+                        token,
+                        key="astro_remember_set",
+                        path="/",
+                        expires_at=datetime.now() + timedelta(days=REMEMBER_DAYS),
+                        secure=True,
+                        same_site="strict",
+                    )
+                    st.session_state["_astro_remember_cookie_written"] = True
+                except Exception:
+                    st.session_state["_astro_remember_cookie_written"] = False
             st.rerun()
         else:
             failures = int(st.session_state.get("_astro_pin_failures", 0)) + 1
@@ -256,9 +431,17 @@ def require_app_unlock():
 require_app_unlock()
 
 with st.sidebar:
-    if st.button("🔒 앱 다시 잠그기", use_container_width=True):
-        st.session_state["_astro_unlocked"] = False
-        st.rerun()
+    if st.session_state.get("_astro_unlocked_via_cookie", False) or st.session_state.get("_astro_remember_cookie_written", False):
+        st.caption("✅ 이 기기 자동 로그인 사용 중")
+    if st.button("🔒 이 기기에서 로그아웃", use_container_width=True):
+        try:
+            if COOKIE_MANAGER is not None:
+                _delete_remember_cookie(COOKIE_MANAGER)
+        finally:
+            st.session_state["_astro_unlocked"] = False
+            st.session_state["_astro_unlocked_via_cookie"] = False
+            st.session_state["_astro_remember_cookie_written"] = False
+            st.rerun()
 
 # ============================================================
 # 1. CONSTANTS
