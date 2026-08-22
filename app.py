@@ -25,6 +25,11 @@ from skyfield.api import load, wgs84
 from skyfield.framelib import ecliptic_frame
 
 try:
+    from streamlit_js_eval import streamlit_js_eval
+except Exception:
+    streamlit_js_eval = None
+
+try:
     import exchange_calendars as xcals
 except Exception:
     xcals = None
@@ -225,16 +230,18 @@ header [data-testid="stToolbar"] { opacity: .18; }
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ============================================================
-# 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (FIRST-PARTY COOKIE)
+# 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
-# V5.2의 extra_streamlit_components CookieManager는 Streamlit 컴포넌트 iframe
-# 내부에서 쿠키를 다뤄 iOS Safari/PWA에서 재접속 시 읽지 못하는 경우가 있었습니다.
-# V5.2.1부터는 실제 앱 도메인의 first-party cookie를 window.parent.document에
-# 기록하고, 새 Streamlit 세션에서는 st.context.cookies로 읽습니다.
+# Streamlit Community Cloud는 프록시 계층에서 대부분의 사용자 정의 cookie를
+# st.context.cookies에 전달하지 않는 경우가 있어 cookie 기반 자동로그인이 풀릴 수 있다.
+# V6.2.1부터는 브라우저 localStorage를 Streamlit custom component로 직접 읽고/쓰는
+# 방식을 1순위로 사용한다. 기존 first-party cookie는 self-host/local 환경용 보조수단.
 REMEMBER_COOKIE_NAME = "astro_remember_v2"
 LEGACY_REMEMBER_COOKIE_NAME = "astro_remember_v1"
+REMEMBER_STORAGE_NAME = "astro_remember_local_v1"
 REMEMBER_DAYS = 30
 REMEMBER_TOKEN_AUDIENCE = "cozysso-astro-app"
+REMEMBER_EMPTY_SENTINEL = "__ASTRO_REMEMBER_EMPTY__"
 
 
 def _secret_text(key, default=""):
@@ -263,7 +270,7 @@ def _b64url_decode(value):
 
 
 def _pin_fingerprint(pin):
-    # PIN 원문은 쿠키에 저장하지 않음. PIN이 바뀌면 기존 자동로그인도 자동 무효화.
+    # PIN 원문은 저장하지 않음. PIN이 바뀌면 기존 자동로그인 토큰도 무효화.
     return hashlib.sha256(pin.encode("utf-8")).hexdigest()[:20]
 
 
@@ -320,7 +327,6 @@ def _verify_remember_token(token, pin, signing_secret, now_ts=None):
         exp = int(payload.get("exp", 0))
         if iat <= 0 or exp <= iat:
             return False
-        # 클라이언트/서버 시계 오차는 5분까지만 허용.
         if iat > now_ts + 300:
             return False
         if exp <= now_ts:
@@ -333,7 +339,7 @@ def _verify_remember_token(token, pin, signing_secret, now_ts=None):
 
 
 def _request_cookie(name):
-    """새 브라우저 세션의 최초 요청에 포함된 first-party cookie를 읽습니다."""
+    """보조수단: self-host/local 환경에서 최초 요청 cookie를 읽는다."""
     try:
         cookies = st.context.cookies
         value = cookies.get(name, "")
@@ -343,7 +349,7 @@ def _request_cookie(name):
 
 
 def _emit_cookie_write(token):
-    """실제 Streamlit 앱 문서(parent)에 30일 first-party cookie를 기록합니다."""
+    """보조수단: 실제 앱 문서에 first-party cookie도 함께 기록한다."""
     cookie_name_js = json.dumps(REMEMBER_COOKIE_NAME)
     legacy_name_js = json.dumps(LEGACY_REMEMBER_COOKIE_NAME)
     token_js = json.dumps(token)
@@ -360,7 +366,7 @@ def _emit_cookie_write(token):
             d.cookie = legacy + '=; Path=/; Max-Age=0; SameSite=Lax; Secure';
             d.cookie = name + '=' + token + '; Path=/; Max-Age={max_age}; SameSite=Lax; Secure';
           }} catch (e) {{
-            console.warn('remember-cookie write skipped', e);
+            console.warn('remember-cookie backup write skipped', e);
           }}
         }})();
         </script>
@@ -371,7 +377,6 @@ def _emit_cookie_write(token):
 
 
 def _emit_cookie_delete(reload_after=False):
-    """현재/구버전 자동로그인 쿠키를 모두 지웁니다."""
     cookie_name_js = json.dumps(REMEMBER_COOKIE_NAME)
     legacy_name_js = json.dumps(LEGACY_REMEMBER_COOKIE_NAME)
     reload_js = "window.parent.setTimeout(() => window.parent.location.reload(), 180);" if reload_after else ""
@@ -387,7 +392,7 @@ def _emit_cookie_delete(reload_after=False):
             d.cookie = legacy + '=; Path=/; Max-Age=0; SameSite=Lax; Secure';
             {reload_js}
           }} catch (e) {{
-            console.warn('remember-cookie delete skipped', e);
+            console.warn('remember-cookie backup delete skipped', e);
           }}
         }})();
         </script>
@@ -397,44 +402,173 @@ def _emit_cookie_delete(reload_after=False):
     )
 
 
-def _flush_pending_cookie_write():
-    token = str(st.session_state.pop("_astro_pending_remember_token", "") or "").strip()
+def _storage_epoch():
+    return int(st.session_state.get("_astro_storage_epoch", 0) or 0)
+
+
+def _read_local_remember_token():
+    """
+    브라우저 localStorage를 component frontend에서 직접 읽어 Python으로 반환.
+    None = component 응답 대기 중, "" = 저장 토큰 없음.
+    """
+    if streamlit_js_eval is None:
+        return ""
+    storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
+    expression = (
+        "(()=>{"
+        f"const v=localStorage.getItem({storage_name_js});"
+        f"return v===null?{json.dumps(REMEMBER_EMPTY_SENTINEL)}:v;"
+        "})()"
+    )
+    value = streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_remember_ls_read_{_storage_epoch()}",
+    )
+    if value is None:
+        return None
+    value = str(value or "").strip()
+    if value == REMEMBER_EMPTY_SENTINEL:
+        return ""
+    return value
+
+
+def _write_local_remember_token(token):
+    """localStorage 기록 완료 여부를 'ok'/'fail'로 되돌려 저장 경합을 막는다."""
+    if streamlit_js_eval is None:
+        return "unavailable"
+    storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
+    token_js = json.dumps(token)
+    expression = (
+        "(()=>{"
+        f"localStorage.setItem({storage_name_js},{token_js});"
+        f"return localStorage.getItem({storage_name_js})==={token_js}?'ok':'fail';"
+        "})()"
+    )
+    token_fp = hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
+    value = streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_remember_ls_write_{token_fp}",
+    )
+    if value is None:
+        return None
+    return str(value)
+
+
+def _delete_local_remember_token(nonce):
+    if streamlit_js_eval is None:
+        return "unavailable"
+    storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
+    expression = (
+        "(()=>{"
+        f"localStorage.removeItem({storage_name_js});"
+        f"return localStorage.getItem({storage_name_js})===null?'ok':'fail';"
+        "})()"
+    )
+    value = streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_remember_ls_delete_{nonce}",
+    )
+    if value is None:
+        return None
+    return str(value)
+
+
+def _render_auth_wait(message):
+    st.markdown("<div style='text-align:center;font-size:2.2rem;margin-top:7vh'>🌙</div>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center;color:#4A3E56'>별빛의 운명</h3>", unsafe_allow_html=True)
+    st.caption(message)
+
+
+def _flush_pending_local_write():
+    token = str(st.session_state.get("_astro_pending_remember_token", "") or "").strip()
     if not token:
-        return
-    _emit_cookie_write(token)
-    st.session_state["_astro_remember_cookie_written"] = True
+        return True
+
+    result = _write_local_remember_token(token)
+    if result is None:
+        _render_auth_wait("이 기기 30일 자동 로그인을 저장하는 중이야…")
+        st.stop()
+
+    st.session_state.pop("_astro_pending_remember_token", None)
+    if result == "ok":
+        st.session_state["_astro_remember_storage_written"] = True
+        _emit_cookie_write(token)  # self-host/local용 보조
+        return True
+
+    st.session_state["_astro_remember_storage_written"] = False
+    st.session_state["_astro_remember_write_failed"] = True
+    return False
 
 
-def _try_cookie_unlock(configured_pin, signing_secret):
+def _process_pending_logout():
+    nonce = str(st.session_state.get("_astro_pending_logout_nonce", "") or "").strip()
+    if not nonce:
+        return False
+
+    result = _delete_local_remember_token(nonce)
+    if result is None:
+        _render_auth_wait("이 기기의 자동 로그인 정보를 지우는 중이야…")
+        st.stop()
+
+    _emit_cookie_delete(reload_after=False)
+    st.session_state.pop("_astro_pending_logout_nonce", None)
+    st.session_state["_astro_storage_epoch"] = _storage_epoch() + 1
+    st.session_state["_astro_unlocked"] = False
+    st.session_state["_astro_unlocked_via_storage"] = False
+    st.session_state["_astro_remember_storage_written"] = False
+    st.rerun()
+
+
+def _try_persistent_unlock(configured_pin, signing_secret):
     if not configured_pin or not signing_secret or len(signing_secret) < 32:
         return False
 
-    token = _request_cookie(REMEMBER_COOKIE_NAME)
-    if not token:
-        return False
+    # 1순위: Streamlit Cloud proxy를 거치지 않는 브라우저 localStorage component.
+    if streamlit_js_eval is not None:
+        token = _read_local_remember_token()
+        if token is None:
+            return None  # component 응답 대기
+        if token:
+            if _verify_remember_token(token, configured_pin, signing_secret):
+                st.session_state["_astro_unlocked"] = True
+                st.session_state["_astro_unlocked_via_storage"] = True
+                st.session_state["_astro_remember_storage_written"] = True
+                return True
+            # 만료/변조/PIN 변경 토큰은 지울 준비.
+            st.session_state["_astro_pending_logout_nonce"] = "invalid_" + secrets.token_hex(4)
+            return False
 
-    if _verify_remember_token(token, configured_pin, signing_secret):
+    # 2순위: self-host/local에서는 st.context cookie가 보일 수 있으므로 기존 토큰도 살림.
+    token = _request_cookie(REMEMBER_COOKIE_NAME)
+    if token and _verify_remember_token(token, configured_pin, signing_secret):
         st.session_state["_astro_unlocked"] = True
-        st.session_state["_astro_unlocked_via_cookie"] = True
-        st.session_state["_astro_remember_cookie_written"] = True
+        st.session_state["_astro_unlocked_via_storage"] = True
+        st.session_state["_astro_remember_storage_written"] = True
         return True
 
-    # 만료/변조/PIN 변경 토큰은 브라우저에서도 제거.
-    _emit_cookie_delete(reload_after=False)
     return False
 
 
 def require_app_unlock():
+    # 명시적 로그아웃/잘못된 토큰 삭제를 인증 검사보다 먼저 처리.
+    if st.session_state.get("_astro_pending_logout_nonce"):
+        _process_pending_logout()
+
     if st.session_state.get("_astro_unlocked", False):
-        # PIN 인증 직후 다음 렌더에서 쿠키를 기록해 st.rerun과 JS 실행의 경합을 피함.
-        _flush_pending_cookie_write()
+        _flush_pending_local_write()
         return
 
     configured_pin = _configured_app_pin()
     signing_secret = _remember_secret()
 
-    if _try_cookie_unlock(configured_pin, signing_secret):
+    persistent_state = _try_persistent_unlock(configured_pin, signing_secret)
+    if persistent_state is None:
+        _render_auth_wait("이 기기의 자동 로그인 정보를 확인하는 중이야…")
+        st.stop()
+    if persistent_state is True:
         return
+    if st.session_state.get("_astro_pending_logout_nonce"):
+        _process_pending_logout()
 
     st.markdown("<div style='text-align:center;font-size:2.4rem;margin-top:7vh'>🌙</div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center;color:#4A3E56'>별빛의 운명</h2>", unsafe_allow_html=True)
@@ -448,12 +582,15 @@ def require_app_unlock():
         st.error("APP_PIN은 6자리 이상으로 설정해 주세요.")
         st.stop()
 
-    remember_enabled = hasattr(st, "context") and len(signing_secret) >= 32
+    remember_enabled = streamlit_js_eval is not None and len(signing_secret) >= 32
     if not remember_enabled:
         st.info(
-            "📱 30일 로그인 유지를 쓰려면 최신 Streamlit과 Secrets의 "
+            "📱 30일 로그인 유지를 쓰려면 streamlit_js_eval 설치와 "
             "REMEMBER_ME_SECRET(32자 이상)이 필요해."
         )
+
+    if st.session_state.pop("_astro_remember_write_failed", False):
+        st.warning("자동 로그인 저장을 완료하지 못했어. PIN 로그인 자체는 정상이고, 다음 배포에서 저장 기능을 다시 확인해.")
 
     now = time.time()
     blocked_until = float(st.session_state.get("_astro_lock_until", 0.0) or 0.0)
@@ -481,12 +618,14 @@ def require_app_unlock():
             st.session_state["_astro_unlocked"] = True
             st.session_state["_astro_pin_failures"] = 0
             st.session_state["_astro_lock_until"] = 0.0
-            st.session_state["_astro_unlocked_via_cookie"] = False
-            st.session_state["_astro_remember_cookie_written"] = False
+            st.session_state["_astro_unlocked_via_storage"] = False
+            st.session_state["_astro_remember_storage_written"] = False
 
             if remember_device and remember_enabled:
-                token = _make_remember_token(configured_pin, signing_secret)
-                st.session_state["_astro_pending_remember_token"] = token
+                st.session_state["_astro_pending_remember_token"] = _make_remember_token(
+                    configured_pin,
+                    signing_secret,
+                )
             else:
                 st.session_state.pop("_astro_pending_remember_token", None)
             st.rerun()
@@ -505,17 +644,19 @@ def require_app_unlock():
 require_app_unlock()
 
 with st.sidebar:
-    if st.session_state.get("_astro_unlocked_via_cookie", False) or st.session_state.get("_astro_remember_cookie_written", False):
+    if (
+        st.session_state.get("_astro_unlocked_via_storage", False)
+        or st.session_state.get("_astro_remember_storage_written", False)
+    ):
         st.caption("✅ 이 기기 30일 자동 로그인 사용 중")
+
     if st.button("🔒 이 기기에서 로그아웃", use_container_width=True):
+        st.session_state["_astro_pending_logout_nonce"] = secrets.token_hex(8)
         st.session_state["_astro_unlocked"] = False
-        st.session_state["_astro_unlocked_via_cookie"] = False
-        st.session_state["_astro_remember_cookie_written"] = False
+        st.session_state["_astro_unlocked_via_storage"] = False
+        st.session_state["_astro_remember_storage_written"] = False
         st.session_state.pop("_astro_pending_remember_token", None)
-        # st.context.cookies는 현재 요청의 스냅샷이므로 즉시 rerun하면 옛 쿠키가 다시 읽힐 수 있음.
-        # 먼저 브라우저 쿠키를 지운 뒤 전체 페이지를 재로딩해서 새 요청을 시작한다.
-        _emit_cookie_delete(reload_after=True)
-        st.stop()
+        st.rerun()
 
 # ============================================================
 # 1. CONSTANTS
