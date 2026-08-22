@@ -1696,7 +1696,7 @@ def period_topic_text(rows,key):
 # ============================================================
 # 8-B. AI INTERPRETER · V6.1
 # ============================================================
-AI_INTERPRETER_VERSION = "v6.2.0"
+AI_INTERPRETER_VERSION = "v6.2.2"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -1706,6 +1706,8 @@ AI_FALLBACK_MODEL = "gemini-3.6-flash"
 AI_DEFAULT_THINKING_LEVEL = "high"
 AI_ALLOWED_THINKING_LEVELS = {"low", "medium", "high"}
 AI_MAX_OUTPUT_TOKENS = 16384
+AI_BROWSER_CACHE_PREFIX = "astro_ai_daily_v1_"
+AI_BROWSER_CACHE_TTL_SECONDS = 86400
 AI_TOPIC_ORDER = ["금전","학업","시험","직장","이직","연애","연락","재회","소식","컨디션"]
 
 
@@ -2008,6 +2010,122 @@ def _call_gemini_once(payload_json, model_name, thinking_level, api_key):
         }
 
 
+
+def _ai_browser_cache_id(payload_json, model, thinking_level, key_fingerprint):
+    raw="|".join([
+        AI_INTERPRETER_VERSION,
+        model or "",
+        thinking_level or "",
+        key_fingerprint or "",
+        payload_json,
+    ])
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:28]
+
+
+def _ai_browser_storage_key(cache_id):
+    return AI_BROWSER_CACHE_PREFIX + cache_id
+
+
+def _read_ai_browser_cache(cache_id):
+    """
+    이 기기의 localStorage에서 AI 해설을 직접 읽는다.
+    None = component 응답 대기 중, "" = 캐시 없음.
+    """
+    if streamlit_js_eval is None:
+        return ""
+    storage_key_js=json.dumps(_ai_browser_storage_key(cache_id))
+    empty_js=json.dumps(REMEMBER_EMPTY_SENTINEL)
+    expression=(
+        "(()=>{"
+        f"const v=localStorage.getItem({storage_key_js});"
+        f"return v===null?{empty_js}:v;"
+        "})()"
+    )
+    value=streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_ai_cache_read_{cache_id}",
+    )
+    if value is None:
+        return None
+    value=str(value or "").strip()
+    if value==REMEMBER_EMPTY_SENTINEL:
+        return ""
+    return value
+
+
+def _write_ai_browser_cache(cache_id, ai_result):
+    """검증이 끝난 AI 결과를 이 기기에 24시간 보관한다."""
+    if streamlit_js_eval is None or not ai_result or not ai_result.get("ok"):
+        return None
+    storage_key=_ai_browser_storage_key(cache_id)
+    packed={
+        "saved_at":int(time.time()),
+        "expires_at":int(time.time())+AI_BROWSER_CACHE_TTL_SECONDS,
+        "result":ai_result,
+    }
+    storage_key_js=json.dumps(storage_key)
+    packed_js=json.dumps(json.dumps(packed,ensure_ascii=False,separators=(",",":")))
+    prefix_js=json.dumps(AI_BROWSER_CACHE_PREFIX)
+    now_ms=int(time.time()*1000)
+    expression=(
+        "(()=>{"
+        "try{"
+        f"const prefix={prefix_js};"
+        "const now=Math.floor(Date.now()/1000);"
+        # 오래된 우리 앱 AI 캐시만 정리. 다른 localStorage는 건드리지 않는다.
+        "for(let i=localStorage.length-1;i>=0;i--){"
+        " const k=localStorage.key(i);"
+        " if(!k||!k.startsWith(prefix)) continue;"
+        " try{const o=JSON.parse(localStorage.getItem(k)||'{}');"
+        " if(!o.expires_at||Number(o.expires_at)<=now) localStorage.removeItem(k);}catch(e){localStorage.removeItem(k);}"
+        "}"
+        f"localStorage.setItem({storage_key_js},{packed_js});"
+        "return 'ok';"
+        "}catch(e){return 'fail';}"
+        "})()"
+    )
+    return streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_ai_cache_write_{cache_id}_{now_ms}",
+    )
+
+
+def _delete_ai_browser_cache(cache_id):
+    if streamlit_js_eval is None:
+        return None
+    storage_key_js=json.dumps(_ai_browser_storage_key(cache_id))
+    expression=f"(()=>{{localStorage.removeItem({storage_key_js});return 'ok';}})()"
+    return streamlit_js_eval(
+        js_expressions=expression,
+        key=f"astro_ai_cache_delete_{cache_id}",
+    )
+
+
+def _decode_ai_browser_cache(raw_value):
+    if not raw_value:
+        return None
+    try:
+        packed=json.loads(raw_value)
+        if not isinstance(packed,dict):
+            return None
+        expires_at=int(packed.get("expires_at",0) or 0)
+        if expires_at<=int(time.time()):
+            return None
+        result=packed.get("result")
+        if not isinstance(result,dict) or not result.get("ok"):
+            return None
+        valid=_validate_ai_output(result.get("data"))
+        if not valid:
+            return None
+        result=dict(result)
+        result["data"]=valid
+        result["cache_source"]="browser"
+        result["cache_saved_at"]=int(packed.get("saved_at",0) or 0)
+        return result
+    except Exception:
+        return None
+
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def cached_ai_daily_interpretation(payload_json, preferred_model, thinking_level, key_fingerprint):
     # key_fingerprint는 캐시 무효화용. 실제 키는 payload/캐시에 넣지 않는다.
@@ -2059,11 +2177,38 @@ def get_ai_daily_interpretation(payload, preferred_model=None):
     api_key=_ai_api_key()
     if not api_key:
         return {"ok":False,"missing_key":True,"error":"GEMINI_API_KEY가 설정되지 않았어."}
+
     model=preferred_model if preferred_model in AI_SUPPORTED_MODELS else _ai_model()
     thinking_level=_ai_thinking_level()
     key_fp=hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
     payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":"),sort_keys=True)
-    return cached_ai_daily_interpretation(payload_json,model,thinking_level,key_fp)
+    cache_id=_ai_browser_cache_id(payload_json,model,thinking_level,key_fp)
+
+    # 1순위: 이 기기 브라우저 캐시. Streamlit Cloud 재시작/절전 후에도 남는다.
+    if streamlit_js_eval is not None:
+        raw_cache=_read_ai_browser_cache(cache_id)
+        wait_key=f"_astro_ai_cache_wait_{cache_id}"
+        if raw_cache is None:
+            waits=int(st.session_state.get(wait_key,0) or 0)+1
+            st.session_state[wait_key]=waits
+            # 첫 렌더에서 component가 값을 돌려줄 시간을 한 번 준다.
+            if waits<=1:
+                return {"ok":False,"cache_waiting":True,"cache_id":cache_id}
+        else:
+            st.session_state.pop(wait_key,None)
+            cached=_decode_ai_browser_cache(raw_cache)
+            if cached:
+                return cached
+            if raw_cache:
+                _delete_ai_browser_cache(cache_id)
+
+    # 2순위: Streamlit 서버 메모리 캐시. 살아 있는 인스턴스에서는 API를 다시 부르지 않는다.
+    result=cached_ai_daily_interpretation(payload_json,model,thinking_level,key_fp)
+    if result and result.get("ok"):
+        result=dict(result)
+        result["cache_source"]=result.get("cache_source","server_or_api")
+        _write_ai_browser_cache(cache_id,result)
+    return result
 
 
 def render_ai_overview(ai_result):
@@ -2080,38 +2225,55 @@ def render_ai_overview(ai_result):
     summary=html.escape(overall.get("summary",""))
     dominant=html.escape(overall.get("dominant_pattern",""))
     turning=html.escape(overall.get("turning_point",""))
-    chips="".join(f"<span class='ai-chip'>{html.escape(x)}</span>" for x in data.get("priorities",[]))
+    priorities=data.get("priorities",[]) if isinstance(data.get("priorities"),list) else []
+    chips="".join(f"<span class='ai-chip'>{html.escape(x)}</span>" for x in priorities[:3])
 
-    clusters=data.get("clusters",{}) if isinstance(data.get("clusters"),dict) else {}
-    cluster_html=[]
-    for label,key in [
-        ("💖 관계","relationship"),
-        ("📚 공부·진로","work_study"),
-        ("💵 돈·소식","money_news"),
-        ("🌿 컨디션","condition"),
-    ]:
-        value=clusters.get(key,"")
-        if value:
-            cluster_html.append(
-                f"<div class='ai-cluster'><strong>{label}</strong><br>{html.escape(value)}</div>"
-            )
-
-    extra=""
-    if dominant:
-        extra+=f"<div class='ai-row'><span class='ai-label'>핵심 패턴</span>{dominant}</div>"
-    if turning:
-        extra+=f"<div class='ai-row'><span class='ai-label'>시간 흐름</span>{turning}</div>"
+    # 첫 화면에는 결론/핵심 패턴/오늘 할 일만 보여서 모바일 길이를 줄인다.
+    quick_pattern=dominant or summary
+    quick_html=""
+    if quick_pattern:
+        quick_html=f"<div class='ai-row'><span class='ai-label'>핵심 패턴</span>{quick_pattern}</div>"
 
     st.markdown(
         f"<div class='ai-overview'>"
         f"<div class='ai-kicker'>AI DEEP INTERPRETATION</div>"
         f"<div class='ai-head'>✨ {headline}</div>"
-        f"<div class='ai-body'>{summary}{extra}</div>"
+        f"<div class='ai-body'>{quick_html}</div>"
         f"<div style='margin-top:9px'>{chips}</div>"
-        f"<div class='ai-grid'>{''.join(cluster_html)}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
+
+    with st.expander("🔎 AI 종합 정밀해설 펼치기", expanded=False):
+        if summary:
+            st.markdown(f"<div class='ai-body'>{summary}</div>",unsafe_allow_html=True)
+        if turning:
+            st.markdown(
+                f"<div class='ai-analysis'><div class='ai-row'><span class='ai-label'>시간 흐름</span>{turning}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+        clusters=data.get("clusters",{}) if isinstance(data.get("clusters"),dict) else {}
+        cluster_html=[]
+        for label,key in [
+            ("💖 관계","relationship"),
+            ("📚 공부·진로","work_study"),
+            ("💵 돈·소식","money_news"),
+            ("🌿 컨디션","condition"),
+        ]:
+            value=clusters.get(key,"")
+            if value:
+                cluster_html.append(
+                    f"<div class='ai-cluster'><strong>{label}</strong><br>{html.escape(value)}</div>"
+                )
+        if cluster_html:
+            st.markdown(f"<div class='ai-grid'>{''.join(cluster_html)}</div>",unsafe_allow_html=True)
+
+    cache_source=ai_result.get("cache_source","")
+    if cache_source=="browser":
+        st.caption("⚡ 이 기기에 저장된 24시간 AI 해설을 사용했어.")
+    else:
+        st.caption("⚡ 같은 계산값의 AI 해설은 서버 + 이 기기에 24시간 캐시해.")
 
     with st.expander("AI 해설 기준 · 개인정보/한계"):
         st.write("AI는 점수나 천체를 새로 계산하지 않고, 앱이 계산한 숫자·시간대·애스펙트·하우스 근거만 종합합니다.")
@@ -2310,6 +2472,11 @@ if main_view=="🌙 일일":
     )
     with st.spinner(f"✨ {AI_SUPPORTED_MODELS[selected_ai_model]}가 계산 근거를 종합 해석하는 중..."):
         ai_result=get_ai_daily_interpretation(ai_payload,selected_ai_model)
+
+    if ai_result and ai_result.get("cache_waiting"):
+        st.caption("⚡ 이 기기에 저장된 AI 해설이 있는지 확인하는 중...")
+        st.stop()
+
     ai_data=render_ai_overview(ai_result) or {}
     ai_topic_analysis=ai_data.get("topic_analysis",{}) if isinstance(ai_data,dict) else {}
 
