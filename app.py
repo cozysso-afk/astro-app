@@ -172,12 +172,14 @@ header [data-testid="stToolbar"] { opacity: .18; }
     border-radius:15px; padding:10px 12px; margin-bottom:10px; font-size:.83rem; line-height:1.55;
 }
 .score-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin:8px 0 14px; }
-.score-card { background:rgba(255,255,255,.80); border:1px solid rgba(202,185,214,.42); border-radius:14px; padding:12px; }
-.score-name { font-size:.82rem; font-weight:800; color:#53475E; }
-.score-num { font-family:'Cinzel','Pretendard',serif; font-weight:800; font-size:1.14rem; color:#8C7033; margin-top:3px; }
-.score-band { font-size:.72rem; color:#897C91; margin-top:1px; }
+.score-card { background:rgba(255,255,255,.84); border:1px solid rgba(202,185,214,.42); border-radius:15px; padding:12px 13px; }
+.score-name { font-size:.80rem; font-weight:800; color:#53475E; }
+.score-num { font-family:'Cinzel','Pretendard',serif; font-weight:800; font-size:1.55rem; line-height:1.05; color:#806632; margin-top:7px; letter-spacing:-.02em; }
+.score-band { display:inline-block; font-size:.68rem; color:#75697C; margin-top:6px; padding:2px 7px; border-radius:999px; background:rgba(240,234,244,.78); }
 .topic-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-.topic-score { white-space:nowrap; font-weight:800; color:#8C7033; }
+.topic-score { min-width:58px; text-align:right; white-space:nowrap; }
+.topic-score-num { font-family:'Cinzel','Pretendard',serif; font-size:1.28rem; line-height:1; font-weight:800; color:#806632; }
+.topic-score-band { display:block; margin-top:4px; font-size:.66rem; color:#7F7486; font-weight:700; }
 .event-pill { background:rgba(255,255,255,.67); border-left:4px solid rgba(154,123,56,.58); padding:9px 11px; border-radius:9px; margin:7px 0; font-size:.86rem; line-height:1.58; }
 .window-card { background:rgba(255,255,255,.75); border:1px solid rgba(196,178,205,.40); border-left:4px solid rgba(154,123,56,.72); border-radius:11px; padding:11px 12px; margin:8px 0; line-height:1.58; font-size:.87rem; }
 .window-card.risk { border-left-color:rgba(210,105,105,.78); }
@@ -189,11 +191,20 @@ header [data-testid="stToolbar"] { opacity: .18; }
 
 .timing-strip { margin-top:10px; padding:9px 11px; border-radius:10px; background:rgba(244,239,249,.78); color:#655A70; font-size:.80rem; line-height:1.55; }
 .decision-strip { margin-top:8px; padding:9px 11px; border-radius:10px; background:rgba(255,247,250,.88); border-left:3px solid rgba(201,92,135,.52); color:#5D5364; font-size:.82rem; line-height:1.55; }
-.ai-overview { background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(247,241,252,.92)); border:1px solid rgba(175,146,198,.40); border-radius:16px; padding:14px 15px; margin:8px 0 14px; box-shadow:0 8px 24px rgba(154,123,175,.08); }
-.ai-head { font-weight:800; color:#51405F; margin-bottom:7px; }
-.ai-body { color:#62576A; font-size:.88rem; line-height:1.72; }
-.ai-topic { margin-top:9px; padding:9px 11px; border-radius:10px; background:rgba(247,243,251,.78); border-left:3px solid rgba(141,113,160,.52); color:#5F5567; font-size:.82rem; line-height:1.60; }
-.ai-chip { display:inline-block; padding:3px 7px; margin:2px 4px 2px 0; border-radius:999px; background:rgba(238,229,245,.88); color:#6B5977; font-size:.73rem; font-weight:700; }
+.ai-overview { background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(246,239,252,.94)); border:1px solid rgba(175,146,198,.44); border-radius:18px; padding:16px; margin:8px 0 16px; box-shadow:0 10px 28px rgba(154,123,175,.09); }
+.ai-kicker { color:#8C7899; font-size:.70rem; font-weight:800; letter-spacing:.08em; margin-bottom:5px; }
+.ai-head { font-weight:900; color:#4C3D59; font-size:1.04rem; margin-bottom:8px; }
+.ai-body { color:#5C5263; font-size:.90rem; line-height:1.76; }
+.ai-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:11px; }
+.ai-cluster { padding:10px 11px; border-radius:12px; background:rgba(248,244,251,.86); border:1px solid rgba(202,185,214,.34); color:#5F5567; font-size:.80rem; line-height:1.58; }
+.ai-cluster strong { color:#51445A; }
+.ai-chip { display:inline-block; padding:4px 8px; margin:3px 4px 1px 0; border-radius:999px; background:rgba(236,226,244,.92); color:#675573; font-size:.71rem; font-weight:800; }
+.ai-analysis { margin-top:11px; padding:11px 12px; border-radius:12px; background:linear-gradient(135deg,rgba(249,245,252,.96),rgba(255,249,251,.92)); border-left:3px solid rgba(141,113,160,.58); color:#594F60; font-size:.82rem; line-height:1.65; }
+.ai-verdict { font-weight:900; color:#493B53; font-size:.88rem; margin-bottom:7px; }
+.ai-row { margin-top:5px; }
+.ai-label { font-weight:800; color:#7A6587; margin-right:4px; }
+.ai-confidence { display:inline-block; margin-top:8px; padding:2px 7px; border-radius:999px; background:rgba(235,228,241,.86); color:#716079; font-size:.68rem; font-weight:800; }
+.rule-summary { color:#716778; font-size:.80rem; line-height:1.62; }
 .astro-note { background:rgba(255,255,255,.62); border:1px solid rgba(202,185,214,.32); border-radius:12px; padding:9px 11px; margin:6px 0 12px; color:#6B6073; font-size:.80rem; line-height:1.55; }
 
 .stTabs [data-baseweb="tab-list"] { overflow-x:auto; flex-wrap:nowrap; justify-content:flex-start; gap:4px; background:rgba(255,255,255,.62); border-radius:16px; padding:5px; scrollbar-width:none; }
@@ -207,6 +218,7 @@ header [data-testid="stToolbar"] { opacity: .18; }
     .ast-card { padding:14px 14px; border-radius:16px; }
     .ast-body { font-size:.89rem; line-height:1.68; }
     .stTabs [data-baseweb="tab"] { font-size:.80rem; padding:6px 9px; }
+    .ai-grid { grid-template-columns:1fr; }
 }
 </style>
 """
@@ -1372,47 +1384,105 @@ def topic_narrative(topic, score, result, evidences=None, all_scores=None):
     return " ".join(part for part in [opening, favor, cross, action] if part)
 
 
-def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None, timing_rows=None, ai_note=""):
+def _render_ai_topic_analysis(ai_note):
+    if not isinstance(ai_note,dict):
+        return ""
+    verdict=html.escape(ai_note.get("verdict",""))
+    reason=html.escape(ai_note.get("reason",""))
+    timing=html.escape(ai_note.get("timing",""))
+    action=html.escape(ai_note.get("action",""))
+    avoid=html.escape(ai_note.get("avoid",""))
+    confidence=html.escape(ai_note.get("confidence","보통"))
+    confidence_reason=html.escape(ai_note.get("confidence_reason",""))
+
+    parts=[]
+    if verdict:
+        parts.append(f"<div class='ai-verdict'>{verdict}</div>")
+    if reason:
+        parts.append(f"<div class='ai-row'><span class='ai-label'>왜</span>{reason}</div>")
+    if timing:
+        parts.append(f"<div class='ai-row'><span class='ai-label'>시간 흐름</span>{timing}</div>")
+    if action:
+        parts.append(f"<div class='ai-row'><span class='ai-label'>오늘 행동</span>{action}</div>")
+    if avoid:
+        parts.append(f"<div class='ai-row'><span class='ai-label'>피할 것</span>{avoid}</div>")
+    if confidence:
+        ctext=f"해석 확신도 · {confidence}"
+        if confidence_reason:
+            ctext+=f" · {confidence_reason}"
+        parts.append(f"<div class='ai-confidence'>{ctext}</div>")
+    return "<div class='ai-analysis'>"+"".join(parts)+"</div>" if parts else ""
+
+
+def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None, timing_rows=None, ai_note=None):
     icon=TOPIC_SPECS[topic]["icon"]; label=DISPLAY_LABELS[topic]
     timing=topic_timing_data(timing_rows,topic,3) if timing_rows else None
     timing_html=""
     if timing and timing.get("best"):
         b=timing["best"]; peak=timing.get("peak_row"); low=timing.get("low")
-        peak_text=f" · 피크 {peak['dt'].strftime('%H:%M')} ({peak.get(topic)}/100)" if peak else ""
+        peak_text=f" · 피크 {peak['dt'].strftime('%H:%M')} · 지수 {peak.get(topic)}" if peak else ""
         if timing.get("spread",0)<4:
             timing_html=(f"<div class='timing-strip'>⏰ 하루 안 시간대 차이는 크지 않아. "
                          f"상대적으로 나은 구간 <strong>{b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')}</strong>{peak_text}</div>")
         else:
             low_text=f" · 덜 유리한 구간 <strong>{low['start'].strftime('%H:%M')}~{low['end'].strftime('%H:%M')}</strong>" if low else ""
             timing_html=(f"<div class='timing-strip'>⏰ 상대적으로 좋은 구간 <strong>{b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')}</strong>{peak_text}{low_text} KST</div>")
-    decision=topic_decision_note(topic,score,timing)
-    decision_html=f"<div class='decision-strip'><strong>{decision}</strong></div>" if decision else ""
-    ai_html=f"<div class='ai-topic'><strong>✨ AI 해설</strong><br>{html.escape(ai_note)}</div>" if ai_note else ""
-    st.markdown(f"<div class='ast-card'><div class='topic-head'><div class='ast-title'>{icon} {label}</div><div class='topic-score'>{score}/100 · {score_band(score)}</div></div><div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div>{timing_html}{decision_html}{ai_html}</div>",unsafe_allow_html=True)
-    with st.expander(f"왜 이렇게 나왔어? · {label}"):
-        st.write(f"관련 테마가 얼마나 움직이는지(활성도) **{result['activation']}/100** · 움직일 때 얼마나 부드럽게 풀리는지(우호도) **{result['favorability']}/100**")
+
+    ai_html=_render_ai_topic_analysis(ai_note)
+    fallback_html=""
+    if not ai_html:
+        fallback_html=f"<div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div>"
+        decision=topic_decision_note(topic,score,timing)
+        if decision:
+            fallback_html+=f"<div class='decision-strip'><strong>{decision}</strong></div>"
+
+    st.markdown(
+        f"<div class='ast-card'>"
+        f"<div class='topic-head'><div class='ast-title'>{icon} {label}</div>"
+        f"<div class='topic-score'><span class='topic-score-num'>{score}</span><span class='topic-score-band'>{score_band(score)}</span></div></div>"
+        f"{ai_html}{fallback_html}{timing_html}</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(f"계산 근거 · {label}"):
+        st.markdown(
+            f"<div class='rule-summary'><strong>기본 규칙 해석</strong><br>"
+            f"{topic_narrative(topic,score,result,evidences,all_scores)}</div>",
+            unsafe_allow_html=True,
+        )
+        decision=topic_decision_note(topic,score,timing)
+        if decision:
+            st.caption("기본 행동 규칙 · "+decision)
+        st.write(
+            f"활성도 **{result['activation']}** · 우호도 **{result['favorability']}** "
+            "· 둘은 각각 '얼마나 움직이는지'와 '움직일 때 얼마나 부드러운지'를 뜻해."
+        )
         if timing and timing.get("best"):
             b=timing["best"]; p=timing.get("peak_row"); low=timing.get("low"); lr=timing.get("low_row")
-            ptxt=f" · 피크 **{p['dt']:%H:%M} {p.get(topic)}/100**" if p else ""
+            ptxt=f" · 피크 **{p['dt']:%H:%M} · {p.get(topic)}**" if p else ""
             st.write(f"⏰ 하루 안 상대 비교: 좋은 구간 **{b['start']:%H:%M}~{b['end']:%H:%M} KST**{ptxt}")
             if low and timing.get("spread",0)>=4:
-                ltxt=f" · 저점 **{lr['dt']:%H:%M} {lr.get(topic)}/100**" if lr else ""
+                ltxt=f" · 저점 **{lr['dt']:%H:%M} · {lr.get(topic)}**" if lr else ""
                 st.write(f"⚠️ 덜 유리한 구간 **{low['start']:%H:%M}~{low['end']:%H:%M} KST**{ltxt}")
             if p:
                 peak_result=p.get("topics",{}).get(topic,{})
                 peak_evidence=peak_result.get("evidence",[])[:2]
                 if peak_evidence:
                     st.caption("피크 시간대를 만든 주요 근거")
-                    for e in peak_evidence: st.write("• "+evidence_to_korean(e))
+                    for e in peak_evidence:
+                        st.write("• "+evidence_to_korean(e))
         slow=[e for e in (evidences or []) if e.get("transit") in {"Jupiter","Saturn","Uranus","Neptune","Pluto"}]
         if slow:
             st.caption("장기 배경 · 하루 타이밍보다 느리게 지속되는 신호")
-            for e in slow[:2]: st.write("• "+evidence_to_korean(e))
+            for e in slow[:2]:
+                st.write("• "+evidence_to_korean(e))
         if evidences:
-            st.caption("주요 계산 근거 · 아래는 설명용 천문/점성 데이터입니다.")
-            for e in evidences[:6]: st.write("• "+evidence_to_korean(e))
+            st.caption("주요 계산 근거")
+            for e in evidences[:6]:
+                st.write("• "+evidence_to_korean(e))
         else:
-            st.caption("강한 단일 애스펙트보다 여러 약한 하우스·배경 신호의 합산 영향이 중심입니다.")
+            st.caption("강한 단일 애스펙트보다 여러 약한 하우스·배경 신호의 합산 영향이 중심이야.")
+
 
 def format_window(w):
     return f"{w['start'].strftime('%H:%M')} ~ {w['end'].strftime('%H:%M')} KST"
@@ -1424,7 +1494,7 @@ def render_windows(title, windows, key, css_class=""):
         st.info("계산 가능한 구간이 없습니다.")
         return
     for i,w in enumerate(windows,1):
-        st.markdown(f"<div class='window-card {css_class}'><strong>{i}위 · {format_window(w)}</strong><br>{key} 상대지수 <strong>{w['score']}/100</strong> · {score_band(w['score'])}</div>",unsafe_allow_html=True)
+        st.markdown(f"<div class='window-card {css_class}'><strong>{i}위 · {format_window(w)}</strong><br>{key} 상대지수 <strong>{w['score']}</strong> · {score_band(w['score'])}</div>",unsafe_allow_html=True)
 
 
 def period_topic_text(rows,key):
@@ -1434,17 +1504,17 @@ def period_topic_text(rows,key):
 
     if key=="투자주의":
         return (
-            f"기간 평균 <strong>{avg}/100 · {band}</strong>. "
-            f"과열·충동매매 위험이 가장 높은 거래일은 <strong>{best['label']} {best[key]}/100</strong>, "
-            f"가장 낮은 거래일은 <strong>{worst['label']} {worst[key]}/100</strong>이야. "
+            f"기간 평균 <strong>{avg} · {band}</strong>. "
+            f"과열·충동매매 위험이 가장 높은 거래일은 <strong>{best['label']} {best[key]}</strong>, "
+            f"가장 낮은 거래일은 <strong>{worst['label']} {worst[key]}</strong>이야. "
             "점수가 높을수록 좋은 날이 아니라 주문 크기·추격·계획 변경을 더 경계해야 하는 날로 봐."
         )
     if key in {"수익실현","신규진입"}:
         noun="수익실현" if key=="수익실현" else "신규진입"
         return (
-            f"거래일 기준 {noun} 상대지수 평균은 <strong>{avg}/100 · {band}</strong>. "
-            f"상대지수가 가장 높은 거래일은 <strong>{best['label']} {best[key]}/100</strong>, "
-            f"가장 낮은 거래일은 <strong>{worst['label']} {worst[key]}/100</strong>이야. "
+            f"거래일 기준 {noun} 상대지수 평균은 <strong>{avg} · {band}</strong>. "
+            f"상대지수가 가장 높은 거래일은 <strong>{best['label']} {best[key]}</strong>, "
+            f"가장 낮은 거래일은 <strong>{worst['label']} {worst[key]}</strong>이야. "
             "실제 매매는 이 순위보다 가격·수급·거래량·손절 기준을 먼저 확인해야 해."
         )
 
@@ -1475,9 +1545,9 @@ def period_topic_text(rows,key):
         "소식":"지연·변경 가능성을 감안할 날", "컨디션":"회복 여백을 더 크게 잡을 날",
     }
     return (
-        f"기간 평균 <strong>{avg}/100 · {band}</strong>. {intro.get(key,'날짜별 차이를 보는 기간')}이야. "
-        f"{best_word.get(key,'상대적으로 나은 날')}은 <strong>{best['label']} {best[key]}/100</strong>, "
-        f"{weak_word.get(key,'상대적으로 약한 날')}은 <strong>{worst['label']} {worst[key]}/100</strong>이야. "
+        f"기간 평균 <strong>{avg} · {band}</strong>. {intro.get(key,'날짜별 차이를 보는 기간')}이야. "
+        f"{best_word.get(key,'상대적으로 나은 날')}은 <strong>{best['label']} {best[key]}</strong>, "
+        f"{weak_word.get(key,'상대적으로 약한 날')}은 <strong>{worst['label']} {worst[key]}</strong>이야. "
         "이 날짜 순위는 같은 분야 안에서 비교한 상대값으로 봐."
     )
 
@@ -1485,14 +1555,14 @@ def period_topic_text(rows,key):
 # ============================================================
 # 8-B. AI INTERPRETER · V6.1
 # ============================================================
-AI_INTERPRETER_VERSION = "v6.1.0"
+AI_INTERPRETER_VERSION = "v6.2.0"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
 }
 AI_DEFAULT_MODEL = "gemini-3.7-flash"
 AI_FALLBACK_MODEL = "gemini-3.6-flash"
-AI_DEFAULT_THINKING_LEVEL = "medium"
+AI_DEFAULT_THINKING_LEVEL = "high"
 AI_ALLOWED_THINKING_LEVELS = {"low", "medium", "high"}
 AI_MAX_OUTPUT_TOKENS = 16384
 AI_TOPIC_ORDER = ["금전","학업","시험","직장","이직","연애","연락","재회","소식","컨디션"]
@@ -1610,53 +1680,124 @@ def build_ai_daily_payload(query_date, daily_scores, topic_results, timing_rows,
     }
 
 
-AI_SYSTEM_PROMPT = """너는 '별빛의 운명' 앱의 점성술 해설자다. 계산자가 아니라 해석자다.
-반드시 제공된 JSON 계산 데이터만 사용하고, 없는 행성 위치·애스펙트·하우스·시간·사건을 절대로 만들어내지 마라.
-점수는 현실 사건의 확률이 아니라 앱 내부의 상대 점성술 지수다. activation은 테마가 얼마나 움직이는지, favorability는 움직일 때 얼마나 부드럽게 풀리는지로 구분해서 읽어라.
-여러 분야를 교차해서 해석하되 숫자가 비슷하다는 이유만으로 인과관계를 만들지 마라.
-연애·연락·재회에서는 특정 사람이 연락한다, 돌아온다, 마음이 있다처럼 타인의 의도나 미래 행동을 단정하지 마라. 실제 행동 신호와 감정 테마를 구분하라.
+AI_SYSTEM_PROMPT = """너는 '별빛의 운명' 앱의 정밀 점성술 해설자다. 계산자가 아니라 분석가다.
+반드시 제공된 CALCULATED_DATA JSON 안의 값만 사용한다. 없는 행성 위치, 애스펙트, 하우스, 시간, 사건을 절대로 만들어내지 마라.
+점수는 사건 확률이 아니라 앱 내부 상대지수다. activation은 테마의 움직임, favorability는 그 움직임의 매끄러움으로 구분해서 읽어라.
+
+가장 중요한 목표는 '점수를 말로 다시 읽어주는 것'이 아니라 서로 다른 계산 신호의 관계를 분석하는 것이다.
+예: 활성도는 높은데 우호도가 낮으면 '움직임은 강하지만 편하게 풀리는 흐름은 아니다'처럼 충돌 구조를 설명한다.
+단기 시간대와 장기 행성 근거가 다르면 어느 쪽이 하루의 타이밍이고 어느 쪽이 배경 압력인지 구분한다.
+연애-연락-재회, 학업-시험-컨디션, 직장-이직-금전처럼 관련 분야를 교차해서 읽되 숫자 크기만으로 인과관계를 만들지 않는다.
+
+절대 기존 자동문구처럼 쓰지 마라.
+'점수가 낮아서 약하다', '흐름이 좋다/나쁘다', '루틴을 우선', '사건성 신호', '무난한 날'만으로 문장을 끝내지 마라.
+가능한 근거가 2개 이상이면 서로 어떻게 합쳐지거나 충돌하는지 설명한다.
+시간대 spread가 작으면 억지로 피크를 과장하지 말고 '시간 차이가 작다'고 분명히 말한다.
+evidence가 빈약하면 해석 확신도를 낮추고 무엇을 단정할 수 없는지 적는다.
+
+각 topic_analysis는 반드시 다음 역할이 다르다.
+- verdict: 사용자가 바로 이해할 오늘의 결론. 단순 점수 번역 금지.
+- reason: 실제 계산 근거 2개 안팎을 연결한 분석. 근거가 부족하면 부족하다고 말한다.
+- timing: 시간대 변화가 실제로 의미 있을 때만 구체적으로 설명. 차이가 작으면 그 사실을 설명.
+- action: 오늘 현실적으로 할 행동 1개.
+- avoid: 오늘 피할 행동 또는 과대해석 1개.
+- confidence: 높음/보통/낮음 중 하나. 데이터의 밀도와 신호 일치도를 기준으로 한다.
+- confidence_reason: 왜 그 확신도인지 짧게 설명.
+
+연애·연락·재회에서는 특정 사람이 연락한다, 돌아온다, 마음이 있다처럼 타인의 의도나 미래 행동을 단정하지 마라.
 컨디션은 질병·진단·치료 예측을 하지 말고 활동 리듬과 휴식 조언만 하라.
-투자는 가격·수익률·매수/매도 성공을 예측하지 마라. KRX 휴장일이면 장중 매매 해설을 만들지 말고 준비·복기 관점으로만 말하라.
-한국어 반말로 자연스럽고 구체적으로 쓰되, '좋을 수 있어', '루틴을 우선', '사건성 신호' 같은 뭉뚱그린 상투어를 반복하지 마라.
-각 분야에서 가능하면 점수·활성도·우호도·시간대·실제 근거를 연결해서 '그래서 오늘 어떻게 읽고 무엇을 할지'를 말하라.
-근거가 약하면 약하다고 분명히 말하고, 점성술 해석임을 벗어나 과학적 사실처럼 표현하지 마라.
-출력은 JSON만 반환하라."""
+투자는 가격·수익률·매수/매도 성공을 예측하지 마라. KRX 휴장일에는 장중 매매 해설을 만들지 않는다.
+한국어 반말로 자연스럽고 구체적으로 쓴다. 같은 시작문장과 상투어를 분야마다 반복하지 않는다.
+출력은 JSON만 반환한다."""
 
 
 AI_OUTPUT_SHAPE = {
-    "headline":"오늘 흐름을 18자 안팎으로 요약한 제목",
-    "overall":"오늘 전체 흐름을 3~5문장으로 종합. 서로 다른 분야를 비교할 때는 절대 원점수를 단순 서열화하지 말 것.",
-    "priorities":["오늘 가장 실용적인 행동 1","행동 2","행동 3"],
-    "relationship":"연애·연락·재회를 교차해 2~4문장으로 해석",
-    "work_study":"학업·시험·직장·이직을 교차해 2~4문장으로 해석",
-    "money_news":"금전·소식, 필요하면 투자 데이터를 엮어 2~4문장으로 해석",
-    "condition":"컨디션을 1~3문장으로 해석. 의료 진단 금지",
-    "topic_notes":{topic:"해당 분야를 기존 규칙문보다 더 구체적으로 2~4문장 해설" for topic in AI_TOPIC_ORDER},
-    "limits":"이번 해설에서 단정하면 안 되는 부분 또는 근거가 약한 부분을 1~2문장으로 명시",
+    "headline":"오늘을 관통하는 핵심을 20자 안팎으로",
+    "overall":{
+        "summary":"전체 흐름을 4~6문장. 가장 중요한 충돌/합치 신호를 중심으로 분석",
+        "dominant_pattern":"오늘 가장 지배적인 패턴 1~2문장",
+        "turning_point":"시간대 변화가 의미 있으면 언제 무엇이 달라지는지. 의미 없으면 시간차가 작다고 명시",
+    },
+    "priorities":["오늘 실제로 하면 좋은 행동 1","행동 2","행동 3"],
+    "clusters":{
+        "relationship":"연애·연락·재회를 교차한 핵심 분석 2~4문장",
+        "work_study":"학업·시험·직장·이직·컨디션을 필요한 만큼 교차한 분석 2~4문장",
+        "money_news":"금전·소식·투자 데이터를 필요한 만큼 교차한 분석 2~4문장",
+        "condition":"컨디션의 하루 리듬과 일정 배치 조언 1~3문장",
+    },
+    "topic_analysis":{
+        topic:{
+            "verdict":"이 분야의 오늘 결론 1문장",
+            "reason":"계산 근거를 연결한 분석 2~4문장",
+            "timing":"시간대 해석 1~2문장",
+            "action":"오늘 할 행동 1문장",
+            "avoid":"피할 행동/과대해석 1문장",
+            "confidence":"높음|보통|낮음",
+            "confidence_reason":"확신도 이유 1문장",
+        } for topic in AI_TOPIC_ORDER
+    },
+    "limits":"전체 해설에서 단정하면 안 되는 부분이나 근거 한계를 1~2문장",
 }
 
 
 def _validate_ai_output(obj):
     if not isinstance(obj,dict):
         return None
+
+    overall_raw=obj.get("overall",{})
+    if isinstance(overall_raw,str):
+        overall_raw={"summary":overall_raw}
+    if not isinstance(overall_raw,dict):
+        overall_raw={}
+
+    clusters_raw=obj.get("clusters",{})
+    if not isinstance(clusters_raw,dict):
+        clusters_raw={}
+
     out={
-        "headline":_clean_ai_text(obj.get("headline"),120),
-        "overall":_clean_ai_text(obj.get("overall"),1800),
-        "relationship":_clean_ai_text(obj.get("relationship"),1200),
-        "work_study":_clean_ai_text(obj.get("work_study"),1200),
-        "money_news":_clean_ai_text(obj.get("money_news"),1200),
-        "condition":_clean_ai_text(obj.get("condition"),900),
+        "headline":_clean_ai_text(obj.get("headline"),140),
+        "overall":{
+            "summary":_clean_ai_text(overall_raw.get("summary"),2200),
+            "dominant_pattern":_clean_ai_text(overall_raw.get("dominant_pattern"),900),
+            "turning_point":_clean_ai_text(overall_raw.get("turning_point"),900),
+        },
+        "clusters":{
+            "relationship":_clean_ai_text(clusters_raw.get("relationship"),1400),
+            "work_study":_clean_ai_text(clusters_raw.get("work_study"),1400),
+            "money_news":_clean_ai_text(clusters_raw.get("money_news"),1400),
+            "condition":_clean_ai_text(clusters_raw.get("condition"),1000),
+        },
         "limits":_clean_ai_text(obj.get("limits"),900),
     }
+
     priorities=obj.get("priorities",[])
-    out["priorities"]=[_clean_ai_text(x,240) for x in priorities[:3] if _clean_ai_text(x,240)] if isinstance(priorities,list) else []
-    notes=obj.get("topic_notes",{})
-    out["topic_notes"]={}
-    if isinstance(notes,dict):
+    out["priorities"]=[_clean_ai_text(x,260) for x in priorities[:3] if _clean_ai_text(x,260)] if isinstance(priorities,list) else []
+
+    analyses=obj.get("topic_analysis",{})
+    out["topic_analysis"]={}
+    if isinstance(analyses,dict):
         for topic in AI_TOPIC_ORDER:
-            txt=_clean_ai_text(notes.get(topic),1100)
-            if txt: out["topic_notes"][topic]=txt
-    if not out["overall"] and not out["topic_notes"]:
+            item=analyses.get(topic,{})
+            if isinstance(item,str):
+                item={"verdict":item}
+            if not isinstance(item,dict):
+                continue
+            confidence=_clean_ai_text(item.get("confidence"),20)
+            if confidence not in {"높음","보통","낮음"}:
+                confidence="보통"
+            cleaned={
+                "verdict":_clean_ai_text(item.get("verdict"),450),
+                "reason":_clean_ai_text(item.get("reason"),1500),
+                "timing":_clean_ai_text(item.get("timing"),800),
+                "action":_clean_ai_text(item.get("action"),500),
+                "avoid":_clean_ai_text(item.get("avoid"),500),
+                "confidence":confidence,
+                "confidence_reason":_clean_ai_text(item.get("confidence_reason"),500),
+            }
+            if any(cleaned[k] for k in ["verdict","reason","timing","action","avoid"]):
+                out["topic_analysis"][topic]=cleaned
+
+    if not out["overall"]["summary"] and not out["topic_analysis"]:
         return None
     return out
 
@@ -1667,7 +1808,7 @@ def _call_gemini_once(payload_json, model_name, thinking_level, api_key):
     url=f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
     user_prompt=(
         "아래 계산 JSON을 해석해. JSON 안에 없는 근거는 만들지 마. "
-        "다음 출력 형태의 키를 그대로 사용하고 topic_notes에는 10개 분야를 가능하면 모두 채워.\n\n"
+        "다음 출력 형태의 키를 그대로 사용하고 topic_analysis에는 10개 분야를 모두 채워. 분야별 문구를 서로 복제하지 마.\n\n"
         "OUTPUT_SHAPE:\n"+json.dumps(AI_OUTPUT_SHAPE,ensure_ascii=False,separators=(",",":"))+"\n\n"
         "CALCULATED_DATA:\n"+payload_json
     )
@@ -1789,32 +1930,61 @@ def render_ai_overview(ai_result):
         if ai_result and ai_result.get("missing_key"):
             st.info("✨ AI 정밀해설은 준비되어 있어. Streamlit Secrets에 GEMINI_API_KEY를 추가하면 켜져.")
         elif ai_result and ai_result.get("error"):
-            st.caption("✨ AI 정밀해설은 이번에 불러오지 못했어. 기존 계산·규칙 해설은 정상 동작해. · "+ai_result.get("error",""))
+            st.caption("✨ AI 정밀해설을 이번에는 불러오지 못했어. 기본 계산 해설은 정상 동작해. · "+ai_result.get("error",""))
         return None
+
     data=ai_result["data"]
-    headline=html.escape(data.get("headline") or "AI 정밀 종합해설")
-    overall=html.escape(data.get("overall", ""))
+    headline=html.escape(data.get("headline") or "오늘의 정밀 분석")
+    overall=data.get("overall",{}) if isinstance(data.get("overall"),dict) else {}
+    summary=html.escape(overall.get("summary",""))
+    dominant=html.escape(overall.get("dominant_pattern",""))
+    turning=html.escape(overall.get("turning_point",""))
     chips="".join(f"<span class='ai-chip'>{html.escape(x)}</span>" for x in data.get("priorities",[]))
-    sections=[]
-    for label,key in [("💖 관계","relationship"),("📚 공부·진로","work_study"),("💵 돈·소식","money_news"),("🌿 컨디션","condition")]:
-        text=data.get(key,"")
-        if text: sections.append(f"<div class='ai-topic'><strong>{label}</strong><br>{html.escape(text)}</div>")
+
+    clusters=data.get("clusters",{}) if isinstance(data.get("clusters"),dict) else {}
+    cluster_html=[]
+    for label,key in [
+        ("💖 관계","relationship"),
+        ("📚 공부·진로","work_study"),
+        ("💵 돈·소식","money_news"),
+        ("🌿 컨디션","condition"),
+    ]:
+        value=clusters.get(key,"")
+        if value:
+            cluster_html.append(
+                f"<div class='ai-cluster'><strong>{label}</strong><br>{html.escape(value)}</div>"
+            )
+
+    extra=""
+    if dominant:
+        extra+=f"<div class='ai-row'><span class='ai-label'>핵심 패턴</span>{dominant}</div>"
+    if turning:
+        extra+=f"<div class='ai-row'><span class='ai-label'>시간 흐름</span>{turning}</div>"
+
     st.markdown(
-        f"<div class='ai-overview'><div class='ai-head'>✨ AI 정밀해설 · {headline}</div><div class='ai-body'>{overall}</div>"
-        f"<div style='margin-top:8px'>{chips}</div>{''.join(sections)}</div>",
+        f"<div class='ai-overview'>"
+        f"<div class='ai-kicker'>AI DEEP INTERPRETATION</div>"
+        f"<div class='ai-head'>✨ {headline}</div>"
+        f"<div class='ai-body'>{summary}{extra}</div>"
+        f"<div style='margin-top:9px'>{chips}</div>"
+        f"<div class='ai-grid'>{''.join(cluster_html)}</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
+
     with st.expander("AI 해설 기준 · 개인정보/한계"):
-        st.write("AI는 운세 점수나 천체를 새로 계산하지 않고, 앱이 계산한 숫자·시간대·애스펙트·하우스 근거만 해석합니다.")
-        st.write("AI 요청에는 이름·생년월일·출생시간·출생지 원문·PIN을 보내지 않습니다. 필요한 파생 점성 데이터만 전달합니다.")
-        st.write("AI가 만든 문장은 점성술적 해석이며 사건 확률, 특정인의 의도, 의료 진단, 주가 방향을 의미하지 않습니다.")
-        if data.get("limits"): st.caption("이번 해설의 한계 · "+data["limits"])
+        st.write("AI는 점수나 천체를 새로 계산하지 않고, 앱이 계산한 숫자·시간대·애스펙트·하우스 근거만 종합합니다.")
+        st.write("AI 요청에는 이름·생년월일·출생시간·출생지 원문·PIN을 보내지 않습니다.")
+        st.write("AI 문장은 점성술적 해석이며 사건 확률, 특정인의 의도, 의료 진단, 주가 방향을 의미하지 않습니다.")
+        if data.get("limits"):
+            st.caption("이번 해설의 한계 · "+data["limits"])
         model_caption="모델 · "+str(ai_result.get("model",AI_DEFAULT_MODEL))
         if ai_result.get("used_fallback"):
             model_caption+=f" · {ai_result.get('fallback_from')} 실패 후 자동 대체"
         model_caption+=f" · thinking {ai_result.get('thinking_level',AI_DEFAULT_THINKING_LEVEL)}"
         st.caption(model_caption)
     return data
+
 
 # ============================================================
 # 9. RETURN / DAILY MOON EVENTS
@@ -1980,9 +2150,9 @@ if main_view=="🌙 일일":
         score=daily_scores[key]
         grid+=f"<div class='score-card'><div class='score-name'>{TOPIC_SPECS[key]['icon']} {DISPLAY_LABELS[key]}</div><div class='score-num'>{score}</div><div class='score-band'>{score_band(score)}</div></div>"
     grid+="</div>"; st.markdown(grid,unsafe_allow_html=True)
-    st.caption("점수 라벨: 30~39 약함 · 40~49 다소 약함 · 50~59 보통 · 60~69 보통 이상 · 70~81 강함 · 82 이상 매우 강함")
+    st.caption("숫자는 사건 확률이 아니라 같은 분야 안에서 흐름을 비교하기 위한 내부 상대지수야.")
 
-    # V6.1: 기존 계산 결과를 한 번에 AI 해설층으로 넘긴다. AI는 숫자를 다시 계산하지 않는다.
+    # V6.2: AI 정밀해설을 메인 해석층으로 사용하고 기본 규칙문은 검산용으로 내린다.
     daily_topic_results={topic:aggregate_topic_result(life_rows,topic) for topic in AI_TOPIC_ORDER}
     ai_payload=build_ai_daily_payload(query_date,daily_scores,daily_topic_results,timing_rows,market_rows,moon_ingresses)
 
@@ -2000,21 +2170,21 @@ if main_view=="🌙 일일":
     with st.spinner(f"✨ {AI_SUPPORTED_MODELS[selected_ai_model]}가 계산 근거를 종합 해석하는 중..."):
         ai_result=get_ai_daily_interpretation(ai_payload,selected_ai_model)
     ai_data=render_ai_overview(ai_result) or {}
-    ai_topic_notes=ai_data.get("topic_notes",{}) if isinstance(ai_data,dict) else {}
+    ai_topic_analysis=ai_data.get("topic_analysis",{}) if isinstance(ai_data,dict) else {}
 
     st.markdown("#### 💵 돈 · 공부 · 진로")
     for topic in ["금전","학업","시험","직장","이직"]:
         result=daily_topic_results[topic]
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get(topic,""))
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_analysis.get(topic,{}))
 
     st.markdown("#### 💖 관계 · 연락 · 소식")
     for topic in ["연애","연락","재회","소식"]:
         result=daily_topic_results[topic]
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get(topic,""))
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_analysis.get(topic,{}))
 
     st.markdown("#### 🌿 컨디션")
     result=daily_topic_results["컨디션"]
-    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get("컨디션",""))
+    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_analysis.get("컨디션",{}))
     st.caption("컨디션·회복 지수는 점성술상의 활동 리듬 참고값이며 질병·진단·치료 예측이 아닙니다.")
 
     st.markdown("#### 📈 주식·투자")
@@ -2031,7 +2201,7 @@ if main_view=="🌙 일일":
         st.caption("휴장일 준비 지수는 금전 판단·정보 정리·과열 억제를 묶은 점성술 상대값이며 매매 수익확률이나 가격 방향 예측이 아닙니다.")
     else:
         realize=rows_avg(market_rows,"수익실현"); entry=rows_avg(market_rows,"신규진입"); risk=rows_avg(market_rows,"투자주의")
-        st.markdown(f"<div class='ast-card'><div class='ast-title'>📈 오늘의 투자 지수</div><div class='ast-body'>수익실현 <strong>{realize}/100</strong> · 신규진입 <strong>{entry}/100</strong> · 과열주의 <strong>{risk}/100</strong><br>점성술 내부 상대지수일 뿐 실제 가격 방향이나 수익확률은 아닙니다.</div></div>",unsafe_allow_html=True)
+        st.markdown(f"<div class='ast-card'><div class='ast-title'>📈 오늘의 투자 지수</div><div class='ast-body'>수익실현 <strong>{realize}</strong> · 신규진입 <strong>{entry}</strong> · 과열주의 <strong>{risk}</strong><br>점성술 내부 상대지수일 뿐 실제 가격 방향이나 수익확률은 아닙니다.</div></div>",unsafe_allow_html=True)
         realize_w=rolling_top_windows(market_rows,"수익실현",3,2); entry_w=rolling_top_windows(market_rows,"신규진입",3,2); risk_w=rolling_top_windows(market_rows,"투자주의",3,2)
         render_windows("💰 수익실현 상대 우호 시간대",realize_w,"수익실현")
         render_windows("🎯 신규진입 상대 우호 시간대",entry_w,"신규진입")
@@ -2116,7 +2286,7 @@ elif main_view=="🌕 월간":
         top_topic=st.selectbox("분야",["시험","학업","직장","이직","연애","연락","재회","소식","금전","컨디션","수익실현","신규진입"],key="monthly_top_topic")
         tops=top_period_days(month_rows,top_topic,5)
         if tops:
-            for i,row in enumerate(tops,1): st.write(f"{i}. **{row['label']}** · {row[top_topic]}/100")
+            for i,row in enumerate(tops,1): st.write(f"{i}. **{row['label']}** · {row[top_topic]}")
         else: st.info("해당 분야의 계산 가능한 날짜가 없습니다.")
 
         with st.expander("📊 월간 숫자표 보기 · 검산용"):
