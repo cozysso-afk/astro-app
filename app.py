@@ -1696,7 +1696,7 @@ def period_topic_text(rows,key):
 # ============================================================
 # 8-B. AI INTERPRETER · V6.1
 # ============================================================
-AI_INTERPRETER_VERSION = "v6.2.2"
+AI_INTERPRETER_VERSION = "v6.2.3"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -2054,25 +2054,35 @@ def _read_ai_browser_cache(cache_id):
 
 
 def _write_ai_browser_cache(cache_id, ai_result):
-    """검증이 끝난 AI 결과를 이 기기에 24시간 보관한다."""
+    """
+    검증이 끝난 AI 결과를 이 기기에 24시간 보관한다.
+    component key를 매 렌더마다 바꾸면 Streamlit이 계속 rerun하므로,
+    결과 fingerprint를 사용해 같은 결과에는 항상 같은 key를 쓴다.
+    """
     if streamlit_js_eval is None or not ai_result or not ai_result.get("ok"):
         return None
+
+    result_json=json.dumps(ai_result,ensure_ascii=False,separators=(",",":"),sort_keys=True)
+    result_fp=hashlib.sha256(result_json.encode("utf-8")).hexdigest()[:12]
+    written_key=f"_astro_ai_cache_written_{cache_id}_{result_fp}"
+    if st.session_state.get(written_key,False):
+        return "ok"
+
     storage_key=_ai_browser_storage_key(cache_id)
+    now_ts=int(time.time())
     packed={
-        "saved_at":int(time.time()),
-        "expires_at":int(time.time())+AI_BROWSER_CACHE_TTL_SECONDS,
+        "saved_at":now_ts,
+        "expires_at":now_ts+AI_BROWSER_CACHE_TTL_SECONDS,
         "result":ai_result,
     }
     storage_key_js=json.dumps(storage_key)
     packed_js=json.dumps(json.dumps(packed,ensure_ascii=False,separators=(",",":")))
     prefix_js=json.dumps(AI_BROWSER_CACHE_PREFIX)
-    now_ms=int(time.time()*1000)
     expression=(
         "(()=>{"
         "try{"
         f"const prefix={prefix_js};"
         "const now=Math.floor(Date.now()/1000);"
-        # 오래된 우리 앱 AI 캐시만 정리. 다른 localStorage는 건드리지 않는다.
         "for(let i=localStorage.length-1;i>=0;i--){"
         " const k=localStorage.key(i);"
         " if(!k||!k.startsWith(prefix)) continue;"
@@ -2084,10 +2094,16 @@ def _write_ai_browser_cache(cache_id, ai_result):
         "}catch(e){return 'fail';}"
         "})()"
     )
-    return streamlit_js_eval(
+    value=streamlit_js_eval(
         js_expressions=expression,
-        key=f"astro_ai_cache_write_{cache_id}_{now_ms}",
+        key=f"astro_ai_cache_write_{cache_id}_{result_fp}",
     )
+    if value is None:
+        return None
+    value=str(value)
+    if value=="ok":
+        st.session_state[written_key]=True
+    return value
 
 
 def _delete_ai_browser_cache(cache_id):
@@ -2191,7 +2207,8 @@ def get_ai_daily_interpretation(payload, preferred_model=None):
         if raw_cache is None:
             waits=int(st.session_state.get(wait_key,0) or 0)+1
             st.session_state[wait_key]=waits
-            # 첫 렌더에서 component가 값을 돌려줄 시간을 한 번 준다.
+            # custom component 응답은 비동기라 첫 렌더에서만 한 번 기다린다.
+            # 페이지 전체를 중단하지 않고 기본 계산 화면을 그대로 보여준다.
             if waits<=1:
                 return {"ok":False,"cache_waiting":True,"cache_id":cache_id}
         else:
@@ -2475,9 +2492,9 @@ if main_view=="🌙 일일":
 
     if ai_result and ai_result.get("cache_waiting"):
         st.caption("⚡ 이 기기에 저장된 AI 해설이 있는지 확인하는 중...")
-        st.stop()
-
-    ai_data=render_ai_overview(ai_result) or {}
+        ai_data={}
+    else:
+        ai_data=render_ai_overview(ai_result) or {}
     ai_topic_analysis=ai_data.get("topic_analysis",{}) if isinstance(ai_data,dict) else {}
 
     st.markdown("#### 💵 돈 · 공부 · 진로")
