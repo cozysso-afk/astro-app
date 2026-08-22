@@ -25,10 +25,6 @@ try:
 except Exception:
     xcals = None
 
-try:
-    import extra_streamlit_components as stx
-except Exception:
-    stx = None
 
 # ============================================================
 # 0. PAGE / DESIGN
@@ -204,9 +200,14 @@ header [data-testid="stToolbar"] { opacity: .18; }
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ============================================================
-# 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME
+# 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (FIRST-PARTY COOKIE)
 # ============================================================
-REMEMBER_COOKIE_NAME = "astro_remember_v1"
+# V5.2의 extra_streamlit_components CookieManager는 Streamlit 컴포넌트 iframe
+# 내부에서 쿠키를 다뤄 iOS Safari/PWA에서 재접속 시 읽지 못하는 경우가 있었습니다.
+# V5.2.1부터는 실제 앱 도메인의 first-party cookie를 window.parent.document에
+# 기록하고, 새 Streamlit 세션에서는 st.context.cookies로 읽습니다.
+REMEMBER_COOKIE_NAME = "astro_remember_v2"
+LEGACY_REMEMBER_COOKIE_NAME = "astro_remember_v1"
 REMEMBER_DAYS = 30
 REMEMBER_TOKEN_AUDIENCE = "cozysso-astro-app"
 
@@ -227,12 +228,6 @@ def _remember_secret():
     return _secret_text("REMEMBER_ME_SECRET", "")
 
 
-try:
-    COOKIE_MANAGER = stx.CookieManager(key="astro_cookie_manager_v1") if stx is not None else None
-except Exception:
-    COOKIE_MANAGER = None
-
-
 def _b64url_encode(raw):
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
@@ -251,7 +246,7 @@ def _make_remember_token(pin, signing_secret, now_ts=None):
     now_ts = int(time.time() if now_ts is None else now_ts)
     payload = {
         "aud": REMEMBER_TOKEN_AUDIENCE,
-        "v": 1,
+        "v": 2,
         "iat": now_ts,
         "exp": now_ts + REMEMBER_DAYS * 86400,
         "pin_fp": _pin_fingerprint(pin),
@@ -291,7 +286,7 @@ def _verify_remember_token(token, pin, signing_secret, now_ts=None):
 
         if payload.get("aud") != REMEMBER_TOKEN_AUDIENCE:
             return False
-        if payload.get("v") != 1:
+        if payload.get("v") != 2:
             return False
         if payload.get("pin_fp") != _pin_fingerprint(pin):
             return False
@@ -312,38 +307,102 @@ def _verify_remember_token(token, pin, signing_secret, now_ts=None):
         return False
 
 
-def _delete_remember_cookie(manager):
+def _request_cookie(name):
+    """새 브라우저 세션의 최초 요청에 포함된 first-party cookie를 읽습니다."""
     try:
-        manager.delete(REMEMBER_COOKIE_NAME, key="astro_remember_delete")
+        cookies = st.context.cookies
+        value = cookies.get(name, "")
+        return str(value or "").strip()
     except Exception:
-        pass
+        return ""
+
+
+def _emit_cookie_write(token):
+    """실제 Streamlit 앱 문서(parent)에 30일 first-party cookie를 기록합니다."""
+    cookie_name_js = json.dumps(REMEMBER_COOKIE_NAME)
+    legacy_name_js = json.dumps(LEGACY_REMEMBER_COOKIE_NAME)
+    token_js = json.dumps(token)
+    max_age = REMEMBER_DAYS * 86400
+    components.html(
+        f"""
+        <script>
+        (() => {{
+          try {{
+            const d = window.parent.document;
+            const name = {cookie_name_js};
+            const legacy = {legacy_name_js};
+            const token = {token_js};
+            d.cookie = legacy + '=; Path=/; Max-Age=0; SameSite=Lax; Secure';
+            d.cookie = name + '=' + token + '; Path=/; Max-Age={max_age}; SameSite=Lax; Secure';
+          }} catch (e) {{
+            console.warn('remember-cookie write skipped', e);
+          }}
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _emit_cookie_delete(reload_after=False):
+    """현재/구버전 자동로그인 쿠키를 모두 지웁니다."""
+    cookie_name_js = json.dumps(REMEMBER_COOKIE_NAME)
+    legacy_name_js = json.dumps(LEGACY_REMEMBER_COOKIE_NAME)
+    reload_js = "window.parent.setTimeout(() => window.parent.location.reload(), 180);" if reload_after else ""
+    components.html(
+        f"""
+        <script>
+        (() => {{
+          try {{
+            const d = window.parent.document;
+            const name = {cookie_name_js};
+            const legacy = {legacy_name_js};
+            d.cookie = name + '=; Path=/; Max-Age=0; SameSite=Lax; Secure';
+            d.cookie = legacy + '=; Path=/; Max-Age=0; SameSite=Lax; Secure';
+            {reload_js}
+          }} catch (e) {{
+            console.warn('remember-cookie delete skipped', e);
+          }}
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _flush_pending_cookie_write():
+    token = str(st.session_state.pop("_astro_pending_remember_token", "") or "").strip()
+    if not token:
+        return
+    _emit_cookie_write(token)
+    st.session_state["_astro_remember_cookie_written"] = True
 
 
 def _try_cookie_unlock(configured_pin, signing_secret):
     if not configured_pin or not signing_secret or len(signing_secret) < 32:
         return False
-    if COOKIE_MANAGER is None:
-        return False
-    try:
-        manager = COOKIE_MANAGER
-        token = manager.get(cookie=REMEMBER_COOKIE_NAME)
-    except Exception:
-        return False
 
+    token = _request_cookie(REMEMBER_COOKIE_NAME)
     if not token:
         return False
 
     if _verify_remember_token(token, configured_pin, signing_secret):
         st.session_state["_astro_unlocked"] = True
         st.session_state["_astro_unlocked_via_cookie"] = True
+        st.session_state["_astro_remember_cookie_written"] = True
         return True
 
-    _delete_remember_cookie(manager)
+    # 만료/변조/PIN 변경 토큰은 브라우저에서도 제거.
+    _emit_cookie_delete(reload_after=False)
     return False
 
 
 def require_app_unlock():
     if st.session_state.get("_astro_unlocked", False):
+        # PIN 인증 직후 다음 렌더에서 쿠키를 기록해 st.rerun과 JS 실행의 경합을 피함.
+        _flush_pending_cookie_write()
         return
 
     configured_pin = _configured_app_pin()
@@ -364,11 +423,11 @@ def require_app_unlock():
         st.error("APP_PIN은 6자리 이상으로 설정해 주세요.")
         st.stop()
 
-    remember_enabled = COOKIE_MANAGER is not None and len(signing_secret) >= 32
+    remember_enabled = hasattr(st, "context") and len(signing_secret) >= 32
     if not remember_enabled:
         st.info(
-            "📱 30일 로그인 유지를 쓰려면 Streamlit Secrets에 "
-            "REMEMBER_ME_SECRET(32자 이상)을 한 번만 추가해 주세요."
+            "📱 30일 로그인 유지를 쓰려면 최신 Streamlit과 Secrets의 "
+            "REMEMBER_ME_SECRET(32자 이상)이 필요해."
         )
 
     now = time.time()
@@ -398,23 +457,13 @@ def require_app_unlock():
             st.session_state["_astro_pin_failures"] = 0
             st.session_state["_astro_lock_until"] = 0.0
             st.session_state["_astro_unlocked_via_cookie"] = False
+            st.session_state["_astro_remember_cookie_written"] = False
 
             if remember_device and remember_enabled:
-                try:
-                    manager = COOKIE_MANAGER
-                    token = _make_remember_token(configured_pin, signing_secret)
-                    manager.set(
-                        REMEMBER_COOKIE_NAME,
-                        token,
-                        key="astro_remember_set",
-                        path="/",
-                        expires_at=datetime.now() + timedelta(days=REMEMBER_DAYS),
-                        secure=True,
-                        same_site="strict",
-                    )
-                    st.session_state["_astro_remember_cookie_written"] = True
-                except Exception:
-                    st.session_state["_astro_remember_cookie_written"] = False
+                token = _make_remember_token(configured_pin, signing_secret)
+                st.session_state["_astro_pending_remember_token"] = token
+            else:
+                st.session_state.pop("_astro_pending_remember_token", None)
             st.rerun()
         else:
             failures = int(st.session_state.get("_astro_pin_failures", 0)) + 1
@@ -432,16 +481,16 @@ require_app_unlock()
 
 with st.sidebar:
     if st.session_state.get("_astro_unlocked_via_cookie", False) or st.session_state.get("_astro_remember_cookie_written", False):
-        st.caption("✅ 이 기기 자동 로그인 사용 중")
+        st.caption("✅ 이 기기 30일 자동 로그인 사용 중")
     if st.button("🔒 이 기기에서 로그아웃", use_container_width=True):
-        try:
-            if COOKIE_MANAGER is not None:
-                _delete_remember_cookie(COOKIE_MANAGER)
-        finally:
-            st.session_state["_astro_unlocked"] = False
-            st.session_state["_astro_unlocked_via_cookie"] = False
-            st.session_state["_astro_remember_cookie_written"] = False
-            st.rerun()
+        st.session_state["_astro_unlocked"] = False
+        st.session_state["_astro_unlocked_via_cookie"] = False
+        st.session_state["_astro_remember_cookie_written"] = False
+        st.session_state.pop("_astro_pending_remember_token", None)
+        # st.context.cookies는 현재 요청의 스냅샷이므로 즉시 rerun하면 옛 쿠키가 다시 읽힐 수 있음.
+        # 먼저 브라우저 쿠키를 지운 뒤 전체 페이지를 재로딩해서 새 요청을 시작한다.
+        _emit_cookie_delete(reload_after=True)
+        st.stop()
 
 # ============================================================
 # 1. CONSTANTS
