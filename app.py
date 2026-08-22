@@ -2,10 +2,14 @@ import base64
 import calendar
 import hashlib
 import hmac
+import html
 import json
 import math
 import secrets
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
 
@@ -185,6 +189,11 @@ header [data-testid="stToolbar"] { opacity: .18; }
 
 .timing-strip { margin-top:10px; padding:9px 11px; border-radius:10px; background:rgba(244,239,249,.78); color:#655A70; font-size:.80rem; line-height:1.55; }
 .decision-strip { margin-top:8px; padding:9px 11px; border-radius:10px; background:rgba(255,247,250,.88); border-left:3px solid rgba(201,92,135,.52); color:#5D5364; font-size:.82rem; line-height:1.55; }
+.ai-overview { background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(247,241,252,.92)); border:1px solid rgba(175,146,198,.40); border-radius:16px; padding:14px 15px; margin:8px 0 14px; box-shadow:0 8px 24px rgba(154,123,175,.08); }
+.ai-head { font-weight:800; color:#51405F; margin-bottom:7px; }
+.ai-body { color:#62576A; font-size:.88rem; line-height:1.72; }
+.ai-topic { margin-top:9px; padding:9px 11px; border-radius:10px; background:rgba(247,243,251,.78); border-left:3px solid rgba(141,113,160,.52); color:#5F5567; font-size:.82rem; line-height:1.60; }
+.ai-chip { display:inline-block; padding:3px 7px; margin:2px 4px 2px 0; border-radius:999px; background:rgba(238,229,245,.88); color:#6B5977; font-size:.73rem; font-weight:700; }
 .astro-note { background:rgba(255,255,255,.62); border:1px solid rgba(202,185,214,.32); border-radius:12px; padding:9px 11px; margin:6px 0 12px; color:#6B6073; font-size:.80rem; line-height:1.55; }
 
 .stTabs [data-baseweb="tab-list"] { overflow-x:auto; flex-wrap:nowrap; justify-content:flex-start; gap:4px; background:rgba(255,255,255,.62); border-radius:16px; padding:5px; scrollbar-width:none; }
@@ -1363,7 +1372,7 @@ def topic_narrative(topic, score, result, evidences=None, all_scores=None):
     return " ".join(part for part in [opening, favor, cross, action] if part)
 
 
-def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None, timing_rows=None):
+def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None, timing_rows=None, ai_note=""):
     icon=TOPIC_SPECS[topic]["icon"]; label=DISPLAY_LABELS[topic]
     timing=topic_timing_data(timing_rows,topic,3) if timing_rows else None
     timing_html=""
@@ -1378,7 +1387,8 @@ def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=No
             timing_html=(f"<div class='timing-strip'>⏰ 상대적으로 좋은 구간 <strong>{b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')}</strong>{peak_text}{low_text} KST</div>")
     decision=topic_decision_note(topic,score,timing)
     decision_html=f"<div class='decision-strip'><strong>{decision}</strong></div>" if decision else ""
-    st.markdown(f"<div class='ast-card'><div class='topic-head'><div class='ast-title'>{icon} {label}</div><div class='topic-score'>{score}/100 · {score_band(score)}</div></div><div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div>{timing_html}{decision_html}</div>",unsafe_allow_html=True)
+    ai_html=f"<div class='ai-topic'><strong>✨ AI 해설</strong><br>{html.escape(ai_note)}</div>" if ai_note else ""
+    st.markdown(f"<div class='ast-card'><div class='topic-head'><div class='ast-title'>{icon} {label}</div><div class='topic-score'>{score}/100 · {score_band(score)}</div></div><div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div>{timing_html}{decision_html}{ai_html}</div>",unsafe_allow_html=True)
     with st.expander(f"왜 이렇게 나왔어? · {label}"):
         st.write(f"관련 테마가 얼마나 움직이는지(활성도) **{result['activation']}/100** · 움직일 때 얼마나 부드럽게 풀리는지(우호도) **{result['favorability']}/100**")
         if timing and timing.get("best"):
@@ -1470,6 +1480,340 @@ def period_topic_text(rows,key):
         f"{weak_word.get(key,'상대적으로 약한 날')}은 <strong>{worst['label']} {worst[key]}/100</strong>이야. "
         "이 날짜 순위는 같은 분야 안에서 비교한 상대값으로 봐."
     )
+
+
+# ============================================================
+# 8-B. AI INTERPRETER · V6.1
+# ============================================================
+AI_INTERPRETER_VERSION = "v6.1.0"
+AI_SUPPORTED_MODELS = {
+    "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
+    "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
+}
+AI_DEFAULT_MODEL = "gemini-3.7-flash"
+AI_FALLBACK_MODEL = "gemini-3.6-flash"
+AI_DEFAULT_THINKING_LEVEL = "medium"
+AI_ALLOWED_THINKING_LEVELS = {"low", "medium", "high"}
+AI_TOPIC_ORDER = ["금전","학업","시험","직장","이직","연애","연락","재회","소식","컨디션"]
+
+
+def _ai_api_key():
+    return _secret_text("GEMINI_API_KEY", "")
+
+
+def _ai_model():
+    configured = _secret_text("GEMINI_MODEL", AI_DEFAULT_MODEL) or AI_DEFAULT_MODEL
+    return configured if configured in AI_SUPPORTED_MODELS else AI_DEFAULT_MODEL
+
+
+def _ai_thinking_level():
+    configured = (_secret_text("GEMINI_THINKING_LEVEL", AI_DEFAULT_THINKING_LEVEL) or AI_DEFAULT_THINKING_LEVEL).lower()
+    return configured if configured in AI_ALLOWED_THINKING_LEVELS else AI_DEFAULT_THINKING_LEVEL
+
+
+def _clean_ai_text(value, max_chars=1200):
+    if not isinstance(value, str):
+        return ""
+    value=" ".join(value.replace("\x00", " ").split()).strip()
+    return value[:max_chars]
+
+
+def _compact_evidence(e):
+    """AI에는 계산 근거만 전달. 이름·생년월일·출생지·원시 네이탈 좌표는 보내지 않는다."""
+    if not isinstance(e, dict):
+        return None
+    if e.get("kind")=="aspect":
+        return {
+            "kind":"aspect",
+            "transit":e.get("transit"),
+            "target":e.get("target"),
+            "aspect":e.get("aspect"),
+            "orb":round(float(e.get("orb",0.0)),2),
+            "motion":e.get("motion",""),
+            "direction":e.get("direction",""),
+            "layer":e.get("layer",LAYER_BY_TRANSIT.get(e.get("transit"),"")),
+        }
+    return {
+        "kind":"house",
+        "transit":e.get("transit"),
+        "whole_house":e.get("whole_house"),
+        "placidus_house":e.get("placidus_house"),
+        "whole_relevant":bool(e.get("whole_relevant")),
+        "placidus_relevant":bool(e.get("placidus_relevant")),
+        "layer":e.get("layer",LAYER_BY_TRANSIT.get(e.get("transit"),"")),
+    }
+
+
+def _timing_payload(rows, topic):
+    timing=topic_timing_data(rows,topic,3) if rows else None
+    if not timing:
+        return None
+    out={"spread":timing.get("spread")}
+    b=timing.get("best"); low=timing.get("low"); peak=timing.get("peak_row"); low_row=timing.get("low_row")
+    if b:
+        out["best_window"]={"start":b["start"].strftime("%H:%M"),"end":b["end"].strftime("%H:%M"),"score":b.get("score")}
+    if peak:
+        out["peak"]={"time":peak["dt"].strftime("%H:%M"),"score":peak.get(topic)}
+    if low:
+        out["low_window"]={"start":low["start"].strftime("%H:%M"),"end":low["end"].strftime("%H:%M"),"score":low.get("score")}
+    if low_row:
+        out["low_point"]={"time":low_row["dt"].strftime("%H:%M"),"score":low_row.get(topic)}
+    return out
+
+
+def build_ai_daily_payload(query_date, daily_scores, topic_results, timing_rows, market_rows, moon_ingresses):
+    topics={}
+    for topic in AI_TOPIC_ORDER:
+        result=topic_results.get(topic,{})
+        evidence=[]
+        for e in result.get("evidence",[])[:6]:
+            c=_compact_evidence(e)
+            if c: evidence.append(c)
+        topics[topic]={
+            "score":daily_scores.get(topic),
+            "band":score_band(daily_scores.get(topic)),
+            "activation":result.get("activation"),
+            "favorability":result.get("favorability"),
+            "timing":_timing_payload(timing_rows,topic),
+            "evidence":evidence,
+        }
+
+    market={"krx_open":bool(market_rows)}
+    if market_rows:
+        for key in ["수익실현","신규진입","투자주의"]:
+            market[key]={
+                "score":rows_avg(market_rows,key),
+                "best_windows":[
+                    {"start":w["start"].strftime("%H:%M"),"end":w["end"].strftime("%H:%M"),"score":w["score"]}
+                    for w in rolling_top_windows(market_rows,key,3,2)
+                ],
+            }
+    else:
+        nxt=next_krx_session(query_date)
+        market["next_krx_session"]=nxt.isoformat() if nxt else None
+
+    moon_events=[]
+    for ts,sign in (moon_ingresses or []):
+        try: t=datetime.fromisoformat(ts).strftime("%H:%M")
+        except Exception: t=str(ts)
+        moon_events.append({"time":t,"sign":sign})
+
+    return {
+        "version":AI_INTERPRETER_VERSION,
+        "date":query_date.isoformat(),
+        "weekday":WEEKDAY_KO[query_date.weekday()],
+        "method_note":"점수는 앱의 점성술 상대지수이며 확률이 아니다. 일일 대표점수는 07:00~23:30 KST 다중시각 평균, 시간대 탐색은 00:00~23:30 KST.",
+        "moon_ingresses":moon_events,
+        "topics":topics,
+        "market":market,
+    }
+
+
+AI_SYSTEM_PROMPT = """너는 '별빛의 운명' 앱의 점성술 해설자다. 계산자가 아니라 해석자다.
+반드시 제공된 JSON 계산 데이터만 사용하고, 없는 행성 위치·애스펙트·하우스·시간·사건을 절대로 만들어내지 마라.
+점수는 현실 사건의 확률이 아니라 앱 내부의 상대 점성술 지수다. activation은 테마가 얼마나 움직이는지, favorability는 움직일 때 얼마나 부드럽게 풀리는지로 구분해서 읽어라.
+여러 분야를 교차해서 해석하되 숫자가 비슷하다는 이유만으로 인과관계를 만들지 마라.
+연애·연락·재회에서는 특정 사람이 연락한다, 돌아온다, 마음이 있다처럼 타인의 의도나 미래 행동을 단정하지 마라. 실제 행동 신호와 감정 테마를 구분하라.
+컨디션은 질병·진단·치료 예측을 하지 말고 활동 리듬과 휴식 조언만 하라.
+투자는 가격·수익률·매수/매도 성공을 예측하지 마라. KRX 휴장일이면 장중 매매 해설을 만들지 말고 준비·복기 관점으로만 말하라.
+한국어 반말로 자연스럽고 구체적으로 쓰되, '좋을 수 있어', '루틴을 우선', '사건성 신호' 같은 뭉뚱그린 상투어를 반복하지 마라.
+각 분야에서 가능하면 점수·활성도·우호도·시간대·실제 근거를 연결해서 '그래서 오늘 어떻게 읽고 무엇을 할지'를 말하라.
+근거가 약하면 약하다고 분명히 말하고, 점성술 해석임을 벗어나 과학적 사실처럼 표현하지 마라.
+출력은 JSON만 반환하라."""
+
+
+AI_OUTPUT_SHAPE = {
+    "headline":"오늘 흐름을 18자 안팎으로 요약한 제목",
+    "overall":"오늘 전체 흐름을 3~5문장으로 종합. 서로 다른 분야를 비교할 때는 절대 원점수를 단순 서열화하지 말 것.",
+    "priorities":["오늘 가장 실용적인 행동 1","행동 2","행동 3"],
+    "relationship":"연애·연락·재회를 교차해 2~4문장으로 해석",
+    "work_study":"학업·시험·직장·이직을 교차해 2~4문장으로 해석",
+    "money_news":"금전·소식, 필요하면 투자 데이터를 엮어 2~4문장으로 해석",
+    "condition":"컨디션을 1~3문장으로 해석. 의료 진단 금지",
+    "topic_notes":{topic:"해당 분야를 기존 규칙문보다 더 구체적으로 2~4문장 해설" for topic in AI_TOPIC_ORDER},
+    "limits":"이번 해설에서 단정하면 안 되는 부분 또는 근거가 약한 부분을 1~2문장으로 명시",
+}
+
+
+def _validate_ai_output(obj):
+    if not isinstance(obj,dict):
+        return None
+    out={
+        "headline":_clean_ai_text(obj.get("headline"),120),
+        "overall":_clean_ai_text(obj.get("overall"),1800),
+        "relationship":_clean_ai_text(obj.get("relationship"),1200),
+        "work_study":_clean_ai_text(obj.get("work_study"),1200),
+        "money_news":_clean_ai_text(obj.get("money_news"),1200),
+        "condition":_clean_ai_text(obj.get("condition"),900),
+        "limits":_clean_ai_text(obj.get("limits"),900),
+    }
+    priorities=obj.get("priorities",[])
+    out["priorities"]=[_clean_ai_text(x,240) for x in priorities[:3] if _clean_ai_text(x,240)] if isinstance(priorities,list) else []
+    notes=obj.get("topic_notes",{})
+    out["topic_notes"]={}
+    if isinstance(notes,dict):
+        for topic in AI_TOPIC_ORDER:
+            txt=_clean_ai_text(notes.get(topic),1100)
+            if txt: out["topic_notes"][topic]=txt
+    if not out["overall"] and not out["topic_notes"]:
+        return None
+    return out
+
+
+def _call_gemini_once(payload_json, model_name, thinking_level, api_key):
+    model_name=(model_name or AI_DEFAULT_MODEL).strip()
+    safe_model=urllib.parse.quote(model_name,safe="-._")
+    url=f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
+    user_prompt=(
+        "아래 계산 JSON을 해석해. JSON 안에 없는 근거는 만들지 마. "
+        "다음 출력 형태의 키를 그대로 사용하고 topic_notes에는 10개 분야를 가능하면 모두 채워.\n\n"
+        "OUTPUT_SHAPE:\n"+json.dumps(AI_OUTPUT_SHAPE,ensure_ascii=False,separators=(",",":"))+"\n\n"
+        "CALCULATED_DATA:\n"+payload_json
+    )
+    body={
+        "systemInstruction":{"parts":[{"text":AI_SYSTEM_PROMPT}]},
+        "contents":[{"role":"user","parts":[{"text":user_prompt}]}],
+        "generationConfig":{
+            "maxOutputTokens":5200,
+            "responseMimeType":"application/json",
+            "thinkingConfig":{"thinkingLevel":thinking_level},
+        },
+    }
+    req=urllib.request.Request(
+        url,
+        data=json.dumps(body,ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type":"application/json","x-goog-api-key":api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req,timeout=55) as resp:
+            raw=json.loads(resp.read().decode("utf-8"))
+        parts=raw.get("candidates",[{}])[0].get("content",{}).get("parts",[])
+        text="".join(p.get("text","") for p in parts if isinstance(p,dict) and not p.get("thought")).strip()
+        if not text:
+            text="".join(p.get("text","") for p in parts if isinstance(p,dict)).strip()
+        if text.startswith("```"):
+            text=text.strip("`").strip()
+            if text.lower().startswith("json"): text=text[4:].lstrip()
+        parsed=json.loads(text)
+        valid=_validate_ai_output(parsed)
+        if not valid:
+            return {"ok":False,"error":"AI 응답 형식 검증에 실패했어.","error_code":"invalid_output","model":model_name}
+        return {"ok":True,"data":valid,"model":model_name}
+    except urllib.error.HTTPError as exc:
+        try:
+            detail=exc.read().decode("utf-8")[:700]
+        except Exception:
+            detail=""
+        if exc.code==429:
+            msg="Gemini API 사용량 한도 또는 요청 제한에 도달했어. 잠시 뒤 다시 열면 돼."
+        elif exc.code in {401,403}:
+            msg="Gemini API 키 권한이나 결제 프로젝트 연결 상태를 확인해줘."
+        elif exc.code==404:
+            msg=f"{model_name} 모델을 이 API 키/프로젝트에서 사용할 수 없는 것 같아."
+        elif exc.code>=500:
+            msg="Gemini 서버가 일시적으로 불안정해."
+        else:
+            msg=f"Gemini API 오류({exc.code})"
+        return {"ok":False,"error":msg,"detail":detail,"error_code":exc.code,"model":model_name}
+    except Exception as exc:
+        return {
+            "ok":False,
+            "error":f"AI 해설 호출 실패: {type(exc).__name__}",
+            "error_code":type(exc).__name__,
+            "model":model_name,
+        }
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def cached_ai_daily_interpretation(payload_json, preferred_model, thinking_level, key_fingerprint):
+    # key_fingerprint는 캐시 무효화용. 실제 키는 payload/캐시에 넣지 않는다.
+    api_key=_ai_api_key()
+    if not api_key:
+        return {"ok":False,"error":"GEMINI_API_KEY가 설정되지 않았어."}
+
+    preferred_model = preferred_model if preferred_model in AI_SUPPORTED_MODELS else AI_DEFAULT_MODEL
+    thinking_level = thinking_level if thinking_level in AI_ALLOWED_THINKING_LEVELS else AI_DEFAULT_THINKING_LEVEL
+
+    primary=_call_gemini_once(payload_json,preferred_model,thinking_level,api_key)
+    if primary.get("ok"):
+        primary["preferred_model"]=preferred_model
+        primary["thinking_level"]=thinking_level
+        primary["used_fallback"]=False
+        return primary
+
+    # 사용자가 3.7을 선택했을 때만 3.6으로 자동 대체.
+    # 인증/권한 오류는 모델을 바꿔도 해결되지 않으므로 재시도하지 않는다.
+    can_fallback=(
+        preferred_model=="gemini-3.7-flash"
+        and AI_FALLBACK_MODEL!=preferred_model
+        and primary.get("error_code") not in {401,403}
+    )
+    if can_fallback:
+        fallback=_call_gemini_once(payload_json,AI_FALLBACK_MODEL,thinking_level,api_key)
+        if fallback.get("ok"):
+            fallback["preferred_model"]=preferred_model
+            fallback["thinking_level"]=thinking_level
+            fallback["used_fallback"]=True
+            fallback["fallback_from"]=preferred_model
+            return fallback
+        return {
+            "ok":False,
+            "error":primary.get("error","AI 해설 호출 실패"),
+            "primary_error":primary,
+            "fallback_error":fallback,
+            "preferred_model":preferred_model,
+            "thinking_level":thinking_level,
+        }
+
+    primary["preferred_model"]=preferred_model
+    primary["thinking_level"]=thinking_level
+    primary["used_fallback"]=False
+    return primary
+
+
+def get_ai_daily_interpretation(payload, preferred_model=None):
+    api_key=_ai_api_key()
+    if not api_key:
+        return {"ok":False,"missing_key":True,"error":"GEMINI_API_KEY가 설정되지 않았어."}
+    model=preferred_model if preferred_model in AI_SUPPORTED_MODELS else _ai_model()
+    thinking_level=_ai_thinking_level()
+    key_fp=hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
+    payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":"),sort_keys=True)
+    return cached_ai_daily_interpretation(payload_json,model,thinking_level,key_fp)
+
+
+def render_ai_overview(ai_result):
+    if not ai_result or not ai_result.get("ok"):
+        if ai_result and ai_result.get("missing_key"):
+            st.info("✨ AI 정밀해설은 준비되어 있어. Streamlit Secrets에 GEMINI_API_KEY를 추가하면 켜져.")
+        elif ai_result and ai_result.get("error"):
+            st.caption("✨ AI 정밀해설은 이번에 불러오지 못했어. 기존 계산·규칙 해설은 정상 동작해. · "+ai_result.get("error",""))
+        return None
+    data=ai_result["data"]
+    headline=html.escape(data.get("headline") or "AI 정밀 종합해설")
+    overall=html.escape(data.get("overall", ""))
+    chips="".join(f"<span class='ai-chip'>{html.escape(x)}</span>" for x in data.get("priorities",[]))
+    sections=[]
+    for label,key in [("💖 관계","relationship"),("📚 공부·진로","work_study"),("💵 돈·소식","money_news"),("🌿 컨디션","condition")]:
+        text=data.get(key,"")
+        if text: sections.append(f"<div class='ai-topic'><strong>{label}</strong><br>{html.escape(text)}</div>")
+    st.markdown(
+        f"<div class='ai-overview'><div class='ai-head'>✨ AI 정밀해설 · {headline}</div><div class='ai-body'>{overall}</div>"
+        f"<div style='margin-top:8px'>{chips}</div>{''.join(sections)}</div>",
+        unsafe_allow_html=True,
+    )
+    with st.expander("AI 해설 기준 · 개인정보/한계"):
+        st.write("AI는 운세 점수나 천체를 새로 계산하지 않고, 앱이 계산한 숫자·시간대·애스펙트·하우스 근거만 해석합니다.")
+        st.write("AI 요청에는 이름·생년월일·출생시간·출생지 원문·PIN을 보내지 않습니다. 필요한 파생 점성 데이터만 전달합니다.")
+        st.write("AI가 만든 문장은 점성술적 해석이며 사건 확률, 특정인의 의도, 의료 진단, 주가 방향을 의미하지 않습니다.")
+        if data.get("limits"): st.caption("이번 해설의 한계 · "+data["limits"])
+        model_caption="모델 · "+str(ai_result.get("model",AI_DEFAULT_MODEL))
+        if ai_result.get("used_fallback"):
+            model_caption+=f" · {ai_result.get('fallback_from')} 실패 후 자동 대체"
+        model_caption+=f" · thinking {ai_result.get('thinking_level',AI_DEFAULT_THINKING_LEVEL)}"
+        st.caption(model_caption)
+    return data
 
 # ============================================================
 # 9. RETURN / DAILY MOON EVENTS
@@ -1637,19 +1981,39 @@ if main_view=="🌙 일일":
     grid+="</div>"; st.markdown(grid,unsafe_allow_html=True)
     st.caption("점수 라벨: 30~39 약함 · 40~49 다소 약함 · 50~59 보통 · 60~69 보통 이상 · 70~81 강함 · 82 이상 매우 강함")
 
+    # V6.1: 기존 계산 결과를 한 번에 AI 해설층으로 넘긴다. AI는 숫자를 다시 계산하지 않는다.
+    daily_topic_results={topic:aggregate_topic_result(life_rows,topic) for topic in AI_TOPIC_ORDER}
+    ai_payload=build_ai_daily_payload(query_date,daily_scores,daily_topic_results,timing_rows,market_rows,moon_ingresses)
+
+    configured_ai_model=_ai_model()
+    ai_model_options=list(AI_SUPPORTED_MODELS.keys())
+    ai_model_index=ai_model_options.index(configured_ai_model) if configured_ai_model in ai_model_options else 0
+    selected_ai_model=st.selectbox(
+        "✨ AI 해설 모델",
+        ai_model_options,
+        index=ai_model_index,
+        format_func=lambda m: AI_SUPPORTED_MODELS[m],
+        help="3.7 Flash는 정밀 해설 기본값이고, 호출 실패 시 3.6 Flash로 자동 대체돼. 3.6을 직접 고르면 3.6만 사용해.",
+        key="ai_daily_model_choice",
+    )
+    with st.spinner(f"✨ {AI_SUPPORTED_MODELS[selected_ai_model]}가 계산 근거를 종합 해석하는 중..."):
+        ai_result=get_ai_daily_interpretation(ai_payload,selected_ai_model)
+    ai_data=render_ai_overview(ai_result) or {}
+    ai_topic_notes=ai_data.get("topic_notes",{}) if isinstance(ai_data,dict) else {}
+
     st.markdown("#### 💵 돈 · 공부 · 진로")
     for topic in ["금전","학업","시험","직장","이직"]:
-        result=aggregate_topic_result(life_rows,topic)
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows)
+        result=daily_topic_results[topic]
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get(topic,""))
 
     st.markdown("#### 💖 관계 · 연락 · 소식")
     for topic in ["연애","연락","재회","소식"]:
-        result=aggregate_topic_result(life_rows,topic)
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows)
+        result=daily_topic_results[topic]
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get(topic,""))
 
     st.markdown("#### 🌿 컨디션")
-    result=aggregate_topic_result(life_rows,"컨디션")
-    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores,timing_rows)
+    result=daily_topic_results["컨디션"]
+    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores,timing_rows,ai_topic_notes.get("컨디션",""))
     st.caption("컨디션·회복 지수는 점성술상의 활동 리듬 참고값이며 질병·진단·치료 예측이 아닙니다.")
 
     st.markdown("#### 📈 주식·투자")
