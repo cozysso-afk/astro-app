@@ -183,6 +183,10 @@ header [data-testid="stToolbar"] { opacity: .18; }
 .section-kicker { color:#8A7A92; font-size:.77rem; font-weight:700; letter-spacing:.03em; margin:4px 0 8px; }
 .period-range { background:rgba(255,255,255,.68); border-radius:13px; padding:10px 12px; margin:5px 0 12px; color:#665C70; font-size:.86rem; }
 
+.timing-strip { margin-top:10px; padding:9px 11px; border-radius:10px; background:rgba(244,239,249,.78); color:#655A70; font-size:.80rem; line-height:1.55; }
+.decision-strip { margin-top:8px; padding:9px 11px; border-radius:10px; background:rgba(255,247,250,.88); border-left:3px solid rgba(201,92,135,.52); color:#5D5364; font-size:.82rem; line-height:1.55; }
+.astro-note { background:rgba(255,255,255,.62); border:1px solid rgba(202,185,214,.32); border-radius:12px; padding:9px 11px; margin:6px 0 12px; color:#6B6073; font-size:.80rem; line-height:1.55; }
+
 .stTabs [data-baseweb="tab-list"] { overflow-x:auto; flex-wrap:nowrap; justify-content:flex-start; gap:4px; background:rgba(255,255,255,.62); border-radius:16px; padding:5px; scrollbar-width:none; }
 .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display:none; }
 .stTabs [data-baseweb="tab"] { flex:0 0 auto; white-space:nowrap; border-radius:11px; padding:7px 11px; }
@@ -901,6 +905,14 @@ def is_krx_session(day_value):
 def krx_sessions_in_range(start_date, end_date):
     return [d for d in (start_date + timedelta(days=i) for i in range((end_date-start_date).days+1)) if is_krx_session(d)]
 
+
+def next_krx_session(after_date, max_days=14):
+    for i in range(1,int(max_days)+1):
+        candidate=after_date+timedelta(days=i)
+        if is_krx_session(candidate):
+            return candidate
+    return None
+
 # ============================================================
 # 7. SCANS / PERIOD AGGREGATION
 # ============================================================
@@ -1040,8 +1052,80 @@ def rolling_top_windows(rows,key,window_slots=3,top_n=2):
         if len(selected)>=top_n: break
     return selected
 
+
+def rolling_bottom_windows(rows,key,window_slots=3,top_n=1):
+    """낮은 점수 구간. 일상 분야에서는 '덜 유리한/주의' 시간대용."""
+    if not rows: return []
+    window_slots=max(1,min(window_slots,len(rows)))
+    step=rows[1]["dt"]-rows[0]["dt"] if len(rows)>1 else timedelta(minutes=30)
+    candidates=[]
+    for i in range(len(rows)-window_slots+1):
+        vals=[rows[j].get(key) for j in range(i,i+window_slots)]
+        if any(v is None for v in vals): continue
+        candidates.append({"start_idx":i,"end_idx":i+window_slots-1,"start":rows[i]["dt"],"end":rows[i+window_slots-1]["dt"]+step,"score":int(round(sum(vals)/len(vals))),"center_row":rows[i+window_slots//2]})
+    candidates.sort(key=lambda x:x["score"])
+    selected=[]
+    for c in candidates:
+        if any(not(c["end_idx"]<s["start_idx"]-1 or c["start_idx"]>s["end_idx"]+1) for s in selected): continue
+        selected.append(c)
+        if len(selected)>=top_n: break
+    return selected
+
+
+TOPIC_TIMING_HOURS = {
+    "금전":(7,23), "학업":(6,24), "시험":(6,24), "직장":(8,21), "이직":(7,23),
+    "연애":(0,24), "연락":(0,24), "재회":(0,24), "소식":(7,23), "컨디션":(0,24),
+}
+
+
+def topic_timing_data(rows,key,window_slots=3):
+    """하루 안에서 같은 분야끼리 비교한 좋은 구간/덜 유리한 구간/피크.
+    직장·금전 같은 분야는 실제 활용 가능한 활동 시간으로 제한하고, 관계·연락은 24시간을 본다.
+    """
+    start_h,end_h=TOPIC_TIMING_HOURS.get(key,(0,24))
+    rows=[r for r in rows if start_h <= r["dt"].hour < end_h]
+    valid=[(i,r.get(key)) for i,r in enumerate(rows) if isinstance(r.get(key),(int,float)) and not pd.isna(r.get(key))]
+    if not valid:
+        return None
+    scores=[v for _,v in valid]
+    bests=rolling_top_windows(rows,key,window_slots,1)
+    lows=rolling_bottom_windows(rows,key,window_slots,1)
+    best=bests[0] if bests else None
+    low=lows[0] if lows else None
+    peak_row=None; low_row=None
+    if best:
+        subset=rows[best["start_idx"]:best["end_idx"]+1]
+        peak_row=max(subset,key=lambda r:r.get(key,-10**9))
+    if low:
+        subset=rows[low["start_idx"]:low["end_idx"]+1]
+        low_row=min(subset,key=lambda r:r.get(key,10**9))
+    return {
+        "best":best,
+        "low":low,
+        "peak_row":peak_row,
+        "low_row":low_row,
+        "spread":int(round(max(scores)-min(scores))),
+        "day_max":int(round(max(scores))),
+        "day_min":int(round(min(scores))),
+    }
+
+
+def investment_prep_rows(rows):
+    """휴장일용 비매매 준비 지수. 실제 거래 신호와 분리한다."""
+    out=[]
+    for row in rows:
+        if not (7 <= row["dt"].hour < 24):
+            continue
+        money=row.get("금전"); risk=row.get("투자주의"); news=row.get("소식")
+        if not all(isinstance(v,(int,float)) for v in (money,risk,news)):
+            continue
+        # 돈 판단 + 정보 정리 + 과열 억제를 묶은 '준비/검토' 참고값.
+        prep=clamp(.45*money + .20*news + .35*(100-risk))
+        out.append({"dt":row["dt"],"투자준비":int(round(prep)),"투자주의":int(round(risk))})
+    return out
+
 # ============================================================
-# 8. HUMAN READABLE INTERPRETATION · V5.1 NATURAL LANGUAGE
+# 8. HUMAN READABLE INTERPRETATION · V5.3 TIMING + ACTION
 # ============================================================
 def score_band(score):
     """사용자용 강도 라벨. 40점대가 갑자기 '보통'으로 보이지 않도록 세분화."""
@@ -1243,6 +1327,33 @@ def evidence_to_korean(e):
     return f"{t}가 Placidus {p}H에서 보조 신호를 형성"
 
 
+def topic_decision_note(topic, score, timing=None):
+    """관계/연락/소식 분야에서 사용자가 바로 행동으로 옮길 수 있는 한 줄 결론."""
+    if score is None:
+        return ""
+    best_text=""
+    if timing and timing.get("best"):
+        b=timing["best"]
+        best_text=f" 가능하면 {b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')} KST 쪽이 상대적으로 낫다."
+    if topic=="연락":
+        if score>=60:return "먼저 연락해도 돼? → 가볍게 시작해도 괜찮아."+best_text
+        if score>=45:return "먼저 연락해도 돼? → 목적이 분명하면 짧게 한 번 정도는 괜찮아."+best_text
+        return "먼저 연락해도 돼? → 특별히 해야 할 이유가 없다면 기다리는 편이 낫다. 꼭 보내야 한다면 답하기 쉬운 한두 문장만 보내."+best_text
+    if topic=="연애":
+        if score>=60:return "만남·호감 표현을 해도 돼? → 자연스럽게 제안해볼 만해. 다만 후속 반응까지 확인해."+best_text
+        if score>=45:return "관계를 밀어도 돼? → 가벼운 만남·대화는 괜찮지만 확답이나 관계 정의는 서두르지 마."+best_text
+        return "관계를 밀어도 돼? → 고백·확답 요구보다 상대의 자발적인 행동을 보는 편이 낫다."+best_text
+    if topic=="재회":
+        if score>=60:return "재회 쪽으로 움직여도 돼? → 접점이 생기면 대화는 가능하지만, 말보다 실제 후속 행동을 기준으로 봐."+best_text
+        if score>=45:return "재회 확인을 위해 먼저 움직여도 돼? → 확인성 연락보다 자연스러운 접점이 생기는지 먼저 보는 게 낫다."+best_text
+        return "재회를 확인하려 먼저 연락해도 돼? → 지금 점수만으로는 권하지 않아. 그리움과 실제 재접촉 신호를 분리해서 봐."+best_text
+    if topic=="소식":
+        if score>=60:return "기다리는 결과를 확인해도 돼? → 메일·문자·기관 공지를 적극적으로 확인해볼 만해."+best_text
+        if score>=45:return "확인 문의해도 돼? → 약속된 확인일이 지났다면 짧고 명확하게 문의하는 건 괜찮아."+best_text
+        return "확인 문의해도 돼? → 마감이나 약속된 날짜 전이라면 재촉보다 일정·스팸함·문서 상태를 먼저 확인해."+best_text
+    return ""
+
+
 def topic_narrative(topic, score, result, evidences=None, all_scores=None):
     level = score_level(score)
     opening = TOPIC_STATE_COPY[topic][level]
@@ -1252,11 +1363,41 @@ def topic_narrative(topic, score, result, evidences=None, all_scores=None):
     return " ".join(part for part in [opening, favor, cross, action] if part)
 
 
-def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None):
+def render_topic_card(topic, score, result, evidences, key_prefix, all_scores=None, timing_rows=None):
     icon=TOPIC_SPECS[topic]["icon"]; label=DISPLAY_LABELS[topic]
-    st.markdown(f"<div class='ast-card'><div class='topic-head'><div class='ast-title'>{icon} {label}</div><div class='topic-score'>{score}/100 · {score_band(score)}</div></div><div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div></div>",unsafe_allow_html=True)
+    timing=topic_timing_data(timing_rows,topic,3) if timing_rows else None
+    timing_html=""
+    if timing and timing.get("best"):
+        b=timing["best"]; peak=timing.get("peak_row"); low=timing.get("low")
+        peak_text=f" · 피크 {peak['dt'].strftime('%H:%M')} ({peak.get(topic)}/100)" if peak else ""
+        if timing.get("spread",0)<4:
+            timing_html=(f"<div class='timing-strip'>⏰ 하루 안 시간대 차이는 크지 않아. "
+                         f"상대적으로 나은 구간 <strong>{b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')}</strong>{peak_text}</div>")
+        else:
+            low_text=f" · 덜 유리한 구간 <strong>{low['start'].strftime('%H:%M')}~{low['end'].strftime('%H:%M')}</strong>" if low else ""
+            timing_html=(f"<div class='timing-strip'>⏰ 상대적으로 좋은 구간 <strong>{b['start'].strftime('%H:%M')}~{b['end'].strftime('%H:%M')}</strong>{peak_text}{low_text} KST</div>")
+    decision=topic_decision_note(topic,score,timing)
+    decision_html=f"<div class='decision-strip'><strong>{decision}</strong></div>" if decision else ""
+    st.markdown(f"<div class='ast-card'><div class='topic-head'><div class='ast-title'>{icon} {label}</div><div class='topic-score'>{score}/100 · {score_band(score)}</div></div><div class='ast-body'>{topic_narrative(topic,score,result,evidences,all_scores)}</div>{timing_html}{decision_html}</div>",unsafe_allow_html=True)
     with st.expander(f"왜 이렇게 나왔어? · {label}"):
         st.write(f"관련 테마가 얼마나 움직이는지(활성도) **{result['activation']}/100** · 움직일 때 얼마나 부드럽게 풀리는지(우호도) **{result['favorability']}/100**")
+        if timing and timing.get("best"):
+            b=timing["best"]; p=timing.get("peak_row"); low=timing.get("low"); lr=timing.get("low_row")
+            ptxt=f" · 피크 **{p['dt']:%H:%M} {p.get(topic)}/100**" if p else ""
+            st.write(f"⏰ 하루 안 상대 비교: 좋은 구간 **{b['start']:%H:%M}~{b['end']:%H:%M} KST**{ptxt}")
+            if low and timing.get("spread",0)>=4:
+                ltxt=f" · 저점 **{lr['dt']:%H:%M} {lr.get(topic)}/100**" if lr else ""
+                st.write(f"⚠️ 덜 유리한 구간 **{low['start']:%H:%M}~{low['end']:%H:%M} KST**{ltxt}")
+            if p:
+                peak_result=p.get("topics",{}).get(topic,{})
+                peak_evidence=peak_result.get("evidence",[])[:2]
+                if peak_evidence:
+                    st.caption("피크 시간대를 만든 주요 근거")
+                    for e in peak_evidence: st.write("• "+evidence_to_korean(e))
+        slow=[e for e in (evidences or []) if e.get("transit") in {"Jupiter","Saturn","Uranus","Neptune","Pluto"}]
+        if slow:
+            st.caption("장기 배경 · 하루 타이밍보다 느리게 지속되는 신호")
+            for e in slow[:2]: st.write("• "+evidence_to_korean(e))
         if evidences:
             st.caption("주요 계산 근거 · 아래는 설명용 천문/점성 데이터입니다.")
             for e in evidences[:6]: st.write("• "+evidence_to_korean(e))
@@ -1333,6 +1474,39 @@ def period_topic_text(rows,key):
 # ============================================================
 # 9. RETURN / DAILY MOON EVENTS
 # ============================================================
+@st.cache_data(ttl=21600, show_spinner=False)
+def cached_moon_ingresses(day_iso):
+    """KST 하루 안 Moon 별자리 이동 시각을 약 1분 이내로 좁힌다. 개인 점수와는 별도인 전체 하늘 맥락."""
+    day_value=date.fromisoformat(day_iso)
+    start=KST.localize(datetime.combine(day_value,dt_time(0,0)))
+    end=start+timedelta(days=1)
+    points=[]; cur=start
+    while cur<=end:
+        points.append(cur); cur+=timedelta(minutes=30)
+
+    sf_points=ts.from_datetimes([p.astimezone(UTC) for p in points])
+    moon_lons=get_tropical_ecliptic_lons("Moon",sf_points)
+    sign_indices=[int((float(lon)%360)//30) for lon in moon_lons]
+
+    def sign_idx(dt_kst):
+        lon=get_tropical_ecliptic_lon("Moon",sf_time(dt_kst.astimezone(UTC)))
+        return int((lon%360)//30)
+
+    events=[]
+    prev=points[0]; prev_idx=sign_indices[0]
+    for cur,cur_idx in zip(points[1:],sign_indices[1:]):
+        if cur_idx!=prev_idx:
+            lo,hi=prev,cur; lo_idx=prev_idx
+            for _ in range(12):
+                mid=lo+(hi-lo)/2
+                if sign_idx(mid)==lo_idx: lo=mid
+                else: hi=mid
+            event_dt=hi.replace(second=0,microsecond=0)
+            new_idx=sign_idx(hi)
+            events.append((event_dt.isoformat(),SIGNS_KO[new_idx]))
+        prev,prev_idx=cur,cur_idx
+    return events
+
 def make_sample_datetimes(start_dt_utc,end_dt_utc,step_hours):
     out=[]; cur=start_dt_utc.astimezone(UTC); end=end_dt_utc.astimezone(UTC); step=timedelta(hours=step_hours)
     while cur<end: out.append(cur); cur+=step
@@ -1442,8 +1616,16 @@ if main_view=="🌙 일일":
     if query_date==today_kst: st.caption("앱을 열었을 때 오늘 날짜를 자동으로 계산합니다. 기준 시각 입력은 필요 없습니다.")
     else: st.caption("선택한 날짜의 하루 전체 흐름을 여러 시간대로 나눠 계산합니다.")
 
+    moon_ingresses=cached_moon_ingresses(query_date.isoformat())
+    if moon_ingresses:
+        moon_text=" · ".join(f"{datetime.fromisoformat(ts).strftime('%H:%M')} {sign} 진입" for ts,sign in moon_ingresses)
+        st.markdown(f"<div class='astro-note'>🌙 <strong>오늘 달의 별자리 전환</strong> · {moon_text}<br>이건 모두에게 공통인 하늘의 분위기 변화이고, 개인 운세 점수는 네이탈 트랜짓·하우스 계산을 우선해.</div>",unsafe_allow_html=True)
+
     with st.spinner("하루 전체 흐름을 계산하는 중..."):
+        # 기존 일일 점수(07:00~23:30)는 그대로 유지하고, 새벽 00:00~06:30은 시간대 탐색에만 추가한다.
         life_rows=cached_intraday_scan(query_date.isoformat(),"07:00:00","23:30:00",30,natal_packed,houses_packed)
+        early_rows=cached_intraday_scan(query_date.isoformat(),"00:00:00","06:30:00",30,natal_packed,houses_packed)
+        timing_rows=early_rows+life_rows
         market_rows=cached_intraday_scan(query_date.isoformat(),"09:00:00","15:30:00",15,natal_packed,houses_packed) if is_krx_session(query_date) else []
 
     daily_scores={k:rows_avg(life_rows,k) for k in ["금전","학업","시험","직장","이직","연애","연락","재회","소식","컨디션"]}
@@ -1458,21 +1640,30 @@ if main_view=="🌙 일일":
     st.markdown("#### 💵 돈 · 공부 · 진로")
     for topic in ["금전","학업","시험","직장","이직"]:
         result=aggregate_topic_result(life_rows,topic)
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores)
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows)
 
     st.markdown("#### 💖 관계 · 연락 · 소식")
     for topic in ["연애","연락","재회","소식"]:
         result=aggregate_topic_result(life_rows,topic)
-        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores)
+        render_topic_card(topic,daily_scores[topic],result,result["evidence"],"daily",daily_scores,timing_rows)
 
     st.markdown("#### 🌿 컨디션")
     result=aggregate_topic_result(life_rows,"컨디션")
-    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores)
+    render_topic_card("컨디션",daily_scores["컨디션"],result,result["evidence"],"daily",daily_scores,timing_rows)
     st.caption("컨디션·회복 지수는 점성술상의 활동 리듬 참고값이며 질병·진단·치료 예측이 아닙니다.")
 
     st.markdown("#### 📈 주식·투자")
     if not market_rows:
-        st.markdown("<div class='ast-card market-closed'><div class='ast-title'>📵 국내 증시 휴장</div><div class='ast-body'>오늘은 KRX 거래일이 아니므로 <strong>신규진입·수익실현·장중 추천시간 점수를 계산하지 않습니다.</strong> 0점으로 넣지도 않아서 주간·월간 투자 평균을 왜곡하지 않아. 보유 종목 점검·관심종목 정리·다음 거래일 계획용으로만 써.</div></div>",unsafe_allow_html=True)
+        nxt=next_krx_session(query_date)
+        nxt_text=f" · 다음 KRX 거래일 <strong>{nxt:%m/%d}({WEEKDAY_KO[nxt.weekday()]})</strong>" if nxt else ""
+        st.markdown(f"<div class='ast-card market-closed'><div class='ast-title'>📵 국내 증시 휴장</div><div class='ast-body'>대주주님, 오늘은 KRX 거래일이 아니므로 <strong>신규진입·수익실현·장중 매매 지수는 산출·표시하지 않습니다.</strong>{nxt_text}<br>대신 아래 시간대는 실제 주문 시간이 아니라 <strong>매매일지 복기·보유종목 기준 정리·관심종목 조사</strong> 같은 준비 작업용 상대값입니다.</div></div>",unsafe_allow_html=True)
+        prep_rows=investment_prep_rows(timing_rows)
+        prep_w=rolling_top_windows(prep_rows,"투자준비",3,2)
+        prep_risk=rolling_top_windows(prep_rows,"투자주의",3,1)
+        render_windows("🗂️ 휴장일 투자 준비·검토 시간대",prep_w,"투자준비")
+        st.markdown("<div class='event-pill'><strong>휴장일에 해둘 일</strong> · 지난 거래일 매매일지 복기 → 보유종목 익절·손절 기준을 숫자로 적기 → 관심종목 후보를 줄이고 다음 거래일 주문 조건을 미리 정리해두세요.</div>",unsafe_allow_html=True)
+        render_windows("⚠️ 과열·확증편향 주의 시간대",prep_risk,"투자주의","risk")
+        st.caption("휴장일 준비 지수는 금전 판단·정보 정리·과열 억제를 묶은 점성술 상대값이며 매매 수익확률이나 가격 방향 예측이 아닙니다.")
     else:
         realize=rows_avg(market_rows,"수익실현"); entry=rows_avg(market_rows,"신규진입"); risk=rows_avg(market_rows,"투자주의")
         st.markdown(f"<div class='ast-card'><div class='ast-title'>📈 오늘의 투자 지수</div><div class='ast-body'>수익실현 <strong>{realize}/100</strong> · 신규진입 <strong>{entry}/100</strong> · 과열주의 <strong>{risk}/100</strong><br>점성술 내부 상대지수일 뿐 실제 가격 방향이나 수익확률은 아닙니다.</div></div>",unsafe_allow_html=True)
@@ -1489,7 +1680,7 @@ if main_view=="🌙 일일":
         st.write(f"Ephemeris: **{EPHEMERIS_USED}**")
         st.write("Tropical · true ecliptic/equinox of date · Whole Sign 주 기준 + Placidus 보조")
         st.write(f"대표 시각 달: **{moon_sign} {moon_deg:.2f}°**")
-        st.write("일일 대표값은 한 시각 스냅샷이 아니라 07:00~23:30 다중 시각 스캔 평균입니다.")
+        st.write("일일 대표점수는 기존과 동일하게 07:00~23:30 KST 다중 시각 평균이며, 시간대 탐색만 00:00~23:30까지 확장합니다.")
 
 # ------------------------------------------------------------
 # WEEKLY
@@ -1578,8 +1769,9 @@ elif main_view=="🔬 정밀분석":
         st.markdown("### ⏰ 선택 날짜 정밀 시간대")
         life_topic=st.selectbox("일상 분야",["시험","학업","직장","이직","연애","연락","재회","소식","금전","컨디션"],key="precision_topic")
         with st.spinner("30분 단위로 계산하는 중..."):
-            precision_rows=cached_intraday_scan(query_date.isoformat(),"07:00:00","23:30:00",30,natal_packed,houses_packed)
+            precision_rows=cached_intraday_scan(query_date.isoformat(),"00:00:00","23:30:00",30,natal_packed,houses_packed)
         render_windows(f"{TOPIC_SPECS[life_topic]['icon']} {DISPLAY_LABELS[life_topic]} TOP 시간대",rolling_top_windows(precision_rows,life_topic,3,3),life_topic)
+        render_windows(f"⚠️ {DISPLAY_LABELS[life_topic]} 상대적으로 덜 유리한 시간대",rolling_bottom_windows(precision_rows,life_topic,3,2),life_topic,"risk")
         if is_krx_session(query_date):
             mrows=cached_intraday_scan(query_date.isoformat(),"09:00:00","15:30:00",15,natal_packed,houses_packed)
             render_windows("📈 수익실현 TOP 시간대",rolling_top_windows(mrows,"수익실현",3,3),"수익실현")
