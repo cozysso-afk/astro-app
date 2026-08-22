@@ -1494,6 +1494,7 @@ AI_DEFAULT_MODEL = "gemini-3.7-flash"
 AI_FALLBACK_MODEL = "gemini-3.6-flash"
 AI_DEFAULT_THINKING_LEVEL = "medium"
 AI_ALLOWED_THINKING_LEVELS = {"low", "medium", "high"}
+AI_MAX_OUTPUT_TOKENS = 16384
 AI_TOPIC_ORDER = ["금전","학업","시험","직장","이직","연애","연락","재회","소식","컨디션"]
 
 
@@ -1674,7 +1675,7 @@ def _call_gemini_once(payload_json, model_name, thinking_level, api_key):
         "systemInstruction":{"parts":[{"text":AI_SYSTEM_PROMPT}]},
         "contents":[{"role":"user","parts":[{"text":user_prompt}]}],
         "generationConfig":{
-            "maxOutputTokens":5200,
+            "maxOutputTokens":AI_MAX_OUTPUT_TOKENS,
             "responseMimeType":"application/json",
             "thinkingConfig":{"thinkingLevel":thinking_level},
         },
