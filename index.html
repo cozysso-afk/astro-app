@@ -77,9 +77,11 @@
       const target = new URL(base);
       const current = new URLSearchParams(window.location.search);
       const kind = current.get('kind');
+      const date = current.get('date');
       const year = current.get('year');
       const month = current.get('month');
       if (kind) target.searchParams.set('push_kind', kind);
+      if (date) target.searchParams.set('push_date', date);
       if (year) target.searchParams.set('push_year', year);
       if (month) target.searchParams.set('push_month', month);
       return target.toString();
