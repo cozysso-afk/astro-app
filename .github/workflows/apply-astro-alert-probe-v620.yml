@@ -1,0 +1,54 @@
+name: Apply astrology alert probe v6.20
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_astro_alert_probe_v620.py"
+      - ".github/workflows/apply-astro-alert-probe-v620.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync main before patch
+        run: git pull --rebase origin main
+
+      - name: Apply alert probe
+        run: python scripts/upgrade_astro_alert_probe_v620.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py scripts/upgrade_astro_alert_probe_v620.py
+
+      - name: Feature marker check
+        shell: bash
+        run: |
+          grep -q 'ASTRO_ALERT_PROBE_VERSION = "v1"' app.py
+          grep -q 'ASTRO_ALERT_JSON=' app.py
+          grep -q '"precision":"🔬 정밀분석"' app.py
+          grep -q 'def _personal_exact_alert_events' app.py
+          grep -q 'def _score_alert_candidates' app.py
+
+      - name: Commit and push patched app safely
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: add personalized astrology alert probe"
+          git pull --rebase origin main
+          git push origin main
