@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Trigger v6.9.0 archive resilience workflow after the workflow exists on main.
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
 
