@@ -1,0 +1,50 @@
+name: Apply annual fortune v6.5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_annual_fortune_v65.py"
+      - ".github/workflows/apply-annual-fortune-v65.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply annual fortune upgrade
+        run: python scripts/upgrade_annual_fortune_v65.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Annual feature marker check
+        shell: bash
+        run: |
+          grep -q 'ANNUAL_AI_INTERPRETER_VERSION = "v1.0"' app.py
+          grep -q 'elif main_view=="🌌 연간"' app.py
+          grep -q 'fortune_archive_year_annual' app.py
+          grep -q 'Solar Return' app.py
+
+      - name: Commit patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: add cached annual astrology report"
+          git push origin HEAD:main
