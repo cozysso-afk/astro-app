@@ -1,0 +1,58 @@
+name: Apply relationship observation v6.10.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_relationship_observation_v6101.py"
+      - ".github/workflows/apply-relationship-observation-v6101.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync main before patch
+        run: git pull --rebase origin main
+
+      - name: Apply relationship observation metadata
+        run: python scripts/upgrade_relationship_observation_v6101.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Feature marker check
+        shell: bash
+        run: |
+          grep -q 'RELATIONSHIP_OBSERVATION_VERSION = "v1.1"' app.py
+          grep -q 'event_time_bucket' app.py
+          grep -q 'channel_options=' app.py
+          grep -q '연락 시각대(선택)' app.py
+          grep -q '연락 경로(선택)' app.py
+          grep -q '현재 운세 점수나 가중치를 즉시 바꾸지는 않아' app.py
+
+      - name: Commit and push patched app safely
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "Relationship observation v6.10.1 already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: record relationship contact time and channel metadata"
+          git pull --rebase origin main
+          git push origin HEAD:main
