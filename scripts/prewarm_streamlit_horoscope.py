@@ -10,11 +10,12 @@ from playwright.sync_api import sync_playwright
 
 KST = ZoneInfo("Asia/Seoul")
 APP_URL = "https://astro-app-wmz23ohfhmhrhrz2gg3kej.streamlit.app/"
+VALID_KINDS = {"daily", "weekly", "monthly"}
 
 SCHEDULE_TO_KIND = {
     "30 22 * * *": "daily",   # 07:30 KST
     "30 11 * * 0": "weekly",  # Sunday 20:30 KST
-    "30 10 * * *": "monthly", # 19:30 KST; last-day guard below
+    "30 10 * * *": "monthly", # 19:30 KST; workflow guard limits scheduled runs to month-end
 }
 
 
@@ -22,22 +23,35 @@ def next_month(year: int, month: int):
     return (year + 1, 1) if month == 12 else (year, month + 1)
 
 
+def next_monday(day_value):
+    # Monday=0. On Monday itself, use the current Monday; on Sunday this returns tomorrow.
+    days_ahead = (7 - day_value.weekday()) % 7
+    return day_value + timedelta(days=days_ahead)
+
+
+def explicit_kind():
+    value = (os.getenv("ASTRO_PREGEN_KIND") or "").strip().lower()
+    return value if value in VALID_KINDS else ""
+
+
 def resolve_kind():
-    explicit = (os.getenv("ASTRO_PREGEN_KIND") or "").strip().lower()
-    if explicit in {"daily", "weekly", "monthly"}:
+    explicit = explicit_kind()
+    if explicit:
         return explicit
     return SCHEDULE_TO_KIND.get((os.getenv("GITHUB_EVENT_SCHEDULE") or "").strip(), "")
 
 
-def target_url(kind: str, now_kst: datetime):
+def target_url(kind: str, now_kst: datetime, manual: bool = False):
     params = {"push_kind": kind, "automation": "1"}
     if kind == "daily":
         params["push_date"] = now_kst.date().isoformat()
     elif kind == "weekly":
-        params["push_date"] = (now_kst.date() + timedelta(days=1)).isoformat()
+        params["push_date"] = next_monday(now_kst.date()).isoformat()
     elif kind == "monthly":
         tomorrow = now_kst.date() + timedelta(days=1)
-        if tomorrow.month == now_kst.month:
+        # Scheduled monthly prewarm should only occur at month-end. Manual testing is
+        # deliberately allowed on any day and previews the coming calendar month.
+        if not manual and tomorrow.month == now_kst.month:
             return None
         year, month = next_month(now_kst.year, now_kst.month)
         params["push_year"] = str(year)
@@ -219,15 +233,16 @@ def main():
         print("ASTRO_APP_PIN secret is not configured yet; skipping pre-generation without failing.")
         return 0
 
+    manual = bool(explicit_kind())
     kind = resolve_kind()
     if not kind:
         print("Could not resolve pre-generation kind; skipping.")
         return 0
 
     now_kst = datetime.now(KST)
-    url = target_url(kind, now_kst)
+    url = target_url(kind, now_kst, manual=manual)
     if url is None:
-        print("Monthly pre-generation fired on a non-last day; skipping.")
+        print("Monthly scheduled pre-generation fired on a non-last day; skipping.")
         return 0
 
     print(f"Pre-generating {kind} horoscope in Streamlit server cache.")
