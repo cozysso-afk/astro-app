@@ -1,0 +1,40 @@
+name: Horoscope push reminders
+
+on:
+  schedule:
+    - cron: "0 23 * * *"   # 08:00 KST daily
+    - cron: "0 12 * * 0"  # Sunday 21:00 KST
+    - cron: "0 11 * * *"   # 20:00 KST daily; sender only sends monthly on the last day
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Push kind"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+      ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
+      GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
+      ASTRO_PUSH_KIND: ${{ inputs.kind }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate sender syntax
+        run: python -m py_compile scripts/send_onesignal_horoscope_push.py
+
+      - name: Send reminder when configured
+        run: python scripts/send_onesignal_horoscope_push.py
