@@ -1,0 +1,55 @@
+name: Apply persistent IndexedDB storage v6.7.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_persistent_storage_v671.py"
+      - ".github/workflows/apply-persistent-storage-v671.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: astro-app-write-main
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply persistent storage upgrade
+        run: python scripts/upgrade_persistent_storage_v671.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Persistent storage marker check
+        shell: bash
+        run: |
+          grep -q 'def _request_browser_persistent_storage' app.py
+          grep -q 'navigator.storage.persist()' app.py
+          grep -q 'IndexedDB 오래 보관 요청' app.py
+          grep -q '지속 저장 모드가 허용됐어' app.py
+
+      - name: Commit and push patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: request persistent IndexedDB storage"
+          git pull --rebase origin main
+          git push origin HEAD:main
