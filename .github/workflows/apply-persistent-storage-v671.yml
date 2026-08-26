@@ -10,14 +10,9 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: astro-app-write-main
-  cancel-in-progress: false
-
 jobs:
   patch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +36,7 @@ jobs:
           grep -q 'IndexedDB 오래 보관 요청' app.py
           grep -q '지속 저장 모드가 허용됐어' app.py
 
-      - name: Commit and push patched app
+      - name: Commit patched app
         shell: bash
         run: |
           if git diff --quiet -- app.py; then
@@ -52,5 +47,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
           git commit -m "feat: request persistent IndexedDB storage"
-          git pull --rebase origin main
           git push origin HEAD:main
