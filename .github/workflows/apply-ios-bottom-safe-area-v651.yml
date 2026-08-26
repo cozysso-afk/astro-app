@@ -1,0 +1,47 @@
+name: Apply iOS bottom safe area v6.5.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/fix_ios_bottom_toolbar_v651.py"
+      - ".github/workflows/apply-ios-bottom-safe-area-v651.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply iOS safe area fix
+        run: python scripts/fix_ios_bottom_toolbar_v651.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Mobile CSS marker check
+        run: |
+          grep -q 'padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
+          grep -q 'scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
+
+      - name: Commit patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "fix: keep mobile buttons above iOS Safari toolbar"
+          git push origin HEAD:main
