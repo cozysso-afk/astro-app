@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/fix_ios_bottom_toolbar_v651.py"
+      - "scripts/upgrade_indexeddb_archive_v67.py"
       - ".github/workflows/apply-ios-bottom-safe-area-v651.yml"
 
 permissions:
@@ -22,16 +23,24 @@ jobs:
       - name: Apply iOS safe area fix
         run: python scripts/fix_ios_bottom_toolbar_v651.py
 
+      - name: Apply IndexedDB fortune storage upgrade
+        run: python scripts/upgrade_indexeddb_archive_v67.py
+
       - name: Python syntax check
         run: python -m py_compile app.py
 
       - name: Diff sanity check
         run: git diff --check
 
-      - name: Mobile CSS marker check
+      - name: Feature marker check
+        shell: bash
         run: |
           grep -q 'padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
           grep -q 'scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
+          grep -q 'BROWSER_IDB_SCHEMA_VERSION = 1' app.py
+          grep -q 'BROWSER_IDB_DB_NAME = "astro_fortune_db_v1"' app.py
+          grep -q 'def _read_browser_storage_estimate' app.py
+          grep -q 'IndexedDB에 장기 보관' app.py
 
       - name: Commit patched app
         shell: bash
@@ -43,5 +52,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "fix: keep mobile buttons above iOS Safari toolbar"
+          git commit -m "feat: move fortune archive to IndexedDB"
           git push origin HEAD:main
