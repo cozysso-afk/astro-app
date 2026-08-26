@@ -33,7 +33,7 @@ jobs:
         run: |
           grep -q 'ANNUAL_AI_INTERPRETER_VERSION = "v1.0"' app.py
           grep -q 'elif main_view=="🌌 연간"' app.py
-          grep -q 'fortune_archive_year_annual' app.py
+          grep -q 'filter_label=="연간"' app.py
           grep -q 'Solar Return' app.py
 
       - name: Commit patched app
