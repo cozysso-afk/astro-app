@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# v6.7.1 retrigger: workflow now exists on main, so this touch safely re-runs the patch.
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
 
