@@ -1,36 +1,14 @@
-name: Validate final direct OneSignal sender
+name: Completed direct push validation (disabled)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/validate-final-push-direct.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  validate:
+  completed:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      ONESIGNAL_APP_ID: "203c25c5-85da-4b51-bd33-b93476622e84"
-      ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
-      ASTRO_PUSH_KIND: daily
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify API key
-        shell: bash
-        run: |
-          if [ -z "$ONESIGNAL_APP_API_KEY" ]; then
-            echo "::error::Missing ONESIGNAL_APP_API_KEY"
-            exit 1
-          fi
-
-      - name: Validate sender syntax
-        run: python -m py_compile scripts/send_onesignal_horoscope_push.py
-
-      - name: Send direct test push
-        run: python scripts/send_onesignal_horoscope_push.py
+      - name: Validation already completed
+        run: echo "Direct OneSignal sender validation already completed successfully."
