@@ -34,7 +34,6 @@ def target_url(kind: str, now_kst: datetime):
     if kind == "daily":
         params["push_date"] = now_kst.date().isoformat()
     elif kind == "weekly":
-        # Sunday evening pre-generation prepares Monday-Sunday.
         params["push_date"] = (now_kst.date() + timedelta(days=1)).isoformat()
     elif kind == "monthly":
         tomorrow = now_kst.date() + timedelta(days=1)
@@ -48,45 +47,169 @@ def target_url(kind: str, now_kst: datetime):
     return APP_URL + "?" + urlencode(params)
 
 
+def all_scopes(page):
+    # Main Streamlit DOM is normally the page itself, but checking child frames makes
+    # this resilient to Streamlit/component rendering changes.
+    scopes = [page]
+    for frame in page.frames:
+        if frame is not page.main_frame:
+            scopes.append(frame)
+    return scopes
+
+
+def body_text(scope, timeout=1500):
+    try:
+        return scope.locator("body").inner_text(timeout=timeout)
+    except Exception:
+        return ""
+
+
 def maybe_wake_streamlit(page):
-    for label in ["Yes, get this app back up!", "Get this app back up", "Wake up"]:
-        locator = page.get_by_text(label, exact=False)
+    labels = [
+        "Yes, get this app back up!",
+        "Get this app back up",
+        "Wake up",
+        "This app has gone to sleep",
+    ]
+    for scope in all_scopes(page):
+        for label in labels:
+            locator = scope.get_by_text(label, exact=False)
+            try:
+                if locator.count() and locator.first.is_visible():
+                    # The first three are buttons/links. The sleep heading itself may
+                    # only signal that a nearby wake button should be searched.
+                    if label == "This app has gone to sleep":
+                        for button_label in ["Yes, get this app back up!", "Get this app back up", "Wake up"]:
+                            btn = scope.get_by_role("button", name=button_label, exact=False)
+                            if btn.count() and btn.first.is_visible():
+                                btn.first.click()
+                                page.wait_for_timeout(3500)
+                                return True
+                    else:
+                        locator.first.click()
+                        page.wait_for_timeout(3500)
+                        return True
+            except Exception:
+                pass
+    return False
+
+
+def _find_pin_box(scope):
+    candidates = [
+        scope.locator('input[placeholder="PIN 입력"]'),
+        scope.locator('input[type="password"]'),
+        scope.get_by_role("textbox", name="PIN", exact=False),
+    ]
+    for locator in candidates:
         try:
             if locator.count() and locator.first.is_visible():
-                locator.first.click()
-                page.wait_for_timeout(2500)
-                return True
+                return locator.first
         except Exception:
             pass
+    return None
+
+
+def _app_is_unlocked(page):
+    for scope in all_scopes(page):
+        text = body_text(scope)
+        if "정밀분석" in text and "저장함" in text:
+            return True
     return False
+
+
+def dump_diagnostics(page, reason: str):
+    print(f"HEADLESS_DIAGNOSTICS reason={reason}", file=sys.stderr)
+    try:
+        print(f"url={page.url}", file=sys.stderr)
+    except Exception:
+        pass
+    try:
+        print(f"title={page.title(timeout=3000)!r}", file=sys.stderr)
+    except Exception as exc:
+        print(f"title_error={type(exc).__name__}: {exc}", file=sys.stderr)
+
+    for index, scope in enumerate(all_scopes(page)):
+        try:
+            scope_url = getattr(scope, "url", "")
+        except Exception:
+            scope_url = ""
+        text = body_text(scope, timeout=2500)
+        # Never print entered values. Body text does not expose password input values.
+        print(f"scope[{index}] url={scope_url!r}", file=sys.stderr)
+        print(f"scope[{index}] body={text[:3500]!r}", file=sys.stderr)
+        try:
+            inputs = scope.locator("input")
+            meta = []
+            for i in range(min(inputs.count(), 12)):
+                node = inputs.nth(i)
+                meta.append({
+                    "type": node.get_attribute("type"),
+                    "placeholder": node.get_attribute("placeholder"),
+                    "aria": node.get_attribute("aria-label"),
+                })
+            print(f"scope[{index}] inputs={meta!r}", file=sys.stderr)
+        except Exception as exc:
+            print(f"scope[{index}] input_scan_error={type(exc).__name__}: {exc}", file=sys.stderr)
+        try:
+            buttons = scope.get_by_role("button")
+            labels = []
+            for i in range(min(buttons.count(), 20)):
+                try:
+                    labels.append(buttons.nth(i).inner_text(timeout=500)[:120])
+                except Exception:
+                    pass
+            print(f"scope[{index}] buttons={labels!r}", file=sys.stderr)
+        except Exception:
+            pass
 
 
 def login_if_needed(page, pin: str):
     deadline = time.time() + 150
+    last_diag = 0.0
     while time.time() < deadline:
         maybe_wake_streamlit(page)
-        pin_box = page.locator('input[placeholder="PIN 입력"]')
-        try:
-            if pin_box.count() and pin_box.first.is_visible():
-                pin_box.first.fill(pin)
-                button = page.get_by_role("button", name="🌙 별빛의 운명 열기")
-                if button.count():
+
+        if _app_is_unlocked(page):
+            return
+
+        for scope in all_scopes(page):
+            pin_box = _find_pin_box(scope)
+            if pin_box is None:
+                continue
+            try:
+                pin_box.fill(pin)
+                button = scope.get_by_role("button", name="🌙 별빛의 운명 열기", exact=False)
+                if button.count() and button.first.is_visible():
                     button.first.click()
                 else:
-                    pin_box.first.press("Enter")
-                page.wait_for_timeout(3000)
-                return
-        except Exception:
-            pass
+                    pin_box.press("Enter")
+                page.wait_for_timeout(3500)
+                # Do not immediately return: verify that the app actually unlocked.
+                if _app_is_unlocked(page):
+                    return
+                # A wrong PIN should be surfaced explicitly rather than looping silently.
+                for check_scope in all_scopes(page):
+                    text = body_text(check_scope)
+                    if "PIN이 맞지 않습니다" in text:
+                        raise RuntimeError("ASTRO_APP_PIN does not match the Streamlit APP_PIN")
+            except RuntimeError:
+                raise
+            except Exception:
+                pass
 
-        # If the menu already exists, a remembered/session unlock was enough.
-        try:
-            body = page.locator("body").inner_text(timeout=2000)
-            if "정밀분석" in body and "저장함" in body:
-                return
-        except Exception:
-            pass
+        combined = "\n".join(body_text(scope) for scope in all_scopes(page))
+        if "You need access" in combined or "Sign in to continue" in combined:
+            raise RuntimeError("Streamlit Cloud access gate blocked the headless browser")
+        if "APP_PIN을 먼저 설정" in combined:
+            raise RuntimeError("Streamlit app reports APP_PIN is not configured")
+
+        # Print one mid-run snapshot so failures are diagnosable without waiting for the end.
+        if time.time() - last_diag > 45:
+            dump_diagnostics(page, "waiting_for_login")
+            last_diag = time.time()
         page.wait_for_timeout(1500)
+
+    dump_diagnostics(page, "login_timeout")
     raise RuntimeError("Timed out waiting for the Streamlit PIN form or unlocked app")
 
 
@@ -96,30 +219,30 @@ def wait_for_report(page, kind: str):
             "최초 생성 사용량",
             "Gemini API 재호출 0회",
             "같은 계산값의 AI 해설",
+            "오늘의 AI 정밀 해설",
         ]
-        timeout_seconds = 180
+        timeout_seconds = 220
     else:
         markers = [
             "AI PERIOD DEEP INTERPRETATION",
             "저장된 기간 AI 해설 사용",
             "이 기간의 새 AI 해설을 저장했어",
+            "기간 AI 심층 해설",
         ]
-        timeout_seconds = 300 if kind == "monthly" else 210
+        timeout_seconds = 330 if kind == "monthly" else 240
 
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
-        try:
-            body = page.locator("body").inner_text(timeout=3000)
-        except Exception:
-            body = ""
-        if any(marker in body for marker in markers):
+        combined = "\n".join(body_text(scope, timeout=2500) for scope in all_scopes(page))
+        if any(marker in combined for marker in markers):
             return True
-        if "GEMINI_API_KEY" in body and ("설정되지" in body or "확인해" in body):
+        if "GEMINI_API_KEY" in combined and ("설정되지" in combined or "확인해" in combined):
             raise RuntimeError("Streamlit app reports a missing GEMINI_API_KEY")
-        if "PIN이 맞지 않습니다" in body:
+        if "PIN이 맞지 않습니다" in combined:
             raise RuntimeError("ASTRO_APP_PIN does not match the Streamlit APP_PIN")
         maybe_wake_streamlit(page)
         page.wait_for_timeout(2000)
+    dump_diagnostics(page, f"report_timeout_{kind}")
     raise RuntimeError(f"Timed out waiting for {kind} AI report completion")
 
 
@@ -144,10 +267,15 @@ def main():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(locale="ko-KR", timezone_id="Asia/Seoul")
+            context = browser.new_context(
+                locale="ko-KR",
+                timezone_id="Asia/Seoul",
+                viewport={"width": 1280, "height": 1400},
+            )
             page = context.new_page()
             page.set_default_timeout(15000)
             page.goto(url, wait_until="domcontentloaded", timeout=120000)
+            page.wait_for_timeout(5000)
             login_if_needed(page, pin)
             wait_for_report(page, kind)
             print(f"Pre-generation completed for {kind}; server-side cache should now be warm.")
