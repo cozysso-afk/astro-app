@@ -1,10 +1,11 @@
-name: Apply push deep-link routing v6.8.1
+name: Apply push routing + archive resilience
 
 on:
   push:
     branches: [main]
     paths:
       - "scripts/upgrade_push_deeplink_v68.py"
+      - "scripts/upgrade_archive_resilience_v690.py"
       - ".github/workflows/apply-push-deeplink-v68.yml"
 
 permissions:
@@ -17,14 +18,21 @@ concurrency:
 jobs:
   patch:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Sync main
+        run: git pull --rebase origin main
+
       - name: Apply push deep-link routing
         run: python scripts/upgrade_push_deeplink_v68.py
+
+      - name: Apply archive resilience
+        run: python scripts/upgrade_archive_resilience_v690.py
 
       - name: Python syntax check
         run: python -m py_compile app.py
@@ -32,14 +40,18 @@ jobs:
       - name: Diff sanity check
         run: git diff --check
 
-      - name: Deep-link marker check
+      - name: Feature marker check
         shell: bash
         run: |
           grep -q 'PUSH_ROUTE_TO_VIEW=' app.py
           grep -q 'push_date_text=_query_param_text' app.py
           grep -q '_push_monthly_autocalc' app.py
-          grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
-          grep -q '월간 알림에서 들어와 선택된 달을 자동 계산해' app.py
+          grep -q 'def _request_browser_persistent_storage' app.py
+          grep -q 'navigator.storage.persist()' app.py
+          grep -q 'def _read_browser_archive_backup' app.py
+          grep -q 'def _restore_browser_archive_records' app.py
+          grep -q '저장함 JSON 백업 다운로드' app.py
+          grep -q '백업 JSON 복원' app.py
 
       - name: Commit and push patched app
         shell: bash
@@ -51,6 +63,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "feat: route horoscope push deep links"
+          git commit -m "feat: finalize push routing and IndexedDB archive resilience"
           git pull --rebase origin main
           git push origin HEAD:main
