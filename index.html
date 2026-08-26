@@ -12,7 +12,8 @@
 
   <link rel="apple-touch-icon" href="./icon.PNG?v=46">
   <link rel="icon" type="image/png" href="./icon.PNG?v=46">
-  <link rel="manifest" href="./manifest.webmanifest?v=46">
+  <link rel="manifest" href="./manifest.webmanifest?v=47">
+  <script src="./push-config.js?v=1"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -40,31 +41,180 @@
     }
     h1 { margin:0 0 8px; font-size:24px; }
     p { margin:0 0 20px; color:#7b6f82; line-height:1.65; font-size:14px; }
-    .open {
-      display:block; width:100%; padding:14px 18px;
+    .open, .push-button, .skip-button {
+      display:block; width:100%; padding:14px 18px; border:0;
       border-radius:15px; background:#fff; color:#75589b;
-      font-weight:800; text-decoration:none;
-      box-shadow:0 5px 20px rgba(50,35,55,.10);
+      font:inherit; font-weight:800; text-decoration:none;
+      box-shadow:0 5px 20px rgba(50,35,55,.10); cursor:pointer;
     }
-    .hint {
+    .push-button { margin-top:10px; background:#7b5aa6; color:#fff; }
+    .skip-button { margin-top:10px; background:rgba(255,255,255,.65); box-shadow:none; }
+    .hint, .push-box {
       margin-top:16px; padding:12px 13px; border-radius:14px;
       background:rgba(193,166,220,.10);
       color:#6d6075; font-size:12px; line-height:1.55;
     }
+    .push-box { display:none; text-align:left; padding:15px; }
+    .push-title { font-size:14px; font-weight:900; color:#665071; margin-bottom:5px; }
+    .push-status { margin-top:9px; min-height:18px; color:#7b6f82; }
   </style>
 
   <script>
+    const FALLBACK_STREAMLIT_URL = 'https://astro-app-wmz23ohfhmhrhrz2gg3kej.streamlit.app/';
+    const PUSH_ENABLED_MARKER = 'astro_push_enabled_v1';
+
     function launchedFromHomeScreen() {
       return window.navigator.standalone === true ||
              window.matchMedia('(display-mode: standalone)').matches;
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      // Safari에서 이 페이지를 열었을 때는 여기 머문다.
-      // 그래야 iOS '홈 화면에 추가'가 GitHub Pages의 apple-touch-icon을 읽을 수 있다.
-      // 홈 화면에서 실행된 경우에만 실제 Streamlit 앱으로 이동한다.
-      if (launchedFromHomeScreen()) {
-        setTimeout(() => window.location.replace('https://astro-app-wmz23ohfhmhrhrz2gg3kej.streamlit.app/'), 250);
+    function pushConfig() {
+      return window.ASTRO_PUSH_CONFIG || {};
+    }
+
+    function buildAppUrl() {
+      const base = pushConfig().streamlitUrl || FALLBACK_STREAMLIT_URL;
+      const target = new URL(base);
+      const current = new URLSearchParams(window.location.search);
+      const kind = current.get('kind');
+      const year = current.get('year');
+      const month = current.get('month');
+      if (kind) target.searchParams.set('push_kind', kind);
+      if (year) target.searchParams.set('push_year', year);
+      if (month) target.searchParams.set('push_month', month);
+      return target.toString();
+    }
+
+    function openApp() {
+      window.location.replace(buildAppUrl());
+    }
+
+    function loadOneSignalSdk() {
+      return new Promise((resolve, reject) => {
+        if (window.OneSignalDeferred) return resolve();
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        const script = document.createElement('script');
+        script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('OneSignal SDK load failed'));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function initializePush() {
+      const cfg = pushConfig();
+      if (!cfg.oneSignalAppId) return { configured:false };
+      await loadOneSignalSdk();
+      return new Promise((resolve, reject) => {
+        let finished = false;
+        const timer = setTimeout(() => {
+          if (!finished) reject(new Error('OneSignal initialization timeout'));
+        }, 6000);
+        window.OneSignalDeferred.push(async function(OneSignal) {
+          try {
+            await OneSignal.init({
+              appId: cfg.oneSignalAppId,
+              serviceWorkerPath: cfg.serviceWorkerPath || 'OneSignalSDKWorker.js',
+              serviceWorkerParam: { scope: cfg.serviceWorkerScope || '/astro-app/' },
+              autoResubscribe: true,
+              notifyButton: { enable: false }
+            });
+            window.__astroOneSignal = OneSignal;
+            finished = true;
+            clearTimeout(timer);
+            resolve({
+              configured:true,
+              supported:Boolean(OneSignal.Notifications.isPushSupported()),
+              permission:Boolean(OneSignal.Notifications.permission),
+              optedIn:Boolean(OneSignal.User.PushSubscription.optedIn)
+            });
+          } catch (error) {
+            finished = true;
+            clearTimeout(timer);
+            reject(error);
+          }
+        });
+      });
+    }
+
+    function showPushSetup(message='') {
+      const box = document.getElementById('pushBox');
+      const status = document.getElementById('pushStatus');
+      if (box) box.style.display = 'block';
+      if (status && message) status.textContent = message;
+    }
+
+    async function enablePushFromUserGesture() {
+      const button = document.getElementById('enablePush');
+      const status = document.getElementById('pushStatus');
+      if (button) button.disabled = true;
+      if (status) status.textContent = 'iPhone 알림 권한을 확인하는 중…';
+      try {
+        let OneSignal = window.__astroOneSignal;
+        if (!OneSignal) {
+          await initializePush();
+          OneSignal = window.__astroOneSignal;
+        }
+        if (!OneSignal || !OneSignal.Notifications.isPushSupported()) {
+          if (status) status.textContent = '이 환경에서는 웹 푸시를 사용할 수 없어. 앱은 그대로 열 수 있어.';
+          return;
+        }
+        await OneSignal.Notifications.requestPermission();
+        if (OneSignal.Notifications.permission && !OneSignal.User.PushSubscription.optedIn) {
+          await OneSignal.User.PushSubscription.optIn();
+        }
+        if (OneSignal.Notifications.permission && OneSignal.User.PushSubscription.optedIn) {
+          localStorage.setItem(PUSH_ENABLED_MARKER, '1');
+          if (status) status.textContent = '✅ 알림이 켜졌어. 이제 운세 알림을 받을 수 있어.';
+          setTimeout(openApp, 700);
+        } else {
+          if (status) status.textContent = '알림 권한이 아직 허용되지 않았어. iPhone 설정에서 허용한 뒤 다시 눌러줘.';
+        }
+      } catch (error) {
+        console.error(error);
+        if (status) status.textContent = '알림 설정에 실패했어. 앱은 정상적으로 열 수 있어.';
+      } finally {
+        if (button) button.disabled = false;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('enablePush')?.addEventListener('click', enablePushFromUserGesture);
+      document.getElementById('skipPush')?.addEventListener('click', openApp);
+
+      const standalone = launchedFromHomeScreen();
+      const params = new URLSearchParams(window.location.search);
+      const fromPush = params.get('from') === 'push';
+      const configured = Boolean(pushConfig().oneSignalAppId);
+
+      // 일반 Safari에서는 홈 화면 추가 안내를 위해 이 페이지에 머문다.
+      if (!standalone) return;
+
+      // 실제 알림을 눌러 들어온 경우나 이미 알림 설정을 마친 경우는 즉시 앱으로 보낸다.
+      if (fromPush || localStorage.getItem(PUSH_ENABLED_MARKER) === '1') {
+        setTimeout(openApp, 180);
+        return;
+      }
+
+      // OneSignal App ID를 아직 넣지 않았으면 기존 동작을 그대로 유지한다.
+      if (!configured) {
+        setTimeout(openApp, 250);
+        return;
+      }
+
+      // iOS는 홈 화면 웹앱에서 사용자 동작으로 알림 권한을 받아야 하므로 첫 실행 때만 설정 화면을 보여준다.
+      try {
+        const state = await initializePush();
+        if (state.supported && state.permission && state.optedIn) {
+          localStorage.setItem(PUSH_ENABLED_MARKER, '1');
+          setTimeout(openApp, 180);
+          return;
+        }
+        showPushSetup(state.supported ? '알림을 켜면 일일·주간·월간 운세 알림을 받을 수 있어.' : '이 환경에서는 웹 푸시를 지원하지 않아.');
+      } catch (error) {
+        console.error(error);
+        showPushSetup('푸시 초기화가 늦어지고 있어. 앱을 먼저 열어도 돼.');
       }
     });
   </script>
@@ -76,9 +226,19 @@
       <h1>별빛의 운명</h1>
       <p>개인용 정밀 점성술 리포트</p>
       <a class="open" href="https://astro-app-wmz23ohfhmhrhrz2gg3kej.streamlit.app/">🌙 지금 앱 열기</a>
+
+      <div id="pushBox" class="push-box">
+        <div class="push-title">🔔 운세 알림 받기</div>
+        <div>홈 화면 앱에서 알림을 한 번 허용하면, 앱을 닫아둬도 예약된 운세 알림을 받을 수 있어.</div>
+        <button id="enablePush" class="push-button" type="button">🔔 알림 켜기</button>
+        <button id="skipPush" class="skip-button" type="button">나중에 · 앱 먼저 열기</button>
+        <div id="pushStatus" class="push-status" aria-live="polite"></div>
+      </div>
+
       <div class="hint">
         홈 화면 아이콘을 만들 때는 이 페이지에서<br>
-        Safari 공유 → <strong>홈 화면에 추가</strong>를 눌러주세요.
+        Safari 공유 → <strong>홈 화면에 추가</strong>를 눌러주세요.<br>
+        <span style="opacity:.78">iPhone 웹 푸시는 홈 화면 앱에서만 설정할 수 있어요.</span>
       </div>
     </section>
   </main>
