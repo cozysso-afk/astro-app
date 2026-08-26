@@ -1,0 +1,50 @@
+name: Pre-generate horoscope AI cache
+
+on:
+  schedule:
+    - cron: "30 22 * * *"   # 07:30 KST daily
+    - cron: "30 11 * * 0"  # Sunday 20:30 KST
+    - cron: "30 10 * * *"   # 19:30 KST daily; worker only runs monthly on the last day
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Pre-generation kind"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+
+permissions:
+  contents: read
+
+jobs:
+  prewarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ASTRO_APP_PIN: ${{ secrets.ASTRO_APP_PIN }}
+      GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
+      ASTRO_PREGEN_KIND: ${{ inputs.kind }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Validate pre-generation worker
+        run: python -m py_compile scripts/prewarm_streamlit_horoscope.py
+
+      - name: Warm Streamlit AI cache when configured
+        run: python scripts/prewarm_streamlit_horoscope.py
