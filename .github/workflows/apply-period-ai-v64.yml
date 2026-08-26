@@ -1,0 +1,50 @@
+name: Apply weekly monthly AI v6.4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_period_ai_v64.py"
+      - ".github/workflows/apply-period-ai-v64.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply period AI upgrade
+        run: python scripts/upgrade_period_ai_v64.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Static markers
+        shell: bash
+        run: |
+          grep -q 'PERIOD_AI_INTERPRETER_VERSION = "v1.0"' app.py
+          grep -q 'get_ai_period_interpretation("weekly"' app.py
+          grep -q 'get_ai_period_interpretation("monthly"' app.py
+          grep -q '_read_period_ai_archive_entries' app.py
+
+      - name: Commit patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: add cached Gemini AI to weekly and monthly fortunes"
+          git push origin HEAD:main
