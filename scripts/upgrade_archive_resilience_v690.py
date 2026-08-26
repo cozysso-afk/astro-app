@@ -118,8 +118,24 @@ if "저장함 JSON 백업 다운로드" not in text:
     text=text.replace(refresh,ui+refresh,1)
     changed=True
 
+# GitHub Actions headless browser compatibility: skip only the localStorage remember-me probe.
+# automation=1 still requires the normal APP_PIN form and comparison, so authentication remains intact.
+auth_marker = 'automation_mode = str(automation_value or "").strip() == "1"'
+if auth_marker not in text:
+    old_auth = '''    configured_pin = _configured_app_pin()\n    signing_secret = _remember_secret()\n\n    persistent_state = _try_persistent_unlock(configured_pin, signing_secret)\n    if persistent_state is None:\n        _render_auth_wait("이 기기의 자동 로그인 정보를 확인하는 중이야…")\n        st.stop()\n    if persistent_state is True:\n        return\n    if st.session_state.get("_astro_pending_logout_nonce"):\n        _process_pending_logout()\n'''
+    new_auth = '''    configured_pin = _configured_app_pin()\n    signing_secret = _remember_secret()\n\n    # Scheduled headless automation cannot reliably complete the browser localStorage component.\n    # automation=1 skips only that remember-me probe; the normal PIN form is still required.\n    automation_value = st.query_params.get("automation", "")\n    if isinstance(automation_value, (list, tuple)):\n        automation_value = automation_value[0] if automation_value else ""\n    automation_mode = str(automation_value or "").strip() == "1"\n\n    if automation_mode:\n        persistent_state = False\n    else:\n        persistent_state = _try_persistent_unlock(configured_pin, signing_secret)\n        if persistent_state is None:\n            _render_auth_wait("이 기기의 자동 로그인 정보를 확인하는 중이야…")\n            st.stop()\n        if persistent_state is True:\n            return\n        if st.session_state.get("_astro_pending_logout_nonce"):\n            _process_pending_logout()\n'''
+    if old_auth not in text:
+        raise SystemExit("auth block marker not found")
+    text=text.replace(old_auth,new_auth,1)
+    old_remember='    remember_enabled = streamlit_js_eval is not None and len(signing_secret) >= 32\n'
+    new_remember='    remember_enabled = (not automation_mode) and streamlit_js_eval is not None and len(signing_secret) >= 32\n'
+    if old_remember not in text:
+        raise SystemExit("remember_enabled marker not found")
+    text=text.replace(old_remember,new_remember,1)
+    changed=True
+
 if changed:
     APP.write_text(text,encoding="utf-8")
-    print("Applied archive resilience v6.9.1")
+    print("Applied archive resilience + secure headless auth v6.9.1")
 else:
-    print("Archive resilience v6.9.1 already applied")
+    print("Archive resilience + secure headless auth v6.9.1 already applied")
