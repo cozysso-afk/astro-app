@@ -1,29 +1,41 @@
-name: Apply IndexedDB fortune storage v6.7
+name: Apply IndexedDB fortune storage v6.9
 
 on:
   push:
     branches: [main]
     paths:
       - "scripts/upgrade_indexeddb_archive_v67.py"
+      - "scripts/upgrade_archive_resilience_v690.py"
       - ".github/workflows/apply-indexeddb-archive-v67.yml"
 
 permissions:
   contents: write
 
+concurrency:
+  group: astro-app-write-main
+  cancel-in-progress: false
+
 jobs:
   patch:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Sync current main before patch
+        run: git pull --rebase origin main
+
       - name: Verify IndexedDB base upgrade
         run: python scripts/upgrade_indexeddb_archive_v67.py
 
       - name: Apply persistent storage hardening
         run: python scripts/upgrade_persistent_storage_v671.py
+
+      - name: Apply archive backup and restore
+        run: python scripts/upgrade_archive_resilience_v690.py
 
       - name: Apply push deep-link routing
         run: python scripts/upgrade_push_deeplink_v68.py
@@ -40,12 +52,16 @@ jobs:
           grep -q 'BROWSER_IDB_SCHEMA_VERSION = 1' app.py
           grep -q 'def _request_browser_persistent_storage' app.py
           grep -q 'navigator.storage.persist()' app.py
+          grep -q 'def _read_browser_archive_backup' app.py
+          grep -q 'def _restore_browser_archive_records' app.py
+          grep -q '저장함 JSON 백업 다운로드' app.py
+          grep -q '백업 JSON 복원' app.py
           grep -q 'PUSH_ROUTE_TO_VIEW=' app.py
           grep -q 'push_date_text=_query_param_text' app.py
           grep -q '_push_monthly_autocalc' app.py
           grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
 
-      - name: Commit patched app
+      - name: Commit patched app safely
         shell: bash
         run: |
           if git diff --quiet -- app.py; then
@@ -55,7 +71,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "feat: finalize persistent storage and push deep links"
+          git commit -m "feat: finalize IndexedDB persistence backup restore and push routing"
+          git pull --rebase origin main
           git push origin HEAD:main
-
-# v6.7 verified patch channel reused for v6.7.1/v6.8 finalization.
