@@ -2,6 +2,10 @@ name: Finish astrology automation setup
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/finish-astro-automation-setup.yml"
 
 permissions:
   contents: write
@@ -11,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
       ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
       ASTRO_APP_PIN: ${{ secrets.ASTRO_APP_PIN }}
     steps:
@@ -27,13 +30,13 @@ jobs:
         shell: bash
         run: |
           missing=0
-          if [ -z "$ONESIGNAL_APP_ID" ]; then echo "::error::Missing repository secret: ONESIGNAL_APP_ID"; missing=1; fi
           if [ -z "$ONESIGNAL_APP_API_KEY" ]; then echo "::error::Missing repository secret: ONESIGNAL_APP_API_KEY"; missing=1; fi
           if [ -z "$ASTRO_APP_PIN" ]; then echo "::error::Missing repository secret: ASTRO_APP_PIN"; missing=1; fi
           exit "$missing"
 
-      - name: Configure public OneSignal App ID
-        run: python scripts/configure_onesignal_client.py
+      - name: Verify public OneSignal App ID is configured
+        shell: bash
+        run: grep -Eq 'oneSignalAppId: "[0-9a-fA-F-]{36}"' push-config.js
 
       - name: Apply persistent IndexedDB storage hardening
         run: python scripts/upgrade_persistent_storage_v671.py
@@ -49,7 +52,6 @@ jobs:
           python -m py_compile app.py
           python -m py_compile scripts/prewarm_streamlit_horoscope.py
           python -m py_compile scripts/send_onesignal_horoscope_push.py
-          python -m py_compile scripts/configure_onesignal_client.py
           python -m py_compile scripts/upgrade_archive_resilience_v690.py
 
       - name: Validate final feature markers
@@ -74,13 +76,13 @@ jobs:
       - name: Commit setup result
         shell: bash
         run: |
-          if git diff --quiet -- app.py push-config.js; then
+          if git diff --quiet -- app.py; then
             echo "Automation setup is already fully applied."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.py push-config.js
+          git add app.py
           git commit -m "feat: finish astrology automation setup"
           git pull --rebase origin main
           git push origin HEAD:main
