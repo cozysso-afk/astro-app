@@ -48,6 +48,8 @@ GitHub Actions의 예약 실행은 GitHub 사정에 따라 몇 분 늦어질 수
 
 `horoscope-prewarm.yml`은 Playwright 헤드리스 브라우저로 Streamlit을 연다. 자동화 URL에서는 브라우저 localStorage 기반 30일 자동로그인 확인만 건너뛰며, **PIN 검증 자체는 그대로 수행한다.** PIN이 맞아야 앱이 열리고 AI 리포트 생성 완료 표시를 확인한 뒤 성공 처리한다.
 
+예약 주간 선생성은 일요일에 다음 월요일~일요일을 대상으로 한다. 수동 주간 테스트는 실행일과 관계없이 다음 월요일을 시작일로 잡는다. 수동 월간 테스트는 말일이 아니어도 다음 달을 대상으로 실행할 수 있으며, 예약 월간 실행의 말일 보호 로직은 그대로 유지한다.
+
 이 선생성은 Streamlit 서버 캐시를 미리 데우는 방식이다. iPhone의 IndexedDB에 원격으로 데이터를 써넣는 것은 아니다. Streamlit 서버가 재시작되면 서버 캐시는 사라질 수 있지만, iPhone에 이미 저장된 IndexedDB 운세는 별도로 남는다.
 
 ## 6. 푸시 발송 방식
@@ -61,11 +63,14 @@ OneSignal의 일반 `Subscribed Users` 세그먼트가 Apple Web Push 구독을 
 - PWA 재설치로 Subscription ID가 새로 생겨도 다음 발송 시 다시 발견한다.
 - HTTP 200이어도 OneSignal 응답에 `errors`가 있거나 실제 message ID가 없으면 성공으로 처리하지 않는다.
 
-## 7. 수동 푸시 테스트
+## 7. 수동 테스트
 
-필요할 때 GitHub → Actions → `Test horoscope push`에서 `daily`, `weekly`, `monthly`를 골라 푸시 sender를 수동 검산할 수 있다.
+필요할 때 GitHub → Actions에서 다음 두 워크플로를 수동 실행할 수 있다.
 
-전체 자동화의 PIN 인증 → Streamlit AI 선생성 → 활성 Web Push 구독 탐색 → OneSignal 직접 발송 경로는 구축 시 실제 E2E 테스트를 통과했다. 임시 E2E 워크플로와 트리거 파일은 검증 후 제거했다.
+- `Pre-generate horoscope AI cache`: `daily`, `weekly`, `monthly` 중 하나를 골라 Streamlit AI 선생성을 검산한다.
+- `Test horoscope push`: `daily`, `weekly`, `monthly` 중 하나를 골라 OneSignal 발송을 검산한다.
+
+수동 주간은 다음 월요일, 수동 월간은 다음 달을 대상으로 한다. 전체 자동화의 PIN 인증 → Streamlit AI 선생성 → 활성 Web Push 구독 탐색 → OneSignal 직접 발송 경로는 구축 시 실제 E2E 테스트를 통과했다. 임시 E2E 워크플로와 트리거 파일은 검증 후 제거했다.
 
 ## 8. 저장 관련 주의
 
