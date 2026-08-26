@@ -1,6 +1,6 @@
 from pathlib import Path
 
-# v6.7.1 retrigger: workflow now exists on main, so this touch safely re-runs the patch.
+# v6.7.1/v6.9.1 trigger: verified workflow also applies archive backup/restore resilience.
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
 
