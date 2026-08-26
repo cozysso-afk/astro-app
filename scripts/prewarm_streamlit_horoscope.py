@@ -30,7 +30,7 @@ def resolve_kind():
 
 
 def target_url(kind: str, now_kst: datetime):
-    params = {"push_kind": kind}
+    params = {"push_kind": kind, "automation": "1"}
     if kind == "daily":
         params["push_date"] = now_kst.date().isoformat()
     elif kind == "weekly":

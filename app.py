@@ -567,14 +567,25 @@ def require_app_unlock():
     configured_pin = _configured_app_pin()
     signing_secret = _remember_secret()
 
-    persistent_state = _try_persistent_unlock(configured_pin, signing_secret)
-    if persistent_state is None:
-        _render_auth_wait("이 기기의 자동 로그인 정보를 확인하는 중이야…")
-        st.stop()
-    if persistent_state is True:
-        return
-    if st.session_state.get("_astro_pending_logout_nonce"):
-        _process_pending_logout()
+    # GitHub Actions의 headless browser는 streamlit_js_eval localStorage component가
+    # 응답하지 않는 환경이 있을 수 있다. automation=1은 자동로그인 조회만 건너뛰며
+    # PIN 검증 자체는 그대로 유지한다.
+    automation_value = st.query_params.get("automation", "")
+    if isinstance(automation_value, (list, tuple)):
+        automation_value = automation_value[0] if automation_value else ""
+    automation_mode = str(automation_value or "").strip() == "1"
+
+    if automation_mode:
+        persistent_state = False
+    else:
+        persistent_state = _try_persistent_unlock(configured_pin, signing_secret)
+        if persistent_state is None:
+            _render_auth_wait("이 기기의 자동 로그인 정보를 확인하는 중이야…")
+            st.stop()
+        if persistent_state is True:
+            return
+        if st.session_state.get("_astro_pending_logout_nonce"):
+            _process_pending_logout()
 
     st.markdown("<div style='text-align:center;font-size:2.4rem;margin-top:7vh'>🌙</div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center;color:#4A3E56'>별빛의 운명</h2>", unsafe_allow_html=True)
@@ -588,7 +599,7 @@ def require_app_unlock():
         st.error("APP_PIN은 6자리 이상으로 설정해 주세요.")
         st.stop()
 
-    remember_enabled = streamlit_js_eval is not None and len(signing_secret) >= 32
+    remember_enabled = (not automation_mode) and streamlit_js_eval is not None and len(signing_secret) >= 32
     if not remember_enabled:
         st.info(
             "📱 30일 로그인 유지를 쓰려면 streamlit_js_eval 설치와 "
