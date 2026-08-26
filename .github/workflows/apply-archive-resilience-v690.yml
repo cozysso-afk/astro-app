@@ -61,3 +61,5 @@ jobs:
           git commit -m "feat: harden IndexedDB archive persistence and backups"
           git pull --rebase origin main
           git push origin HEAD:main
+
+# retrigger: v6.9.0 archive resilience
