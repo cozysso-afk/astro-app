@@ -108,6 +108,8 @@ def _find_pin_box(scope):
 def _app_is_unlocked(page):
     for scope in all_scopes(page):
         text = body_text(scope)
+        if "ASTRO_ALERT_PROBE_V1" in text:
+            return True
         if "정밀분석" in text and "저장함" in text:
             return True
     return False
