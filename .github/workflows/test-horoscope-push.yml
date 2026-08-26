@@ -1,0 +1,43 @@
+name: Test horoscope push
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Push kind"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+      ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
+      ASTRO_PUSH_KIND: ${{ inputs.kind }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify OneSignal secrets
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "$ONESIGNAL_APP_ID" ]; then echo "::error::Missing ONESIGNAL_APP_ID"; missing=1; fi
+          if [ -z "$ONESIGNAL_APP_API_KEY" ]; then echo "::error::Missing ONESIGNAL_APP_API_KEY"; missing=1; fi
+          exit "$missing"
+
+      - name: Validate sender syntax
+        run: python -m py_compile scripts/send_onesignal_horoscope_push.py
+
+      - name: Send test push
+        run: python scripts/send_onesignal_horoscope_push.py
