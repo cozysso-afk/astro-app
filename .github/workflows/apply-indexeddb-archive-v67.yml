@@ -1,4 +1,4 @@
-name: Apply IndexedDB fortune storage v6.9
+name: Apply IndexedDB fortune storage v6.9.1
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/upgrade_indexeddb_archive_v67.py"
       - "scripts/upgrade_archive_resilience_v690.py"
+      - "scripts/upgrade_automation_auth_v691.py"
       - ".github/workflows/apply-indexeddb-archive-v67.yml"
 
 permissions:
@@ -40,8 +41,13 @@ jobs:
       - name: Apply push deep-link routing
         run: python scripts/upgrade_push_deeplink_v68.py
 
+      - name: Apply headless automation auth compatibility
+        run: python scripts/upgrade_automation_auth_v691.py
+
       - name: Python syntax check
-        run: python -m py_compile app.py
+        run: |
+          python -m py_compile app.py
+          python -m py_compile scripts/prewarm_streamlit_horoscope.py
 
       - name: Diff sanity check
         run: git diff --check
@@ -60,17 +66,19 @@ jobs:
           grep -q 'push_date_text=_query_param_text' app.py
           grep -q '_push_monthly_autocalc' app.py
           grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
+          grep -q 'automation_mode = str(automation_value or "").strip() == "1"' app.py
+          grep -q '"automation": "1"' scripts/prewarm_streamlit_horoscope.py
 
       - name: Commit patched app safely
         shell: bash
         run: |
-          if git diff --quiet -- app.py; then
-            echo "No app.py changes to commit."
+          if git diff --quiet -- app.py scripts/prewarm_streamlit_horoscope.py; then
+            echo "No app/worker changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.py
-          git commit -m "feat: finalize IndexedDB persistence backup restore and push routing"
+          git add app.py scripts/prewarm_streamlit_horoscope.py
+          git commit -m "fix: support secure headless PIN pre-generation"
           git pull --rebase origin main
           git push origin HEAD:main
