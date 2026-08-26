@@ -218,7 +218,13 @@ header [data-testid="stToolbar"] { opacity: .18; }
 .stTabs [aria-selected="true"] { background:linear-gradient(135deg, rgba(247,201,221,.85), rgba(221,211,247,.90)) !important; color:#4A3E56 !important; font-weight:800 !important; }
 
 @media (max-width:640px) {
-    .block-container { padding-left: .9rem; padding-right: .9rem; padding-top:.7rem; }
+    html, body { scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
+    .block-container {
+        padding-left: .9rem;
+        padding-right: .9rem;
+        padding-top: .7rem;
+        padding-bottom: calc(9rem + env(safe-area-inset-bottom));
+    }
     .score-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .ast-card { padding:14px 14px; border-radius:16px; }
     .ast-body { font-size:.89rem; line-height:1.68; }
