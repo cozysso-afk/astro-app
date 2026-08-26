@@ -1,0 +1,54 @@
+name: One-off astrology automation validation
+
+on:
+  workflow_run:
+    workflows: ["pages build and deployment"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_commit.message == 'ci: trigger one-off astro e2e'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ASTRO_APP_PIN: ${{ secrets.ASTRO_APP_PIN }}
+      ONESIGNAL_APP_ID: "203c25c5-85da-4b51-bd33-b93476622e84"
+      ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
+      ASTRO_PREGEN_KIND: daily
+      ASTRO_PUSH_KIND: daily
+    steps:
+      - name: Verify required secrets exist
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "$ASTRO_APP_PIN" ]; then echo "::error::Missing repository secret: ASTRO_APP_PIN"; missing=1; fi
+          if [ -z "$ONESIGNAL_APP_API_KEY" ]; then echo "::error::Missing repository secret: ONESIGNAL_APP_API_KEY"; missing=1; fi
+          exit "$missing"
+
+      - name: Checkout current main
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Validate workers
+        run: |
+          python -m py_compile scripts/prewarm_streamlit_horoscope.py
+          python -m py_compile scripts/send_onesignal_horoscope_push.py
+
+      - name: Pre-generate today's AI horoscope
+        run: python scripts/prewarm_streamlit_horoscope.py
+
+      - name: Send one test daily push
+        run: python scripts/send_onesignal_horoscope_push.py
