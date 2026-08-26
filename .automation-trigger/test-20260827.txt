@@ -1,1 +1,2 @@
 Trigger end-to-end astrology automation validation after OneSignal and GitHub Actions secrets were configured.
+Run requested at 2026-08-27 KST after repository secrets were added.
