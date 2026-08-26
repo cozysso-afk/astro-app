@@ -1,1 +1,0 @@
-One-off end-to-end astrology automation validation trigger.
