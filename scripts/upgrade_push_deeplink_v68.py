@@ -2,18 +2,16 @@ from pathlib import Path
 
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
+changed = False
 
-if "PUSH_ROUTE_TO_VIEW={" in text or "PUSH_ROUTE_TO_VIEW =" in text:
-    print("Push deep-link v6.8 already applied")
-    raise SystemExit(0)
-
-needle = '''now_kst=datetime.now(KST)
+route_present = "PUSH_ROUTE_TO_VIEW={" in text or "PUSH_ROUTE_TO_VIEW =" in text
+if not route_present:
+    needle = '''now_kst=datetime.now(KST)
 today_kst=now_kst.date()
 
 st.markdown('<div class="top-nav">✦ ASTROLOGY · HOROSCOPE · PRIVATE ✦</div>',unsafe_allow_html=True)
 '''
-
-replacement = '''now_kst=datetime.now(KST)
+    replacement = '''now_kst=datetime.now(KST)
 today_kst=now_kst.date()
 
 # ============================================================
@@ -68,10 +66,24 @@ if push_kind in PUSH_ROUTE_TO_VIEW and st.session_state.get("_push_route_applied
 
 st.markdown('<div class="top-nav">✦ ASTROLOGY · HOROSCOPE · PRIVATE ✦</div>',unsafe_allow_html=True)
 '''
-
-if needle not in text:
-    raise SystemExit("profile routing insertion marker not found")
-text=text.replace(needle,replacement,1)
+    if needle not in text:
+        raise SystemExit("profile routing insertion marker not found")
+    text=text.replace(needle,replacement,1)
+    changed=True
+else:
+    # Older v6.8 runs may have routed monthly without setting the auto-calc flag.
+    monthly_route_needle='''                st.session_state["monthly_year_select"]=pushed_year
+                st.session_state["monthly_month_select"]=pushed_month
+'''
+    monthly_route_replacement='''                st.session_state["monthly_year_select"]=pushed_year
+                st.session_state["monthly_month_select"]=pushed_month
+                st.session_state["_push_monthly_autocalc"]=True
+'''
+    if "st.session_state[\"_push_monthly_autocalc\"]=True" not in text:
+        if monthly_route_needle not in text:
+            raise SystemExit("monthly route upgrade marker not found")
+        text=text.replace(monthly_route_needle,monthly_route_replacement,1)
+        changed=True
 
 main_needle='''main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
 '''
@@ -79,9 +91,11 @@ main_replacement='''main_view=st.radio("메뉴",["🌙 일일","📅 주간","�
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 '''
-if main_needle not in text:
-    raise SystemExit("main view marker not found")
-text=text.replace(main_needle,main_replacement,1)
+if "운세 알림에서 해당 리포트로 바로 이동했어" not in text:
+    if main_needle not in text:
+        raise SystemExit("main view marker not found")
+    text=text.replace(main_needle,main_replacement,1)
+    changed=True
 
 monthly_needle='''    calc=st.button("🌕 선택한 달 전체 흐름 계산",type="primary",use_container_width=True,key="monthly_calc")
     monthly_key=(month_year,month_month,natal_packed,houses_packed)
@@ -92,9 +106,14 @@ monthly_replacement='''    calc=st.button("🌕 선택한 달 전체 흐름 계�
         st.caption("🔔 월간 알림에서 들어와 선택된 달을 자동 계산해.")
     monthly_key=(month_year,month_month,natal_packed,houses_packed)
 '''
-if monthly_needle not in text:
-    raise SystemExit("monthly auto-calc marker not found")
-text=text.replace(monthly_needle,monthly_replacement,1)
+if 'st.session_state.pop("_push_monthly_autocalc",False)' not in text:
+    if monthly_needle not in text:
+        raise SystemExit("monthly auto-calc marker not found")
+    text=text.replace(monthly_needle,monthly_replacement,1)
+    changed=True
 
-APP.write_text(text,encoding="utf-8")
-print("Applied push deep-link routing v6.8")
+if changed:
+    APP.write_text(text,encoding="utf-8")
+    print("Applied or completed push deep-link routing v6.8.1")
+else:
+    print("Push deep-link routing v6.8.1 already complete")
