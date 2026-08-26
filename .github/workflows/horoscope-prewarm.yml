@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: "30 22 * * *"   # 07:30 KST daily
     - cron: "30 11 * * 0"  # Sunday 20:30 KST
-    - cron: "30 10 * * *"   # 19:30 KST daily; worker only runs monthly on the last day
+    - cron: "30 10 * * *"   # 19:30 KST daily; guard only runs monthly on the last day
   workflow_dispatch:
     inputs:
       kind:
@@ -29,22 +29,58 @@ jobs:
       GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
       ASTRO_PREGEN_KIND: ${{ inputs.kind }}
     steps:
+      - name: Decide whether browser work is needed
+        id: guard
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          pin=(os.getenv("ASTRO_APP_PIN") or "").strip()
+          explicit=(os.getenv("ASTRO_PREGEN_KIND") or "").strip().lower()
+          schedule=(os.getenv("GITHUB_EVENT_SCHEDULE") or "").strip()
+          kinds={"30 22 * * *":"daily","30 11 * * 0":"weekly","30 10 * * *":"monthly"}
+          kind=explicit if explicit in {"daily","weekly","monthly"} else kinds.get(schedule,"")
+          should=bool(pin and kind)
+          reason="ready"
+          if not pin:
+              should=False; reason="ASTRO_APP_PIN secret missing"
+          elif not kind:
+              should=False; reason="unknown schedule/kind"
+          elif kind=="monthly" and not explicit:
+              now=datetime.now(ZoneInfo("Asia/Seoul"))
+              tomorrow=now.date()+timedelta(days=1)
+              if tomorrow.month==now.month:
+                  should=False; reason="not the last day of month"
+          with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as f:
+              f.write(f"should_run={'true' if should else 'false'}\n")
+              f.write(f"kind={kind}\n")
+          print(f"prewarm guard: should_run={should}, kind={kind or '-'}, reason={reason}")
+          PY
+
       - name: Checkout
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Playwright
+        if: steps.guard.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install playwright
           python -m playwright install --with-deps chromium
 
       - name: Validate pre-generation worker
+        if: steps.guard.outputs.should_run == 'true'
         run: python -m py_compile scripts/prewarm_streamlit_horoscope.py
 
-      - name: Warm Streamlit AI cache when configured
+      - name: Warm Streamlit AI cache
+        if: steps.guard.outputs.should_run == 'true'
         run: python scripts/prewarm_streamlit_horoscope.py
