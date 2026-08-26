@@ -49,3 +49,5 @@ jobs:
           git add app.py
           git commit -m "feat: move fortune archive to IndexedDB"
           git push origin HEAD:main
+
+# v6.7 trigger: IndexedDB is primary; legacy localStorage stays as fallback.
