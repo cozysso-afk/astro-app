@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Trigger combined routing + archive resilience patch after workflow update.
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
 changed = False
