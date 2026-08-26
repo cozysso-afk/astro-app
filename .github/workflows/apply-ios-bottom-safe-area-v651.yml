@@ -6,6 +6,8 @@ on:
     paths:
       - "scripts/fix_ios_bottom_toolbar_v651.py"
       - "scripts/upgrade_indexeddb_archive_v67.py"
+      - "scripts/upgrade_persistent_storage_v671.py"
+      - "scripts/upgrade_push_deeplink_v68.py"
       - ".github/workflows/apply-ios-bottom-safe-area-v651.yml"
 
 permissions:
@@ -20,11 +22,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply iOS safe area fix
+      - name: Verify iOS safe area fix
         run: python scripts/fix_ios_bottom_toolbar_v651.py
 
-      - name: Apply IndexedDB fortune storage upgrade
+      - name: Verify IndexedDB base storage
         run: python scripts/upgrade_indexeddb_archive_v67.py
+
+      - name: Apply persistent storage hardening
+        run: python scripts/upgrade_persistent_storage_v671.py
+
+      - name: Apply push deep-link routing
+        run: python scripts/upgrade_push_deeplink_v68.py
 
       - name: Python syntax check
         run: python -m py_compile app.py
@@ -36,11 +44,14 @@ jobs:
         shell: bash
         run: |
           grep -q 'padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
-          grep -q 'scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom));' app.py
           grep -q 'BROWSER_IDB_SCHEMA_VERSION = 1' app.py
-          grep -q 'BROWSER_IDB_DB_NAME = "astro_fortune_db_v1"' app.py
-          grep -q 'def _read_browser_storage_estimate' app.py
-          grep -q 'IndexedDB에 장기 보관' app.py
+          grep -q 'def _request_browser_persistent_storage' app.py
+          grep -q 'navigator.storage.persist()' app.py
+          grep -q 'IndexedDB 오래 보관 요청' app.py
+          grep -q 'PUSH_ROUTE_TO_VIEW=' app.py
+          grep -q 'push_date_text=_query_param_text' app.py
+          grep -q '_push_monthly_autocalc' app.py
+          grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
 
       - name: Commit patched app
         shell: bash
@@ -52,5 +63,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "feat: move fortune archive to IndexedDB"
+          git commit -m "feat: finalize persistent storage and push deep links"
           git push origin HEAD:main
