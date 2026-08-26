@@ -33,13 +33,18 @@ def resolve_kind():
 def build_message(kind: str, now_kst: datetime):
     params = {"from": "push", "kind": kind}
     if kind == "daily":
+        target_date = now_kst.date()
+        params["date"] = target_date.isoformat()
         title = "🌙 오늘의 별빛 운세"
         body = "오늘의 정밀 일일운세와 AI 해설을 확인해봐."
-        name = f"astro-daily-{now_kst:%Y-%m-%d}"
+        name = f"astro-daily-{target_date:%Y-%m-%d}"
     elif kind == "weekly":
-        title = "📅 이번 주 별빛 운세"
-        body = "7일 흐름과 분야별 주간 AI 해설을 확인할 시간이야."
-        name = f"astro-weekly-{now_kst:%Y-%m-%d}"
+        # Sunday 21:00 KST notification previews the coming Monday-Sunday week.
+        target_date = now_kst.date() + timedelta(days=1)
+        params["date"] = target_date.isoformat()
+        title = "📅 다음 주 별빛 운세"
+        body = "월요일부터 7일 흐름과 분야별 주간 AI 해설을 확인할 시간이야."
+        name = f"astro-weekly-{target_date:%Y-%m-%d}"
     elif kind == "monthly":
         tomorrow = now_kst.date() + timedelta(days=1)
         # Scheduled every day because cron has no portable 'last day of month'.
