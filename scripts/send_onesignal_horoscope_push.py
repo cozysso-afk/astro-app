@@ -16,11 +16,12 @@ ONESIGNAL_ENDPOINT = "https://api.onesignal.com/notifications?c=push"
 ONESIGNAL_EXPORT_ENDPOINT = "https://api.onesignal.com/players/csv_export"
 LAUNCHER_URL = "https://cozysso-afk.github.io/astro-app/"
 WEB_PUSH_DEVICE_TYPES = {5, 7, 17}  # ChromePush / SafariPush variants
+VALID_KINDS = {"daily", "weekly", "monthly"}
 
 SCHEDULE_TO_KIND = {
     "0 23 * * *": "daily",   # 08:00 KST
     "0 12 * * 0": "weekly",  # Sunday 21:00 KST
-    "0 11 * * *": "monthly", # 20:00 KST; last-day guard below
+    "0 11 * * *": "monthly", # 20:00 KST; scheduled month-end guard below
 }
 
 
@@ -28,15 +29,25 @@ def next_month(year: int, month: int):
     return (year + 1, 1) if month == 12 else (year, month + 1)
 
 
+def next_monday(day_value):
+    days_ahead = (7 - day_value.weekday()) % 7
+    return day_value + timedelta(days=days_ahead)
+
+
+def explicit_kind():
+    value = (os.getenv("ASTRO_PUSH_KIND") or "").strip().lower()
+    return value if value in VALID_KINDS else ""
+
+
 def resolve_kind():
-    explicit = (os.getenv("ASTRO_PUSH_KIND") or "").strip().lower()
-    if explicit in {"daily", "weekly", "monthly"}:
+    explicit = explicit_kind()
+    if explicit:
         return explicit
     schedule = (os.getenv("GITHUB_EVENT_SCHEDULE") or "").strip()
     return SCHEDULE_TO_KIND.get(schedule, "")
 
 
-def build_message(kind: str, now_kst: datetime):
+def build_message(kind: str, now_kst: datetime, manual: bool = False):
     params = {"from": "push", "kind": kind}
     if kind == "daily":
         target_date = now_kst.date()
@@ -45,14 +56,16 @@ def build_message(kind: str, now_kst: datetime):
         body = "오늘의 정밀 일일운세와 AI 해설을 확인해봐."
         name = f"astro-daily-{target_date:%Y-%m-%d}"
     elif kind == "weekly":
-        target_date = now_kst.date() + timedelta(days=1)
+        target_date = next_monday(now_kst.date())
         params["date"] = target_date.isoformat()
         title = "📅 다음 주 별빛 운세"
         body = "월요일부터 7일 흐름과 분야별 주간 AI 해설을 확인할 시간이야."
         name = f"astro-weekly-{target_date:%Y-%m-%d}"
     elif kind == "monthly":
         tomorrow = now_kst.date() + timedelta(days=1)
-        if tomorrow.month == now_kst.month:
+        # Scheduled sender only fires a real monthly push at month-end. Manual testing
+        # is allowed on any day and points at the coming calendar month.
+        if not manual and tomorrow.month == now_kst.month:
             return None
         year, month = next_month(now_kst.year, now_kst.month)
         params.update({"year": str(year), "month": str(month)})
@@ -200,15 +213,16 @@ def main():
         print("OneSignal secrets are not configured yet; skipping push without failing the workflow.")
         return 0
 
+    manual = bool(explicit_kind())
     kind = resolve_kind()
     if not kind:
         print("Could not resolve push kind; skipping.")
         return 0
 
     now_kst = datetime.now(KST)
-    message = build_message(kind, now_kst)
+    message = build_message(kind, now_kst, manual=manual)
     if message is None:
-        print("Monthly schedule fired on a non-last day; skipping.")
+        print("Monthly scheduled sender fired on a non-last day; skipping.")
         return 0
 
     try:
