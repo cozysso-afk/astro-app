@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+      ONESIGNAL_APP_ID: "203c25c5-85da-4b51-bd33-b93476622e84"
       ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
       GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
       ASTRO_PUSH_KIND: ${{ inputs.kind }}
