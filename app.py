@@ -4163,6 +4163,56 @@ PROFILE_BIRTH_DATE_DEFAULT=_profile_date_default(); PROFILE_BIRTH_TIME_DEFAULT=_
 now_kst=datetime.now(KST)
 today_kst=now_kst.date()
 
+# ============================================================
+# PUSH DEEP-LINK ROUTING · V6.8
+# ============================================================
+# GitHub Pages 홈 화면 런처가 OneSignal 알림의 목적지를 query param으로 전달한다.
+# 한 Streamlit 세션에서 같은 알림 파라미터를 매 rerun마다 다시 강제하지 않도록 signature를 기억한다.
+PUSH_ROUTE_TO_VIEW={"daily":"🌙 일일","weekly":"📅 주간","monthly":"🌕 월간","annual":"🌌 연간"}
+
+
+def _query_param_text(name):
+    try:
+        value=st.query_params.get(name,"")
+        if isinstance(value,(list,tuple)):
+            return str(value[-1]) if value else ""
+        return str(value or "")
+    except Exception:
+        try:
+            values=st.experimental_get_query_params().get(name,[])
+            return str(values[-1]) if values else ""
+        except Exception:
+            return ""
+
+
+push_kind=_query_param_text("push_kind").strip().lower()
+push_date_text=_query_param_text("push_date").strip()
+push_year_text=_query_param_text("push_year").strip()
+push_month_text=_query_param_text("push_month").strip()
+push_signature="|".join([push_kind,push_date_text,push_year_text,push_month_text])
+
+if push_kind in PUSH_ROUTE_TO_VIEW and st.session_state.get("_push_route_applied")!=push_signature:
+    st.session_state["main_view"]=PUSH_ROUTE_TO_VIEW[push_kind]
+    if push_kind in {"daily","weekly"} and push_date_text:
+        try:
+            pushed_date=date.fromisoformat(push_date_text)
+            st.session_state["profile_query_date"]=pushed_date
+        except ValueError:
+            pass
+    if push_kind=="monthly" and push_year_text and push_month_text:
+        try:
+            pushed_year=int(push_year_text); pushed_month=int(push_month_text)
+            if 1<=pushed_month<=12:
+                st.session_state["monthly_year"]=pushed_year
+                st.session_state["monthly_month"]=pushed_month
+                st.session_state["monthly_year_select"]=pushed_year
+                st.session_state["monthly_month_select"]=pushed_month
+                st.session_state["_push_monthly_autocalc"]=True
+        except ValueError:
+            pass
+    st.session_state["_push_route_applied"]=push_signature
+    st.session_state["_push_route_notice"]=push_kind
+
 st.markdown('<div class="top-nav">✦ ASTROLOGY · HOROSCOPE · PRIVATE ✦</div>',unsafe_allow_html=True)
 st.title("🌙 별빛의 운명")
 st.caption(f"{EPHEMERIS_USED} · Tropical · Whole Sign 주 기준 · Placidus 보조")
@@ -4202,6 +4252,8 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # 11. TABS
 # ============================================================
 main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
+if st.session_state.pop("_push_route_notice",None):
+    st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
 # ------------------------------------------------------------
 # DAILY
@@ -4370,6 +4422,9 @@ elif main_view=="🌕 월간":
     st.markdown(f"<div class='period-range'><strong>{month_year}년 {month_month}월</strong> · {month_days}일 · KRX 거래일 <strong>{len(sessions)}일</strong></div>",unsafe_allow_html=True)
 
     calc=st.button("🌕 선택한 달 전체 흐름 계산",type="primary",use_container_width=True,key="monthly_calc")
+    if st.session_state.pop("_push_monthly_autocalc",False):
+        calc=True
+        st.caption("🔔 월간 알림에서 들어와 선택된 달을 자동 계산해.")
     monthly_key=(month_year,month_month,natal_packed,houses_packed)
     if calc:
         with st.spinner("월간을 날짜별 다중 시각으로 계산하는 중..."):
