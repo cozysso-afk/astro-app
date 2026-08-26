@@ -1,0 +1,59 @@
+name: Astrology event alerts
+
+on:
+  schedule:
+    - cron: "20 23 * * *"  # 08:20 KST daily
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Test mode"
+        required: true
+        default: "dry_run"
+        type: choice
+        options:
+          - dry_run
+          - send
+
+permissions:
+  contents: read
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      ONESIGNAL_APP_ID: "203c25c5-85da-4b51-bd33-b93476622e84"
+      ONESIGNAL_APP_API_KEY: ${{ secrets.ONESIGNAL_APP_API_KEY }}
+      ASTRO_APP_PIN: ${{ secrets.ASTRO_APP_PIN }}
+      ASTRO_ALERT_MODE: ${{ inputs.mode }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "$ONESIGNAL_APP_API_KEY" ]; then echo "::error::Missing ONESIGNAL_APP_API_KEY"; missing=1; fi
+          if [ -z "$ASTRO_APP_PIN" ]; then echo "::error::Missing ASTRO_APP_PIN"; missing=1; fi
+          exit "$missing"
+
+      - name: Install alert runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyswisseph==2.10.3.2" playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Validate alert scripts
+        run: |
+          python -m py_compile scripts/astro_event_alerts.py
+          python -m py_compile scripts/prewarm_streamlit_horoscope.py
+          python -m py_compile scripts/send_onesignal_horoscope_push.py
+
+      - name: Run astrology alert watcher
+        run: python scripts/astro_event_alerts.py
