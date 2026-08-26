@@ -1,26 +1,38 @@
-name: Apply persistent IndexedDB storage v6.7.1
+name: Apply IndexedDB persistence and archive resilience
 
 on:
   push:
     branches: [main]
     paths:
       - "scripts/upgrade_persistent_storage_v671.py"
+      - "scripts/upgrade_archive_resilience_v690.py"
       - ".github/workflows/apply-persistent-storage-v671.yml"
 
 permissions:
   contents: write
 
+concurrency:
+  group: astro-app-storage-main
+  cancel-in-progress: false
+
 jobs:
   patch:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Sync main
+        run: git pull --rebase origin main
+
       - name: Apply persistent storage upgrade
         run: python scripts/upgrade_persistent_storage_v671.py
+
+      - name: Apply archive backup and restore upgrade
+        run: python scripts/upgrade_archive_resilience_v690.py
 
       - name: Python syntax check
         run: python -m py_compile app.py
@@ -28,13 +40,16 @@ jobs:
       - name: Diff sanity check
         run: git diff --check
 
-      - name: Persistent storage marker check
+      - name: Storage feature marker check
         shell: bash
         run: |
           grep -q 'def _request_browser_persistent_storage' app.py
           grep -q 'navigator.storage.persist()' app.py
           grep -q 'IndexedDB 오래 보관 요청' app.py
-          grep -q '지속 저장 모드가 허용됐어' app.py
+          grep -q 'def _read_browser_archive_backup' app.py
+          grep -q 'def _restore_browser_archive_records' app.py
+          grep -q '저장함 JSON 백업 다운로드' app.py
+          grep -q '백업 JSON 복원' app.py
 
       - name: Commit patched app
         shell: bash
@@ -46,5 +61,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "feat: request persistent IndexedDB storage"
+          git commit -m "feat: add persistent IndexedDB archive backup and restore"
+          git pull --rebase origin main
           git push origin HEAD:main
