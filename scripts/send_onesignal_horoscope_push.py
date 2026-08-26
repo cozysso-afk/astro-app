@@ -81,12 +81,7 @@ def _request_json(url: str, api_key: str, method="GET", payload=None, timeout=45
     data = None
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        method=method,
-        headers=_auth_headers(api_key),
-    )
+    req = urllib.request.Request(url, data=data, method=method, headers=_auth_headers(api_key))
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
             raw = response.read().decode("utf-8", errors="replace")
@@ -131,8 +126,8 @@ def _download_export_rows(csv_url: str):
 
 
 def _active_web_subscription_ids(app_id: str, api_key: str):
-    # Do not persist or log device-level Subscription IDs. Discover the currently
-    # active web subscriptions at send time so browser re-installs remain resilient.
+    # Device-level IDs remain private: discover active Web Push subscriptions at
+    # send time and never persist or print them. This also survives PWA reinstalls.
     query = urlencode({"app_id": app_id})
     status, data = _request_json(
         ONESIGNAL_EXPORT_ENDPOINT + "?" + query,
@@ -169,8 +164,6 @@ def _active_web_subscription_ids(app_id: str, api_key: str):
         subscription_id = str(row.get("id") or row.get("subscription_id") or "").strip()
         if subscription_id:
             active.append(subscription_id)
-
-    # Keep deterministic order and remove accidental duplicates without exposing IDs.
     return list(dict.fromkeys(active))
 
 
@@ -194,7 +187,6 @@ def _send_payload(api_key: str, payload):
         payload=payload,
         timeout=45,
     )
-    # Keep logs useful without ever printing targeting Subscription IDs.
     safe = dict(data) if isinstance(data, dict) else {"response": str(data)}
     safe.pop("recipients", None)
     print(f"OneSignal HTTP {status}: {json.dumps(safe, ensure_ascii=False)}")
@@ -219,19 +211,6 @@ def main():
         print("Monthly schedule fired on a non-last day; skipping.")
         return 0
 
-    base = _base_payload(app_id, message, kind)
-
-    # Fast path: normal OneSignal subscribed-user segment.
-    segment_payload = dict(base)
-    segment_payload["included_segments"] = ["Subscribed Users"]
-    status, data = _send_payload(api_key, segment_payload)
-    if _notification_succeeded(status, data):
-        print("OneSignal push accepted via Subscribed Users segment.")
-        return 0
-
-    errors = data.get("errors") if isinstance(data, dict) else None
-    print(f"Segment targeting did not produce a deliverable message; falling back to active web subscriptions. errors={errors!r}")
-
     try:
         subscription_ids = _active_web_subscription_ids(app_id, api_key)
     except Exception as exc:
@@ -243,9 +222,9 @@ def main():
         print("No active web push subscription is currently messageable. Re-open the installed home-screen app and re-enable notifications.", file=sys.stderr)
         return 1
 
-    direct_payload = dict(base)
-    direct_payload["include_subscription_ids"] = subscription_ids
-    status, data = _send_payload(api_key, direct_payload)
+    payload = _base_payload(app_id, message, kind)
+    payload["include_subscription_ids"] = subscription_ids
+    status, data = _send_payload(api_key, payload)
     if not _notification_succeeded(status, data):
         print("OneSignal direct subscription push was not accepted as deliverable.", file=sys.stderr)
         return 1
