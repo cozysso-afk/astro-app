@@ -1,12 +1,9 @@
-name: Apply archive resilience v6.9.0
+name: Apply archive resilience v6.9.1
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "scripts/upgrade_archive_resilience_v690.py"
-      - ".github/workflows/apply-archive-resilience-v690.yml"
   workflow_dispatch:
+  issues:
+    types: [opened]
 
 permissions:
   contents: write
@@ -17,6 +14,7 @@ concurrency:
 
 jobs:
   patch:
+    if: github.event_name != 'issues' || github.event.issue.title == '[automation] apply archive resilience'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -58,8 +56,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.py
-          git commit -m "feat: harden IndexedDB archive persistence and backups"
+          git commit -m "feat: add IndexedDB archive backup and restore"
           git pull --rebase origin main
           git push origin HEAD:main
-
-# retrigger: v6.9.0 archive resilience
