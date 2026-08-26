@@ -1,0 +1,55 @@
+name: Apply push deep-link routing v6.8
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_push_deeplink_v68.py"
+      - ".github/workflows/apply-push-deeplink-v68.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: astro-app-write-main
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply push deep-link routing
+        run: python scripts/upgrade_push_deeplink_v68.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Deep-link marker check
+        shell: bash
+        run: |
+          grep -q 'PUSH_ROUTE_TO_VIEW=' app.py
+          grep -q 'push_date_text=_query_param_text' app.py
+          grep -q 'monthly_year_select' app.py
+          grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
+
+      - name: Commit and push patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: route horoscope push deep links"
+          git pull --rebase origin main
+          git push origin HEAD:main
