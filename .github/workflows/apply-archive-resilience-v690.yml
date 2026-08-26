@@ -29,8 +29,13 @@ jobs:
       - name: Apply archive resilience upgrade
         run: python scripts/upgrade_archive_resilience_v690.py
 
+      - name: Apply headless automation auth compatibility
+        run: python scripts/upgrade_automation_auth_v691.py
+
       - name: Python syntax check
-        run: python -m py_compile app.py
+        run: |
+          python -m py_compile app.py
+          python -m py_compile scripts/prewarm_streamlit_horoscope.py
 
       - name: Diff sanity check
         run: git diff --check
@@ -45,17 +50,19 @@ jobs:
           grep -q 'IndexedDB 오래 보관 요청' app.py
           grep -q '저장함 JSON 백업 다운로드' app.py
           grep -q '백업 JSON 복원' app.py
+          grep -q 'automation_mode = str(automation_value or "").strip() == "1"' app.py
+          grep -q '"automation": "1"' scripts/prewarm_streamlit_horoscope.py
 
       - name: Commit and push patched app
         shell: bash
         run: |
-          if git diff --quiet -- app.py; then
-            echo "No app.py changes to commit."
+          if git diff --quiet -- app.py scripts/prewarm_streamlit_horoscope.py; then
+            echo "No app/worker changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.py
-          git commit -m "feat: add IndexedDB archive backup and restore"
+          git add app.py scripts/prewarm_streamlit_horoscope.py
+          git commit -m "fix: support headless PIN automation without weakening auth"
           git pull --rebase origin main
           git push origin HEAD:main
