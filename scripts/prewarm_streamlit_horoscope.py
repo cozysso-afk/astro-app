@@ -48,8 +48,6 @@ def target_url(kind: str, now_kst: datetime):
 
 
 def all_scopes(page):
-    # Main Streamlit DOM is normally the page itself, but checking child frames makes
-    # this resilient to Streamlit/component rendering changes.
     scopes = [page]
     for frame in page.frames:
         if frame is not page.main_frame:
@@ -65,30 +63,14 @@ def body_text(scope, timeout=1500):
 
 
 def maybe_wake_streamlit(page):
-    labels = [
-        "Yes, get this app back up!",
-        "Get this app back up",
-        "Wake up",
-        "This app has gone to sleep",
-    ]
     for scope in all_scopes(page):
-        for label in labels:
-            locator = scope.get_by_text(label, exact=False)
+        for label in ["Yes, get this app back up!", "Get this app back up", "Wake up"]:
             try:
-                if locator.count() and locator.first.is_visible():
-                    # The first three are buttons/links. The sleep heading itself may
-                    # only signal that a nearby wake button should be searched.
-                    if label == "This app has gone to sleep":
-                        for button_label in ["Yes, get this app back up!", "Get this app back up", "Wake up"]:
-                            btn = scope.get_by_role("button", name=button_label, exact=False)
-                            if btn.count() and btn.first.is_visible():
-                                btn.first.click()
-                                page.wait_for_timeout(3500)
-                                return True
-                    else:
-                        locator.first.click()
-                        page.wait_for_timeout(3500)
-                        return True
+                button = scope.get_by_role("button", name=label, exact=False)
+                if button.count() and button.first.is_visible():
+                    button.first.click()
+                    page.wait_for_timeout(3500)
+                    return True
             except Exception:
                 pass
     return False
@@ -134,13 +116,12 @@ def dump_diagnostics(page, reason: str):
         except Exception:
             scope_url = ""
         text = body_text(scope, timeout=2500)
-        # Never print entered values. Body text does not expose password input values.
         print(f"scope[{index}] url={scope_url!r}", file=sys.stderr)
-        print(f"scope[{index}] body={text[:3500]!r}", file=sys.stderr)
+        print(f"scope[{index}] body={text[:1800]!r}", file=sys.stderr)
         try:
             inputs = scope.locator("input")
             meta = []
-            for i in range(min(inputs.count(), 12)):
+            for i in range(min(inputs.count(), 8)):
                 node = inputs.nth(i)
                 meta.append({
                     "type": node.get_attribute("type"),
@@ -148,24 +129,13 @@ def dump_diagnostics(page, reason: str):
                     "aria": node.get_attribute("aria-label"),
                 })
             print(f"scope[{index}] inputs={meta!r}", file=sys.stderr)
-        except Exception as exc:
-            print(f"scope[{index}] input_scan_error={type(exc).__name__}: {exc}", file=sys.stderr)
-        try:
-            buttons = scope.get_by_role("button")
-            labels = []
-            for i in range(min(buttons.count(), 20)):
-                try:
-                    labels.append(buttons.nth(i).inner_text(timeout=500)[:120])
-                except Exception:
-                    pass
-            print(f"scope[{index}] buttons={labels!r}", file=sys.stderr)
         except Exception:
             pass
 
 
 def login_if_needed(page, pin: str):
     deadline = time.time() + 150
-    last_diag = 0.0
+    did_mid_diag = False
     while time.time() < deadline:
         maybe_wake_streamlit(page)
 
@@ -178,16 +148,14 @@ def login_if_needed(page, pin: str):
                 continue
             try:
                 pin_box.fill(pin)
-                button = scope.get_by_role("button", name="🌙 별빛의 운명 열기", exact=False)
+                button = scope.get_by_role("button", name="별빛의 운명 열기", exact=False)
                 if button.count() and button.first.is_visible():
                     button.first.click()
                 else:
                     pin_box.press("Enter")
                 page.wait_for_timeout(3500)
-                # Do not immediately return: verify that the app actually unlocked.
                 if _app_is_unlocked(page):
                     return
-                # A wrong PIN should be surfaced explicitly rather than looping silently.
                 for check_scope in all_scopes(page):
                     text = body_text(check_scope)
                     if "PIN이 맞지 않습니다" in text:
@@ -203,10 +171,9 @@ def login_if_needed(page, pin: str):
         if "APP_PIN을 먼저 설정" in combined:
             raise RuntimeError("Streamlit app reports APP_PIN is not configured")
 
-        # Print one mid-run snapshot so failures are diagnosable without waiting for the end.
-        if time.time() - last_diag > 45:
+        if not did_mid_diag and time.time() > deadline - 100:
             dump_diagnostics(page, "waiting_for_login")
-            last_diag = time.time()
+            did_mid_diag = True
         page.wait_for_timeout(1500)
 
     dump_diagnostics(page, "login_timeout")
