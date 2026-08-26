@@ -1,4 +1,4 @@
-name: Apply push deep-link routing v6.8
+name: Apply push deep-link routing v6.8.1
 
 on:
   push:
@@ -37,8 +37,9 @@ jobs:
         run: |
           grep -q 'PUSH_ROUTE_TO_VIEW=' app.py
           grep -q 'push_date_text=_query_param_text' app.py
-          grep -q 'monthly_year_select' app.py
+          grep -q '_push_monthly_autocalc' app.py
           grep -q '운세 알림에서 해당 리포트로 바로 이동했어' app.py
+          grep -q '월간 알림에서 들어와 선택된 달을 자동 계산해' app.py
 
       - name: Commit and push patched app
         shell: bash
