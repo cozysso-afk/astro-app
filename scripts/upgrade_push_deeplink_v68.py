@@ -3,7 +3,7 @@ from pathlib import Path
 APP = Path("app.py")
 text = APP.read_text(encoding="utf-8")
 
-if "PUSH_ROUTE_TO_VIEW =" in text:
+if "PUSH_ROUTE_TO_VIEW={" in text or "PUSH_ROUTE_TO_VIEW =" in text:
     print("Push deep-link v6.8 already applied")
     raise SystemExit(0)
 
@@ -60,6 +60,7 @@ if push_kind in PUSH_ROUTE_TO_VIEW and st.session_state.get("_push_route_applied
                 st.session_state["monthly_month"]=pushed_month
                 st.session_state["monthly_year_select"]=pushed_year
                 st.session_state["monthly_month_select"]=pushed_month
+                st.session_state["_push_monthly_autocalc"]=True
         except ValueError:
             pass
     st.session_state["_push_route_applied"]=push_signature
@@ -81,6 +82,19 @@ if st.session_state.pop("_push_route_notice",None):
 if main_needle not in text:
     raise SystemExit("main view marker not found")
 text=text.replace(main_needle,main_replacement,1)
+
+monthly_needle='''    calc=st.button("🌕 선택한 달 전체 흐름 계산",type="primary",use_container_width=True,key="monthly_calc")
+    monthly_key=(month_year,month_month,natal_packed,houses_packed)
+'''
+monthly_replacement='''    calc=st.button("🌕 선택한 달 전체 흐름 계산",type="primary",use_container_width=True,key="monthly_calc")
+    if st.session_state.pop("_push_monthly_autocalc",False):
+        calc=True
+        st.caption("🔔 월간 알림에서 들어와 선택된 달을 자동 계산해.")
+    monthly_key=(month_year,month_month,natal_packed,houses_packed)
+'''
+if monthly_needle not in text:
+    raise SystemExit("monthly auto-calc marker not found")
+text=text.replace(monthly_needle,monthly_replacement,1)
 
 APP.write_text(text,encoding="utf-8")
 print("Applied push deep-link routing v6.8")
