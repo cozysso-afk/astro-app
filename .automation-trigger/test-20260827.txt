@@ -1,0 +1,1 @@
+Trigger end-to-end astrology automation validation after OneSignal and GitHub Actions secrets were configured.
