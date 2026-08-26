@@ -4325,6 +4325,7 @@ today_kst=now_kst.date()
 # 아래 세 값은 동일 계산 근거를 방향성 관점으로 재조합한 실험 보조지표이며
 # 사건 확률이 아니다. 실제 결과 기록을 쌓아 개인별 유효성을 나중에 검증한다.
 RELATIONSHIP_SIGNAL_VERSION = "v1.0"
+RELATIONSHIP_OBSERVATION_VERSION = "v1.1"
 RELATIONSHIP_OUTCOME_KIND = "outcome"
 RELATIONSHIP_OUTCOME_MIN_COMPARE = 5
 RELATIONSHIP_OUTCOME_CALIBRATION_READY = 20
@@ -4562,8 +4563,18 @@ def _relationship_calibration_summary(entries):
     sent_no=[x for x in rows if x.get("event") in {"none","received"}]
     past_yes=[x for x in rows if bool(x.get("past_connection")) and x.get("event")!="none"]
     past_no=[x for x in rows if not bool(x.get("past_connection"))]
+    occurred=[x for x in rows if x.get("event")!="none"]
+    time_counts={}
+    channel_counts={}
+    for item in occurred:
+        time_key=str(item.get("event_time_bucket") or "").strip()
+        channel_key=str(item.get("channel") or "").strip()
+        if time_key:time_counts[time_key]=time_counts.get(time_key,0)+1
+        if channel_key:channel_counts[channel_key]=channel_counts.get(channel_key,0)+1
     return {
         "n":len(rows),
+        "event_time_counts":time_counts,
+        "channel_counts":channel_counts,
         "recv_yes_n":len(recv_yes),"recv_no_n":len(recv_no),
         "recv_yes":_mean_metric(recv_yes,"수신신호"),"recv_no":_mean_metric(recv_no,"수신신호"),
         "sent_yes_n":len(sent_yes),"sent_no_n":len(sent_no),
@@ -4597,13 +4608,27 @@ def render_relationship_signal_panel(query_date,daily_scores,daily_topic_results
     code_by_label={"기록 안 함":"","연락 없음":"none","연락 받음":"received","내가 먼저 보냄":"sent","서로 주고받음":"both"}
     label_by_code={v:k for k,v in code_by_label.items()}
     default_label=label_by_code.get(existing.get("event"),"기록 안 함")
+    time_options=["시간 기록 안 함","새벽(00~06)","오전(06~12)","오후(12~18)","저녁(18~22)","밤(22~24)"]
+    time_code={"시간 기록 안 함":"","새벽(00~06)":"dawn","오전(06~12)":"morning","오후(12~18)":"afternoon","저녁(18~22)":"evening","밤(22~24)":"night"}
+    time_label={v:k for k,v in time_code.items()}
+    default_time=time_label.get(existing.get("event_time_bucket"),"시간 기록 안 함")
+    channel_options=["경로 기록 안 함","문자·메신저","DM·SNS","전화","직접 만남","기타"]
+    channel_code={"경로 기록 안 함":"","문자·메신저":"message","DM·SNS":"dm","전화":"call","직접 만남":"in_person","기타":"other"}
+    channel_label={v:k for k,v in channel_code.items()}
+    default_channel=channel_label.get(existing.get("channel"),"경로 기록 안 함")
 
     with st.expander("🧪 실제 결과 기록 · 개인보정",expanded=False):
         st.caption("연락이 있었던 날뿐 아니라 '연락 없음'인 날도 같이 기록해야 비교가 덜 치우쳐. 기록은 이 기기 IndexedDB에만 저장되고 저장함 JSON 백업에도 포함돼.")
         with st.form(f"relationship_outcome_form_{query_date.isoformat()}"):
             event_label=st.selectbox("이 날 실제 연락 결과",event_options,index=event_options.index(default_label))
             past_connection=st.checkbox("과거 인연 관련 연락",value=bool(existing.get("past_connection",False)))
+            meta_cols=st.columns(2)
+            with meta_cols[0]:
+                event_time_label=st.selectbox("연락 시각대(선택)",time_options,index=time_options.index(default_time))
+            with meta_cols[1]:
+                channel_label_value=st.selectbox("연락 경로(선택)",channel_options,index=channel_options.index(default_channel))
             note=st.text_input("짧은 메모(선택)",value=str(existing.get("note") or "")[:200],placeholder="예: 저녁에 먼저 전화 옴")
+            st.caption("시각대·경로는 나중에 일중 트랜짓 패턴을 검증하기 위한 메타데이터야. 현재 운세 점수나 가중치를 즉시 바꾸지는 않아.")
             save=st.form_submit_button("💾 실제 결과 저장",use_container_width=True)
         if save:
             event=code_by_label.get(event_label,"")
@@ -4615,6 +4640,8 @@ def render_relationship_signal_panel(query_date,daily_scores,daily_topic_results
                     "date":query_date.isoformat(),
                     "event":event,
                     "past_connection":bool(past_connection and event!="none"),
+                    "event_time_bucket":time_code.get(event_time_label,"") if event!="none" else "",
+                    "channel":channel_code.get(channel_label_value,"") if event!="none" else "",
                     "note":note.strip()[:200],
                     "recorded_at":int(time.time()),
                     "scores":{
@@ -4647,6 +4674,16 @@ def render_relationship_signal_panel(query_date,daily_scores,daily_topic_results
             summary=_relationship_calibration_summary(entries)
             n=summary["n"]
             st.markdown(f"**개인보정 기록 · {n}일**")
+            time_names={"dawn":"새벽","morning":"오전","afternoon":"오후","evening":"저녁","night":"밤"}
+            channel_names={"message":"문자·메신저","dm":"DM·SNS","call":"전화","in_person":"직접 만남","other":"기타"}
+            time_counts=summary.get("event_time_counts") or {}
+            channel_counts=summary.get("channel_counts") or {}
+            if time_counts:
+                time_text=" · ".join(f"{time_names.get(k,k)} {v}회" for k,v in sorted(time_counts.items(),key=lambda x:(-x[1],x[0])))
+                st.caption("⏱ 기록된 연락 시각대 · "+time_text)
+            if channel_counts:
+                channel_text=" · ".join(f"{channel_names.get(k,k)} {v}회" for k,v in sorted(channel_counts.items(),key=lambda x:(-x[1],x[0])))
+                st.caption("📨 기록된 연락 경로 · "+channel_text)
             if n < RELATIONSHIP_OUTCOME_MIN_COMPARE:
                 st.caption(f"아직 표본이 적어. 최소 {RELATIONSHIP_OUTCOME_MIN_COMPARE}일 이상부터 발생일/비발생일 평균을 참고용으로 비교할게.")
             else:
