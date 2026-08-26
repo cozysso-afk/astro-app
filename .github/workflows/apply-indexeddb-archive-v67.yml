@@ -1,0 +1,51 @@
+name: Apply IndexedDB fortune storage v6.7
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_indexeddb_archive_v67.py"
+      - ".github/workflows/apply-indexeddb-archive-v67.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply IndexedDB upgrade
+        run: python scripts/upgrade_indexeddb_archive_v67.py
+
+      - name: Python syntax check
+        run: python -m py_compile app.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: IndexedDB feature marker check
+        shell: bash
+        run: |
+          grep -q 'BROWSER_IDB_SCHEMA_VERSION = 1' app.py
+          grep -q 'BROWSER_IDB_DB_NAME = "astro_fortune_db_v1"' app.py
+          grep -q 'def _read_browser_storage_estimate' app.py
+          grep -q 'IndexedDB에 장기 보관' app.py
+          grep -q 'def _write_annual_entry' app.py
+
+      - name: Commit patched app
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "feat: move fortune archive to IndexedDB"
+          git push origin HEAD:main
