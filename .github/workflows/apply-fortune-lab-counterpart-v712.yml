@@ -1,0 +1,38 @@
+name: Apply Fortune Lab counterpart v0.1.2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/upgrade_fortune_lab_counterpart_v712.py"
+      - ".github/workflows/apply-fortune-lab-counterpart-v712.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply counterpart reunion patch
+        run: python scripts/upgrade_fortune_lab_counterpart_v712.py
+      - name: Syntax check
+        run: python -m py_compile fortune_lab_v71.py app.py
+      - name: Diff sanity
+        run: git diff --check
+      - name: Verify markers
+        run: |
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.2"' fortune_lab_v71.py
+          grep -q '💞 특정 상대와 재회' fortune_lab_v71.py
+          grep -q 'partner natal/synastry/transit not calculated yet' fortune_lab_v71.py
+          grep -q '상대 출생시간을 알고 있음' fortune_lab_v71.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fortune_lab_v71.py
+          git commit -m "feat: add specific-counterpart reunion mode"
+          git push origin HEAD:main
