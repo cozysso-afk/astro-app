@@ -1,0 +1,43 @@
+name: Bump home icon cache v48
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bump-home-icon-v48.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bump icon and manifest cache keys
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('./icon.PNG?v=46','./icon.PNG?v=48')
+          s=s.replace('./manifest.webmanifest?v=47','./manifest.webmanifest?v=48')
+          p.write_text(s,encoding='utf-8')
+          p=Path('manifest.webmanifest')
+          s=p.read_text(encoding='utf-8').replace('./icon.PNG?v=46','./icon.PNG?v=48')
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify
+        run: |
+          grep -q 'icon.PNG?v=48' index.html
+          grep -q 'manifest.webmanifest?v=48' index.html
+          grep -q 'icon.PNG?v=48' manifest.webmanifest
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html manifest.webmanifest
+          git commit -m "chore: bump home icon cache to v48"
+          git push origin HEAD:main
