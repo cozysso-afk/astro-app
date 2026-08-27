@@ -33,7 +33,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.1"
+FORTUNE_LAB_VERSION = "v0.1.2"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -42,6 +42,7 @@ FORTUNE_LAB_MAX_ARCHIVE = 36
 FORTUNE_LAB_TOPICS = {
     "💘 연애·새 인연": {"western":"연애", "focus":"새 인연 유입, 내가 끌리는 흐름, 상호 진전, 관계 재검토"},
     "🔄 재회·과거 인연": {"western":"재회", "focus":"과거 인연 재활성, 접점, 관계 재검토, 반복 패턴"},
+    "💞 특정 상대와 재회": {"western":"재회", "focus":"입력한 특정 상대와의 관계 재활성 가능 구간, 접점 환경, 반복 패턴. 상대의 행동·감정을 확정하지 않음"},
     "📝 시험·합격": {"western":"시험", "focus":"흡수, 출력, 평가 압박, 실수 위험, 성과 회수"},
     "📚 공부·학업": {"western":"학업", "focus":"집중, 이해, 기억, 루틴, 학습 지속성"},
     "💼 취업·직장": {"western":"직장", "focus":"지원, 평가, 조직 적응, 책임, 성과 가시화"},
@@ -232,6 +233,41 @@ def _saju_payload(birth_date,birth_time,longitude,gender,start_date,end_date):
         return {"ok":False,"error":f"{type(exc).__name__}: {exc}"}
 
 
+def _counterpart_saju_payload(birth_date,time_known=False,birth_time=None,longitude=None):
+    if Solar is None:
+        return {"ok":False,"error":"lunar_python 미설치"}
+    try:
+        time_known=bool(time_known and birth_time is not None)
+        true_solar_meta=None
+        if time_known and longitude is not None:
+            use_dt,true_solar_meta=_true_solar_datetime(birth_date,birth_time,float(longitude))
+            time_policy="known_time_true_solar"
+        else:
+            # 정오를 임시 계산시각으로 사용하지만, 시주는 결과에 노출하지 않는다.
+            # 출생시간 미상에서는 절입 당일/23시 일진 경계 같은 정밀 판정을 하지 않는다.
+            use_dt=datetime.combine(birth_date,dt_time(12,0))
+            time_policy="unknown_or_unlocated_time_three_pillars_only"
+        e=Solar.fromYmdHms(use_dt.year,use_dt.month,use_dt.day,use_dt.hour,use_dt.minute,use_dt.second).getLunar().getEightChar()
+        try: e.setSect(2)
+        except Exception: pass
+        pillars={"year":e.getYear(),"month":e.getMonth(),"day":e.getDay(),"hour":e.getTime() if (time_known and longitude is not None) else None}
+        return {
+            "ok":True,
+            "engine":"lunar_python 1.4.8" + (" + Swiss Ephemeris true-solar correction" if true_solar_meta else ""),
+            "time_policy":time_policy,
+            "true_solar":true_solar_meta,
+            "pillars":pillars,
+            "day_master":pillars["day"][:1] if pillars.get("day") else None,
+            "precision_limits":[
+                "출생시간 미상 또는 경도 미입력 시 시주 미사용",
+                "출생시간 미상에서는 절입 당일·23시 전후 경계 판정 불가",
+                "상대 대운·세운·월운은 이번 단계에서 계산하지 않음",
+            ],
+        }
+    except Exception as exc:
+        return {"ok":False,"error":f"{type(exc).__name__}: {exc}"}
+
+
 def _thai_payload(birth_date,birth_time):
     dt=datetime.combine(birth_date,birth_time)
     shifted=dt-timedelta(hours=6)
@@ -274,18 +310,41 @@ def _western_payload(ctx,topic,start_date,end_date):
     return {"ok":True,"engine":"별빛의 운명 Western period engine","topic_key":key,"months":months,"score_policy":"점수는 사건 발생 확률이 아니라 같은 분야 안의 상대 흐름"}
 
 
-def _build_bundle(ctx,topic,start_date,end_date,gender):
+def _build_bundle(ctx,topic,start_date,end_date,gender,counterpart=None):
     western=_western_payload(ctx,topic,start_date,end_date)
     saju=_saju_payload(ctx["birth_date"],ctx["birth_time"],ctx["birth_lon"],gender,start_date,end_date)
     thai=_thai_payload(ctx["birth_date"],ctx["birth_time"])
+    counterpart_payload=None
+    if topic=="💞 특정 상대와 재회" and isinstance(counterpart,dict):
+        cp_saju=_counterpart_saju_payload(
+            counterpart.get("birth_date"),counterpart.get("time_known",False),
+            counterpart.get("birth_time"),counterpart.get("longitude"),
+        )
+        cross_links=[]
+        if cp_saju.get("ok") and saju.get("ok"):
+            up=saju.get("pillars") or {}; cp=cp_saju.get("pillars") or {}
+            user_branches={"내 년지":str(up.get("year") or "")[1:2],"내 월지":str(up.get("month") or "")[1:2],"내 일지":str(up.get("day") or "")[1:2],"내 시지":str(up.get("hour") or "")[1:2]}
+            for label in ("year","month","day","hour"):
+                branch=str(cp.get(label) or "")[1:2]
+                if branch:
+                    for link in _branch_links(branch,user_branches):
+                        cross_links.append(f"상대 {label}지 {branch} ↔ {link}")
+        counterpart_payload={
+            "input":_jsonable(counterpart),
+            "saju":cp_saju,
+            "cross_branch_links":cross_links,
+            "western_status":"partner natal/synastry/transit not calculated yet",
+            "scope_note":"현재 Western 월별 값은 사용자의 재회 활성 환경이다. 상대의 행동 시기나 연락일로 바꾸지 않는다.",
+        }
     return {
         "version":FORTUNE_LAB_VERSION,"topic":topic,"topic_focus":FORTUNE_LAB_TOPICS[topic]["focus"],
         "period":{"start":start_date.isoformat(),"end":end_date.isoformat()},
-        "western":western,"saju":saju,"thai":thai,
+        "western":western,"saju":saju,"thai":thai,"counterpart":counterpart_payload,
         "consensus_policy":{
-            "western":"period timing evidence available",
+            "western":"period timing evidence available for user",
             "saju":"DaYun/year/month cycle facts available; interpretation is separate",
             "thai":"natal baseline only; excluded from predictive consensus until Suriyayat transit is implemented",
+            "counterpart":"natal Saju context only in v0.1.2; no partner-specific Western timing vote",
         },
     }
 
@@ -303,7 +362,9 @@ def _deep_prompt(bundle):
 5. Thai는 현재 출생요일·요일행성 baseline뿐이다. Suriyayat/Thai transit가 없으므로 태국점성술로 특정 월·날짜를 예측하지 않는다.
 6. 서로 다른 체계가 실제로 같은 주제를 지지할 때만 교차 보조 신호라고 말한다. 억지로 합의시키지 않는다.
 7. 특정 타인의 속마음·연락·재회·합격을 확정하지 않는다. 확률 숫자를 지어내지 않는다.
-8. 결과는 전문용어를 나열하지 말고 점성·사주를 모르는 사람이 이해할 현실 장면으로 번역한다.
+8. counterpart가 있더라도 상대 출생시간이 없으면 시주·ASC·하우스·정확한 달 위치를 만들지 않는다. 현재 partner natal/synastry/transit가 미계산이면 Western 월별 값은 사용자의 재회 환경으로만 읽고 상대의 연락일로 바꾸지 않는다.
+9. 상대 사주 원국 일부와 두 사람의 합·충은 관계 패턴의 보조 맥락이지 연락·재회 발생의 증명이 아니다.
+10. 결과는 전문용어를 나열하지 말고 점성·사주를 모르는 사람이 이해할 현실 장면으로 번역한다.
 
 [분석 주제]
 {bundle['topic']} — {bundle['topic_focus']}
@@ -429,6 +490,23 @@ def render_fortune_lab(ctx):
 
     topic=st.selectbox("분석 주제",list(FORTUNE_LAB_TOPICS.keys()),key="fortune_lab_topic")
     gender=st.selectbox("사주 대운용 성별",["여성","남성"],index=0 if str(ctx.get("birth_gender","여성")).startswith("여") else 1,key="fortune_lab_gender")
+
+    counterpart=None
+    if topic=="💞 특정 상대와 재회":
+        st.markdown("#### 💞 특정 상대 정보")
+        st.caption("출생시간을 몰라도 가능해. 그 경우 상대 시주·ASC·하우스는 계산하지 않고, 아는 데이터만 사용해.")
+        cp_name=st.text_input("상대 호칭 · 선택",value="",placeholder="예: A",key="fortune_lab_cp_name")
+        cp_birth_date=st.date_input("상대 출생일",value=date(1990,1,1),key="fortune_lab_cp_birth_date")
+        cp_time_known=st.checkbox("상대 출생시간을 알고 있음",value=False,key="fortune_lab_cp_time_known")
+        cp_birth_time=st.time_input("상대 출생시간",value=dt_time(12,0),step=60,key="fortune_lab_cp_birth_time",disabled=not cp_time_known)
+        cp_place=st.text_input("상대 출생지 · 선택",value="",placeholder="예: 광주",key="fortune_lab_cp_place")
+        cp_lon_raw=st.text_input("상대 출생지 경도(E) · 시간 보정용 선택",value="",placeholder="시간을 정확히 알 때만 예: 126.85",key="fortune_lab_cp_lon")
+        cp_context=st.text_area("현재 관계 상태 · 선택",value="",placeholder="예: 마지막 연락 시점/현재 단절 여부 정도만",key="fortune_lab_cp_context")
+        cp_lon=None
+        if cp_time_known and cp_lon_raw.strip():
+            try: cp_lon=float(cp_lon_raw.strip())
+            except Exception: st.warning("상대 경도는 숫자로 입력해줘. 경도를 비우면 상대 시주는 사용하지 않아.")
+        counterpart={"name":cp_name.strip(),"birth_date":cp_birth_date,"time_known":cp_time_known,"birth_time":cp_birth_time if cp_time_known else None,"birth_place":cp_place.strip(),"longitude":cp_lon,"context":cp_context.strip()}
     default_start=date(ctx["query_date"].year,ctx["query_date"].month,1)
     default_end=date(default_start.year,12,31) if default_start.month>=8 else min(date(default_start.year,12,31),default_start+timedelta(days=150))
     c1,c2=st.columns(2)
@@ -441,10 +519,11 @@ def render_fortune_lab(ctx):
         st.error(f"1차 버전은 한 번에 최대 {FORTUNE_LAB_MAX_DAYS}일까지 분석해."); return
 
     calc=st.button("🧭 세 체계 계산자료 만들기",type="primary",use_container_width=True,key="fortune_lab_calc")
-    fp=hashlib.sha256(f"{FORTUNE_LAB_VERSION}|{topic}|{start_date}|{end_date}|{gender}|{ctx['birth_date']}|{ctx['birth_time']}|{ctx['birth_lon']}|{ctx['natal_packed']}|{ctx['houses_packed']}".encode()).hexdigest()[:24]
+    cp_fp=json.dumps(_jsonable(counterpart),ensure_ascii=False,sort_keys=True) if counterpart else ""
+    fp=hashlib.sha256(f"{FORTUNE_LAB_VERSION}|{topic}|{start_date}|{end_date}|{gender}|{ctx['birth_date']}|{ctx['birth_time']}|{ctx['birth_lon']}|{ctx['natal_packed']}|{ctx['houses_packed']}|{cp_fp}".encode()).hexdigest()[:24]
     if calc:
         with st.spinner("서양 기간값 + 사주 대운·세운·월운 + 태국 출생층을 계산하는 중..."):
-            st.session_state["fortune_lab_bundle"]=_build_bundle(ctx,topic,start_date,end_date,gender)
+            st.session_state["fortune_lab_bundle"]=_build_bundle(ctx,topic,start_date,end_date,gender,counterpart=counterpart)
             st.session_state["fortune_lab_bundle_fp"]=fp
     bundle=st.session_state.get("fortune_lab_bundle") if st.session_state.get("fortune_lab_bundle_fp")==fp else None
     if not bundle:
@@ -452,6 +531,18 @@ def render_fortune_lab(ctx):
         return
 
     _render_engine_summary(bundle)
+    cp=bundle.get("counterpart")
+    if isinstance(cp,dict):
+        cps=cp.get("saju") or {}
+        with st.expander("💞 특정 상대 계산 범위",expanded=True):
+            if cps.get("ok"):
+                p=cps.get("pillars") or {}
+                st.write(f"상대 사주 자료 · {p.get('year','?')} / {p.get('month','?')} / {p.get('day','?')} / {p.get('hour') or '시간 미상'}")
+                st.caption("현재는 상대 원국 일부 + 내 사주와의 육합·육충 보조맥락까지만 사용해. 상대 Western 시너스트리·트랜짓은 다음 단계라 특정 연락일을 만들지 않아.")
+                if cp.get("cross_branch_links"):
+                    st.write(" · ".join(cp.get("cross_branch_links")[:8]))
+            else:
+                st.warning(str(cps.get("error") or "상대 사주 계산 실패"))
     st.markdown("#### 📆 월별 계산 요약")
     _render_month_table(bundle)
 

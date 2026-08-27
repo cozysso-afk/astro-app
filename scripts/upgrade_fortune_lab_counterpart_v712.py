@@ -19,7 +19,7 @@ replace_once(
 'topic')
 
 anchor='''\n\ndef _thai_payload(birth_date,birth_time):\n'''
-helper=r'''\n\ndef _counterpart_saju_payload(birth_date,time_known=False,birth_time=None,longitude=None):
+helper='''\n\ndef _counterpart_saju_payload(birth_date,time_known=False,birth_time=None,longitude=None):
     if Solar is None:
         return {"ok":False,"error":"lunar_python 미설치"}
     try:
