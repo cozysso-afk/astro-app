@@ -6,6 +6,7 @@ on:
     paths:
       - "fortune_lab_v71.py"
       - "scripts/upgrade_fortune_lab_v71.py"
+      - "scripts/fix_fortune_lab_true_solar_v711.py"
       - ".github/workflows/apply-fortune-lab-v71.yml"
 
 permissions:
@@ -20,18 +21,37 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Apply true-solar correction to Fortune Lab module
+        run: python scripts/fix_fortune_lab_true_solar_v711.py
+
       - name: Apply Fortune Lab upgrade
         run: python scripts/upgrade_fortune_lab_v71.py
 
-      - name: Install Saju engine for verification
-        run: python -m pip install --disable-pip-version-check lunar_python==1.4.8
+      - name: Install Saju verification engines
+        run: python -m pip install --disable-pip-version-check lunar_python==1.4.8 pyswisseph==2.10.3.2
 
-      - name: Verify known Korean Saju pillars
+      - name: Verify known Korean Saju pillars with true solar time
         shell: bash
         run: |
           python - <<'PY'
+          from datetime import datetime,timedelta
+          import swisseph as swe
           from lunar_python import Solar
-          s=Solar.fromYmdHms(1991,3,21,7,26,0)
+
+          legal=datetime(1991,3,21,7,26,0)
+          longitude=127.6622
+          utc=legal-timedelta(hours=9)
+          ut_hour=utc.hour+utc.minute/60+utc.second/3600
+          jd=swe.julday(utc.year,utc.month,utc.day,ut_hour,swe.GREG_CAL)
+          eot_minutes=float(swe.time_equ(jd))*1440.0
+          lon_minutes=4.0*(longitude-135.0)
+          true_solar=legal+timedelta(minutes=lon_minutes+eot_minutes)
+          print("legal KST:",legal)
+          print("longitude correction min:",lon_minutes)
+          print("equation of time min:",eot_minutes)
+          print("true solar:",true_solar)
+
+          s=Solar.fromYmdHms(true_solar.year,true_solar.month,true_solar.day,true_solar.hour,true_solar.minute,true_solar.second)
           e=s.getLunar().getEightChar()
           e.setSect(2)
           got=[e.getYear(),e.getMonth(),e.getDay(),e.getTime()]
@@ -39,12 +59,15 @@ jobs:
           print("pillars:",got)
           if got!=expected:
               raise SystemExit(f"pillar mismatch: expected {expected}, got {got}")
+
           for sect in (1,2):
               yun=e.getYun(0,sect)
               print("yun sect",sect,"start",yun.getStartSolar().toYmdHms(),"start offset",yun.getStartYear(),yun.getStartMonth(),yun.getStartDay())
+              found=[]
               for dy in yun.getDaYun(12):
                   if dy.getStartYear() <= 2026 <= dy.getEndYear():
-                      print("2026 dayun sect",sect,dy.getGanZhi(),dy.getStartYear(),dy.getEndYear(),dy.getStartAge(),dy.getEndAge())
+                      found.append((dy.getGanZhi(),dy.getStartYear(),dy.getEndYear(),dy.getStartAge(),dy.getEndAge()))
+              print("2026 dayun sect",sect,found)
           PY
 
       - name: Python syntax check
@@ -59,19 +82,21 @@ jobs:
         run: |
           grep -q 'from fortune_lab_v71 import render_fortune_lab' app.py
           grep -q 'elif main_view=="🧭 포춘랩"' app.py
+          grep -q '"birth_lon":lon' app.py
           grep -q 'lunar_python==1.4.8' requirements.txt
-          grep -q 'FORTUNE_LAB_VERSION = "v0.1.0"' fortune_lab_v71.py
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.1"' fortune_lab_v71.py
+          grep -q 'FORTUNE_LAB_TRUE_SOLAR_V711 = True' fortune_lab_v71.py
           grep -q 'Suriyayat' fortune_lab_v71.py
 
-      - name: Commit patched app and requirements
+      - name: Commit patched app, module and requirements
         shell: bash
         run: |
-          if git diff --quiet -- app.py requirements.txt; then
-            echo "No app.py/requirements changes to commit."
+          if git diff --quiet -- app.py fortune_lab_v71.py requirements.txt; then
+            echo "No app/module/requirements changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.py requirements.txt
-          git commit -m "feat: add Fortune Lab multi-system analysis"
+          git add app.py fortune_lab_v71.py requirements.txt
+          git commit -m "feat: add Fortune Lab with true-solar Saju"
           git push origin HEAD:main
