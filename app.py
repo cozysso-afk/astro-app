@@ -23,6 +23,7 @@ from PIL import Image
 from scipy.optimize import brentq
 from skyfield.api import load, wgs84
 from skyfield.framelib import ecliptic_frame
+from fortune_lab_v71 import render_fortune_lab
 
 try:
     from streamlit_js_eval import streamlit_js_eval
@@ -4903,6 +4904,7 @@ st.caption(f"{EPHEMERIS_USED} · Tropical · Whole Sign 주 기준 · Placidus �
 
 with st.expander("👤 출생정보 수정", expanded=False):
     user_name=st.text_input("성함 또는 호칭",value=PROFILE_NAME_DEFAULT,key="profile_name")
+    birth_gender=st.selectbox("성별 · 사주 대운 계산용",["여성","남성"],index=0,key="profile_birth_gender")
     birth_date=st.date_input("출생일",PROFILE_BIRTH_DATE_DEFAULT,key="profile_birth_date")
     birth_time=st.time_input("출생 시간",PROFILE_BIRTH_TIME_DEFAULT,step=60,key="profile_birth_time")
     places=list(KOREA_BIRTHPLACES)+["직접 좌표 입력(고급)"]
@@ -4948,7 +4950,7 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # ============================================================
 # 11. TABS
 # ============================================================
-main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
+main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","🧭 포춘랩","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
@@ -5225,6 +5227,27 @@ elif main_view=="🌌 연간":
                     st.success("🌌 연간운세 생성·저장 완료. 다음부터는 저장본을 바로 열어.")
                 else:
                     render_ai_annual_overview(annual_ai_result,annual_payload,archive=False)
+
+# ------------------------------------------------------------
+# FORTUNE LAB · SAJU × WESTERN × THAI BASELINE
+# ------------------------------------------------------------
+elif main_view=="🧭 포춘랩":
+    render_fortune_lab({
+        "birth_date":birth_date,
+        "birth_time":birth_time,
+        "birth_lon":lon,
+        "birth_gender":birth_gender,
+        "query_date":query_date,
+        "natal_packed":natal_packed,
+        "houses_packed":houses_packed,
+        "cached_period_scores":cached_period_scores,
+        "period_topic_stats":_period_topic_stats,
+        "ai_api_key":_ai_api_key,
+        "ai_model":_ai_model,
+        "ai_thinking_level":_ai_thinking_level,
+        "ai_supported_models":AI_SUPPORTED_MODELS,
+        "gemini_usage_summary":_gemini_usage_summary,
+    })
 
 # ------------------------------------------------------------
 # ARCHIVE

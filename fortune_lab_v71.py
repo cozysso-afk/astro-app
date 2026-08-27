@@ -20,6 +20,7 @@ import urllib.request
 from datetime import date, datetime, time as dt_time, timedelta
 
 import streamlit as st
+import swisseph as swe
 
 try:
     from streamlit_js_eval import streamlit_js_eval
@@ -32,7 +33,8 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.0"
+FORTUNE_LAB_VERSION = "v0.1.1"
+FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
 FORTUNE_LAB_MAX_ARCHIVE = 36
@@ -97,6 +99,35 @@ def _month_segments(start_date,end_date):
     return out
 
 
+def _true_solar_datetime(birth_date,birth_time,longitude):
+    """KST legal time -> local apparent/true solar time.
+
+    Korea standard meridian is 135E. Local mean solar time differs by
+    4 minutes per degree of longitude; Swiss Ephemeris swe.time_equ returns
+    equation of time E = LAT - LMT in days.
+    """
+    legal=datetime.combine(birth_date,birth_time)
+    longitude=float(longitude)
+    utc=legal-timedelta(hours=9)
+    ut_hour=utc.hour+utc.minute/60+utc.second/3600+utc.microsecond/3_600_000_000
+    jd_ut=swe.julday(utc.year,utc.month,utc.day,ut_hour,swe.GREG_CAL)
+    eot_days=float(swe.time_equ(jd_ut))
+    longitude_minutes=4.0*(longitude-135.0)
+    eot_minutes=eot_days*1440.0
+    total_minutes=longitude_minutes+eot_minutes
+    apparent=legal+timedelta(minutes=total_minutes)
+    return apparent,{
+        "legal_kst":legal.strftime("%Y-%m-%d %H:%M:%S"),
+        "longitude_east":round(longitude,6),
+        "kst_standard_meridian_east":135.0,
+        "longitude_correction_minutes":round(longitude_minutes,4),
+        "equation_of_time_minutes":round(eot_minutes,4),
+        "total_correction_minutes":round(total_minutes,4),
+        "true_solar_time":apparent.strftime("%Y-%m-%d %H:%M:%S"),
+        "formula":"KST + 4*(longitude-135E) minutes + Swiss Ephemeris equation_of_time(LAT-LMT)",
+    }
+
+
 def _ten_god(day_stem,target_stem):
     if day_stem not in _STEM_INFO or target_stem not in _STEM_INFO:
         return ""
@@ -128,11 +159,12 @@ def _branch_links(target_branch,natal_branches):
     return links
 
 
-def _saju_payload(birth_date,birth_time,gender,start_date,end_date):
+def _saju_payload(birth_date,birth_time,longitude,gender,start_date,end_date):
     if Solar is None:
         return {"ok":False,"error":"lunar_python 미설치"}
     try:
-        solar=Solar.fromYmdHms(birth_date.year,birth_date.month,birth_date.day,birth_time.hour,birth_time.minute,birth_time.second)
+        true_solar,true_solar_meta=_true_solar_datetime(birth_date,birth_time,longitude)
+        solar=Solar.fromYmdHms(true_solar.year,true_solar.month,true_solar.day,true_solar.hour,true_solar.minute,true_solar.second)
         lunar=solar.getLunar()
         eight=lunar.getEightChar()
         # sect=2 only affects the late-night day-boundary convention. Make it explicit.
@@ -189,11 +221,12 @@ def _saju_payload(birth_date,birth_time,gender,start_date,end_date):
         try: start_solar=yun.getStartSolar().toYmdHms()
         except Exception: start_solar=""
         return {
-            "ok":True,"engine":"lunar_python 1.4.8","calendar_input":"solar wall-clock KST",
+            "ok":True,"engine":"lunar_python 1.4.8 + Swiss Ephemeris true-solar correction","calendar_input":"legal KST corrected to local apparent solar time",
+            "true_solar":true_solar_meta,
             "pillars":pillars,"day_master":day_master,"elements":element_count,"natal_ten_gods":natal_ten_gods,
             "yun_policy":"gender 1=male/0=female, sect=1 (3 days=1 year convention)","yun_start_solar":start_solar,
             "dayun":dayuns,"annual":years,"monthly":months,
-            "not_calculated":["진태양시/균시차 최종보정","신강·신약","용신·희신·기신","형·파·해 전체 규칙"],
+            "not_calculated":["신강·신약","용신·희신·기신","형·파·해 전체 규칙"],
         }
     except Exception as exc:
         return {"ok":False,"error":f"{type(exc).__name__}: {exc}"}
@@ -243,7 +276,7 @@ def _western_payload(ctx,topic,start_date,end_date):
 
 def _build_bundle(ctx,topic,start_date,end_date,gender):
     western=_western_payload(ctx,topic,start_date,end_date)
-    saju=_saju_payload(ctx["birth_date"],ctx["birth_time"],gender,start_date,end_date)
+    saju=_saju_payload(ctx["birth_date"],ctx["birth_time"],ctx["birth_lon"],gender,start_date,end_date)
     thai=_thai_payload(ctx["birth_date"],ctx["birth_time"])
     return {
         "version":FORTUNE_LAB_VERSION,"topic":topic,"topic_focus":FORTUNE_LAB_TOPICS[topic]["focus"],
@@ -265,7 +298,7 @@ def _deep_prompt(bundle):
 [최우선 규칙]
 1. 계산은 다시 추측하지 말고 CALCULATED_DATA에 있는 값만 근거로 쓴다. 없는 값은 만들지 않는다.
 2. Western 점수는 사건 발생 확률이 아니다. 같은 주제 안에서 월별 상대강도와 변화를 비교하는 자료다.
-3. Saju에는 원국·대운·연간 간지·월별 대표 절기월 간지가 있다. 신강·신약/용희기신/진태양시/형파해가 not_calculated에 있으면 임의 생성하지 않는다.
+3. Saju에는 진태양시로 보정한 원국·대운·연간 간지·월별 대표 절기월 간지가 있다. 신강·신약/용희기신/형파해가 not_calculated에 있으면 임의 생성하지 않는다.
 4. Saju monthly의 대표 간지는 해당 달 중간 대표일 기준이다. 절입 경계 정확시각이 없으므로 경계일을 특정하지 않는다.
 5. Thai는 현재 출생요일·요일행성 baseline뿐이다. Suriyayat/Thai transit가 없으므로 태국점성술로 특정 월·날짜를 예측하지 않는다.
 6. 서로 다른 체계가 실제로 같은 주제를 지지할 때만 교차 보조 신호라고 말한다. 억지로 합의시키지 않는다.
@@ -408,7 +441,7 @@ def render_fortune_lab(ctx):
         st.error(f"1차 버전은 한 번에 최대 {FORTUNE_LAB_MAX_DAYS}일까지 분석해."); return
 
     calc=st.button("🧭 세 체계 계산자료 만들기",type="primary",use_container_width=True,key="fortune_lab_calc")
-    fp=hashlib.sha256(f"{FORTUNE_LAB_VERSION}|{topic}|{start_date}|{end_date}|{gender}|{ctx['birth_date']}|{ctx['birth_time']}|{ctx['natal_packed']}|{ctx['houses_packed']}".encode()).hexdigest()[:24]
+    fp=hashlib.sha256(f"{FORTUNE_LAB_VERSION}|{topic}|{start_date}|{end_date}|{gender}|{ctx['birth_date']}|{ctx['birth_time']}|{ctx['birth_lon']}|{ctx['natal_packed']}|{ctx['houses_packed']}".encode()).hexdigest()[:24]
     if calc:
         with st.spinner("서양 기간값 + 사주 대운·세운·월운 + 태국 출생층을 계산하는 중..."):
             st.session_state["fortune_lab_bundle"]=_build_bundle(ctx,topic,start_date,end_date,gender)
@@ -426,7 +459,7 @@ def render_fortune_lab(ctx):
     if saju.get("ok"):
         with st.expander("🧧 사주 계산 원자료"):
             st.json(_jsonable(saju),expanded=False)
-            st.caption("1차 버전은 lunar_python의 절기 기준 원국/대운/연간/월간 간지를 사용해. 진태양시·신강약·용희기신·형파해 전체는 아직 미계산이라 AI가 만들지 못하게 프롬프트에서 잠가뒀어.")
+            st.caption("원국은 출생지 경도 + Swiss Ephemeris 균시차로 진태양시를 보정한 뒤 lunar_python 절기 기준으로 계산해. 신강약·용희기신·형파해 전체는 아직 미계산이라 AI가 만들지 못하게 프롬프트에서 잠가뒀어.")
 
     prompt=_deep_prompt(bundle)
     st.markdown("#### 📋 Opus·GPT 등 심층 AI용 프롬프트")
