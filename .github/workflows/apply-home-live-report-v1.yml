@@ -1,0 +1,47 @@
+name: Apply home live report v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-home-live-report-v1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply home report patch
+        run: python scripts/patch_home_live_report_v1.py
+      - name: Verify patch markers
+        run: |
+          grep -q 'LIVE CELESTIAL REPORT' web/src/AppNext.tsx
+          grep -q 'collectFortuneHighlights' web/src/AppNext.tsx
+          grep -q 'integratedMatchesSelection' web/src/AppNext.tsx
+          grep -q '좋은 날짜 · 주의 날짜' web/src/AppNext.tsx
+          ! grep -q '통합운세 실계산 결과를 다음 단계에서 이 홈 리포트에도 재사용해.' web/src/AppNext.tsx
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Build mobile web
+        working-directory: web
+        run: npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit patched frontend
+        run: |
+          if git diff --quiet -- web/src/AppNext.tsx; then
+            echo 'No frontend diff to commit'
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/AppNext.tsx
+          git commit -m "feat: connect live fortune to home period report"
+          git push origin HEAD:main
