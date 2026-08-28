@@ -1,0 +1,53 @@
+name: Apply Fortune Lab v0.1.6 UI refinement
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-fortune-ui-v716.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply UI refinement
+        run: python scripts/refine_fortune_ui_v716.py
+
+      - name: Syntax check
+        run: python -m py_compile app.py fortune_lab_v71.py scripts/refine_fortune_ui_v716.py
+
+      - name: Verify navigation and compatibility markers
+        shell: bash
+        run: |
+          grep -q 'main_nav_period_' app.py
+          grep -q 'main_nav_tool_' app.py
+          ! grep -q 'main_view=st.radio("메뉴"' app.py
+          grep -q '"mode":"compatibility" if main_view=="궁합운" else "general"' app.py
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.6"' fortune_lab_v71.py
+          grep -q 'COMPATIBILITY_TOPICS' fortune_lab_v71.py
+          grep -q '궁합운에서 볼 것' fortune_lab_v71.py
+          grep -q 'def _render_month_timeline' fortune_lab_v71.py
+          ! grep -q '분석 방식' fortune_lab_v71.py
+
+      - name: Diff sanity
+        run: git diff --check
+
+      - name: Commit
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No code changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py fortune_lab_v71.py
+          git commit -m "feat: clarify navigation and compatibility UI"
+          git push origin HEAD:main
