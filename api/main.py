@@ -17,7 +17,7 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-fortune-v4.4-relationship-fix"
+APP_VERSION = "api-fortune-v4.5-integrated-fix"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -260,8 +260,14 @@ def relationship_western(request: RelationshipRequest) -> dict:
 
 @app.post("/v1/fortune/integrated")
 def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
+    profile = request.profile
     return build_integrated_fortune(
-        profile=request.profile.model_dump(),
+        birth_date=profile.birth_date,
+        birth_time=profile.birth_time,
+        latitude=profile.latitude,
+        longitude=profile.longitude,
+        utc_offset_hours=profile.utc_offset_hours,
+        gender=profile.gender,
         start_date=request.start_date,
         end_date=request.end_date,
     )
@@ -271,8 +277,14 @@ def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
 def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
     _prune_jobs(_calc_jobs, _calc_jobs_lock)
     job_id = uuid.uuid4().hex
+    profile = request.profile
     payload = {
-        "profile": request.profile.model_dump(),
+        "birth_date": profile.birth_date,
+        "birth_time": profile.birth_time,
+        "latitude": profile.latitude,
+        "longitude": profile.longitude,
+        "utc_offset_hours": profile.utc_offset_hours,
+        "gender": profile.gender,
         "start_date": request.start_date,
         "end_date": request.end_date,
     }
