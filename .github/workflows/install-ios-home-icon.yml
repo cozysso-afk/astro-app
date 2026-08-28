@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'web/public/apple-touch-icon-gold4.b64'
+      - '.github/workflows/install-ios-home-icon.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,12 +24,17 @@ jobs:
         run: |
           set -euo pipefail
           test -f web/public/apple-touch-icon-gold4.b64
-          base64 -d web/public/apple-touch-icon-gold4.b64 > web/public/apple-touch-icon-gold4.png
           python - <<'PY'
           from pathlib import Path
-          import struct
+          import base64, struct
+          src=Path('web/public/apple-touch-icon-gold4.b64')
+          raw=src.read_text(encoding='utf-8').strip()
+          compact=''.join(raw.split())
+          print('payload chars', len(compact), 'prefix', compact[:16])
+          assert compact.startswith('iVBORw0KGgo'), compact[:32]
+          b=base64.b64decode(compact, validate=False)
           p=Path('web/public/apple-touch-icon-gold4.png')
-          b=p.read_bytes()
+          p.write_bytes(b)
           assert b[:8] == b'\x89PNG\r\n\x1a\n', 'not PNG'
           assert b[12:16] == b'IHDR', 'missing IHDR'
           w,h=struct.unpack('>II', b[16:24])
