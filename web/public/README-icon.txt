@@ -1,0 +1,1 @@
+This directory contains PWA and iOS home-screen icon assets.
