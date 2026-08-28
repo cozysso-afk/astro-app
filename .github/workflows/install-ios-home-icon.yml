@@ -1,0 +1,73 @@
+name: Install iOS home icon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/public/apple-touch-icon-gold4.b64'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode and verify icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f web/public/apple-touch-icon-gold4.b64
+          base64 -d web/public/apple-touch-icon-gold4.b64 > web/public/apple-touch-icon-gold4.png
+          python - <<'PY'
+          from pathlib import Path
+          import struct
+          p=Path('web/public/apple-touch-icon-gold4.png')
+          b=p.read_bytes()
+          assert b[:8] == b'\x89PNG\r\n\x1a\n', 'not PNG'
+          assert b[12:16] == b'IHDR', 'missing IHDR'
+          w,h=struct.unpack('>II', b[16:24])
+          assert (w,h)==(180,180), (w,h)
+          assert len(b) > 15000, len(b)
+          print('verified', w, h, len(b))
+          PY
+          cp web/public/apple-touch-icon-gold4.png web/public/apple-touch-icon.png
+          cp web/public/apple-touch-icon-gold4.png web/public/apple-touch-icon-precomposed.png
+      - name: Point HTML and manifest at verified icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('web/index.html')
+          s=p.read_text()
+          s=s.replace('/apple-touch-icon-gold3.png','/apple-touch-icon-gold4.png')
+          s=s.replace('20260828-pastel3','20260828-pastel4')
+          p.write_text(s)
+          m=Path('web/public/manifest.webmanifest')
+          data=json.loads(m.read_text())
+          data['theme_color']='#f4f0f8'
+          data['background_color']='#f8f4fb'
+          data['icons']=[{
+            'src':'/apple-touch-icon-gold4.png',
+            'sizes':'180x180',
+            'type':'image/png',
+            'purpose':'any'
+          }]
+          m.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n')
+          PY
+      - name: Commit verified binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/public/apple-touch-icon-gold4.png web/public/apple-touch-icon.png web/public/apple-touch-icon-precomposed.png web/index.html web/public/manifest.webmanifest
+          git commit -m 'fix: install verified iOS home icon'
+          git push
