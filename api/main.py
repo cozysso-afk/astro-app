@@ -17,7 +17,7 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-fortune-v4.3-detached"
+APP_VERSION = "api-fortune-v4.4-relationship-fix"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -118,6 +118,29 @@ def _prune_jobs(store: dict, lock: threading.Lock):
         for key in stale:
             store.pop(key, None)
 
+def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
+    if end_date < start_date:
+        raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
+    if (end_date - start_date).days > 730:
+        raise HTTPException(status_code=422, detail="relationship timing range is limited to 731 days per request")
+
+    segments: list[tuple[date, date]] = []
+    cursor = date(start_date.year, start_date.month, 1)
+    while cursor <= end_date:
+        next_month = date(
+            cursor.year + (1 if cursor.month == 12 else 0),
+            1 if cursor.month == 12 else cursor.month + 1,
+            1,
+        )
+        month_end = next_month - timedelta(days=1)
+        seg_start = max(start_date, cursor)
+        seg_end = min(end_date, month_end)
+        if seg_start <= seg_end:
+            segments.append((seg_start, seg_end))
+        cursor = next_month
+    return segments
+
+
 def _set_job(store: dict, lock: threading.Lock, job_id: str, **fields):
     with lock:
         record = store.setdefault(job_id, {"created_ts": time.time()})
@@ -204,23 +227,33 @@ def fortune_interpret_job(job_id: str) -> dict:
 
 @app.post("/v1/relationship/western")
 def relationship_western(request: RelationshipRequest) -> dict:
-    if request.user.birth_time is None or not request.user.time_known:
-        raise HTTPException(status_code=422, detail="user exact birth_time is required for precision relationship engine")
-    result = build_relationship_western(
-        user=request.user.engine_payload(),
-        counterpart=request.counterpart.engine_payload(),
-        start_date=request.start_date,
-        end_date=request.end_date,
-        relationship_status=request.relationship_status,
-    )
+    user_payload = request.user.engine_payload()
+    cp_payload = request.counterpart.engine_payload()
+
+    if user_payload["birth_time"] is None:
+        raise HTTPException(status_code=422, detail="user birth_time is required for the precision relationship engine")
+
+    segments = _month_segments(request.start_date, request.end_date)
+    try:
+        result = build_relationship_western(user_payload, cp_payload, segments)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
+
     return {
+        "ok": bool(result.get("ok", True)),
+        "api_version": APP_VERSION,
+        "engine": result.get("engine", REL_ENGINE_VERSION),
+        "relationship_status": request.relationship_status,
+        "period": {
+            "start": request.start_date.isoformat(),
+            "end": request.end_date.isoformat(),
+            "month_segments": len(segments),
+        },
         "result": result,
-        "engine": REL_ENGINE_VERSION,
-        "period": {"start": request.start_date.isoformat(), "end": request.end_date.isoformat()},
-        "policy": {
-            "contact_counts_are_probabilities": False,
-            "private_feelings_are_inferred": False,
-            "missing_precision_is_guessed": False,
+        "interpretation_policy": {
+            "probability": False,
+            "private_feelings_claims": False,
+            "marriage_mode": "결혼 여부 예언이 아니라 장기 결속·관계 주기·협력/긴장 활성도를 해석하는 모드",
         },
     }
 
