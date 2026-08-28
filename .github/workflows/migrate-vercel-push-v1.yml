@@ -1,0 +1,50 @@
+name: Migrate Vercel push v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch_vercel_push_v1.py'
+      - '.github/workflows/migrate-vercel-push-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Vercel push patch
+        run: python scripts/patch_vercel_push_v1.py
+
+      - name: Verify push sender syntax
+        run: python -m py_compile scripts/send_onesignal_horoscope_push.py
+
+      - name: Verify push markers
+        run: |
+          grep -q "astro-app-web-ten.vercel.app" scripts/send_onesignal_horoscope_push.py
+          grep -q "운세 푸시 알림" web/src/AppNext.tsx
+          grep -q "OneSignalSDKWorker.js" web/src/lib/push.ts
+          grep -q "kind === 'weekly'" web/src/AppNext.tsx
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify service worker in build
+        run: test -f web/dist/OneSignalSDKWorker.js
+
+      - name: Commit push migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/settings.css scripts/send_onesignal_horoscope_push.py
+          git commit -m 'feat: reconnect push notifications to Vercel PWA'
+          git push
