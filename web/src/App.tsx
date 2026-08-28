@@ -44,6 +44,14 @@ type CounterpartProfile = BirthProfile & {
   timeKnown: boolean
 }
 
+type PlacePreset = {
+  key: string
+  region: string
+  label: string
+  lat: string
+  lon: string
+}
+
 type Aspect = {
   a: string
   aspect: string
@@ -104,20 +112,91 @@ const relationshipModes: Array<[RelationshipStatus, string]> = [
   ['married', '기혼'],
 ]
 
-const placePresets = [
-  { key: '', label: '직접 입력 / 선택 안 함', lat: '', lon: '' },
-  { key: 'seoul', label: '서울', lat: '37.5665', lon: '126.9780' },
-  { key: 'busan', label: '부산', lat: '35.1796', lon: '129.0756' },
-  { key: 'daegu', label: '대구', lat: '35.8714', lon: '128.6014' },
-  { key: 'incheon', label: '인천', lat: '37.4563', lon: '126.7052' },
-  { key: 'gwangju', label: '광주', lat: '35.1595', lon: '126.8526' },
-  { key: 'daejeon', label: '대전', lat: '36.3504', lon: '127.3845' },
-  { key: 'ulsan', label: '울산', lat: '35.5384', lon: '129.3114' },
-  { key: 'suwon', label: '수원', lat: '37.2636', lon: '127.0286' },
-  { key: 'jeju', label: '제주', lat: '33.4996', lon: '126.5312' },
-  { key: 'yeosu', label: '여수', lat: '34.7604', lon: '127.6622' },
-  { key: 'pyeongtaek', label: '평택', lat: '36.9921', lon: '127.1129' },
+const placePresets: PlacePreset[] = [
+  { key: 'seoul', region: '서울특별시', label: '서울', lat: '37.5665', lon: '126.9780' },
+  { key: 'busan', region: '부산광역시', label: '부산', lat: '35.1796', lon: '129.0756' },
+  { key: 'daegu', region: '대구광역시', label: '대구', lat: '35.8714', lon: '128.6014' },
+  { key: 'incheon', region: '인천광역시', label: '인천', lat: '37.4563', lon: '126.7052' },
+  { key: 'gwangju', region: '광주광역시', label: '광주', lat: '35.1595', lon: '126.8526' },
+  { key: 'daejeon', region: '대전광역시', label: '대전', lat: '36.3504', lon: '127.3845' },
+  { key: 'ulsan', region: '울산광역시', label: '울산', lat: '35.5384', lon: '129.3114' },
+  { key: 'sejong', region: '세종특별자치시', label: '세종', lat: '36.4800', lon: '127.2890' },
+
+  { key: 'suwon', region: '경기도', label: '수원', lat: '37.2636', lon: '127.0286' },
+  { key: 'seongnam', region: '경기도', label: '성남', lat: '37.4200', lon: '127.1267' },
+  { key: 'goyang', region: '경기도', label: '고양', lat: '37.6584', lon: '126.8320' },
+  { key: 'yongin', region: '경기도', label: '용인', lat: '37.2411', lon: '127.1776' },
+  { key: 'bucheon', region: '경기도', label: '부천', lat: '37.5034', lon: '126.7660' },
+  { key: 'ansan', region: '경기도', label: '안산', lat: '37.3219', lon: '126.8309' },
+  { key: 'anyang', region: '경기도', label: '안양', lat: '37.3943', lon: '126.9568' },
+  { key: 'pyeongtaek', region: '경기도', label: '평택', lat: '36.9921', lon: '127.1129' },
+  { key: 'hwaseong', region: '경기도', label: '화성', lat: '37.1995', lon: '126.8312' },
+  { key: 'namyangju', region: '경기도', label: '남양주', lat: '37.6360', lon: '127.2165' },
+  { key: 'uijeongbu', region: '경기도', label: '의정부', lat: '37.7381', lon: '127.0337' },
+  { key: 'paju', region: '경기도', label: '파주', lat: '37.7599', lon: '126.7800' },
+  { key: 'gimpo', region: '경기도', label: '김포', lat: '37.6152', lon: '126.7156' },
+  { key: 'gwangju-gyeonggi', region: '경기도', label: '광주(경기)', lat: '37.4294', lon: '127.2550' },
+  { key: 'icheon', region: '경기도', label: '이천', lat: '37.2720', lon: '127.4350' },
+  { key: 'anseong', region: '경기도', label: '안성', lat: '37.0080', lon: '127.2797' },
+
+  { key: 'chuncheon', region: '강원특별자치도', label: '춘천', lat: '37.8813', lon: '127.7298' },
+  { key: 'wonju', region: '강원특별자치도', label: '원주', lat: '37.3422', lon: '127.9202' },
+  { key: 'gangneung', region: '강원특별자치도', label: '강릉', lat: '37.7519', lon: '128.8761' },
+  { key: 'sokcho', region: '강원특별자치도', label: '속초', lat: '38.2070', lon: '128.5918' },
+  { key: 'donghae', region: '강원특별자치도', label: '동해', lat: '37.5247', lon: '129.1143' },
+  { key: 'samcheok', region: '강원특별자치도', label: '삼척', lat: '37.4499', lon: '129.1652' },
+  { key: 'taebaek', region: '강원특별자치도', label: '태백', lat: '37.1641', lon: '128.9856' },
+
+  { key: 'cheongju', region: '충청북도', label: '청주', lat: '36.6424', lon: '127.4890' },
+  { key: 'chungju', region: '충청북도', label: '충주', lat: '36.9910', lon: '127.9259' },
+  { key: 'jecheon', region: '충청북도', label: '제천', lat: '37.1326', lon: '128.1910' },
+
+  { key: 'cheonan', region: '충청남도', label: '천안', lat: '36.8151', lon: '127.1139' },
+  { key: 'gongju', region: '충청남도', label: '공주', lat: '36.4465', lon: '127.1190' },
+  { key: 'boryeong', region: '충청남도', label: '보령', lat: '36.3333', lon: '126.6128' },
+  { key: 'asan', region: '충청남도', label: '아산', lat: '36.7898', lon: '127.0018' },
+  { key: 'seosan', region: '충청남도', label: '서산', lat: '36.7845', lon: '126.4503' },
+  { key: 'nonsan', region: '충청남도', label: '논산', lat: '36.1872', lon: '127.0987' },
+  { key: 'dangjin', region: '충청남도', label: '당진', lat: '36.8897', lon: '126.6459' },
+
+  { key: 'jeonju', region: '전북특별자치도', label: '전주', lat: '35.8242', lon: '127.1480' },
+  { key: 'gunsan', region: '전북특별자치도', label: '군산', lat: '35.9677', lon: '126.7369' },
+  { key: 'iksan', region: '전북특별자치도', label: '익산', lat: '35.9483', lon: '126.9576' },
+  { key: 'jeongeup', region: '전북특별자치도', label: '정읍', lat: '35.5699', lon: '126.8559' },
+  { key: 'namwon', region: '전북특별자치도', label: '남원', lat: '35.4164', lon: '127.3903' },
+  { key: 'gimje', region: '전북특별자치도', label: '김제', lat: '35.8036', lon: '126.8807' },
+
+  { key: 'mokpo', region: '전라남도', label: '목포', lat: '34.8118', lon: '126.3922' },
+  { key: 'yeosu', region: '전라남도', label: '여수', lat: '34.7604', lon: '127.6622' },
+  { key: 'suncheon', region: '전라남도', label: '순천', lat: '34.9506', lon: '127.4872' },
+  { key: 'naju', region: '전라남도', label: '나주', lat: '35.0159', lon: '126.7108' },
+  { key: 'gwangyang', region: '전라남도', label: '광양', lat: '34.9407', lon: '127.6959' },
+
+  { key: 'pohang', region: '경상북도', label: '포항', lat: '36.0190', lon: '129.3435' },
+  { key: 'gyeongju', region: '경상북도', label: '경주', lat: '35.8562', lon: '129.2247' },
+  { key: 'gimcheon', region: '경상북도', label: '김천', lat: '36.1398', lon: '128.1136' },
+  { key: 'andong', region: '경상북도', label: '안동', lat: '36.5684', lon: '128.7294' },
+  { key: 'gumi', region: '경상북도', label: '구미', lat: '36.1195', lon: '128.3446' },
+  { key: 'yeongju', region: '경상북도', label: '영주', lat: '36.8057', lon: '128.6240' },
+  { key: 'yeongcheon', region: '경상북도', label: '영천', lat: '35.9733', lon: '128.9386' },
+  { key: 'sangju', region: '경상북도', label: '상주', lat: '36.4109', lon: '128.1590' },
+  { key: 'mungyeong', region: '경상북도', label: '문경', lat: '36.5861', lon: '128.1868' },
+  { key: 'gyeongsan', region: '경상북도', label: '경산', lat: '35.8251', lon: '128.7415' },
+
+  { key: 'changwon', region: '경상남도', label: '창원', lat: '35.2279', lon: '128.6811' },
+  { key: 'jinju', region: '경상남도', label: '진주', lat: '35.1800', lon: '128.1076' },
+  { key: 'tongyeong', region: '경상남도', label: '통영', lat: '34.8544', lon: '128.4331' },
+  { key: 'sacheon', region: '경상남도', label: '사천', lat: '35.0038', lon: '128.0642' },
+  { key: 'gimhae', region: '경상남도', label: '김해', lat: '35.2285', lon: '128.8894' },
+  { key: 'miryang', region: '경상남도', label: '밀양', lat: '35.5038', lon: '128.7466' },
+  { key: 'geoje', region: '경상남도', label: '거제', lat: '34.8806', lon: '128.6210' },
+  { key: 'yangsan', region: '경상남도', label: '양산', lat: '35.3350', lon: '129.0373' },
+
+  { key: 'jeju', region: '제주특별자치도', label: '제주', lat: '33.4996', lon: '126.5312' },
+  { key: 'seogwipo', region: '제주특별자치도', label: '서귀포', lat: '33.2541', lon: '126.5601' },
 ]
+
+const placeRegions = Array.from(new Set(placePresets.map((place) => place.region)))
 
 const emptyProfile: BirthProfile = {
   name: '',
@@ -141,6 +220,21 @@ const planetLabels: Record<string, string> = {
 
 const aspectLabels: Record<string, string> = {
   conjunction: '합', sextile: '육합', square: '사각', trine: '삼각', quincunx: '퀸컨스', opposition: '대립',
+}
+
+function BirthplaceOptions() {
+  return (
+    <>
+      <option value="">직접 입력 / 해외 / 목록에 없음</option>
+      {placeRegions.map((region) => (
+        <optgroup key={region} label={region}>
+          {placePresets.filter((place) => place.region === region).map((place) => (
+            <option key={place.key} value={place.key}>{place.label}</option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  )
 }
 
 function toDateInputValue(date: Date) {
@@ -184,7 +278,12 @@ function loadStoredProfile(): BirthProfile {
 function applyPlace<T extends BirthProfile>(profile: T, placeKey: string): T {
   const place = placePresets.find((item) => item.key === placeKey)
   if (!place) return { ...profile, placeKey }
-  return { ...profile, placeKey, latitude: place.lat, longitude: place.lon }
+  return { ...profile, placeKey, latitude: place.lat, longitude: place.lon, utcOffset: '9' }
+}
+
+function selectedPlaceLabel(placeKey: string) {
+  const place = placePresets.find((item) => item.key === placeKey)
+  return place ? `${place.region} · ${place.label}` : ''
 }
 
 function aspectText(aspect: Aspect) {
@@ -339,7 +438,7 @@ export default function App() {
               <div className="profile-copy">
                 <span className="eyebrow">MY BIRTH PROFILE</span>
                 <strong>{hasProfile ? `${birthProfile.name || '나'}의 출생 프로필` : '나의 출생 프로필'}</strong>
-                <span>{hasProfile ? `${birthProfile.birthDate} · ${birthProfile.birthTime} · 이 기기에 저장됨` : '정밀 계산에 사용할 출생정보를 먼저 저장해'}</span>
+                <span>{hasProfile ? `${birthProfile.birthDate} · ${birthProfile.birthTime}${birthProfile.placeKey ? ` · ${selectedPlaceLabel(birthProfile.placeKey)}` : ''} · 이 기기에 저장됨` : '정밀 계산에 사용할 출생정보를 먼저 저장해'}</span>
               </div>
               <ChevronDown size={20} strokeWidth={1.8} />
             </button>
@@ -416,20 +515,31 @@ export default function App() {
                     <span>상대 출생시간 모름 — 달·각도·다빈슨/마크스 일부 정밀 레이어는 자동 제외</span>
                   </label>
                   <label className="field field-wide">
-                    <span>출생지 간편 선택</span>
+                    <span>출생지역 선택 · 좌표 자동 입력</span>
                     <select value={counterpart.placeKey} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart(applyPlace(counterpart, event.target.value))}>
-                      {placePresets.map((place) => <option key={place.key} value={place.key}>{place.label}</option>)}
+                      <BirthplaceOptions />
                     </select>
                   </label>
-                  <label className="field">
-                    <span>위도</span>
-                    <input inputMode="decimal" value={counterpart.latitude} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart({ ...counterpart, latitude: event.target.value, placeKey: '' })} placeholder="35.1595" />
-                  </label>
-                  <label className="field">
-                    <span>경도</span>
-                    <input inputMode="decimal" value={counterpart.longitude} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart({ ...counterpart, longitude: event.target.value, placeKey: '' })} placeholder="126.8526" />
-                  </label>
+                  <details className="advanced-panel field-wide">
+                    <summary>고급 위치 설정 · 위도/경도 직접 수정</summary>
+                    <div className="advanced-grid">
+                      <label className="field">
+                        <span>위도</span>
+                        <input inputMode="decimal" value={counterpart.latitude} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart({ ...counterpart, latitude: event.target.value, placeKey: '' })} placeholder="자동 입력" />
+                      </label>
+                      <label className="field">
+                        <span>경도</span>
+                        <input inputMode="decimal" value={counterpart.longitude} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart({ ...counterpart, longitude: event.target.value, placeKey: '' })} placeholder="자동 입력" />
+                      </label>
+                      <label className="field field-wide">
+                        <span>UTC(협정세계시) 시차</span>
+                        <input inputMode="decimal" value={counterpart.utcOffset} disabled={!counterpart.timeKnown} onChange={(event) => setCounterpart({ ...counterpart, utcOffset: event.target.value })} placeholder="한국은 9" />
+                      </label>
+                    </div>
+                  </details>
                 </div>
+
+                <div className="coordinate-note"><MapPin size={16} /><span>국내 지역을 선택하면 위도·경도와 UTC +9를 자동으로 넣어. 숫자를 직접 입력할 필요는 없어. 해외·목록 외 지역만 고급 위치 설정을 사용하면 돼.</span></div>
 
                 <div className="calculation-range">
                   <CalendarDays size={17} />
@@ -537,13 +647,19 @@ export default function App() {
               <label className="field field-wide"><span>이름 / 닉네임</span><input value={birthProfile.name} onChange={(event) => setBirthProfile({ ...birthProfile, name: event.target.value })} placeholder="선택 입력" autoComplete="off" /></label>
               <label className="field"><span>생년월일</span><input type="date" value={birthProfile.birthDate} onChange={(event) => setBirthProfile({ ...birthProfile, birthDate: event.target.value })} /></label>
               <label className="field"><span>출생시간</span><input type="time" value={birthProfile.birthTime} onChange={(event) => setBirthProfile({ ...birthProfile, birthTime: event.target.value })} /></label>
-              <label className="field field-wide"><span>출생지 간편 선택</span><select value={birthProfile.placeKey} onChange={(event) => setBirthProfile(applyPlace(birthProfile, event.target.value))}>{placePresets.map((place) => <option key={place.key} value={place.key}>{place.label}</option>)}</select></label>
-              <label className="field"><span>위도</span><input inputMode="decimal" value={birthProfile.latitude} onChange={(event) => setBirthProfile({ ...birthProfile, latitude: event.target.value, placeKey: '' })} placeholder="37.5665" /></label>
-              <label className="field"><span>경도</span><input inputMode="decimal" value={birthProfile.longitude} onChange={(event) => setBirthProfile({ ...birthProfile, longitude: event.target.value, placeKey: '' })} placeholder="126.9780" /></label>
-              <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={birthProfile.utcOffset} onChange={(event) => setBirthProfile({ ...birthProfile, utcOffset: event.target.value })} placeholder="한국은 9" /></label>
+              <label className="field field-wide"><span>출생지역 선택 · 좌표 자동 입력</span><select value={birthProfile.placeKey} onChange={(event) => setBirthProfile(applyPlace(birthProfile, event.target.value))}><BirthplaceOptions /></select></label>
+
+              <details className="advanced-panel field-wide">
+                <summary>고급 위치 설정 · 위도/경도 직접 수정</summary>
+                <div className="advanced-grid">
+                  <label className="field"><span>위도</span><input inputMode="decimal" value={birthProfile.latitude} onChange={(event) => setBirthProfile({ ...birthProfile, latitude: event.target.value, placeKey: '' })} placeholder="지역 선택 시 자동 입력" /></label>
+                  <label className="field"><span>경도</span><input inputMode="decimal" value={birthProfile.longitude} onChange={(event) => setBirthProfile({ ...birthProfile, longitude: event.target.value, placeKey: '' })} placeholder="지역 선택 시 자동 입력" /></label>
+                  <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={birthProfile.utcOffset} onChange={(event) => setBirthProfile({ ...birthProfile, utcOffset: event.target.value })} placeholder="한국은 9" /></label>
+                </div>
+              </details>
             </div>
 
-            <div className="coordinate-note"><MapPin size={16} /><span>위도·경도가 없으면 기본 시너스트리는 계산되지만 다빈슨·마크스 같은 위치 기반 정밀 레이어는 제한돼.</span></div>
+            <div className="coordinate-note"><MapPin size={16} /><span>국내 출생지역을 고르면 좌표와 UTC +9가 자동 입력돼. 위도·경도를 직접 칠 필요 없어. 좌표가 없으면 기본 행성 궁합은 가능하지만 상승점·하우스·다빈슨·마크스 같은 위치 기반 정밀 레이어는 제한돼.</span></div>
 
             <button className="primary-button" type="button" onClick={saveBirthProfile}><Save size={18} /><span>{profileSaved ? '이 기기에 저장 완료' : '이 기기에 프로필 저장'}</span></button>
           </section>
