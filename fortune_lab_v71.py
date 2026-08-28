@@ -35,7 +35,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.9"
+FORTUNE_LAB_VERSION = "v0.2.0"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -612,14 +612,14 @@ def render_fortune_lab(ctx):
 
     if is_compat:
         st.markdown("""<div class="fortune-page-head compat-head">
-          <div class="fortune-page-icon">♥</div>
+          <div class="fortune-page-icon">💗</div>
           <div><div class="fortune-kicker">RELATIONSHIP ASTROLOGY</div>
           <div class="fortune-title">궁합운</div>
           <div class="fortune-lead">두 사람의 기본 궁합과 관계·재회 흐름을 분리해서 분석해.</div></div>
         </div>""",unsafe_allow_html=True)
     else:
         st.markdown("""<div class="fortune-page-head integrated-head">
-          <div class="fortune-page-icon">✦</div>
+          <div class="fortune-page-icon">✨</div>
           <div><div class="fortune-kicker">INTEGRATED FORTUNE</div>
           <div class="fortune-title">통합운세</div>
           <div class="fortune-lead">서양점성술·사주명리·태국점성술을 각각 계산해 겹치는 흐름과 차이를 비교해.</div></div>
