@@ -17,7 +17,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PAGE='https://cozysso-afk.github.io/astro-app/'
+          PAGE='https://cozysso-afk.github.io/astro-app/mobile/'
           API='https://astro-app-api-f7fn.onrender.com'
 
           echo '--- PAGE ---'
@@ -25,12 +25,12 @@ jobs:
           for i in $(seq 1 12); do
             if curl -fsSL --max-time 30 "$PAGE?verify=$i" -o /tmp/page.html \
               && grep -q '별빛의 운명' /tmp/page.html \
-              && grep -q '/astro-app/assets/' /tmp/page.html; then
+              && grep -q '/astro-app/mobile/assets/' /tmp/page.html; then
               ok=1
               break
             fi
             echo "page not propagated yet: $i"
-            head -c 500 /tmp/page.html 2>/dev/null || true
+            head -c 700 /tmp/page.html 2>/dev/null || true
             echo
             sleep 10
           done
