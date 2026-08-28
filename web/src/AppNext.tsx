@@ -190,7 +190,7 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   error: string
   onRetry: () => void
 }) {
-  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>Gemini가 서버에서 실계산 근거를 해석하는 중…</strong><p>앱을 잠깐 나가도 서버 작업은 계속돼. 돌아오면 완료된 리딩을 자동으로 다시 확인해.</p></div></section>
+  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>Gemini가 서버에서 정밀해석 중…</strong><p>앱을 닫거나 다른 앱으로 이동해도 서버 작업은 계속돼. 돌아오면 완료된 리딩을 자동으로 이어받아.</p></div></section>
   if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
   if (!result?.ok || !result.data) return null
   const data = result.data
@@ -247,6 +247,20 @@ const planetLabels: Record<string, string> = {
 }
 const aspectLabels: Record<string, string> = {
   conjunction:'합', sextile:'육합', square:'사각', trine:'삼각', quincunx:'퀸컨스', opposition:'대립',
+}
+
+function humanizeEvidence(value: string) {
+  let text = String(value ?? '')
+  const replacements: Array<[RegExp, string]> = [
+    [/True Node/g, '진북교점'], [/Uranus/g, '천왕성'], [/Neptune/g, '해왕성'], [/Saturn/g, '토성'],
+    [/Jupiter/g, '목성'], [/Mercury/g, '수성'], [/Venus/g, '금성'], [/Pluto/g, '명왕성'], [/Mars/g, '화성'],
+    [/Moon/g, '달'], [/Sun/g, '태양'], [/ASC/g, '상승점'], [/DSC/g, '하강점'], [/MC/g, '중천점'], [/IC/g, '천저점'],
+    [/Whole Sign/g, '홀사인'], [/Placidus/g, '플라시두스'],
+  ]
+  replacements.forEach(([pattern, label]) => { text = text.replace(pattern, label) })
+  text = text.replace(/(\d+)H\b/g, '$1하우스')
+  text = text.replace(/orb\s*/gi, '오브 ')
+  return text
 }
 const coreTopicOrder = ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
@@ -1246,7 +1260,7 @@ export default function AppNext() {
                 <p className="result-note">날짜 점수는 사건 확률이 아니라 기존 Western 기간엔진의 상대적 활성도야.</p>
               </section>}
 
-              {integratedResult.western.detail_days?.length ? <section className="result-card"><div className="result-card-title"><span>TIME FLOW</span><strong>시간 흐름 · 계산 근거</strong></div><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`${day.date}-${topic}`}><strong>{topic}</strong>{detail.best_window && <span>↑ 상대적으로 좋은 구간 {detail.best_window.start}~{detail.best_window.end} · {detail.best_window.score}</span>}{detail.caution_window && <span>↓ 주의 구간 {detail.caution_window.start}~{detail.caution_window.end} · {detail.caution_window.score}</span>}{detail.evidence?.length ? <small>{detail.evidence.slice(0,2).join(' · ')}</small> : null}</div>)}</div></details>)}</div></section> : null}
+              {integratedResult.western.detail_days?.length ? <section className="result-card"><div className="result-card-title"><span>TIME FLOW</span><strong>시간 흐름 · 계산 근거</strong></div><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></section> : null}
 
               <section className="result-card">
                 <div className="result-card-title"><span>SYSTEMS</span><strong>사주 · Thai 요약</strong></div>
