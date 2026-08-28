@@ -1,0 +1,1 @@
+iOS home-screen icon now uses a new physical filename instead of only query-string cache busting.
