@@ -1,0 +1,37 @@
+name: Apply internal emoji cleanup v7.9
+
+on:
+  push:
+    paths:
+      - 'scripts/fix_internal_emoji_v79.py'
+      - '.github/workflows/apply-internal-emoji-v79.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/fix_internal_emoji_v79.py
+      - name: Apply patch
+        run: python scripts/fix_internal_emoji_v79.py
+      - name: Syntax check fortune lab
+        run: python -m py_compile fortune_lab_v71.py
+      - name: Verify native emoji markers
+        run: |
+          grep -q 'fortune-page-icon">💗' fortune_lab_v71.py
+          grep -q 'fortune-page-icon">✨' fortune_lab_v71.py
+          grep -q 'FORTUNE_LAB_VERSION = "v0.2.0"' fortune_lab_v71.py
+      - name: Commit integrated file
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add fortune_lab_v71.py
+          git commit -m 'fix: use native emoji in fortune headers'
+          git push
