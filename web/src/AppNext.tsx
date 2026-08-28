@@ -602,22 +602,26 @@ export default function AppNext() {
     if (!calculation) return
     setAiLoading(true); setAiError('')
     try {
-      const response = await fetch(`${API_BASE}/v1/fortune/interpret`, {
+      const startResponse = await fetch(`${API_BASE}/v1/fortune/interpret/start`, {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ calculation, model: aiModel }),
       })
-      const payload = await response.json() as AiInterpretationResponse
-      if (!response.ok) throw new Error(payload?.error || 'AI 해설 요청에 실패했어.')
-      if (!payload.ok || !payload.data) {
-        if (payload.missing_key) setAiConfigured(false)
-        throw new Error(payload.error || 'AI 해설 결과가 비어 있어.')
+      const started = await startResponse.json()
+      if (!startResponse.ok || !started?.job_id) throw new Error(started?.detail || started?.error || 'AI 해설 작업을 시작하지 못했어.')
+      let finalPayload: AiInterpretationResponse | null = null
+      for (let attempt=0; attempt<90; attempt++) {
+        await new Promise((resolve)=>window.setTimeout(resolve, 2000))
+        const pollResponse = await fetch(`${API_BASE}/v1/fortune/interpret/jobs/${encodeURIComponent(started.job_id)}`)
+        const job = await pollResponse.json()
+        if (!pollResponse.ok) throw new Error(job?.detail || 'AI 해설 상태를 확인하지 못했어.')
+        if (job.status === 'failed') throw new Error(job.error || 'AI 해설 작업이 실패했어.')
+        if (job.status === 'done') { finalPayload = job.result as AiInterpretationResponse; break }
       }
-      setAiInterpretation(payload); setAiConfigured(true)
+      if (!finalPayload) throw new Error('AI 정밀해설 시간이 길어지고 있어. 다시 시도해줘.')
+      if (!finalPayload.ok) throw new Error(finalPayload.error || 'AI 해설 생성에 실패했어.')
+      setAiInterpretation(finalPayload)
     } catch (error) {
-      setAiInterpretation(null)
-      setAiError(error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.')
-    } finally {
-      setAiLoading(false)
-    }
+      setAiError(error instanceof Error ? error.message : 'AI 해설 중 오류가 발생했어.')
+    } finally { setAiLoading(false) }
   }
 
   const runIntegrated = async () => {
@@ -646,12 +650,21 @@ export default function AppNext() {
     }
     setIntegratedLoading(true)
     try {
-      const response = await fetch(`${API_BASE}/v1/fortune/integrated`, {
+      const startResponse = await fetch(`${API_BASE}/v1/fortune/integrated/start`, {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
       })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '통합운세 계산 요청에 실패했어.')
-      const calculation = payload as IntegratedApiResponse
+      const started = await startResponse.json()
+      if (!startResponse.ok || !started?.job_id) throw new Error(started?.detail || started?.error || '통합운세 계산 작업을 시작하지 못했어.')
+      let calculation: IntegratedApiResponse | null = null
+      for (let attempt=0; attempt<120; attempt++) {
+        await new Promise((resolve)=>window.setTimeout(resolve, 2000))
+        const pollResponse = await fetch(`${API_BASE}/v1/fortune/integrated/jobs/${encodeURIComponent(started.job_id)}`)
+        const job = await pollResponse.json()
+        if (!pollResponse.ok) throw new Error(job?.detail || '통합운세 계산 상태를 확인하지 못했어.')
+        if (job.status === 'failed') throw new Error(job.error || '통합운세 계산 작업이 실패했어.')
+        if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
+      }
+      if (!calculation) throw new Error('정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
       setIntegratedResult(calculation)
       setIntegratedRequestSnapshot(body)
       void runAiInterpretation(calculation)

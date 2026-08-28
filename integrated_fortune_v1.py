@@ -21,8 +21,8 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v2.1"
-WESTERN_ENGINE_VERSION = "western-period-engine-v5-compatible"
+ENGINE_VERSION = "integrated-fortune-v2.2-legacy-exact"
+WESTERN_ENGINE_VERSION = "western-period-engine-v5-legacy-exact"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
 
@@ -691,40 +691,119 @@ def _rows_avg(rows: list[dict], key: str):
 
 @lru_cache(maxsize=5000)
 def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tuple, offset_hours: float):
+    """Legacy Streamlit period aggregation, unchanged in sampling policy.
+
+    Life topics: 08:00~22:00, 120-minute samples.
+    KRX investment derivatives: 09:00~15:30, 60-minute samples, open sessions only.
+    """
     day_value = date.fromisoformat(day_iso)
-    life = _scan_intraday(
-        day_value,
-        dt_time(8, 0),
-        dt_time(22, 0),
-        120,
-        _unpack_natal_lons(natal_packed),
-        _unpack_houses(houses_packed),
-        offset_hours,
-    )
+    natal_lons = _unpack_natal_lons(natal_packed)
+    natal_houses = _unpack_houses(houses_packed)
+    life = _scan_intraday(day_value, dt_time(8, 0), dt_time(22, 0), 120, natal_lons, natal_houses, offset_hours)
+    market = _scan_intraday(day_value, dt_time(9, 0), dt_time(15, 30), 60, natal_lons, natal_houses, offset_hours) if _is_market_day(day_value) else []
     row = {
         "date": day_value.isoformat(),
         "label": f"{day_value.month}/{day_value.day}({WEEKDAY_KO[day_value.weekday()]})",
+        "market_open": bool(market),
     }
-    for key in TOPIC_ORDER + ["수신신호", "발신적합", "과거인연접점"]:
+    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션", "수신신호", "발신적합", "과거인연접점"]:
         row[key] = _rows_avg(life, key)
+    row["투자심리"] = _rows_avg(market, "투자심리") if market else None
+    for key in ["수익실현", "신규진입", "투자주의"]:
+        row[key] = _rows_avg(market, key) if market else None
     return row
+
+
+def _aggregate_topic_result(rows: list[dict], topic: str) -> dict:
+    results = [((row.get("topics") or {}).get(topic)) for row in rows]
+    results = [x for x in results if isinstance(x, dict)]
+    if not results:
+        return {"topic": topic, "activation": 0, "favorability": 50, "layers": [], "evidence": []}
+    activation = int(round(sum(float(r.get("activation", 0)) for r in results) / len(results)))
+    favorability = int(round(sum(float(r.get("favorability", 50)) for r in results) / len(results)))
+    layers = sorted({layer for r in results for layer in (r.get("layers") or [])})
+    evidence = []
+    for r in results:
+        evidence.extend(r.get("evidence") or [])
+    evidence.sort(key=lambda x: float(x.get("score", 0)) if isinstance(x, dict) else 0.0, reverse=True)
+    return {"topic": topic, "activation": activation, "favorability": favorability, "layers": layers, "evidence": evidence[:8]}
+
+
+def _window_with_step(rows: list[dict], key: str, size: int = 3):
+    usable = [row for row in rows if isinstance(row.get(key), (int, float)) and row.get("dt") is not None]
+    if not usable:
+        return None, None
+    size = max(1, min(size, len(usable)))
+    step = (usable[1]["dt"] - usable[0]["dt"]) if len(usable) > 1 else timedelta(minutes=30)
+    windows = []
+    for i in range(len(usable) - size + 1):
+        chunk = usable[i:i + size]
+        avg = sum(float(r[key]) for r in chunk) / len(chunk)
+        windows.append((avg, chunk[0]["dt"], chunk[-1]["dt"] + step))
+    def pack(item):
+        avg, start_dt, end_dt = item
+        return {"start": start_dt.strftime("%H:%M"), "end": end_dt.strftime("%H:%M"), "score": round(avg, 1)}
+    return pack(max(windows, key=lambda x: x[0])), pack(min(windows, key=lambda x: x[0]))
+
+
+def _legacy_detail(day_value: date, timing_rows: list[dict], market_rows: list[dict]):
+    details = {}
+    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]:
+        best, worst = _window_with_step(timing_rows, key, 3)
+        if not best:
+            continue
+        evidence = []
+        scored = [r for r in timing_rows if isinstance(r.get(key), (int, float))]
+        if scored:
+            peak = max(scored, key=lambda r: float(r.get(key, 0)))
+            raw = ((peak.get("topics") or {}).get(key) or {}).get("evidence") or []
+            evidence = [_evidence_text(x) for x in raw[:6]]
+        details[key] = {"best_window": best, "caution_window": worst, "evidence": evidence}
+    if market_rows:
+        for key in ["투자심리", "수익실현", "신규진입", "투자주의"]:
+            best, worst = _window_with_step(market_rows, key, 3)
+            if not best:
+                continue
+            evidence = []
+            scored = [r for r in market_rows if isinstance(r.get(key), (int, float))]
+            if scored:
+                peak = max(scored, key=lambda r: float(r.get(key, 0)))
+                bases = [key] if key in TOPIC_SPECS else ["금전", "투자심리"]
+                for base_key in bases:
+                    raw = ((peak.get("topics") or {}).get(base_key) or {}).get("evidence") or []
+                    evidence.extend(_evidence_text(x) for x in raw[:3])
+            details[key] = {"best_window": best, "caution_window": worst, "evidence": evidence[:6]}
+    return {"date": day_value.isoformat(), "market_open": bool(market_rows), "topics": details}
 
 
 @lru_cache(maxsize=64)
 def _daily_detailed_cached(day_iso: str, natal_packed: tuple, houses_packed: tuple, offset_hours: float):
+    """Exact legacy daily policy used by the Streamlit report.
+
+    Scores: 07:00~23:30 every 30 minutes.
+    Timing search: 00:00~23:30 every 30 minutes.
+    KRX investment: 09:00~15:30 every 15 minutes.
+    """
     day_value = date.fromisoformat(day_iso)
     natal_lons = _unpack_natal_lons(natal_packed)
     natal_houses = _unpack_houses(houses_packed)
-    # One scan powers BOTH daily averages and time/evidence detail. The previous
-    # mobile v2 performed a second scan and could exceed Render's request window.
-    life = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 90, natal_lons, natal_houses, offset_hours)
+    life = _scan_intraday(day_value, dt_time(7, 0), dt_time(23, 30), 30, natal_lons, natal_houses, offset_hours)
+    early = _scan_intraday(day_value, dt_time(0, 0), dt_time(6, 30), 30, natal_lons, natal_houses, offset_hours)
+    timing = early + life
+    market = _scan_intraday(day_value, dt_time(9, 0), dt_time(15, 30), 15, natal_lons, natal_houses, offset_hours) if _is_market_day(day_value) else []
     row = {
         "date": day_value.isoformat(),
         "label": f"{day_value.month}/{day_value.day}({WEEKDAY_KO[day_value.weekday()]})",
+        "market_open": bool(market),
     }
-    for key in TOPIC_ORDER + ["수신신호", "발신적합", "과거인연접점"]:
+    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]:
         row[key] = _rows_avg(life, key)
-    return {"row": row, "detail": _detail_from_rows(day_value, life)}
+    aggregated = {topic: _aggregate_topic_result(life, topic) for topic in TOPIC_SPECS}
+    row.update(_relationship_direction_scores(aggregated))
+    row["투자심리"] = _rows_avg(market, "투자심리") if market else None
+    for key in ["수익실현", "신규진입", "투자주의"]:
+        row[key] = _rows_avg(market, key) if market else None
+    return {"row": row, "detail": _legacy_detail(day_value, timing, market)}
 
 
 def _score_band(score: float | None):
@@ -841,7 +920,7 @@ def _western_payload(
         "ephemeris": ephemeris_used,
         "ephemeris_fallback_reason": fallback_reason,
         "score_policy": "점수는 사건 발생 확률이 아니라 같은 분야 안의 상대 흐름",
-        "method": ("단일일은 07:30~23:00 90분 간격 단일 패스로 평균+시간창을 함께 산출" if day_count == 1 else "다일 기간은 하루 08:00~22:00 120분 간격으로 집계하고 날짜별 강약을 비교"),
+        "method": ("이전 Streamlit 일일엔진과 동일: 생활점수 07:00~23:30/30분, 시간탐색 00:00~23:30/30분, KRX 09:00~15:30/15분" if day_count == 1 else "이전 Streamlit 기간엔진과 동일: 생활 08:00~22:00/120분, KRX 09:00~15:30/60분"),
         "natal": {
             "asc": round(natal_houses["asc"], 6),
             "mc": round(natal_houses["mc"], 6),
