@@ -1,0 +1,38 @@
+name: Detach Render jobs v1.5
+
+on:
+  push:
+    paths:
+      - '.github/workflows/detach-render-jobs-v15.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply detached job patch
+        run: python scripts/detach_render_jobs_v15.py
+      - name: Verify backend syntax
+        run: |
+          python -m py_compile api/main.py
+          grep -q 'api-fortune-v4.3-detached' api/main.py
+          grep -q 'threading.Thread(target=_run_calc_job' api/main.py
+          grep -q 'threading.Thread(target=_run_ai_job' api/main.py
+          ! grep -q 'BackgroundTasks' api/main.py
+      - name: Build frontend regression
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit detached jobs
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'fix: detach long fortune jobs from Render request lifecycle'
+          git push
