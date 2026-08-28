@@ -7,6 +7,7 @@ import './birthplace.css'
 import './integrated.css'
 import './archive.css'
 import './precision.css'
+import './celestial-theme.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
