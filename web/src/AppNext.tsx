@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Cloud, Copy, Gem, Heart, History, Home,
   LoaderCircle, MapPin, Moon, Orbit, RefreshCw, Save, Search, Settings, Sparkles, Sun, Trash2, User,
@@ -13,6 +13,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
+const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year'
 type ApiStatus = 'warming' | 'online' | 'offline'
@@ -189,7 +190,7 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   error: string
   onRetry: () => void
 }) {
-  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>Gemini가 실계산 근거를 해석하는 중…</strong><p>숫자를 사건 확률로 바꾸지 않고 Western·사주·Thai를 분리해서 읽고 있어.</p></div></section>
+  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>Gemini가 서버에서 실계산 근거를 해석하는 중…</strong><p>앱을 잠깐 나가도 서버 작업은 계속돼. 돌아오면 완료된 리딩을 자동으로 다시 확인해.</p></div></section>
   if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
   if (!result?.ok || !result.data) return null
   const data = result.data
@@ -558,6 +559,7 @@ export default function AppNext() {
   const [aiInterpretation, setAiInterpretation] = useState<AiInterpretationResponse | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const aiPollRef = useRef<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
   const [integratedLoading, setIntegratedLoading] = useState(false)
@@ -599,6 +601,17 @@ export default function AppNext() {
   useEffect(() => {
     window.localStorage.setItem(AI_MODEL_STORAGE_KEY, aiModel)
   }, [aiModel])
+
+  useEffect(() => {
+    const resume = () => { if (document.visibilityState !== 'hidden') resumeAiInterpretationJob() }
+    document.addEventListener('visibilitychange', resume)
+    window.addEventListener('pageshow', resume)
+    resume()
+    return () => {
+      document.removeEventListener('visibilitychange', resume)
+      window.removeEventListener('pageshow', resume)
+    }
+  }, [])
 
   useEffect(() => {
     if (mainView === 'history' || mainView === 'settings') void refreshArchive()
@@ -682,28 +695,90 @@ export default function AppNext() {
     setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
   }
 
-  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
-  if (!calculation) return
-  setAiLoading(true); setAiError('')
-  try {
-    await ensureSupabaseSession()
-    const { data, error } = await supabase.functions.invoke('fortune-interpret', {
-      body: { calculation, model: aiModel },
-    })
-    if (error) throw error
-    const payload = data as AiInterpretationResponse
-    if (!payload?.ok || !payload.data) {
-      if (payload?.missing_key) setAiConfigured(false)
-      throw new Error(payload?.error || 'AI 해설 결과가 비어 있어.')
+  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string) => {
+    if (!jobId || aiPollRef.current === jobId) return
+    aiPollRef.current = jobId
+    setAiLoading(true); setAiError('')
+    try {
+      await ensureSupabaseSession()
+      for (let attempt = 0; attempt < 180; attempt++) {
+        if (document.visibilityState === 'hidden') return
+        const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+          body: { action: 'status', job_id: jobId },
+        })
+        if (error) throw error
+        if (data?.status === 'done') {
+          const payload: AiInterpretationResponse = {
+            ok: true,
+            model: data.model,
+            fallback_from: data.fallback_from,
+            interpreter_version: 'supabase-ai-v2-background-jobs',
+            usage: data.usage ?? undefined,
+            data: data.data ?? undefined,
+          }
+          if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
+          const currentEnd = periodEnd(queryDate, period)
+          if (!periodStart || (queryDate === periodStart && currentEnd === periodEndValue)) {
+            setAiInterpretation(payload)
+          }
+          window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+          setAiConfigured(true)
+          return
+        }
+        if (data?.status === 'failed') {
+          window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+          throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2500))
+      }
+      setAiError('AI 해석은 서버에서 계속 진행 중이야. 앱을 다시 열면 자동으로 완료 여부를 확인해.')
+    } catch (error) {
+      if (document.visibilityState === 'hidden') return
+      const message = error instanceof Error ? error.message : 'AI 해설 상태 확인에 실패했어.'
+      setAiError(message.includes('non-2xx') ? 'AI 해설 상태 확인이 잠시 끊겼어. 앱을 다시 열면 이어서 확인해.' : message)
+    } finally {
+      aiPollRef.current = null
+      setAiLoading(Boolean(window.localStorage.getItem(AI_JOB_STORAGE_KEY)))
     }
-    setAiInterpretation(payload)
-    setAiConfigured(true)
-  } catch (error) {
-    setAiInterpretation(null)
-    const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
-    setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
-  } finally { setAiLoading(false) }
-}
+  }
+
+  const resumeAiInterpretationJob = () => {
+    if (document.visibilityState === 'hidden') return
+    const raw = window.localStorage.getItem(AI_JOB_STORAGE_KEY)
+    if (!raw) return
+    try {
+      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string }
+      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd)
+    } catch {
+      window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+      setAiLoading(false)
+    }
+  }
+
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
+    if (!calculation) return
+    setAiLoading(true); setAiError(''); setAiInterpretation(null)
+    try {
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+        body: { action: 'start', calculation, model: aiModel },
+      })
+      if (error) throw error
+      if (!data?.ok || !data?.job_id) {
+        if (data?.missing_key) setAiConfigured(false)
+        throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
+      }
+      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end }
+      window.localStorage.setItem(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
+      setAiConfigured(true)
+      void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd)
+    } catch (error) {
+      window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+      setAiLoading(false)
+      const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
+      setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
+    }
+  }
 
   const runIntegrated = async () => {
     setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')

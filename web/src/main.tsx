@@ -12,6 +12,7 @@ import './celestial-pastel.css'
 import './settings.css'
 import './ai-interpret.css'
 import './relationship-analysis.css'
+import './readability-v3.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
