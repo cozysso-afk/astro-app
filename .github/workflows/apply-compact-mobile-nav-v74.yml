@@ -1,0 +1,41 @@
+name: Apply compact mobile nav v7.4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-compact-mobile-nav-v74.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/compact_mobile_nav_v74.py
+      - name: Apply patch
+        run: python scripts/compact_mobile_nav_v74.py
+      - name: Syntax check app
+        run: python -m py_compile app.py
+      - name: Verify compact nav markers
+        shell: bash
+        run: |
+          grep -q 'astro_period_nav_group' app.py
+          grep -q 'astro_tool_nav_group' app.py
+          grep -q 'ASTRO_DESIGN_V74_CSS' app.py
+          grep -q 'grid-template-columns:repeat(4,minmax(0,1fr))' app.py
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py scripts/compact_mobile_nav_v74.py
+          git commit -m "style: compact mobile segmented navigation"
+          git push origin HEAD:main
