@@ -1,0 +1,47 @@
+name: Fix Integrated API Contract v45
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-integrated-api-v45.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore integrated API contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('api/main.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('APP_VERSION = "api-fortune-v4.4-relationship-fix"','APP_VERSION = "api-fortune-v4.5-integrated-fix"')
+
+          old='''@app.post("/v1/fortune/integrated")\ndef fortune_integrated(request: IntegratedFortuneRequest) -> dict:\n    return build_integrated_fortune(\n        profile=request.profile.model_dump(),\n        start_date=request.start_date,\n        end_date=request.end_date,\n    )\n'''
+          new='''@app.post("/v1/fortune/integrated")\ndef fortune_integrated(request: IntegratedFortuneRequest) -> dict:\n    profile = request.profile\n    return build_integrated_fortune(\n        birth_date=profile.birth_date,\n        birth_time=profile.birth_time,\n        latitude=profile.latitude,\n        longitude=profile.longitude,\n        utc_offset_hours=profile.utc_offset_hours,\n        gender=profile.gender,\n        start_date=request.start_date,\n        end_date=request.end_date,\n    )\n'''
+          assert old in s, 'direct integrated route anchor missing'
+          s=s.replace(old,new,1)
+
+          old2='''    payload = {\n        "profile": request.profile.model_dump(),\n        "start_date": request.start_date,\n        "end_date": request.end_date,\n    }\n'''
+          new2='''    profile = request.profile\n    payload = {\n        "birth_date": profile.birth_date,\n        "birth_time": profile.birth_time,\n        "latitude": profile.latitude,\n        "longitude": profile.longitude,\n        "utc_offset_hours": profile.utc_offset_hours,\n        "gender": profile.gender,\n        "start_date": request.start_date,\n        "end_date": request.end_date,\n    }\n'''
+          assert old2 in s, 'async integrated payload anchor missing'
+          s=s.replace(old2,new2,1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          python -m py_compile api/main.py integrated_fortune_v1.py
+          grep -q 'api-fortune-v4.5-integrated-fix' api/main.py
+          grep -q 'birth_date=profile.birth_date' api/main.py
+          grep -q '"birth_date": profile.birth_date' api/main.py
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py
+          git commit -m 'fix: restore integrated API engine contract'
+          git push
