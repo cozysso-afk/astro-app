@@ -1,4 +1,4 @@
-name: Verify async production v1.4
+name: Verify async production v1.5
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Wait for Render v4.2 and run full async E2E
+      - name: Wait for Render v4.3 and run full detached E2E
         shell: bash
         run: |
           set -euo pipefail
@@ -22,7 +22,7 @@ jobs:
           for i in $(seq 1 36); do
             meta=$(curl -fsS --max-time 20 "$API/v1/meta" || true)
             echo "meta attempt $i: $meta"
-            if echo "$meta" | grep -q 'api-fortune-v4.2-async'; then ready=1; break; fi
+            if echo "$meta" | grep -q 'api-fortune-v4.3-detached'; then ready=1; break; fi
             sleep 10
           done
           test "$ready" = 1
@@ -49,10 +49,8 @@ jobs:
           echo "calc start response seconds=$((t1-t0))"
           test $((t1-t0)) -lt 15
           CALC_JOB=$(python -c "import json; print(json.load(open('/tmp/calc-start.json'))['job_id'])")
-
-          # API must stay responsive while the expensive legacy-exact calculation runs.
           curl -fsS --max-time 10 "$API/health" >/tmp/health.json
-          grep -q 'api-fortune-v4.2-async' /tmp/health.json
+          grep -q 'api-fortune-v4.3-detached' /tmp/health.json
 
           done_calc=0
           for i in $(seq 1 150); do
@@ -68,7 +66,7 @@ jobs:
           import json
           j=json.load(open('/tmp/calc-job.json'))
           d=j['result']; w=d['western']
-          assert d['api_version']=='api-fortune-v4.2-async', d.get('api_version')
+          assert d['api_version']=='api-fortune-v4.3-detached', d.get('api_version')
           assert d['engine']=='integrated-fortune-v2.2-legacy-exact', d.get('engine')
           assert '07:00~23:30/30분' in w['method'], w['method']
           assert '09:00~15:30/15분' in w['method'], w['method']
@@ -78,7 +76,7 @@ jobs:
               assert key in w['relationship_signals'], key
           assert w['market']['has_open_session'] is True
           assert w['detail_days'] and w['detail_days'][0]['topics']
-          print('CALC ASYNC + LEGACY EXACT OK')
+          print('CALC DETACHED + LEGACY EXACT OK')
           print('investment', {k:w['overall'][k]['average'] for k in ['수익실현','신규진입','투자주의']})
           print('signals', {k:w['relationship_signals'][k]['average'] for k in ['수신신호','발신적합','과거인연접점']})
           PY
@@ -118,7 +116,7 @@ jobs:
           topics=(d.get('data') or {}).get('topic_analysis') or {}
           for key in ['금전','수익실현','학업','시험','직장','이직','연락','소식']:
               assert key in topics, (key,topics.keys())
-          print('AI ASYNC OK')
+          print('AI DETACHED OK')
           print('usage',usage)
           print('headline',d['data']['headline'])
           PY
