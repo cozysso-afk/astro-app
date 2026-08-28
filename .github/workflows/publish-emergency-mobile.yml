@@ -1,0 +1,37 @@
+name: Publish Emergency Mobile Build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-emergency-mobile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build latest mobile app
+        working-directory: web
+        run: |
+          npm ci
+          npm run build -- --base=/astro-app/mobile/
+      - name: Publish into Pages-served tree
+        shell: bash
+        run: |
+          rm -rf mobile
+          mkdir -p mobile
+          cp -R web/dist/. mobile/
+          touch mobile/.nojekyll
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f mobile
+          git commit -m 'deploy: emergency mobile frontend on GitHub Pages'
+          git push
