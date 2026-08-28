@@ -1,0 +1,158 @@
+name: Vercel Preview Release Gate 2026-08-29
+
+on:
+  push:
+    branches:
+      - vercel-recovery-20260829
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build mobile frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          grep -q "relationship-analysis.css" src/main.tsx
+          grep -q "Gemini 관계 정밀해석" src/AppNext.tsx
+          grep -q "이번 해설 API 사용량" src/AppNext.tsx
+          grep -q "수익실현" src/AppNext.tsx
+          grep -q "과거인연접점" src/AppNext.tsx
+
+      - name: Verify live calculation and AI services
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          SUPA='https://dbynfabwfcakxayyggzi.supabase.co'
+          KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+
+          echo '--- API HEALTH ---'
+          curl -fsSL --max-time 30 "$API/health" -o /tmp/health.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json'))
+          assert d.get('status') == 'ok', d
+          assert d.get('version') == 'api-fortune-v4.5-integrated-fix', d
+          print('HEALTH_OK', d)
+          PY
+
+          echo '--- INTEGRATED CALCULATION ---'
+          cat > /tmp/integrated.json <<'JSON'
+          {
+            "profile": {
+              "name": "Vercel Preview Gate",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-08-29",
+            "end_date": "2026-08-29"
+          }
+          JSON
+          curl -fsSL --max-time 30 -X POST "$API/v1/fortune/integrated/start" -H 'Content-Type: application/json' --data-binary @/tmp/integrated.json -o /tmp/calc-start.json
+          job=$(python -c "import json;print(json.load(open('/tmp/calc-start.json'))['job_id'])")
+          for i in $(seq 1 60); do
+            curl -fsSL --max-time 30 "$API/v1/fortune/integrated/jobs/$job" -o /tmp/calc-job.json
+            status=$(python -c "import json;print(json.load(open('/tmp/calc-job.json')).get('status',''))")
+            echo "calc[$i]=$status"
+            [ "$status" = done ] && break
+            [ "$status" = failed ] && cat /tmp/calc-job.json && exit 1
+            sleep 3
+          done
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/calc-job.json'))
+          assert j.get('status') == 'done', j
+          r=j['result']
+          assert r.get('ok') is True
+          assert r['western']['ok'] is True and r['saju']['ok'] is True and r['thai']['ok'] is True
+          for key in ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']:
+              assert key in r['western']['overall'], key
+          for key in ['수신신호','발신적합','과거인연접점']:
+              assert key in r['western']['relationship_signals'], key
+          print('INTEGRATED_OK', r['engine'], r['western']['overall']['재회']['average'])
+          json.dump(r,open('/tmp/calculation.json','w'),ensure_ascii=False)
+          PY
+
+          echo '--- RELATIONSHIP CALCULATION ---'
+          cat > /tmp/relationship.json <<'JSON'
+          {
+            "user": {"name":"U","birth_date":"1990-01-01","birth_time":"12:00:00","time_known":true,"latitude":37.5665,"longitude":126.9780,"utc_offset_hours":9},
+            "counterpart": {"name":"A","birth_date":"1992-02-29","birth_time":null,"time_known":false,"latitude":null,"longitude":null,"utc_offset_hours":9},
+            "start_date":"2026-08-29","end_date":"2026-08-29","relationship_status":"single"
+          }
+          JSON
+          curl -fsSL --max-time 90 -X POST "$API/v1/relationship/western" -H 'Content-Type: application/json' --data-binary @/tmp/relationship.json -o /tmp/relationship-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relationship-result.json'))
+          r=d['result']
+          assert d.get('ok') is True and r.get('ok') is True
+          assert r['natal_synastry']['available'] is True
+          assert r['natal_synastry']['partner_time_exact'] is False
+          assert r['davison']['available'] is False
+          assert len(r['natal_synastry']['aspects']) > 0
+          print('RELATIONSHIP_OK', len(r['natal_synastry']['aspects']))
+          PY
+
+          echo '--- SUPABASE ANON AUTH ---'
+          curl -fsSL --max-time 30 -X POST "$SUPA/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}' -o /tmp/auth.json
+          token=$(python -c "import json;print(json.load(open('/tmp/auth.json'))['access_token'])")
+
+          echo '--- RELATIONSHIP AI ---'
+          python - <<'PY'
+          import json
+          rel=json.load(open('/tmp/relationship-result.json'))
+          json.dump({'calculation':rel,'model':'gemini-3.7-flash'},open('/tmp/relationship-ai-request.json','w'),ensure_ascii=False)
+          PY
+          curl -fsSL --max-time 150 -X POST "$SUPA/functions/v1/relationship-interpret" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/relationship-ai-request.json -o /tmp/relationship-ai.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relationship-ai.json'))
+          assert d.get('ok') is True, d
+          data=d.get('data') or {}; usage=d.get('usage') or {}
+          for key in ['headline','overview','chemistry','communication','stability','tensions','timing','reunion_context','limits']:
+              assert data.get(key), (key,d)
+          assert '미계산' in data['timing'] or '출생시간' in data['timing'], data['timing']
+          assert int(usage.get('total_tokens') or 0) > 0, usage
+          print('REL_AI_OK', d.get('model'), 'fallback=', d.get('fallback_from'), 'tokens=', usage.get('total_tokens'), 'krw=', usage.get('estimated_krw'))
+          PY
+
+          echo '--- INTEGRATED AI ---'
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/calculation.json'))
+          json.dump({'calculation':calc,'model':'gemini-3.7-flash'},open('/tmp/fortune-ai-request.json','w'),ensure_ascii=False)
+          PY
+          curl -fsSL --max-time 150 -X POST "$SUPA/functions/v1/fortune-interpret" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/fortune-ai-request.json -o /tmp/fortune-ai.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/fortune-ai.json'))
+          assert d.get('ok') is True, d
+          data=d.get('data') or {}; usage=d.get('usage') or {}
+          assert data.get('headline') and data.get('overall') and data.get('topic_analysis')
+          assert int(usage.get('total_tokens') or 0) > 0
+          print('FORTUNE_AI_OK', d.get('model'), 'fallback=', d.get('fallback_from'), 'tokens=', usage.get('total_tokens'), 'krw=', usage.get('estimated_krw'))
+          PY
+
+          echo 'RELEASE_GATE_OK'
