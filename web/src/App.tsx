@@ -15,7 +15,8 @@ import {
   User,
 } from 'lucide-react'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year'
 
@@ -45,24 +46,24 @@ function toDateInputValue(date: Date) {
 export default function App() {
   const [period, setPeriod] = useState<PeriodKey>('today')
   const [queryDate, setQueryDate] = useState(() => toDateInputValue(new Date()))
-  const [apiStatus, setApiStatus] = useState<ApiStatus>(API_BASE ? 'warming' : 'idle')
+  const [apiStatus, setApiStatus] = useState<ApiStatus>('warming')
 
   useEffect(() => {
-    if (!API_BASE) return
-
     const controller = new AbortController()
     fetch(`${API_BASE}/health`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('health check failed')
-        setApiStatus('online')
+        return response.json()
       })
-      .catch(() => setApiStatus('offline'))
+      .then(() => setApiStatus('online'))
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setApiStatus('offline')
+      })
 
     return () => controller.abort()
   }, [])
 
   const apiLabel = useMemo(() => {
-    if (!API_BASE) return '계산 서버 연결 전'
     if (apiStatus === 'warming') return '계산 서버 깨우는 중'
     if (apiStatus === 'online') return '계산 서버 연결됨'
     if (apiStatus === 'offline') return '계산 서버 대기 중'
