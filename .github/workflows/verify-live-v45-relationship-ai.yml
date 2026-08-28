@@ -1,0 +1,141 @@
+name: Verify Live v45 + Relationship AI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-live-v45-relationship-ai.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: End-to-end production verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          PAGE='https://cozysso-afk.github.io/astro-app/mobile/'
+          SUPA='https://dbynfabwfcakxayyggzi.supabase.co'
+          KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+
+          echo '--- WAIT RENDER V4.5 ---'
+          ready=0
+          for i in $(seq 1 36); do
+            h=$(curl -fsSL --max-time 30 "$API/health" || true)
+            echo "[$i] $h"
+            if echo "$h" | grep -q 'api-fortune-v4.5-integrated-fix'; then ready=1; break; fi
+            sleep 10
+          done
+          [ "$ready" = 1 ]
+
+          echo '--- INTEGRATED ASYNC ---'
+          cat > /tmp/integrated.json <<'JSON'
+          {
+            "profile": {
+              "name": "E2E",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-08-28",
+            "end_date": "2026-08-28"
+          }
+          JSON
+          curl -fsSL --max-time 30 -X POST "$API/v1/fortune/integrated/start" -H 'Content-Type: application/json' --data-binary @/tmp/integrated.json -o /tmp/start.json
+          job=$(python -c "import json;print(json.load(open('/tmp/start.json'))['job_id'])")
+          calc_ok=0
+          for i in $(seq 1 60); do
+            curl -fsSL --max-time 30 "$API/v1/fortune/integrated/jobs/$job" -o /tmp/job.json
+            status=$(python -c "import json;print(json.load(open('/tmp/job.json')).get('status',''))")
+            echo "calc [$i] $status"
+            if [ "$status" = done ]; then calc_ok=1; break; fi
+            if [ "$status" = failed ]; then cat /tmp/job.json; exit 1; fi
+            sleep 3
+          done
+          [ "$calc_ok" = 1 ]
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/job.json'))
+          r=j['result']
+          assert r.get('ok') is True
+          assert r.get('western',{}).get('ok') is True
+          assert r.get('saju',{}).get('ok') is True
+          assert r.get('thai',{}).get('ok') is True
+          assert '금전' in r['western']['overall']
+          assert '재회' in r['western']['overall']
+          print('INTEGRATED_OK', r.get('engine'), r['western']['overall']['재회']['average'])
+          PY
+
+          echo '--- RELATIONSHIP ---'
+          cat > /tmp/relreq.json <<'JSON'
+          {
+            "user": {"name":"U","birth_date":"1990-01-01","birth_time":"12:00:00","time_known":true,"latitude":37.5665,"longitude":126.978,"utc_offset_hours":9},
+            "counterpart": {"name":"A","birth_date":"1992-02-29","birth_time":null,"time_known":false,"latitude":null,"longitude":null,"utc_offset_hours":9},
+            "start_date":"2026-08-28","end_date":"2026-08-28","relationship_status":"single"
+          }
+          JSON
+          curl -fsSL --max-time 60 -X POST "$API/v1/relationship/western" -H 'Content-Type: application/json' --data-binary @/tmp/relreq.json -o /tmp/rel.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/rel.json')); r=d['result']
+          assert d.get('ok') is True and r.get('ok') is True
+          assert r['natal_synastry']['available'] is True
+          assert r['natal_synastry']['partner_time_exact'] is False
+          assert r['davison']['available'] is False
+          print('REL_OK', len(r['natal_synastry']['aspects']))
+          PY
+
+          echo '--- ANON AUTH ---'
+          curl -fsSL --max-time 30 -X POST "$SUPA/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}' -o /tmp/auth.json
+          token=$(python -c "import json;print(json.load(open('/tmp/auth.json'))['access_token'])")
+
+          echo '--- RELATIONSHIP AI ---'
+          python - <<'PY'
+          import json
+          rel=json.load(open('/tmp/rel.json'))
+          json.dump({'calculation':rel,'model':'gemini-3.7-flash'},open('/tmp/relai_req.json','w'),ensure_ascii=False)
+          PY
+          curl -fsSL --max-time 150 -X POST "$SUPA/functions/v1/relationship-interpret" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/relai_req.json -o /tmp/relai.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relai.json'))
+          assert d.get('ok') is True, d
+          data=d.get('data') or {}; usage=d.get('usage') or {}
+          assert data.get('overview')
+          assert data.get('timing')
+          assert data.get('reunion_context')
+          assert int(usage.get('total_tokens') or 0) > 0
+          print('REL_AI_OK', d.get('model'), 'fallback_from=', d.get('fallback_from'), 'tokens=', usage.get('total_tokens'), 'krw=', usage.get('estimated_krw'))
+          print('TIMING=', data.get('timing'))
+          PY
+
+          echo '--- EMERGENCY PAGE CONTENT ---'
+          page_ok=0
+          for i in $(seq 1 24); do
+            curl -fsSL --max-time 30 "$PAGE?relui=$i" -o /tmp/page.html || true
+            asset=$(python - <<'PY'
+          import re
+          s=open('/tmp/page.html',encoding='utf-8').read()
+          m=re.search(r'<script[^>]+src="([^"]+\.js)"',s)
+          print(m.group(1) if m else '')
+          PY
+          )
+            if [ -n "$asset" ]; then
+              url="https://cozysso-afk.github.io$asset"
+              curl -fsSL --max-time 30 "$url" -o /tmp/app.js || true
+              if grep -q 'Gemini 관계 정밀해석' /tmp/app.js && grep -q '정밀 타이밍 계산 제외' /tmp/app.js; then page_ok=1; break; fi
+            fi
+            echo "page content pending [$i] asset=$asset"
+            sleep 5
+          done
+          [ "$page_ok" = 1 ]
+          echo 'PAGE_UI_OK'
