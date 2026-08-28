@@ -19,7 +19,7 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v1"
+ENGINE_VERSION = "integrated-fortune-v2"
 WESTERN_ENGINE_VERSION = "western-period-engine-v5-compatible"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
@@ -133,7 +133,8 @@ TOPIC_SPECS = {
     },
 }
 
-TOPIC_ORDER = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
+TOPIC_ORDER = ["금전", "투자심리", "수익실현", "신규진입", "투자주의", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
+INVESTMENT_KEYS = {"투자심리", "수익실현", "신규진입", "투자주의"}
 
 _STEM_INFO = {
     "甲": ("木", 1), "乙": ("木", 0), "丙": ("火", 1), "丁": ("火", 0), "戊": ("土", 1),
@@ -499,9 +500,87 @@ def _relationship_direction_scores(topic_results: dict):
 
 
 def _derived_scores(topic_results: dict):
-    out = {k: _blend_topic(v) for k, v in topic_results.items() if k != "투자심리"}
+    # Keep the original life-topic scores and restore the investment derivatives
+    # that existed in the legacy Streamlit engine. They remain relative astrology
+    # indices, never price-direction or profit probabilities.
+    out = {k: _blend_topic(v) for k, v in topic_results.items()}
+    money = topic_results.get("금전") or {"activation": 0.0, "favorability": 50.0}
+    invest = topic_results.get("투자심리") or {"activation": 0.0, "favorability": 50.0}
+    overheat = max(0.0, float(invest.get("activation", 0.0)) - float(invest.get("favorability", 50.0)))
+    realize = _clamp(.40 * float(money.get("activation", 0.0)) + .40 * float(money.get("favorability", 50.0)) + .20 * (100.0 - .70 * overheat))
+    entry = _clamp(.25 * float(money.get("activation", 0.0)) + .35 * float(money.get("favorability", 50.0)) + .15 * float(invest.get("activation", 0.0)) + .25 * float(invest.get("favorability", 50.0)) - .25 * overheat)
+    risk = _clamp(.55 * float(invest.get("activation", 0.0)) + .45 * (100.0 - float(invest.get("favorability", 50.0))) + .15 * overheat)
+    out.update({
+        "수익실현": int(round(realize)),
+        "신규진입": int(round(entry)),
+        "투자주의": int(round(risk)),
+    })
     out.update(_relationship_direction_scores(topic_results))
     return out
+
+
+def _is_market_day(day_value: date) -> bool:
+    # The API intentionally avoids making price claims. This is only a display
+    # gate for investment indices. Weekends are always closed; exchange holidays
+    # fall back to weekday display when a calendar dependency is unavailable.
+    try:
+        import pandas as pd
+        import exchange_calendars as xcals
+        cal = xcals.get_calendar("XKRX")
+        return bool(cal.is_session(pd.Timestamp(day_value.isoformat())))
+    except Exception:
+        return day_value.weekday() < 5
+
+
+def _rolling_window(rows: list[dict], key: str, size: int = 3):
+    usable = [row for row in rows if isinstance(row.get(key), (int, float)) and row.get("dt") is not None]
+    if not usable:
+        return None, None
+    size = max(1, min(size, len(usable)))
+    windows = []
+    for i in range(0, len(usable) - size + 1):
+        chunk = usable[i:i+size]
+        avg = sum(float(r[key]) for r in chunk) / len(chunk)
+        windows.append((avg, chunk[0]["dt"], chunk[-1]["dt"]))
+    best = max(windows, key=lambda x: x[0])
+    worst = min(windows, key=lambda x: x[0])
+    def pack(item):
+        avg, start_dt, end_dt = item
+        return {
+            "start": start_dt.strftime("%H:%M"),
+            "end": end_dt.strftime("%H:%M"),
+            "score": round(avg, 1),
+        }
+    return pack(best), pack(worst)
+
+
+def _daily_detail(day_value: date, natal_lons: dict, natal_houses: dict, offset_hours: float):
+    rows = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 30, natal_lons, natal_houses, offset_hours)
+    details = {}
+    keys = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
+    if _is_market_day(day_value):
+        keys += ["투자심리", "수익실현", "신규진입", "투자주의"]
+    for key in keys:
+        best, worst = _rolling_window(rows, key, 3)
+        if not best:
+            continue
+        evidence = []
+        if key in TOPIC_SPECS:
+            scored = [r for r in rows if isinstance(r.get(key), (int, float))]
+            if scored:
+                peak = max(scored, key=lambda r: float(r.get(key, 0)))
+                topic_raw = (peak.get("topics") or {}).get(key) or {}
+                raw_evidence = topic_raw.get("evidence") or []
+                evidence = [str(x) for x in raw_evidence[:6]]
+        elif key in {"수익실현", "신규진입", "투자주의"}:
+            scored = [r for r in rows if isinstance(r.get(key), (int, float))]
+            if scored:
+                peak = max(scored, key=lambda r: float(r.get(key, 0)))
+                for base_key in ("금전", "투자심리"):
+                    raw = ((peak.get("topics") or {}).get(base_key) or {}).get("evidence") or []
+                    evidence.extend(str(x) for x in raw[:3])
+        details[key] = {"best_window": best, "caution_window": worst, "evidence": evidence[:6]}
+    return {"date": day_value.isoformat(), "market_open": _is_market_day(day_value), "topics": details}
 
 
 def _pack_natal_lons(natal_lons: dict):
@@ -664,19 +743,35 @@ def _western_payload(
         for i in range(day_count)
     ]
 
-    overall = {key: _period_stats(rows, key) for key in TOPIC_ORDER}
+    market_rows = [r for r in rows if _is_market_day(date.fromisoformat(r["date"]))]
+    overall = {
+        key: _period_stats(market_rows if key in INVESTMENT_KEYS else rows, key)
+        for key in TOPIC_ORDER
+    }
     relationship_signals = {
         key: _period_stats(rows, key) for key in ["수신신호", "발신적합", "과거인연접점"]
     }
+    market_info = {
+        "has_open_session": bool(market_rows),
+        "session_count": len(market_rows),
+        "session_dates": [r["date"] for r in market_rows],
+    }
+    # Rich intraday evidence is intentionally limited to short ranges to keep
+    # annual/monthly payloads and Gemini prompts bounded.
+    detail_days = []
+    if day_count <= 7:
+        for i in range(day_count):
+            detail_days.append(_daily_detail(start_date + timedelta(days=i), natal_lons, natal_houses, float(utc_offset_hours)))
 
     months = []
     for seg_start, seg_end in _month_segments(start_date, end_date):
         seg_rows = [r for r in rows if seg_start.isoformat() <= r["date"] <= seg_end.isoformat()]
+        seg_market_rows = [r for r in seg_rows if _is_market_day(date.fromisoformat(r["date"]))]
         months.append({
             "calendar_month": f"{seg_start.year}-{seg_start.month:02d}",
             "start": seg_start.isoformat(),
             "end": seg_end.isoformat(),
-            "topics": {key: _period_stats(seg_rows, key) for key in TOPIC_ORDER},
+            "topics": {key: _period_stats(seg_market_rows if key in INVESTMENT_KEYS else seg_rows, key) for key in TOPIC_ORDER},
             "relationship_signals": {
                 key: _period_stats(seg_rows, key) for key in ["수신신호", "발신적합", "과거인연접점"]
             },
@@ -696,6 +791,8 @@ def _western_payload(
         },
         "overall": overall,
         "relationship_signals": relationship_signals,
+        "market": market_info,
+        "detail_days": detail_days,
         "months": months,
     }
 

@@ -98,3 +98,27 @@
   .ai-settings-card > label { align-items:flex-start; flex-direction:column; }
   .ai-settings-card select { width:100%; max-width:none; }
 }
+
+
+/* v2 readability restoration · iPhone */
+.ai-interpret-card { padding: 20px; gap: 17px; }
+.ai-interpret-head h3 { font-size: 1.22rem; line-height: 1.38; }
+.ai-interpret-head small { font-size: .72rem; }
+.ai-summary { font-size: .94rem; line-height: 1.82; color:#514858; }
+.ai-highlight strong, .ai-priorities > strong, .ai-system-note > strong { font-size: .82rem; }
+.ai-highlight span { font-size: .86rem; line-height: 1.72; }
+.ai-cluster-grid strong { font-size: .82rem; }
+.ai-cluster-grid p { font-size: .84rem; line-height: 1.68; }
+.ai-priorities p, .ai-system-note p { font-size: .84rem; line-height: 1.68; }
+.ai-details summary { font-size: .88rem; padding: 5px 0; }
+.ai-topic-title strong { font-size: .94rem; }
+.ai-topic-title span { font-size: .68rem; }
+.ai-topic-list p { font-size: .84rem; line-height: 1.7; }
+.ai-limits { font-size: .74rem; line-height: 1.62; }
+.ai-usage-card { display:grid; gap:5px; padding:12px 14px; border-radius:16px; background:linear-gradient(135deg,rgba(239,232,250,.9),rgba(229,247,244,.88)); border:1px solid rgba(170,178,204,.28); }
+.ai-usage-card strong { font-size:.82rem; color:#51445d; }
+.ai-usage-card span, .ai-usage-card small { font-size:.73rem; line-height:1.5; color:#786d80; }
+.ai-usage-card b { font-size:.84rem; color:#6a5676; }
+.ai-settings-card strong, .ai-api-state strong { font-size:.86rem; }
+.ai-settings-card small, .ai-api-state small { font-size:.72rem; }
+.ai-settings-card select { font-size:.78rem; height:44px; }

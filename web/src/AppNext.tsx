@@ -98,6 +98,8 @@ type IntegratedApiResponse = {
     natal: { asc: number; mc: number }
     overall: Record<string, FortuneStat | null>
     relationship_signals: Record<string, FortuneStat | null>
+    market?: { has_open_session: boolean; session_count: number; session_dates: string[] }
+    detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>
     months: FortuneMonth[]
   }
   saju: {
@@ -146,11 +148,11 @@ type AiInterpretationResponse = {
   model?: string
   fallback_from?: string
   interpreter_version?: string
-  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number }
+  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; billable_output_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number; price_phase?: string }
   data?: {
     headline: string
     overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string }
-    clusters: { relationship: string; work_study: string; money_news: string; condition: string }
+    clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
     systems: { western: string; saju: string; thai: string }
     priorities: string[]
     topic_analysis: Record<string, AiTopicInterpretation>
@@ -170,16 +172,18 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   const data = result.data
   return <section className="ai-interpret-card">
     <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">GEMINI INTERPRETATION</span><h3>{data.headline || '통합 계산 해설'}</h3><small>{result.model || 'Gemini'} · 계산 후 해설층</small></div></div>
+    {result.usage?.total_tokens ? <div className="ai-usage-card"><strong>이번 해설 API 사용량</strong><span>입력 {(result.usage.prompt_tokens ?? 0).toLocaleString()} · 본문출력 {(result.usage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(result.usage.thought_tokens ?? 0).toLocaleString()} tokens</span><b>예상비용 ${Number(result.usage.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(result.usage.estimated_krw ?? 0).toLocaleString()}원</b><small>최초 생성 예상치 · 저장된 기록 재열람은 Gemini 재호출이 없으면 0원</small></div> : null}
     <p className="ai-summary">{data.overall.summary}</p>
     {data.overall.dominant_pattern && <div className="ai-highlight"><strong>핵심 패턴</strong><span>{data.overall.dominant_pattern}</span></div>}
     <div className="ai-cluster-grid">
       {data.clusters.relationship && <div><strong>관계</strong><p>{data.clusters.relationship}</p></div>}
       {data.clusters.work_study && <div><strong>일 · 학업</strong><p>{data.clusters.work_study}</p></div>}
       {data.clusters.money_news && <div><strong>금전 · 소식</strong><p>{data.clusters.money_news}</p></div>}
+      {data.clusters.investment && <div><strong>주식 · 투자</strong><p>{data.clusters.investment}</p></div>}
       {data.clusters.condition && <div><strong>컨디션</strong><p>{data.clusters.condition}</p></div>}
     </div>
     {!!data.priorities?.length && <div className="ai-priorities"><strong>이 기간 우선순위</strong>{data.priorities.map((item, index)=><p key={`${index}-${item}`}>{index+1}. {item}</p>)}</div>}
-    <details className="ai-details"><summary>분야별 정밀 해석 보기</summary><div className="ai-topic-list">{topicOrder.map((topic)=>{
+    <details className="ai-details" open><summary>분야별 정밀 해석</summary><div className="ai-topic-list">{topicOrder.map((topic)=>{
       const item=data.topic_analysis?.[topic]
       if(!item) return null
       return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {item.reason}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}</article>
@@ -220,7 +224,8 @@ const planetLabels: Record<string, string> = {
 const aspectLabels: Record<string, string> = {
   conjunction:'합', sextile:'육합', square:'사각', trine:'삼각', quincunx:'퀸컨스', opposition:'대립',
 }
-const topicOrder = ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
+const topicOrder = ['금전','투자심리','수익실현','신규진입','투자주의','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
+const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
 
 function initialPeriodFromUrl(): PeriodKey {
   if (typeof window === 'undefined') return 'today'
@@ -537,11 +542,16 @@ export default function AppNext() {
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
   const resultMonths = relationshipResult?.result?.months ?? []
   const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
-  const topIntegratedTopics = integratedResult
+  const orderedIntegratedTopics = integratedResult
     ? topicOrder
         .map((topic) => ({ topic, stat: integratedResult.western.overall[topic] }))
         .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
-        .sort((a,b) => b.stat.average - a.stat.average)
+    : []
+  const topIntegratedTopics = [...orderedIntegratedTopics].sort((a,b) => b.stat.average - a.stat.average)
+  const orderedRelationshipSignals = integratedResult
+    ? relationshipSignalOrder
+        .map((topic) => ({ topic, stat: integratedResult.western.relationship_signals[topic] }))
+        .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
     : []
   const activeDayun = currentDayun(integratedResult)
   const integratedSelectionEnd = periodEnd(queryDate, period)
@@ -850,7 +860,7 @@ export default function AppNext() {
                 <div className="result-card-title"><span>WESTERN</span><strong>서양점성술 기간 흐름</strong></div>
                 <p className="result-note">{integratedResult.western.score_policy} · {integratedResult.western.ephemeris}</p>
                 <div className="integrated-topic-grid">
-                  {topIntegratedTopics.slice(0,6).map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
+                  {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
                 {topIntegratedTopics.length>0 && <div className="best-window"><span>가장 강한 흐름</span><strong>{topIntegratedTopics.slice(0,3).map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
@@ -1018,10 +1028,14 @@ export default function AppNext() {
               <section className="result-card">
                 <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
                 <div className="integrated-topic-grid">
-                  {topIntegratedTopics.slice(0,3).map(({topic,stat})=><div className="integrated-topic" key={`home-top-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
+                  {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={`home-top-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
                 {cautionIntegratedTopics.length>0 && <div className="best-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
+
+              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>CONTACT SIGNALS</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 보조신호' : topic === '발신적합' ? '발신 적합도' : '과거인연 접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">사건 확률이나 특정 상대의 행동 예측이 아니라 연락축 내부의 상대 활성도야.</p></section>}
+
+              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MARKET FLOW</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">거래일만 집계한 점성술 상대지수야. 실제 가격·수급·거래량·손절 기준이 우선이야.</p></section>}
 
               {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card">
                 <div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>
@@ -1029,6 +1043,8 @@ export default function AppNext() {
                 {cautionIntegratedDays.map((point)=><div className="tight-row" key={`caution-${point.date}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
                 <p className="result-note">날짜 점수는 사건 확률이 아니라 기존 Western 기간엔진의 상대적 활성도야.</p>
               </section>}
+
+              {integratedResult.western.detail_days?.length ? <section className="result-card"><div className="result-card-title"><span>TIME FLOW</span><strong>시간 흐름 · 계산 근거</strong></div><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`${day.date}-${topic}`}><strong>{topic}</strong>{detail.best_window && <span>↑ 상대적으로 좋은 구간 {detail.best_window.start}~{detail.best_window.end} · {detail.best_window.score}</span>}{detail.caution_window && <span>↓ 주의 구간 {detail.caution_window.start}~{detail.caution_window.end} · {detail.caution_window.score}</span>}{detail.evidence?.length ? <small>{detail.evidence.slice(0,2).join(' · ')}</small> : null}</div>)}</div></details>)}</div></section> : null}
 
               <section className="result-card">
                 <div className="result-card-title"><span>SYSTEMS</span><strong>사주 · Thai 요약</strong></div>

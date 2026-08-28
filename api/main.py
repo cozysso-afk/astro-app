@@ -14,7 +14,7 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-fortune-v3"
+APP_VERSION = "api-fortune-v4"
 
 app = FastAPI(
     title="별빛의 운명 API",
