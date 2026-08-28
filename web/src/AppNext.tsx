@@ -193,6 +193,24 @@ function currentDayun(result: IntegratedApiResponse | null) {
   return result.saju.dayun.find((row) => row.start_year <= y && row.end_year >= y) ?? result.saju.dayun[0]
 }
 
+function collectFortuneHighlights(
+  rows: Array<{ topic: string; stat: FortuneStat }>,
+  key: 'best_days' | 'caution_days',
+  limit = 3,
+) {
+  const byDate = new Map<string, FortunePoint & { topic: string }>()
+  rows.forEach(({ topic, stat }) => {
+    for (const point of stat[key] ?? []) {
+      const previous = byDate.get(point.date)
+      const shouldReplace = !previous || (key === 'best_days' ? point.score > previous.score : point.score < previous.score)
+      if (shouldReplace) byDate.set(point.date, { ...point, topic })
+    }
+  })
+  return [...byDate.values()]
+    .sort((a, b) => key === 'best_days' ? b.score - a.score : a.score - b.score)
+    .slice(0, limit)
+}
+
 export default function AppNext() {
   const [period, setPeriod] = useState<PeriodKey>('today')
   const [queryDate, setQueryDate] = useState(() => toDateInputValue(new Date()))
@@ -237,6 +255,21 @@ export default function AppNext() {
         .sort((a,b) => b.stat.average - a.stat.average)
     : []
   const activeDayun = currentDayun(integratedResult)
+  const integratedSelectionEnd = periodEnd(queryDate, period)
+  const integratedMatchesSelection = Boolean(
+    integratedResult &&
+    integratedResult.period.start === queryDate &&
+    integratedResult.period.end === integratedSelectionEnd
+  )
+  const cautionIntegratedTopics = [...topIntegratedTopics]
+    .sort((a,b) => a.stat.average - b.stat.average)
+    .slice(0,2)
+  const bestIntegratedDays = integratedMatchesSelection
+    ? collectFortuneHighlights(topIntegratedTopics, 'best_days')
+    : []
+  const cautionIntegratedDays = integratedMatchesSelection
+    ? collectFortuneHighlights(topIntegratedTopics, 'caution_days')
+    : []
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
   const saveBirthProfile = () => {
@@ -334,7 +367,7 @@ export default function AppNext() {
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'통합 계산 중…':'통합운세 실제 계산'}</span></button>
 
-            {integratedResult && <div className="results-wrap integrated-results">
+            {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
 
               <section className="result-card">
@@ -406,7 +439,46 @@ export default function AppNext() {
           </section>}
 
           {selectedTool === 'precision' && <section className="report-card"><div className="report-icon"><Search size={21}/></div><div className="report-copy"><span className="eyebrow">PRECISION</span><strong>정밀분석</strong><p>궁합/결혼운에서는 실제 정밀 접점이 이미 연결돼 있어. 독립 화면은 통합운세 안정화 뒤 확장해.</p></div></section>}
-          <section className="report-card"><div className="report-icon"><Moon size={21}/></div><div className="report-copy"><span className="eyebrow">DAILY CELESTIAL REPORT</span><strong>{period==='today'?'오늘의 리포트':`${periods.find((item)=>item.key===period)?.label} 리포트`}</strong><p>운세 기준일 {queryDate}. 통합운세 실계산 결과를 다음 단계에서 이 홈 리포트에도 재사용해.</p></div></section>
+          <section className="tool-panel">
+            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">LIVE CELESTIAL REPORT</span><h2>{period==='today'?'오늘의 리포트':`${periods.find((item)=>item.key===period)?.label} 리포트`}</h2><p>{queryDate} → {integratedSelectionEnd} · 통합운세 실계산 요약</p></div></div>
+
+            {!integratedMatchesSelection && <>
+              <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 아래 버튼은 통합운세와 같은 Render 실계산을 한 번만 실행하고, 그 응답을 이 홈 리포트와 상세 통합운세가 함께 재사용해.</span></div>
+              {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
+              <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'리포트 계산 중…':`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label} 리포트 계산`}</span></button>
+            </>}
+
+            {integratedMatchesSelection && integratedResult && <>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
+
+              <section className="result-card">
+                <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
+                <div className="integrated-topic-grid">
+                  {topIntegratedTopics.slice(0,3).map(({topic,stat})=><div className="integrated-topic" key={`home-top-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
+                </div>
+                {cautionIntegratedTopics.length>0 && <div className="best-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
+              </section>
+
+              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card">
+                <div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>
+                {bestIntegratedDays.map((point)=><div className="tight-row" key={`best-${point.date}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
+                {cautionIntegratedDays.map((point)=><div className="tight-row" key={`caution-${point.date}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
+                <p className="result-note">날짜 점수는 사건 확률이 아니라 기존 Western 기간엔진의 상대적 활성도야.</p>
+              </section>}
+
+              <section className="result-card">
+                <div className="result-card-title"><span>SYSTEMS</span><strong>사주 · Thai 요약</strong></div>
+                <div className="saju-summary">
+                  {integratedResult.saju.ok && integratedResult.saju.day_master && <span>사주 일간 <b>{integratedResult.saju.day_master}</b></span>}
+                  {activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}
+                  <span>Thai <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
+                </div>
+                <p className="result-note">Thai는 아직 출생요일 baseline만 표시하며 날짜별 예측 점수에는 섞지 않아.</p>
+              </section>
+
+              <button className="primary-button" type="button" onClick={()=>setSelectedTool('integrated')}><Search size={18}/><span>상세 통합운세 보기</span></button>
+            </>}
+          </section>
         </>}
 
         {mainView === 'profile' && <section className="form-card profile-form-card">
