@@ -8,10 +8,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from integrated_fortune_v1 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
+from integrated_fortune_v1 import build_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-relationship-v1"
+APP_VERSION = "api-fortune-v2"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -46,6 +48,7 @@ RelationshipStatus = Literal[
     "engaged",
     "married",
 ]
+Gender = Literal["female", "male"]
 
 
 class RelationshipProfile(BaseModel):
@@ -77,6 +80,22 @@ class RelationshipRequest(BaseModel):
     relationship_status: RelationshipStatus = "dating"
 
 
+class FortuneProfile(BaseModel):
+    name: str | None = None
+    birth_date: date
+    birth_time: dt_time
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
+    gender: Gender = "female"
+
+
+class IntegratedFortuneRequest(BaseModel):
+    profile: FortuneProfile
+    start_date: date
+    end_date: date
+
+
 def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
     if end_date < start_date:
         raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
@@ -86,7 +105,11 @@ def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]
     segments: list[tuple[date, date]] = []
     cursor = date(start_date.year, start_date.month, 1)
     while cursor <= end_date:
-        next_month = date(cursor.year + (1 if cursor.month == 12 else 0), 1 if cursor.month == 12 else cursor.month + 1, 1)
+        next_month = date(
+            cursor.year + (1 if cursor.month == 12 else 0),
+            1 if cursor.month == 12 else cursor.month + 1,
+            1,
+        )
         month_end = next_month - timedelta(days=1)
         seg_start = max(start_date, cursor)
         seg_end = min(end_date, month_end)
@@ -120,18 +143,19 @@ def meta() -> dict:
     return {
         "version": APP_VERSION,
         "calculation_engine_connected": True,
-        "connected_engines": [REL_ENGINE_VERSION],
-        "phase": "relationship-engine-live",
+        "connected_engines": [INTEGRATED_ENGINE_VERSION, REL_ENGINE_VERSION],
+        "phase": "integrated-fortune-and-relationship-live",
         "planned_routes": [
             "daily",
             "weekly",
             "monthly",
             "annual",
-            "integrated",
-            "compatibility",
-            "marriage",
+            "precision",
         ],
-        "live_routes": ["relationship/western"],
+        "live_routes": [
+            "fortune/integrated",
+            "relationship/western",
+        ],
         "relationship_modes": [
             "single",
             "dating",
@@ -140,7 +164,48 @@ def meta() -> dict:
             "engaged",
             "married",
         ],
-        "note": "정밀 관계 점성 엔진은 Render API에 연결되었고, 기간 운세 엔진은 순차 분리 중이다.",
+        "note": (
+            "통합운세는 기존 서양 기간엔진 규칙 + 진태양시 사주 + Thai 출생요일 baseline을 "
+            "한 요청으로 반환한다. Thai transit은 미구현이라 기간 합의에는 넣지 않는다."
+        ),
+    }
+
+
+@app.post("/v1/fortune/integrated")
+def integrated_fortune(request: IntegratedFortuneRequest) -> dict:
+    if request.end_date < request.start_date:
+        raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
+    if (request.end_date - request.start_date).days > 365:
+        raise HTTPException(status_code=422, detail="integrated fortune range is limited to 366 days per request")
+
+    profile = request.profile
+    try:
+        result = build_integrated_fortune(
+            birth_date=profile.birth_date,
+            birth_time=profile.birth_time,
+            latitude=profile.latitude,
+            longitude=profile.longitude,
+            utc_offset_hours=profile.utc_offset_hours,
+            gender=profile.gender,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"integrated fortune calculation failed: {exc}") from exc
+
+    return {
+        **result,
+        "api_version": APP_VERSION,
+        "profile": {
+            "name": profile.name or None,
+            "gender": profile.gender,
+            "birth_date": profile.birth_date.isoformat(),
+            "birth_time": profile.birth_time.isoformat(),
+            "location_supplied": True,
+            "utc_offset_hours": profile.utc_offset_hours,
+        },
     }
 
 
