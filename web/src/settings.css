@@ -1,0 +1,85 @@
+/* Functional settings + archive UX + iPhone touch safety */
+.settings-view { display: grid; gap: 18px; }
+.settings-list { display: grid; gap: 10px; }
+.settings-toggle-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(178,187,203,.32);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.93), rgba(241,242,251,.84));
+  box-shadow: 0 10px 24px rgba(93,86,112,.06), 0 1px 0 rgba(255,255,255,.92) inset;
+}
+.settings-row-icon {
+  width: 42px; height: 42px; border-radius: 14px;
+  display: grid; place-items: center;
+  border: 1px solid rgba(176,184,201,.32);
+  box-shadow: 0 8px 18px rgba(96,88,118,.08), 0 1px 0 #fff inset;
+}
+.settings-row-icon.lilac { color:#846da3; background:linear-gradient(145deg,#fff,#e9def8 58%,#dcecff); }
+.settings-row-icon.blue { color:#6687a7; background:linear-gradient(145deg,#fff,#dcecff 58%,#dcf3ea); }
+.settings-row-copy { display:grid; gap:4px; min-width:0; }
+.settings-row-copy strong { color:#3f3544; font-size:15px; }
+.settings-row-copy small { color:#7c7480; line-height:1.45; font-size:12px; }
+.toggle-switch { position:relative; display:inline-flex; }
+.toggle-switch input { position:absolute; opacity:0; pointer-events:none; }
+.toggle-track {
+  width: 48px; height: 29px; border-radius: 999px; padding:3px;
+  display:block; background:#d9dbe2; border:1px solid rgba(142,149,164,.28);
+  transition:background .18s ease, box-shadow .18s ease;
+}
+.toggle-track > span {
+  display:block; width:21px; height:21px; border-radius:50%; background:#fff;
+  box-shadow:0 2px 7px rgba(60,55,72,.18); transition:transform .18s ease;
+}
+.toggle-switch input:checked + .toggle-track {
+  background:linear-gradient(120deg,#d7c8ee,#bcdcf3 52%,#c9eadf);
+  box-shadow:0 0 16px rgba(184,166,221,.22);
+}
+.toggle-switch input:checked + .toggle-track > span { transform:translateX(19px); }
+
+.settings-status-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.settings-status-grid > div {
+  min-width:0; padding:12px 10px; border-radius:17px;
+  border:1px solid rgba(183,190,205,.26);
+  background:linear-gradient(150deg,rgba(255,255,255,.91),rgba(241,247,249,.82));
+  display:grid; gap:4px;
+}
+.settings-status-grid span { color:#887b89; font-size:11px; }
+.settings-status-grid strong { color:#493f4c; font-size:14px; }
+.settings-status-grid small { color:#8a838c; font-size:10px; line-height:1.35; word-break:break-word; }
+.settings-note { margin:0; }
+.settings-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.settings-actions button,
+.archive-empty-action {
+  min-height:44px; border-radius:15px; border:1px solid rgba(171,181,198,.34);
+  background:linear-gradient(135deg,rgba(250,247,255,.96),rgba(228,238,251,.92),rgba(226,246,239,.90));
+  color:#62566c; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px;
+  box-shadow:0 8px 18px rgba(90,84,110,.06),0 1px 0 #fff inset;
+}
+.archive-empty { gap:10px; }
+.archive-empty span { max-width:420px; line-height:1.55; }
+.archive-empty-action { margin-top:4px; padding:0 16px; }
+
+/* Decorative layers must never steal taps on iPhone. */
+.bottom-nav { z-index:100 !important; pointer-events:auto !important; }
+.nav-item { position:relative; z-index:2; pointer-events:auto !important; touch-action:manipulation; }
+.hero-card::before,.hero-card::after,.period-button::before,.tool-card::before,.tool-card::after,.profile-card::before,.profile-card::after,.date-card::before,.date-card::after,.report-card::before,.report-card::after,.tool-panel::before { pointer-events:none !important; }
+
+html[data-celestial-glow='off'] .app-shell::before,
+html[data-celestial-glow='off'] .app-shell::after { opacity:.10 !important; }
+html[data-celestial-glow='off'] .hero-star { box-shadow:none !important; }
+html[data-celestial-glow='off'] .hero-card,
+html[data-celestial-glow='off'] .tool-card,
+html[data-celestial-glow='off'] .tool-panel { box-shadow:0 10px 24px rgba(80,75,92,.05),0 1px 0 rgba(255,255,255,.9) inset !important; }
+
+html[data-celestial-motion='off'] .hero-star,
+html[data-celestial-motion='off'] .period-button::before,
+html[data-celestial-motion='off'] .spin { animation:none !important; }
+
+@media (max-width:520px) {
+  .settings-status-grid { grid-template-columns:1fr; }
+  .settings-actions { grid-template-columns:1fr; }
+}

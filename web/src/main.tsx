@@ -9,6 +9,7 @@ import './archive.css'
 import './precision.css'
 import './celestial-theme.css'
 import './celestial-pastel.css'
+import './settings.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

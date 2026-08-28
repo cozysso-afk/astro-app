@@ -9,6 +9,7 @@ import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
+const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year'
 type ApiStatus = 'warming' | 'online' | 'offline'
@@ -174,6 +175,18 @@ function periodEnd(start: string, period: PeriodKey) {
 function parseOptionalNumber(value: string) {
   const n = Number(value.trim()); return value.trim() && Number.isFinite(n) ? n : null
 }
+function loadUiSettings() {
+  if (typeof window === 'undefined') return { glow: true, motion: true }
+  try {
+    const raw = window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY)
+    if (!raw) return { glow: true, motion: true }
+    const parsed = JSON.parse(raw) as Partial<{ glow: boolean; motion: boolean }>
+    return { glow: parsed.glow !== false, motion: parsed.motion !== false }
+  } catch {
+    return { glow: true, motion: true }
+  }
+}
+
 function loadStoredProfile(): BirthProfile {
   if (typeof window === 'undefined') return emptyProfile
   try {
@@ -374,6 +387,8 @@ export default function AppNext() {
   const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>([])
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [archiveStatus, setArchiveStatus] = useState('')
+  const [archiveError, setArchiveError] = useState('')
+  const [uiSettings, setUiSettings] = useState(() => loadUiSettings())
   const [actionNotice, setActionNotice] = useState('')
 
   useEffect(() => {
@@ -386,8 +401,14 @@ export default function AppNext() {
   }, [])
 
   useEffect(() => {
-    if (mainView === 'history') void refreshArchive()
+    if (mainView === 'history' || mainView === 'settings') void refreshArchive()
   }, [mainView])
+
+  useEffect(() => {
+    window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(uiSettings))
+    document.documentElement.dataset.celestialGlow = uiSettings.glow ? 'on' : 'off'
+    document.documentElement.dataset.celestialMotion = uiSettings.motion ? 'on' : 'off'
+  }, [uiSettings])
 
   const apiLabel = useMemo(() => {
     if (apiStatus === 'warming') return '계산 서버 깨우는 중'
@@ -560,11 +581,16 @@ export default function AppNext() {
 
   async function refreshArchive() {
     setArchiveLoading(true)
+    setArchiveError('')
     try {
       const data = await listArchive()
       setArchiveItems(data.items)
-      if (data.cloudAvailable) setArchiveStatus(data.cloudError ? `클라우드 연결됨 · 일부 동기화 주의: ${data.cloudError}` : 'Supabase 클라우드 기록 연결됨')
-      else setArchiveStatus(data.cloudError ? `이 기기 기록 사용 중 · 클라우드 대기: ${data.cloudError}` : '이 기기 기록 사용 중')
+      if (data.cloudAvailable) setArchiveStatus(data.cloudError ? `클라우드 연결됨 · 일부 동기화 주의: ${data.cloudError}` : `Supabase 클라우드 기록 연결됨 · ${data.items.length}개`)
+      else setArchiveStatus(data.cloudError ? `이 기기 기록 사용 중 · 클라우드 대기: ${data.cloudError}` : `이 기기 기록 사용 중 · ${data.items.length}개`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '기록을 불러오지 못했어.'
+      setArchiveError(message)
+      setArchiveStatus('기록 불러오기 오류')
     } finally {
       setArchiveLoading(false)
     }
@@ -619,7 +645,7 @@ export default function AppNext() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${uiSettings.glow ? 'celestial-glow-on' : 'celestial-glow-off'} ${uiSettings.motion ? 'celestial-motion-on' : 'celestial-motion-off'}`}>
       <main className="page-content">
         <section className="hero-card">
           <div className="hero-orbit hero-orbit-a"/><div className="hero-orbit hero-orbit-b"/><div className="hero-star hero-star-a"/><div className="hero-star hero-star-b"/>
@@ -878,9 +904,10 @@ export default function AppNext() {
 
         {mainView === 'history' && <section className="form-card archive-view">
           <div className="form-card-heading"><div className="report-icon"><History size={21}/></div><div><span className="eyebrow">ARCHIVE</span><h2>분석 기록</h2><p>통합운세·정밀분석·궁합·결혼운 결과를 저장하고 다시 열어볼 수 있어.</p></div></div>
-          <div className="archive-sync-row"><span><Cloud size={15}/>{archiveStatus || '기록 연결 상태 확인 중'}</span><button type="button" onClick={refreshArchive} disabled={archiveLoading}><RefreshCw className={archiveLoading?'spin':''} size={15}/>새로고침</button></div>
+          <div className="archive-sync-row"><span><Cloud size={15}/>{archiveLoading ? '기록 연결 상태 확인 중' : archiveStatus || '기록 연결 상태 확인 전'}</span><button type="button" onClick={refreshArchive} disabled={archiveLoading}><RefreshCw className={archiveLoading?'spin':''} size={15}/>새로고침</button></div>
+          {archiveError && <div className="status-banner error"><AlertTriangle size={16}/><span>{archiveError}</span></div>}
           {archiveLoading && archiveItems.length===0 && <div className="status-banner subtle"><LoaderCircle className="spin" size={16}/><span>저장된 기록을 불러오는 중…</span></div>}
-          {!archiveLoading && archiveItems.length===0 && <div className="archive-empty"><History size={22}/><strong>아직 저장된 기록이 없어</strong><span>계산 결과에서 “기록 저장”을 누르면 여기에 쌓여.</span></div>}
+          {!archiveLoading && !archiveError && archiveItems.length===0 && <div className="archive-empty"><History size={22}/><strong>저장된 기록 0개</strong><span>클라우드 연결은 정상이고, 현재 세션에 저장된 분석 결과가 아직 없어. 계산 결과에서 “기록 저장”을 누르면 여기에 쌓여.</span><button className="archive-empty-action" type="button" onClick={()=>switchMainView('home')}><Home size={15}/>홈에서 계산하고 기록 저장하기</button></div>}
           <div className="archive-list">{archiveItems.map((item)=><article className="archive-card" key={item.id}>
             <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{item.kind==='integrated'?'통합운세':item.kind==='precision'?'정밀분석':item.kind==='marriage'?'결혼운':'궁합운'}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
             <div className="archive-actions">
@@ -890,7 +917,33 @@ export default function AppNext() {
             </div>
           </article>)}</div>
         </section>}
-        {mainView === 'settings' && <section className="report-card"><div className="report-icon"><Settings size={21}/></div><div className="report-copy"><span className="eyebrow">SETTINGS</span><strong>설정</strong><p>AI 해석 모델, 개인정보, 알림, 앱 설정을 이곳으로 분리해.</p></div></section>}
+
+        {mainView === 'settings' && <section className="form-card settings-view">
+          <div className="form-card-heading"><div className="report-icon"><Settings size={21}/></div><div><span className="eyebrow">SETTINGS</span><h2>설정</h2><p>별빛 화면 효과와 앱 상태를 여기서 조절해.</p></div></div>
+
+          <div className="settings-list">
+            <label className="settings-toggle-row">
+              <span className="settings-row-icon lilac"><Sparkles size={19}/></span>
+              <span className="settings-row-copy"><strong>별빛 · 오로라 효과</strong><small>파스텔 빛 번짐, 글로우, 천체 장식의 강도를 켜고 꺼.</small></span>
+              <span className="toggle-switch"><input type="checkbox" checked={uiSettings.glow} onChange={(e)=>setUiSettings({...uiSettings, glow:e.target.checked})}/><span className="toggle-track"><span/></span></span>
+            </label>
+            <label className="settings-toggle-row">
+              <span className="settings-row-icon blue"><Orbit size={19}/></span>
+              <span className="settings-row-copy"><strong>잔잔한 애니메이션</strong><small>별 반짝임과 광택 이동 효과를 사용해.</small></span>
+              <span className="toggle-switch"><input type="checkbox" checked={uiSettings.motion} onChange={(e)=>setUiSettings({...uiSettings, motion:e.target.checked})}/><span className="toggle-track"><span/></span></span>
+            </label>
+          </div>
+
+          <div className="subsection-title">앱 상태</div>
+          <div className="settings-status-grid">
+            <div><span>계산 서버</span><strong>{apiStatus==='online'?'연결됨':apiStatus==='warming'?'확인 중':'대기 중'}</strong><small>{apiVersion || 'API 상태 확인'}</small></div>
+            <div><span>클라우드 기록</span><strong>{archiveLoading?'확인 중':archiveError?'확인 오류':archiveItems.length+'개'}</strong><small>{archiveError || archiveStatus || '기록 상태 확인 전'}</small></div>
+            <div><span>출생 프로필</span><strong>{hasProfile?'저장됨':'미저장'}</strong><small>{hasProfile?'이 브라우저 기기 보관':'내정보에서 먼저 저장'}</small></div>
+          </div>
+
+          <div className="privacy-note settings-note"><Cloud size={16}/><span>클라우드 기록은 현재 익명 로그인 세션 기준이야. Safari와 홈화면 웹앱이 서로 다른 익명 세션을 만들면 기록이 따로 보일 수 있어. 장기적으로 기기 간 동일 기록이 필요하면 Apple/Google 로그인이 필요해.</span></div>
+          <div className="settings-actions"><button type="button" onClick={()=>switchMainView('history')}><History size={16}/>기록함 열기</button><button type="button" onClick={()=>switchMainView('profile')}><User size={16}/>출생 프로필 열기</button></div>
+        </section>}
       </main>
       <nav className="bottom-nav" aria-label="하단 탐색">
         <button className={`nav-item ${mainView==='home'?'is-active':''}`} type="button" onClick={()=>switchMainView('home')}><Home size={20}/><span>홈</span></button>
