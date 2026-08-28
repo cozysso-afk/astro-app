@@ -1,0 +1,39 @@
+name: Verify mobile AI Render route v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-mobile-ai-render-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Render deploy and verify AI meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://astro-app-api-f7fn.onrender.com/v1/fortune/ai-meta'
+          for i in $(seq 1 20); do
+            echo "attempt $i"
+            body=$(curl -fsS --max-time 40 "$url" || true)
+            if echo "$body" | grep -q 'mobile-ai-v1'; then
+              echo "$body"
+              python - <<'PY' "$body"
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get('interpreter_version') == 'mobile-ai-v1'
+          print('AI_CONFIGURED=', data.get('configured'))
+          print('DEFAULT_MODEL=', data.get('default_model'))
+          PY
+              exit 0
+            fi
+            sleep 15
+          done
+          echo 'Render route did not update in time' >&2
+          exit 1
