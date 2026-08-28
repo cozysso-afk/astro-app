@@ -28,15 +28,10 @@ jobs:
           if supa_import not in s:
               s=s.replace(push_import, push_import+supa_import, 1)
 
-          old_meta='''  useEffect(() => {
-            let cancelled = false
-            fetch(`${API_BASE}/v1/fortune/ai-meta`)
-              .then((response)=>response.json().then((payload)=>({response,payload})))
-              .then(({response,payload})=>{ if(!cancelled) setAiConfigured(Boolean(response.ok && payload?.configured)) })
-              .catch(()=>{ if(!cancelled) setAiConfigured(false) })
-            return () => { cancelled = true }
-          }, [])
-          '''
+          marker="    fetch(`${API_BASE}/v1/fortune/ai-meta`)"
+          assert marker in s, 'AI meta marker missing'
+          meta_start=s.rfind('  useEffect(() => {', 0, s.index(marker))
+          meta_end=s.index("\n\n  useEffect(() => {\n    window.localStorage.setItem(AI_MODEL_STORAGE_KEY", meta_start)
           new_meta='''  useEffect(() => {
             let cancelled = false
             ;(async () => {
@@ -50,10 +45,8 @@ jobs:
               }
             })()
             return () => { cancelled = true }
-          }, [])
-          '''
-          assert old_meta in s, 'AI meta block changed'
-          s=s.replace(old_meta,new_meta,1)
+          }, [])'''
+          s=s[:meta_start]+new_meta+s[meta_end:]
 
           start=s.index('  const runAiInterpretation = async')
           end=s.index('\n\n  const runIntegrated = async', start)
@@ -85,6 +78,9 @@ jobs:
           s=s.replace('미연결 · Render에 GEMINI_API_KEY 설정 필요','미연결 · Supabase에 GEMINI_API_KEY 설정 필요')
           s=s.replace("<small>{aiConfigured===true?'Gemini 준비':'GEMINI_API_KEY 확인'}</small>","<small>{aiConfigured===true?'Supabase AI 준비':'Supabase GEMINI_API_KEY 확인'}</small>")
 
+          assert '/v1/fortune/interpret/start' not in s
+          assert '/v1/fortune/ai-meta' not in s
+          assert "supabase.functions.invoke('fortune-interpret'" in s
           p.write_text(s,encoding='utf-8')
           PY
       - name: Build frontend
