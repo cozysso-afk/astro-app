@@ -6,6 +6,7 @@ import {
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
+import { ensureSupabaseSession, supabase } from './lib/supabase'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
@@ -508,13 +509,19 @@ export default function AppNext() {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    fetch(`${API_BASE}/v1/fortune/ai-meta`)
-      .then((response)=>response.json().then((payload)=>({response,payload})))
-      .then(({response,payload})=>{ if(!cancelled) setAiConfigured(Boolean(response.ok && payload?.configured)) })
-      .catch(()=>{ if(!cancelled) setAiConfigured(false) })
-    return () => { cancelled = true }
-  }, [])
+  let cancelled = false
+  ;(async () => {
+    try {
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke('fortune-interpret', { body: { action: 'meta' } })
+      if (error) throw error
+      if (!cancelled) setAiConfigured(Boolean(data?.configured))
+    } catch {
+      if (!cancelled) setAiConfigured(false)
+    }
+  })()
+  return () => { cancelled = true }
+}, [])
 
   useEffect(() => {
     window.localStorage.setItem(AI_MODEL_STORAGE_KEY, aiModel)
@@ -599,30 +606,27 @@ export default function AppNext() {
   }
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
-    if (!calculation) return
-    setAiLoading(true); setAiError('')
-    try {
-      const startResponse = await fetch(`${API_BASE}/v1/fortune/interpret/start`, {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ calculation, model: aiModel }),
-      })
-      const started = await startResponse.json()
-      if (!startResponse.ok || !started?.job_id) throw new Error(started?.detail || started?.error || 'AI 해설 작업을 시작하지 못했어.')
-      let finalPayload: AiInterpretationResponse | null = null
-      for (let attempt=0; attempt<90; attempt++) {
-        await new Promise((resolve)=>window.setTimeout(resolve, 2000))
-        const pollResponse = await fetch(`${API_BASE}/v1/fortune/interpret/jobs/${encodeURIComponent(started.job_id)}`)
-        const job = await pollResponse.json()
-        if (!pollResponse.ok) throw new Error(job?.detail || 'AI 해설 상태를 확인하지 못했어.')
-        if (job.status === 'failed') throw new Error(job.error || 'AI 해설 작업이 실패했어.')
-        if (job.status === 'done') { finalPayload = job.result as AiInterpretationResponse; break }
-      }
-      if (!finalPayload) throw new Error('AI 정밀해설 시간이 길어지고 있어. 다시 시도해줘.')
-      if (!finalPayload.ok) throw new Error(finalPayload.error || 'AI 해설 생성에 실패했어.')
-      setAiInterpretation(finalPayload)
-    } catch (error) {
-      setAiError(error instanceof Error ? error.message : 'AI 해설 중 오류가 발생했어.')
-    } finally { setAiLoading(false) }
-  }
+  if (!calculation) return
+  setAiLoading(true); setAiError('')
+  try {
+    await ensureSupabaseSession()
+    const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+      body: { calculation, model: aiModel },
+    })
+    if (error) throw error
+    const payload = data as AiInterpretationResponse
+    if (!payload?.ok || !payload.data) {
+      if (payload?.missing_key) setAiConfigured(false)
+      throw new Error(payload?.error || 'AI 해설 결과가 비어 있어.')
+    }
+    setAiInterpretation(payload)
+    setAiConfigured(true)
+  } catch (error) {
+    setAiInterpretation(null)
+    const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
+    setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
+  } finally { setAiLoading(false) }
+}
 
   const runIntegrated = async () => {
     setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')
@@ -1142,7 +1146,7 @@ export default function AppNext() {
           <div className="subsection-title">AI 해석</div>
           <div className="ai-settings-card">
             <label><span><strong>AI 해석 모델</strong><small>실계산 뒤에 붙는 자연어 해설 모델</small></span><select value={aiModel} onChange={(e)=>setAiModel(e.target.value)}><option value="gemini-3.7-flash">Gemini 3.7 Flash · 정밀 우선</option><option value="gemini-3.6-flash">Gemini 3.6 Flash · 빠른 해설</option></select></label>
-            <div className={`ai-api-state ${aiConfigured===true?'online':aiConfigured===false?'offline':'checking'}`}><Sparkles size={16}/><span><strong>Gemini API</strong><small>{aiConfigured===true?'서버 비밀키 연결됨 · 계산 후 자동 해설':aiConfigured===false?'미연결 · Render에 GEMINI_API_KEY 설정 필요':'연결 상태 확인 중'}</small></span></div>
+            <div className={`ai-api-state ${aiConfigured===true?'online':aiConfigured===false?'offline':'checking'}`}><Sparkles size={16}/><span><strong>Gemini API</strong><small>{aiConfigured===true?'Supabase Edge Function 연결됨 · Gemini 해설':aiConfigured===false?'미연결 · Supabase에 GEMINI_API_KEY 설정 필요':'연결 상태 확인 중'}</small></span></div>
           </div>
 
           <div className="subsection-title">알림</div>
