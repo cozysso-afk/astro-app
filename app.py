@@ -44,7 +44,9 @@ ICON_PATH = APP_DIR / "icon.PNG"
 ICON_URL = "https://raw.githubusercontent.com/cozysso-afk/astro-app/main/icon.PNG"
 
 try:
-    PAGE_ICON = Image.open(ICON_PATH)
+    with Image.open(ICON_PATH) as _page_icon_src:
+        _page_icon_src.load()
+        PAGE_ICON = _page_icon_src.copy()
 except Exception:
     PAGE_ICON = "✨"
 
