@@ -120,6 +120,7 @@ input:focus-visible {
 .field select {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   height: 44px;
   border: 1px solid rgba(92, 62, 43, 0.12);
   border-radius: 13px;
@@ -472,6 +473,21 @@ input:focus-visible {
 
   .field-grid {
     gap: 9px;
+  }
+
+  /* iPhone Safari keeps a large intrinsic width on native date/time inputs.
+     Give birth date and birth time their own full-width rows on mobile. */
+  .profile-form-card .field-grid > .field:nth-child(2),
+  .profile-form-card .field-grid > .field:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .profile-form-card input[type='date'],
+  .profile-form-card input[type='time'] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .field input,
