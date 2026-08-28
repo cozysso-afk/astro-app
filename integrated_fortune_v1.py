@@ -9,6 +9,8 @@ It intentionally contains no Streamlit/UI state and no AI interpretation.
 from __future__ import annotations
 
 import calendar
+import json
+from pathlib import Path
 from datetime import date, datetime, time as dt_time, timedelta, timezone
 from functools import lru_cache
 from typing import Any
@@ -519,17 +521,28 @@ def _derived_scores(topic_results: dict):
     return out
 
 
-def _is_market_day(day_value: date) -> bool:
-    # The API intentionally avoids making price claims. This is only a display
-    # gate for investment indices. Weekends are always closed; exchange holidays
-    # fall back to weekday display when a calendar dependency is unavailable.
+@lru_cache(maxsize=1)
+def _krx_session_set() -> frozenset[str]:
+    path = Path(__file__).resolve().parent / "data" / "krx_sessions_2020_2027.json"
     try:
-        import pandas as pd
-        import exchange_calendars as xcals
-        cal = xcals.get_calendar("XKRX")
-        return bool(cal.is_session(pd.Timestamp(day_value.isoformat())))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        values = payload.get("sessions") if isinstance(payload, dict) else payload
+        if isinstance(values, list):
+            return frozenset(str(x) for x in values)
     except Exception:
-        return day_value.weekday() < 5
+        pass
+    return frozenset()
+
+
+def _is_market_day(day_value: date) -> bool:
+    # Runtime stays lightweight: the exact XKRX calendar is precomputed at build
+    # time through the currently available range. Outside it we explicitly fall
+    # back to weekdays instead of loading pandas/exchange_calendars in Render.
+    sessions = _krx_session_set()
+    iso = day_value.isoformat()
+    if sessions and "2020-01-01" <= iso <= "2027-08-27":
+        return iso in sessions
+    return day_value.weekday() < 5
 
 
 def _rolling_window(rows: list[dict], key: str, size: int = 3):
@@ -555,7 +568,7 @@ def _rolling_window(rows: list[dict], key: str, size: int = 3):
 
 
 def _daily_detail(day_value: date, natal_lons: dict, natal_houses: dict, offset_hours: float):
-    rows = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 30, natal_lons, natal_houses, offset_hours)
+    rows = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 45, natal_lons, natal_houses, offset_hours)
     details = {}
     keys = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
     if _is_market_day(day_value):
