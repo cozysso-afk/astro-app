@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime, time as dt_time, timedelta, timezone
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -17,7 +17,7 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-fortune-v4.2-async"
+APP_VERSION = "api-fortune-v4.3-detached"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -244,14 +244,14 @@ def integrated_fortune(request: IntegratedFortuneRequest) -> dict:
 
 
 @app.post("/v1/fortune/integrated/start", status_code=202)
-def integrated_fortune_start(request: IntegratedFortuneRequest, background_tasks: BackgroundTasks) -> dict:
+def integrated_fortune_start(request: IntegratedFortuneRequest) -> dict:
     _prune_jobs(_calc_jobs, _calc_jobs_lock)
     if request.end_date < request.start_date or (request.end_date - request.start_date).days > 365:
         raise HTTPException(status_code=422, detail="invalid integrated fortune range")
     job_id = uuid.uuid4().hex
     with _calc_jobs_lock:
         _calc_jobs[job_id] = {"status": "queued", "created_ts": time.time()}
-    background_tasks.add_task(_run_calc_job, job_id, request.model_dump(mode="json"))
+    threading.Thread(target=_run_calc_job, args=(job_id, request.model_dump(mode="json")), daemon=True, name=f"fortune-calc-{job_id[:8]}").start()
     return {"ok": True, "job_id": job_id, "status": "queued"}
 
 
@@ -281,14 +281,14 @@ def fortune_interpret(request: IntegratedInterpretRequest) -> dict:
 
 
 @app.post("/v1/fortune/interpret/start", status_code=202)
-def fortune_interpret_start(request: IntegratedInterpretRequest, background_tasks: BackgroundTasks) -> dict:
+def fortune_interpret_start(request: IntegratedInterpretRequest) -> dict:
     if not isinstance(request.calculation, dict) or not request.calculation:
         raise HTTPException(status_code=422, detail="calculation result is required")
     _prune_jobs(_ai_jobs, _ai_jobs_lock)
     job_id = uuid.uuid4().hex
     with _ai_jobs_lock:
         _ai_jobs[job_id] = {"status": "queued", "created_ts": time.time()}
-    background_tasks.add_task(_run_ai_job, job_id, request.calculation, request.model)
+    threading.Thread(target=_run_ai_job, args=(job_id, request.calculation, request.model), daemon=True, name=f"fortune-ai-{job_id[:8]}").start()
     return {"ok": True, "job_id": job_id, "status": "queued"}
 
 
