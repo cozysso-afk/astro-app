@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MODELS: Record<string, string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
@@ -6,7 +7,7 @@ const MODELS: Record<string, string> = {
 };
 const DEFAULT_MODEL = "gemini-3.7-flash";
 const FALLBACK_MODEL = "gemini-3.6-flash";
-const INTERPRETER_VERSION = "supabase-ai-v1";
+const INTERPRETER_VERSION = "supabase-ai-v2-background-jobs";
 const TOPICS = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션", "투자심리", "수익실현", "신규진입", "투자주의"];
 const REL_SIGNALS = ["수신신호", "발신적합", "과거인연접점"];
 const INTRO_END = new Date("2026-12-31T23:59:59Z");
@@ -185,7 +186,9 @@ function validateOutput(obj: any) {
       saju: cleanText(systems.saju, 1800),
       thai: cleanText(systems.thai, 1400),
     },
-    priorities: Array.isArray(obj.priorities) ? obj.priorities.slice(0, 3).map((x: unknown) => cleanText(x, 420)).filter(Boolean) : [],
+    priorities: Array.isArray(obj.priorities)
+      ? obj.priorities.slice(0, 3).map((x: unknown) => cleanText(x, 420)).filter(Boolean)
+      : [],
     topic_analysis: {},
     limits: cleanText(obj.limits, 1400),
   };
@@ -230,27 +233,38 @@ function usageSummary(raw: any) {
   };
 }
 
-async function callGemini(payload: any, model: string, apiKey: string, timeoutMs: number, thinkingLevel: "high" | "medium") {
+async function callGemini(
+  payload: any,
+  model: string,
+  apiKey: string,
+  timeoutMs: number,
+  thinkingLevel: "high" | "medium",
+) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const prompt = `아래 통합 계산 결과를 종합 해석해. 제공된 분야를 빠짐없이 채우고 계산값을 확률로 바꾸지 마.\n\nOUTPUT_SHAPE:\n${JSON.stringify(OUTPUT_SHAPE)}\n\nCALCULATED_DATA:\n${JSON.stringify(payload)}`;
-    const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 10000,
-          responseMimeType: "application/json",
-          thinkingConfig: { thinkingLevel },
-        },
-      }),
-    });
+    const upstream = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: 10000,
+            responseMimeType: "application/json",
+            thinkingConfig: { thinkingLevel },
+          },
+        }),
+      },
+    );
     const rawText = await upstream.text();
-    if (!upstream.ok) return { ok: false, error: `Gemini HTTP ${upstream.status} · ${rawText.slice(0, 700)}`, model, status: upstream.status };
+    if (!upstream.ok) {
+      return { ok: false, error: `Gemini HTTP ${upstream.status} · ${rawText.slice(0, 700)}`, model, status: upstream.status };
+    }
     const raw = JSON.parse(rawText);
     const parts = raw?.candidates?.[0]?.content?.parts ?? [];
     let text = parts.filter((p: any) => !p?.thought).map((p: any) => p?.text ?? "").join("").trim();
@@ -259,7 +273,13 @@ async function callGemini(payload: any, model: string, apiKey: string, timeoutMs
     const parsed = JSON.parse(text);
     const data = validateOutput(parsed);
     if (!data) return { ok: false, error: "AI 해설 응답 구조를 검증하지 못했어.", model };
-    return { ok: true, data, model, interpreter_version: INTERPRETER_VERSION, usage: usageSummary(raw) };
+    return {
+      ok: true,
+      data,
+      model,
+      interpreter_version: INTERPRETER_VERSION,
+      usage: usageSummary(raw),
+    };
   } catch (error) {
     const message = error instanceof DOMException && error.name === "AbortError"
       ? `Gemini ${model} 해설이 제한시간을 넘겼어.`
@@ -270,27 +290,173 @@ async function callGemini(payload: any, model: string, apiKey: string, timeoutMs
   }
 }
 
+const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+const SUPABASE_ANON_KEY = (Deno.env.get("SUPABASE_ANON_KEY") ?? "").trim();
+const SUPABASE_SERVICE_ROLE_KEY = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+
+function adminClient() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function currentUser(req: Request) {
+  const auth = req.headers.get("Authorization") ?? "";
+  if (!auth) return null;
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error) return null;
+  return data.user ?? null;
+}
+
+async function calculateWithFallback(compact: any, preferred: string, apiKey: string) {
+  const primary = await callGemini(
+    compact,
+    preferred,
+    apiKey,
+    preferred === DEFAULT_MODEL ? 85_000 : 120_000,
+    preferred === DEFAULT_MODEL ? "high" : "medium",
+  );
+  if (primary.ok) return primary;
+  if (preferred === DEFAULT_MODEL) {
+    const fallback = await callGemini(compact, FALLBACK_MODEL, apiKey, 55_000, "medium");
+    if (fallback.ok) return { ...fallback, fallback_from: preferred };
+    return {
+      ok: false,
+      error: `${primary.error} / 자동대체도 실패: ${fallback.error}`,
+      model: preferred,
+    };
+  }
+  return primary;
+}
+
+async function runJob(jobId: string, compact: any, preferred: string, apiKey: string) {
+  const admin = adminClient();
+  await admin.from("ai_interpret_jobs").update({
+    status: "running",
+    updated_at: new Date().toISOString(),
+  }).eq("id", jobId);
+  try {
+    const result: any = await calculateWithFallback(compact, preferred, apiKey);
+    if (result.ok) {
+      await admin.from("ai_interpret_jobs").update({
+        status: "done",
+        model: result.model ?? preferred,
+        fallback_from: result.fallback_from ?? null,
+        result_json: result.data ?? null,
+        usage_json: result.usage ?? null,
+        error: null,
+        updated_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+    } else {
+      await admin.from("ai_interpret_jobs").update({
+        status: "failed",
+        model: result.model ?? preferred,
+        error: result.error ?? "AI 해설 실패",
+        updated_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+    }
+  } catch (error) {
+    await admin.from("ai_interpret_jobs").update({
+      status: "failed",
+      error: error instanceof Error ? error.message : String(error),
+      updated_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    }).eq("id", jobId);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return response({ ok: false, error: "POST만 지원해." }, 405);
 
   let body: any;
-  try { body = await req.json(); } catch { return response({ ok: false, error: "JSON 요청이 필요해." }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return response({ ok: false, error: "JSON 요청이 필요해." }, 400);
+  }
+
   const apiKey = (Deno.env.get("GEMINI_API_KEY") ?? "").trim();
   if (body?.action === "meta") {
-    return response({ configured: Boolean(apiKey), interpreter_version: INTERPRETER_VERSION, default_model: DEFAULT_MODEL, models: MODELS, runtime: "supabase-edge" });
+    return response({
+      configured: Boolean(apiKey),
+      interpreter_version: INTERPRETER_VERSION,
+      default_model: DEFAULT_MODEL,
+      models: MODELS,
+      runtime: "supabase-edge",
+      background_jobs: true,
+    });
   }
-  if (!apiKey) return response({ ok: false, missing_key: true, error: "Supabase Edge Function에 GEMINI_API_KEY가 설정되지 않았어." }, 503);
-  if (!body?.calculation || typeof body.calculation !== "object") return response({ ok: false, error: "calculation이 필요해." }, 400);
+  if (!apiKey) {
+    return response({
+      ok: false,
+      missing_key: true,
+      error: "Supabase Edge Function에 GEMINI_API_KEY가 설정되지 않았어.",
+    }, 503);
+  }
 
+  const user = await currentUser(req);
+  if (!user) return response({ ok: false, error: "인증 세션이 필요해." }, 401);
+
+  if (body?.action === "status") {
+    const jobId = cleanText(body?.job_id, 80);
+    if (!jobId) return response({ ok: false, error: "job_id가 필요해." }, 400);
+    const { data, error } = await adminClient()
+      .from("ai_interpret_jobs")
+      .select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at")
+      .eq("id", jobId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error) return response({ ok: false, error: `job 조회 실패: ${error.message}` }, 500);
+    if (!data) return response({ ok: false, error: "job을 찾지 못했어." }, 404);
+    return response({
+      ok: true,
+      job_id: data.id,
+      status: data.status,
+      model: data.model,
+      fallback_from: data.fallback_from,
+      data: data.result_json,
+      usage: data.usage_json,
+      error: data.error,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      completed_at: data.completed_at,
+    });
+  }
+
+  if (!body?.calculation || typeof body.calculation !== "object") {
+    return response({ ok: false, error: "calculation이 필요해." }, 400);
+  }
   const preferred = MODELS[body.model] ? body.model : DEFAULT_MODEL;
   const compact = compactCalculation(body.calculation);
-  const primary = await callGemini(compact, preferred, apiKey, preferred === DEFAULT_MODEL ? 85_000 : 120_000, preferred === DEFAULT_MODEL ? "high" : "medium");
-  if (primary.ok) return response(primary);
-  if (preferred === DEFAULT_MODEL) {
-    const fallback = await callGemini(compact, FALLBACK_MODEL, apiKey, 55_000, "medium");
-    if (fallback.ok) return response({ ...fallback, fallback_from: preferred });
-    return response({ ok: false, error: `${primary.error} / 자동대체도 실패: ${fallback.error}`, model: preferred }, 502);
+
+  if (body?.action === "start") {
+    const admin = adminClient();
+    const { data, error } = await admin.from("ai_interpret_jobs").insert({
+      user_id: user.id,
+      kind: "fortune",
+      status: "queued",
+      model: preferred,
+    }).select("id").single();
+    if (error || !data?.id) {
+      return response({ ok: false, error: `job 생성 실패: ${error?.message ?? "unknown"}` }, 500);
+    }
+    const task = runJob(data.id, compact, preferred, apiKey);
+    (globalThis as any).EdgeRuntime?.waitUntil?.(task);
+    return response({
+      ok: true,
+      job_id: data.id,
+      status: "queued",
+      interpreter_version: INTERPRETER_VERSION,
+    }, 202);
   }
-  return response(primary, 502);
+
+  const direct: any = await calculateWithFallback(compact, preferred, apiKey);
+  return response(direct, direct.ok ? 200 : 502);
 });
