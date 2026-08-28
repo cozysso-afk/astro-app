@@ -29,7 +29,7 @@ _allowed_origins = [
     origin.strip()
     for origin in os.getenv(
         "ASTRO_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://astro-app-web-ten.vercel.app",
+        "http://localhost:5173,http://127.0.0.1:5173,https://astro-app-web-ten.vercel.app,https://cozysso-afk.github.io",
     ).split(",")
     if origin.strip()
 ]
@@ -118,154 +118,49 @@ def _prune_jobs(store: dict, lock: threading.Lock):
         for key in stale:
             store.pop(key, None)
 
+def _set_job(store: dict, lock: threading.Lock, job_id: str, **fields):
+    with lock:
+        record = store.setdefault(job_id, {"created_ts": time.time()})
+        record.update(fields)
+
+
 def _run_ai_job(job_id: str, calculation: dict, model: str):
+    _set_job(_ai_jobs, _ai_jobs_lock, job_id, status="running")
     try:
         result = interpret_integrated_fortune(calculation, model)
-        with _ai_jobs_lock:
-            if job_id in _ai_jobs:
-                _ai_jobs[job_id].update({"status": "done", "result": result, "completed_ts": time.time()})
-    except Exception as exc:
-        with _ai_jobs_lock:
-            if job_id in _ai_jobs:
-                _ai_jobs[job_id].update({"status": "failed", "error": f"{type(exc).__name__}: {exc}", "completed_ts": time.time()})
+        _set_job(_ai_jobs, _ai_jobs_lock, job_id, status="done", result=result)
+    except Exception as exc:  # noqa: BLE001
+        _set_job(_ai_jobs, _ai_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
 
-def _calculate_integrated_payload(request: IntegratedFortuneRequest) -> dict:
-    if request.end_date < request.start_date:
-        raise ValueError("end_date must be on or after start_date")
-    if (request.end_date - request.start_date).days > 365:
-        raise ValueError("integrated fortune range is limited to 366 days per request")
-    profile = request.profile
-    result = build_integrated_fortune(
-        birth_date=profile.birth_date, birth_time=profile.birth_time, latitude=profile.latitude, longitude=profile.longitude,
-        utc_offset_hours=profile.utc_offset_hours, gender=profile.gender, start_date=request.start_date, end_date=request.end_date,
-    )
-    return {**result, "api_version": APP_VERSION, "profile": {"name": profile.name or None, "gender": profile.gender, "birth_date": profile.birth_date.isoformat(), "birth_time": profile.birth_time.isoformat(), "location_supplied": True, "utc_offset_hours": profile.utc_offset_hours}}
 
 def _run_calc_job(job_id: str, payload: dict):
+    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running")
     try:
-        request = IntegratedFortuneRequest.model_validate(payload)
-        result = _calculate_integrated_payload(request)
-        with _calc_jobs_lock:
-            if job_id in _calc_jobs:
-                _calc_jobs[job_id].update({"status": "done", "result": result, "completed_ts": time.time()})
-    except Exception as exc:
-        with _calc_jobs_lock:
-            if job_id in _calc_jobs:
-                _calc_jobs[job_id].update({"status": "failed", "error": f"{type(exc).__name__}: {exc}", "completed_ts": time.time()})
-
-
-def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
-    if end_date < start_date:
-        raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
-    if (end_date - start_date).days > 730:
-        raise HTTPException(status_code=422, detail="relationship timing range is limited to 731 days per request")
-
-    segments: list[tuple[date, date]] = []
-    cursor = date(start_date.year, start_date.month, 1)
-    while cursor <= end_date:
-        next_month = date(
-            cursor.year + (1 if cursor.month == 12 else 0),
-            1 if cursor.month == 12 else cursor.month + 1,
-            1,
-        )
-        month_end = next_month - timedelta(days=1)
-        seg_start = max(start_date, cursor)
-        seg_end = min(end_date, month_end)
-        if seg_start <= seg_end:
-            segments.append((seg_start, seg_end))
-        cursor = next_month
-    return segments
-
-
-@app.get("/")
-def root() -> dict:
-    return {
-        "service": "astro-app-api",
-        "version": APP_VERSION,
-        "status": "ok",
-    }
+        result = build_integrated_fortune(**payload)
+        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", result=result)
+    except Exception as exc:  # noqa: BLE001
+        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/health")
 def health() -> dict:
-    return {
-        "status": "ok",
-        "service": "astro-app-api",
-        "version": APP_VERSION,
-        "time_utc": datetime.now(timezone.utc).isoformat(),
-    }
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.get("/v1/meta")
 def meta() -> dict:
     return {
-        "version": APP_VERSION,
+        "api_version": APP_VERSION,
+        "relationship_engine": REL_ENGINE_VERSION,
+        "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "calculation_engine_connected": True,
         "ai_interpretation": ai_status(),
-        "connected_engines": [INTEGRATED_ENGINE_VERSION, REL_ENGINE_VERSION],
-        "phase": "integrated-fortune-and-relationship-live",
-        "planned_routes": [
-            "daily",
-            "weekly",
-            "monthly",
-            "annual",
-            "precision",
-        ],
-        "live_routes": [
-            "fortune/integrated",
-            "fortune/integrated/start+jobs",
-            "fortune/interpret",
-            "fortune/interpret/start+jobs",
+        "routes": [
             "relationship/western",
+            "fortune/integrated",
+            "fortune/interpret",
         ],
-        "relationship_modes": [
-            "single",
-            "dating",
-            "long_term",
-            "cohabiting",
-            "engaged",
-            "married",
-        ],
-        "note": (
-            "통합운세는 기존 서양 기간엔진 규칙 + 진태양시 사주 + Thai 출생요일 baseline을 "
-            "한 요청으로 반환한다. Thai transit은 미구현이라 기간 합의에는 넣지 않는다."
-        ),
     }
-
-
-@app.post("/v1/fortune/integrated")
-def integrated_fortune(request: IntegratedFortuneRequest) -> dict:
-    try:
-        return _calculate_integrated_payload(request)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"integrated fortune calculation failed: {exc}") from exc
-
-
-@app.post("/v1/fortune/integrated/start", status_code=202)
-def integrated_fortune_start(request: IntegratedFortuneRequest) -> dict:
-    _prune_jobs(_calc_jobs, _calc_jobs_lock)
-    if request.end_date < request.start_date or (request.end_date - request.start_date).days > 365:
-        raise HTTPException(status_code=422, detail="invalid integrated fortune range")
-    job_id = uuid.uuid4().hex
-    with _calc_jobs_lock:
-        _calc_jobs[job_id] = {"status": "queued", "created_ts": time.time()}
-    threading.Thread(target=_run_calc_job, args=(job_id, request.model_dump(mode="json")), daemon=True, name=f"fortune-calc-{job_id[:8]}").start()
-    return {"ok": True, "job_id": job_id, "status": "queued"}
-
-
-@app.get("/v1/fortune/integrated/jobs/{job_id}")
-def integrated_fortune_job(job_id: str) -> dict:
-    _prune_jobs(_calc_jobs, _calc_jobs_lock)
-    with _calc_jobs_lock:
-        item = dict(_calc_jobs.get(job_id) or {})
-    if not item:
-        raise HTTPException(status_code=404, detail="calculation job not found")
-    out = {"ok": item.get("status") != "failed", "job_id": job_id, "status": item.get("status")}
-    if item.get("status") == "done": out["result"] = item.get("result")
-    if item.get("status") == "failed": out["error"] = item.get("error")
-    return out
 
 
 @app.get("/v1/fortune/ai-meta")
@@ -280,15 +175,19 @@ def fortune_interpret(request: IntegratedInterpretRequest) -> dict:
     return interpret_integrated_fortune(request.calculation, request.model)
 
 
-@app.post("/v1/fortune/interpret/start", status_code=202)
+@app.post("/v1/fortune/interpret/start")
 def fortune_interpret_start(request: IntegratedInterpretRequest) -> dict:
     if not isinstance(request.calculation, dict) or not request.calculation:
         raise HTTPException(status_code=422, detail="calculation result is required")
     _prune_jobs(_ai_jobs, _ai_jobs_lock)
     job_id = uuid.uuid4().hex
-    with _ai_jobs_lock:
-        _ai_jobs[job_id] = {"status": "queued", "created_ts": time.time()}
-    threading.Thread(target=_run_ai_job, args=(job_id, request.calculation, request.model), daemon=True, name=f"fortune-ai-{job_id[:8]}").start()
+    _set_job(_ai_jobs, _ai_jobs_lock, job_id, status="queued")
+    threading.Thread(
+        target=_run_ai_job,
+        args=(job_id, request.calculation, request.model),
+        daemon=True,
+        name=f"fortune-ai-{job_id[:8]}",
+    ).start()
     return {"ok": True, "job_id": job_id, "status": "queued"}
 
 
@@ -296,43 +195,70 @@ def fortune_interpret_start(request: IntegratedInterpretRequest) -> dict:
 def fortune_interpret_job(job_id: str) -> dict:
     _prune_jobs(_ai_jobs, _ai_jobs_lock)
     with _ai_jobs_lock:
-        item = dict(_ai_jobs.get(job_id) or {})
-    if not item:
-        raise HTTPException(status_code=404, detail="AI interpretation job not found")
-    out = {"ok": item.get("status") != "failed", "job_id": job_id, "status": item.get("status")}
-    if item.get("status") == "done": out["result"] = item.get("result")
-    if item.get("status") == "failed": out["error"] = item.get("error")
-    return out
+        job = dict(_ai_jobs.get(job_id) or {})
+    if not job:
+        raise HTTPException(status_code=404, detail="AI job not found or expired")
+    job.pop("created_ts", None)
+    return {"job_id": job_id, **job}
 
 
 @app.post("/v1/relationship/western")
 def relationship_western(request: RelationshipRequest) -> dict:
-    user_payload = request.user.engine_payload()
-    cp_payload = request.counterpart.engine_payload()
-
-    if user_payload["birth_time"] is None:
-        raise HTTPException(status_code=422, detail="user birth_time is required for the precision relationship engine")
-
-    segments = _month_segments(request.start_date, request.end_date)
-    try:
-        result = build_relationship_western(user_payload, cp_payload, segments)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
-
+    if request.user.birth_time is None or not request.user.time_known:
+        raise HTTPException(status_code=422, detail="user exact birth_time is required for precision relationship engine")
+    result = build_relationship_western(
+        user=request.user.engine_payload(),
+        counterpart=request.counterpart.engine_payload(),
+        start_date=request.start_date,
+        end_date=request.end_date,
+        relationship_status=request.relationship_status,
+    )
     return {
-        "ok": bool(result.get("ok", True)),
-        "api_version": APP_VERSION,
-        "engine": result.get("engine", REL_ENGINE_VERSION),
-        "relationship_status": request.relationship_status,
-        "period": {
-            "start": request.start_date.isoformat(),
-            "end": request.end_date.isoformat(),
-            "month_segments": len(segments),
-        },
         "result": result,
-        "interpretation_policy": {
-            "probability": False,
-            "private_feelings_claims": False,
-            "marriage_mode": "결혼 여부 예언이 아니라 장기 결속·관계 주기·협력/긴장 활성도를 해석하는 모드",
+        "engine": REL_ENGINE_VERSION,
+        "period": {"start": request.start_date.isoformat(), "end": request.end_date.isoformat()},
+        "policy": {
+            "contact_counts_are_probabilities": False,
+            "private_feelings_are_inferred": False,
+            "missing_precision_is_guessed": False,
         },
     }
+
+
+@app.post("/v1/fortune/integrated")
+def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
+    return build_integrated_fortune(
+        profile=request.profile.model_dump(),
+        start_date=request.start_date,
+        end_date=request.end_date,
+    )
+
+
+@app.post("/v1/fortune/integrated/start")
+def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
+    _prune_jobs(_calc_jobs, _calc_jobs_lock)
+    job_id = uuid.uuid4().hex
+    payload = {
+        "profile": request.profile.model_dump(),
+        "start_date": request.start_date,
+        "end_date": request.end_date,
+    }
+    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="queued")
+    threading.Thread(
+        target=_run_calc_job,
+        args=(job_id, payload),
+        daemon=True,
+        name=f"fortune-calc-{job_id[:8]}",
+    ).start()
+    return {"ok": True, "job_id": job_id, "status": "queued"}
+
+
+@app.get("/v1/fortune/integrated/jobs/{job_id}")
+def fortune_integrated_job(job_id: str) -> dict:
+    _prune_jobs(_calc_jobs, _calc_jobs_lock)
+    with _calc_jobs_lock:
+        job = dict(_calc_jobs.get(job_id) or {})
+    if not job:
+        raise HTTPException(status_code=404, detail="calculation job not found or expired")
+    job.pop("created_ts", None)
+    return {"job_id": job_id, **job}
