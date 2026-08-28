@@ -28,7 +28,7 @@ jobs:
           ! grep -q '통합운세 실계산 결과를 다음 단계에서 이 홈 리포트에도 재사용해.' web/src/AppNext.tsx
       - name: Install web dependencies
         working-directory: web
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Build mobile web
         working-directory: web
         run: npm run build
