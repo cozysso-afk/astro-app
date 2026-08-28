@@ -1,0 +1,85 @@
+name: Apply archive and copy v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-archive-copy-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply archive and copy patch
+        run: python scripts/patch_archive_copy_v1.py
+      - name: Verify markers
+        run: |
+          grep -q '요청/프롬프트 전체복사' web/src/AppNext.tsx
+          grep -q '결과 전체복사' web/src/AppNext.tsx
+          grep -q '분석 기록' web/src/AppNext.tsx
+          grep -q 'saveIntegratedRecord' web/src/AppNext.tsx
+          grep -q 'saveRelationshipRecord' web/src/AppNext.tsx
+          grep -q 'restoreArchive' web/src/AppNext.tsx
+          grep -q 'Supabase 클라우드 기록 연결됨' web/src/AppNext.tsx
+      - name: Install web dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+      - name: Build mobile web
+        working-directory: web
+        run: npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Supabase anonymous archive smoke
+        id: cloud_smoke
+        continue-on-error: true
+        working-directory: web
+        run: |
+          node --input-type=module <<'JS'
+          import { createClient } from '@supabase/supabase-js'
+          const supabase = createClient(
+            'https://dbynfabwfcakxayyggzi.supabase.co',
+            'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r',
+            { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+          )
+          const { data: authData, error: authError } = await supabase.auth.signInAnonymously({
+            options: { data: { purpose: 'ci-archive-smoke', created_by: 'astro-app' } },
+          })
+          if (authError || !authData.user) throw authError ?? new Error('anonymous auth returned no user')
+          const userId = authData.user.id
+          const { data: inserted, error: insertError } = await supabase.from('readings').insert({
+            user_id: userId,
+            reading_type: 'integrated',
+            period_start: '2026-08-28',
+            period_end: '2026-08-28',
+            engine_version: 'ci-smoke',
+            calculation_json: { archive_v: 1, local_id: `ci-${userId}`, period_key: 'today', request: {}, result: {} },
+            interpretation_json: { archive_v: 1 },
+            summary: 'ci archive smoke',
+          }).select('id, user_id, summary').single()
+          if (insertError) throw insertError
+          if (inserted.user_id !== userId || inserted.summary !== 'ci archive smoke') throw new Error('RLS insert/select mismatch')
+          const { error: deleteError } = await supabase.from('readings').delete().eq('id', inserted.id)
+          if (deleteError) throw deleteError
+          console.log('supabase-archive-smoke-ok', userId)
+          JS
+      - name: Report cloud smoke outcome
+        run: |
+          echo "cloud-smoke-outcome=${{ steps.cloud_smoke.outcome }}"
+      - name: Commit patched frontend
+        run: |
+          if git diff --quiet -- web/src/AppNext.tsx web/package-lock.json; then
+            echo 'No frontend diff to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/package-lock.json
+          git commit -m 'feat: add persistent archive and full-copy actions'
+          git push origin HEAD:main
