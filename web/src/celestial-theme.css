@@ -1,0 +1,473 @@
+/*
+ * Celestial atmosphere layer for the mobile home experience.
+ * Keeps the warm ivory/gold identity while adding moonlight, depth and glassy highlights.
+ */
+
+:root {
+  --celestial-ivory: #fffdf8;
+  --celestial-cream: #fbf3e6;
+  --celestial-gold: #c99758;
+  --celestial-gold-bright: #e6c58e;
+  --celestial-gold-deep: #8c6038;
+  --celestial-lilac: rgba(205, 190, 232, 0.18);
+  --celestial-glow: rgba(233, 199, 139, 0.32);
+  --celestial-hairline: rgba(197, 145, 79, 0.2);
+}
+
+html,
+body {
+  background: #f7f0e6;
+}
+
+body {
+  background:
+    radial-gradient(circle at 16% -2%, rgba(245, 215, 164, 0.36), transparent 30%),
+    radial-gradient(circle at 96% 16%, var(--celestial-lilac), transparent 26%),
+    radial-gradient(circle at 52% 63%, rgba(255, 248, 231, 0.92), transparent 38%),
+    linear-gradient(180deg, #fcf8f1 0%, #f7efe4 44%, #faf5ed 100%);
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(ellipse at 48% -4%, rgba(255, 248, 228, 0.78), transparent 34%),
+    radial-gradient(ellipse at 108% 24%, rgba(221, 205, 238, 0.14), transparent 31%),
+    radial-gradient(ellipse at -10% 55%, rgba(236, 198, 136, 0.16), transparent 28%);
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.app-shell::before {
+  inset: 0;
+  opacity: 0.7;
+  background-image:
+    radial-gradient(circle at 12% 9%, rgba(255, 255, 255, 0.92) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 83% 12%, rgba(210, 160, 91, 0.62) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 92% 34%, rgba(255, 255, 255, 0.82) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 18% 44%, rgba(197, 145, 80, 0.4) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 72% 61%, rgba(255, 255, 255, 0.84) 0 1.15px, transparent 2px),
+    radial-gradient(circle at 31% 77%, rgba(210, 168, 103, 0.48) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 88% 88%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.8px);
+}
+
+.app-shell::after {
+  width: 330px;
+  height: 330px;
+  right: -190px;
+  top: 118px;
+  border: 1px solid rgba(191, 143, 81, 0.12);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 34px rgba(199, 153, 91, 0.026),
+    0 0 0 72px rgba(199, 153, 91, 0.018);
+  transform: rotate(-18deg) scaleY(0.44);
+}
+
+.page-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hero: moonlit observatory rather than a flat beige banner. */
+.hero-card {
+  isolation: isolate;
+  border-color: rgba(194, 144, 80, 0.25);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.92), transparent 24%),
+    radial-gradient(circle at 86% 16%, rgba(229, 204, 239, 0.2), transparent 25%),
+    radial-gradient(circle at 74% 78%, rgba(230, 185, 112, 0.28), transparent 29%),
+    linear-gradient(135deg, rgba(255, 254, 250, 0.99), rgba(249, 236, 213, 0.95));
+  box-shadow:
+    0 22px 48px rgba(86, 55, 32, 0.11),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.28) inset,
+    0 0 32px rgba(227, 184, 112, 0.1);
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -28% -9% 28% 44%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 50%, rgba(255, 255, 255, 0.78) 0 3%, transparent 4%),
+    radial-gradient(circle at 56% 37%, rgba(228, 182, 111, 0.7) 0 1.4%, transparent 2.2%),
+    conic-gradient(from 205deg, transparent 0 22%, rgba(217, 177, 116, 0.12) 23% 27%, transparent 28% 100%);
+  filter: blur(0.1px);
+  opacity: 0.95;
+}
+
+.hero-card::after {
+  right: -58px;
+  top: -72px;
+  width: 205px;
+  height: 205px;
+  border-color: rgba(189, 137, 71, 0.24);
+  box-shadow:
+    0 0 0 18px rgba(205, 160, 97, 0.04),
+    0 0 0 42px rgba(205, 160, 97, 0.025),
+    0 0 34px rgba(231, 196, 142, 0.15);
+}
+
+.hero-orbit {
+  border-color: rgba(185, 132, 67, 0.25);
+  filter: drop-shadow(0 0 6px rgba(213, 165, 98, 0.13));
+}
+
+.hero-star {
+  background: #d6a45f;
+  box-shadow:
+    0 0 4px rgba(255, 255, 255, 0.92),
+    0 0 14px rgba(213, 164, 90, 0.7);
+  animation: celestialTwinkle 3.6s ease-in-out infinite;
+}
+
+.hero-star-b {
+  animation-delay: 1.2s;
+}
+
+.hero-kicker,
+.eyebrow,
+.section-label {
+  color: #9c734d;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.hero-sigil {
+  position: relative;
+  color: #9c6631;
+  border-color: rgba(191, 139, 71, 0.31);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.96), transparent 29%),
+    linear-gradient(145deg, #fffdf7 0%, #f5dfb8 62%, #e8c17f 100%);
+  box-shadow:
+    0 12px 26px rgba(126, 84, 43, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.66) inset,
+    0 0 18px rgba(222, 178, 105, 0.18);
+}
+
+.hero-sigil::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  top: 7px;
+  right: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.86);
+  filter: blur(1px);
+}
+
+.hero-row h1 {
+  color: #35241c;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.82),
+    0 8px 28px rgba(141, 91, 50, 0.08);
+}
+
+.hero-row p {
+  color: #746157;
+}
+
+/* Glass-like ivory cards with a faint reflected moonlight edge. */
+.profile-card,
+.date-card,
+.report-card,
+.tool-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--celestial-hairline);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 252, 0.93), rgba(253, 247, 237, 0.89));
+  box-shadow:
+    0 14px 34px rgba(78, 50, 30, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  backdrop-filter: blur(16px) saturate(115%);
+  -webkit-backdrop-filter: blur(16px) saturate(115%);
+}
+
+.profile-card::before,
+.date-card::before,
+.report-card::before,
+.tool-card::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 130px;
+  height: 130px;
+  right: -55px;
+  top: -72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(231, 193, 131, 0.22), transparent 68%);
+  pointer-events: none;
+}
+
+.profile-card::after,
+.date-card::after,
+.report-card::after,
+.tool-card::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 12%;
+  right: 12%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), rgba(224, 184, 119, 0.45), transparent);
+  pointer-events: none;
+}
+
+.profile-card {
+  box-shadow:
+    0 12px 30px rgba(77, 49, 30, 0.065),
+    0 0 22px rgba(214, 171, 107, 0.055);
+}
+
+.date-control {
+  border-color: rgba(178, 130, 73, 0.16);
+  background:
+    radial-gradient(circle at 6% 30%, rgba(229, 193, 135, 0.08), transparent 27%),
+    rgba(255, 254, 250, 0.88);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 7px 17px rgba(82, 52, 31, 0.025);
+}
+
+/* Period selector: champagne glass instead of a flat brown block. */
+.period-button {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(176, 128, 72, 0.17);
+  color: #685448;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 252, 0.96), rgba(249, 240, 227, 0.9));
+  box-shadow:
+    0 7px 18px rgba(76, 49, 30, 0.045),
+    0 1px 0 rgba(255, 255, 255, 0.88) inset;
+}
+
+.period-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.7) 42%, transparent 62%);
+  transform: translateX(-115%);
+  opacity: 0;
+}
+
+.period-button.is-active {
+  border-color: rgba(181, 126, 60, 0.5);
+  color: #fffaf2;
+  background:
+    radial-gradient(circle at 26% 18%, rgba(255, 240, 208, 0.28), transparent 28%),
+    linear-gradient(135deg, #9e6b3f 0%, #bd8750 47%, #8b5b36 100%);
+  box-shadow:
+    0 12px 26px rgba(126, 78, 40, 0.2),
+    0 0 0 1px rgba(255, 239, 205, 0.2) inset,
+    0 0 21px rgba(220, 173, 101, 0.14);
+  text-shadow: 0 1px 1px rgba(76, 43, 24, 0.22);
+}
+
+.period-button.is-active::before {
+  opacity: 0.5;
+  animation: celestialSheen 5.8s ease-in-out infinite;
+}
+
+/* Tool cards: jewel-like corner glows, still restrained and readable. */
+.tool-card {
+  min-height: 142px;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.tool-card:hover {
+  border-color: rgba(188, 137, 74, 0.26);
+  box-shadow:
+    0 18px 38px rgba(78, 49, 29, 0.09),
+    0 0 24px rgba(222, 182, 119, 0.08);
+}
+
+.tool-card:nth-child(1)::before {
+  background: radial-gradient(circle, rgba(237, 193, 118, 0.28), transparent 68%);
+}
+
+.tool-card:nth-child(2)::before {
+  background: radial-gradient(circle, rgba(226, 181, 195, 0.2), transparent 68%);
+}
+
+.tool-card:nth-child(3)::before {
+  background: radial-gradient(circle, rgba(229, 196, 145, 0.24), transparent 68%);
+}
+
+.tool-card:nth-child(4)::before {
+  background: radial-gradient(circle, rgba(193, 207, 186, 0.2), transparent 68%);
+}
+
+.tool-icon,
+.report-icon {
+  position: relative;
+  box-shadow:
+    0 10px 22px rgba(119, 78, 43, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.64) inset;
+}
+
+.tool-icon::after,
+.report-icon::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.72);
+}
+
+.tone-gold,
+.report-icon {
+  color: #a56b2e;
+  background:
+    radial-gradient(circle at 28% 22%, #fffefb, transparent 27%),
+    linear-gradient(145deg, #fff9ea, #f0d39d 70%, #e3b96f);
+  border-color: rgba(179, 117, 48, 0.18);
+}
+
+.tone-rose {
+  background:
+    radial-gradient(circle at 28% 22%, #fffefe, transparent 28%),
+    linear-gradient(145deg, #fff7f8, #f3dce1 70%, #e9c3cb);
+}
+
+.tone-champagne {
+  background:
+    radial-gradient(circle at 28% 22%, #fffefa, transparent 28%),
+    linear-gradient(145deg, #fffaf0, #ead5b3 72%, #dbb47d);
+}
+
+.tone-sage {
+  background:
+    radial-gradient(circle at 28% 22%, #fefffd, transparent 28%),
+    linear-gradient(145deg, #f6faf4, #dfe9da 70%, #cadac3);
+}
+
+.tool-card strong,
+.report-copy strong {
+  color: #35251e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.tool-card > span:last-child,
+.report-copy p {
+  color: #7f6d62;
+}
+
+/* Report area gets the most noticeable celestial halo. */
+.report-card {
+  border-color: rgba(192, 139, 72, 0.23);
+  background:
+    radial-gradient(circle at 82% 16%, rgba(218, 202, 238, 0.2), transparent 25%),
+    radial-gradient(circle at 12% 94%, rgba(235, 193, 121, 0.22), transparent 28%),
+    linear-gradient(145deg, rgba(255, 254, 250, 0.96), rgba(250, 241, 227, 0.92));
+  box-shadow:
+    0 18px 42px rgba(76, 48, 29, 0.085),
+    0 0 32px rgba(226, 181, 108, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
+}
+
+.server-pill {
+  border-color: rgba(180, 133, 78, 0.16);
+  background: rgba(255, 253, 248, 0.78);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.76) inset;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.server-pill.online {
+  color: #64765c;
+  background: linear-gradient(145deg, rgba(246, 250, 242, 0.92), rgba(231, 241, 225, 0.9));
+  box-shadow:
+    0 5px 14px rgba(84, 111, 78, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+/* Frosted navigation that picks up the same champagne light. */
+.bottom-nav {
+  border-top-color: rgba(168, 119, 65, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.84), rgba(248, 239, 227, 0.91));
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  box-shadow:
+    0 -14px 36px rgba(74, 47, 28, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.78) inset;
+}
+
+.nav-item {
+  transition: color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.nav-item.is-active {
+  color: #7d5334;
+  background: radial-gradient(circle at 50% 32%, rgba(222, 181, 116, 0.13), transparent 64%);
+}
+
+@keyframes celestialTwinkle {
+  0%, 100% {
+    opacity: 0.62;
+    transform: scale(0.82);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1.28);
+  }
+}
+
+@keyframes celestialSheen {
+  0%, 58% {
+    transform: translateX(-115%);
+  }
+  76%, 100% {
+    transform: translateX(115%);
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell::after {
+    right: -210px;
+    top: 96px;
+    opacity: 0.82;
+  }
+
+  .hero-card {
+    box-shadow:
+      0 18px 38px rgba(86, 55, 32, 0.1),
+      0 1px 0 rgba(255, 255, 255, 0.94) inset,
+      0 0 26px rgba(227, 184, 112, 0.08);
+  }
+
+  .profile-card,
+  .date-card,
+  .report-card,
+  .tool-card {
+    backdrop-filter: blur(12px) saturate(112%);
+    -webkit-backdrop-filter: blur(12px) saturate(112%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-star,
+  .period-button.is-active::before {
+    animation: none !important;
+  }
+}
