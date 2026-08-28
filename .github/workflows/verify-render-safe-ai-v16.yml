@@ -1,0 +1,80 @@
+name: Verify Render-safe AI v1.6
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-render-safe-ai-v16.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Exact calc plus preferred 3.7 interpretation
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          ready=0
+          for i in $(seq 1 36); do
+            meta=$(curl -fsS --max-time 15 "$API/v1/meta" || true)
+            echo "meta $i $meta"
+            if echo "$meta" | grep -q 'api-fortune-v4.3-detached' && echo "$meta" | grep -q 'mobile-ai-v2.1-render-safe'; then ready=1; break; fi
+            sleep 10
+          done
+          test "$ready" = 1
+          cat >/tmp/request.json <<'JSON'
+          {"profile":{"name":"SAFE-E2E","birth_date":"1990-01-01","birth_time":"12:00:00","latitude":37.5665,"longitude":126.9780,"utc_offset_hours":9,"gender":"female"},"start_date":"2026-08-28","end_date":"2026-08-28"}
+          JSON
+          curl -fsS --max-time 10 -H 'Content-Type: application/json' -d @/tmp/request.json "$API/v1/fortune/integrated/start" >/tmp/start.json
+          JOB=$(python -c "import json; print(json.load(open('/tmp/start.json'))['job_id'])")
+          for i in $(seq 1 100); do
+            curl -fsS --max-time 10 "$API/v1/fortune/integrated/jobs/$JOB" >/tmp/job.json
+            S=$(python -c "import json; print(json.load(open('/tmp/job.json')).get('status',''))")
+            echo "calc $i $S"
+            [ "$S" = done ] && break
+            [ "$S" = failed ] && { cat /tmp/job.json; exit 1; }
+            sleep 2
+          done
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/job.json'))['result']; w=d['western']
+          assert d['engine']=='integrated-fortune-v2.2-legacy-exact'
+          assert '07:00~23:30/30분' in w['method']
+          assert w['overall']['수익실현']['average']==56.0
+          assert w['overall']['신규진입']['average']==50.0
+          assert w['overall']['투자주의']['average']==41.0
+          print('exact calculation preserved')
+          json.dump({'calculation':d,'model':'gemini-3.7-flash'},open('/tmp/ai.json','w'),ensure_ascii=False)
+          PY
+          T0=$(date +%s)
+          curl -fsS --max-time 10 -H 'Content-Type: application/json' -d @/tmp/ai.json "$API/v1/fortune/interpret/start" >/tmp/aistart.json
+          AJOB=$(python -c "import json; print(json.load(open('/tmp/aistart.json'))['job_id'])")
+          done_ai=0
+          for i in $(seq 1 60); do
+            curl -fsS --max-time 10 "$API/v1/fortune/interpret/jobs/$AJOB" >/tmp/aijob.json
+            S=$(python -c "import json; print(json.load(open('/tmp/aijob.json')).get('status',''))")
+            echo "ai $i $S"
+            if [ "$S" = done ]; then done_ai=1; break; fi
+            [ "$S" = failed ] && { cat /tmp/aijob.json; exit 1; }
+            sleep 2
+          done
+          test "$done_ai" = 1
+          T1=$(date +%s); echo "AI elapsed=$((T1-T0))s"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/aijob.json'))['result']
+          print('model',d.get('model'),'fallback_from',d.get('fallback_from'),'thinking',d.get('thinking_level'),'usage',d.get('usage'))
+          assert d.get('ok') is True, d
+          assert d.get('interpreter_version')=='mobile-ai-v2.1-render-safe'
+          usage=d.get('usage') or {}
+          assert usage.get('total_tokens',0)>0
+          assert isinstance(usage.get('estimated_krw'),(int,float))
+          topics=(d.get('data') or {}).get('topic_analysis') or {}
+          for key in ['금전','수익실현','학업','시험','직장','이직','연락','소식']:
+              assert key in topics, (key, topics.keys())
+          print('RENDER SAFE AI E2E OK')
+          PY
