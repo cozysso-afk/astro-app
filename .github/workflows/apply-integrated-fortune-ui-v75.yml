@@ -1,0 +1,49 @@
+name: Apply integrated fortune UI v7.5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-integrated-fortune-ui-v75.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/apply_integrated_fortune_ui_v75.py
+
+      - name: Apply UI patch
+        run: python scripts/apply_integrated_fortune_ui_v75.py
+
+      - name: Syntax check app
+        run: python -m py_compile app.py fortune_lab_v71.py
+
+      - name: Verify rename and visual markers
+        shell: bash
+        run: |
+          grep -q '"통합운세"' app.py
+          ! grep -q '"포춘랩"' app.py
+          grep -q 'ASTRO_DESIGN_V75_CSS' app.py
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.8"' fortune_lab_v71.py
+          grep -q 'INTEGRATED FORTUNE' fortune_lab_v71.py
+          grep -q '<div class="fortune-title">통합운세</div>' fortune_lab_v71.py
+
+      - name: Diff sanity
+        run: git diff --check
+
+      - name: Commit integrated UI
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py fortune_lab_v71.py scripts/apply_integrated_fortune_ui_v75.py
+          git commit -m "style: rename integrated fortune and polish mobile UI"
+          git push origin HEAD:main
