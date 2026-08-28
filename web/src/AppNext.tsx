@@ -551,6 +551,10 @@ export default function AppNext() {
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
   const resultMonths = relationshipResult?.result?.months ?? []
   const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
+  const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)
+  const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length
+  const natalChallenging = natalAspects.filter((aspect) => aspect.tone === 'challenging').length
+  const natalMixed = natalAspects.filter((aspect) => aspect.tone === 'mixed').length
   const orderedIntegratedTopics = integratedResult
     ? coreTopicOrder
         .map((topic) => ({ topic, stat: integratedResult.western.overall[topic] }))
@@ -945,9 +949,22 @@ export default function AppNext() {
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
               <section className="result-card">
-                <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조</strong></div><div className="metric-grid"><div className="metric"><strong>{natalAspects.length}</strong><span>시너스트리 접점</span></div><div className="metric"><strong>{relationshipResult.result.davison?.available?'ON':'OFF'}</strong><span>다빈슨</span></div><div className="metric"><strong>{relationshipResult.result.marks?.available?'ON':'OFF'}</strong><span>마크스</span></div></div><div className="aspect-list">{natalAspects.slice(0,8).map((aspect,index)=><div className="aspect-row" key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><span className={`tone-dot ${aspect.tone}`}/><div><strong>{aspectText(aspect)}</strong><span>오브 {aspect.orb.toFixed(2)}° · {aspect.tone==='supportive'?'조화':aspect.tone==='challenging'?'긴장':'혼합'}</span></div></div>)}</div></section>
-              {resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 활성도</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
-              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{relationshipResult.result.limitations?.join(' ')}</span></div>}
+                <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조 · 계산 근거</strong></div>
+                <p className="result-note">아래 숫자는 관계 점수나 재회 확률이 아니라, 허용 오브 안에서 포착된 주요 천체 각의 개수야.</p>
+                <div className="metric-grid">
+                  <div className="metric"><strong>{natalAspects.length}</strong><span>주요 각</span></div>
+                  <div className="metric"><strong>{natalSupportive}</strong><span>조화 각</span></div>
+                  <div className="metric"><strong>{natalChallenging}</strong><span>긴장 각</span></div>
+                </div>
+                {natalMixed>0 && <p className="result-note">혼합 각 {natalMixed}개 · 개수만으로 관계의 좋고 나쁨을 판정하지 않아.</p>}
+                <div className="aspect-list">{natalAspects.slice(0,8).map((aspect,index)=><div className="aspect-row" key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><span className={`tone-dot ${aspect.tone}`}/><div><strong>{aspectText(aspect)}</strong><span>오브 {aspect.orb.toFixed(2)}° · {aspect.tone==='supportive'?'조화':aspect.tone==='challenging'?'긴장':'혼합'}</span></div></div>)}</div>
+              </section>
+              {!partnerTimeExact ? <section className="result-card">
+                <div className="result-card-title"><span>TIMING</span><strong>정밀 시기층 미계산</strong></div>
+                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 시너스트리·진행 합성·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
+                <p className="result-note">현재는 출생시간 없이도 계산 가능한 기본 시너스트리만 해석 근거로 사용해.</p>
+              </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
+              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
             </div>}
           </section>}
 
