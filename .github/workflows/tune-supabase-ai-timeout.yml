@@ -13,31 +13,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Tune Edge Gemini timeout
+      - name: Restore deployed Edge Gemini timeouts
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('supabase/functions/fortune-interpret/index.ts')
           s=p.read_text(encoding='utf-8')
-          old='preferred === DEFAULT_MODEL ? 85_000 : 120_000'
-          new='preferred === DEFAULT_MODEL ? 105_000 : 120_000'
+          old='preferred === DEFAULT_MODEL ? 105_000 : 120_000'
+          new='preferred === DEFAULT_MODEL ? 85_000 : 120_000'
           assert old in s, 'primary timeout anchor missing'
           s=s.replace(old,new,1)
-          old2='FALLBACK_MODEL, apiKey, 55_000, "medium"'
-          new2='FALLBACK_MODEL, apiKey, 30_000, "medium"'
+          old2='FALLBACK_MODEL, apiKey, 30_000, "medium"'
+          new2='FALLBACK_MODEL, apiKey, 55_000, "medium"'
           assert old2 in s, 'fallback timeout anchor missing'
           s=s.replace(old2,new2,1)
           p.write_text(s,encoding='utf-8')
-          print('TIMEOUTS TUNED')
+          print('DEPLOYED TIMEOUTS RESTORED')
           PY
-          grep -q '105_000' supabase/functions/fortune-interpret/index.ts
-          grep -q '30_000' supabase/functions/fortune-interpret/index.ts
       - name: Commit
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add supabase/functions/fortune-interpret/index.ts
-          git commit -m 'fix: give Gemini 3.7 more Edge runtime'
+          git commit -m 'chore: keep Edge source aligned with deployed function'
           git push
