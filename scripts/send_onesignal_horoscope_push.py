@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 KST = ZoneInfo("Asia/Seoul")
 ONESIGNAL_ENDPOINT = "https://api.onesignal.com/notifications?c=push"
 ONESIGNAL_EXPORT_ENDPOINT = "https://api.onesignal.com/players/csv_export"
-LAUNCHER_URL = "https://cozysso-afk.github.io/astro-app/"
+LAUNCHER_URL = "https://astro-app-web-ten.vercel.app/"
 WEB_PUSH_DEVICE_TYPES = {5, 7, 17}  # ChromePush / SafariPush variants
 VALID_KINDS = {"daily", "weekly", "monthly"}
 

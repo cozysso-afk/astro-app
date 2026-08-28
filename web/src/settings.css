@@ -83,3 +83,24 @@ html[data-celestial-motion='off'] .spin { animation:none !important; }
   .settings-status-grid { grid-template-columns:1fr; }
   .settings-actions { grid-template-columns:1fr; }
 }
+
+
+/* Vercel OneSignal push settings v1 */
+.push-settings-card { display:grid; gap:10px; }
+.push-state-row {
+  display:flex; align-items:flex-start; gap:11px; padding:13px 14px; border-radius:18px;
+  border:1px solid rgba(183,190,207,.28); background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(242,246,252,.88));
+}
+.push-state-icon { flex:0 0 auto; font-size:19px; line-height:1.2; }
+.push-state-row > span:last-child { min-width:0; display:grid; gap:3px; }
+.push-state-row strong { color:#4e4455; font-size:.7rem; }
+.push-state-row small { color:#817988; font-size:.57rem; line-height:1.45; }
+.push-state-row.ready { background:linear-gradient(145deg,rgba(249,255,252,.96),rgba(223,245,236,.86)); }
+.push-state-row.error { background:linear-gradient(145deg,rgba(255,250,252,.96),rgba(248,226,234,.84)); }
+.push-settings-card > button {
+  min-height:44px; border-radius:15px; border:1px solid rgba(174,181,201,.34);
+  color:#5e5369; font-weight:800; background:linear-gradient(135deg,rgba(241,224,248,.96),rgba(218,236,250,.94),rgba(218,244,235,.92));
+  box-shadow:0 8px 20px rgba(91,84,111,.07),0 1px 0 rgba(255,255,255,.95) inset;
+}
+.push-settings-card > button:disabled { opacity:.52; }
+.push-settings-card > p { margin:0; color:#8a7f8d; font-size:.58rem; line-height:1.55; }

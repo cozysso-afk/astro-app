@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
+import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
@@ -221,6 +222,28 @@ const aspectLabels: Record<string, string> = {
 }
 const topicOrder = ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
 
+function initialPeriodFromUrl(): PeriodKey {
+  if (typeof window === 'undefined') return 'today'
+  const kind = new URLSearchParams(window.location.search).get('kind')
+  if (kind === 'weekly') return 'week'
+  if (kind === 'monthly') return 'month'
+  if (kind === 'annual') return 'year'
+  return 'today'
+}
+
+function initialDateFromUrl() {
+  if (typeof window === 'undefined') return toDateInputValue(new Date())
+  const params = new URLSearchParams(window.location.search)
+  const date = params.get('date')
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date
+  const year = params.get('year')
+  const month = params.get('month')
+  if (year && month && /^\d{4}$/.test(year) && /^\d{1,2}$/.test(month)) {
+    return `${year}-${String(Number(month)).padStart(2,'0')}-01`
+  }
+  return toDateInputValue(new Date())
+}
+
 function toDateInputValue(date: Date) {
   const y = date.getFullYear(); const m = String(date.getMonth()+1).padStart(2,'0'); const d = String(date.getDate()).padStart(2,'0')
   return `${y}-${m}-${d}`
@@ -435,10 +458,12 @@ function precisionResultText(result: IntegratedApiResponse) {
 }
 
 export default function AppNext() {
-  const [period, setPeriod] = useState<PeriodKey>('today')
-  const [queryDate, setQueryDate] = useState(() => toDateInputValue(new Date()))
+  const [period, setPeriod] = useState<PeriodKey>(() => initialPeriodFromUrl())
+  const [queryDate, setQueryDate] = useState(() => initialDateFromUrl())
   const [apiStatus, setApiStatus] = useState<ApiStatus>('warming')
   const [apiVersion, setApiVersion] = useState('')
+  const [pushState, setPushState] = useState<PushSnapshot | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
@@ -493,6 +518,10 @@ export default function AppNext() {
   }, [mainView])
 
   useEffect(() => {
+    if (mainView === 'settings') void refreshPushState()
+  }, [mainView])
+
+  useEffect(() => {
     window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(uiSettings))
     document.documentElement.dataset.celestialGlow = uiSettings.glow ? 'on' : 'off'
     document.documentElement.dataset.celestialMotion = uiSettings.motion ? 'on' : 'off'
@@ -537,6 +566,21 @@ export default function AppNext() {
     : []
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
+  const refreshPushState = async () => {
+    const state = await getPushState()
+    setPushState(state)
+  }
+
+  const togglePush = async () => {
+    setPushBusy(true)
+    try {
+      const state = pushState?.status === 'ready' ? await disablePush() : await enablePush()
+      setPushState(state)
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
   const saveBirthProfile = () => {
     window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(birthProfile))
     setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
@@ -1070,10 +1114,19 @@ export default function AppNext() {
             <div className={`ai-api-state ${aiConfigured===true?'online':aiConfigured===false?'offline':'checking'}`}><Sparkles size={16}/><span><strong>Gemini API</strong><small>{aiConfigured===true?'서버 비밀키 연결됨 · 계산 후 자동 해설':aiConfigured===false?'미연결 · Render에 GEMINI_API_KEY 설정 필요':'연결 상태 확인 중'}</small></span></div>
           </div>
 
+          <div className="subsection-title">알림</div>
+          <div className="push-settings-card">
+            <div className={`push-state-row ${pushState?.status || 'checking'}`}><span className="push-state-icon">🔔</span><span><strong>운세 푸시 알림</strong><small>{pushState?.message || 'OneSignal 알림 구독 상태 확인 중'}</small></span></div>
+            <button type="button" onClick={()=>void togglePush()} disabled={pushBusy || pushState?.status==='unsupported'}>{pushBusy?'처리 중…':pushState?.status==='ready'?'알림 끄기':'알림 켜기'}</button>
+            {pushState?.status==='needs_install' && <p>iPhone에서는 Safari에서 홈 화면에 추가한 뒤, 홈화면의 ‘별빛의 운명’을 열고 여기서 알림 켜기를 눌러야 해.</p>}
+            {pushState?.status==='error' && <p>OneSignal 사이트 주소가 현재 Vercel 도메인과 맞는지 대시보드에서 확인해줘.</p>}
+          </div>
+
           <div className="subsection-title">앱 상태</div>
           <div className="settings-status-grid">
             <div><span>계산 서버</span><strong>{apiStatus==='online'?'연결됨':apiStatus==='warming'?'확인 중':'대기 중'}</strong><small>{apiVersion || 'API 상태 확인'}</small></div>
             <div><span>AI 해설</span><strong>{aiConfigured===true?'연결됨':aiConfigured===false?'미연결':'확인 중'}</strong><small>{aiModel}</small></div>
+            <div><span>알림</span><strong>{pushState?.status==='ready'?'켜짐':pushState?.status==='needs_install'?'홈화면 설치 필요':pushState?.status==='unsupported'?'지원 안 됨':pushState?.status==='error'?'확인 오류':'꺼짐/확인 중'}</strong><small>{pushState?.message || '설정 탭에서 확인'}</small></div>
             <div><span>클라우드 기록</span><strong>{archiveLoading?'확인 중':archiveError?'확인 오류':archiveItems.length+'개'}</strong><small>{archiveError || archiveStatus || '기록 상태 확인 전'}</small></div>
             <div><span>출생 프로필</span><strong>{hasProfile?'저장됨':'미저장'}</strong><small>{hasProfile?'이 브라우저 기기 보관':'내정보에서 먼저 저장'}</small></div>
           </div>
