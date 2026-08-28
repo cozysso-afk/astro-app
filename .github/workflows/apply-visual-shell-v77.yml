@@ -1,0 +1,43 @@
+name: Apply structural visual shell v7.7
+
+on:
+  push:
+    paths:
+      - 'scripts/refactor_visual_shell_v77.py'
+      - '.github/workflows/apply-visual-shell-v77.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/refactor_visual_shell_v77.py
+      - name: Apply structural UI patch
+        run: python scripts/refactor_visual_shell_v77.py
+      - name: Syntax check app
+        run: python -m py_compile app.py
+      - name: Verify structural markers
+        run: |
+          grep -q 'ASTRO_DESIGN_V77_CSS' app.py
+          grep -q 'identity-summary-card' app.py
+          grep -q 'daily-cover-card' app.py
+          grep -q 'profile-inner-label' app.py
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit integrated app
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.py
+          git commit -m 'style: rebuild mobile shell around approved mockup'
+          git push
