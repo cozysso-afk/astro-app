@@ -1,0 +1,39 @@
+name: Verify Emergency Pages Frontend
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-emergency-pages.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify page and API CORS
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE='https://cozysso-afk.github.io/astro-app/'
+          API='https://astro-app-api-f7fn.onrender.com'
+          echo '--- PAGE ---'
+          curl -fsSL --max-time 30 "$PAGE" -o /tmp/page.html
+          grep -q '별빛의 운명' /tmp/page.html
+          grep -q '/astro-app/assets/' /tmp/page.html
+          echo 'PAGE OK'
+
+          echo '--- API HEALTH ---'
+          curl -fsSL --max-time 30 "$API/health"
+          echo
+
+          echo '--- CORS ---'
+          curl -sS -D /tmp/headers -o /dev/null --max-time 30 -X OPTIONS "$API/v1/fortune/integrated/start" \
+            -H 'Origin: https://cozysso-afk.github.io' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type'
+          cat /tmp/headers
+          grep -qi '^access-control-allow-origin: https://cozysso-afk.github.io' /tmp/headers
+          echo 'CORS OK'
