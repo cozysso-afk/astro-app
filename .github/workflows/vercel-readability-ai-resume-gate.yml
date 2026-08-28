@@ -1,0 +1,108 @@
+name: Vercel Readability AI Resume Gate
+
+on:
+  push:
+    branches:
+      - vercel-readability-ai-resume-20260829
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply UI patch
+        run: |
+          python scripts/patch_readability_resume_v4.py
+          grep -q "앱을 닫거나 다른 앱으로 이동해도 서버 작업은 계속돼" web/src/AppNext.tsx
+          grep -q "humanizeEvidence" web/src/AppNext.tsx
+          grep -q "time-window-good" web/src/AppNext.tsx
+
+      - name: Build mobile frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit patched app
+        run: |
+          if git diff --quiet -- web/src/AppNext.tsx; then
+            echo "No AppNext patch diff"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add web/src/AppNext.tsx
+            git commit -m "feat: persist AI reading and improve timing readability"
+            git push origin HEAD:vercel-readability-ai-resume-20260829
+          fi
+
+      - name: Verify persistent AI job survives no polling
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          SUPA='https://dbynfabwfcakxayyggzi.supabase.co'
+          KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+
+          for i in $(seq 1 8); do
+            if curl -fsSL --max-time 25 "$API/health" >/tmp/health.json; then break; fi
+            sleep 8
+          done
+
+          cat >/tmp/calc.json <<'JSON'
+          {"profile":{"name":"AI Resume Gate","birth_date":"1990-01-01","birth_time":"12:00:00","latitude":37.5665,"longitude":126.978,"utc_offset_hours":9,"gender":"female"},"start_date":"2026-08-29","end_date":"2026-08-29"}
+          JSON
+          curl -fsSL --max-time 30 -X POST "$API/v1/fortune/integrated/start" -H 'Content-Type: application/json' --data-binary @/tmp/calc.json -o /tmp/start.json
+          calc_job=$(python -c "import json; print(json.load(open('/tmp/start.json'))['job_id'])")
+          for i in $(seq 1 80); do
+            curl -fsSL --max-time 30 "$API/v1/fortune/integrated/jobs/$calc_job" -o /tmp/calc-status.json
+            status=$(python -c "import json; print(json.load(open('/tmp/calc-status.json')).get('status',''))")
+            [ "$status" = done ] && break
+            [ "$status" = failed ] && cat /tmp/calc-status.json && exit 1
+            sleep 2
+          done
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/calc-status.json'))
+          assert j.get('status')=='done', j
+          json.dump(j['result'],open('/tmp/calculation.json','w'),ensure_ascii=False)
+          PY
+
+          curl -fsSL --max-time 30 -X POST "$SUPA/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}' -o /tmp/auth.json
+          token=$(python -c "import json; print(json.load(open('/tmp/auth.json'))['access_token'])")
+          python - <<'PY'
+          import json
+          json.dump({'action':'start','calculation':json.load(open('/tmp/calculation.json')),'model':'gemini-3.7-flash'},open('/tmp/ai-start-body.json','w'),ensure_ascii=False)
+          PY
+          curl -fsSL --max-time 30 -X POST "$SUPA/functions/v1/fortune-interpret" -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data-binary @/tmp/ai-start-body.json -o /tmp/ai-start.json
+          job=$(python -c "import json; j=json.load(open('/tmp/ai-start.json')); assert j.get('ok') and j.get('job_id'),j; print(j['job_id'])")
+          echo "AI job started: $job; simulating app away with no polling"
+          sleep 55
+
+          for i in $(seq 1 50); do
+            curl -fsSL --max-time 30 -X POST "$SUPA/functions/v1/fortune-interpret" -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "{\"action\":\"status\",\"job_id\":\"$job\"}" -o /tmp/ai-status.json
+            status=$(python -c "import json; print(json.load(open('/tmp/ai-status.json')).get('status',''))")
+            echo "resume[$i]=$status"
+            [ "$status" = done ] && break
+            [ "$status" = failed ] && cat /tmp/ai-status.json && exit 1
+            sleep 3
+          done
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/ai-status.json'))
+          assert j.get('ok') is True and j.get('status')=='done', j
+          assert (j.get('data') or {}).get('headline'), j
+          assert int((j.get('usage') or {}).get('total_tokens') or 0) > 0, j
+          print('PERSISTENT_AI_OK', j.get('model'), 'fallback=', j.get('fallback_from'), 'tokens=', (j.get('usage') or {}).get('total_tokens'))
+          PY
