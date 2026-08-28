@@ -450,6 +450,57 @@ div[class*="st-key-main_nav_"] button[kind="primary"]{
 """
 st.markdown(ASTRO_DESIGN_V73_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A4. VISUAL SYSTEM v7.4 · COMPACT MOBILE SEGMENTED NAV
+# ============================================================
+ASTRO_DESIGN_V74_CSS = """
+<style>
+/* Only the two primary nav groups are forced to remain 4-up on phones. */
+div[class*="st-key-astro_period_nav_group"] [data-testid="stHorizontalBlock"],
+div[class*="st-key-astro_tool_nav_group"] [data-testid="stHorizontalBlock"]{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:6px!important;
+}
+div[class*="st-key-astro_period_nav_group"] [data-testid="column"],
+div[class*="st-key-astro_tool_nav_group"] [data-testid="column"]{
+  width:auto!important;
+  min-width:0!important;
+  flex:none!important;
+}
+div[class*="st-key-astro_period_nav_group"] button,
+div[class*="st-key-astro_tool_nav_group"] button{
+  width:100%!important;
+  min-height:38px!important;
+  height:38px!important;
+  padding:0 4px!important;
+  border-radius:12px!important;
+  font-size:.76rem!important;
+  font-weight:800!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+}
+.astro-nav-label{
+  margin:9px 2px 5px!important;
+  font-size:.62rem!important;
+  letter-spacing:.10em!important;
+  color:#9a806d!important;
+}
+.astro-nav-tools{margin-top:7px!important}
+@media(max-width:640px){
+  div[class*="st-key-astro_period_nav_group"],
+  div[class*="st-key-astro_tool_nav_group"]{margin-bottom:0!important}
+  div[class*="st-key-astro_period_nav_group"] button,
+  div[class*="st-key-astro_tool_nav_group"] button{
+    min-height:36px!important;height:36px!important;font-size:.72rem!important;border-radius:11px!important;
+  }
+}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V74_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -5195,20 +5246,22 @@ if st.session_state.get("main_view") not in _main_views:
 main_view=st.session_state["main_view"]
 
 st.markdown('<div class="astro-nav-label">기간 운세</div>',unsafe_allow_html=True)
-_nav_period=st.columns(4,gap="small")
-for _i,_label in enumerate(["오늘","주간","월간","연간"]):
-    if _nav_period[_i].button(_label,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
-        if main_view!=_label:
-            st.session_state["main_view"]=_label
-            st.rerun()
+with st.container(key="astro_period_nav_group"):
+    _nav_period=st.columns(4,gap="small")
+    for _i,_label in enumerate(["오늘","주간","월간","연간"]):
+        if _nav_period[_i].button(_label,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
+            if main_view!=_label:
+                st.session_state["main_view"]=_label
+                st.rerun()
 
 st.markdown('<div class="astro-nav-label astro-nav-tools">분석 도구</div>',unsafe_allow_html=True)
-_nav_tools=st.columns(4,gap="small")
-for _i,_label in enumerate(["포춘랩","궁합운","저장함","정밀분석"]):
-    if _nav_tools[_i].button(_label,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
-        if main_view!=_label:
-            st.session_state["main_view"]=_label
-            st.rerun()
+with st.container(key="astro_tool_nav_group"):
+    _nav_tools=st.columns(4,gap="small")
+    for _i,_label in enumerate(["포춘랩","궁합운","저장함","정밀분석"]):
+        if _nav_tools[_i].button(_label,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
+            if main_view!=_label:
+                st.session_state["main_view"]=_label
+                st.rerun()
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
