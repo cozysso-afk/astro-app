@@ -1,0 +1,37 @@
+name: Unify daily fortune scan v1.2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/unify-daily-scan-v12.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply single-pass patch
+        run: python scripts/unify_daily_scan_v12.py
+      - name: Verify backend syntax and markers
+        run: |
+          python -m py_compile integrated_fortune_v1.py
+          grep -q '_daily_detailed_cached' integrated_fortune_v1.py
+          grep -q '90, natal_lons' integrated_fortune_v1.py
+          grep -q 'coreTopicOrder' web/src/AppNext.tsx
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit single-pass engine
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py web/src/AppNext.tsx
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'perf: compute daily detail and averages in one pass'
+          git push
