@@ -1,0 +1,51 @@
+name: Fix Integrated API Contract v4.5
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-integrated-api-contract-v45.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore integrated engine call contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('api/main.py')
+          s=p.read_text(encoding='utf-8')
+
+          old='''def _run_calc_job(job_id: str, payload: dict):\n    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running")\n    try:\n        result = build_integrated_fortune(**payload)\n        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", result=result)\n    except Exception as exc:  # noqa: BLE001\n        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")\n'''
+          new='''def _run_calc_job(job_id: str, payload: dict):\n    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running")\n    try:\n        result = build_integrated_fortune(**payload)\n        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", result=result)\n    except Exception as exc:  # noqa: BLE001\n        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")\n'''
+          assert old in s
+          s=s.replace(old,new,1)
+
+          start=s.index('@app.post("/v1/fortune/integrated")')
+          end=s.index('\n\n@app.post("/v1/fortune/integrated/start")', start)
+          direct='''@app.post("/v1/fortune/integrated")\ndef fortune_integrated(request: IntegratedFortuneRequest) -> dict:\n    profile = request.profile\n    return build_integrated_fortune(\n        birth_date=profile.birth_date,\n        birth_time=profile.birth_time,\n        latitude=profile.latitude,\n        longitude=profile.longitude,\n        utc_offset_hours=profile.utc_offset_hours,\n        gender=profile.gender,\n        start_date=request.start_date,\n        end_date=request.end_date,\n    )\n'''
+          s=s[:start]+direct+s[end:]
+
+          start=s.index('@app.post("/v1/fortune/integrated/start")')
+          end=s.index('\n\n@app.get("/v1/fortune/integrated/jobs/{job_id}")', start)
+          async_route='''@app.post("/v1/fortune/integrated/start")\ndef fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:\n    _prune_jobs(_calc_jobs, _calc_jobs_lock)\n    job_id = uuid.uuid4().hex\n    profile = request.profile\n    payload = {\n        "birth_date": profile.birth_date,\n        "birth_time": profile.birth_time,\n        "latitude": profile.latitude,\n        "longitude": profile.longitude,\n        "utc_offset_hours": profile.utc_offset_hours,\n        "gender": profile.gender,\n        "start_date": request.start_date,\n        "end_date": request.end_date,\n    }\n    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="queued")\n    threading.Thread(\n        target=_run_calc_job,\n        args=(job_id, payload),\n        daemon=True,\n        name=f"fortune-calc-{job_id[:8]}",\n    ).start()\n    return {"ok": True, "job_id": job_id, "status": "queued"}\n'''
+          s=s[:start]+async_route+s[end:]
+          s=s.replace('APP_VERSION = "api-fortune-v4.4-relationship-fix"','APP_VERSION = "api-fortune-v4.5-contract-fix"')
+          p.write_text(s,encoding='utf-8')
+          PY
+          python -m py_compile api/main.py integrated_fortune_v1.py relationship_western_v1.py
+          grep -q 'birth_date=profile.birth_date' api/main.py
+          grep -q '"birth_date": profile.birth_date' api/main.py
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py
+          git commit -m 'fix: restore integrated fortune API engine contract'
+          git push
