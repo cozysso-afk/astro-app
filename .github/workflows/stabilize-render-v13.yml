@@ -1,0 +1,32 @@
+name: Stabilize Render v1.3
+
+on:
+  push:
+    paths:
+      - '.github/workflows/stabilize-render-v13.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply stabilization
+        run: python scripts/stabilize_render_v13.py
+      - name: Verify syntax
+        run: |
+          python -m py_compile integrated_fortune_v1.py api/main.py
+          grep -q 'integrated-fortune-v2.1' integrated_fortune_v1.py
+          grep -q 'evidences = evidences\[:8\]' integrated_fortune_v1.py
+          grep -q 'api-fortune-v4.1' api/main.py
+      - name: Commit stabilization
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py api/main.py
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'perf: bound daily evidence memory on Render'
+          git push
