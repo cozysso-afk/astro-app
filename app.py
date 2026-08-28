@@ -5495,6 +5495,7 @@ elif main_view in ("포춘랩","궁합운"):
         "birth_date":birth_date,
         "birth_time":birth_time,
         "birth_lon":lon,
+        "birth_lat":lat,
         "birth_gender":birth_gender,
         "birthplace_options":KOREA_BIRTHPLACES,
         "query_date":query_date,
