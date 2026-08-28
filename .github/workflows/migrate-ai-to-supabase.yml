@@ -1,0 +1,101 @@
+name: Migrate AI to Supabase Edge
+
+on:
+  push:
+    paths:
+      - '.github/workflows/migrate-ai-to-supabase.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch frontend AI transport
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('web/src/AppNext.tsx')
+          s=p.read_text(encoding='utf-8')
+
+          push_import="import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'\n"
+          supa_import="import { ensureSupabaseSession, supabase } from './lib/supabase'\n"
+          assert push_import in s
+          if supa_import not in s:
+              s=s.replace(push_import, push_import+supa_import, 1)
+
+          old_meta='''  useEffect(() => {
+            let cancelled = false
+            fetch(`${API_BASE}/v1/fortune/ai-meta`)
+              .then((response)=>response.json().then((payload)=>({response,payload})))
+              .then(({response,payload})=>{ if(!cancelled) setAiConfigured(Boolean(response.ok && payload?.configured)) })
+              .catch(()=>{ if(!cancelled) setAiConfigured(false) })
+            return () => { cancelled = true }
+          }, [])
+          '''
+          new_meta='''  useEffect(() => {
+            let cancelled = false
+            ;(async () => {
+              try {
+                await ensureSupabaseSession()
+                const { data, error } = await supabase.functions.invoke('fortune-interpret', { body: { action: 'meta' } })
+                if (error) throw error
+                if (!cancelled) setAiConfigured(Boolean(data?.configured))
+              } catch {
+                if (!cancelled) setAiConfigured(false)
+              }
+            })()
+            return () => { cancelled = true }
+          }, [])
+          '''
+          assert old_meta in s, 'AI meta block changed'
+          s=s.replace(old_meta,new_meta,1)
+
+          start=s.index('  const runAiInterpretation = async')
+          end=s.index('\n\n  const runIntegrated = async', start)
+          new_run='''  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
+            if (!calculation) return
+            setAiLoading(true); setAiError('')
+            try {
+              await ensureSupabaseSession()
+              const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+                body: { calculation, model: aiModel },
+              })
+              if (error) throw error
+              const payload = data as AiInterpretationResponse
+              if (!payload?.ok || !payload.data) {
+                if (payload?.missing_key) setAiConfigured(false)
+                throw new Error(payload?.error || 'AI 해설 결과가 비어 있어.')
+              }
+              setAiInterpretation(payload)
+              setAiConfigured(true)
+            } catch (error) {
+              setAiInterpretation(null)
+              const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
+              setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
+            } finally { setAiLoading(false) }
+          }'''
+          s=s[:start]+new_run+s[end:]
+
+          s=s.replace('서버 비밀키 연결됨 · 계산 후 자동 해설','Supabase Edge Function 연결됨 · Gemini 해설')
+          s=s.replace('미연결 · Render에 GEMINI_API_KEY 설정 필요','미연결 · Supabase에 GEMINI_API_KEY 설정 필요')
+          s=s.replace("<small>{aiConfigured===true?'Gemini 준비':'GEMINI_API_KEY 확인'}</small>","<small>{aiConfigured===true?'Supabase AI 준비':'Supabase GEMINI_API_KEY 확인'}</small>")
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Build frontend
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: move Gemini interpretation to Supabase Edge'
+          git push
