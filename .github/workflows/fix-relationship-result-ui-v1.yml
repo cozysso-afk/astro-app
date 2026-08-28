@@ -1,0 +1,51 @@
+name: Fix Relationship Result UI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-relationship-result-ui-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Clarify relationship result semantics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/AppNext.tsx')
+          s=p.read_text(encoding='utf-8')
+          anchor="  const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []\n"
+          insert="""  const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []\n  const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)\n  const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length\n  const natalChallenging = natalAspects.filter((aspect) => aspect.tone === 'challenging').length\n  const natalMixed = natalAspects.filter((aspect) => aspect.tone === 'mixed').length\n"""
+          assert anchor in s, 'natalAspects anchor missing'
+          s=s.replace(anchor, insert, 1)
+
+          start_marker='''              <section className="result-card">\n                <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조</strong></div>'''
+          end_marker='''              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{relationshipResult.result.limitations?.join(' ')}</span></div>}'''
+          start=s.index(start_marker)
+          end=s.index(end_marker, start)+len(end_marker)
+          replacement='''              <section className="result-card">\n                <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조 · 계산 근거</strong></div>\n                <p className="result-note">아래 숫자는 관계 점수나 재회 확률이 아니라, 허용 오브 안에서 포착된 주요 천체 각의 개수야.</p>\n                <div className="metric-grid">\n                  <div className="metric"><strong>{natalAspects.length}</strong><span>주요 각</span></div>\n                  <div className="metric"><strong>{natalSupportive}</strong><span>조화 각</span></div>\n                  <div className="metric"><strong>{natalChallenging}</strong><span>긴장 각</span></div>\n                </div>\n                {natalMixed>0 && <p className="result-note">혼합 각 {natalMixed}개 · 개수만으로 관계의 좋고 나쁨을 판정하지 않아.</p>}\n                <div className="aspect-list">{natalAspects.slice(0,8).map((aspect,index)=><div className="aspect-row" key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><span className={`tone-dot ${aspect.tone}`}/><div><strong>{aspectText(aspect)}</strong><span>오브 {aspect.orb.toFixed(2)}° · {aspect.tone==='supportive'?'조화':aspect.tone==='challenging'?'긴장':'혼합'}</span></div></div>)}</div>\n              </section>\n              {!partnerTimeExact ? <section className="result-card">\n                <div className="result-card-title"><span>TIMING</span><strong>정밀 시기층 미계산</strong></div>\n                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 시너스트리·진행 합성·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>\n                <p className="result-note">현재는 출생시간 없이도 계산 가능한 기본 시너스트리만 해석 근거로 사용해.</p>\n              </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}\n              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}'''
+          s=s[:start]+replacement+s[end:]
+          p.write_text(s, encoding='utf-8')
+          PY
+          cd web
+          npm ci
+          npm run build
+      - name: Commit UI fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git commit -m 'fix: clarify relationship calculation results'
+          git push
