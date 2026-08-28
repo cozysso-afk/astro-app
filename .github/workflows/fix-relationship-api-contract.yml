@@ -1,0 +1,47 @@
+name: Fix Relationship API Contract
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-relationship-api-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore relationship API contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('api/main.py')
+          s=p.read_text(encoding='utf-8')
+
+          if 'def _month_segments(' not in s:
+              anchor='\n\ndef _set_job(store: dict, lock: threading.Lock, job_id: str, **fields):\n'
+              helper='''\n\ndef _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:\n    if end_date < start_date:\n        raise HTTPException(status_code=422, detail="end_date must be on or after start_date")\n    if (end_date - start_date).days > 730:\n        raise HTTPException(status_code=422, detail="relationship timing range is limited to 731 days per request")\n\n    segments: list[tuple[date, date]] = []\n    cursor = date(start_date.year, start_date.month, 1)\n    while cursor <= end_date:\n        next_month = date(\n            cursor.year + (1 if cursor.month == 12 else 0),\n            1 if cursor.month == 12 else cursor.month + 1,\n            1,\n        )\n        month_end = next_month - timedelta(days=1)\n        seg_start = max(start_date, cursor)\n        seg_end = min(end_date, month_end)\n        if seg_start <= seg_end:\n            segments.append((seg_start, seg_end))\n        cursor = next_month\n    return segments\n'''
+              assert anchor in s, 'job helper anchor missing'
+              s=s.replace(anchor, helper+anchor, 1)
+
+          start=s.index('@app.post("/v1/relationship/western")')
+          end=s.index('\n\n@app.post("/v1/fortune/integrated")', start)
+          replacement='''@app.post("/v1/relationship/western")\ndef relationship_western(request: RelationshipRequest) -> dict:\n    user_payload = request.user.engine_payload()\n    cp_payload = request.counterpart.engine_payload()\n\n    if user_payload["birth_time"] is None:\n        raise HTTPException(status_code=422, detail="user birth_time is required for the precision relationship engine")\n\n    segments = _month_segments(request.start_date, request.end_date)\n    try:\n        result = build_relationship_western(user_payload, cp_payload, segments)\n    except Exception as exc:\n        raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc\n\n    return {\n        "ok": bool(result.get("ok", True)),\n        "api_version": APP_VERSION,\n        "engine": result.get("engine", REL_ENGINE_VERSION),\n        "relationship_status": request.relationship_status,\n        "period": {\n            "start": request.start_date.isoformat(),\n            "end": request.end_date.isoformat(),\n            "month_segments": len(segments),\n        },\n        "result": result,\n        "interpretation_policy": {\n            "probability": False,\n            "private_feelings_claims": False,\n            "marriage_mode": "결혼 여부 예언이 아니라 장기 결속·관계 주기·협력/긴장 활성도를 해석하는 모드",\n        },\n    }\n'''
+          s=s[:start]+replacement+s[end:]
+          s=s.replace('APP_VERSION = "api-fortune-v4.3-detached"','APP_VERSION = "api-fortune-v4.4-relationship-fix"')
+          p.write_text(s, encoding='utf-8')
+          PY
+          python -m py_compile api/main.py relationship_western_v1.py
+          grep -q 'build_relationship_western(user_payload, cp_payload, segments)' api/main.py
+          grep -q 'api-fortune-v4.4-relationship-fix' api/main.py
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py
+          git commit -m 'fix: restore relationship API engine contract'
+          git push
