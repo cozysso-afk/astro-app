@@ -76,3 +76,38 @@ jobs:
           else:
               raise SystemExit(f'Render integrated route not live: {last}')
           PY
+      - name: Run Render live integrated POST
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          payload = {
+              'profile': {
+                  'name': 'dummy-live-profile',
+                  'birth_date': '1990-01-01',
+                  'birth_time': '12:00:00',
+                  'latitude': 37.5665,
+                  'longitude': 126.9780,
+                  'utc_offset_hours': 9,
+                  'gender': 'female',
+              },
+              'start_date': '2026-08-28',
+              'end_date': '2026-08-28',
+          }
+          request = urllib.request.Request(
+              'https://astro-app-api-f7fn.onrender.com/v1/fortune/integrated',
+              data=json.dumps(payload).encode('utf-8'),
+              headers={'Content-Type': 'application/json'},
+              method='POST',
+          )
+          with urllib.request.urlopen(request, timeout=120) as response:
+              result = json.load(response)
+          assert result['ok'] is True
+          assert result['western']['ok'] is True
+          assert result['saju']['ok'] is True
+          assert result['thai']['ok'] is True
+          assert result['period']['day_count'] == 1
+          assert result['western']['overall']['연애']['average'] is not None
+          print('render-live-post-ok', result.get('api_version'), result.get('engine'))
+          PY
