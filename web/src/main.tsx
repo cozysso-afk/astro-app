@@ -10,6 +10,7 @@ import './precision.css'
 import './celestial-theme.css'
 import './celestial-pastel.css'
 import './settings.css'
+import './ai-interpret.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

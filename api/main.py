@@ -10,10 +10,11 @@ from pydantic import BaseModel, Field
 
 from integrated_fortune_v1 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
 from integrated_fortune_v1 import build_integrated_fortune
+from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 
-APP_VERSION = "api-fortune-v2"
+APP_VERSION = "api-fortune-v3"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -96,6 +97,11 @@ class IntegratedFortuneRequest(BaseModel):
     end_date: date
 
 
+class IntegratedInterpretRequest(BaseModel):
+    calculation: dict
+    model: str = AI_DEFAULT_MODEL
+
+
 def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
     if end_date < start_date:
         raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
@@ -143,6 +149,7 @@ def meta() -> dict:
     return {
         "version": APP_VERSION,
         "calculation_engine_connected": True,
+        "ai_interpretation": ai_status(),
         "connected_engines": [INTEGRATED_ENGINE_VERSION, REL_ENGINE_VERSION],
         "phase": "integrated-fortune-and-relationship-live",
         "planned_routes": [
@@ -154,6 +161,7 @@ def meta() -> dict:
         ],
         "live_routes": [
             "fortune/integrated",
+            "fortune/interpret",
             "relationship/western",
         ],
         "relationship_modes": [
@@ -207,6 +215,18 @@ def integrated_fortune(request: IntegratedFortuneRequest) -> dict:
             "utc_offset_hours": profile.utc_offset_hours,
         },
     }
+
+
+@app.get("/v1/fortune/ai-meta")
+def fortune_ai_meta() -> dict:
+    return ai_status()
+
+
+@app.post("/v1/fortune/interpret")
+def fortune_interpret(request: IntegratedInterpretRequest) -> dict:
+    if not isinstance(request.calculation, dict) or not request.calculation:
+        raise HTTPException(status_code=422, detail="calculation result is required")
+    return interpret_integrated_fortune(request.calculation, request.model)
 
 
 @app.post("/v1/relationship/western")

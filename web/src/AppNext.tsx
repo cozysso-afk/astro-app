@@ -10,6 +10,7 @@ const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
+const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year'
 type ApiStatus = 'warming' | 'online' | 'offline'
@@ -126,6 +127,67 @@ type IntegratedApiResponse = {
   }
 }
 
+
+type AiTopicInterpretation = {
+  verdict: string
+  reason: string
+  timing: string
+  action: string
+  avoid: string
+  confidence: '높음' | '보통' | '낮음'
+  confidence_reason: string
+}
+
+type AiInterpretationResponse = {
+  ok: boolean
+  missing_key?: boolean
+  error?: string
+  model?: string
+  fallback_from?: string
+  interpreter_version?: string
+  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number }
+  data?: {
+    headline: string
+    overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string }
+    clusters: { relationship: string; work_study: string; money_news: string; condition: string }
+    systems: { western: string; saju: string; thai: string }
+    priorities: string[]
+    topic_analysis: Record<string, AiTopicInterpretation>
+    limits: string
+  }
+}
+
+function AiInterpretationPanel({ result, loading, error, onRetry }: {
+  result: AiInterpretationResponse | null
+  loading: boolean
+  error: string
+  onRetry: () => void
+}) {
+  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>Gemini가 실계산 근거를 해석하는 중…</strong><p>숫자를 사건 확률로 바꾸지 않고 Western·사주·Thai를 분리해서 읽고 있어.</p></div></section>
+  if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
+  if (!result?.ok || !result.data) return null
+  const data = result.data
+  return <section className="ai-interpret-card">
+    <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">GEMINI INTERPRETATION</span><h3>{data.headline || '통합 계산 해설'}</h3><small>{result.model || 'Gemini'} · 계산 후 해설층</small></div></div>
+    <p className="ai-summary">{data.overall.summary}</p>
+    {data.overall.dominant_pattern && <div className="ai-highlight"><strong>핵심 패턴</strong><span>{data.overall.dominant_pattern}</span></div>}
+    <div className="ai-cluster-grid">
+      {data.clusters.relationship && <div><strong>관계</strong><p>{data.clusters.relationship}</p></div>}
+      {data.clusters.work_study && <div><strong>일 · 학업</strong><p>{data.clusters.work_study}</p></div>}
+      {data.clusters.money_news && <div><strong>금전 · 소식</strong><p>{data.clusters.money_news}</p></div>}
+      {data.clusters.condition && <div><strong>컨디션</strong><p>{data.clusters.condition}</p></div>}
+    </div>
+    {!!data.priorities?.length && <div className="ai-priorities"><strong>이 기간 우선순위</strong>{data.priorities.map((item, index)=><p key={`${index}-${item}`}>{index+1}. {item}</p>)}</div>}
+    <details className="ai-details"><summary>분야별 정밀 해석 보기</summary><div className="ai-topic-list">{topicOrder.map((topic)=>{
+      const item=data.topic_analysis?.[topic]
+      if(!item) return null
+      return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {item.reason}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}</article>
+    })}</div></details>
+    <div className="ai-system-note"><strong>체계별 해석</strong>{data.systems.western&&<p><b>Western</b> {data.systems.western}</p>}{data.systems.saju&&<p><b>사주</b> {data.systems.saju}</p>}{data.systems.thai&&<p><b>Thai</b> {data.systems.thai}</p>}</div>
+    {data.limits && <p className="ai-limits">{data.limits}</p>}
+  </section>
+}
+
 const periods = [
   { key: 'today' as const, label: '오늘', icon: Sun },
   { key: 'week' as const, label: '주간', icon: CalendarDays },
@@ -185,6 +247,13 @@ function loadUiSettings() {
   } catch {
     return { glow: true, motion: true }
   }
+}
+
+
+function loadAiModel() {
+  if (typeof window === 'undefined') return 'gemini-3.7-flash'
+  const saved = window.localStorage.getItem(AI_MODEL_STORAGE_KEY)
+  return saved === 'gemini-3.6-flash' ? saved : 'gemini-3.7-flash'
 }
 
 function loadStoredProfile(): BirthProfile {
@@ -380,6 +449,11 @@ export default function AppNext() {
   const [relationshipLoading, setRelationshipLoading] = useState(false)
   const [relationshipError, setRelationshipError] = useState('')
   const [integratedResult, setIntegratedResult] = useState<IntegratedApiResponse | null>(null)
+  const [aiInterpretation, setAiInterpretation] = useState<AiInterpretationResponse | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
+  const [aiModel, setAiModel] = useState(loadAiModel)
   const [integratedLoading, setIntegratedLoading] = useState(false)
   const [integratedError, setIntegratedError] = useState('')
   const [integratedRequestSnapshot, setIntegratedRequestSnapshot] = useState<Record<string, unknown> | null>(null)
@@ -400,6 +474,19 @@ export default function AppNext() {
       .catch(() => { if (!cancelled) setApiStatus('offline') })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/v1/fortune/ai-meta`)
+      .then((response)=>response.json().then((payload)=>({response,payload})))
+      .then(({response,payload})=>{ if(!cancelled) setAiConfigured(Boolean(response.ok && payload?.configured)) })
+      .catch(()=>{ if(!cancelled) setAiConfigured(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(AI_MODEL_STORAGE_KEY, aiModel)
+  }, [aiModel])
 
   useEffect(() => {
     if (mainView === 'history' || mainView === 'settings') void refreshArchive()
@@ -455,8 +542,30 @@ export default function AppNext() {
     setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
   }
 
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
+    if (!calculation) return
+    setAiLoading(true); setAiError('')
+    try {
+      const response = await fetch(`${API_BASE}/v1/fortune/interpret`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ calculation, model: aiModel }),
+      })
+      const payload = await response.json() as AiInterpretationResponse
+      if (!response.ok) throw new Error(payload?.error || 'AI 해설 요청에 실패했어.')
+      if (!payload.ok || !payload.data) {
+        if (payload.missing_key) setAiConfigured(false)
+        throw new Error(payload.error || 'AI 해설 결과가 비어 있어.')
+      }
+      setAiInterpretation(payload); setAiConfigured(true)
+    } catch (error) {
+      setAiInterpretation(null)
+      setAiError(error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   const runIntegrated = async () => {
-    setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null)
+    setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')
     if (!birthProfile.birthDate || !birthProfile.birthTime) {
       setIntegratedError('먼저 내정보에서 생년월일과 출생시간을 저장해줘.'); return
     }
@@ -486,8 +595,10 @@ export default function AppNext() {
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '통합운세 계산 요청에 실패했어.')
-      setIntegratedResult(payload as IntegratedApiResponse)
+      const calculation = payload as IntegratedApiResponse
+      setIntegratedResult(calculation)
       setIntegratedRequestSnapshot(body)
+      void runAiInterpretation(calculation)
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
     } finally { setIntegratedLoading(false) }
@@ -682,6 +793,7 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
+              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -857,6 +969,7 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <>
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
+              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
 
               <section className="result-card">
                 <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
@@ -951,9 +1064,16 @@ export default function AppNext() {
             </label>
           </div>
 
+          <div className="subsection-title">AI 해석</div>
+          <div className="ai-settings-card">
+            <label><span><strong>AI 해석 모델</strong><small>실계산 뒤에 붙는 자연어 해설 모델</small></span><select value={aiModel} onChange={(e)=>setAiModel(e.target.value)}><option value="gemini-3.7-flash">Gemini 3.7 Flash · 정밀 우선</option><option value="gemini-3.6-flash">Gemini 3.6 Flash · 빠른 해설</option></select></label>
+            <div className={`ai-api-state ${aiConfigured===true?'online':aiConfigured===false?'offline':'checking'}`}><Sparkles size={16}/><span><strong>Gemini API</strong><small>{aiConfigured===true?'서버 비밀키 연결됨 · 계산 후 자동 해설':aiConfigured===false?'미연결 · Render에 GEMINI_API_KEY 설정 필요':'연결 상태 확인 중'}</small></span></div>
+          </div>
+
           <div className="subsection-title">앱 상태</div>
           <div className="settings-status-grid">
             <div><span>계산 서버</span><strong>{apiStatus==='online'?'연결됨':apiStatus==='warming'?'확인 중':'대기 중'}</strong><small>{apiVersion || 'API 상태 확인'}</small></div>
+            <div><span>AI 해설</span><strong>{aiConfigured===true?'연결됨':aiConfigured===false?'미연결':'확인 중'}</strong><small>{aiModel}</small></div>
             <div><span>클라우드 기록</span><strong>{archiveLoading?'확인 중':archiveError?'확인 오류':archiveItems.length+'개'}</strong><small>{archiveError || archiveStatus || '기록 상태 확인 전'}</small></div>
             <div><span>출생 프로필</span><strong>{hasProfile?'저장됨':'미저장'}</strong><small>{hasProfile?'이 브라우저 기기 보관':'내정보에서 먼저 저장'}</small></div>
           </div>
