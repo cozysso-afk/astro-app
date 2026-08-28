@@ -23,10 +23,10 @@ jobs:
           import pandas as pd
           import exchange_calendars as xcals
           cal=xcals.get_calendar('XKRX')
-          sessions=cal.sessions_in_range(pd.Timestamp('2020-01-01'), pd.Timestamp('2035-12-31'))
+          sessions=cal.sessions_in_range(pd.Timestamp('2020-01-01'), pd.Timestamp('2027-08-27'))
           values=[x.strftime('%Y-%m-%d') for x in sessions]
-          with open('data/krx_sessions_2020_2035.json','w',encoding='utf-8') as f:
-              json.dump({'calendar':'XKRX','range':['2020-01-01','2035-12-31'],'sessions':values},f,ensure_ascii=False,separators=(',',':'))
+          with open('data/krx_sessions_2020_2027.json','w',encoding='utf-8') as f:
+              json.dump({'calendar':'XKRX','range':['2020-01-01','2027-08-27'],'sessions':values},f,ensure_ascii=False,separators=(',',':'))
           print('KRX sessions',len(values))
           assert '2026-08-28' in values
           PY
@@ -35,13 +35,13 @@ jobs:
       - name: Verify syntax and markers
         run: |
           python -m py_compile integrated_fortune_v1.py
-          grep -q 'krx_sessions_2020_2035.json' integrated_fortune_v1.py
+          grep -q 'krx_sessions_2020_2027.json' integrated_fortune_v1.py
           grep -q 'dt_time(23, 0), 45' integrated_fortune_v1.py
       - name: Commit optimization
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add integrated_fortune_v1.py data/krx_sessions_2020_2035.json
+          git add integrated_fortune_v1.py data/krx_sessions_2020_2027.json
           git diff --cached --quiet && { echo 'No changes'; exit 1; }
           git commit -m 'perf: precompute KRX sessions and lighten detailed scans'
           git push
