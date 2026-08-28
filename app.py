@@ -4952,7 +4952,7 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # ============================================================
 # 11. TABS
 # ============================================================
-main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","🧭 포춘랩","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
+main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","🧭 포춘랩","💞 상대재회","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
@@ -5233,8 +5233,9 @@ elif main_view=="🌌 연간":
 # ------------------------------------------------------------
 # FORTUNE LAB · SAJU × WESTERN × THAI BASELINE
 # ------------------------------------------------------------
-elif main_view=="🧭 포춘랩":
+elif main_view in ("🧭 포춘랩","💞 상대재회"):
     render_fortune_lab({
+        "forced_mode":"💞 특정 상대" if main_view=="💞 상대재회" else None,
         "birth_date":birth_date,
         "birth_time":birth_time,
         "birth_lon":lon,

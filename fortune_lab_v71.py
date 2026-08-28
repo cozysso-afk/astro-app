@@ -33,7 +33,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.3"
+FORTUNE_LAB_VERSION = "v0.1.4"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -488,12 +488,17 @@ def render_fortune_lab(ctx):
     st.markdown("### 🧭 FORTUNE LAB · 다체계 운세 분석")
     st.caption("별빛의 서양 계산 + 사주 대운·세운·월운 + 태국 출생요일층을 한 번에 정리하고, 해석가는 Gemini 또는 외부 AI로 자유롭게 선택해.")
 
-    analysis_mode=st.radio(
-        "분석 방식",
-        ["🌙 일반 운세", "💞 특정 상대"],
-        horizontal=True,
-        key="fortune_lab_analysis_mode",
-    )
+    forced_mode=str(ctx.get("forced_mode") or "").strip()
+    if forced_mode=="💞 특정 상대":
+        analysis_mode="💞 특정 상대"
+        st.success("💞 특정 상대 재회 분석 · 상대 정보를 바로 입력해.")
+    else:
+        analysis_mode=st.radio(
+            "분석 방식",
+            ["🌙 일반 운세", "💞 특정 상대"],
+            horizontal=True,
+            key="fortune_lab_analysis_mode",
+        )
     if analysis_mode=="💞 특정 상대":
         topic="💞 특정 상대와 재회"
         st.info("특정 상대 정보를 아래에 입력하면, 아는 데이터만 사용해서 재회 흐름을 계산해.")
