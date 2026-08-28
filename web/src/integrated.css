@@ -1,0 +1,141 @@
+.integrated-results {
+  gap: 12px;
+}
+
+.integrated-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.integrated-topic {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 8px;
+  border-radius: 13px;
+  text-align: center;
+  background: linear-gradient(145deg, #fff9ec, #f7ead7);
+  border: 1px solid rgba(176, 119, 55, 0.1);
+}
+
+.integrated-topic span {
+  color: #826b58;
+  font-size: 0.61rem;
+  font-weight: 800;
+}
+
+.integrated-topic strong {
+  color: #6f4c32;
+  font-size: 1rem;
+}
+
+.integrated-topic small {
+  color: #9a806c;
+  font-size: 0.54rem;
+}
+
+.best-window {
+  display: grid;
+  gap: 4px;
+  margin-top: 11px;
+  padding: 10px 11px;
+  border-radius: 13px;
+  background: #f8f2e8;
+}
+
+.best-window span {
+  color: #9a7c62;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.best-window strong {
+  color: #5d4432;
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+.pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.pillar-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  text-align: center;
+  background: #faf4eb;
+}
+
+.pillar-grid span {
+  color: #907b6b;
+  font-size: 0.56rem;
+}
+
+.pillar-grid strong {
+  color: #5f4230;
+  font-size: 0.88rem;
+}
+
+.saju-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.saju-summary span {
+  padding: 6px 8px;
+  border-radius: 999px;
+  color: #766356;
+  background: #f5ede2;
+  font-size: 0.6rem;
+}
+
+.saju-summary b {
+  color: #59402f;
+}
+
+.thai-baseline {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f6f7ef, #eef2e9);
+}
+
+.thai-baseline strong {
+  color: #576452;
+  font-size: 0.86rem;
+}
+
+.thai-baseline span {
+  color: #72806d;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.thai-baseline p {
+  margin: 3px 0 0;
+  color: #7b8677;
+  font-size: 0.61rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .integrated-topic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pillar-grid {
+    gap: 6px;
+  }
+
+  .pillar-grid strong {
+    font-size: 0.82rem;
+  }
+}
