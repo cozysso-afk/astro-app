@@ -244,7 +244,7 @@ def _render_month_timeline(bundle):
         links=html.escape(" · ".join(s.get("branch_links") or []) or "특기할 육합·육충 없음")
         best=html.escape(_fmt_month_day_items(w.get("best_days")))
         caution=html.escape(_fmt_month_day_items(w.get("caution_days")))
-        cards.append(f'''<div class="fortune-month-card">
+        cards.append(f"""<div class="fortune-month-card">
   <div class="fortune-month-head">
     <div><div class="fortune-month-name">{html.escape(month_name)}</div><div class="fortune-month-period">{html.escape(period)}</div></div>
     <div class="fortune-month-band">{band}</div>
@@ -259,7 +259,7 @@ def _render_month_timeline(bundle):
     <div class="fortune-month-day"><small>상대적으로 강한 날짜</small><span>{best}</span></div>
     <div class="fortune-month-day caution"><small>상대적으로 주의할 날짜</small><span>{caution}</span></div>
   </div>
-</div>''')
+</div>""")
     st.markdown('<div class="fortune-month-stack">'+''.join(cards)+'</div>',unsafe_allow_html=True)
     st.caption("월별 숫자는 사건 발생 확률이 아니라 같은 주제 안에서 시기를 비교하는 상대지수야.")
 '''

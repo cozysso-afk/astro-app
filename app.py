@@ -354,6 +354,102 @@ label,[data-testid="stWidgetLabel"] p{color:#4b4039!important;font-weight:720!im
 """
 st.markdown(ASTRO_DESIGN_V72_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A3. VISUAL SYSTEM v7.3 · NAVIGATION + MONTH TIMELINE
+# ============================================================
+ASTRO_DESIGN_V73_CSS = """
+<style>
+.astro-nav-label{
+  margin:10px 2px 6px;
+  color:#8e745f;
+  font-size:.68rem;
+  font-weight:850;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.astro-nav-tools{margin-top:5px}
+
+/* Main navigation uses real buttons: no radio circle, no clipped horizontal scroll. */
+div[class*="st-key-main_nav_"] button{
+  min-height:42px!important;
+  padding:.5rem .35rem!important;
+  border-radius:13px!important;
+  font-size:.80rem!important;
+  font-weight:800!important;
+  letter-spacing:-.02em!important;
+  white-space:nowrap!important;
+}
+div[class*="st-key-main_nav_"] button[kind="secondary"]{
+  background:rgba(255,253,249,.78)!important;
+  border:1px solid rgba(126,103,87,.16)!important;
+  color:#67564b!important;
+  box-shadow:0 4px 12px rgba(75,55,42,.035)!important;
+}
+div[class*="st-key-main_nav_"] button[kind="primary"]{
+  background:linear-gradient(135deg,#55473e,#7b6251)!important;
+  color:#fff!important;
+  border:1px solid #665247!important;
+  box-shadow:0 8px 20px rgba(75,54,42,.16)!important;
+}
+
+/* Fortune Lab monthly timeline */
+.fortune-month-stack{position:relative;margin:10px 0 18px;padding-left:18px}
+.fortune-month-stack:before{
+  content:"";position:absolute;left:6px;top:14px;bottom:18px;width:1px;
+  background:linear-gradient(#c9a577,rgba(201,165,119,.18));
+}
+.fortune-month-card{
+  position:relative;
+  margin:0 0 12px;
+  padding:15px 15px 14px;
+  border:1px solid rgba(137,108,84,.16);
+  border-radius:19px;
+  background:rgba(255,253,249,.90);
+  box-shadow:0 10px 26px rgba(78,58,43,.07);
+}
+.fortune-month-card:before{
+  content:"";position:absolute;left:-17px;top:20px;width:9px;height:9px;border-radius:50%;
+  background:#b68b58;border:3px solid #f7f0e6;box-shadow:0 0 0 1px rgba(147,111,76,.2);
+}
+.fortune-month-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.fortune-month-name{font-size:1.02rem;font-weight:900;color:#3d322c;letter-spacing:-.035em}
+.fortune-month-period{font-size:.68rem;color:#9a8779;margin-top:2px}
+.fortune-month-band{
+  flex:0 0 auto;padding:4px 8px;border-radius:999px;background:#f1e5d6;color:#755b45;
+  font-size:.68rem;font-weight:800;white-space:nowrap
+}
+.fortune-month-score{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px;
+  padding:10px 11px;border-radius:13px;background:#f8f1e8;margin-bottom:10px
+}
+.fortune-month-score span{font-size:.72rem;color:#806e61;font-weight:750}
+.fortune-month-score strong{font-family:'Cinzel','Pretendard',serif;font-size:1.45rem;line-height:1;color:#9b7043}
+.fortune-month-facts{display:grid;gap:7px}
+.fortune-month-fact{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;align-items:start}
+.fortune-month-fact span{font-size:.70rem;color:#958174;font-weight:750}
+.fortune-month-fact b{font-size:.79rem;color:#554942;line-height:1.5;font-weight:720}
+.fortune-month-days{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.fortune-month-day{
+  padding:9px 10px;border-radius:12px;background:#fbf7f0;border:1px solid rgba(137,108,84,.10)
+}
+.fortune-month-day.caution{background:#faf3f0}
+.fortune-month-day small{display:block;font-size:.63rem;color:#9b8778;font-weight:800;margin-bottom:4px}
+.fortune-month-day span{display:block;font-size:.72rem;color:#5f5148;line-height:1.45;font-weight:680}
+.fortune-scope-card{
+  padding:12px 13px;margin:8px 0 14px;border-radius:15px;background:rgba(255,252,246,.82);
+  border:1px solid rgba(147,113,77,.15);color:#66574e;font-size:.79rem;line-height:1.62
+}
+
+@media(max-width:640px){
+  div[class*="st-key-main_nav_"] button{min-height:40px!important;font-size:.76rem!important;padding:.42rem .2rem!important}
+  .fortune-month-days{grid-template-columns:1fr}
+  .fortune-month-fact{grid-template-columns:68px minmax(0,1fr)}
+}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V73_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -5093,7 +5189,26 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # ============================================================
 # 11. TABS
 # ============================================================
-main_view=st.radio("메뉴",["오늘","주간","월간","연간","포춘랩","궁합운","저장함","정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
+_main_views=["오늘","주간","월간","연간","포춘랩","궁합운","저장함","정밀분석"]
+if st.session_state.get("main_view") not in _main_views:
+    st.session_state["main_view"]="오늘"
+main_view=st.session_state["main_view"]
+
+st.markdown('<div class="astro-nav-label">기간 운세</div>',unsafe_allow_html=True)
+_nav_period=st.columns(4,gap="small")
+for _i,_label in enumerate(["오늘","주간","월간","연간"]):
+    if _nav_period[_i].button(_label,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
+        if main_view!=_label:
+            st.session_state["main_view"]=_label
+            st.rerun()
+
+st.markdown('<div class="astro-nav-label astro-nav-tools">분석 도구</div>',unsafe_allow_html=True)
+_nav_tools=st.columns(4,gap="small")
+for _i,_label in enumerate(["포춘랩","궁합운","저장함","정밀분석"]):
+    if _nav_tools[_i].button(_label,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
+        if main_view!=_label:
+            st.session_state["main_view"]=_label
+            st.rerun()
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
@@ -5376,7 +5491,7 @@ elif main_view=="연간":
 # ------------------------------------------------------------
 elif main_view in ("포춘랩","궁합운"):
     render_fortune_lab({
-        "forced_mode":"💞 특정 상대" if main_view=="궁합운" else None,
+        "mode":"compatibility" if main_view=="궁합운" else "general",
         "birth_date":birth_date,
         "birth_time":birth_time,
         "birth_lon":lon,

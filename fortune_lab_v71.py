@@ -12,6 +12,7 @@ Important: Thai predictive Suriyayat/transit is NOT implemented in this phase an
 
 import calendar
 import hashlib
+import html
 import json
 import time
 import urllib.error
@@ -33,7 +34,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.5"
+FORTUNE_LAB_VERSION = "v0.1.6"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -42,7 +43,9 @@ FORTUNE_LAB_MAX_ARCHIVE = 36
 FORTUNE_LAB_TOPICS = {
     "💘 연애·새 인연": {"western":"연애", "focus":"새 인연 유입, 내가 끌리는 흐름, 상호 진전, 관계 재검토"},
     "🔄 재회·과거 인연": {"western":"재회", "focus":"과거 인연 재활성, 접점, 관계 재검토, 반복 패턴"},
-    "💞 특정 상대와 재회": {"western":"재회", "focus":"입력한 특정 상대와의 관계 재활성 가능 구간, 접점 환경, 반복 패턴. 상대의 행동·감정을 확정하지 않음"},
+    "궁합 전체": {"western":"연애", "focus":"두 사람의 기본 관계 패턴, 잘 맞는 축과 마찰 축, 관계를 지속할 때의 장단점. 계산되지 않은 상대 심리·행동은 확정하지 않음"},
+    "관계 흐름": {"western":"연애", "focus":"입력한 상대와 관계가 가까워지거나 멀어지는 환경, 상호작용의 리듬, 반복 패턴"},
+    "재회 흐름": {"western":"재회", "focus":"입력한 상대와 과거 관계가 다시 활성화될 수 있는 환경, 접점과 재검토 흐름. 실제 연락·재회를 확정하지 않음"},
     "📝 시험·합격": {"western":"시험", "focus":"흡수, 출력, 평가 압박, 실수 위험, 성과 회수"},
     "📚 공부·학업": {"western":"학업", "focus":"집중, 이해, 기억, 루틴, 학습 지속성"},
     "💼 취업·직장": {"western":"직장", "focus":"지원, 평가, 조직 적응, 책임, 성과 가시화"},
@@ -51,6 +54,8 @@ FORTUNE_LAB_TOPICS = {
     "💌 연락·소식": {"western":"연락", "focus":"교류 활성도, 접점, 메시지·대화 흐름. 특정인의 연락을 확정하지 않음"},
     "🌿 컨디션·생활리듬": {"western":"컨디션", "focus":"활동 리듬, 소모, 회복, 일정 배치. 의료 예측 금지"},
 }
+
+COMPATIBILITY_TOPICS = {"궁합 전체", "관계 흐름", "재회 흐름"}
 
 _STEM_INFO = {
     "甲":("木",1), "乙":("木",0), "丙":("火",1), "丁":("火",0), "戊":("土",1),
@@ -315,7 +320,7 @@ def _build_bundle(ctx,topic,start_date,end_date,gender,counterpart=None):
     saju=_saju_payload(ctx["birth_date"],ctx["birth_time"],ctx["birth_lon"],gender,start_date,end_date)
     thai=_thai_payload(ctx["birth_date"],ctx["birth_time"])
     counterpart_payload=None
-    if topic=="💞 특정 상대와 재회" and isinstance(counterpart,dict):
+    if topic in COMPATIBILITY_TOPICS and isinstance(counterpart,dict):
         cp_saju=_counterpart_saju_payload(
             counterpart.get("birth_date"),counterpart.get("time_known",False),
             counterpart.get("birth_time"),counterpart.get("longitude"),
@@ -334,7 +339,7 @@ def _build_bundle(ctx,topic,start_date,end_date,gender,counterpart=None):
             "saju":cp_saju,
             "cross_branch_links":cross_links,
             "western_status":"partner natal/synastry/transit not calculated yet",
-            "scope_note":"현재 Western 월별 값은 사용자의 재회 활성 환경이다. 상대의 행동 시기나 연락일로 바꾸지 않는다.",
+            "scope_note":"현재 두 사람의 정적 궁합 근거는 사주 원국 교차관계까지 계산한다. Western 월별 값은 사용자의 관계 환경이며, 상대의 Western 시너스트리·트랜짓은 아직 미계산이므로 상대 행동 시기로 바꾸지 않는다.",
         }
     return {
         "version":FORTUNE_LAB_VERSION,"topic":topic,"topic_focus":FORTUNE_LAB_TOPICS[topic]["focus"],
@@ -344,13 +349,21 @@ def _build_bundle(ctx,topic,start_date,end_date,gender,counterpart=None):
             "western":"period timing evidence available for user",
             "saju":"DaYun/year/month cycle facts available; interpretation is separate",
             "thai":"natal baseline only; excluded from predictive consensus until Suriyayat transit is implemented",
-            "counterpart":"natal Saju context only in v0.1.2; no partner-specific Western timing vote",
+            "counterpart":"two-person Saju natal cross-context available; partner Western synastry/transit is not calculated yet",
         },
     }
 
 
 def _deep_prompt(bundle):
     data=json.dumps(_jsonable(bundle),ensure_ascii=False,indent=2)
+    compatibility_extra=""
+    if isinstance(bundle.get("counterpart"),dict):
+        compatibility_extra="""
+[궁합운 추가 규칙]
+- 먼저 두 사람의 정적 관계 패턴(잘 맞는 축/마찰 축/반복되는 관계 습관)을 CALCULATED_DATA 범위 안에서 분리해 요약한다.
+- 그 다음 선택 기간의 관계 흐름을 별도로 본다. 정적 궁합과 시기운을 섞어 같은 것으로 말하지 않는다.
+- partner Western synastry/transit가 미계산이면 서양점성술로 두 사람의 궁합을 계산했다고 말하지 않는다.
+"""
     return f"""너는 사주명리·서양점성술·태국점성술의 서로 다른 전통을 구분해서 읽는 전문 해석자다.
 아래 CALCULATED_DATA는 웹앱이 계산한 자료다. 이전 대화, MBTI, 사용자에 대한 기억은 사용하지 않는다.
 
@@ -366,6 +379,7 @@ def _deep_prompt(bundle):
 9. 상대 사주 원국 일부와 두 사람의 합·충은 관계 패턴의 보조 맥락이지 연락·재회 발생의 증명이 아니다.
 10. 결과는 전문용어를 나열하지 말고 점성·사주를 모르는 사람이 이해할 현실 장면으로 번역한다.
 
+{compatibility_extra}
 [분석 주제]
 {bundle['topic']} — {bundle['topic_focus']}
 기간: {bundle['period']['start']} ~ {bundle['period']['end']}
@@ -470,19 +484,71 @@ def _render_engine_summary(bundle):
     st.caption("※ 태국 Suriyayat(수리야얏·태국식 행성 운행)는 아직 미연결이라 기간 합의에는 포함하지 않아.")
 
 
-def _render_month_table(bundle):
+def _fmt_month_day_items(items):
+    out=[]
+    for item in (items or [])[:2]:
+        if not isinstance(item,dict):
+            continue
+        raw=str(item.get("date") or item.get("label") or "").strip()
+        shown=raw
+        try:
+            d=date.fromisoformat(raw[:10])
+            shown=f"{d.month}.{d.day}"
+        except Exception:
+            shown=raw[:20] if raw else "-"
+        score=item.get("score")
+        if score is not None:
+            try: shown+=f" · {float(score):.1f}"
+            except Exception: pass
+        out.append(shown)
+    return " / ".join(out) if out else "자료 없음"
+
+
+def _render_month_timeline(bundle):
     western={x.get("calendar_month"):x for x in bundle.get("western",{}).get("months",[]) if isinstance(x,dict)}
     saju={x.get("calendar_month"):x for x in bundle.get("saju",{}).get("monthly",[]) if isinstance(x,dict)}
-    rows=[]
-    for month in sorted(set(western)|set(saju)):
-        w=western.get(month,{}); s=saju.get(month,{})
-        rows.append({
-            "월":month,"서양 상대지수":w.get("average"),"서양 밴드":w.get("band"),
-            "월운 간지":s.get("ganzhi"),"월간 십성":s.get("stem_ten_god"),"합·충":", ".join(s.get("branch_links") or []) or "-",
-        })
-    if rows:
-        st.dataframe(rows,use_container_width=True,hide_index=True)
+    months=sorted(set(western)|set(saju))
+    if not months:
+        st.info("표시할 월별 계산자료가 없어.")
+        return
 
+    cards=[]
+    for month in months:
+        w=western.get(month,{})
+        s=saju.get(month,{})
+        try:
+            y,m=[int(x) for x in month.split("-")[:2]]
+            month_name=f"{y}년 {m}월"
+        except Exception:
+            month_name=str(month)
+        period=f"{w.get('start') or s.get('segment_start') or ''} ~ {w.get('end') or s.get('segment_end') or ''}"
+        avg=w.get("average")
+        try: score_text=f"{float(avg):.1f}" if avg is not None else "—"
+        except Exception: score_text=html.escape(str(avg)) if avg is not None else "—"
+        band=html.escape(str(w.get("band") or "상대 흐름"))
+        ganzhi=html.escape(str(s.get("ganzhi") or "—"))
+        ten=html.escape(str(s.get("stem_ten_god") or "—"))
+        links=html.escape(" · ".join(s.get("branch_links") or []) or "특기할 육합·육충 없음")
+        best=html.escape(_fmt_month_day_items(w.get("best_days")))
+        caution=html.escape(_fmt_month_day_items(w.get("caution_days")))
+        cards.append(f"""<div class="fortune-month-card">
+  <div class="fortune-month-head">
+    <div><div class="fortune-month-name">{html.escape(month_name)}</div><div class="fortune-month-period">{html.escape(period)}</div></div>
+    <div class="fortune-month-band">{band}</div>
+  </div>
+  <div class="fortune-month-score"><span>서양점성술 · 같은 주제 안의 상대지수</span><strong>{score_text}</strong></div>
+  <div class="fortune-month-facts">
+    <div class="fortune-month-fact"><span>사주 월운</span><b>{ganzhi}</b></div>
+    <div class="fortune-month-fact"><span>월간 십성</span><b>{ten}</b></div>
+    <div class="fortune-month-fact"><span>원국 교차</span><b>{links}</b></div>
+  </div>
+  <div class="fortune-month-days">
+    <div class="fortune-month-day"><small>상대적으로 강한 날짜</small><span>{best}</span></div>
+    <div class="fortune-month-day caution"><small>상대적으로 주의할 날짜</small><span>{caution}</span></div>
+  </div>
+</div>""")
+    st.markdown('<div class="fortune-month-stack">'+''.join(cards)+'</div>',unsafe_allow_html=True)
+    st.caption("월별 숫자는 사건 발생 확률이 아니라 같은 주제 안에서 시기를 비교하는 상대지수야.")
 
 
 def _select_birthplace_from_options(options,key_prefix):
@@ -517,35 +583,31 @@ def _select_birthplace_from_options(options,key_prefix):
     return selected,(float(coords[1]) if len(coords)>1 and coords[1] is not None else None)
 
 def render_fortune_lab(ctx):
+    mode=str(ctx.get("mode") or "general").strip().lower()
+    is_compat=(mode=="compatibility")
+
     st.markdown('<div class="fortune-kicker">FORTUNE LAB</div>',unsafe_allow_html=True)
-    st.markdown('<div class="fortune-title">운의 흐름을 겹쳐보기</div>',unsafe_allow_html=True)
-    st.markdown('<div class="fortune-lead">서양점성술의 시간축과 사주 대운·세운·월운, 태국 출생층을 한 화면에서 비교해.</div>',unsafe_allow_html=True)
+    if is_compat:
+        st.markdown('<div class="fortune-title">두 사람의 궁합과 관계 흐름</div>',unsafe_allow_html=True)
+        st.markdown('<div class="fortune-lead">궁합의 기본 패턴과 선택한 기간의 관계 흐름을 분리해서 봐. 상대 정보는 아는 범위까지만 사용해.</div>',unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="fortune-title">운의 흐름을 겹쳐보기</div>',unsafe_allow_html=True)
+        st.markdown('<div class="fortune-lead">서양점성술의 시간축과 사주 대운·세운·월운, 태국 출생층을 한 화면에서 비교해.</div>',unsafe_allow_html=True)
     st.caption(f"운영 버전 · {FORTUNE_LAB_VERSION}")
 
-    forced_mode=str(ctx.get("forced_mode") or "").strip()
-    if forced_mode=="💞 특정 상대":
-        analysis_mode="💞 특정 상대"
-        st.success("궁합운 · 특정 상대의 관계 흐름을 보는 모드야.")
-    else:
-        analysis_mode=st.radio(
-            "분석 방식",
-            ["🌙 일반 운세", "💞 특정 상대"],
-            horizontal=True,
-            key="fortune_lab_analysis_mode",
-        )
-    if analysis_mode=="💞 특정 상대":
-        topic="💞 특정 상대와 재회"
-        st.info("상대 정보를 아는 만큼 입력해. 출생시간이 없으면 시간·ASC·하우스는 만들지 않아.")
-    else:
-        general_topics=[k for k in FORTUNE_LAB_TOPICS.keys() if k!="💞 특정 상대와 재회"]
-        topic=st.selectbox("분석 주제",general_topics,key="fortune_lab_topic")
-
-    gender=st.selectbox("사주 대운용 성별",["여성","남성"],index=0 if str(ctx.get("birth_gender","여성")).startswith("여") else 1,key="fortune_lab_gender")
-
+    gender=str(ctx.get("birth_gender") or "여성")
     counterpart=None
-    if analysis_mode=="💞 특정 상대":
+
+    if is_compat:
+        topic=st.selectbox(
+            "궁합운에서 볼 것",
+            ["궁합 전체","관계 흐름","재회 흐름"],
+            key="fortune_lab_compat_topic",
+            help="궁합 전체는 기본 관계 패턴을 먼저 보고, 관계/재회 흐름은 선택 기간의 활성도를 더 강조해.",
+        )
+        st.markdown('<div class="fortune-scope-card"><strong>현재 계산 범위</strong><br>사주: 두 사람 원국의 기본 교차관계까지 실제 계산 · 서양점성술: 내 기간 흐름 계산 · 상대 Western 시너스트리/트랜짓: 아직 미계산. 그래서 상대의 연락일이나 행동을 확정하지 않아.</div>',unsafe_allow_html=True)
         st.markdown("#### 상대 프로필")
-        st.caption("출생시간은 몰라도 돼. 아는 범위까지만 계산해.")
+        st.caption("출생시간은 몰라도 돼. 시간이 없으면 상대 시주·ASC(상승점)·하우스는 만들지 않아.")
         cp_name=st.text_input("상대 호칭 · 선택",value="",placeholder="예: A",key="fortune_lab_cp_name")
         cp_birth_date=st.date_input("상대 출생일",value=date(1990,1,1),key="fortune_lab_cp_birth_date")
         cp_time_known=st.checkbox("상대 출생시간을 알고 있음",value=False,key="fortune_lab_cp_time_known")
@@ -553,6 +615,11 @@ def render_fortune_lab(ctx):
         cp_place,cp_lon=_select_birthplace_from_options(ctx.get("birthplace_options") or {},"fortune_lab_cp")
         cp_context=st.text_area("현재 관계 상태 · 선택",value="",placeholder="예: 마지막 연락 시점, 현재 단절 여부 정도",key="fortune_lab_cp_context")
         counterpart={"name":cp_name.strip(),"birth_date":cp_birth_date,"time_known":cp_time_known,"birth_time":cp_birth_time if cp_time_known else None,"birth_place":cp_place.strip(),"longitude":cp_lon,"context":cp_context.strip()}
+    else:
+        general_topics=[k for k in FORTUNE_LAB_TOPICS.keys() if k not in COMPATIBILITY_TOPICS]
+        topic=st.selectbox("분석 주제",general_topics,key="fortune_lab_topic")
+
+    st.caption(f"사주 대운 계산 성별 · {gender} · 나의 출생 프로필 기준")
     default_start=date(ctx["query_date"].year,ctx["query_date"].month,1)
     default_end=date(default_start.year,12,31) if default_start.month>=8 else min(date(default_start.year,12,31),default_start+timedelta(days=150))
     c1,c2=st.columns(2)
@@ -580,17 +647,17 @@ def render_fortune_lab(ctx):
     cp=bundle.get("counterpart")
     if isinstance(cp,dict):
         cps=cp.get("saju") or {}
-        with st.expander("💞 특정 상대 계산 범위",expanded=True):
+        with st.expander("두 사람 궁합 계산 범위",expanded=True):
             if cps.get("ok"):
                 p=cps.get("pillars") or {}
                 st.write(f"상대 사주 자료 · {p.get('year','?')} / {p.get('month','?')} / {p.get('day','?')} / {p.get('hour') or '시간 미상'}")
-                st.caption("현재는 상대 원국 일부 + 내 사주와의 육합·육충 보조맥락까지만 사용해. 상대 Western 시너스트리·트랜짓은 다음 단계라 특정 연락일을 만들지 않아.")
+                st.caption("현재 정적 궁합은 두 사람 사주 원국의 육합·육충 교차관계까지 계산해. 상대 Western 시너스트리·트랜짓은 아직 미계산이라 상대의 특정 연락일·행동 시기로 바꾸지 않아.")
                 if cp.get("cross_branch_links"):
                     st.write(" · ".join(cp.get("cross_branch_links")[:8]))
             else:
                 st.warning(str(cps.get("error") or "상대 사주 계산 실패"))
-    st.markdown("#### 📆 월별 계산 요약")
-    _render_month_table(bundle)
+    st.markdown("#### 월별 흐름")
+    _render_month_timeline(bundle)
 
     saju=bundle.get("saju",{})
     if saju.get("ok"):
