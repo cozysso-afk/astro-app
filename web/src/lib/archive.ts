@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-export type ArchiveKind = 'integrated' | 'compatibility' | 'marriage' | 'precision'
+export type ArchiveKind = 'integrated' | 'compatibility' | 'marriage' | 'precision' | 'daily' | 'outcome'
 export type ArchivePeriod = 'today' | 'week' | 'month' | 'year'
 
 export type ArchiveItem = {
@@ -89,7 +89,7 @@ async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<Archi
 
   let data: { id: string; created_at: string | null } | null = null
 
-  if (item.kind === 'integrated' || item.kind === 'precision') {
+  if (item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome') {
     const response = await supabase
       .from('readings')
       .insert({
@@ -180,7 +180,7 @@ function cloudRowToItem(
     ? calculation.result as Record<string, unknown>
     : {}
   const rawKind = String(row.reading_type || kindFallback)
-  const kind: ArchiveKind = rawKind === 'marriage' || rawKind === 'compatibility' || rawKind === 'integrated' || rawKind === 'precision'
+  const kind: ArchiveKind = rawKind === 'marriage' || rawKind === 'compatibility' || rawKind === 'integrated' || rawKind === 'precision' || rawKind === 'daily' || rawKind === 'outcome'
     ? rawKind
     : kindFallback
   const rawPeriod = String(calculation.period_key || 'today')
@@ -262,7 +262,7 @@ export async function listArchive(): Promise<ArchiveListResult> {
 export async function deleteArchive(item: ArchiveItem) {
   persistLocal(loadLocal().filter((row) => row.id !== item.id))
   if (!item.cloudId) return
-  const response = item.kind === 'integrated' || item.kind === 'precision'
+  const response = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
     ? await supabase.from('readings').delete().eq('id', item.cloudId)
     : await supabase.from('relationship_readings').delete().eq('id', item.cloudId)
   if (response.error) throw response.error

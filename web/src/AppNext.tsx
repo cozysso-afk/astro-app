@@ -388,6 +388,7 @@ export default function AppNext() {
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [archiveStatus, setArchiveStatus] = useState('')
   const [archiveError, setArchiveError] = useState('')
+  const [legacyArchiveOpen, setLegacyArchiveOpen] = useState<ArchiveItem | null>(null)
   const [uiSettings, setUiSettings] = useState(() => loadUiSettings())
   const [actionNotice, setActionNotice] = useState('')
 
@@ -597,6 +598,12 @@ export default function AppNext() {
   }
 
   function restoreArchive(item: ArchiveItem) {
+    if (item.kind === 'daily' || item.kind === 'outcome') {
+      setLegacyArchiveOpen(item)
+      setMainView('history')
+      return
+    }
+    setLegacyArchiveOpen(null)
     setQueryDate(item.periodStart)
     setPeriod(item.periodKey)
     if (item.kind === 'integrated' || item.kind === 'precision') {
@@ -626,6 +633,10 @@ export default function AppNext() {
   }
 
   async function copyArchiveResult(item: ArchiveItem) {
+    if (item.kind === 'daily' || item.kind === 'outcome') {
+      await handleCopy('이전 기록 전체복사', JSON.stringify(item.result, null, 2))
+      return
+    }
     if (item.kind === 'integrated' || item.kind === 'precision') {
       const result = item.result as unknown as IntegratedApiResponse
       await handleCopy('저장 결과 전체복사', item.kind === 'precision' ? precisionResultText(result) : integratedResultText(result))
@@ -637,6 +648,7 @@ export default function AppNext() {
   async function removeArchive(item: ArchiveItem) {
     try {
       await deleteArchive(item)
+      if (legacyArchiveOpen?.id === item.id) setLegacyArchiveOpen(null)
       setArchiveStatus('기록 삭제 완료')
       await refreshArchive()
     } catch (error) {
@@ -905,11 +917,16 @@ export default function AppNext() {
         {mainView === 'history' && <section className="form-card archive-view">
           <div className="form-card-heading"><div className="report-icon"><History size={21}/></div><div><span className="eyebrow">ARCHIVE</span><h2>분석 기록</h2><p>통합운세·정밀분석·궁합·결혼운 결과를 저장하고 다시 열어볼 수 있어.</p></div></div>
           <div className="archive-sync-row"><span><Cloud size={15}/>{archiveLoading ? '기록 연결 상태 확인 중' : archiveStatus || '기록 연결 상태 확인 전'}</span><button type="button" onClick={refreshArchive} disabled={archiveLoading}><RefreshCw className={archiveLoading?'spin':''} size={15}/>새로고침</button></div>
+          {legacyArchiveOpen && <section className={`legacy-archive-detail legacy-${legacyArchiveOpen.kind}`}>
+            <div className="legacy-archive-head"><div><span className={`archive-kind kind-${legacyArchiveOpen.kind}`}>{legacyArchiveOpen.kind==='daily'?'이전 일일운세':'결과 기록'}</span><strong>{legacyArchiveOpen.title}</strong><small>{legacyArchiveOpen.periodStart} · {new Date(legacyArchiveOpen.createdAt).toLocaleString('ko-KR')}</small></div><button type="button" onClick={()=>setLegacyArchiveOpen(null)}>닫기</button></div>
+            <p>{legacyArchiveOpen.kind==='daily'?'이전 앱에서 저장한 일일운세 원문이야. 기존 계산·해석 데이터를 수정하지 않고 그대로 보존했어.':'이전 앱에서 남긴 실제 결과/피드백 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.'}</p>
+            <details open><summary>원문 데이터 보기</summary><pre>{JSON.stringify(legacyArchiveOpen.result,null,2)}</pre></details>
+          </section>}
           {archiveError && <div className="status-banner error"><AlertTriangle size={16}/><span>{archiveError}</span></div>}
           {archiveLoading && archiveItems.length===0 && <div className="status-banner subtle"><LoaderCircle className="spin" size={16}/><span>저장된 기록을 불러오는 중…</span></div>}
           {!archiveLoading && !archiveError && archiveItems.length===0 && <div className="archive-empty"><History size={22}/><strong>저장된 기록 0개</strong><span>클라우드 연결은 정상이고, 현재 세션에 저장된 분석 결과가 아직 없어. 계산 결과에서 “기록 저장”을 누르면 여기에 쌓여.</span><button className="archive-empty-action" type="button" onClick={()=>switchMainView('home')}><Home size={15}/>홈에서 계산하고 기록 저장하기</button></div>}
           <div className="archive-list">{archiveItems.map((item)=><article className="archive-card" key={item.id}>
-            <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{item.kind==='integrated'?'통합운세':item.kind==='precision'?'정밀분석':item.kind==='marriage'?'결혼운':'궁합운'}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
+            <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{item.kind==='integrated'?'통합운세':item.kind==='precision'?'정밀분석':item.kind==='marriage'?'결혼운':item.kind==='compatibility'?'궁합운':item.kind==='daily'?'이전 일일운세':'결과 기록'}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
             <div className="archive-actions">
               <button type="button" onClick={()=>restoreArchive(item)}><Search size={14}/>다시 열기</button>
               <button type="button" onClick={()=>copyArchiveResult(item)}><Copy size={14}/>전체복사</button>
