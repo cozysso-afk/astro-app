@@ -71,6 +71,28 @@ type RelationshipApiResponse = {
   }
 }
 
+type RelationshipAiResponse = {
+  ok: boolean
+  error?: string
+  model?: string
+  fallback_from?: string
+  interpreter_version?: string
+  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number }
+  data?: {
+    headline: string
+    overview: string
+    chemistry: string
+    communication: string
+    stability: string
+    tensions: string
+    timing: string
+    reunion_context: string
+    practical_advice: string[]
+    top_aspects: Array<{ label: string; meaning: string }>
+    limits: string
+  }
+}
+
 type FortunePoint = { date: string; label: string; score: number }
 type FortuneStat = {
   average: number
@@ -229,6 +251,54 @@ const coreTopicOrder = ['금전','학업','시험','직장','이직','연애','�
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
 const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
+
+function hasPair(aspect: Aspect, a: string, b: string) {
+  return (aspect.a === a && aspect.b === b) || (aspect.a === b && aspect.b === a)
+}
+function relationshipAspectMeaning(aspect: Aspect) {
+  const tense = aspect.tone === 'challenging'
+  const supportive = aspect.tone === 'supportive'
+  if (hasPair(aspect,'Mercury','Mars')) return tense ? '말의 속도와 반응성이 빨라져 논쟁·반박이 쉽게 붙는 접점이야. 누가 맞는지보다 말의 강도를 조절하는 게 핵심이야.' : '생각을 행동으로 옮기는 속도가 잘 맞기 쉬워. 대화를 실제 움직임으로 연결하는 힘이 있어.'
+  if (hasPair(aspect,'Mercury','Uranus')) return tense ? '대화가 갑자기 튀거나 예상 밖의 말로 흐름이 끊길 수 있어. 신선함은 크지만 안정적인 소통 규칙이 필요해.' : '서로의 생각을 깨우는 자극이 강해. 새로운 관점과 아이디어가 잘 살아나는 접점이야.'
+  if (hasPair(aspect,'Mars','Pluto')) return '추진력과 힘겨루기가 동시에 커질 수 있는 강한 접점이야. 경계·통제·주도권을 어떻게 다루는지가 중요해.'
+  if ((aspect.a === 'Neptune' || aspect.b === 'Neptune') && ['ASC','DSC'].some((x)=>aspect.a===x||aspect.b===x)) return tense ? '상대를 보는 이미지와 실제 관계 방식 사이에 흐림이나 이상화가 생기기 쉬워. 추측보다 확인이 중요해.' : '분위기·공감은 잘 생길 수 있지만 현실 확인을 같이 해야 안정적으로 쓰여.'
+  if ((aspect.a === 'Sun' || aspect.b === 'Sun') && ['MC','IC'].some((x)=>aspect.a===x||aspect.b===x)) return supportive ? '한 사람의 핵심 방향성이 다른 사람의 진로·생활축과 자연스럽게 연결되는 접점이야.' : '개인의 방향성과 생활·진로축이 부딪힐 수 있어. 관계와 각자의 목표를 분리해 조율해야 해.'
+  if (hasPair(aspect,'Venus','Mars')) return supportive ? '호감 표현 방식과 추진력이 자연스럽게 맞물리는 전형적인 끌림 접점이야. 다만 이것만으로 관계 지속이나 재회를 뜻하진 않아.' : '끌림은 강할 수 있지만 원하는 속도나 표현 방식 차이로 마찰도 같이 생길 수 있어.'
+  if (aspect.a === 'Saturn' || aspect.b === 'Saturn') return tense ? '책임·거리·기준이 무겁게 느껴질 수 있어. 오래 가려면 의무감보다 합의된 규칙이 필요해.' : '관계에 구조와 지속성을 더해주는 접점이야. 꾸준함과 현실적인 약속으로 쓸 때 힘이 생겨.'
+  if (aspect.a === 'Jupiter' || aspect.b === 'Jupiter') return supportive ? '서로의 시야를 넓히고 격려하는 방향으로 쓰이기 쉬워.' : '기대나 낙관이 과해질 수 있어. 실제 상황보다 크게 해석하지 않는 게 중요해.'
+  if (aspect.a === 'True Node' || aspect.b === 'True Node') return '익숙함이나 의미 부여가 강해질 수 있지만 운명·재회 확정의 증거는 아니야. 반복 패턴을 살피는 근거로 보는 게 맞아.'
+  return supportive ? '이 기능은 비교적 자연스럽게 연결되는 조화 접점이야. 관계 전체가 좋다는 뜻은 아니야.' : tense ? '자극과 마찰이 반복되기 쉬운 긴장 접점이야. 나쁘다는 뜻보다 조율이 필요한 힘이 강하다는 의미야.' : '강한 결합이나 혼합 효과가 나타나는 접점이야. 상황에 따라 협력과 부담이 함께 나타날 수 있어.'
+}
+function relationshipLimitKo(text: string) {
+  if (text.includes('Partner exact birth time/place missing')) return '상대의 정확한 출생시간·장소가 없어 데이비슨·마크스·마크스 3차 진행은 추정하지 않고 제외했어.'
+  if (text.includes('Exact partner birth time')) return '상대의 정확한 출생시간이 없어 해당 정밀 진행 레이어는 계산하지 않았어.'
+  return text
+}
+function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading, aiError, onAi }: { aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string; onAi: () => void }) {
+  const supportive = aspects.filter((a)=>a.tone==='supportive').length
+  const challenging = aspects.filter((a)=>a.tone==='challenging').length
+  const mixed = aspects.filter((a)=>a.tone==='mixed').length
+  const tight = [...aspects].sort((a,b)=>a.orb-b.orb).slice(0,4)
+  const communication = aspects.filter((a)=>a.a==='Mercury'||a.b==='Mercury')
+  const chemistry = aspects.filter((a)=>['Venus','Mars','Pluto'].includes(a.a)||['Venus','Mars','Pluto'].includes(a.b))
+  const structure = aspects.filter((a)=>['Saturn','Jupiter','True Node'].includes(a.a)||['Saturn','Jupiter','True Node'].includes(a.b))
+  const headline = challenging > supportive + 3 ? '강한 자극과 마찰이 함께 있는 관계 구조' : supportive > challenging + 3 ? '조화 접점이 상대적으로 많은 관계 구조' : '끌림·조화·긴장이 섞여 있는 복합 관계 구조'
+  const communicationText = communication.length ? `소통 관련 접점이 ${communication.length}개 보여. ${communication.slice(0,2).map(relationshipAspectMeaning).join(' ')}` : '수성 관련 주요 접점이 상위권에 많지 않아. 대화 패턴은 다른 접점과 실제 경험을 같이 봐야 해.'
+  const chemistryText = chemistry.length ? `끌림·추진력·강도 관련 접점이 ${chemistry.length}개야. ${chemistry.slice(0,2).map(relationshipAspectMeaning).join(' ')}` : '금성·화성·명왕성 관련 강한 접점이 상위권에 적어, 끌림 하나만으로 관계 전체를 설명하기는 어려워.'
+  const stabilityText = structure.length ? `지속성·성장·반복 패턴 관련 접점이 ${structure.length}개야. ${structure.slice(0,2).map(relationshipAspectMeaning).join(' ')}` : '토성·목성·노드 관련 상위 접점이 적어 장기 지속성은 현재 계산만으로 강하게 단정하기 어려워.'
+  const timing = partnerExact ? '두 사람의 정확한 출생시간·좌표가 있어 진행 시너스트리·데이비슨·마크스 타이밍까지 계산할 수 있어. 아래 접점 수는 사건 확률이 아니야.' : '상대 출생시간/장소가 없어서 진행 시너스트리·진행 컴포지트·데이비슨·마크스 타이밍은 계산에서 제외됐어. 0/0/0은 활성도 0이 아니라 정밀 타이밍 미계산이 맞아.'
+  return <>
+    <section className="relationship-reading-card">
+      <span className="eyebrow">RELATIONSHIP READING</span><h3>{headline}</h3>
+      <p className="relationship-overview">시너스트리에서 {aspects.length}개 접점이 잡혔고 조화 {supportive} · 긴장 {challenging} · 혼합 {mixed}이야. 이 숫자는 궁합 점수나 재회 확률이 아니라 두 차트가 어디에서 반복적으로 맞물리는지 보여주는 구조값이야. 오브가 좁을수록 그 주제가 체감되기 쉬워.</p>
+      <div className="relationship-reading-grid"><article><strong>대화 · 소통</strong><p>{communicationText}</p></article><article><strong>끌림 · 자극</strong><p>{chemistryText}</p></article><article><strong>지속성 · 성장</strong><p>{stabilityText}</p></article><article><strong>타이밍 정밀도</strong><p>{timing}</p></article></div>
+      <div className="relationship-key-aspects"><strong>가장 강한 접점</strong>{tight.map((aspect,index)=><div key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><b>{aspectText(aspect)} · 오브 {aspect.orb.toFixed(2)}°</b><p>{relationshipAspectMeaning(aspect)}</p></div>)}</div>
+    </section>
+    <div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini 관계 해석 중…':'Gemini 관계 정밀해석'}</span></button><small>원할 때만 AI 호출 · 완료 후 토큰/예상비용 표시</small></div>
+    {aiError && <div className="status-banner error"><AlertTriangle size={16}/><span>{aiError}</span></div>}
+    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">GEMINI RELATIONSHIP INTERPRETATION</span><h3>{ai.data.headline}</h3>{ai.usage?.total_tokens?<div className="relationship-ai-usage"><span>입력 {(ai.usage.prompt_tokens??0).toLocaleString()} · 출력 {(ai.usage.candidate_tokens??0).toLocaleString()} · 사고 {(ai.usage.thought_tokens??0).toLocaleString()} tokens</span><b>예상비용 ${Number(ai.usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(ai.usage.estimated_krw??0).toLocaleString()}원</b></div>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 자극</strong><p>{ai.data.chemistry}</p></article><article><strong>대화 · 소통</strong><p>{ai.data.communication}</p></article><article><strong>지속성</strong><p>{ai.data.stability}</p></article><article><strong>긴장 포인트</strong><p>{ai.data.tensions}</p></article><article><strong>타이밍</strong><p>{ai.data.timing}</p></article><article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article></div>{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>현실 조언</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>핵심 애스펙트 상세</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
+  </>
+}
 
 function initialPeriodFromUrl(): PeriodKey {
   if (typeof window === 'undefined') return 'today'
@@ -481,6 +551,9 @@ export default function AppNext() {
   const [relationshipResult, setRelationshipResult] = useState<RelationshipApiResponse | null>(null)
   const [relationshipLoading, setRelationshipLoading] = useState(false)
   const [relationshipError, setRelationshipError] = useState('')
+  const [relationshipAi, setRelationshipAi] = useState<RelationshipAiResponse | null>(null)
+  const [relationshipAiLoading, setRelationshipAiLoading] = useState(false)
+  const [relationshipAiError, setRelationshipAiError] = useState('')
   const [integratedResult, setIntegratedResult] = useState<IntegratedApiResponse | null>(null)
   const [aiInterpretation, setAiInterpretation] = useState<AiInterpretationResponse | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -549,7 +622,7 @@ export default function AppNext() {
 
   const selectedToolInfo = selectedTool ? tools.find((tool) => tool.key === selectedTool) : null
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
-  const resultMonths = relationshipResult?.result?.months ?? []
+  const resultMonths = (relationshipResult?.result?.natal_synastry?.partner_time_exact ? relationshipResult?.result?.months : []) ?? []
   const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
   const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)
   const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length
@@ -682,7 +755,7 @@ export default function AppNext() {
   }
 
   const runRelationship = async () => {
-    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null)
+    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError('')
     if (!birthProfile.birthDate || !birthProfile.birthTime) { setRelationshipError('먼저 내정보에서 본인 생년월일과 출생시간을 저장해줘.'); return }
     if (!counterpart.birthDate) { setRelationshipError('상대 생년월일은 반드시 필요해.'); return }
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
@@ -710,6 +783,22 @@ export default function AppNext() {
     } catch (error) {
       setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
     } finally { setRelationshipLoading(false) }
+  }
+
+
+  const runRelationshipAi = async () => {
+    if (!relationshipResult) return
+    setRelationshipAiLoading(true); setRelationshipAiError('')
+    try {
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke('relationship-interpret', { body: { calculation: relationshipResult, model: aiModel } })
+      if (error) throw error
+      const payload = data as RelationshipAiResponse
+      if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
+      setRelationshipAi(payload)
+    } catch (error) {
+      setRelationshipAiError(error instanceof Error ? error.message : '관계 AI 해설을 불러오지 못했어.')
+    } finally { setRelationshipAiLoading(false) }
   }
 
 
@@ -948,6 +1037,8 @@ export default function AppNext() {
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} />
+              {!relationshipResult.result.natal_synastry?.partner_time_exact && <section className="result-card timing-unavailable"><div className="result-card-title"><span>TIMING</span><strong>정밀 타이밍 계산 제외</strong></div><p>상대 출생시간·장소가 없어서 진행 시너스트리·진행 컴포지트·데이비슨·마크스 계열은 추정하지 않았어. 이전 화면의 0/0/0은 “아무 접점 없음”이 아니라 계산 불가를 잘못 표시한 거였어.</p></section>}
               <section className="result-card">
                 <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조 · 계산 근거</strong></div>
                 <p className="result-note">아래 숫자는 관계 점수나 재회 확률이 아니라, 허용 오브 안에서 포착된 주요 천체 각의 개수야.</p>
@@ -964,7 +1055,7 @@ export default function AppNext() {
                 <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 시너스트리·진행 합성·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
                 <p className="result-note">현재는 출생시간 없이도 계산 가능한 기본 시너스트리만 해석 근거로 사용해.</p>
               </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
-              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
+              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.map(relationshipLimitKo).join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
             </div>}
           </section>}
 
