@@ -1,0 +1,121 @@
+name: Apply AI Resume + Readability v3
+
+on:
+  push:
+    branches:
+      - ux-ai-resume-20260829
+    paths:
+      - 'scripts/patch_ai_resume_readability.py'
+      - '.github/workflows/apply-ai-resume-readability-v3.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ux-ai-resume-20260829
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply frontend patch
+        run: python scripts/patch_ai_resume_readability.py
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          grep -q "AI_JOB_STORAGE_KEY" src/AppNext.tsx
+          grep -q "action: 'start'" src/AppNext.tsx
+          grep -q "action: 'status'" src/AppNext.tsx
+          grep -q "visibilitychange" src/AppNext.tsx
+          grep -q "pageshow" src/AppNext.tsx
+          grep -q "readability-v3.css" src/main.tsx
+
+      - name: Verify background AI survives client absence
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          SUPA='https://dbynfabwfcakxayyggzi.supabase.co'
+          KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+
+          ready=0
+          for i in $(seq 1 8); do
+            if curl -fsSL --max-time 25 "$API/health" -o /tmp/health.json; then ready=1; break; fi
+            sleep 8
+          done
+          [ "$ready" = 1 ]
+
+          cat > /tmp/integrated.json <<'JSON'
+          {"profile":{"name":"Background AI E2E","birth_date":"1990-01-01","birth_time":"12:00:00","latitude":37.5665,"longitude":126.9780,"utc_offset_hours":9,"gender":"female"},"start_date":"2026-08-29","end_date":"2026-08-29"}
+          JSON
+          curl -fsSL --max-time 30 -X POST "$API/v1/fortune/integrated/start" -H 'Content-Type: application/json' --data-binary @/tmp/integrated.json -o /tmp/calc-start.json
+          calc_job=$(python -c "import json;print(json.load(open('/tmp/calc-start.json'))['job_id'])")
+          for i in $(seq 1 60); do
+            curl -fsSL --max-time 30 "$API/v1/fortune/integrated/jobs/$calc_job" -o /tmp/calc-job.json
+            status=$(python -c "import json;print(json.load(open('/tmp/calc-job.json')).get('status',''))")
+            [ "$status" = done ] && break
+            [ "$status" = failed ] && cat /tmp/calc-job.json && exit 1
+            sleep 3
+          done
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/calc-job.json')); assert j.get('status')=='done',j
+          json.dump(j['result'],open('/tmp/calculation.json','w'),ensure_ascii=False)
+          PY
+
+          curl -fsSL --max-time 30 -X POST "$SUPA/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}' -o /tmp/auth.json
+          token=$(python -c "import json;print(json.load(open('/tmp/auth.json'))['access_token'])")
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/calculation.json'))
+          json.dump({'action':'start','calculation':calc,'model':'gemini-3.7-flash'},open('/tmp/ai-start-request.json','w'),ensure_ascii=False)
+          PY
+          curl -fsSL --max-time 30 -X POST "$SUPA/functions/v1/fortune-interpret" -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data-binary @/tmp/ai-start-request.json -o /tmp/ai-start.json
+          ai_job=$(python -c "import json;d=json.load(open('/tmp/ai-start.json'));assert d.get('ok') and d.get('job_id'),d;print(d['job_id'])")
+          echo "AI_JOB_STARTED=$ai_job"
+
+          # Simulate the iPhone leaving the PWA: no polling/request remains open.
+          sleep 20
+
+          done_flag=0
+          for i in $(seq 1 60); do
+            printf '{"action":"status","job_id":"%s"}' "$ai_job" > /tmp/ai-status-request.json
+            curl -fsSL --max-time 30 -X POST "$SUPA/functions/v1/fortune-interpret" -H "apikey: $KEY" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data-binary @/tmp/ai-status-request.json -o /tmp/ai-status.json
+            status=$(python -c "import json;print(json.load(open('/tmp/ai-status.json')).get('status',''))")
+            echo "ai[$i]=$status"
+            if [ "$status" = done ]; then done_flag=1; break; fi
+            if [ "$status" = failed ]; then cat /tmp/ai-status.json; exit 1; fi
+            sleep 3
+          done
+          [ "$done_flag" = 1 ]
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/ai-status.json'))
+          assert d.get('ok') is True and d.get('status')=='done',d
+          assert (d.get('data') or {}).get('headline'),d
+          usage=d.get('usage') or {}; assert int(usage.get('total_tokens') or 0)>0,usage
+          print('BACKGROUND_AI_OK',d.get('model'),'fallback=',d.get('fallback_from'),'tokens=',usage.get('total_tokens'),'krw=',usage.get('estimated_krw'))
+          PY
+
+      - name: Commit verified frontend patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/main.tsx web/src/readability-v3.css
+          if git diff --cached --quiet; then
+            echo 'No app changes to commit'
+          else
+            git commit -m 'fix: persist AI reading jobs and improve timing readability [skip ci]'
+            git push origin HEAD:ux-ai-resume-20260829
+          fi
