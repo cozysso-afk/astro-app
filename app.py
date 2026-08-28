@@ -241,6 +241,119 @@ header [data-testid="stToolbar"] { opacity: .18; }
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A2. VISUAL SYSTEM v7.2 · WARM CELESTIAL OBSERVATORY
+# ============================================================
+ASTRO_DESIGN_V72_CSS = """
+<style>
+:root{
+  --astro-bg:#f7f2e9;
+  --astro-paper:rgba(255,252,247,.90);
+  --astro-paper-strong:#fffdf9;
+  --astro-ink:#332d2a;
+  --astro-muted:#7b6e67;
+  --astro-gold:#b48853;
+  --astro-rose:#b9827a;
+  --astro-sage:#829184;
+  --astro-line:rgba(126,103,87,.18);
+  --astro-shadow:0 14px 38px rgba(83,61,45,.09);
+}
+html,body,[class*="css"]{color:var(--astro-ink)!important}
+.stApp{
+  background:
+    radial-gradient(circle at 92% 2%,rgba(213,178,137,.26),transparent 28%),
+    radial-gradient(circle at 4% 30%,rgba(190,146,135,.13),transparent 30%),
+    linear-gradient(180deg,#fbf8f2 0%,#f4ece2 55%,#f8f5ef 100%)!important;
+  color:var(--astro-ink)!important;
+}
+.block-container{max-width:760px!important;padding-top:.8rem!important}
+h1,h2,h3,h4{color:#342c28!important;letter-spacing:-.025em}
+p,[data-testid="stCaptionContainer"],.stCaption{color:var(--astro-muted)!important}
+
+/* Brand hero */
+.astro-hero{padding:18px 4px 7px;margin-bottom:8px}
+.astro-hero-kicker{font-size:.67rem;letter-spacing:.22em;font-weight:800;color:#9a806c;margin-bottom:8px}
+.astro-hero-row{display:flex;align-items:center;gap:12px}
+.astro-hero-sigil{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fffaf1,#e5caa8);border:1px solid rgba(180,136,83,.28);box-shadow:0 8px 22px rgba(120,89,58,.12);font-size:1.55rem;color:#a77b48}
+.astro-hero-title{font-size:2rem;line-height:1.05;font-weight:900;color:#342c28;letter-spacing:-.055em}
+.astro-hero-sub{font-size:.73rem;color:#8c7a70;margin-top:6px;letter-spacing:.04em}
+
+/* Cards / profile */
+.profile-strip,.ast-card,.ai-overview,.period-range,.astro-note,
+[data-testid="stExpander"],div[data-testid="stVerticalBlockBorderWrapper"]{
+  background:var(--astro-paper)!important;
+  border-color:var(--astro-line)!important;
+  box-shadow:var(--astro-shadow)!important;
+}
+.profile-strip{border-radius:20px!important;padding:14px 15px!important;color:#534841!important}
+[data-testid="stExpander"]{border-radius:18px!important;overflow:hidden}
+
+/* Menu radios -> horizontal pill navigation */
+div[role="radiogroup"]{display:flex!important;flex-wrap:nowrap!important;gap:7px!important;overflow-x:auto!important;padding:3px 1px 8px!important;scrollbar-width:none!important}
+div[role="radiogroup"]::-webkit-scrollbar{display:none}
+div[role="radiogroup"] label{
+  flex:0 0 auto!important;
+  min-height:38px!important;
+  border:1px solid var(--astro-line)!important;
+  border-radius:999px!important;
+  background:rgba(255,252,247,.72)!important;
+  padding:7px 12px!important;
+  box-shadow:0 5px 14px rgba(84,63,48,.04)!important;
+}
+div[role="radiogroup"] label:has(input:checked){
+  background:linear-gradient(135deg,#4d4039,#725b4c)!important;
+  border-color:#5e4b40!important;
+  color:#fff!important;
+  box-shadow:0 8px 20px rgba(73,52,41,.18)!important;
+}
+div[role="radiogroup"] label:has(input:checked) p{color:#fff!important}
+div[role="radiogroup"] label [data-testid="stMarkdownContainer"] p{font-size:.83rem!important;font-weight:760!important;white-space:nowrap!important}
+
+/* Inputs */
+[data-baseweb="select"]>div,
+[data-testid="stDateInput"] input,
+[data-testid="stTimeInput"] input,
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea{
+  background:#fffdf9!important;
+  border-color:rgba(128,104,87,.20)!important;
+  border-radius:14px!important;
+  color:#3e3530!important;
+  min-height:46px!important;
+}
+label,[data-testid="stWidgetLabel"] p{color:#4b4039!important;font-weight:720!important}
+
+/* Buttons */
+.stButton>button[kind="primary"],.stDownloadButton>button[kind="primary"]{
+  background:linear-gradient(135deg,#a67947,#c49a68)!important;
+  color:white!important;border:0!important;border-radius:15px!important;
+  min-height:48px!important;box-shadow:0 10px 24px rgba(159,116,69,.20)!important;
+}
+.stButton>button:not([kind="primary"]),.stDownloadButton>button{
+  border-radius:14px!important;border-color:var(--astro-line)!important;background:#fffdf9!important;color:#51443d!important;
+}
+
+/* Tables / metrics */
+[data-testid="stMetric"]{background:rgba(255,253,249,.86);border:1px solid var(--astro-line);border-radius:16px;padding:11px 12px}
+[data-testid="stDataFrame"]{border-radius:16px;overflow:hidden;border:1px solid var(--astro-line)}
+
+.fortune-kicker{font-size:.68rem;letter-spacing:.18em;font-weight:850;color:#a17b54;margin:2px 0 4px}
+.fortune-title{font-size:1.55rem;font-weight:900;letter-spacing:-.045em;color:#342c28;margin-bottom:4px}
+.fortune-lead{font-size:.88rem;line-height:1.65;color:#7a6b63;margin-bottom:14px}
+.fortune-section-label{font-size:.78rem;font-weight:850;color:#765f50;letter-spacing:.02em;margin:6px 0 2px}
+
+@media(max-width:640px){
+  .block-container{padding-left:1rem!important;padding-right:1rem!important;padding-bottom:calc(8rem + env(safe-area-inset-bottom))!important}
+  .astro-hero-title{font-size:1.95rem}
+  .astro-hero-sigil{width:42px;height:42px}
+  div[role="radiogroup"] label{padding:7px 11px!important}
+}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V72_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -4858,7 +4971,7 @@ def render_relationship_signal_panel(query_date,daily_scores,daily_topic_results
 # ============================================================
 # GitHub Pages 홈 화면 런처가 OneSignal 알림의 목적지를 query param으로 전달한다.
 # 한 Streamlit 세션에서 같은 알림 파라미터를 매 rerun마다 다시 강제하지 않도록 signature를 기억한다.
-PUSH_ROUTE_TO_VIEW={"daily":"🌙 일일","weekly":"📅 주간","monthly":"🌕 월간","annual":"🌌 연간","precision":"🔬 정밀분석"}
+PUSH_ROUTE_TO_VIEW={"daily":"오늘","weekly":"주간","monthly":"월간","annual":"연간","precision":"정밀분석"}
 
 
 def _query_param_text(name):
@@ -4903,23 +5016,48 @@ if push_kind in PUSH_ROUTE_TO_VIEW and st.session_state.get("_push_route_applied
     st.session_state["_push_route_applied"]=push_signature
     st.session_state["_push_route_notice"]=push_kind
 
-st.markdown('<div class="top-nav">✦ ASTROLOGY · HOROSCOPE · PRIVATE ✦</div>',unsafe_allow_html=True)
-st.title("🌙 별빛의 운명")
+st.markdown("""
+<div class="astro-hero">
+  <div class="astro-hero-kicker">CELESTIAL TIMING LAB</div>
+  <div class="astro-hero-row">
+    <div class="astro-hero-sigil">☾</div>
+    <div>
+      <div class="astro-hero-title">별빛의 운명</div>
+      <div class="astro-hero-sub">시간의 흐름과 삶의 패턴을 읽는 개인 관측실</div>
+    </div>
+  </div>
+</div>
+""",unsafe_allow_html=True)
 st.caption(f"{EPHEMERIS_USED} · Tropical · Whole Sign 주 기준 · Placidus 보조")
 
-with st.expander("👤 출생정보 수정", expanded=False):
-    user_name=st.text_input("성함 또는 호칭",value=PROFILE_NAME_DEFAULT,key="profile_name")
+with st.expander("👤 나의 출생 프로필", expanded=False):
+    user_name=st.text_input("호칭",value=PROFILE_NAME_DEFAULT,key="profile_name")
     birth_gender=st.selectbox("성별 · 사주 대운 계산용",["여성","남성"],index=0,key="profile_birth_gender")
     birth_date=st.date_input("출생일",PROFILE_BIRTH_DATE_DEFAULT,key="profile_birth_date")
     birth_time=st.time_input("출생 시간",PROFILE_BIRTH_TIME_DEFAULT,step=60,key="profile_birth_time")
-    places=list(KOREA_BIRTHPLACES)+["직접 좌표 입력(고급)"]
-    birth_place=st.selectbox("출생 지역",places,index=places.index(PROFILE_BIRTH_PLACE_DEFAULT),key="profile_birth_place")
-    if birth_place=="직접 좌표 입력(고급)":
-        lat=st.number_input("출생지 위도(N)",value=34.7604,format="%.6f",key="_direct_lat"); lon=st.number_input("출생지 경도(E)",value=127.6622,format="%.6f",key="_direct_lon"); place_label="직접 좌표"
+    _place_groups={}
+    for _place_name in KOREA_BIRTHPLACES:
+        _province=_place_name.split()[0]
+        _place_groups.setdefault(_province,[]).append(_place_name)
+    _default_province=PROFILE_BIRTH_PLACE_DEFAULT.split()[0]
+    _province_options=list(_place_groups)+["해외·직접 좌표"]
+    _province_index=_province_options.index(_default_province) if _default_province in _province_options else 0
+    birth_province=st.selectbox("출생 시·도",_province_options,index=_province_index,key="profile_birth_province")
+    if birth_province=="해외·직접 좌표":
+        place_label=st.text_input("출생 지역명",value="",placeholder="예: Tokyo, Japan",key="profile_birth_place_direct") or "직접 좌표"
+        lat=st.number_input("출생지 위도(N)",value=34.7604,format="%.6f",key="_direct_lat")
+        lon=st.number_input("출생지 경도(E)",value=127.6622,format="%.6f",key="_direct_lon")
+        birth_place="직접 좌표 입력(고급)"
     else:
+        _city_options=_place_groups[birth_province]
+        _default_city=PROFILE_BIRTH_PLACE_DEFAULT if PROFILE_BIRTH_PLACE_DEFAULT in _city_options else _city_options[0]
+        birth_place=st.selectbox(
+            "출생 시·군·구",_city_options,index=_city_options.index(_default_city),
+            format_func=lambda x:(x[len(birth_province):].strip() or x),key="profile_birth_place"
+        )
         lat,lon=KOREA_BIRTHPLACES[birth_place]; place_label=birth_place
 # 날짜는 오늘 자동. 사용자가 원할 때만 바꾼다.
-query_date=st.date_input("📅 일일/주간 시작 날짜", value=today_kst, key="profile_query_date", help="앱을 열면 오늘 날짜가 자동 선택됩니다. 다른 날짜 운세를 보고 싶을 때만 바꾸세요.")
+query_date=st.date_input("기준 날짜", value=today_kst, key="profile_query_date", help="앱을 열면 오늘 날짜가 자동 선택돼. 다른 날짜를 볼 때만 바꿔.")
 query_ref_time=now_kst.time().replace(second=0,microsecond=0) if query_date==today_kst else dt_time(12,0)
 query_dt_kst=KST.localize(datetime.combine(query_date,query_ref_time)); query_dt_utc=query_dt_kst.astimezone(UTC)
 
@@ -4955,14 +5093,14 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # ============================================================
 # 11. TABS
 # ============================================================
-main_view=st.radio("메뉴",["🌙 일일","📅 주간","🌕 월간","🌌 연간","🧭 포춘랩","💞 상대재회","📚 저장함","🔬 정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
+main_view=st.radio("메뉴",["오늘","주간","월간","연간","포춘랩","궁합운","저장함","정밀분석"],horizontal=True,label_visibility="collapsed",key="main_view")
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
 
 # ------------------------------------------------------------
 # DAILY
 # ------------------------------------------------------------
-if main_view=="🌙 일일":
+if main_view=="오늘":
     st.markdown(f"### 🌙 {query_date:%Y년 %m월 %d일}({WEEKDAY_KO[query_date.weekday()]}) 일일 리포트")
     if query_date==today_kst: st.caption("앱을 열었을 때 오늘 날짜를 자동으로 계산합니다. 기준 시각 입력은 필요 없습니다.")
     else: st.caption("선택한 날짜의 하루 전체 흐름을 여러 시간대로 나눠 계산합니다.")
@@ -5063,7 +5201,7 @@ if main_view=="🌙 일일":
 # ------------------------------------------------------------
 # WEEKLY
 # ------------------------------------------------------------
-elif main_view=="📅 주간":
+elif main_view=="주간":
     week_end=query_date+timedelta(days=6)
     st.markdown("### 📅 7일 주간 정밀 리포트")
     week_sessions=krx_sessions_in_range(query_date,week_end)
@@ -5112,7 +5250,7 @@ elif main_view=="📅 주간":
 # ------------------------------------------------------------
 # MONTHLY
 # ------------------------------------------------------------
-elif main_view=="🌕 월간":
+elif main_view=="월간":
     st.markdown("### 🌕 월간 정밀 리포트")
     if "monthly_year" not in st.session_state: st.session_state["monthly_year"]=query_date.year
     if "monthly_month" not in st.session_state: st.session_state["monthly_month"]=query_date.month
@@ -5182,7 +5320,7 @@ elif main_view=="🌕 월간":
 # ------------------------------------------------------------
 # ANNUAL
 # ------------------------------------------------------------
-elif main_view=="🌌 연간":
+elif main_view=="연간":
     st.markdown("### 🌌 연간 정밀운세")
     annual_years=list(range(query_date.year-2,query_date.year+5))
     default_year=query_date.year+1 if query_date.month>=8 and query_date.year+1 in annual_years else query_date.year
@@ -5236,13 +5374,14 @@ elif main_view=="🌌 연간":
 # ------------------------------------------------------------
 # FORTUNE LAB · SAJU × WESTERN × THAI BASELINE
 # ------------------------------------------------------------
-elif main_view in ("🧭 포춘랩","💞 상대재회"):
+elif main_view in ("포춘랩","궁합운"):
     render_fortune_lab({
-        "forced_mode":"💞 특정 상대" if main_view=="💞 상대재회" else None,
+        "forced_mode":"💞 특정 상대" if main_view=="궁합운" else None,
         "birth_date":birth_date,
         "birth_time":birth_time,
         "birth_lon":lon,
         "birth_gender":birth_gender,
+        "birthplace_options":KOREA_BIRTHPLACES,
         "query_date":query_date,
         "natal_packed":natal_packed,
         "houses_packed":houses_packed,
@@ -5258,13 +5397,13 @@ elif main_view in ("🧭 포춘랩","💞 상대재회"):
 # ------------------------------------------------------------
 # ARCHIVE
 # ------------------------------------------------------------
-elif main_view=="📚 저장함":
+elif main_view=="저장함":
     _render_fortune_archive()
 
 # ------------------------------------------------------------
 # PRECISION / TRANSITS / RETURNS / VALIDATION
 # ------------------------------------------------------------
-elif main_view=="🔬 정밀분석":
+elif main_view=="정밀분석":
     detail_view=st.radio("정밀분석 메뉴",["⏰ 시간대","🪐 트랜짓","🔄 리턴","⚙️ 검증"],horizontal=True,label_visibility="collapsed",key="detail_view")
     if detail_view=="⏰ 시간대":
         st.markdown("### ⏰ 선택 날짜 정밀 시간대")

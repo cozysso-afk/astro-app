@@ -33,7 +33,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.4"
+FORTUNE_LAB_VERSION = "v0.1.5"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -484,15 +484,48 @@ def _render_month_table(bundle):
         st.dataframe(rows,use_container_width=True,hide_index=True)
 
 
+
+def _select_birthplace_from_options(options,key_prefix):
+    """Two-stage Korea selector with direct-input fallback. Returns (label, longitude)."""
+    places=dict(options or {})
+    if not places:
+        label=st.text_input("상대 출생 지역",value="",placeholder="예: 광주광역시",key=f"{key_prefix}_direct_label")
+        lon_raw=st.text_input("상대 출생지 경도(E) · 선택",value="",placeholder="출생시간을 알 때만",key=f"{key_prefix}_direct_lon")
+        try: lon=float(lon_raw.strip()) if lon_raw.strip() else None
+        except Exception:
+            lon=None; st.warning("경도는 숫자로 입력해줘.")
+        return label.strip(),lon
+    groups={}
+    for name in places:
+        province=name.split()[0]
+        groups.setdefault(province,[]).append(name)
+    province_options=list(groups)+["해외·직접 입력"]
+    province=st.selectbox("상대 출생 시·도",province_options,key=f"{key_prefix}_province")
+    if province=="해외·직접 입력":
+        label=st.text_input("상대 출생 지역명",value="",placeholder="예: Tokyo, Japan",key=f"{key_prefix}_direct_label")
+        lon_raw=st.text_input("상대 출생지 경도(E) · 선택",value="",placeholder="출생시간을 알 때만",key=f"{key_prefix}_direct_lon")
+        try: lon=float(lon_raw.strip()) if lon_raw.strip() else None
+        except Exception:
+            lon=None; st.warning("경도는 숫자로 입력해줘.")
+        return label.strip(),lon
+    city_options=groups[province]
+    selected=st.selectbox(
+        "상대 출생 시·군·구",city_options,
+        format_func=lambda x:(x[len(province):].strip() or x),key=f"{key_prefix}_city"
+    )
+    coords=places.get(selected) or (None,None)
+    return selected,(float(coords[1]) if len(coords)>1 and coords[1] is not None else None)
+
 def render_fortune_lab(ctx):
-    st.markdown("### 🧭 FORTUNE LAB · 다체계 운세 분석")
+    st.markdown('<div class="fortune-kicker">FORTUNE LAB</div>',unsafe_allow_html=True)
+    st.markdown('<div class="fortune-title">운의 흐름을 겹쳐보기</div>',unsafe_allow_html=True)
+    st.markdown('<div class="fortune-lead">서양점성술의 시간축과 사주 대운·세운·월운, 태국 출생층을 한 화면에서 비교해.</div>',unsafe_allow_html=True)
     st.caption(f"운영 버전 · {FORTUNE_LAB_VERSION}")
-    st.caption("별빛의 서양 계산 + 사주 대운·세운·월운 + 태국 출생요일층을 한 번에 정리하고, 해석가는 Gemini 또는 외부 AI로 자유롭게 선택해.")
 
     forced_mode=str(ctx.get("forced_mode") or "").strip()
     if forced_mode=="💞 특정 상대":
         analysis_mode="💞 특정 상대"
-        st.success("💞 특정 상대 재회 분석 · 상대 정보를 바로 입력해.")
+        st.success("궁합운 · 특정 상대의 관계 흐름을 보는 모드야.")
     else:
         analysis_mode=st.radio(
             "분석 방식",
@@ -502,7 +535,7 @@ def render_fortune_lab(ctx):
         )
     if analysis_mode=="💞 특정 상대":
         topic="💞 특정 상대와 재회"
-        st.info("특정 상대 정보를 아래에 입력하면, 아는 데이터만 사용해서 재회 흐름을 계산해.")
+        st.info("상대 정보를 아는 만큼 입력해. 출생시간이 없으면 시간·ASC·하우스는 만들지 않아.")
     else:
         general_topics=[k for k in FORTUNE_LAB_TOPICS.keys() if k!="💞 특정 상대와 재회"]
         topic=st.selectbox("분석 주제",general_topics,key="fortune_lab_topic")
@@ -511,19 +544,14 @@ def render_fortune_lab(ctx):
 
     counterpart=None
     if analysis_mode=="💞 특정 상대":
-        st.markdown("#### 💞 특정 상대 정보")
-        st.caption("출생시간을 몰라도 가능해. 그 경우 상대 시주·ASC·하우스는 계산하지 않고, 아는 데이터만 사용해.")
+        st.markdown("#### 상대 프로필")
+        st.caption("출생시간은 몰라도 돼. 아는 범위까지만 계산해.")
         cp_name=st.text_input("상대 호칭 · 선택",value="",placeholder="예: A",key="fortune_lab_cp_name")
         cp_birth_date=st.date_input("상대 출생일",value=date(1990,1,1),key="fortune_lab_cp_birth_date")
         cp_time_known=st.checkbox("상대 출생시간을 알고 있음",value=False,key="fortune_lab_cp_time_known")
         cp_birth_time=st.time_input("상대 출생시간",value=dt_time(12,0),step=60,key="fortune_lab_cp_birth_time",disabled=not cp_time_known)
-        cp_place=st.text_input("상대 출생지 · 선택",value="",placeholder="예: 광주",key="fortune_lab_cp_place")
-        cp_lon_raw=st.text_input("상대 출생지 경도(E) · 시간 보정용 선택",value="",placeholder="시간을 정확히 알 때만 예: 126.85",key="fortune_lab_cp_lon")
-        cp_context=st.text_area("현재 관계 상태 · 선택",value="",placeholder="예: 마지막 연락 시점/현재 단절 여부 정도만",key="fortune_lab_cp_context")
-        cp_lon=None
-        if cp_time_known and cp_lon_raw.strip():
-            try: cp_lon=float(cp_lon_raw.strip())
-            except Exception: st.warning("상대 경도는 숫자로 입력해줘. 경도를 비우면 상대 시주는 사용하지 않아.")
+        cp_place,cp_lon=_select_birthplace_from_options(ctx.get("birthplace_options") or {},"fortune_lab_cp")
+        cp_context=st.text_area("현재 관계 상태 · 선택",value="",placeholder="예: 마지막 연락 시점, 현재 단절 여부 정도",key="fortune_lab_cp_context")
         counterpart={"name":cp_name.strip(),"birth_date":cp_birth_date,"time_known":cp_time_known,"birth_time":cp_birth_time if cp_time_known else None,"birth_place":cp_place.strip(),"longitude":cp_lon,"context":cp_context.strip()}
     default_start=date(ctx["query_date"].year,ctx["query_date"].month,1)
     default_end=date(default_start.year,12,31) if default_start.month>=8 else min(date(default_start.year,12,31),default_start+timedelta(days=150))
@@ -536,7 +564,7 @@ def render_fortune_lab(ctx):
     if day_count>FORTUNE_LAB_MAX_DAYS:
         st.error(f"1차 버전은 한 번에 최대 {FORTUNE_LAB_MAX_DAYS}일까지 분석해."); return
 
-    calc=st.button("🧭 세 체계 계산자료 만들기",type="primary",use_container_width=True,key="fortune_lab_calc")
+    calc=st.button("✨ 운의 흐름 계산하기",type="primary",use_container_width=True,key="fortune_lab_calc")
     cp_fp=json.dumps(_jsonable(counterpart),ensure_ascii=False,sort_keys=True) if counterpart else ""
     fp=hashlib.sha256(f"{FORTUNE_LAB_VERSION}|{topic}|{start_date}|{end_date}|{gender}|{ctx['birth_date']}|{ctx['birth_time']}|{ctx['birth_lon']}|{ctx['natal_packed']}|{ctx['houses_packed']}|{cp_fp}".encode()).hexdigest()[:24]
     if calc:
@@ -545,7 +573,7 @@ def render_fortune_lab(ctx):
             st.session_state["fortune_lab_bundle_fp"]=fp
     bundle=st.session_state.get("fortune_lab_bundle") if st.session_state.get("fortune_lab_bundle_fp")==fp else None
     if not bundle:
-        st.info("주제와 기간을 고른 뒤 계산자료 만들기를 눌러줘. Gemini를 안 써도 계산자료와 심층 프롬프트는 만들어져.")
+        st.info("정보와 기간을 확인한 뒤 ‘운의 흐름 계산하기’를 눌러줘. Gemini 없이도 계산자료와 심층 프롬프트는 만들어져.")
         return
 
     _render_engine_summary(bundle)
