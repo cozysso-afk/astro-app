@@ -84,9 +84,9 @@ jobs:
           asset=$(grep -oE '/assets/[^" ]+\.js' /tmp/index.html | head -1)
           test -n "$asset"
           curl -fsSL --max-time 45 "$WEB$asset" > /tmp/app.js
-          grep -q 'AI 해설 모델' /tmp/app.js
-          grep -q 'Gemini' /tmp/app.js
-          grep -q '알림 켜기' /tmp/app.js
+          grep -q 'AI 해설 모델' /tmp/app.js && echo 'AI model UI: OK'
+          grep -q 'Gemini' /tmp/app.js && echo 'Gemini UI: OK'
+          grep -q '알림 켜기' /tmp/app.js && echo 'Push settings UI: OK'
           sw=$(curl -fsSL --max-time 45 "$WEB/OneSignalSDKWorker.js")
-          echo "$sw" | grep -q 'OneSignalSDK.sw.js'
+          echo "$sw" | grep -q 'OneSignalSDK.sw.js' && echo 'OneSignal service worker: OK'
           echo 'Vercel production contains AI interpretation UI and OneSignal service worker.'
