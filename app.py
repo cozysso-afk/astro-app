@@ -501,6 +501,106 @@ div[class*="st-key-astro_tool_nav_group"] button{
 """
 st.markdown(ASTRO_DESIGN_V74_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A5. VISUAL SYSTEM v7.5 · WARM OBSERVATORY POLISH
+# ============================================================
+ASTRO_DESIGN_V75_CSS = """
+<style>
+/* Softer paper background with stronger text contrast. */
+.stApp{
+  background:
+    radial-gradient(circle at 10% 2%,rgba(224,184,126,.12),transparent 28%),
+    radial-gradient(circle at 94% 18%,rgba(186,142,105,.08),transparent 24%),
+    linear-gradient(180deg,#fbf7f0 0%,#f7f0e5 55%,#fbf8f3 100%)!important;
+}
+.block-container{max-width:760px!important}
+
+/* Profile becomes a deliberate compact summary card. */
+.profile-strip{
+  background:rgba(255,253,249,.96)!important;
+  border:1px solid rgba(141,105,79,.14)!important;
+  border-radius:18px!important;
+  padding:13px 15px!important;
+  margin:9px 0 12px!important;
+  color:#51443c!important;
+  line-height:1.58!important;
+  box-shadow:0 9px 24px rgba(81,58,42,.055)!important;
+}
+.profile-strip strong{color:#302824!important}
+
+/* Main navigation: true compact segmented cards. */
+.astro-nav-label{
+  color:#806754!important;
+  font-size:.64rem!important;
+  font-weight:850!important;
+  letter-spacing:.12em!important;
+  margin:10px 2px 5px!important;
+}
+div[class*="st-key-astro_period_nav_group"] button,
+div[class*="st-key-astro_tool_nav_group"] button{
+  border-radius:13px!important;
+  border:1px solid rgba(128,96,73,.14)!important;
+  background:rgba(255,253,249,.94)!important;
+  color:#625146!important;
+  box-shadow:0 5px 14px rgba(74,54,40,.035)!important;
+  transition:none!important;
+}
+div[class*="st-key-astro_period_nav_group"] button[kind="primary"],
+div[class*="st-key-astro_tool_nav_group"] button[kind="primary"]{
+  background:linear-gradient(135deg,#5a4437,#7b5a45)!important;
+  border-color:#654a3c!important;
+  color:#fff!important;
+  box-shadow:0 8px 18px rgba(72,49,35,.16)!important;
+}
+div[class*="st-key-astro_period_nav_group"] button[kind="primary"] p,
+div[class*="st-key-astro_period_nav_group"] button[kind="primary"] span,
+div[class*="st-key-astro_tool_nav_group"] button[kind="primary"] p,
+div[class*="st-key-astro_tool_nav_group"] button[kind="primary"] span{color:#fff!important;opacity:1!important}
+
+/* Cleaner form controls. */
+[data-baseweb="select"]>div,
+[data-testid="stDateInput"] input,
+[data-testid="stTimeInput"] input,
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea{
+  background:rgba(255,253,249,.97)!important;
+  border:1px solid rgba(128,96,73,.15)!important;
+  box-shadow:none!important;
+}
+[data-testid="stExpander"]{
+  background:rgba(255,253,249,.82)!important;
+  border:1px solid rgba(128,96,73,.13)!important;
+  border-radius:17px!important;
+  overflow:hidden!important;
+}
+
+/* Report headings no longer overpower the entire first viewport. */
+h1,h2,h3{color:#302824!important;letter-spacing:-.035em!important}
+.block-container h3{font-size:1.42rem!important;line-height:1.23!important;margin-top:1.05rem!important}
+.fortune-kicker{color:#a06f3e!important;letter-spacing:.16em!important}
+.fortune-title{font-size:1.62rem!important;color:#302824!important}
+.fortune-lead{color:#74645a!important;max-width:38rem}
+
+/* Secondary captions stay readable instead of disappearing into beige. */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p{color:#89786d!important}
+
+@media(max-width:640px){
+  .block-container{padding-left:1rem!important;padding-right:1rem!important;padding-top:.55rem!important}
+  .profile-strip{padding:12px 13px!important;border-radius:16px!important}
+  div[class*="st-key-astro_period_nav_group"] button,
+  div[class*="st-key-astro_tool_nav_group"] button{
+    height:37px!important;min-height:37px!important;font-size:.71rem!important;border-radius:11px!important;
+  }
+  .block-container h3{font-size:1.28rem!important}
+  .fortune-title{font-size:1.48rem!important}
+}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V75_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -5240,7 +5340,7 @@ st.markdown(f"<div class='profile-strip'><strong>{user_name}</strong> · {birth_
 # ============================================================
 # 11. TABS
 # ============================================================
-_main_views=["오늘","주간","월간","연간","포춘랩","궁합운","저장함","정밀분석"]
+_main_views=["오늘","주간","월간","연간","통합운세","궁합운","저장함","정밀분석"]
 if st.session_state.get("main_view") not in _main_views:
     st.session_state["main_view"]="오늘"
 main_view=st.session_state["main_view"]
@@ -5257,7 +5357,7 @@ with st.container(key="astro_period_nav_group"):
 st.markdown('<div class="astro-nav-label astro-nav-tools">분석 도구</div>',unsafe_allow_html=True)
 with st.container(key="astro_tool_nav_group"):
     _nav_tools=st.columns(4,gap="small")
-    for _i,_label in enumerate(["포춘랩","궁합운","저장함","정밀분석"]):
+    for _i,_label in enumerate(["통합운세","궁합운","저장함","정밀분석"]):
         if _nav_tools[_i].button(_label,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
             if main_view!=_label:
                 st.session_state["main_view"]=_label
@@ -5542,7 +5642,7 @@ elif main_view=="연간":
 # ------------------------------------------------------------
 # FORTUNE LAB · SAJU × WESTERN × THAI BASELINE
 # ------------------------------------------------------------
-elif main_view in ("포춘랩","궁합운"):
+elif main_view in ("통합운세","궁합운"):
     render_fortune_lab({
         "mode":"compatibility" if main_view=="궁합운" else "general",
         "birth_date":birth_date,

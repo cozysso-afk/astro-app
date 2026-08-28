@@ -35,7 +35,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.7"
+FORTUNE_LAB_VERSION = "v0.1.8"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -453,7 +453,7 @@ def _call_gemini(prompt,model,thinking_level,api_key,usage_helper=None):
     safe_model=urllib.parse.quote(str(model),safe="-._")
     url=f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
     body={
-        "systemInstruction":{"parts":[{"text":"너는 별빛의 운명 FORTUNE LAB의 해석자다. 계산값을 재계산하거나 없는 근거를 만들지 않는다. 한국어 반말로 자연스럽고 구체적으로 쓴다."}]},
+        "systemInstruction":{"parts":[{"text":"너는 별빛의 운명 통합운세 해석자다. 계산값을 재계산하거나 없는 근거를 만들지 않는다. 한국어 반말로 자연스럽고 구체적으로 쓴다."}]},
         "contents":[{"role":"user","parts":[{"text":prompt}]}],
         "generationConfig":{"maxOutputTokens":12000,"thinkingConfig":{"thinkingLevel":thinking_level}},
     }
@@ -610,13 +610,13 @@ def render_fortune_lab(ctx):
     mode=str(ctx.get("mode") or "general").strip().lower()
     is_compat=(mode=="compatibility")
 
-    st.markdown('<div class="fortune-kicker">FORTUNE LAB</div>',unsafe_allow_html=True)
+    st.markdown('<div class="fortune-kicker">INTEGRATED FORTUNE</div>',unsafe_allow_html=True)
     if is_compat:
         st.markdown('<div class="fortune-title">두 사람의 궁합과 관계 흐름</div>',unsafe_allow_html=True)
         st.markdown('<div class="fortune-lead">궁합의 기본 패턴과 선택한 기간의 관계 흐름을 분리해서 봐. 상대 정보는 아는 범위까지만 사용해.</div>',unsafe_allow_html=True)
     else:
-        st.markdown('<div class="fortune-title">운의 흐름을 겹쳐보기</div>',unsafe_allow_html=True)
-        st.markdown('<div class="fortune-lead">서양점성술의 시간축과 사주 대운·세운·월운, 태국 출생층을 한 화면에서 비교해.</div>',unsafe_allow_html=True)
+        st.markdown('<div class="fortune-title">통합운세</div>',unsafe_allow_html=True)
+        st.markdown('<div class="fortune-lead">서양점성술·사주명리·태국점성술을 각각 계산한 뒤, 같은 기간에서 겹치는 흐름과 차이를 한눈에 비교해.</div>',unsafe_allow_html=True)
     st.caption(f"운영 버전 · {FORTUNE_LAB_VERSION}")
 
     gender=str(ctx.get("birth_gender") or "여성")
