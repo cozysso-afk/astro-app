@@ -1,0 +1,124 @@
+name: Verify async production v1.4
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-async-production-v14.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  production-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wait for Render v4.2 and run full async E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          ready=0
+          for i in $(seq 1 36); do
+            meta=$(curl -fsS --max-time 20 "$API/v1/meta" || true)
+            echo "meta attempt $i: $meta"
+            if echo "$meta" | grep -q 'api-fortune-v4.2-async'; then ready=1; break; fi
+            sleep 10
+          done
+          test "$ready" = 1
+
+          cat >/tmp/request.json <<'JSON'
+          {
+            "profile": {
+              "name": "E2E",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-08-28",
+            "end_date": "2026-08-28"
+          }
+          JSON
+
+          t0=$(date +%s)
+          curl -fsS --max-time 15 -H 'Content-Type: application/json' -d @/tmp/request.json "$API/v1/fortune/integrated/start" >/tmp/calc-start.json
+          t1=$(date +%s)
+          echo "calc start response seconds=$((t1-t0))"
+          test $((t1-t0)) -lt 15
+          CALC_JOB=$(python -c "import json; print(json.load(open('/tmp/calc-start.json'))['job_id'])")
+
+          # API must stay responsive while the expensive legacy-exact calculation runs.
+          curl -fsS --max-time 10 "$API/health" >/tmp/health.json
+          grep -q 'api-fortune-v4.2-async' /tmp/health.json
+
+          done_calc=0
+          for i in $(seq 1 150); do
+            curl -fsS --max-time 15 "$API/v1/fortune/integrated/jobs/$CALC_JOB" >/tmp/calc-job.json
+            status=$(python -c "import json; print(json.load(open('/tmp/calc-job.json')).get('status',''))")
+            echo "calc poll $i status=$status"
+            if [ "$status" = done ]; then done_calc=1; break; fi
+            if [ "$status" = failed ]; then cat /tmp/calc-job.json; exit 1; fi
+            sleep 2
+          done
+          test "$done_calc" = 1
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/calc-job.json'))
+          d=j['result']; w=d['western']
+          assert d['api_version']=='api-fortune-v4.2-async', d.get('api_version')
+          assert d['engine']=='integrated-fortune-v2.2-legacy-exact', d.get('engine')
+          assert '07:00~23:30/30분' in w['method'], w['method']
+          assert '09:00~15:30/15분' in w['method'], w['method']
+          for key in ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션','수익실현','신규진입','투자주의']:
+              assert key in w['overall'], key
+          for key in ['수신신호','발신적합','과거인연접점']:
+              assert key in w['relationship_signals'], key
+          assert w['market']['has_open_session'] is True
+          assert w['detail_days'] and w['detail_days'][0]['topics']
+          print('CALC ASYNC + LEGACY EXACT OK')
+          print('investment', {k:w['overall'][k]['average'] for k in ['수익실현','신규진입','투자주의']})
+          print('signals', {k:w['relationship_signals'][k]['average'] for k in ['수신신호','발신적합','과거인연접점']})
+          PY
+
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/calc-job.json'))['result']
+          json.dump({'calculation':calc,'model':'gemini-3.7-flash'},open('/tmp/ai-request.json','w'),ensure_ascii=False)
+          PY
+          t0=$(date +%s)
+          curl -fsS --max-time 15 -H 'Content-Type: application/json' -d @/tmp/ai-request.json "$API/v1/fortune/interpret/start" >/tmp/ai-start.json
+          t1=$(date +%s)
+          echo "AI start response seconds=$((t1-t0))"
+          test $((t1-t0)) -lt 15
+          AI_JOB=$(python -c "import json; print(json.load(open('/tmp/ai-start.json'))['job_id'])")
+          curl -fsS --max-time 10 "$API/health" >/dev/null
+
+          done_ai=0
+          for i in $(seq 1 120); do
+            curl -fsS --max-time 15 "$API/v1/fortune/interpret/jobs/$AI_JOB" >/tmp/ai-job.json
+            status=$(python -c "import json; print(json.load(open('/tmp/ai-job.json')).get('status',''))")
+            echo "AI poll $i status=$status"
+            if [ "$status" = done ]; then done_ai=1; break; fi
+            if [ "$status" = failed ]; then cat /tmp/ai-job.json; exit 1; fi
+            sleep 2
+          done
+          test "$done_ai" = 1
+          python - <<'PY'
+          import json
+          job=json.load(open('/tmp/ai-job.json'))
+          d=job['result']
+          assert d.get('ok') is True, d
+          assert d.get('interpreter_version')=='mobile-ai-v2', d.get('interpreter_version')
+          usage=d.get('usage') or {}
+          assert usage.get('total_tokens',0)>0, usage
+          assert isinstance(usage.get('estimated_krw'),(int,float)), usage
+          topics=(d.get('data') or {}).get('topic_analysis') or {}
+          for key in ['금전','수익실현','학업','시험','직장','이직','연락','소식']:
+              assert key in topics, (key,topics.keys())
+          print('AI ASYNC OK')
+          print('usage',usage)
+          print('headline',d['data']['headline'])
+          PY
