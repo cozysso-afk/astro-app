@@ -1,0 +1,56 @@
+.advanced-panel {
+  border: 1px solid rgba(92, 62, 43, 0.1);
+  border-radius: 13px;
+  background: #fbf7f1;
+  overflow: hidden;
+}
+
+.advanced-panel summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  color: #7c695c;
+  font-size: 0.65rem;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel summary::after {
+  content: '＋';
+  margin-left: auto;
+  color: #9a7658;
+  font-size: 0.82rem;
+}
+
+.advanced-panel[open] summary::after {
+  content: '−';
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 11px 11px;
+}
+
+.field select optgroup {
+  color: #6f5747;
+  font-weight: 800;
+}
+
+.field select option {
+  color: #3e3028;
+  font-weight: 600;
+}
+
+@media (max-width: 420px) {
+  .advanced-grid {
+    gap: 9px;
+  }
+}
