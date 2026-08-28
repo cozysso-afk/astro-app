@@ -1,0 +1,39 @@
+name: Restore mobile fortune depth v1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-mobile-fortune-depth-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply restoration patch
+        run: python scripts/restore_mobile_fortune_depth_v1.py
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile integrated_fortune_v1.py ai_interpret_v1.py api/main.py
+          grep -q '수익실현' integrated_fortune_v1.py
+          grep -q 'estimated_krw' ai_interpret_v1.py
+          grep -q '이번 해설 API 사용량' web/src/AppNext.tsx
+          grep -q '연락 방향 보조지표' web/src/AppNext.tsx
+          grep -q '시간 흐름 · 계산 근거' web/src/AppNext.tsx
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit restoration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py ai_interpret_v1.py api/main.py web/src/AppNext.tsx web/src/ai-interpret.css web/src/integrated.css
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'feat: restore full mobile fortune depth and usage costs'
+          git push
