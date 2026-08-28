@@ -1,0 +1,38 @@
+name: Expose Fortune Lab specific counterpart mode
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-fortune-lab-counterpart-v713.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply visible counterpart mode patch
+        run: python scripts/upgrade_fortune_lab_counterpart_v713.py
+      - name: Syntax check
+        run: python -m py_compile fortune_lab_v71.py app.py scripts/upgrade_fortune_lab_counterpart_v713.py
+      - name: Diff sanity
+        run: git diff --check
+      - name: Verify UI markers
+        run: |
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.3"' fortune_lab_v71.py
+          grep -q '"분석 방식"' fortune_lab_v71.py
+          grep -q '"💞 특정 상대"' fortune_lab_v71.py
+          grep -q '특정 상대 정보를 아래에 입력하면' fortune_lab_v71.py
+          grep -q '상대 출생일' fortune_lab_v71.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fortune_lab_v71.py scripts/upgrade_fortune_lab_counterpart_v713.py
+          git commit -m "fix: expose specific-counterpart input in Fortune Lab"
+          git push origin HEAD:main
