@@ -285,10 +285,10 @@ Deno.serve(async (req: Request) => {
 
   const preferred = MODELS[body.model] ? body.model : DEFAULT_MODEL;
   const compact = compactCalculation(body.calculation);
-  const primary = await callGemini(compact, preferred, apiKey, preferred === DEFAULT_MODEL ? 85_000 : 120_000, preferred === DEFAULT_MODEL ? "high" : "medium");
+  const primary = await callGemini(compact, preferred, apiKey, preferred === DEFAULT_MODEL ? 105_000 : 120_000, preferred === DEFAULT_MODEL ? "high" : "medium");
   if (primary.ok) return response(primary);
   if (preferred === DEFAULT_MODEL) {
-    const fallback = await callGemini(compact, FALLBACK_MODEL, apiKey, 55_000, "medium");
+    const fallback = await callGemini(compact, FALLBACK_MODEL, apiKey, 30_000, "medium");
     if (fallback.ok) return response({ ...fallback, fallback_from: preferred });
     return response({ ok: false, error: `${primary.error} / 자동대체도 실패: ${fallback.error}`, model: preferred }, 502);
   }
