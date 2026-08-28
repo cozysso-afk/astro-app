@@ -783,6 +783,52 @@ div[class*="st-key-astro_tool_nav_group"] button[kind="primary"]{
 """
 st.markdown(ASTRO_DESIGN_V77_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A8. VISUAL SYSTEM v7.8 · VISIBLE DATE + NATIVE EMOJI
+# ============================================================
+ASTRO_DESIGN_V78_CSS = """
+<style>
+/* The date is a first-class, always-visible control again. */
+[data-testid="stDateInput"]{margin:8px 0 10px!important}
+[data-testid="stDateInput"] label p{
+  color:#4d3c32!important;font-size:.78rem!important;font-weight:850!important;
+}
+[data-testid="stDateInput"] input{
+  min-height:46px!important;background:#fffdf9!important;
+  border:1px solid rgba(111,78,55,.14)!important;border-radius:14px!important;
+  box-shadow:0 6px 16px rgba(69,45,29,.035)!important;
+}
+
+/* Profile summary now has one purpose only. */
+.identity-summary-card.identity-profile-only{display:block!important;margin:10px 0 14px!important}
+.identity-profile-only .identity-person-block{padding:13px 15px!important;border:0!important}
+
+/* Use color emoji glyphs instead of pseudo-icon typography. */
+div[class*="st-key-astro_tool_nav_group"] button::before{
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-size:1.55rem!important;line-height:1!important;margin-bottom:5px!important;
+  filter:none!important;color:initial!important;
+}
+div[class*="st-key-astro_tool_nav_group"] [data-testid="column"]:nth-child(1) button::before{content:"✨"!important}
+div[class*="st-key-astro_tool_nav_group"] [data-testid="column"]:nth-child(2) button::before{content:"💗"!important}
+div[class*="st-key-astro_tool_nav_group"] [data-testid="column"]:nth-child(3) button::before{content:"📚"!important}
+div[class*="st-key-astro_tool_nav_group"] [data-testid="column"]:nth-child(4) button::before{content:"🔍"!important}
+
+/* Period buttons render native emoji naturally and stay compact. */
+div[class*="st-key-astro_period_nav_group"] button p,
+div[class*="st-key-astro_period_nav_group"] button span{
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Apple Color Emoji",sans-serif!important;
+}
+
+@media(max-width:640px){
+  div[class*="st-key-astro_tool_nav_group"] button{height:78px!important;min-height:78px!important}
+  div[class*="st-key-astro_tool_nav_group"] button::before{font-size:1.45rem!important}
+}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V78_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -5489,9 +5535,8 @@ with st.expander("👤 나의 출생 프로필", expanded=False):
             format_func=lambda x:(x[len(birth_province):].strip() or x),key="profile_birth_place"
         )
         lat,lon=KOREA_BIRTHPLACES[birth_place]; place_label=birth_place
-    st.markdown("<div class='profile-inner-label'>운세 기준 날짜</div>", unsafe_allow_html=True)
-    query_date=st.date_input("기준 날짜", value=today_kst, key="profile_query_date", help="앱을 열면 오늘 날짜가 자동 선택돼. 다른 날짜를 볼 때만 바꿔.", label_visibility="collapsed")
 # 날짜는 오늘 자동. 사용자가 원할 때만 바꾼다.
+query_date=st.date_input("운세 기준 날짜", value=today_kst, key="profile_query_date", help="앱을 열면 오늘 날짜가 자동 선택돼. 다른 날짜를 볼 때 바로 바꿔.")
 query_ref_time=now_kst.time().replace(second=0,microsecond=0) if query_date==today_kst else dt_time(12,0)
 query_dt_kst=KST.localize(datetime.combine(query_date,query_ref_time)); query_dt_utc=query_dt_kst.astimezone(UTC)
 
@@ -5523,11 +5568,7 @@ if str(_alert_probe_value or "").strip()=="1":
 
 asc_sign,asc_deg,_=get_sign_and_degree(natal_houses["asc"])
 st.markdown(f"""
-<div class="identity-summary-card">
-  <div class="identity-date-block">
-    <span class="identity-eyebrow">기준 날짜</span>
-    <strong>{query_date:%Y / %m / %d} ({WEEKDAY_KO[query_date.weekday()]})</strong>
-  </div>
+<div class="identity-summary-card identity-profile-only">
   <div class="identity-person-block">
     <span class="identity-eyebrow">나의 프로필</span>
     <strong>{user_name}</strong><span> · {birth_date:%Y.%m.%d} {birth_time:%H:%M}</span><br>
@@ -5547,7 +5588,7 @@ main_view=st.session_state["main_view"]
 st.markdown('<div class="astro-nav-label">기간 선택</div>',unsafe_allow_html=True)
 with st.container(key="astro_period_nav_group"):
     _nav_period=st.columns(4,gap="small")
-    _period_items=[("오늘","☀ 오늘"),("주간","▣ 주간"),("월간","☾ 월간"),("연간","◎ 연간")]
+    _period_items=[("오늘","☀️ 오늘"),("주간","📅 주간"),("월간","🌙 월간"),("연간","🪐 연간")]
     for _i,(_route,_display) in enumerate(_period_items):
         if _nav_period[_i].button(_display,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_route else "secondary"):
             if main_view!=_route:
