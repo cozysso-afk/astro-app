@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'web/public/.icon-gold5/03.txt'
+      - '.github/workflows/install-ios-icon-gold5.yml'
   workflow_dispatch:
 
 permissions:
