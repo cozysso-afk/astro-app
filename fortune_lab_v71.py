@@ -35,7 +35,7 @@ except Exception:
     Solar = None
 
 
-FORTUNE_LAB_VERSION = "v0.1.8"
+FORTUNE_LAB_VERSION = "v0.1.9"
 FORTUNE_LAB_TRUE_SOLAR_V711 = True
 FORTUNE_LAB_STORAGE_PREFIX = "astro_fortune_lab_v1_"
 FORTUNE_LAB_MAX_DAYS = 366
@@ -610,22 +610,32 @@ def render_fortune_lab(ctx):
     mode=str(ctx.get("mode") or "general").strip().lower()
     is_compat=(mode=="compatibility")
 
-    st.markdown('<div class="fortune-kicker">INTEGRATED FORTUNE</div>',unsafe_allow_html=True)
     if is_compat:
-        st.markdown('<div class="fortune-title">두 사람의 궁합과 관계 흐름</div>',unsafe_allow_html=True)
-        st.markdown('<div class="fortune-lead">궁합의 기본 패턴과 선택한 기간의 관계 흐름을 분리해서 봐. 상대 정보는 아는 범위까지만 사용해.</div>',unsafe_allow_html=True)
+        st.markdown("""<div class="fortune-page-head compat-head">
+          <div class="fortune-page-icon">♥</div>
+          <div><div class="fortune-kicker">RELATIONSHIP ASTROLOGY</div>
+          <div class="fortune-title">궁합운</div>
+          <div class="fortune-lead">두 사람의 기본 궁합과 관계·재회 흐름을 분리해서 분석해.</div></div>
+        </div>""",unsafe_allow_html=True)
     else:
-        st.markdown('<div class="fortune-title">통합운세</div>',unsafe_allow_html=True)
-        st.markdown('<div class="fortune-lead">서양점성술·사주명리·태국점성술을 각각 계산한 뒤, 같은 기간에서 겹치는 흐름과 차이를 한눈에 비교해.</div>',unsafe_allow_html=True)
+        st.markdown("""<div class="fortune-page-head integrated-head">
+          <div class="fortune-page-icon">✦</div>
+          <div><div class="fortune-kicker">INTEGRATED FORTUNE</div>
+          <div class="fortune-title">통합운세</div>
+          <div class="fortune-lead">서양점성술·사주명리·태국점성술을 각각 계산해 겹치는 흐름과 차이를 비교해.</div></div>
+        </div>""",unsafe_allow_html=True)
     st.caption(f"운영 버전 · {FORTUNE_LAB_VERSION}")
 
     gender=str(ctx.get("birth_gender") or "여성")
     counterpart=None
 
     if is_compat:
-        topic=st.selectbox(
+        st.markdown('<div class="compat-tab-label">어떤 흐름을 볼까?</div>',unsafe_allow_html=True)
+        topic=st.radio(
             "궁합운에서 볼 것",
             ["궁합 전체","관계 흐름","재회 흐름"],
+            horizontal=True,
+            label_visibility="collapsed",
             key="fortune_lab_compat_topic",
             help="궁합 전체는 기본 관계 패턴을 먼저 보고, 관계/재회 흐름은 선택 기간의 활성도를 더 강조해.",
         )

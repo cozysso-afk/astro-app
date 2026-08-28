@@ -601,6 +601,33 @@ h1,h2,h3{color:#302824!important;letter-spacing:-.035em!important}
 """
 st.markdown(ASTRO_DESIGN_V75_CSS, unsafe_allow_html=True)
 
+
+# ============================================================
+# 0-A6. VISUAL SYSTEM v7.6 · MOCKUP-GRADE CELESTIAL MOBILE UI
+# ============================================================
+ASTRO_DESIGN_V76_CSS = """
+<style>
+:root{--obs-paper:#fffdf9;--obs-brown:#6c4934;--obs-gold:#c18a45;--obs-line:rgba(112,78,54,.13);--obs-shadow:0 14px 35px rgba(76,51,34,.075)}
+.stApp{background:radial-gradient(circle at 15% 0%,rgba(235,196,132,.17),transparent 30%),radial-gradient(circle at 100% 24%,rgba(210,169,129,.10),transparent 27%),linear-gradient(180deg,#fbf8f1 0%,#f7efe4 58%,#fcfaf6 100%)!important}
+.block-container{max-width:720px!important;padding-top:.65rem!important}
+.astro-hero-v76{position:relative!important;overflow:hidden!important;margin:6px 0 12px!important;padding:24px 20px 22px!important;border:1px solid rgba(184,137,81,.17)!important;border-radius:27px!important;background:radial-gradient(circle at 89% 18%,rgba(224,183,111,.18),transparent 21%),radial-gradient(circle at 12% 85%,rgba(244,222,184,.34),transparent 28%),linear-gradient(135deg,rgba(255,253,248,.99),rgba(249,238,219,.94))!important;box-shadow:0 18px 44px rgba(91,62,39,.085)!important}
+.astro-hero-v76:after{content:"";position:absolute;right:-55px;top:-76px;width:185px;height:185px;border-radius:50%;border:1px solid rgba(190,143,79,.20);box-shadow:0 0 0 18px rgba(201,155,93,.035),0 0 0 38px rgba(201,155,93,.025)}
+.astro-hero-orbit{position:absolute;border:1px solid rgba(186,139,78,.17);border-radius:50%;pointer-events:none}.astro-hero-orbit.orbit-a{width:210px;height:86px;right:-55px;top:35px;transform:rotate(-18deg)}.astro-hero-orbit.orbit-b{width:120px;height:120px;left:-72px;bottom:-70px}
+.astro-hero-star{position:absolute;color:#c49658;opacity:.72;pointer-events:none}.astro-hero-star.star-a{right:66px;top:30px;font-size:1.08rem}.astro-hero-star.star-b{right:35px;bottom:25px;font-size:.82rem}
+.astro-hero-kicker{color:#a17b54!important;font-size:.61rem!important;letter-spacing:.19em!important;margin-bottom:9px!important}.astro-hero-row{gap:13px!important;position:relative;z-index:2}.astro-hero-sigil{width:48px!important;height:48px!important;background:linear-gradient(145deg,#fffdf7,#efd4a9)!important;border-color:rgba(184,136,70,.22)!important;color:#a86f2f!important;box-shadow:0 10px 26px rgba(127,86,45,.12)!important}.astro-hero-title{font-size:2.02rem!important;color:#3b281f!important}.astro-title-spark{color:#c18a45;font-size:.72em}.astro-hero-sub{color:#7d685b!important;font-size:.76rem!important}
+.profile-strip,[data-testid="stExpander"]{background:rgba(255,253,249,.96)!important;border:1px solid var(--obs-line)!important;box-shadow:var(--obs-shadow)!important;border-radius:18px!important}
+[data-testid="stDateInput"] input,[data-baseweb="select"]>div,[data-testid="stTextInput"] input,[data-testid="stTimeInput"] input,[data-testid="stTextArea"] textarea,[data-testid="stNumberInput"] input{background:rgba(255,254,251,.98)!important;border:1px solid rgba(120,86,61,.13)!important;border-radius:13px!important;box-shadow:0 5px 15px rgba(75,51,34,.025)!important}
+div[class*="st-key-astro_period_nav_group"] [data-testid="stHorizontalBlock"]{gap:8px!important}div[class*="st-key-astro_period_nav_group"] button{height:43px!important;min-height:43px!important;border-radius:13px!important;font-size:.76rem!important;font-weight:800!important;background:rgba(255,253,249,.96)!important;border:1px solid var(--obs-line)!important;color:#665247!important;box-shadow:0 5px 15px rgba(76,51,34,.035)!important}div[class*="st-key-astro_period_nav_group"] button[kind="primary"]{background:linear-gradient(135deg,#65452f,#8a613f)!important;color:#fff!important;border-color:#725038!important;box-shadow:0 10px 22px rgba(91,60,37,.18)!important}
+div[class*="st-key-astro_tool_nav_group"] [data-testid="stHorizontalBlock"]{gap:8px!important}div[class*="st-key-astro_tool_nav_group"] button{height:64px!important;min-height:64px!important;border-radius:16px!important;font-size:.75rem!important;font-weight:850!important;background:rgba(255,253,249,.97)!important;border:1px solid rgba(120,86,61,.13)!important;color:#514038!important;box-shadow:0 9px 23px rgba(76,51,34,.055)!important;padding:0 5px!important}div[class*="st-key-astro_tool_nav_group"] button[kind="primary"]{background:linear-gradient(145deg,#fff8ea,#f0d6ae)!important;color:#553c2b!important;border:1.5px solid rgba(190,132,61,.55)!important;box-shadow:0 12px 28px rgba(132,87,42,.12)!important}div[class*="st-key-astro_tool_nav_group"] button[kind="primary"] p,div[class*="st-key-astro_tool_nav_group"] button[kind="primary"] span{color:#553c2b!important}
+.astro-nav-label{font-size:.64rem!important;color:#856955!important;letter-spacing:.10em!important;margin:13px 2px 6px!important}.astro-nav-tools{margin-top:11px!important}
+.fortune-page-head{display:flex;align-items:center;gap:13px;margin:9px 0 12px;padding:16px;border-radius:20px;border:1px solid rgba(120,86,61,.13);background:rgba(255,253,249,.94);box-shadow:var(--obs-shadow)}.fortune-page-icon{width:43px;height:43px;flex:0 0 43px;border-radius:14px;display:grid;place-items:center;font-size:1.25rem;font-weight:900;background:#fff7e8;color:#ad7431;border:1px solid rgba(188,131,63,.18)}.compat-head .fortune-page-icon{background:#fff0f2;color:#d65d77;border-color:rgba(214,93,119,.15)}.fortune-page-head .fortune-kicker{margin:0 0 2px!important;font-size:.58rem!important}.fortune-page-head .fortune-title{margin:0!important;font-size:1.38rem!important;line-height:1.18!important}.fortune-page-head .fortune-lead{margin:4px 0 0!important;font-size:.78rem!important;line-height:1.48!important}
+.compat-tab-label{font-size:.72rem;font-weight:850;color:#6d5749;margin:13px 1px 6px}div[class*="st-key-fortune_lab_compat_topic"] [role="radiogroup"]{width:100%!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;padding:4px!important;background:rgba(246,237,225,.72)!important;border:1px solid rgba(124,88,61,.11)!important;border-radius:15px!important;overflow:hidden!important}div[class*="st-key-fortune_lab_compat_topic"] [role="radiogroup"] label{width:100%!important;justify-content:center!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:11px!important;padding:8px 4px!important}div[class*="st-key-fortune_lab_compat_topic"] [role="radiogroup"] label:has(input:checked){background:#fffdf9!important;color:#68482f!important;box-shadow:0 5px 14px rgba(89,59,36,.08)!important}div[class*="st-key-fortune_lab_compat_topic"] [data-testid="stWidgetLabel"]{display:none!important}
+.stButton>button[kind="primary"]{border-radius:14px!important;background:linear-gradient(135deg,#68462f,#8e633f)!important;color:#fff!important;border:0!important;min-height:48px!important;box-shadow:0 11px 26px rgba(91,59,36,.18)!important}.stButton>button[kind="primary"] p,.stButton>button[kind="primary"] span{color:#fff!important}
+@media(max-width:640px){.block-container{padding-left:.92rem!important;padding-right:.92rem!important;padding-top:.45rem!important}.astro-hero-v76{padding:21px 17px 20px!important;border-radius:23px!important}.astro-hero-title{font-size:1.78rem!important}.astro-hero-sigil{width:44px!important;height:44px!important}div[class*="st-key-astro_period_nav_group"] button{height:41px!important;min-height:41px!important;font-size:.70rem!important}div[class*="st-key-astro_tool_nav_group"] button{height:61px!important;min-height:61px!important;font-size:.68rem!important;padding:0 2px!important}.fortune-page-head{padding:14px 13px;border-radius:17px}.fortune-page-icon{width:39px;height:39px;flex-basis:39px;border-radius:12px}.fortune-page-head .fortune-title{font-size:1.23rem!important}.fortune-page-head .fortune-lead{font-size:.73rem!important}}
+</style>
+"""
+st.markdown(ASTRO_DESIGN_V76_CSS, unsafe_allow_html=True)
+
 # ============================================================
 # 0-B. PRIVATE PIN LOCK / 30-DAY REMEMBER-ME (LOCAL STORAGE PRIMARY)
 # ============================================================
@@ -5264,12 +5291,16 @@ if push_kind in PUSH_ROUTE_TO_VIEW and st.session_state.get("_push_route_applied
     st.session_state["_push_route_notice"]=push_kind
 
 st.markdown("""
-<div class="astro-hero">
-  <div class="astro-hero-kicker">CELESTIAL TIMING LAB</div>
+<div class="astro-hero astro-hero-v76">
+  <div class="astro-hero-orbit orbit-a"></div>
+  <div class="astro-hero-orbit orbit-b"></div>
+  <div class="astro-hero-star star-a">✦</div>
+  <div class="astro-hero-star star-b">✧</div>
+  <div class="astro-hero-kicker">CELESTIAL OBSERVATORY</div>
   <div class="astro-hero-row">
     <div class="astro-hero-sigil">☾</div>
     <div>
-      <div class="astro-hero-title">별빛의 운명</div>
+      <div class="astro-hero-title">별빛의 운명 <span class="astro-title-spark">✦</span></div>
       <div class="astro-hero-sub">시간의 흐름과 삶의 패턴을 읽는 개인 관측실</div>
     </div>
   </div>
@@ -5345,22 +5376,29 @@ if st.session_state.get("main_view") not in _main_views:
     st.session_state["main_view"]="오늘"
 main_view=st.session_state["main_view"]
 
-st.markdown('<div class="astro-nav-label">기간 운세</div>',unsafe_allow_html=True)
+st.markdown('<div class="astro-nav-label">기간 선택</div>',unsafe_allow_html=True)
 with st.container(key="astro_period_nav_group"):
     _nav_period=st.columns(4,gap="small")
-    for _i,_label in enumerate(["오늘","주간","월간","연간"]):
-        if _nav_period[_i].button(_label,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
-            if main_view!=_label:
-                st.session_state["main_view"]=_label
+    _period_items=[("오늘","☀ 오늘"),("주간","▣ 주간"),("월간","☾ 월간"),("연간","◎ 연간")]
+    for _i,(_route,_display) in enumerate(_period_items):
+        if _nav_period[_i].button(_display,key=f"main_nav_period_{_i}",use_container_width=True,type="primary" if main_view==_route else "secondary"):
+            if main_view!=_route:
+                st.session_state["main_view"]=_route
                 st.rerun()
 
 st.markdown('<div class="astro-nav-label astro-nav-tools">분석 도구</div>',unsafe_allow_html=True)
 with st.container(key="astro_tool_nav_group"):
     _nav_tools=st.columns(4,gap="small")
-    for _i,_label in enumerate(["통합운세","궁합운","저장함","정밀분석"]):
-        if _nav_tools[_i].button(_label,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_label else "secondary"):
-            if main_view!=_label:
-                st.session_state["main_view"]=_label
+    _tool_items=[
+        ("통합운세","✦ 통합운세"),
+        ("궁합운","♥ 궁합운"),
+        ("저장함","▣ 저장함"),
+        ("정밀분석","⌕ 정밀분석"),
+    ]
+    for _i,(_route,_display) in enumerate(_tool_items):
+        if _nav_tools[_i].button(_display,key=f"main_nav_tool_{_i}",use_container_width=True,type="primary" if main_view==_route else "secondary"):
+            if main_view!=_route:
+                st.session_state["main_view"]=_route
                 st.rerun()
 if st.session_state.pop("_push_route_notice",None):
     st.caption("🔔 운세 알림에서 해당 리포트로 바로 이동했어.")
