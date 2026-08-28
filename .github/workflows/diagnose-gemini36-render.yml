@@ -1,0 +1,63 @@
+name: Diagnose Gemini 3.6 Render
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose-gemini36-render.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run exact calculation then Gemini 3.6 job
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          for i in $(seq 1 20); do
+            meta=$(curl -fsS --max-time 15 "$API/v1/meta" || true)
+            echo "$meta" | grep -q 'api-fortune-v4.3-detached' && break
+            sleep 5
+          done
+          cat >/tmp/request.json <<'JSON'
+          {"profile":{"name":"E2E36","birth_date":"1990-01-01","birth_time":"12:00:00","latitude":37.5665,"longitude":126.9780,"utc_offset_hours":9,"gender":"female"},"start_date":"2026-08-28","end_date":"2026-08-28"}
+          JSON
+          curl -fsS --max-time 10 -H 'Content-Type: application/json' -d @/tmp/request.json "$API/v1/fortune/integrated/start" >/tmp/start.json
+          JOB=$(python -c "import json; print(json.load(open('/tmp/start.json'))['job_id'])")
+          for i in $(seq 1 90); do
+            curl -fsS --max-time 10 "$API/v1/fortune/integrated/jobs/$JOB" >/tmp/job.json
+            S=$(python -c "import json; print(json.load(open('/tmp/job.json')).get('status',''))")
+            [ "$S" = done ] && break
+            [ "$S" = failed ] && { cat /tmp/job.json; exit 1; }
+            sleep 2
+          done
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/job.json'))['result']
+          json.dump({'calculation':calc,'model':'gemini-3.6-flash'},open('/tmp/ai.json','w'),ensure_ascii=False)
+          PY
+          T0=$(date +%s)
+          curl -fsS --max-time 10 -H 'Content-Type: application/json' -d @/tmp/ai.json "$API/v1/fortune/interpret/start" >/tmp/aistart.json
+          AJOB=$(python -c "import json; print(json.load(open('/tmp/aistart.json'))['job_id'])")
+          for i in $(seq 1 60); do
+            curl -fsS --max-time 10 "$API/v1/fortune/interpret/jobs/$AJOB" >/tmp/aijob.json
+            S=$(python -c "import json; print(json.load(open('/tmp/aijob.json')).get('status',''))")
+            echo "poll $i $S"
+            if [ "$S" = done ]; then
+              T1=$(date +%s); echo "Gemini 3.6 elapsed=$((T1-T0))s"
+              python - <<'PY'
+          import json
+          d=json.load(open('/tmp/aijob.json'))['result']
+          print('ok',d.get('ok'),'model',d.get('model'),'usage',d.get('usage'))
+          assert d.get('ok') is True, d
+          PY
+              exit 0
+            fi
+            [ "$S" = failed ] && { cat /tmp/aijob.json; exit 1; }
+            sleep 2
+          done
+          echo 'Gemini 3.6 did not finish'; exit 1
