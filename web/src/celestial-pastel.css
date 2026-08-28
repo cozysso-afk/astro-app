@@ -1,0 +1,224 @@
+/* Pastel celestial override: aurora glass + silver pearl accents */
+:root {
+  --pastel-blue: #dcecff;
+  --pastel-blue-deep: #9bbfe8;
+  --pastel-mint: #dcf3ea;
+  --pastel-mint-deep: #8fc8b8;
+  --pastel-pink: #f8dfe9;
+  --pastel-pink-deep: #d9a7bc;
+  --pastel-lilac: #e9def8;
+  --pastel-lilac-deep: #b8a0d9;
+  --pearl: rgba(244, 248, 252, 0.96);
+  --silver: rgba(177, 187, 202, 0.58);
+  --silver-soft: rgba(220, 226, 235, 0.72);
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 9%, rgba(232, 218, 251, .42), transparent 28%),
+    radial-gradient(circle at 92% 21%, rgba(213, 237, 255, .42), transparent 31%),
+    radial-gradient(circle at 15% 68%, rgba(216, 246, 235, .32), transparent 32%),
+    radial-gradient(circle at 86% 76%, rgba(250, 220, 235, .30), transparent 30%),
+    linear-gradient(180deg, #fbf7f1 0%, #f8f4ee 45%, #faf7f3 100%);
+}
+
+.app-shell {
+  background:
+    radial-gradient(ellipse at 22% 4%, rgba(232, 218, 250, .30), transparent 30%),
+    radial-gradient(ellipse at 92% 35%, rgba(211, 238, 250, .30), transparent 31%),
+    radial-gradient(ellipse at 9% 71%, rgba(213, 241, 232, .24), transparent 30%),
+    radial-gradient(ellipse at 88% 82%, rgba(248, 216, 232, .22), transparent 27%);
+}
+
+/* Pearl/silver surfaces */
+.profile-card,
+.date-card,
+.tool-card,
+.report-card,
+.tool-panel {
+  border-color: rgba(183, 190, 204, .34) !important;
+  box-shadow:
+    0 16px 38px rgba(99, 86, 116, .075),
+    0 1px 0 rgba(255,255,255,.96) inset,
+    0 0 0 1px rgba(235,240,247,.55) inset,
+    0 0 30px rgba(207, 194, 235, .07) !important;
+}
+
+/* Period buttons: deliberately NOT beige. */
+.period-button {
+  border-color: rgba(173, 182, 199, .38) !important;
+  color: #5f5968 !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.82);
+  box-shadow:
+    0 8px 20px rgba(92, 90, 114, .07),
+    0 1px 0 rgba(255,255,255,.95) inset,
+    0 0 0 1px rgba(255,255,255,.55) inset !important;
+}
+.period-button:nth-child(1) {
+  background: linear-gradient(145deg, rgba(255,249,252,.98), rgba(248,223,233,.88)) !important;
+}
+.period-button:nth-child(2) {
+  background: linear-gradient(145deg, rgba(250,253,255,.98), rgba(220,236,255,.92)) !important;
+}
+.period-button:nth-child(3) {
+  background: linear-gradient(145deg, rgba(253,251,255,.98), rgba(233,222,248,.92)) !important;
+}
+.period-button:nth-child(4) {
+  background: linear-gradient(145deg, rgba(251,255,253,.98), rgba(220,243,234,.92)) !important;
+}
+
+.period-button.is-active {
+  color: #51475d !important;
+  border-color: rgba(174, 167, 201, .68) !important;
+  box-shadow:
+    0 12px 27px rgba(114, 98, 145, .16),
+    0 0 0 1px rgba(255,255,255,.72) inset,
+    0 0 22px rgba(206, 193, 242, .26) !important;
+}
+.period-button:nth-child(1).is-active {
+  background: linear-gradient(135deg, #f9d9e8 0%, #e8dcfa 52%, #dcecff 100%) !important;
+}
+.period-button:nth-child(2).is-active {
+  background: linear-gradient(135deg, #d7ebff 0%, #e6e0fb 54%, #e6f6f2 100%) !important;
+}
+.period-button:nth-child(3).is-active {
+  background: linear-gradient(135deg, #e8dcfb 0%, #dceaff 48%, #f5deec 100%) !important;
+}
+.period-button:nth-child(4).is-active {
+  background: linear-gradient(135deg, #d9f2e9 0%, #d9ebfb 52%, #e8ddf7 100%) !important;
+}
+
+/* Four analysis cards become four jewel/aurora cards. */
+.tool-card {
+  border-color: rgba(185, 192, 207, .34) !important;
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+.tool-card:nth-child(1) {
+  background:
+    radial-gradient(circle at 86% 12%, rgba(205,218,255,.46), transparent 34%),
+    radial-gradient(circle at 8% 90%, rgba(230,214,249,.48), transparent 38%),
+    linear-gradient(145deg, rgba(255,255,255,.94), rgba(238,235,252,.90)) !important;
+}
+.tool-card:nth-child(2) {
+  background:
+    radial-gradient(circle at 85% 13%, rgba(249,211,230,.48), transparent 35%),
+    radial-gradient(circle at 10% 92%, rgba(230,218,249,.43), transparent 38%),
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(251,234,243,.90)) !important;
+}
+.tool-card:nth-child(3) {
+  background:
+    radial-gradient(circle at 84% 13%, rgba(215,235,252,.48), transparent 35%),
+    radial-gradient(circle at 9% 92%, rgba(228,231,240,.58), transparent 39%),
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(235,242,250,.91)) !important;
+}
+.tool-card:nth-child(4) {
+  background:
+    radial-gradient(circle at 84% 13%, rgba(211,244,234,.52), transparent 35%),
+    radial-gradient(circle at 9% 92%, rgba(221,235,251,.43), transparent 39%),
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(231,247,241,.91)) !important;
+}
+
+.tool-card::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.96), rgba(203,212,228,.76), rgba(233,219,249,.76), transparent) !important;
+}
+
+.tone-gold {
+  color: #8d79b0 !important;
+  border-color: rgba(169,154,202,.30) !important;
+  background: linear-gradient(145deg, #fdfaff, #e7ddf8 52%, #dbeaff) !important;
+}
+.tone-rose {
+  color: #bc7899 !important;
+  border-color: rgba(211,160,185,.32) !important;
+  background: linear-gradient(145deg, #fffafd, #f7dce8 55%, #e9def8) !important;
+}
+.tone-champagne {
+  color: #7188a4 !important;
+  border-color: rgba(155,176,201,.34) !important;
+  background: linear-gradient(145deg, #fcfeff, #dcecff 53%, #e9e7f1) !important;
+}
+.tone-sage {
+  color: #699f91 !important;
+  border-color: rgba(140,195,180,.34) !important;
+  background: linear-gradient(145deg, #fbfffd, #dcf3ea 52%, #dcecff) !important;
+}
+
+/* Make report and detail panels mystical instead of cream-heavy. */
+.tool-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 90% 8%, rgba(220,232,255,.34), transparent 29%),
+    radial-gradient(circle at 8% 94%, rgba(232,217,249,.32), transparent 34%),
+    linear-gradient(145deg, rgba(255,255,255,.94), rgba(247,246,252,.91)) !important;
+}
+.tool-panel::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  width: 220px;
+  height: 220px;
+  right: -115px;
+  bottom: -130px;
+  border: 1px solid rgba(168,180,205,.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px rgba(225,218,245,.035), 0 0 0 48px rgba(211,235,246,.028);
+}
+
+.coordinate-note {
+  border-color: rgba(183,190,205,.22) !important;
+  background: linear-gradient(135deg, rgba(247,244,255,.92), rgba(240,249,250,.90)) !important;
+}
+
+.primary-button {
+  border: 1px solid rgba(170,174,203,.58) !important;
+  color: #4f485d !important;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,.58), transparent 22%),
+    linear-gradient(120deg, #f3ddeb 0%, #dddffa 31%, #d7ebfb 62%, #d9f2e9 100%) !important;
+  box-shadow:
+    0 14px 30px rgba(105,92,135,.16),
+    0 1px 0 rgba(255,255,255,.90) inset,
+    0 0 24px rgba(199,190,233,.20) !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.72);
+}
+
+.primary-button:active {
+  transform: scale(.985);
+}
+
+.server-pill.online {
+  color: #56796f !important;
+  border-color: rgba(137,191,176,.28) !important;
+  background: linear-gradient(145deg, rgba(245,255,251,.96), rgba(217,243,234,.94)) !important;
+  box-shadow: 0 0 16px rgba(161,221,204,.13) !important;
+}
+
+.bottom-nav {
+  border-top-color: rgba(174,181,197,.24) !important;
+  background:
+    linear-gradient(180deg, rgba(253,252,255,.86), rgba(244,246,249,.92)) !important;
+  box-shadow:
+    0 -14px 38px rgba(87,81,108,.075),
+    0 1px 0 rgba(255,255,255,.94) inset !important;
+}
+.nav-item.is-active {
+  color: #78668f !important;
+  background: radial-gradient(circle at 50% 35%, rgba(223,213,247,.30), transparent 66%) !important;
+}
+
+/* Silver-moon shimmer, deliberately subtle. */
+.hero-orbit {
+  border-color: rgba(166,178,199,.30) !important;
+  filter: drop-shadow(0 0 7px rgba(215,224,238,.34)) !important;
+}
+.hero-star {
+  background: #eef4ff !important;
+  box-shadow: 0 0 4px #fff, 0 0 12px rgba(198,213,239,.85), 0 0 21px rgba(222,207,247,.42) !important;
+}
+
+@media (max-width: 420px) {
+  .period-button { box-shadow: 0 7px 16px rgba(91,88,112,.065), 0 1px 0 #fff inset !important; }
+  .tool-card { box-shadow: 0 13px 30px rgba(91,84,111,.07), 0 1px 0 rgba(255,255,255,.96) inset !important; }
+}
