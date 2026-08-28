@@ -1,0 +1,50 @@
+name: Apply visible date and native emoji v7.8
+
+on:
+  push:
+    paths:
+      - 'scripts/fix_date_and_native_emoji_v78.py'
+      - '.github/workflows/apply-visible-date-native-emoji-v78.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/fix_date_and_native_emoji_v78.py
+      - name: Apply patch
+        run: python scripts/fix_date_and_native_emoji_v78.py
+      - name: Syntax check app
+        run: python -m py_compile app.py
+      - name: Verify markers
+        run: |
+          grep -q 'st.date_input("운세 기준 날짜"' app.py
+          grep -q 'identity-profile-only' app.py
+          grep -q '☀️ 오늘' app.py
+          grep -q 'content:"✨"' app.py
+          grep -q 'content:"💗"' app.py
+          grep -q 'content:"📚"' app.py
+          grep -q 'content:"🔍"' app.py
+          ! grep -q '("주간","▣ 주간")' app.py
+          ! grep -q '("월간","☾ 월간")' app.py
+          ! grep -q '("연간","◎ 연간")' app.py
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit integrated app
+        run: |
+          if git diff --quiet -- app.py; then
+            echo 'No app changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.py
+          git commit -m 'fix: restore visible date and native emoji navigation'
+          git push
