@@ -4,6 +4,7 @@ import App from './AppNext'
 import './styles.css'
 import './relationship.css'
 import './birthplace.css'
+import './integrated.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
