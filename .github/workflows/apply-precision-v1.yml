@@ -1,0 +1,122 @@
+name: Apply precision view v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-precision-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply precision frontend patch
+        run: python scripts/patch_precision_v1.py
+
+      - name: Verify precision markers
+        run: |
+          grep -q 'LIVE PRECISION ENGINE' web/src/AppNext.tsx
+          grep -q '정밀분석 실제 계산' web/src/AppNext.tsx
+          grep -q 'WESTERN AXES' web/src/AppNext.tsx
+          grep -q 'SAJU RAW' web/src/AppNext.tsx
+          grep -q 'THAI STATUS' web/src/AppNext.tsx
+          grep -q 'RAW JSON' web/src/AppNext.tsx
+          grep -q "kind: 'precision'" web/src/AppNext.tsx
+          grep -q "item.kind === 'integrated' || item.kind === 'precision'" web/src/AppNext.tsx
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Build mobile web
+        working-directory: web
+        run: npm run build
+
+      - name: Diff sanity
+        run: git diff --check
+
+      - name: Render integrated engine smoke
+        working-directory: web
+        run: |
+          node --input-type=module <<'JS'
+          const response = await fetch('https://astro-app-api-f7fn.onrender.com/v1/fortune/integrated', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profile: {
+                name: 'precision-ci-dummy',
+                birth_date: '1990-01-01',
+                birth_time: '12:00',
+                latitude: 37.5665,
+                longitude: 126.9780,
+                utc_offset_hours: 9,
+                gender: 'male'
+              },
+              start_date: '2026-08-28',
+              end_date: '2026-09-03'
+            })
+          })
+          const payload = await response.json()
+          if (!response.ok) throw new Error(`render ${response.status}: ${JSON.stringify(payload)}`)
+          if (!payload?.ok || !payload?.western?.ok || !payload?.saju?.ok || !payload?.thai?.ok) {
+            throw new Error(`incomplete integrated payload: ${JSON.stringify({ok:payload?.ok, western:payload?.western?.ok, saju:payload?.saju?.ok, thai:payload?.thai?.ok})}`)
+          }
+          if (typeof payload?.western?.natal?.asc !== 'number' || typeof payload?.western?.natal?.mc !== 'number') {
+            throw new Error('missing precision western axes')
+          }
+          console.log('render-precision-engine-smoke-ok', payload.engine, payload.period)
+          JS
+
+      - name: Supabase precision archive smoke
+        working-directory: web
+        run: |
+          node --input-type=module <<'JS'
+          import { createClient } from '@supabase/supabase-js'
+          const supabase = createClient(
+            'https://dbynfabwfcakxayyggzi.supabase.co',
+            'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r',
+            { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+          )
+          const { data: authData, error: authError } = await supabase.auth.signInAnonymously({
+            options: { data: { purpose: 'ci-precision-smoke', created_by: 'astro-app' } },
+          })
+          if (authError || !authData.user) throw authError ?? new Error('anonymous auth returned no user')
+          const userId = authData.user.id
+          const localId = `precision-ci-${userId}`
+          const { data: inserted, error: insertError } = await supabase.from('readings').insert({
+            user_id: userId,
+            reading_type: 'precision',
+            period_start: '2026-08-28',
+            period_end: '2026-09-03',
+            engine_version: 'ci-precision-smoke',
+            calculation_json: { archive_v: 1, local_id: localId, period_key: 'week', request: {}, result: {} },
+            interpretation_json: { archive_v: 1 },
+            summary: 'ci precision archive smoke',
+          }).select('id, user_id, reading_type, calculation_json').single()
+          if (insertError) throw insertError
+          if (inserted.user_id !== userId || inserted.reading_type !== 'precision') throw new Error('precision RLS insert/select mismatch')
+          if (inserted.calculation_json?.local_id !== localId) throw new Error('precision payload mismatch')
+          const { error: deleteError } = await supabase.from('readings').delete().eq('id', inserted.id)
+          if (deleteError) throw deleteError
+          console.log('supabase-precision-archive-smoke-ok', userId)
+          JS
+
+      - name: Commit precision frontend
+        run: |
+          if git diff --quiet -- web/src/AppNext.tsx web/package-lock.json; then
+            echo 'No precision frontend diff to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/package-lock.json
+          git commit -m 'feat: connect independent precision view to live engine'
+          git push origin HEAD:main
