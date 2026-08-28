@@ -1,0 +1,60 @@
+name: Restore mobile AI interpretation v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch_mobile_ai_v1.py'
+      - '.github/workflows/restore-mobile-ai-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply mobile AI patch
+        run: python scripts/patch_mobile_ai_v1.py
+
+      - name: Verify Python syntax
+        run: python -m py_compile api/main.py ai_interpret_v1.py
+
+      - name: Install backend dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Import API and verify AI meta without secret
+        run: |
+          python - <<'PY'
+          import api.main as m
+          status=m.fortune_ai_meta()
+          assert 'configured' in status
+          assert 'gemini-3.7-flash' in status['models']
+          print(status)
+          PY
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify frontend markers
+        run: |
+          grep -q 'AI 해석 모델' web/src/AppNext.tsx
+          grep -q '/v1/fortune/interpret' web/src/AppNext.tsx
+          grep -q 'GEMINI INTERPRETATION' web/src/AppNext.tsx
+          grep -q "ai-interpret.css" web/src/main.tsx
+
+      - name: Commit mobile AI restoration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py web/src/AppNext.tsx web/src/main.tsx
+          git commit -m 'feat: restore Gemini interpretation in mobile app'
+          git push
