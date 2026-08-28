@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Verify page and API CORS
         shell: bash
@@ -19,10 +19,22 @@ jobs:
           set -euo pipefail
           PAGE='https://cozysso-afk.github.io/astro-app/'
           API='https://astro-app-api-f7fn.onrender.com'
+
           echo '--- PAGE ---'
-          curl -fsSL --max-time 30 "$PAGE" -o /tmp/page.html
-          grep -q '별빛의 운명' /tmp/page.html
-          grep -q '/astro-app/assets/' /tmp/page.html
+          ok=0
+          for i in $(seq 1 12); do
+            if curl -fsSL --max-time 30 "$PAGE?verify=$i" -o /tmp/page.html \
+              && grep -q '별빛의 운명' /tmp/page.html \
+              && grep -q '/astro-app/assets/' /tmp/page.html; then
+              ok=1
+              break
+            fi
+            echo "page not propagated yet: $i"
+            head -c 500 /tmp/page.html 2>/dev/null || true
+            echo
+            sleep 10
+          done
+          [ "$ok" = 1 ] || { echo 'PAGE VERIFY FAILED'; exit 1; }
           echo 'PAGE OK'
 
           echo '--- API HEALTH ---'
@@ -30,10 +42,19 @@ jobs:
           echo
 
           echo '--- CORS ---'
-          curl -sS -D /tmp/headers -o /dev/null --max-time 30 -X OPTIONS "$API/v1/fortune/integrated/start" \
-            -H 'Origin: https://cozysso-afk.github.io' \
-            -H 'Access-Control-Request-Method: POST' \
-            -H 'Access-Control-Request-Headers: content-type'
-          cat /tmp/headers
-          grep -qi '^access-control-allow-origin: https://cozysso-afk.github.io' /tmp/headers
+          cors_ok=0
+          for i in $(seq 1 12); do
+            curl -sS -D /tmp/headers -o /dev/null --max-time 30 -X OPTIONS "$API/v1/fortune/integrated/start" \
+              -H 'Origin: https://cozysso-afk.github.io' \
+              -H 'Access-Control-Request-Method: POST' \
+              -H 'Access-Control-Request-Headers: content-type'
+            if grep -qi '^access-control-allow-origin: https://cozysso-afk.github.io' /tmp/headers; then
+              cors_ok=1
+              break
+            fi
+            echo "CORS not propagated yet: $i"
+            cat /tmp/headers
+            sleep 10
+          done
+          [ "$cors_ok" = 1 ] || { echo 'CORS VERIFY FAILED'; cat /tmp/headers; exit 1; }
           echo 'CORS OK'
