@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
 
+# rerun after Supabase GEMINI_API_KEY was configured
 jobs:
   e2e:
     runs-on: ubuntu-latest
