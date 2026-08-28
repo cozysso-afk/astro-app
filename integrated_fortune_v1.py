@@ -21,7 +21,7 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v2"
+ENGINE_VERSION = "integrated-fortune-v2.1"
 WESTERN_ENGINE_VERSION = "western-period-engine-v5-compatible"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
@@ -465,6 +465,9 @@ def _score_topic(topic_name: str, transit_records: list[dict], snapshots: dict, 
     activation = _clamp(raw_activation * 18.0 + stacking_bonus)
     favorability = _clamp(50.0 + (polarity_num / polarity_den) * 40.0) if polarity_den else 50.0
     evidences.sort(key=lambda x: x["score"], reverse=True)
+    # Scores already include every contribution. Retain only the strongest
+    # evidence rows for interpretation/UI to keep Render memory bounded.
+    evidences = evidences[:8]
     return {
         "topic": topic_name,
         "activation": int(round(activation)),
@@ -707,7 +710,7 @@ def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tu
     return row
 
 
-@lru_cache(maxsize=1000)
+@lru_cache(maxsize=64)
 def _daily_detailed_cached(day_iso: str, natal_packed: tuple, houses_packed: tuple, offset_hours: float):
     day_value = date.fromisoformat(day_iso)
     natal_lons = _unpack_natal_lons(natal_packed)
