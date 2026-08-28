@@ -1,0 +1,19 @@
+{
+  "name": "별빛의 운명",
+  "short_name": "별빛의 운명",
+  "description": "시간의 흐름과 삶의 패턴을 읽는 개인 관측실",
+  "lang": "ko-KR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f4fb",
+  "theme_color": "#f4f0f8",
+  "icons": [
+    {
+      "src": "/apple-touch-icon-gold5.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
