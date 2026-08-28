@@ -17,6 +17,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Normalize current relationship markup
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/AppNext.tsx')
+          s = p.read_text()
+          old = '<section className="result-card"><div className="result-card-title"><span>STATIC</span>'
+          new = '<section className="result-card">\n                <div className="result-card-title"><span>STATIC</span>'
+          if old in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s)
+          PY
       - name: Apply archive and copy patch
         run: python scripts/patch_archive_copy_v1.py
       - name: Verify markers
