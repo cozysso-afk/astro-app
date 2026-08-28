@@ -224,7 +224,9 @@ const planetLabels: Record<string, string> = {
 const aspectLabels: Record<string, string> = {
   conjunction:'합', sextile:'육합', square:'사각', trine:'삼각', quincunx:'퀸컨스', opposition:'대립',
 }
-const topicOrder = ['금전','투자심리','수익실현','신규진입','투자주의','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
+const coreTopicOrder = ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
+const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
+const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
 
 function initialPeriodFromUrl(): PeriodKey {
@@ -543,7 +545,7 @@ export default function AppNext() {
   const resultMonths = relationshipResult?.result?.months ?? []
   const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
   const orderedIntegratedTopics = integratedResult
-    ? topicOrder
+    ? coreTopicOrder
         .map((topic) => ({ topic, stat: integratedResult.western.overall[topic] }))
         .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
     : []

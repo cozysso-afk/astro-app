@@ -567,33 +567,55 @@ def _rolling_window(rows: list[dict], key: str, size: int = 3):
     return pack(best), pack(worst)
 
 
-def _daily_detail(day_value: date, natal_lons: dict, natal_houses: dict, offset_hours: float):
-    rows = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 45, natal_lons, natal_houses, offset_hours)
+def _evidence_text(item: dict) -> str:
+    if not isinstance(item, dict):
+        return str(item)
+    if item.get("kind") == "aspect":
+        transit = item.get("transit", "")
+        target = item.get("target", "")
+        aspect = item.get("aspect", "")
+        orb = item.get("orb")
+        direction = item.get("direction", "")
+        orb_text = f" · orb {float(orb):.2f}°" if isinstance(orb, (int, float)) else ""
+        dir_text = f" · {direction}" if direction else ""
+        return f"{transit}→{target} {aspect}{orb_text}{dir_text}".strip()
+    if item.get("kind") == "house":
+        transit = item.get("transit", "")
+        whole = item.get("whole_house")
+        placidus = item.get("placidus_house")
+        return f"{transit} · Whole Sign {whole}H · Placidus {placidus}H"
+    return str(item)
+
+
+def _detail_from_rows(day_value: date, rows: list[dict]):
     details = {}
     keys = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
     if _is_market_day(day_value):
         keys += ["투자심리", "수익실현", "신규진입", "투자주의"]
     for key in keys:
-        best, worst = _rolling_window(rows, key, 3)
+        # 90-minute samples + 2-point window preserve a 1h30m readable window
+        # while avoiding a second expensive astronomy pass on Render.
+        best, worst = _rolling_window(rows, key, 2)
         if not best:
             continue
         evidence = []
-        if key in TOPIC_SPECS:
-            scored = [r for r in rows if isinstance(r.get(key), (int, float))]
-            if scored:
-                peak = max(scored, key=lambda r: float(r.get(key, 0)))
-                topic_raw = (peak.get("topics") or {}).get(key) or {}
-                raw_evidence = topic_raw.get("evidence") or []
-                evidence = [str(x) for x in raw_evidence[:6]]
-        elif key in {"수익실현", "신규진입", "투자주의"}:
-            scored = [r for r in rows if isinstance(r.get(key), (int, float))]
-            if scored:
-                peak = max(scored, key=lambda r: float(r.get(key, 0)))
+        scored = [r for r in rows if isinstance(r.get(key), (int, float))]
+        if scored:
+            peak = max(scored, key=lambda r: float(r.get(key, 0)))
+            if key in TOPIC_SPECS:
+                raw = ((peak.get("topics") or {}).get(key) or {}).get("evidence") or []
+                evidence = [_evidence_text(x) for x in raw[:6]]
+            elif key in {"수익실현", "신규진입", "투자주의"}:
                 for base_key in ("금전", "투자심리"):
                     raw = ((peak.get("topics") or {}).get(base_key) or {}).get("evidence") or []
-                    evidence.extend(str(x) for x in raw[:3])
+                    evidence.extend(_evidence_text(x) for x in raw[:3])
         details[key] = {"best_window": best, "caution_window": worst, "evidence": evidence[:6]}
     return {"date": day_value.isoformat(), "market_open": _is_market_day(day_value), "topics": details}
+
+
+def _daily_detail(day_value: date, natal_lons: dict, natal_houses: dict, offset_hours: float):
+    rows = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 90, natal_lons, natal_houses, offset_hours)
+    return _detail_from_rows(day_value, rows)
 
 
 def _pack_natal_lons(natal_lons: dict):
@@ -685,6 +707,23 @@ def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tu
     return row
 
 
+@lru_cache(maxsize=1000)
+def _daily_detailed_cached(day_iso: str, natal_packed: tuple, houses_packed: tuple, offset_hours: float):
+    day_value = date.fromisoformat(day_iso)
+    natal_lons = _unpack_natal_lons(natal_packed)
+    natal_houses = _unpack_houses(houses_packed)
+    # One scan powers BOTH daily averages and time/evidence detail. The previous
+    # mobile v2 performed a second scan and could exceed Render's request window.
+    life = _scan_intraday(day_value, dt_time(7, 30), dt_time(23, 0), 90, natal_lons, natal_houses, offset_hours)
+    row = {
+        "date": day_value.isoformat(),
+        "label": f"{day_value.month}/{day_value.day}({WEEKDAY_KO[day_value.weekday()]})",
+    }
+    for key in TOPIC_ORDER + ["수신신호", "발신적합", "과거인연접점"]:
+        row[key] = _rows_avg(life, key)
+    return {"row": row, "detail": _detail_from_rows(day_value, life)}
+
+
 def _score_band(score: float | None):
     if score is None:
         return "해당 없음"
@@ -751,10 +790,16 @@ def _western_payload(
     houses_packed = _pack_houses(natal_houses)
 
     day_count = (end_date - start_date).days + 1
-    rows = [
-        dict(_daily_aggregate_cached((start_date + timedelta(days=i)).isoformat(), natal_packed, houses_packed, float(utc_offset_hours)))
-        for i in range(day_count)
-    ]
+    detail_days = []
+    if day_count == 1:
+        packed_day = _daily_detailed_cached(start_date.isoformat(), natal_packed, houses_packed, float(utc_offset_hours))
+        rows = [dict(packed_day["row"])]
+        detail_days = [packed_day["detail"]]
+    else:
+        rows = [
+            dict(_daily_aggregate_cached((start_date + timedelta(days=i)).isoformat(), natal_packed, houses_packed, float(utc_offset_hours)))
+            for i in range(day_count)
+        ]
 
     market_rows = [r for r in rows if _is_market_day(date.fromisoformat(r["date"]))]
     overall = {
@@ -769,12 +814,8 @@ def _western_payload(
         "session_count": len(market_rows),
         "session_dates": [r["date"] for r in market_rows],
     }
-    # Rich intraday evidence is intentionally limited to short ranges to keep
-    # annual/monthly payloads and Gemini prompts bounded.
-    detail_days = []
-    if day_count <= 7:
-        for i in range(day_count):
-            detail_days.append(_daily_detail(start_date + timedelta(days=i), natal_lons, natal_houses, float(utc_offset_hours)))
+    # Intraday evidence is returned for a single selected day. Multi-day reports
+    # keep best/caution dates but avoid multiplying expensive intraday scans.
 
     months = []
     for seg_start, seg_end in _month_segments(start_date, end_date):
@@ -797,7 +838,7 @@ def _western_payload(
         "ephemeris": ephemeris_used,
         "ephemeris_fallback_reason": fallback_reason,
         "score_policy": "점수는 사건 발생 확률이 아니라 같은 분야 안의 상대 흐름",
-        "method": "하루 08:00~22:00 현지시간을 120분 간격으로 샘플링해 기존 기간 엔진 방식으로 집계",
+        "method": ("단일일은 07:30~23:00 90분 간격 단일 패스로 평균+시간창을 함께 산출" if day_count == 1 else "다일 기간은 하루 08:00~22:00 120분 간격으로 집계하고 날짜별 강약을 비교"),
         "natal": {
             "asc": round(natal_houses["asc"], 6),
             "mc": round(natal_houses["mc"], 6),
