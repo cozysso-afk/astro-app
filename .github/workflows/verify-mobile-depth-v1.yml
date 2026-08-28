@@ -1,0 +1,85 @@
+name: Verify restored mobile fortune depth
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-mobile-depth-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render v4 and verify full fortune depth
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          ok=0
+          for i in $(seq 1 24); do
+            meta=$(curl -fsS --max-time 45 "$API/v1/meta" || true)
+            echo "attempt $i: $meta"
+            if echo "$meta" | grep -q 'api-fortune-v4'; then ok=1; break; fi
+            sleep 10
+          done
+          test "$ok" = 1
+
+          cat >/tmp/request.json <<'JSON'
+          {
+            "profile": {
+              "name": "E2E",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-08-28",
+            "end_date": "2026-08-28"
+          }
+          JSON
+          curl -fsS --max-time 150 -H 'Content-Type: application/json' -d @/tmp/request.json "$API/v1/fortune/integrated" >/tmp/calc.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/calc.json'))
+          assert d.get('ok') is True, d
+          w=d['western']
+          for key in ['금전','투자심리','수익실현','신규진입','투자주의','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']:
+              assert key in w['overall'], key
+          for key in ['수신신호','발신적합','과거인연접점']:
+              assert key in w['relationship_signals'], key
+          assert w.get('market',{}).get('has_open_session') is True, w.get('market')
+          assert w.get('detail_days') and w['detail_days'][0].get('topics'), w.get('detail_days')
+          for key in ['수익실현','학업','시험','연락','소식','이직']:
+              assert key in w['detail_days'][0]['topics'], key
+          print('CALC DEPTH OK')
+          print('market', w['market'])
+          print('investment', {k:w['overall'][k]['average'] for k in ['수익실현','신규진입','투자주의']})
+          print('signals', {k:w['relationship_signals'][k]['average'] for k in ['수신신호','발신적합','과거인연접점']})
+          PY
+
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/calc.json'))
+          json.dump({'calculation':calc,'model':'gemini-3.7-flash'},open('/tmp/ai.json','w'),ensure_ascii=False)
+          PY
+          curl -fsS --max-time 180 -H 'Content-Type: application/json' -d @/tmp/ai.json "$API/v1/fortune/interpret" >/tmp/ai-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/ai-result.json'))
+          assert d.get('ok') is True, d
+          assert d.get('interpreter_version') == 'mobile-ai-v2', d
+          usage=d.get('usage') or {}
+          assert usage.get('total_tokens',0)>0, usage
+          assert isinstance(usage.get('estimated_krw'),(int,float)), usage
+          topics=(d.get('data') or {}).get('topic_analysis') or {}
+          for key in ['금전','수익실현','학업','시험','직장','이직','연락','소식']:
+              assert key in topics, (key,topics.keys())
+          print('AI DEPTH OK')
+          print('usage', usage)
+          print('headline', d['data']['headline'])
+          PY
