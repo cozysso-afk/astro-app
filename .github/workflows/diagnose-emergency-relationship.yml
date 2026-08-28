@@ -1,0 +1,72 @@
+name: Diagnose Emergency Relationship
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose-emergency-relationship.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Test CORS and relationship POST
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          ORIGIN='https://cozysso-afk.github.io'
+          echo '--- OPTIONS relationship ---'
+          curl -sS -D /tmp/headers -o /dev/null --max-time 30 -X OPTIONS "$API/v1/relationship/western" \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type'
+          cat /tmp/headers
+          grep -qi '^access-control-allow-origin: https://cozysso-afk.github.io' /tmp/headers
+
+          cat > /tmp/body.json <<'JSON'
+          {
+            "user": {
+              "name": "U",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "time_known": true,
+              "latitude": 37.5665,
+              "longitude": 126.978,
+              "utc_offset_hours": 9
+            },
+            "counterpart": {
+              "name": "A",
+              "birth_date": "1992-02-29",
+              "birth_time": null,
+              "time_known": false,
+              "latitude": null,
+              "longitude": null,
+              "utc_offset_hours": 9
+            },
+            "start_date": "2026-08-28",
+            "end_date": "2026-08-28",
+            "relationship_status": "single"
+          }
+          JSON
+
+          echo '--- POST relationship ---'
+          started=$(date +%s)
+          http=$(curl -sS --max-time 180 -w '%{http_code}' -o /tmp/out.json \
+            -X POST "$API/v1/relationship/western" \
+            -H "Origin: $ORIGIN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/body.json)
+          ended=$(date +%s)
+          echo "HTTP=$http elapsed=$((ended-started))s"
+          head -c 2000 /tmp/out.json; echo
+          test "$http" = 200
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/out.json'))
+          assert d.get('ok') is True
+          print('RELATIONSHIP_OK', d.get('api_version'), d.get('engine'))
+          PY
