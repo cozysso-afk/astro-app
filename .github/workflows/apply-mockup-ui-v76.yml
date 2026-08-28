@@ -1,0 +1,51 @@
+name: Apply mockup-grade celestial UI v7.6
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-mockup-ui-v76.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Syntax check patcher
+        run: python -m py_compile scripts/polish_mockup_ui_v76.py
+
+      - name: Apply UI patch
+        run: python scripts/polish_mockup_ui_v76.py
+
+      - name: Syntax check app
+        run: python -m py_compile app.py fortune_lab_v71.py
+
+      - name: Verify mockup UI markers
+        shell: bash
+        run: |
+          grep -q 'ASTRO_DESIGN_V76_CSS' app.py
+          grep -q 'astro-hero-v76' app.py
+          grep -q '_tool_items=' app.py
+          grep -q '✦  통합운세' app.py
+          grep -q 'fortune-page-head' fortune_lab_v71.py
+          grep -q 'compat-tab-label' fortune_lab_v71.py
+          grep -q 'FORTUNE_LAB_VERSION = "v0.1.9"' fortune_lab_v71.py
+          ! grep -q 'topic=st.selectbox(' fortune_lab_v71.py || true
+
+      - name: Diff sanity
+        run: git diff --check
+
+      - name: Commit integrated files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py fortune_lab_v71.py scripts/polish_mockup_ui_v76.py
+          git commit -m "style: match approved celestial mobile mockup"
+          git push origin HEAD:main
