@@ -1,0 +1,72 @@
+name: Restore legacy exact async v1.4
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-legacy-exact-async-v14.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact legacy and async patch
+        run: python scripts/restore_legacy_exact_async_v14.py
+      - name: Audit legacy calculation constants and sampling
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          legacy = Path('app.py').read_text(encoding='utf-8')
+          mobile = Path('integrated_fortune_v1.py').read_text(encoding='utf-8')
+          def literal_assignment(text, name):
+              tree=ast.parse(text)
+              for node in tree.body:
+                  if isinstance(node, ast.Assign):
+                      for target in node.targets:
+                          if isinstance(target,ast.Name) and target.id==name:
+                              return ast.literal_eval(node.value)
+              raise AssertionError(name)
+          for name in ['EXACT_ORB','ASPECTS','PLANET_TONE']:
+              assert literal_assignment(legacy,name)==literal_assignment(mobile,name), name
+          a=literal_assignment(legacy,'TOPIC_SPECS'); b=literal_assignment(mobile,'TOPIC_SPECS')
+          for topic, spec in b.items():
+              assert topic in a, topic
+              for key in ['targets','transits','houses','ruler_houses']:
+                  assert a[topic][key]==spec[key], (topic,key)
+          # Legacy sampling policies must be preserved verbatim in the mobile engine.
+          for marker in [
+              'dt_time(7, 0), dt_time(23, 30), 30',
+              'dt_time(0, 0), dt_time(6, 30), 30',
+              'dt_time(9, 0), dt_time(15, 30), 15',
+              'dt_time(8, 0), dt_time(22, 0), 120',
+              'dt_time(9, 0), dt_time(15, 30), 60',
+              '.40 * float(money.get("activation", 0.0))',
+              '.55 * float(invest.get("activation", 0.0))',
+          ]:
+              assert marker in mobile, marker
+          print('LEGACY CORE AUDIT OK')
+          PY
+      - name: Verify backend syntax
+        run: |
+          python -m py_compile integrated_fortune_v1.py api/main.py ai_interpret_v1.py
+          grep -q 'api-fortune-v4.2-async' api/main.py
+          grep -q '/v1/fortune/integrated/start' api/main.py
+          grep -q '/v1/fortune/interpret/start' api/main.py
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit exact legacy async engine
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py api/main.py web/src/AppNext.tsx
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'fix: restore exact legacy sampling and avoid long-request 502s'
+          git push
