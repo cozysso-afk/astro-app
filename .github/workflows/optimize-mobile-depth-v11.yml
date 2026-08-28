@@ -1,0 +1,47 @@
+name: Optimize mobile depth v1.1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/optimize-mobile-depth-v11.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build static KRX calendar
+        run: |
+          python -m pip install -q 'exchange-calendars>=4.11,<5.0'
+          mkdir -p data
+          python - <<'PY'
+          import json
+          import pandas as pd
+          import exchange_calendars as xcals
+          cal=xcals.get_calendar('XKRX')
+          sessions=cal.sessions_in_range(pd.Timestamp('2020-01-01'), pd.Timestamp('2035-12-31'))
+          values=[x.strftime('%Y-%m-%d') for x in sessions]
+          with open('data/krx_sessions_2020_2035.json','w',encoding='utf-8') as f:
+              json.dump({'calendar':'XKRX','range':['2020-01-01','2035-12-31'],'sessions':values},f,ensure_ascii=False,separators=(',',':'))
+          print('KRX sessions',len(values))
+          assert '2026-08-28' in values
+          PY
+      - name: Apply runtime optimization
+        run: python scripts/optimize_mobile_depth_v11.py
+      - name: Verify syntax and markers
+        run: |
+          python -m py_compile integrated_fortune_v1.py
+          grep -q 'krx_sessions_2020_2035.json' integrated_fortune_v1.py
+          grep -q 'dt_time(23, 0), 45' integrated_fortune_v1.py
+      - name: Commit optimization
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py data/krx_sessions_2020_2035.json
+          git diff --cached --quiet && { echo 'No changes'; exit 1; }
+          git commit -m 'perf: precompute KRX sessions and lighten detailed scans'
+          git push
