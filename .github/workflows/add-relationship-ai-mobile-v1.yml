@@ -1,0 +1,81 @@
+name: Add Relationship AI Mobile v1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-relationship-ai-mobile-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Patch relationship interpretation UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/AppNext.tsx')
+          s=p.read_text(encoding='utf-8')
+
+          type_anchor='type AiTopicInterpretation = {'
+          rel_type='''type RelationshipAiInterpretationResponse = {\n  ok: boolean\n  error?: string\n  model?: string\n  fallback_from?: string\n  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number }\n  data?: {\n    headline: string\n    summary: string\n    structure: { attraction: string; tension: string; communication: string; durability: string }\n    reconnection: { summary: string; supports: string; cannot_say: string }\n    timing: { available: boolean; summary: string; periods: Array<{ period: string; meaning: string }> }\n    key_aspects: Array<{ label: string; meaning: string; tone: string }>\n    actions: string[]\n    limits: string\n  }\n}\n\n'''
+          if 'type RelationshipAiInterpretationResponse' not in s:
+              assert type_anchor in s
+              s=s.replace(type_anchor,rel_type+type_anchor,1)
+
+          panel_anchor='function AiInterpretationPanel({ result, loading, error, onRetry }:'
+          rel_panel='''function RelationshipAiPanel({ result, loading, error, onRetry }: {\n  result: RelationshipAiInterpretationResponse | null\n  loading: boolean\n  error: string\n  onRetry: () => void\n}) {\n  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={20}/><div><span className="eyebrow">RELATIONSHIP INTERPRETATION</span><strong>관계 계산값을 자연어로 해석하는 중…</strong><p>상대 출생시간이 없으면 정밀 타이밍은 만들지 않고, 확인 가능한 관계 구조만 읽어.</p></div></section>\n  if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">RELATIONSHIP INTERPRETATION</span><strong>관계 해석을 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>관계 해석 다시 시도</button></div></section>\n  if (!result?.ok || !result.data) return null\n  const d=result.data\n  return <section className="ai-interpret-card relationship-ai-card">\n    <div className="ai-interpret-head"><span className="ai-orb"><Heart size={19}/></span><div><span className="eyebrow">RELATIONSHIP INTERPRETATION</span><h3>{d.headline || '관계 구조 해석'}</h3><small>{result.model || 'Gemini'} · 계산값 해설층</small></div></div>\n    {result.usage?.total_tokens ? <div className="ai-usage-card"><strong>이번 관계 해설 API 사용량</strong><span>입력 {(result.usage.prompt_tokens ?? 0).toLocaleString()} · 본문출력 {(result.usage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(result.usage.thought_tokens ?? 0).toLocaleString()} tokens</span><b>예상비용 ${Number(result.usage.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(result.usage.estimated_krw ?? 0).toLocaleString()}원</b></div> : null}\n    <p className="ai-summary">{d.summary}</p>\n    <div className="ai-cluster-grid"><div><strong>끌림 · 친화</strong><p>{d.structure.attraction}</p></div><div><strong>마찰 · 긴장</strong><p>{d.structure.tension}</p></div><div><strong>소통 패턴</strong><p>{d.structure.communication}</p></div><div><strong>반복 · 지속 구조</strong><p>{d.structure.durability}</p></div></div>\n    <div className="ai-highlight"><strong>과거인연 · 재접점 관점</strong><span>{d.reconnection.summary}</span>{d.reconnection.supports&&<span>{d.reconnection.supports}</span>}{d.reconnection.cannot_say&&<small>{d.reconnection.cannot_say}</small>}</div>\n    <div className="ai-system-note"><strong>시기 해석</strong><p>{d.timing.summary}</p>{d.timing.available&&d.timing.periods?.map((x,i)=><p key={`${x.period}-${i}`}><b>{x.period}</b> {x.meaning}</p>)}</div>\n    {!!d.key_aspects?.length && <details className="ai-details"><summary>주요 애스펙트 계산 근거</summary><div className="ai-topic-list">{d.key_aspects.map((x,i)=><article key={`${x.label}-${i}`}><div className="ai-topic-title"><strong>{x.label}</strong><span>{x.tone}</span></div><p>{x.meaning}</p></article>)}</div></details>}\n    {!!d.actions?.length && <div className="ai-priorities"><strong>현실적으로 볼 포인트</strong>{d.actions.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}\n    {d.limits&&<p className="ai-limits">{d.limits}</p>}\n  </section>\n}\n\n'''
+          if 'function RelationshipAiPanel' not in s:
+              assert panel_anchor in s
+              s=s.replace(panel_anchor,rel_panel+panel_anchor,1)
+
+          state_anchor="  const [relationshipError, setRelationshipError] = useState('')\n"
+          states="  const [relationshipAi, setRelationshipAi] = useState<RelationshipAiInterpretationResponse | null>(null)\n  const [relationshipAiLoading, setRelationshipAiLoading] = useState(false)\n  const [relationshipAiError, setRelationshipAiError] = useState('')\n"
+          if 'const [relationshipAi,' not in s:
+              assert state_anchor in s
+              s=s.replace(state_anchor,state_anchor+states,1)
+
+          run_anchor='  const runRelationship = async () => {'
+          rel_runner='''  const runRelationshipAi = async (calculation: RelationshipApiResponse | null = relationshipResult) => {\n    if (!calculation) return\n    setRelationshipAiLoading(true); setRelationshipAiError('')\n    try {\n      await ensureSupabaseSession()\n      const { data, error } = await supabase.functions.invoke('relationship-interpret', { body: { calculation, model: aiModel } })\n      if (error) throw error\n      const payload = data as RelationshipAiInterpretationResponse\n      if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 해석 결과를 받지 못했어.')\n      setRelationshipAi(payload)\n    } catch (error) {\n      setRelationshipAiError(error instanceof Error ? error.message : '관계 해석 중 오류가 발생했어.')\n    } finally { setRelationshipAiLoading(false) }\n  }\n\n'''
+          if 'const runRelationshipAi' not in s:
+              assert run_anchor in s
+              s=s.replace(run_anchor,rel_runner+run_anchor,1)
+
+          s=s.replace("    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null)\n", "    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError('')\n",1)
+          success="      setRelationshipResult(payload as RelationshipApiResponse)\n      setRelationshipRequestSnapshot(body as Record<string, unknown>)\n"
+          if 'void runRelationshipAi(payload as RelationshipApiResponse)' not in s:
+              assert success in s
+              s=s.replace(success,success+"      void runRelationshipAi(payload as RelationshipApiResponse)\n",1)
+
+          rel_marker='                <button className="save-action" type="button" onClick={saveRelationshipRecord}><Save size={15}/><span>기록 저장</span></button>'
+          idx=s.index(rel_marker)
+          card=s.index('              <section className="result-card">',idx)
+          panel='              <RelationshipAiPanel result={relationshipAi} loading={relationshipAiLoading} error={relationshipAiError} onRetry={()=>void runRelationshipAi()}/>\n'
+          if panel.strip() not in s[idx:card+500]:
+              s=s[:card]+panel+s[card:]
+
+          timing_start=s.index('              {resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span>',idx)
+          timing_end=s.index('              {(relationshipResult.result.limitations?.length??0)>0',timing_start)
+          timing='''              {resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 활성도</strong></div>{relationshipResult.result.natal_synastry?.partner_time_exact ? <><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></> : <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간이 없어서 진행 시너스트리·진행 컴포지트·데이비슨·마크스 기반 정밀 타이밍은 계산하지 않았어. 0개를 ‘가능성 0’으로 읽으면 안 돼.</span></div>}</section>}\n'''
+          s=s[:timing_start]+timing+s[timing_end:]
+
+          p.write_text(s,encoding='utf-8')
+          PY
+          cd web
+          npm ci
+          npm run build
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git commit -m 'feat: add natural-language relationship interpretation'
+          git push
