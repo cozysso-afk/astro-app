@@ -486,6 +486,7 @@ def _render_month_table(bundle):
 
 def render_fortune_lab(ctx):
     st.markdown("### 🧭 FORTUNE LAB · 다체계 운세 분석")
+    st.caption(f"운영 버전 · {FORTUNE_LAB_VERSION}")
     st.caption("별빛의 서양 계산 + 사주 대운·세운·월운 + 태국 출생요일층을 한 번에 정리하고, 해석가는 Gemini 또는 외부 AI로 자유롭게 선택해.")
 
     forced_mode=str(ctx.get("forced_mode") or "").strip()

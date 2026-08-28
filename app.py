@@ -23,7 +23,10 @@ from PIL import Image
 from scipy.optimize import brentq
 from skyfield.api import load, wgs84
 from skyfield.framelib import ecliptic_frame
-from fortune_lab_v71 import render_fortune_lab
+import importlib
+import fortune_lab_v71 as fortune_lab_module
+fortune_lab_module = importlib.reload(fortune_lab_module)
+render_fortune_lab = fortune_lab_module.render_fortune_lab
 
 try:
     from streamlit_js_eval import streamlit_js_eval
