@@ -1,0 +1,92 @@
+name: Verify final mobile E2E
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-final-mobile-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify Render AI config and live interpretation
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          meta=$(curl -fsS --max-time 45 "$API/v1/fortune/ai-meta")
+          echo "$meta"
+          python - <<'PY' "$meta"
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get('configured') is True, data
+          assert data.get('interpreter_version') == 'mobile-ai-v1', data
+          print('AI configured:', data.get('default_model'))
+          PY
+
+          cat > /tmp/request.json <<'JSON'
+          {
+            "profile": {
+              "name": "E2E",
+              "birth_date": "1990-01-01",
+              "birth_time": "12:00:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-08-28",
+            "end_date": "2026-08-28"
+          }
+          JSON
+
+          curl -fsS --max-time 90 -H 'Content-Type: application/json' \
+            -d @/tmp/request.json "$API/v1/fortune/integrated" > /tmp/calc.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/calc.json'))
+          assert d.get('ok') is True, d
+          assert d.get('western',{}).get('ok') is True, d
+          assert d.get('saju',{}).get('ok') is True, d
+          assert d.get('thai',{}).get('ok') is True, d
+          print('Integrated calculation OK:', d.get('engine'))
+          PY
+
+          python - <<'PY'
+          import json
+          calc=json.load(open('/tmp/calc.json'))
+          json.dump({'calculation': calc, 'model':'gemini-3.7-flash'}, open('/tmp/interpret-request.json','w'), ensure_ascii=False)
+          PY
+          curl -fsS --max-time 120 -H 'Content-Type: application/json' \
+            -d @/tmp/interpret-request.json "$API/v1/fortune/interpret" > /tmp/interpret.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/interpret.json'))
+          assert d.get('ok') is True, d
+          data=d.get('data') or {}
+          assert str(data.get('headline') or '').strip(), d
+          assert str((data.get('overall') or {}).get('summary') or '').strip(), d
+          print('Gemini interpretation OK:', d.get('model'))
+          print('Headline:', data.get('headline'))
+          PY
+
+      - name: Verify Vercel production AI and push assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB='https://astro-app-web-ten.vercel.app'
+          html=$(curl -fsSL --max-time 45 "$WEB/")
+          printf '%s' "$html" > /tmp/index.html
+          asset=$(grep -oE '/assets/[^" ]+\.js' /tmp/index.html | head -1)
+          test -n "$asset"
+          curl -fsSL --max-time 45 "$WEB$asset" > /tmp/app.js
+          grep -q 'AI 해설 모델' /tmp/app.js
+          grep -q 'Gemini' /tmp/app.js
+          grep -q '알림 켜기' /tmp/app.js
+          sw=$(curl -fsSL --max-time 45 "$WEB/OneSignalSDKWorker.js")
+          echo "$sw" | grep -q 'OneSignalSDK.sw.js'
+          echo 'Vercel production contains AI interpretation UI and OneSignal service worker.'
