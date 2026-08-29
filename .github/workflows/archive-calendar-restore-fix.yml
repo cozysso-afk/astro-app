@@ -1,0 +1,43 @@
+name: Archive calendar restore fix
+on:
+  push:
+    branches: [final-review-fixpack-20260829]
+    paths:
+      - 'scripts/apply_archive_calendar_restore_fix.py'
+      - '.github/workflows/archive-calendar-restore-fix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: final-review-fixpack-20260829
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Patch calendar archive restore
+        run: python scripts/apply_archive_calendar_restore_fix.py
+      - name: Verify
+        run: |
+          grep -q 'isFullCalendarYear' web/src/AppNext.tsx
+          grep -q 'setIntegratedCalendarYear(isFullCalendarYear ? archiveYear : null)' web/src/AppNext.tsx
+          grep -q 'setRelationshipCalendarYear(isFullCalendarYear ? archiveYear : null)' web/src/AppNext.tsx
+          grep -q "integratedArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period" web/src/AppNext.tsx
+          grep -q "precisionArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period" web/src/AppNext.tsx
+      - name: Build
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git commit -m 'fix: preserve calendar-year archive selections'
+          git push origin HEAD:final-review-fixpack-20260829
