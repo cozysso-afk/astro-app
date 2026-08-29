@@ -1,0 +1,34 @@
+/* v5 · iPhone-first celestial editorial pass */
+:root{--ink:#342b3c;--muted:#766c79;--violet:#7d6699;--rose:#b97891;--gold:#a87949;--glass:rgba(255,255,255,.76)}
+body{font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.018em}
+.result-card-title span,.section-kicker,.eyebrow,.relationship-reading-card>small,.relationship-ai-card>small{font-family:"Avenir Next","SF Pro Display","Helvetica Neue",sans-serif;letter-spacing:.14em!important;font-weight:750}
+h1,h2,h3,.result-card-title strong,.relationship-reading-card h3,.relationship-ai-card h3{font-family:"Apple SD Gothic Neo","Pretendard Variable",sans-serif;letter-spacing:-.045em!important}
+
+/* less boxy, more breathing room */
+.result-card,.relationship-reading-card,.relationship-ai-card{border-color:rgba(139,115,161,.16)!important;box-shadow:0 18px 50px rgba(88,69,116,.08),inset 0 1px rgba(255,255,255,.9)!important}
+.relationship-reading-card,.relationship-ai-card{padding:26px 22px!important;border-radius:30px!important;background:radial-gradient(circle at 8% 0%,rgba(244,222,255,.55),transparent 27%),radial-gradient(circle at 95% 12%,rgba(210,241,246,.52),transparent 30%),linear-gradient(150deg,rgba(255,255,255,.94),rgba(248,245,253,.91))!important}
+.relationship-reading-card h3,.relationship-ai-card h3{font-size:1.62rem!important;line-height:1.24!important;margin:8px 0 18px!important;color:var(--ink)!important}
+.relationship-overview,.relationship-ai-overview{font-size:1.02rem!important;line-height:1.82!important;color:#5d5361!important;margin-bottom:22px!important}
+.relationship-reading-grid,.relationship-ai-grid{gap:14px!important}
+.relationship-reading-grid article,.relationship-ai-grid article{padding:20px 18px!important;border-radius:22px!important;background:rgba(255,255,255,.68)!important;box-shadow:inset 0 1px rgba(255,255,255,.9)}
+.relationship-reading-grid strong,.relationship-ai-grid strong{font-size:1.08rem!important;line-height:1.35!important}
+.relationship-reading-grid p,.relationship-ai-grid p{font-size:.98rem!important;line-height:1.82!important;color:#625965!important;margin-top:10px!important}
+.relationship-key-aspects{margin-top:22px!important;padding-top:20px!important}.relationship-key-aspects>strong{font-size:1.12rem!important}.relationship-key-aspects>div{padding:16px!important}.relationship-key-aspects p{font-size:.95rem!important;line-height:1.72!important}
+.relationship-ai-advice{padding:20px!important;border-radius:23px!important;background:linear-gradient(145deg,rgba(248,239,255,.8),rgba(240,250,248,.74))!important}.relationship-ai-advice strong{font-size:1.1rem!important}.relationship-ai-advice p{font-size:.98rem!important;line-height:1.78!important}
+.relationship-ai-usage{padding:16px 18px!important;border-radius:20px!important;font-size:.88rem!important}.relationship-ai-usage b{font-size:1rem!important}
+
+/* daily cards: compact enough to scan, large enough to read */
+.tight-row{min-height:58px!important;padding:12px 2px!important}.tight-row>span{font-size:1rem!important}.tight-row>b{font-size:1.16rem!important;min-width:54px!important;padding:8px 9px!important}
+.time-detail-list{gap:12px!important}.time-detail-list details{padding:16px!important;border-radius:22px!important}.time-topic{padding:15px!important;border-radius:18px!important}.time-topic-name{font-size:1.08rem!important}.time-window{padding:9px 10px!important}.time-evidence em{font-size:.9rem!important;line-height:1.58!important}
+
+/* Gemini: editorial hierarchy instead of one giant text slab */
+.ai-interpret-card{padding:24px 21px!important;gap:20px!important;border-radius:28px!important;background:radial-gradient(circle at 4% 0%,rgba(238,215,250,.7),transparent 28%),radial-gradient(circle at 96% 5%,rgba(207,237,249,.68),transparent 30%),radial-gradient(circle at 82% 95%,rgba(216,246,234,.55),transparent 28%),linear-gradient(150deg,rgba(255,255,255,.95),rgba(248,246,253,.93))!important}
+.ai-interpret-head{align-items:flex-start!important}.ai-orb{width:50px!important;height:50px!important;flex-basis:50px!important;border-radius:17px!important;box-shadow:0 10px 26px rgba(112,83,145,.15),0 0 28px rgba(218,195,244,.45)!important}.ai-interpret-head h3{font-size:1.42rem!important;line-height:1.3!important}.ai-interpret-head small{font-size:.78rem!important;line-height:1.5!important}.ai-summary{font-size:1rem!important;line-height:1.86!important;color:#554c59!important}.ai-highlight,.ai-priorities,.ai-system-note{padding:17px!important;border-radius:20px!important}.ai-highlight strong,.ai-priorities>strong,.ai-system-note>strong{font-size:.9rem!important}.ai-highlight span,.ai-priorities p,.ai-system-note p{font-size:.94rem!important;line-height:1.76!important}.ai-topic-list{gap:12px!important}.ai-topic-list article{padding:17px!important;border-radius:19px!important}.ai-topic-title strong{font-size:1.02rem!important}.ai-topic-list p{font-size:.94rem!important;line-height:1.76!important}.ai-limits{font-size:.82rem!important;line-height:1.65!important}
+
+@media(max-width:430px){
+ .relationship-reading-card,.relationship-ai-card{padding:23px 18px!important;border-radius:27px!important}
+ .relationship-reading-card h3,.relationship-ai-card h3{font-size:1.48rem!important}
+ .relationship-overview,.relationship-ai-overview{font-size:.98rem!important;line-height:1.78!important}
+ .relationship-reading-grid,.relationship-ai-grid{grid-template-columns:1fr!important}
+ .ai-interpret-card{padding:22px 18px!important}.ai-interpret-head h3{font-size:1.32rem!important}.ai-summary{font-size:.97rem!important;line-height:1.82!important}
+}
