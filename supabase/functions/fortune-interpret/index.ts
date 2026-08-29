@@ -7,8 +7,8 @@ const MODELS: Record<string, string> = {
 };
 const DEFAULT_MODEL = "gemini-3.7-flash";
 const FALLBACK_MODEL = "gemini-3.6-flash";
-const INTERPRETER_VERSION = "supabase-ai-v2-background-jobs";
-const TOPICS = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션", "투자심리", "수익실현", "신규진입", "투자주의"];
+const INTERPRETER_VERSION = "supabase-ai-v3-evidence-first";
+const TOPICS = ["금전", "학업", "시험", "직장", "이직", "연애", "재회", "소식", "컨디션", "투자심리", "수익실현", "신규진입", "투자주의"];
 const REL_SIGNALS = ["수신신호", "발신적합", "과거인연접점"];
 const INTRO_END = new Date("2026-12-31T23:59:59Z");
 const USD_KRW = 1384;
@@ -122,9 +122,11 @@ Western 점수는 사건 확률이 아니라 같은 분야 안에서 비교하�
 사주의 not_calculated 항목은 임의 추정하지 마라. Thai predictive_status가 미구현이면 출생요일 baseline만 설명하고 날짜별 합의에 섞지 마라.
 연애·연락·재회는 특정 상대의 속마음이나 미래 행동을 단정하지 마라. 금전·투자는 수익률이나 가격 방향을 보장하지 마라.
 detail_days에 시간창과 evidence가 있으면 적극 사용해 왜/언제를 설명하고, 시간 근거가 없으면 특정 시각을 만들지 마라.
-직장과 이직, 학업과 시험, 연락과 소식, 금전과 수익실현을 반드시 구분한다.
-투자심리·수익실현·신규진입·투자주의는 market.has_open_session=true인 경우에만 거래일 지표로 해석한다.
-단순 점수 낭독을 금지한다. 각 분야마다 결론, 근거, 시기, 행동, 주의를 구체적으로 쓴다.
+직장과 이직, 학업과 시험, 금전과 소식을 반드시 구분한다.
+연락은 generic '연락운' 하나로 쓰지 마라. relationship_signals의 수신신호(상대→나), 발신적합(나→상대), 과거인연접점(재활성)을 세 방향으로 반드시 분리한다. 세 값은 실제 연락 확률이 아니다.
+투자심리·수익실현·신규진입·투자주의는 역할이 다르다. 투자심리는 판단의 열기/과열, 수익실현은 기존 포지션 정리 적합도, 신규진입은 새 진입 적합도, 투자주의는 높을수록 위험 경계가 큰 지수로 해석한다. 네 문단을 같은 말로 반복하지 마라.
+market_open, has_open_session, true/false, JSON 키 이름 같은 내부 구현값을 사용자 문장에 절대 노출하지 마라. 필요하면 'KRX 거래일', '휴장일', '거래일 포함 여부'처럼 자연어로 번역한다.
+단순 점수 낭독을 금지한다. 각 분야는 계산 근거와 실제 체감 의미를 연결하되 뻔한 조언을 반복하지 마라.
 한국어 반말로 자연스럽고 읽기 쉽게 쓴다. 희망고문과 공포 조장을 피한다. 출력은 JSON만 반환한다.`;
 
 const OUTPUT_SHAPE = {
@@ -136,11 +138,22 @@ const OUTPUT_SHAPE = {
     caution_phase: "상대적으로 보수적으로 볼 날짜/시간 구간과 이유",
   },
   clusters: {
-    relationship: "연애·연락·재회 교차 해석",
+    relationship: "연애·재회 전체 맥락. 연락 방향은 contact_flow에서 따로 쓸 것",
     work_study: "학업·시험·직장·이직 교차 해석",
     money_news: "금전·소식 교차 해석",
-    investment: "투자심리·수익실현·신규진입·투자주의 구분 해석",
+    investment: "주식 4축 전체 비교 요약. 각 축 상세는 investment_reading에서 분리",
     condition: "컨디션과 일정 배치 해석",
+  },
+  contact_flow: {
+    incoming: "수신신호 근거, 강한 날짜/시간, 약한 구간. 상대가 실제 연락한다고 단정 금지",
+    outgoing: "발신적합 근거, 내가 먼저 움직이기 상대적으로 좋은/나쁜 시기",
+    reconnection: "과거인연접점의 강약과 시기. 재회 확률로 표현 금지",
+  },
+  investment_reading: {
+    psychology: "투자심리: 판단 열기·과열·흔들림",
+    realization: "수익실현: 보유분 정리/실현 적합도",
+    entry: "신규진입: 새 포지션 진입 적합도",
+    risk: "투자주의: 높을수록 경계가 큰 위험 지수",
   },
   systems: {
     western: "Western 계산 핵심",
@@ -169,17 +182,28 @@ function validateOutput(obj: any) {
   const out: any = {
     headline: cleanText(obj.headline, 180),
     overall: {
-      summary: cleanText(overall.summary, 3200),
-      dominant_pattern: cleanText(overall.dominant_pattern, 1800),
+      summary: cleanText(overall.summary, 2200),
+      dominant_pattern: cleanText(overall.dominant_pattern, 1200),
       best_phase: cleanText(overall.best_phase, 1400),
       caution_phase: cleanText(overall.caution_phase, 1400),
     },
     clusters: {
-      relationship: cleanText(clusters.relationship, 2200),
-      work_study: cleanText(clusters.work_study, 2200),
-      money_news: cleanText(clusters.money_news, 2200),
-      investment: cleanText(clusters.investment, 2400),
-      condition: cleanText(clusters.condition, 1800),
+      relationship: cleanText(clusters.relationship, 1500),
+      work_study: cleanText(clusters.work_study, 1600),
+      money_news: cleanText(clusters.money_news, 1400),
+      investment: cleanText(clusters.investment, 1600),
+      condition: cleanText(clusters.condition, 1200),
+    },
+    contact_flow: {
+      incoming: cleanText(obj?.contact_flow?.incoming, 1500),
+      outgoing: cleanText(obj?.contact_flow?.outgoing, 1500),
+      reconnection: cleanText(obj?.contact_flow?.reconnection, 1500),
+    },
+    investment_reading: {
+      psychology: cleanText(obj?.investment_reading?.psychology, 1400),
+      realization: cleanText(obj?.investment_reading?.realization, 1400),
+      entry: cleanText(obj?.investment_reading?.entry, 1400),
+      risk: cleanText(obj?.investment_reading?.risk, 1400),
     },
     systems: {
       western: cleanText(systems.western, 1800),
@@ -254,7 +278,7 @@ async function callGemini(
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 10000,
+            maxOutputTokens: 8200,
             responseMimeType: "application/json",
             thinkingConfig: { thinkingLevel },
           },
