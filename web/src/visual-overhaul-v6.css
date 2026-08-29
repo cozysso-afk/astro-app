@@ -82,3 +82,7 @@ body{font-family:"Noto Sans KR","Pretendard Variable","Apple SD Gothic Neo",sans
 .ai-topic-list p{font-size:.85rem!important;line-height:1.7!important}.ai-verdict{font-size:.91rem!important;line-height:1.62!important}
 .ai-meta-details{margin:10px 0 14px}.ai-meta-details>summary{cursor:pointer;font-size:.68rem;font-weight:800;color:#84798a}.ai-meta-details[open]>summary{margin-bottom:8px}.ai-meta-details .ai-usage-card,.relationship-meta-details .relationship-ai-usage{margin:0!important}
 @media(max-width:430px){.relationship-main-mode-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}.relationship-range-block{padding:11px}.ai-summary,.relationship-overview,.relationship-ai-overview{font-size:.87rem!important}}
+
+
+/* v10 · user-facing cleanup */
+.relationship-range-note{display:block;margin-top:8px;font-size:.65rem;line-height:1.55;color:#817687}.marriage-range-block{margin-bottom:5px}.relationship-evidence-details>summary{cursor:pointer;list-style:none;font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.86rem;font-weight:700;color:#594d61}.relationship-evidence-details>summary::-webkit-details-marker{display:none}.relationship-evidence-details>summary:before{content:"＋";display:inline-block;margin-right:7px;color:#8a739c}.relationship-evidence-details[open]>summary:before{content:"－"}.relationship-evidence-body{margin-top:13px;padding-top:12px;border-top:1px solid rgba(128,112,148,.1)}

@@ -237,11 +237,11 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   onRetry: () => void
 }) {
   if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>Gemini가 서버에서 정밀해석 중…</strong><p>앱을 닫거나 다른 앱으로 이동해도 서버 작업은 계속돼. 돌아오면 완료된 리딩을 자동으로 이어받아.</p></div></section>
-  if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI INTERPRETATION</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
+  if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
   if (!result?.ok || !result.data) return null
   const data = result.data
   return <section className="ai-interpret-card">
-    <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">Gemini(제미나이) 통합 해설</span><h3>{data.headline || '통합 계산 해설'}</h3><small>{result.model || 'Gemini'} · 계산 후 해설층</small></div></div>
+    <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">Gemini(제미나이) 통합 해설</span><h3>{data.headline || '통합 계산 해설'}</h3><small>실계산 결과를 바탕으로 한 자연어 해설</small></div></div>
     {result.usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(result.usage.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(result.usage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(result.usage.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(result.usage.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(result.usage.estimated_krw ?? 0).toLocaleString()}원</b><small>최초 생성 예상치 · 저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
     <p className="ai-summary">{data.overall.summary}</p>
     {data.overall.dominant_pattern && <div className="ai-highlight"><strong>핵심 패턴</strong><span>{data.overall.dominant_pattern}</span></div>}
@@ -260,7 +260,7 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
       if(!item) return null
       return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {item.reason}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}</article>
     })}</div></details>
-    <div className="ai-system-note"><strong>체계별 해석</strong>{data.systems.western&&<p><b>Western</b> {data.systems.western}</p>}{data.systems.saju&&<p><b>사주</b> {data.systems.saju}</p>}{data.systems.thai&&<p><b>Thai</b> {data.systems.thai}</p>}</div>
+    <div className="ai-system-note"><strong>체계별 해석</strong>{data.systems.western&&<p><b>Western(서양점성술)</b> {data.systems.western}</p>}{data.systems.saju&&<p><b>사주</b> {data.systems.saju}</p>}{data.systems.thai&&<p><b>Thai(태국점성술)</b> {data.systems.thai}</p>}</div>
     {data.limits && <p className="ai-limits">{data.limits}</p>}
   </section>
 }
@@ -1248,17 +1248,17 @@ export default function AppNext() {
           </button>
           <section className="date-card"><label htmlFor="query-date">운세 기준 날짜</label><div className="date-control"><CalendarDays size={19}/><input id="query-date" type="date" value={queryDate} onChange={(e)=>setQueryDate(e.target.value)}/></div></section>
           <section className="section-block"><div className="section-label">기간 선택</div><div className="period-grid">{periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${period===key?'is-active':''}`} type="button" onClick={()=>setPeriod(key)}><Icon size={17}/><span>{label}</span></button>)}</div></section>
-          <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{tools.map(({key,label,desc,icon:Icon,tone})=><button key={key} className={`tool-card ${selectedTool===key?'is-selected':''}`} type="button" onClick={()=>setSelectedTool(key)}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
+          <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{tools.map(({key,label,desc,icon:Icon,tone})=><button key={key} className={`tool-card ${selectedTool===key?'is-selected':''}`} type="button" onClick={()=>{setSelectedTool(key); if(key==='marriage') setPeriod('year')}}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">LIVE INTEGRATED ENGINE</span><h2>통합운세</h2><p>Western(서양점성술) 기간 흐름, 진태양시 보정 사주, Thai(태국) 출생요일층을 각각 계산해 한 화면에서 비교해.</p></div></div>
+            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">통합 흐름 계산</span><h2>통합운세</h2><p>Western(서양점성술) 기간 흐름, 진태양시 보정 사주, Thai(태국점성술) 출생요일층을 각각 계산해 한 화면에서 비교해.</p></div></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
-            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai는 현재 출생요일 baseline만 사용해.</span></div>
+            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 현재 출생요일 기준값만 사용해.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'통합 계산 중…':'통합운세 실제 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
@@ -1317,10 +1317,12 @@ export default function AppNext() {
               <div className="relationship-range-block">
                 <div><strong>{relationshipPurpose==='reunion'?'재회운 분석기간':'궁합 시기 분석기간'}</strong><span>{queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
                 <div className="relationship-range-buttons">{periods.map((item)=><button key={item.key} type="button" className={period===item.key?'is-active':''} onClick={()=>setPeriod(item.key)}>{item.key==='today'?'1일':item.key==='week'?'7일':item.key==='month'?'31일':'1년'}</button>)}</div>
+                <small className="relationship-range-note">{relationshipPurpose==='reunion'?'재회는 기본 1년으로 열리고, 수신·발신·재접점의 강한 날짜와 약한 날짜를 이 범위 안에서 비교해.':'기본 궁합 구조는 출생차트끼리 보는 고정 구조야. 여기서 고르는 기간은 관계의 시기 흐름에만 적용돼.'}</small>
               </div>
             </>}
             {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null)}}><strong>미혼</strong><span>결혼 전 · 장기 결속과 결혼생활 적합 구조</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setRelationshipAi(null)}}><strong>기혼</strong><span>결혼 후 · 현재 결속과 갈등·회복 주기</span></button></div>}
             {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='unmarried'?'결혼 여부 예언이 아니라, 이 관계가 결혼생활로 이어질 때의 생활궁합·책임·갈등·지속성을 깊게 봐.':'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·갈등과 회복 흐름을 봐.'}</span></div>}
+            {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div><div className="relationship-range-buttons">{periods.map((item)=><button key={item.key} type="button" className={period===item.key?'is-active':''} onClick={()=>setPeriod(item.key)}>{item.key==='today'?'1일':item.key==='week'?'7일':item.key==='month'?'31일':'1년'}</button>)}</div><small className="relationship-range-note">결혼운은 기본 1년으로 열고, 관계 구조 자체와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {queryDate}~{periodEnd(queryDate,period)}이고, 위 버튼에서 1일·7일·31일·1년으로 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
@@ -1336,12 +1338,12 @@ export default function AppNext() {
               </div></details>
             </div>
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>{queryDate} → {periodEnd(queryDate,period)} · {periods.find((item)=>item.key===period)?.label} 범위</span></div>
+            <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
             {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
             <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||apiStatus==='offline'}>{relationshipLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{relationshipLoading?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
 
             {relationshipResult && <div className="results-wrap">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.engine} · {relationshipResult.period.month_segments}개 월 구간</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {periodRangeLabel(period)}</span></div></div>
               <div className="result-actions">
                 <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':'compatibility', relationshipRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':'compatibility', relationshipResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1351,9 +1353,10 @@ export default function AppNext() {
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
               <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} />
-              {!relationshipResult.result.natal_synastry?.partner_time_exact && <section className="result-card timing-unavailable"><div className="result-card-title"><span>TIMING</span><strong>정밀 타이밍 계산 제외</strong></div><p>상대 출생시간·장소가 없어서 진행 시너스트리·진행 컴포지트·데이비슨·마크스 계열은 추정하지 않았어. 이전 화면의 0/0/0은 “아무 접점 없음”이 아니라 계산 불가를 잘못 표시한 거였어.</p></section>}
-              <section className="result-card">
-                <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조 · 계산 근거</strong></div>
+              <details className="result-card relationship-evidence-details">
+                <summary>기본 관계 구조 · 계산 근거 펼치기</summary>
+                <div className="relationship-evidence-body">
+                <div className="result-card-title"><span>기본 궁합</span><strong>계산 근거</strong></div>
                 <p className="result-note">아래 숫자는 관계 점수나 재회 확률이 아니라, 허용 오브 안에서 포착된 주요 천체 각의 개수야.</p>
                 <div className="metric-grid">
                   <div className="metric"><strong>{natalAspects.length}</strong><span>주요 각</span></div>
@@ -1362,25 +1365,26 @@ export default function AppNext() {
                 </div>
                 {natalMixed>0 && <p className="result-note">혼합 각 {natalMixed}개 · 개수만으로 관계의 좋고 나쁨을 판정하지 않아.</p>}
                 <div className="aspect-list">{natalAspects.slice(0,8).map((aspect,index)=><div className="aspect-row" key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><span className={`tone-dot ${aspect.tone}`}/><div><strong>{aspectText(aspect)}</strong><span>오브 {aspect.orb.toFixed(2)}° · {aspect.tone==='supportive'?'조화':aspect.tone==='challenging'?'긴장':'혼합'}</span></div></div>)}</div>
-              </section>
+                </div>
+              </details>
               {!partnerTimeExact ? <section className="result-card">
-                <div className="result-card-title"><span>TIMING</span><strong>정밀 시기층 미계산</strong></div>
-                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 시너스트리·진행 합성·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
-                <p className="result-note">현재는 출생시간 없이도 계산 가능한 기본 시너스트리만 해석 근거로 사용해.</p>
-              </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>TIMING</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
+                <div className="result-card-title"><span>정밀도</span><strong>출생시간 미상 · 일부 시기층 제외</strong></div>
+                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 궁합차트·진행 합성차트·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
+                <p className="result-note">현재는 출생시간 없이도 확정 가능한 행성 간 기본 궁합 접점만 해석 근거로 사용해.</p>
+              </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>시기</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
               {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.map(relationshipLimitKo).join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
             </div>}
           </section>}
 
           {selectedTool === 'precision' && <section className="tool-panel precision-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-sage"><Search size={22}/></span><div><span className="eyebrow">LIVE PRECISION ENGINE</span><h2>정밀분석</h2><p>새 점수를 만들지 않고 운영 중인 통합 실계산의 원자료를 더 깊게 펼쳐봐. Western(서양점성술) 세부 지표, 사주 원자료, Thai(태국점성술) 상태와 원본 JSON까지 확인할 수 있어.</p></div></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>{queryDate} → {periodEnd(queryDate,period)} · {periods.find((item)=>item.key===period)?.label} 범위</span></div>
-            <div className="coordinate-note"><Search size={16}/><span>통합운세와 같은 `/v1/fortune/integrated` 실제 엔진을 재사용해. 같은 날짜·기간 계산이 이미 있으면 다시 호출하지 않고 동일 응답을 정밀 화면에서 그대로 펼쳐 보여줘.</span></div>
+            <div className="tool-panel-heading"><span className="tool-icon tone-sage"><Search size={22}/></span><div><span className="eyebrow">정밀 계산</span><h2>정밀분석</h2><p>새 점수를 만들지 않고 운영 중인 통합 실계산의 원자료를 더 깊게 펼쳐봐. Western(서양점성술) 세부 지표, 사주 원자료, Thai(태국점성술) 상태와 원본 JSON(제이슨·데이터 형식)까지 확인할 수 있어.</p></div></div>
+            <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
+            <div className="coordinate-note"><Search size={16}/><span>통합운세와 같은 실계산 결과를 재사용해. 같은 날짜·기간 계산이 이미 있으면 다시 호출하지 않고 동일 결과를 정밀 화면에서 펼쳐 보여줘.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             {!integratedMatchesSelection && <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Search size={18}/>}<span>{integratedLoading?'정밀 계산 중…':'정밀분석 실제 계산'}</span></button>}
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap precision-results">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>정밀 실계산 준비 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 · 원자료 확장 보기</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>정밀 실계산 준비 완료</strong><span>{integratedResult.period.day_count}일 분석 · 원자료 확장 보기</span></div></div>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('정밀 요청/프롬프트 전체복사', precisionPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('정밀 결과 전체복사', precisionResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1448,12 +1452,12 @@ export default function AppNext() {
 
               <section className="result-card">
                 <div className="result-card-title"><span>RAW JSON</span><strong>원본 계산 응답</strong></div>
-                <details className="precision-details"><summary>원본 JSON 전체 펼치기</summary><div className="precision-details-body"><pre className="precision-json">{JSON.stringify(integratedResult,null,2)}</pre></div></details>
+                <details className="precision-details"><summary>원본 JSON(제이슨·데이터 형식) 전체 펼치기</summary><div className="precision-details-body"><pre className="precision-json">{JSON.stringify(integratedResult,null,2)}</pre></div></details>
               </section>
             </div>}
           </section>}
           <section className="tool-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">LIVE CELESTIAL REPORT</span><h2>{period==='today'?'오늘의 리포트':`${periods.find((item)=>item.key===period)?.label} 리포트`}</h2><p>{queryDate} → {integratedSelectionEnd} · 통합운세 실계산 요약</p></div></div>
+            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">천체 흐름 리포트</span><h2>{period==='today'?'오늘의 리포트':`${periods.find((item)=>item.key===period)?.label} 리포트`}</h2><p>{queryDate} → {integratedSelectionEnd} · 통합운세 실계산 요약</p></div></div>
 
             {!integratedMatchesSelection && <>
               <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 아래 버튼은 통합운세와 같은 Render 실계산을 한 번만 실행하고, 그 응답을 이 홈 리포트와 상세 통합운세가 함께 재사용해.</span></div>
@@ -1462,23 +1466,23 @@ export default function AppNext() {
             </>}
 
             {integratedMatchesSelection && integratedResult && <>
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.period.day_count}일 분석</span></div></div>
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
 
               <section className="result-card">
-                <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
+                <div className="result-card-title"><span>핵심 흐름</span><strong>핵심 흐름</strong></div>
                 <div className="integrated-topic-grid">
                   {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={`home-top-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
                 {cautionIntegratedTopics.length>0 && <div className="best-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
 
-              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>CONTACT SIGNALS</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신은 들어오는 흐름, 발신은 내가 먼저 움직일 때의 적합도, 재접점은 과거 인연 활성도를 따로 본 값이야. 셋 다 사건 확률은 아니야.</p></section>}
+              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>연락 방향</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신은 들어오는 흐름, 발신은 내가 먼저 움직일 때의 적합도, 재접점은 과거 인연 활성도를 따로 본 값이야. 셋 다 사건 확률은 아니야.</p></section>}
 
-              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MARKET FLOW</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자심리=판단의 열기, 수익실현=정리 적합도, 신규진입=새 포지션 적합도, 투자주의=위험 경계지수야. 투자주의만 높을수록 좋은 게 아니라 더 조심해야 한다는 뜻이야.</p></section>}
+              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>투자 흐름</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자심리=판단의 열기, 수익실현=정리 적합도, 신규진입=새 포지션 적합도, 투자주의=위험 경계지수야. 투자주의만 높을수록 좋은 게 아니라 더 조심해야 한다는 뜻이야.</p></section>}
 
               {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card">
-                <div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>
+                <div className="result-card-title"><span>시기</span><strong>좋은 날짜 · 주의 날짜</strong></div>
                 {bestIntegratedDays.map((point)=><div className="tight-row" key={`best-${point.date}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
                 {cautionIntegratedDays.map((point)=><div className="tight-row" key={`caution-${point.date}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
                 <p className="result-note">날짜 점수는 사건 확률이 아니라 기존 Western 기간엔진의 상대적 활성도야.</p>
