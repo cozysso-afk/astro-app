@@ -40,3 +40,12 @@ body{font-family:"Noto Sans KR","Pretendard Variable","Apple SD Gothic Neo",sans
 .bottom-nav{width:min(calc(100% - 18px),542px)!important;left:50%!important;bottom:max(7px,env(safe-area-inset-bottom))!important;padding:5px 7px!important;border:1px solid rgba(160,151,180,.2)!important;border-radius:20px!important;background:rgba(250,249,253,.84)!important;box-shadow:0 10px 32px rgba(77,66,101,.13),inset 0 1px rgba(255,255,255,.96)!important}.nav-item{min-height:45px!important;gap:2px!important;border-radius:14px!important;font-size:.56rem!important}.nav-item svg{width:18px!important;height:18px!important}
 
 @media(max-width:430px){.page-content{padding-left:12px!important;padding-right:12px!important}.hero-card{padding:18px 16px 17px!important}.hero-row h1{font-size:1.68rem!important}.tool-card{min-height:111px!important}.tool-panel,.form-card{padding:15px 14px!important}.field-grid{grid-template-columns:1fr 1fr!important}.result-card{padding:16px 14px!important}.relationship-reading-card,.relationship-ai-card,.ai-interpret-card{padding:18px 15px!important}.ai-summary,.relationship-overview,.relationship-ai-overview{font-size:.93rem!important}.bottom-nav{width:calc(100% - 16px)!important}}
+
+
+/* v7 · evidence-first interpretation rhythm */
+.relationship-ai-scenarios{margin-top:13px;padding:15px;border:1px solid rgba(137,119,159,.10);border-radius:18px;background:linear-gradient(145deg,rgba(250,246,255,.83),rgba(241,249,253,.78))}
+.relationship-ai-scenarios>strong{display:block;margin-bottom:9px;font-family:var(--v6-serif);font-size:1rem;color:#493e50}
+.relationship-ai-scenarios p{display:grid;grid-template-columns:25px 1fr;gap:9px;align-items:start;margin:0;padding:9px 0;border-bottom:1px solid rgba(128,112,148,.08);font-size:.9rem;line-height:1.72;color:#615868}
+.relationship-ai-scenarios p:last-child{border-bottom:0;padding-bottom:0}.relationship-ai-scenarios p span{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:rgba(225,216,244,.7);font-size:.68rem;font-weight:800;color:#75648b}
+.relationship-ai-grid article strong{display:block;margin-bottom:2px}.relationship-ai-grid article p{max-width:42rem}
+@media(max-width:430px){.relationship-ai-scenarios{padding:14px}.relationship-ai-scenarios p{font-size:.88rem}}
