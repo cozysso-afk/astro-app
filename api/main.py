@@ -16,8 +16,9 @@ from integrated_fortune_v1 import build_integrated_fortune
 from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
+from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v4.5-integrated-fix"
+APP_VERSION = "api-fortune-v4.6-fixpack"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -105,6 +106,10 @@ class IntegratedInterpretRequest(BaseModel):
     model: str = AI_DEFAULT_MODEL
 
 
+class LocationFitRequest(BaseModel):
+    profile: FortuneProfile
+
+
 _ai_jobs: dict[str, dict] = {}
 _ai_jobs_lock = threading.Lock()
 _calc_jobs: dict[str, dict] = {}
@@ -182,6 +187,7 @@ def meta() -> dict:
             "relationship/western",
             "fortune/integrated",
             "fortune/interpret",
+            "location/fit",
         ],
     }
 
@@ -224,6 +230,24 @@ def fortune_interpret_job(job_id: str) -> dict:
     job.pop("created_ts", None)
     return {"job_id": job_id, **job}
 
+
+
+
+@app.post("/v1/location/fit")
+def location_fit(request: LocationFitRequest) -> dict:
+    try:
+        result = build_location_fit(
+            birth_date=request.profile.birth_date,
+            birth_time=request.profile.birth_time,
+            utc_offset_hours=request.profile.utc_offset_hours,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"location fit calculation failed: {exc}") from exc
+    return {
+        "api_version": APP_VERSION,
+        "engine": LOCATION_ENGINE_VERSION,
+        **result,
+    }
 
 @app.post("/v1/relationship/western")
 def relationship_western(request: RelationshipRequest) -> dict:
