@@ -1,0 +1,54 @@
+name: Final review fixpack 20260829
+on:
+  push:
+    branches: [final-review-fixpack-20260829]
+    paths:
+      - 'scripts/apply_final_review_fixpack_20260829.py'
+      - '.github/workflows/final-review-fixpack-20260829.yml'
+permissions:
+  contents: write
+jobs:
+  patch-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: final-review-fixpack-20260829
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply final review patch
+        run: python scripts/apply_final_review_fixpack_20260829.py
+      - name: Static regression checks
+        run: |
+          set -euo pipefail
+          grep -q "relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage'" web/src/AppNext.tsx
+          grep -q 'reunion_directional_context' web/src/AppNext.tsx
+          grep -q '관계 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일' web/src/AppNext.tsx
+          ! grep -q '분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}' web/src/AppNext.tsx
+          grep -q "relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming)" web/src/AppNext.tsx
+          grep -q "setRelationshipPurpose('reunion')" web/src/AppNext.tsx
+          grep -q 'selectablePlanets' web/src/AstrocartographyWorldMap.tsx
+          grep -q "key==='DC'?'DSC':key" web/src/AstrocartographyWorldMap.tsx
+          grep -q 'openstreetmap.org/copyright' web/src/AstrocartographyWorldMap.tsx
+          grep -q 'location_engine' api/main.py
+          python -m py_compile api/main.py astrocartography_v1.py integrated_fortune_v1.py relationship_western_v1.py
+      - name: Install and build web
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit product changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py web/src/AppNext.tsx web/src/AstrocartographyWorldMap.tsx web/src/astrocartography-map.css
+          git commit -m 'fix: close final review gaps' || exit 0
+          git push origin HEAD:final-review-fixpack-20260829
