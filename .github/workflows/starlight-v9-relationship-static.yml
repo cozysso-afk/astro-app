@@ -1,0 +1,34 @@
+name: Starlight v9 relationship static
+on:
+  push:
+    branches: [ui-reading-overhaul-20260829]
+    paths:
+      - 'scripts/starlight_v9_relationship_static.py'
+      - '.github/workflows/starlight-v9-relationship-static.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-reading-overhaul-20260829
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch relationship static reading
+        run: python scripts/starlight_v9_relationship_static.py
+      - name: Build web
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: make static relationship reading evidence-first'
+          git push origin HEAD:ui-reading-overhaul-20260829
