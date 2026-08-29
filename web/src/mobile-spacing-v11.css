@@ -59,3 +59,7 @@
   .field-grid>.field{grid-column:1!important}
   .marriage-purpose-row{grid-template-columns:1fr!important}
 }
+
+
+/* calendar-year selector */
+.calendar-year-selector{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:12px 13px;border:1px solid rgba(130,112,150,.12);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(244,240,252,.78))}.calendar-year-selector>div{display:grid;gap:2px;min-width:0}.calendar-year-selector strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.82rem;color:#524759}.calendar-year-selector span{font-size:.64rem;color:#83788a}.calendar-year-selector select{appearance:auto;min-width:112px;height:38px;padding:0 10px;border:1px solid rgba(130,112,150,.16);border-radius:12px;background:rgba(255,255,255,.92);font-size:.76rem;font-weight:700;color:#5c5064}.relationship-calendar-year{margin-top:9px}.relationship-range-buttons button.is-active{box-shadow:0 6px 16px rgba(101,78,124,.1)}@media(max-width:430px){.calendar-year-selector{padding:11px}.calendar-year-selector select{min-width:105px;font-size:.73rem}}
