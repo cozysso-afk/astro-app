@@ -18,7 +18,7 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 
 import swisseph as swe
 
-ENGINE_VERSION = "relationship-western-v1.0"
+ENGINE_VERSION = "relationship-western-v1.1-transit-triggers"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -46,6 +46,117 @@ ASPECTS = {
 }
 SUPPORTIVE = {"sextile", "trine"}
 CHALLENGING = {"square", "opposition", "quincunx"}
+
+
+TRANSIT_WEIGHTS = {
+    "Sun": .45, "Mercury": 1.00, "Venus": .95, "Mars": .90,
+    "Jupiter": .85, "Saturn": .70, "Uranus": .70, "Neptune": .55, "Pluto": .65,
+}
+TRANSIT_TARGET_WEIGHTS = {
+    "Sun": 1.00, "Mercury": .95, "Venus": 1.00, "Mars": .90,
+    "Jupiter": .55, "Saturn": .65, "Uranus": .45, "Neptune": .50, "Pluto": .75,
+    "True Node": .65, "ASC": .90, "DSC": .90, "MC": .55, "IC": .45,
+}
+TRANSIT_ASPECT_WEIGHTS = {
+    "conjunction": 1.00, "opposition": .95, "square": .92,
+    "trine": .82, "sextile": .76, "quincunx": .68,
+}
+
+
+def _transit_orb_limit(planet):
+    return 1.4 if planet in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else 1.0
+
+
+def _transit_hits(transit_chart, natal_chart, person):
+    transits = transit_chart.get("positions") or {}
+    targets = _point_map(natal_chart)
+    found = []
+    for t_name, t_info in transits.items():
+        if t_name not in TRANSIT_WEIGHTS:
+            continue
+        t_lon = float(t_info["lon"])
+        orb_limit = _transit_orb_limit(t_name)
+        for target, n_lon in targets.items():
+            target_weight = TRANSIT_TARGET_WEIGHTS.get(target, .35)
+            dist = _angle_distance(t_lon, float(n_lon))
+            for aspect, exact in ASPECTS.items():
+                orb = abs(dist - exact)
+                if orb > orb_limit:
+                    continue
+                orb_factor = max(0.0, 1.0 - orb / orb_limit)
+                score = 100.0 * TRANSIT_WEIGHTS[t_name] * target_weight * TRANSIT_ASPECT_WEIGHTS[aspect] * orb_factor
+                tone = "supportive" if aspect in SUPPORTIVE else ("challenging" if aspect in CHALLENGING else "mixed")
+                found.append({
+                    "person": person,
+                    "transit": t_name,
+                    "aspect": aspect,
+                    "target": target,
+                    "orb": round(orb, 3),
+                    "tone": tone,
+                    "score": round(score, 1),
+                })
+    found.sort(key=lambda x: (-x["score"], x["orb"]))
+    return found[:10]
+
+
+def _side_trigger_score(hits):
+    if not hits:
+        return 0.0
+    top = [float(x["score"]) for x in hits[:4]]
+    return round(min(100.0, sum(top) / 2.35), 1)
+
+
+def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
+    rows = []
+    cursor = start_date
+    tz = timezone(timedelta(hours=float(utc_offset_hours or 9.0)))
+    while cursor <= end_date:
+        target_local = datetime.combine(cursor, dt_time(12, 0), tzinfo=tz)
+        transit_chart = _chart_from_jd(_jd_from_utc(target_local.astimezone(timezone.utc)), include_moon=False, include_angles=False)
+        user_hits = _transit_hits(transit_chart, user_natal, "user")
+        cp_hits = _transit_hits(transit_chart, cp_natal, "counterpart")
+        user_score = _side_trigger_score(user_hits)
+        cp_score = _side_trigger_score(cp_hits)
+        shared_bonus = 8.0 if user_score >= 35 and cp_score >= 35 else 0.0
+        combined = round(min(100.0, user_score * .45 + cp_score * .55 + shared_bonus), 1)
+        rows.append({
+            "date": cursor.isoformat(),
+            "score": combined,
+            "user_score": user_score,
+            "counterpart_score": cp_score,
+            "shared_activation": bool(user_score >= 25 and cp_score >= 25),
+            "hits": (cp_hits[:3] + user_hits[:3])[:6],
+        })
+        cursor += timedelta(days=1)
+
+    ranked = sorted(rows, key=lambda x: (-x["score"], x["date"]))
+    # Avoid filling the top list with adjacent dates from the same transit pass.
+    top_days = []
+    for row in ranked:
+        d = date.fromisoformat(row["date"])
+        if any(abs((d - date.fromisoformat(existing["date"])).days) <= 1 for existing in top_days):
+            continue
+        top_days.append(row)
+        if len(top_days) >= 18:
+            break
+
+    months = {}
+    for row in rows:
+        key = row["date"][:7]
+        months.setdefault(key, []).append(row)
+    top_months = []
+    for key, month_rows in months.items():
+        strongest = sorted(month_rows, key=lambda x: x["score"], reverse=True)[:5]
+        score = round(sum(x["score"] for x in strongest) / max(1, len(strongest)), 1)
+        top_months.append({"calendar_month": key, "score": score, "top_dates": [x["date"] for x in strongest[:3]]})
+    top_months.sort(key=lambda x: (-x["score"], x["calendar_month"]))
+    return {
+        "available": True,
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "policy": "daily transits to both natal charts; descriptive activation, not contact/reunion probability",
+        "top_days": top_days,
+        "top_months": top_months[:12],
+    }
 
 
 def _norm(x):
@@ -260,6 +371,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     month_segments: iterable of (segment_start: date, segment_end: date); midpoint noon KST is used as
     the representative timing date. Exact partner birth time/place unlocks Davison and Marks layers.
     """
+    month_segments = list(month_segments)
     result = {
         "ok": True,
         "engine": ENGINE_VERSION,
@@ -290,6 +402,11 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "chart": _midpoint_chart(user_natal, cp_natal),
         "note": "Mathematical midpoint composite. Partner angles/Moon are omitted when partner time is unknown.",
     }
+
+    if month_segments:
+        result["reunion_transits"] = _build_reunion_transits(
+            user_natal, cp_natal, month_segments[0][0], month_segments[-1][1], user_profile.get("utc_offset_hours", 9.0)
+        )
 
     davison = marks_a = marks_b = None
     if user_exact and cp_exact:

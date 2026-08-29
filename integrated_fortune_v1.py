@@ -21,8 +21,8 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v2.2-legacy-exact"
-WESTERN_ENGINE_VERSION = "western-period-engine-v5-legacy-exact"
+ENGINE_VERSION = "integrated-fortune-v2.3-interpersonal"
+WESTERN_ENGINE_VERSION = "western-period-engine-v6-interpersonal"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
 
@@ -103,6 +103,12 @@ TOPIC_SPECS = {
         "houses": {6: .55, 10: 1.0, 2: .55, 9: .65, 11: .75},
         "ruler_houses": [6, 10, 11],
     },
+    "대인관계": {
+        "targets": {"Mercury": .90, "Venus": .85, "Moon": .80, "Jupiter": .65, "Saturn": .55, "Sun": .45, "ASC": .45},
+        "transits": {"Mercury": .95, "Venus": .80, "Moon": .80, "Jupiter": .65, "Saturn": .55, "Mars": .45, "Uranus": .35, "Sun": .35},
+        "houses": {3: .75, 4: .90, 7: .85, 11: 1.0, 5: .35},
+        "ruler_houses": [3, 4, 7, 11],
+    },
     "연애": {
         "targets": {"Venus": 1.0, "Moon": .85, "Mars": .65, "Sun": .45, "Mercury": .35, "ASC": .45},
         "transits": {"Venus": 1.0, "Moon": .85, "Mars": .65, "Mercury": .50, "Jupiter": .55, "Saturn": .35, "Sun": .35},
@@ -135,7 +141,7 @@ TOPIC_SPECS = {
     },
 }
 
-TOPIC_ORDER = ["금전", "투자심리", "수익실현", "신규진입", "투자주의", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
+TOPIC_ORDER = ["금전", "투자심리", "수익실현", "신규진입", "투자주의", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"]
 INVESTMENT_KEYS = {"투자심리", "수익실현", "신규진입", "투자주의"}
 
 _STEM_INFO = {
