@@ -1250,11 +1250,12 @@ export default function AppNext() {
   async function saveIntegratedRecord() {
     if (!integratedResult || !integratedRequestSnapshot || archiveSaving) return
     setArchiveSaving(true); setArchiveStatus('기록 저장 중…')
-    const label = periods.find((item) => item.key === period)?.label ?? period
+    const integratedArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period
+    const label = integratedCalendarYear ? `${integratedCalendarYear}년` : (periods.find((item) => item.key === period)?.label ?? period)
     try {
     const saved = await saveArchive({
       kind: 'integrated',
-      periodKey: period,
+      periodKey: integratedArchivePeriod,
       title: `${label} 통합운세 · ${integratedResult.period.start}`,
       periodStart: integratedResult.period.start,
       periodEnd: integratedResult.period.end,
@@ -1271,11 +1272,12 @@ export default function AppNext() {
   async function savePrecisionRecord() {
     if (!integratedResult || !integratedRequestSnapshot || archiveSaving) return
     setArchiveSaving(true); setArchiveStatus('정밀분석 기록 저장 중…')
+    const precisionArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period
     try {
     const saved = await saveArchive({
       kind: 'precision',
-      periodKey: period,
-      title: `정밀분석 · ${integratedResult.period.start}`,
+      periodKey: precisionArchivePeriod,
+      title: `${integratedCalendarYear ? `${integratedCalendarYear}년 · ` : ''}정밀분석 · ${integratedResult.period.start}`,
       periodStart: integratedResult.period.start,
       periodEnd: integratedResult.period.end,
       engine: integratedResult.engine,
@@ -1337,7 +1339,11 @@ export default function AppNext() {
     setLegacyArchiveOpen(null)
     setQueryDate(item.periodStart)
     setPeriod(item.periodKey)
+    const archiveYear = Number(item.periodStart.slice(0,4))
+    const isFullCalendarYear = Number.isFinite(archiveYear) && item.periodStart === `${archiveYear}-01-01` && item.periodEnd === `${archiveYear}-12-31`
     if (item.kind === 'integrated' || item.kind === 'precision') {
+      setIntegratedCalendarYear(isFullCalendarYear ? archiveYear : null)
+      setRelationshipCalendarYear(null)
       setIntegratedResult(item.result as unknown as IntegratedApiResponse)
       setIntegratedRequestSnapshot(item.request)
       setSelectedTool(item.kind)
@@ -1345,6 +1351,8 @@ export default function AppNext() {
       const request = item.request
       const cp = (request.counterpart ?? {}) as Record<string, unknown>
       const known = cp.time_known !== false
+      setIntegratedCalendarYear(null)
+      setRelationshipCalendarYear(isFullCalendarYear ? archiveYear : null)
       setRelationshipResult(item.result as unknown as RelationshipApiResponse)
       setRelationshipRequestSnapshot(request)
       const restoredDays = Math.max(7, Math.min(365, Math.round((new Date(`${item.periodEnd}T12:00:00Z`).getTime()-new Date(`${item.periodStart}T12:00:00Z`).getTime())/86400000)+1))
