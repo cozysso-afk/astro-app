@@ -1,0 +1,24 @@
+name: Check starlight production API
+on:
+  push:
+    branches: [starlight-fixpack-20260829-v2]
+    paths: ['.github/workflows/check-starlight-production-api.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render deployment and verify health
+        run: |
+          set -e
+          for i in $(seq 1 30); do
+            echo "Attempt $i"
+            BODY=$(curl -fsS --max-time 20 https://astro-app-api-f7fn.onrender.com/health || true)
+            echo "$BODY"
+            if echo "$BODY" | grep -q 'api-fortune-v4.6-fixpack'; then
+              echo 'Production API updated.'
+              exit 0
+            fi
+            sleep 20
+          done
+          echo 'Production API did not update within 10 minutes.'
+          exit 1
