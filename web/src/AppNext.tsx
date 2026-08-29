@@ -751,7 +751,7 @@ export default function AppNext() {
   ;(async () => {
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', { body: { action: 'meta' } })
+      const { data, error } = await supabase.functions.invoke('fortune-interpret-v4-preview', { body: { action: 'meta' } })
       if (error) throw error
       if (!cancelled) setAiConfigured(Boolean(data?.configured))
     } catch {
@@ -867,7 +867,7 @@ export default function AppNext() {
       await ensureSupabaseSession()
       for (let attempt = 0; attempt < 180; attempt++) {
         if (document.visibilityState === 'hidden') return
-        const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', {
+        const { data, error } = await supabase.functions.invoke('fortune-interpret-v4-preview', {
           body: { action: 'status', job_id: jobId },
         })
         if (error) throw error
@@ -924,7 +924,7 @@ export default function AppNext() {
     setAiLoading(true); setAiError(''); setAiInterpretation(null)
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', {
+      const { data, error } = await supabase.functions.invoke('fortune-interpret-v4-preview', {
         body: { action: 'start', calculation, model: aiModel },
       })
       if (error) throw error
@@ -1084,7 +1084,7 @@ export default function AppNext() {
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('relationship-interpret-v7-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
+      const { data, error } = await supabase.functions.invoke('relationship-interpret-v8-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
       if (error) throw error
       const payload = data as RelationshipAiResponse
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
