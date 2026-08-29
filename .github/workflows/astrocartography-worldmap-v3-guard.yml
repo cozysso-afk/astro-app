@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/astrocartography-worldmap-v3-guard.yml'
 permissions:
-  contents: write
+  contents: read
 jobs:
   guard:
     runs-on: ubuntu-latest
@@ -17,27 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Add rolling-deploy guard
+      - name: Verify rolling-deploy guard exists
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('web/src/AppNext.tsx')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace('  map: {\n    projection: string', '  map?: {\n    projection: string', 1)
-          old='<AstrocartographyWorldMap map={locationResult.map} purposes={locationResult.purposes}/>'
-          new='{locationResult.map && <AstrocartographyWorldMap map={locationResult.map} purposes={locationResult.purposes}/>}'
-          assert old in s, 'map component anchor missing'
-          s=s.replace(old,new,1)
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Build web
+          grep -q 'map?: {' web/src/AppNext.tsx
+          grep -q 'locationResult.map && <AstrocartographyWorldMap' web/src/AppNext.tsx
+      - name: Build current web source
         working-directory: web
         run: npm ci && npm run build
-      - name: Commit guard
-        run: |
-          git config user.name 'cozysso-afk'
-          git config user.email 'cozysso@gmail.com'
-          git add web/src/AppNext.tsx
-          git commit -m 'fix: guard world map during rolling backend deploy'
-          git push origin HEAD:astrocartography-worldmap-v3-20260829
-# triggered after workflow registration
