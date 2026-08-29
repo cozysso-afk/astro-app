@@ -21,6 +21,8 @@ type MainView = 'home' | 'profile' | 'history' | 'settings'
 type ToolKey = 'integrated' | 'compatibility' | 'marriage' | 'precision'
 type RelationshipStatus = 'single' | 'dating' | 'long_term' | 'cohabiting' | 'engaged' | 'married'
 type RelationshipPurpose = 'compatibility' | 'reunion'
+type MarriageMode = 'unmarried' | 'married'
+type RelationshipAnalysisMode = RelationshipPurpose | 'marriage_unmarried' | 'marriage_married'
 type Gender = 'female' | 'male'
 
 type BirthProfile = {
@@ -96,6 +98,18 @@ type RelationshipAiResponse = {
       reconnection_windows: string
       low_windows: string
       relationship_filter: string
+      precision_note: string
+    }
+    marriage_reading?: {
+      mode: string
+      bottom_line: string
+      bond: string
+      emotional_home: string
+      daily_life: string
+      conflict_repair: string
+      commitment_or_current_cycle: string
+      timing: string
+      caution: string
       precision_note: string
     }
     practical_advice: string[]
@@ -314,10 +328,12 @@ function relationshipLimitKo(text: string) {
   if (text.includes('Exact partner birth time')) return '상대의 정확한 출생시간이 없어 해당 정밀 진행 레이어는 계산하지 않았어.'
   return text
 }
-function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading, aiError, onAi }: { aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string; onAi: () => void }) {
+function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode }: { aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string; onAi: () => void; analysisMode: RelationshipAnalysisMode }) {
   const supportive = aspects.filter((a)=>a.tone==='supportive').length
   const challenging = aspects.filter((a)=>a.tone==='challenging').length
   const mixed = aspects.filter((a)=>a.tone==='mixed').length
+  const isReunion = analysisMode === 'reunion'
+  const isMarriage = analysisMode.startsWith('marriage_')
   const tight = [...aspects].sort((a,b)=>a.orb-b.orb).slice(0,4)
   const communication = aspects.filter((a)=>a.a==='Mercury'||a.b==='Mercury')
   const chemistry = aspects.filter((a)=>['Venus','Mars','Pluto'].includes(a.a)||['Venus','Mars','Pluto'].includes(a.b))
@@ -336,7 +352,7 @@ function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading,
     </section>
     <div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini 관계 해석 중…':'Gemini 관계 정밀해석'}</span></button><small>원할 때만 AI 호출 · 완료 후 토큰/예상비용 표시</small></div>
     {aiError && <div className="status-banner error"><AlertTriangle size={16}/><span>{aiError}</span></div>}
-    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">GEMINI RELATIONSHIP INTERPRETATION</span><h3>{ai.data.headline}</h3>{ai.usage?.total_tokens?<div className="relationship-ai-usage"><span>입력 {(ai.usage.prompt_tokens??0).toLocaleString()} · 출력 {(ai.usage.candidate_tokens??0).toLocaleString()} · 사고 {(ai.usage.thought_tokens??0).toLocaleString()} tokens</span><b>예상비용 ${Number(ai.usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(ai.usage.estimated_krw??0).toLocaleString()}원</b></div>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 자극</strong><p>{ai.data.chemistry}</p></article><article><strong>대화 · 소통</strong><p>{ai.data.communication}</p></article><article><strong>지속성</strong><p>{ai.data.stability}</p></article><article><strong>긴장 포인트</strong><p>{ai.data.tensions}</p></article><article><strong>타이밍</strong><p>{ai.data.timing}</p></article><article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article></div>{ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
+    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">GEMINI RELATIONSHIP INTERPRETATION</span><h3>{ai.data.headline}</h3>{ai.usage?.total_tokens?<div className="relationship-ai-usage"><span>입력 {(ai.usage.prompt_tokens??0).toLocaleString()} · 출력 {(ai.usage.candidate_tokens??0).toLocaleString()} · 사고 {(ai.usage.thought_tokens??0).toLocaleString()} tokens</span><b>예상비용 ${Number(ai.usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(ai.usage.estimated_krw??0).toLocaleString()}원</b></div>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 자극</strong><p>{ai.data.chemistry}</p></article><article><strong>대화 · 소통</strong><p>{ai.data.communication}</p></article><article><strong>지속성</strong><p>{ai.data.stability}</p></article><article><strong>긴장 포인트</strong><p>{ai.data.tensions}</p></article><article><strong>타이밍</strong><p>{ai.data.timing}</p></article>{!isMarriage&&<article><strong>{isReunion?'재회 맥락':'관계 전개 맥락'}</strong><p>{ai.data.reunion_context}</p></article>}</div>{ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{isMarriage&&ai.data.marriage_reading?.bottom_line&&<div className="marriage-ai-deep"><strong>{analysisMode==='marriage_unmarried'?'미혼 결혼운 · 정밀 해석':'기혼 결혼운 · 정밀 해석'}</strong><p className="marriage-ai-bottom">{ai.data.marriage_reading.bottom_line}</p><div className="marriage-ai-grid"><article><b>장기 결속력</b><p>{ai.data.marriage_reading.bond}</p></article><article><b>정서적 집</b><p>{ai.data.marriage_reading.emotional_home}</p></article><article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b><p>{ai.data.marriage_reading.conflict_repair}</p></article><article><b>{analysisMode==='marriage_unmarried'?'결혼 결정 흐름':'현재 결혼생활 주기'}</b><p>{ai.data.marriage_reading.commitment_or_current_cycle}</p></article><article><b>시기 흐름</b><p>{ai.data.marriage_reading.timing}</p></article><article><b>장기 주의점</b><p>{ai.data.marriage_reading.caution}</p></article><article><b>정밀도</b><p>{ai.data.marriage_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
   </>
 }
 
@@ -571,6 +587,7 @@ function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Rec
   return [
     `[별빛의 운명 · ${kind === 'marriage' ? '결혼운' : '궁합운'} 분석 요청]`,
     `관계 상태: ${String(request.relationship_status ?? '')}`,
+    `분석 모드: ${String(request.analysis_mode ?? kind)}`,
     `분석 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
     '',
     `본인: ${String(user.name ?? '나')} / ${String(user.birth_date ?? '')} ${String(user.birth_time ?? '')}`,
@@ -636,6 +653,7 @@ export default function AppNext() {
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
+  const [marriageMode, setMarriageMode] = useState<MarriageMode>('unmarried')
   const [reunionTiming, setReunionTiming] = useState<ReunionTimingContext | null>(null)
   const [reunionTimingLoading, setReunionTimingLoading] = useState(false)
   const [reunionTimingError, setReunionTimingError] = useState('')
@@ -988,7 +1006,9 @@ export default function AppNext() {
         longitude: counterpart.timeKnown ? parseOptionalNumber(counterpart.longitude) : null,
         utc_offset_hours: Number(counterpart.utcOffset || 9),
       },
-      start_date: queryDate, end_date: periodEnd(queryDate, period), relationship_status: relationshipPurpose === 'reunion' ? 'single' : relationshipMode,
+      start_date: queryDate, end_date: periodEnd(queryDate, period),
+      relationship_status: selectedTool === 'marriage' ? (marriageMode === 'married' ? 'married' : 'dating') : (relationshipPurpose === 'reunion' ? 'single' : relationshipMode),
+      analysis_mode: selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose,
     }
     setRelationshipLoading(true)
     try {
@@ -1006,11 +1026,12 @@ export default function AppNext() {
 
   const runRelationshipAi = async () => {
     if (!relationshipResult) return
-    if (relationshipPurpose === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
+    const analysisMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
+    if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('relationship-interpret-v5-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: relationshipPurpose, model: aiModel } })
+      const { data, error } = await supabase.functions.invoke('relationship-interpret-v6-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
       if (error) throw error
       const payload = data as RelationshipAiResponse
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
@@ -1113,6 +1134,8 @@ export default function AppNext() {
       setRelationshipResult(item.result as unknown as RelationshipApiResponse)
       setRelationshipRequestSnapshot(request)
       setRelationshipMode((request.relationship_status as RelationshipStatus) || 'dating')
+      if (request.analysis_mode === 'marriage_married') setMarriageMode('married')
+      else if (request.analysis_mode === 'marriage_unmarried') setMarriageMode('unmarried')
       setCounterpart({
         ...emptyCounterpart,
         name: String(cp.name ?? ''),
@@ -1229,7 +1252,9 @@ export default function AppNext() {
           {selectedToolInfo && (selectedTool === 'compatibility' || selectedTool === 'marriage') && <section className="tool-panel">
             <div className="tool-panel-heading"><span className={`tool-icon ${selectedTool==='compatibility'?'tone-rose':'tone-champagne'}`}>{selectedTool==='compatibility'?<Heart size={22}/>:<Gem size={22}/>}</span><div><span className="eyebrow">LIVE RELATIONSHIP ENGINE</span><h2>{selectedToolInfo.label}</h2><p>{selectedTool==='marriage'?'결혼 여부를 단정하지 않고 두 사람의 장기 결속·협력·긴장 활성도를 계산해.':'정적 궁합과 월별 진행 접점을 분리해서 보여줘.'}</p></div></div>
             {selectedTool==='compatibility' && <div className="relationship-purpose-row"><button type="button" className={relationshipPurpose==='compatibility'?'is-active':''} onClick={()=>{setRelationshipPurpose('compatibility');setReunionTiming(null);setRelationshipAi(null)}}>궁합 구조</button><button type="button" className={relationshipPurpose==='reunion'?'is-active':''} onClick={()=>{setRelationshipPurpose('reunion');setRelationshipMode('single');setReunionTiming(null);setRelationshipAi(null)}}>재회운 · 연락 시기</button></div>}
-            {(selectedTool==='marriage'||relationshipPurpose==='compatibility') && <div className="relationship-mode-row">{relationshipModes.map(([value,label])=><button key={value} type="button" className={relationshipMode===value?'is-active':''} onClick={()=>setRelationshipMode(value)}>{label}</button>)}</div>}
+            {selectedTool==='compatibility'&&relationshipPurpose==='compatibility' && <div className="relationship-mode-row">{relationshipModes.map(([value,label])=><button key={value} type="button" className={relationshipMode===value?'is-active':''} onClick={()=>setRelationshipMode(value)}>{label}</button>)}</div>}
+            {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null)}}><strong>미혼</strong><span>결혼 전 · 장기 결속과 결혼생활 적합 구조</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setRelationshipAi(null)}}><strong>기혼</strong><span>결혼 후 · 현재 결속과 갈등·회복 주기</span></button></div>}
+            {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='unmarried'?'결혼 여부 예언이 아니라, 이 관계가 결혼생활로 이어질 때의 생활궁합·책임·갈등·지속성을 깊게 봐.':'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·갈등과 회복 흐름을 봐.'}</span></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>과거 인연 기준으로 수신(상대→나) · 발신(나→상대) · 재접점 흐름과 강한 시기를 따로 계산해.</span></div>}
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
@@ -1247,7 +1272,7 @@ export default function AppNext() {
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>{queryDate} → {periodEnd(queryDate,period)} · {periods.find((item)=>item.key===period)?.label} 범위</span></div>
             {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
-            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||apiStatus==='offline'}>{relationshipLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{relationshipLoading?(relationshipPurpose==='reunion'?'재회운 계산 중…':'정밀 계산 중…'):(relationshipPurpose==='reunion'?'재회운 정밀 계산':'실제 계산 실행')}</span></button>
+            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||apiStatus==='offline'}>{relationshipLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{relationshipLoading?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
 
             {relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.engine} · {relationshipResult.period.month_segments}개 월 구간</span></div></div>
@@ -1259,7 +1284,7 @@ export default function AppNext() {
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} />
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} />
               {!relationshipResult.result.natal_synastry?.partner_time_exact && <section className="result-card timing-unavailable"><div className="result-card-title"><span>TIMING</span><strong>정밀 타이밍 계산 제외</strong></div><p>상대 출생시간·장소가 없어서 진행 시너스트리·진행 컴포지트·데이비슨·마크스 계열은 추정하지 않았어. 이전 화면의 0/0/0은 “아무 접점 없음”이 아니라 계산 불가를 잘못 표시한 거였어.</p></section>}
               <section className="result-card">
                 <div className="result-card-title"><span>STATIC</span><strong>기본 관계 구조 · 계산 근거</strong></div>
