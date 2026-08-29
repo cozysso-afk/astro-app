@@ -40,3 +40,4 @@ jobs:
           git add web/src/AppNext.tsx
           git commit -m 'fix: guard world map during rolling backend deploy'
           git push origin HEAD:astrocartography-worldmap-v3-20260829
+# triggered after workflow registration
