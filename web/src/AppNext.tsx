@@ -216,7 +216,7 @@ type LocationFitResponse = {
   api_version: string
   engine: string
   policy: { meaning: string; probability: boolean; guarantee: boolean; catalog_scope: string; distance_rule: string }
-  map: {
+  map?: {
     projection: string
     latitude_limit: number
     line_policy: string
@@ -1506,7 +1506,7 @@ export default function AppNext() {
             {locationError && <div className="status-banner error"><AlertTriangle size={17}/><span>{locationError}</span></div>}
             <button className="primary-button" type="button" onClick={runLocationFit} disabled={locationLoading||apiStatus==='offline'}>{locationLoading?<LoaderCircle className="spin" size={18}/>:<MapPin size={18}/>}<span>{locationLoading?'국가·도시 계산 중…':'나와 맞는 국가·도시 계산'}</span></button>
             {locationResult && <div className="results-wrap">
-              <AstrocartographyWorldMap map={locationResult.map} purposes={locationResult.purposes}/>
+              {locationResult.map && <AstrocartographyWorldMap map={locationResult.map} purposes={locationResult.purposes}/>}
               <section className="result-card"><div className="result-card-title"><span>국가 순위</span><strong>종합·장기거주 기준 상위 국가</strong></div><div className="location-rank-list">{locationResult.countries.slice(0,10).map((row,index)=><div className="location-rank-row" key={row.country}><span>{index+1}</span><div><strong>{row.country}</strong><small>대표 도시 {row.best_city}</small></div><b>{row.score.toFixed(1)}</b></div>)}</div><p className="result-note">점수는 대표 도시 카탈로그 안의 상대적 점성 활성도야. 실제 이민·여행 성공 확률이 아니야.</p></section>
               <div className="location-purpose-grid">{Object.entries(locationResult.purposes).map(([key,group])=><section className="location-purpose-card" key={key}><strong>{group.label}</strong><div className="location-rank-list">{group.cities.slice(0,5).map((row,index)=><div className="location-rank-row" key={`${key}-${row.city}`}><span>{index+1}</span><div><strong>{row.city} · {row.country}</strong><small>{row.evidence.slice(0,2).map((ev)=>`${ev.planet}(${annotateUserFacingText(ev.planet).replace(ev.planet,'').replace(/[()]/g,'')||ev.planet})-${ev.angle} ${ev.separation_deg}°`).join(' · ')}</small></div><b>{row.score.toFixed(1)}</b></div>)}</div></section>)}</div>
               <p className="location-evidence">{locationResult.policy.meaning} · {locationResult.policy.catalog_scope}</p>
