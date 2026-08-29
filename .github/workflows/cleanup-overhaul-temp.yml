@@ -1,0 +1,47 @@
+name: Cleanup overhaul temp files
+
+on:
+  push:
+    branches:
+      - ui-reading-overhaul-20260829
+    paths:
+      - .github/workflows/cleanup-overhaul-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-reading-overhaul-20260829
+          fetch-depth: 0
+      - name: Remove temporary patch automation
+        run: |
+          git rm -f \
+            .github/workflows/add-reunion-analysis-v1.yml \
+            .github/workflows/apply-relationship-preview-v4.yml \
+            .github/workflows/finalize-starlight-overhaul-v8.yml \
+            .github/workflows/fix-relationship-mode-guards-v6.yml \
+            .github/workflows/marriage-design-v6.yml \
+            .github/workflows/relationship-v7-evidence-ui-fix.yml \
+            .github/workflows/relationship-v7-evidence-ui.yml \
+            .github/workflows/relationship-v7-precision-guard.yml \
+            .github/workflows/reunion-analysis-v2.yml \
+            .github/workflows/switch-fortune-ai-v3-preview.yml \
+            .github/workflows/cleanup-overhaul-temp.yml \
+            scripts/finalize_starlight_overhaul_v8.py \
+            scripts/fix_relationship_mode_guards_v6.py \
+            scripts/patch_marriage_modes_design_v6.py \
+            scripts/patch_relationship_v7_precision_guard.py \
+            scripts/patch_relationship_v7_ui.py \
+            scripts/patch_reunion_analysis_v2.py \
+            scripts/switch_fortune_ai_v3_preview.py
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove temporary overhaul patch files"
+          git push origin HEAD:ui-reading-overhaul-20260829
