@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap');
 
 /* v6 · complete mobile hierarchy pass */
-:root{--v6-ink:#352d3b;--v6-muted:#736b78;--v6-line:rgba(126,111,150,.14);--v6-glass:rgba(255,255,255,.72);--v6-serif:"Noto Serif KR","Apple SD Gothic Neo",serif}
+:root{--v6-ink:#352d3b;--v6-muted:#736b78;--v6-line:rgba(126,111,150,.14);--v6-glass:rgba(255,255,255,.72);--v6-serif:"AppleMyungjo","Noto Serif KR","Nanum Myeongjo",serif}
 html,body{font-size:16px}
 body{font-family:"Noto Sans KR","Pretendard Variable","Apple SD Gothic Neo",sans-serif;color:var(--v6-ink);background:radial-gradient(circle at 4% 7%,rgba(229,212,250,.42),transparent 28%),radial-gradient(circle at 98% 22%,rgba(209,235,255,.42),transparent 31%),radial-gradient(circle at 10% 76%,rgba(210,244,232,.32),transparent 31%),linear-gradient(180deg,#fcf9fb 0%,#f8f7fb 48%,#fbfafc 100%)}
 .page-content{width:min(100%,560px);padding:max(11px,env(safe-area-inset-top)) 13px calc(78px + env(safe-area-inset-bottom))}
@@ -62,3 +62,23 @@ body{font-family:"Noto Sans KR","Pretendard Variable","Apple SD Gothic Neo",sans
 .signal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.signal-topic{min-height:72px!important;padding:10px 7px!important}.signal-topic>span{font-size:.62rem!important;line-height:1.35!important}.signal-topic>strong{font-size:1.22rem!important}
 .market-flow-card .integrated-topic-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.market-flow-card .integrated-topic{min-height:74px!important}
 @media(max-width:430px){.ai-direction-grid article,.ai-investment-grid article{padding:13px 14px}.ai-direction-grid p,.ai-investment-grid p{font-size:.86rem}.signal-grid{gap:6px!important}.signal-topic{min-height:68px!important}.signal-topic>span{font-size:.59rem!important}}
+
+
+/* v9 · explicit range + visible Korean typography contrast */
+.hero-row h1,.tool-card strong,.tool-panel-heading h2,.form-card-heading h2,.result-card-title strong,
+.ai-interpret-head h3,.relationship-reading-card h3,.relationship-ai-card h3,.ai-verdict,
+.relationship-ai-grid strong,.relationship-reading-grid strong,.relationship-key-aspects>strong,
+.reunion-ai-deep>strong,.marriage-ai-deep>strong{font-family:"AppleMyungjo","Noto Serif KR","Nanum Myeongjo",serif!important;font-weight:600!important;letter-spacing:-.055em!important}
+.relationship-main-mode-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin-top:14px!important}
+.relationship-main-mode-row button{min-height:40px!important;padding:7px 8px!important;border-radius:14px!important;font-size:.72rem!important}
+.relationship-main-mode-row button:first-child{background:linear-gradient(145deg,rgba(252,235,244,.9),rgba(241,235,255,.85))!important}
+.relationship-main-mode-row button.is-active{box-shadow:0 8px 18px rgba(105,78,128,.12)!important}
+.relationship-range-block{margin-top:10px;padding:12px;border:1px solid rgba(137,119,159,.11);border-radius:17px;background:linear-gradient(145deg,rgba(255,255,255,.76),rgba(244,247,253,.72))}
+.relationship-range-block>div:first-child{display:grid;gap:3px}.relationship-range-block strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.88rem;color:#4a3e50}.relationship-range-block span{font-size:.67rem;color:#786e7e}
+.relationship-range-buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}.relationship-range-buttons button{min-height:32px;border:1px solid rgba(132,113,153,.12);border-radius:11px;background:rgba(255,255,255,.72);font-size:.65rem;color:#716577}.relationship-range-buttons button.is-active{background:linear-gradient(145deg,rgba(226,217,247,.95),rgba(235,246,251,.9));color:#4d4058;font-weight:800}
+.ai-summary,.relationship-overview,.relationship-ai-overview{font-size:.89rem!important;line-height:1.76!important;letter-spacing:-.012em!important}
+.ai-cluster-grid p,.relationship-reading-grid p,.relationship-ai-grid p,.reunion-ai-grid p,.marriage-ai-grid p{font-size:.86rem!important;line-height:1.72!important}
+.relationship-key-aspects p{font-size:.82rem!important;line-height:1.68!important}
+.ai-topic-list p{font-size:.85rem!important;line-height:1.7!important}.ai-verdict{font-size:.91rem!important;line-height:1.62!important}
+.ai-meta-details{margin:10px 0 14px}.ai-meta-details>summary{cursor:pointer;font-size:.68rem;font-weight:800;color:#84798a}.ai-meta-details[open]>summary{margin-bottom:8px}.ai-meta-details .ai-usage-card,.relationship-meta-details .relationship-ai-usage{margin:0!important}
+@media(max-width:430px){.relationship-main-mode-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}.relationship-range-block{padding:11px}.ai-summary,.relationship-overview,.relationship-ai-overview{font-size:.87rem!important}}
