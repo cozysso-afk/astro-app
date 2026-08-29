@@ -1,0 +1,32 @@
+name: Marriage + Visual v6
+
+on:
+  push:
+    paths:
+      - '.github/workflows/marriage-design-v6.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply marriage/design patch
+        run: python scripts/patch_marriage_modes_design_v6.py
+      - name: Build web
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit patched files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/main.tsx web/src/visual-overhaul-v6.css
+          git commit -m 'feat: split marriage modes and complete visual hierarchy v6'
+          git push
