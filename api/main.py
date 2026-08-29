@@ -16,9 +16,10 @@ from integrated_fortune_v1 import build_integrated_fortune
 from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
+from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v4.6-fixpack"
+APP_VERSION = "api-fortune-v4.7-relationship-depth"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -83,6 +84,7 @@ class RelationshipRequest(BaseModel):
     start_date: date
     end_date: date
     relationship_status: RelationshipStatus = "dating"
+    analysis_mode: Literal["compatibility", "reunion", "marriage_unmarried", "marriage_married"] = "compatibility"
 
 
 class FortuneProfile(BaseModel):
@@ -260,6 +262,11 @@ def relationship_western(request: RelationshipRequest) -> dict:
     segments = _month_segments(request.start_date, request.end_date)
     try:
         result = build_relationship_western(user_payload, cp_payload, segments)
+        result["analysis_mode"] = request.analysis_mode
+        try:
+            result["saju_relationship"] = build_relationship_saju(user_payload, cp_payload)
+        except Exception as saju_exc:
+            result["saju_relationship"] = {"available": False, "engine": REL_SAJU_ENGINE_VERSION, "error": str(saju_exc)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
 
