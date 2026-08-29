@@ -1,0 +1,31 @@
+name: Sync relationship AI v10.1
+on:
+  push:
+    branches: [relationship-depth-v2-20260829]
+    paths:
+      - 'scripts/relationship_ai_v10_1_patch.py'
+      - '.github/workflows/sync-relationship-ai-v10-1.yml'
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: relationship-depth-v2-20260829
+      - name: Apply v10.1 grounding patch
+        run: python scripts/relationship_ai_v10_1_patch.py
+      - name: Verify source markers
+        run: |
+          grep -q 'relationship-v10.1-grounded-depth' supabase/functions/relationship-interpret-v9-preview/index.ts
+          grep -q 'function grounded' supabase/functions/relationship-interpret-v9-preview/index.ts
+          grep -q '을경합' supabase/functions/relationship-interpret-v9-preview/index.ts
+      - name: Commit source sync
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview/index.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: ground and deepen compatibility marriage ai'
+          git push origin HEAD:relationship-depth-v2-20260829
