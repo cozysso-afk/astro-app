@@ -4,6 +4,7 @@ import {
   LoaderCircle, MapPin, Moon, Orbit, RefreshCw, Save, Search, Settings, Sparkles, Sun, Trash2, User,
 } from 'lucide-react'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
+import { AstrocartographyWorldMap } from './AstrocartographyWorldMap'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
@@ -215,8 +216,14 @@ type LocationFitResponse = {
   api_version: string
   engine: string
   policy: { meaning: string; probability: boolean; guarantee: boolean; catalog_scope: string; distance_rule: string }
+  map: {
+    projection: string
+    latitude_limit: number
+    line_policy: string
+    lines: Array<{ planet:string; angle:'ASC'|'DC'|'MC'|'IC'; segments:Array<Array<{latitude:number;longitude:number}>> }>
+  }
   countries: Array<{ country: string; score: number; best_city: string; evidence: Array<{planet:string;angle:string;separation_deg:number;tone:string}> }>
-  purposes: Record<string,{ label:string; cities:Array<{city:string;country:string;score:number;evidence:Array<{planet:string;angle:string;separation_deg:number;tone:string}>}> }>
+  purposes: Record<string,{ label:string; cities:Array<{city:string;country:string;latitude:number;longitude:number;score:number;evidence:Array<{planet:string;angle:string;separation_deg:number;tone:string}>}> }>
 }
 
 type AiTopicInterpretation = {
@@ -611,7 +618,7 @@ function compactPlace(value: unknown) {
   return String(value ?? '').replace('::', ' ') || '위치 미표기'
 }
 
-function integratedPromptText(request: Record<string, unknown>) {
+function integratedPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null) {
   const profile = (request.profile ?? {}) as Record<string, unknown>
   return [
     '[별빛의 운명 · 통합운세 분석 요청]',
@@ -629,6 +636,14 @@ function integratedPromptText(request: Record<string, unknown>) {
     '',
     '[원본 API 요청 JSON]',
     JSON.stringify(request, null, 2),
+    '',
+    '[외부 AI 해석 지시]',
+    '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 값이다. 행성 위치·하우스·점수·사주를 다시 계산하거나 임의 수정하지 말고 이 값만 근거로 해석한다.',
+    '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',
+    '- 전문용어는 한국어 뜻을 붙이고, 결론→계산 근거→현실에서 체감되는 방식→시기 순서로 설명한다.',
+    '',
+    '[CALCULATED_DATA · 원본 계산 JSON]',
+    calculation ? JSON.stringify(calculation, null, 2) : '계산 결과 없음',
   ].join('\n')
 }
 
@@ -662,7 +677,7 @@ function integratedResultText(result: IntegratedApiResponse) {
   return lines.join('\n')
 }
 
-function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Record<string, unknown>) {
+function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null) {
   const user = (request.user ?? {}) as Record<string, unknown>
   const cp = (request.counterpart ?? {}) as Record<string, unknown>
   return [
@@ -684,6 +699,16 @@ function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Rec
     '',
     '[원본 API 요청 JSON]',
     JSON.stringify(request, null, 2),
+    '',
+    '[외부 AI 해석 지시]',
+    '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 관계 계산값이다. 다른 천문력/사주 계산으로 덮어쓰지 말고 이 데이터를 해석의 단일 근거로 사용한다.',
+    '- 오브가 좁은 실제 접점을 우선하고, 접점 수나 점수를 재회·결혼·연락 확률로 바꾸지 않는다.',
+    '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
+    '- 사주는 CALCULATED_DATA에 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고, 없는 천간합·신강/신약·용신·배우자성 등을 만들지 않는다.',
+    '- 결론→계산 근거→관계에서 실제 체감되는 패턴→시기 순서로 구체적으로 설명한다.',
+    '',
+    '[CALCULATED_DATA · 원본 관계 계산 JSON]',
+    calculation ? JSON.stringify(calculation, null, 2) : '계산 결과 없음',
   ].join('\n')
 }
 
@@ -712,8 +737,8 @@ function relationshipResultText(kind: 'compatibility' | 'marriage', response: Re
   return lines.join('\n')
 }
 
-function precisionPromptText(request: Record<string, unknown>) {
-  return integratedPromptText(request)
+function precisionPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null) {
+  return integratedPromptText(request, calculation)
     .replace('[별빛의 운명 · 통합운세 분석 요청]', '[별빛의 운명 · 정밀분석 요청]')
     .concat('\n\n[정밀분석 표시 원칙]\n- 요약 점수를 새로 만들지 않고 동일 실계산의 원자료를 더 자세히 펼쳐본다.\n- 엔진이 계산하지 않은 항목은 추정하지 않는다.')
 }
@@ -1357,7 +1382,7 @@ export default function AppNext() {
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
               <div className="result-actions">
-                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveIntegratedRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
@@ -1443,7 +1468,7 @@ export default function AppNext() {
             {relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {clampedRelationshipDays}일</span></div></div>
               <div className="result-actions">
-                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':'compatibility', relationshipRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':'compatibility', relationshipRequestSnapshot, relationshipResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':'compatibility', relationshipResult))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveRelationshipRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
@@ -1481,6 +1506,7 @@ export default function AppNext() {
             {locationError && <div className="status-banner error"><AlertTriangle size={17}/><span>{locationError}</span></div>}
             <button className="primary-button" type="button" onClick={runLocationFit} disabled={locationLoading||apiStatus==='offline'}>{locationLoading?<LoaderCircle className="spin" size={18}/>:<MapPin size={18}/>}<span>{locationLoading?'국가·도시 계산 중…':'나와 맞는 국가·도시 계산'}</span></button>
             {locationResult && <div className="results-wrap">
+              <AstrocartographyWorldMap map={locationResult.map} purposes={locationResult.purposes}/>
               <section className="result-card"><div className="result-card-title"><span>국가 순위</span><strong>종합·장기거주 기준 상위 국가</strong></div><div className="location-rank-list">{locationResult.countries.slice(0,10).map((row,index)=><div className="location-rank-row" key={row.country}><span>{index+1}</span><div><strong>{row.country}</strong><small>대표 도시 {row.best_city}</small></div><b>{row.score.toFixed(1)}</b></div>)}</div><p className="result-note">점수는 대표 도시 카탈로그 안의 상대적 점성 활성도야. 실제 이민·여행 성공 확률이 아니야.</p></section>
               <div className="location-purpose-grid">{Object.entries(locationResult.purposes).map(([key,group])=><section className="location-purpose-card" key={key}><strong>{group.label}</strong><div className="location-rank-list">{group.cities.slice(0,5).map((row,index)=><div className="location-rank-row" key={`${key}-${row.city}`}><span>{index+1}</span><div><strong>{row.city} · {row.country}</strong><small>{row.evidence.slice(0,2).map((ev)=>`${ev.planet}(${annotateUserFacingText(ev.planet).replace(ev.planet,'').replace(/[()]/g,'')||ev.planet})-${ev.angle} ${ev.separation_deg}°`).join(' · ')}</small></div><b>{row.score.toFixed(1)}</b></div>)}</div></section>)}</div>
               <p className="location-evidence">{locationResult.policy.meaning} · {locationResult.policy.catalog_scope}</p>
@@ -1497,7 +1523,7 @@ export default function AppNext() {
             {integratedMatchesSelection && integratedResult && <div className="results-wrap precision-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>정밀 실계산 준비 완료</strong><span>{integratedResult.period.day_count}일 분석 · 원자료 확장 보기</span></div></div>
               <div className="result-actions">
-                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('정밀 요청/프롬프트 전체복사', precisionPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('정밀 요청/프롬프트 전체복사', precisionPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('정밀 결과 전체복사', precisionResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={savePrecisionRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'정밀 기록 저장'}</span></button>
               </div>

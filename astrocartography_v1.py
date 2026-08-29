@@ -16,7 +16,7 @@ from typing import Any
 
 import swisseph as swe
 
-ENGINE_VERSION = "astrocartography-city-fit-v1.0"
+ENGINE_VERSION = "astrocartography-world-lines-v2.0"
 
 BODIES = {
     "Sun": swe.SUN,
@@ -226,9 +226,91 @@ def _city_score(jd: float, positions: dict[str, tuple[float, float]], city: tupl
     }
 
 
+def _split_world_line(points: list[dict[str, float]]) -> list[list[dict[str, float]]]:
+    """Split a sampled line at antimeridian jumps so clients do not draw across the globe."""
+    if not points:
+        return []
+    segments: list[list[dict[str, float]]] = []
+    current: list[dict[str, float]] = [points[0]]
+    for point in points[1:]:
+        if abs(float(point["longitude"]) - float(current[-1]["longitude"])) > 180.0:
+            if len(current) >= 2:
+                segments.append(current)
+            current = [point]
+        else:
+            current.append(point)
+    if len(current) >= 2:
+        segments.append(current)
+    return segments
+
+
+def _horizon_segments(*, ra_deg: float, dec_deg: float, gst_deg: float, rising: bool) -> list[list[dict[str, float]]]:
+    """Sample the exact altitude=0 rising/setting curve from -85° to +85° latitude."""
+    segments: list[list[dict[str, float]]] = []
+    current: list[dict[str, float]] = []
+    dec = math.radians(float(dec_deg))
+    for lat in range(-85, 86, 2):
+        phi = math.radians(float(lat))
+        value = -math.tan(phi) * math.tan(dec)
+        if not -1.0 <= value <= 1.0:
+            if len(current) >= 2:
+                segments.extend(_split_world_line(current))
+            current = []
+            continue
+        h_abs = math.degrees(math.acos(max(-1.0, min(1.0, value))))
+        hour_angle = -h_abs if rising else h_abs
+        lon = _norm180(float(ra_deg) + hour_angle - float(gst_deg))
+        current.append({"latitude": float(lat), "longitude": round(lon, 4)})
+    if len(current) >= 2:
+        segments.extend(_split_world_line(current))
+    return segments
+
+
+def _astrocartography_lines(jd: float, positions: dict[str, tuple[float, float]]) -> list[dict[str, Any]]:
+    """Return standard natal astrocartography angular lines for a world map.
+
+    MC/IC are meridians where the planet culminates/anti-culminates. ASC/DC are
+    the sampled terrestrial loci where the planet is exactly on the horizon.
+    """
+    gst_deg = float(swe.sidtime(float(jd))) * 15.0
+    lines: list[dict[str, Any]] = []
+    vertical_lats = [-85.0, 85.0]
+    for planet, (ra_deg, dec_deg) in positions.items():
+        mc_lon = round(_norm180(float(ra_deg) - gst_deg), 4)
+        ic_lon = round(_norm180(mc_lon + 180.0), 4)
+        lines.append({
+            "planet": planet,
+            "angle": "MC",
+            "segments": [[
+                {"latitude": vertical_lats[0], "longitude": mc_lon},
+                {"latitude": vertical_lats[1], "longitude": mc_lon},
+            ]],
+        })
+        lines.append({
+            "planet": planet,
+            "angle": "IC",
+            "segments": [[
+                {"latitude": vertical_lats[0], "longitude": ic_lon},
+                {"latitude": vertical_lats[1], "longitude": ic_lon},
+            ]],
+        })
+        lines.append({
+            "planet": planet,
+            "angle": "ASC",
+            "segments": _horizon_segments(ra_deg=ra_deg, dec_deg=dec_deg, gst_deg=gst_deg, rising=True),
+        })
+        lines.append({
+            "planet": planet,
+            "angle": "DC",
+            "segments": _horizon_segments(ra_deg=ra_deg, dec_deg=dec_deg, gst_deg=gst_deg, rising=False),
+        })
+    return lines
+
+
 def build_location_fit(*, birth_date: date, birth_time: dt_time, utc_offset_hours: float) -> dict[str, Any]:
     jd = _birth_jd(birth_date, birth_time, utc_offset_hours)
     positions = _planet_equatorial(jd)
+    world_lines = _astrocartography_lines(jd, positions)
 
     by_purpose: dict[str, list[dict[str, Any]]] = {}
     for purpose in PURPOSES:
@@ -265,6 +347,12 @@ def build_location_fit(*, birth_date: date, birth_time: dt_time, utc_offset_hour
             "guarantee": False,
             "catalog_scope": f"대표 도시 {len(CITIES)}곳 비교",
             "distance_rule": "각도 축 근접도 기반; 실제 생활비·비자·치안·언어·직업시장 등 현실 조건은 별도 판단",
+        },
+        "map": {
+            "projection": "web_mercator",
+            "latitude_limit": 85.0,
+            "line_policy": "ASC=자기표현·새 출발, DC=관계·타인, MC=커리어·사회적 방향, IC=집·내면·정착. 행성선 자체는 길흉 확률이 아니며 목적별 도시 점수와 함께 읽는다.",
+            "lines": world_lines,
         },
         "countries": countries[:16],
         "purposes": {
