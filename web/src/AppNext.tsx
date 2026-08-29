@@ -117,7 +117,7 @@ type RelationshipAiResponse = {
       caution: string
       precision_note: string
     }
-    practical_advice: string[]
+    practical_advice?: string[]
     top_aspects: Array<{ label: string; meaning: string }>
     limits: string
   }
@@ -754,8 +754,9 @@ export default function AppNext() {
   const selectedToolInfo = selectedTool ? tools.find((tool) => tool.key === selectedTool) : null
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
   const resultMonths = (relationshipResult?.result?.natal_synastry?.partner_time_exact ? relationshipResult?.result?.months : []) ?? []
-  const natalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
   const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)
+  const rawNatalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
+  const natalAspects = partnerTimeExact ? rawNatalAspects : rawNatalAspects.filter((aspect) => !relationshipTimeSensitivePoints.has(aspect.a) && !relationshipTimeSensitivePoints.has(aspect.b))
   const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length
   const natalChallenging = natalAspects.filter((aspect) => aspect.tone === 'challenging').length
   const natalMixed = natalAspects.filter((aspect) => aspect.tone === 'mixed').length
