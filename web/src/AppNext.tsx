@@ -710,7 +710,7 @@ export default function AppNext() {
   ;(async () => {
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret', { body: { action: 'meta' } })
+      const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', { body: { action: 'meta' } })
       if (error) throw error
       if (!cancelled) setAiConfigured(Boolean(data?.configured))
     } catch {
@@ -826,7 +826,7 @@ export default function AppNext() {
       await ensureSupabaseSession()
       for (let attempt = 0; attempt < 180; attempt++) {
         if (document.visibilityState === 'hidden') return
-        const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+        const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', {
           body: { action: 'status', job_id: jobId },
         })
         if (error) throw error
@@ -883,7 +883,7 @@ export default function AppNext() {
     setAiLoading(true); setAiError(''); setAiInterpretation(null)
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret', {
+      const { data, error } = await supabase.functions.invoke('fortune-interpret-v3-preview', {
         body: { action: 'start', calculation, model: aiModel },
       })
       if (error) throw error
