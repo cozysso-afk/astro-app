@@ -511,10 +511,28 @@ def _derived_scores(topic_results: dict):
     out = {k: _blend_topic(v) for k, v in topic_results.items()}
     money = topic_results.get("금전") or {"activation": 0.0, "favorability": 50.0}
     invest = topic_results.get("투자심리") or {"activation": 0.0, "favorability": 50.0}
-    overheat = max(0.0, float(invest.get("activation", 0.0)) - float(invest.get("favorability", 50.0)))
-    realize = _clamp(.40 * float(money.get("activation", 0.0)) + .40 * float(money.get("favorability", 50.0)) + .20 * (100.0 - .70 * overheat))
-    entry = _clamp(.25 * float(money.get("activation", 0.0)) + .35 * float(money.get("favorability", 50.0)) + .15 * float(invest.get("activation", 0.0)) + .25 * float(invest.get("favorability", 50.0)) - .25 * overheat)
-    risk = _clamp(.55 * float(invest.get("activation", 0.0)) + .45 * (100.0 - float(invest.get("favorability", 50.0))) + .15 * overheat)
+    money_activation = float(money.get("activation", 0.0))
+    money_favor = float(money.get("favorability", 50.0))
+    invest_activation = float(invest.get("activation", 0.0))
+    invest_favor = float(invest.get("favorability", 50.0))
+    # A high activation with weak favorability is treated as heat/volatility, not opportunity.
+    overheat = max(0.0, invest_activation - invest_favor)
+    calm_bias = max(0.0, invest_favor - invest_activation)
+    # Realization prefers already-developed money flow and clarity; it does not reward raw heat.
+    realize = _clamp(
+        .18 * money_activation + .48 * money_favor + .14 * invest_activation + .20 * invest_favor
+        - .32 * overheat + .08 * calm_bias
+    )
+    # New entry needs cleaner investment favorability and is penalized most strongly by overheat.
+    entry = _clamp(
+        .12 * money_activation + .22 * money_favor + .18 * invest_activation + .48 * invest_favor
+        - .48 * overheat + .05 * calm_bias
+    )
+    # Caution is intentionally a danger index: higher means more restraint is warranted.
+    risk = _clamp(
+        .30 * invest_activation + .38 * (100.0 - invest_favor)
+        + .20 * (100.0 - money_favor) + .42 * overheat
+    )
     out.update({
         "수익실현": int(round(realize)),
         "신규진입": int(round(entry)),

@@ -49,3 +49,16 @@ body{font-family:"Noto Sans KR","Pretendard Variable","Apple SD Gothic Neo",sans
 .relationship-ai-scenarios p:last-child{border-bottom:0;padding-bottom:0}.relationship-ai-scenarios p span{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:rgba(225,216,244,.7);font-size:.68rem;font-weight:800;color:#75648b}
 .relationship-ai-grid article strong{display:block;margin-bottom:2px}.relationship-ai-grid article p{max-width:42rem}
 @media(max-width:430px){.relationship-ai-scenarios{padding:14px}.relationship-ai-scenarios p{font-size:.88rem}}
+
+
+/* v8 · final hierarchy and directional readings */
+.ai-direction-grid,.ai-investment-grid{display:grid;grid-template-columns:1fr;gap:9px;margin-top:12px}
+.ai-direction-grid article,.ai-investment-grid article{padding:14px 15px;border-radius:18px;border:1px solid rgba(134,117,155,.10);background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(246,243,252,.72))}
+.ai-direction-grid strong,.ai-investment-grid strong{display:block;font-family:var(--v6-serif);font-size:.96rem;color:#4d4254;margin-bottom:6px}
+.ai-direction-grid p,.ai-investment-grid p{margin:0;font-size:.88rem;line-height:1.72;color:#625a67}
+.ai-direction-grid article:nth-child(1){background:linear-gradient(145deg,rgba(244,249,255,.88),rgba(249,246,255,.78))}
+.ai-direction-grid article:nth-child(2){background:linear-gradient(145deg,rgba(250,246,255,.88),rgba(255,249,250,.78))}
+.ai-investment-grid .is-risk{border-style:dashed;background:linear-gradient(145deg,rgba(255,248,244,.9),rgba(252,245,249,.78))}
+.signal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.signal-topic{min-height:72px!important;padding:10px 7px!important}.signal-topic>span{font-size:.62rem!important;line-height:1.35!important}.signal-topic>strong{font-size:1.22rem!important}
+.market-flow-card .integrated-topic-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.market-flow-card .integrated-topic{min-height:74px!important}
+@media(max-width:430px){.ai-direction-grid article,.ai-investment-grid article{padding:13px 14px}.ai-direction-grid p,.ai-investment-grid p{font-size:.86rem}.signal-grid{gap:6px!important}.signal-topic{min-height:68px!important}.signal-topic>span{font-size:.59rem!important}}

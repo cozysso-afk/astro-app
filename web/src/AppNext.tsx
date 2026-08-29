@@ -221,6 +221,8 @@ type AiInterpretationResponse = {
     headline: string
     overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string }
     clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
+    contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
+    investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }
     systems: { western: string; saju: string; thai: string }
     priorities: string[]
     topic_analysis: Record<string, AiTopicInterpretation>
@@ -250,6 +252,8 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
       {data.clusters.investment && <div><strong>주식 · 투자</strong><p>{data.clusters.investment}</p></div>}
       {data.clusters.condition && <div><strong>컨디션</strong><p>{data.clusters.condition}</p></div>}
     </div>
+    {data.contact_flow && (data.contact_flow.incoming || data.contact_flow.outgoing || data.contact_flow.reconnection) && <div className="ai-direction-grid"><article><strong>수신 · 상대 → 나</strong><p>{data.contact_flow.incoming || '뚜렷한 수신 근거가 없어.'}</p></article><article><strong>발신 · 나 → 상대</strong><p>{data.contact_flow.outgoing || '뚜렷한 발신 적합 근거가 없어.'}</p></article><article><strong>과거 인연 · 재접점</strong><p>{data.contact_flow.reconnection || '재접점 근거가 약해.'}</p></article></div>}
+    {data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid"><article><strong>투자심리</strong><p>{data.investment_reading.psychology}</p></article><article><strong>수익실현</strong><p>{data.investment_reading.realization}</p></article><article><strong>신규진입</strong><p>{data.investment_reading.entry}</p></article><article className="is-risk"><strong>투자주의 · 높을수록 경계</strong><p>{data.investment_reading.risk}</p></article></div>}
     {!!data.priorities?.length && <div className="ai-priorities"><strong>이 기간 우선순위</strong>{data.priorities.map((item, index)=><p key={`${index}-${item}`}>{index+1}. {item}</p>)}</div>}
     <details className="ai-details" open><summary>분야별 정밀 해석</summary><div className="ai-topic-list">{topicOrder.map((topic)=>{
       const item=data.topic_analysis?.[topic]
@@ -306,7 +310,7 @@ function humanizeEvidence(value: string) {
   text = text.replace(/orb\s*/gi, '오브 ')
   return text
 }
-const coreTopicOrder = ['금전','학업','시험','직장','이직','연애','연락','재회','소식','컨디션']
+const coreTopicOrder = ['금전','학업','시험','직장','이직','연애','재회','소식','컨디션']
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
 const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
@@ -1415,9 +1419,9 @@ export default function AppNext() {
                 {cautionIntegratedTopics.length>0 && <div className="best-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
 
-              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>CONTACT SIGNALS</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 보조신호' : topic === '발신적합' ? '발신 적합도' : '과거인연 접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">사건 확률이나 특정 상대의 행동 예측이 아니라 연락축 내부의 상대 활성도야.</p></section>}
+              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>CONTACT SIGNALS</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신은 들어오는 흐름, 발신은 내가 먼저 움직일 때의 적합도, 재접점은 과거 인연 활성도를 따로 본 값이야. 셋 다 사건 확률은 아니야.</p></section>}
 
-              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MARKET FLOW</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">거래일만 집계한 점성술 상대지수야. 실제 가격·수급·거래량·손절 기준이 우선이야.</p></section>}
+              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MARKET FLOW</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topic}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자심리=판단의 열기, 수익실현=정리 적합도, 신규진입=새 포지션 적합도, 투자주의=위험 경계지수야. 투자주의만 높을수록 좋은 게 아니라 더 조심해야 한다는 뜻이야.</p></section>}
 
               {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card">
                 <div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>
