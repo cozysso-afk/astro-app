@@ -1,0 +1,34 @@
+name: Starlight v10 user-facing cleanup
+on:
+  push:
+    branches: [ui-reading-overhaul-20260829]
+    paths:
+      - 'scripts/starlight_v10_user_facing_cleanup.py'
+      - '.github/workflows/starlight-v10-user-facing-cleanup.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-reading-overhaul-20260829
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply user-facing cleanup
+        run: python scripts/starlight_v10_user_facing_cleanup.py
+      - name: Build web
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/visual-overhaul-v6.css
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: clean relationship timing and user-facing jargon'
+          git push origin HEAD:ui-reading-overhaul-20260829
