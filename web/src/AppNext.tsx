@@ -677,11 +677,20 @@ function integratedResultText(result: IntegratedApiResponse) {
   return lines.join('\n')
 }
 
-function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null) {
+function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null) {
   const user = (request.user ?? {}) as Record<string, unknown>
   const cp = (request.counterpart ?? {}) as Record<string, unknown>
+  const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
+  const calculatedData = kind === 'reunion'
+    ? { relationship: calculation ?? null, reunion_directional_context: reunionContext ?? null }
+    : calculation ?? null
+  const modeRule = kind === 'marriage'
+    ? '- 결혼 여부를 예언하지 않고 장기 결속·협력·긴장 활성도를 본다.'
+    : kind === 'reunion'
+      ? '- 재회는 ① 연락/재접촉 활성화 ② 감정 재활성화 ③ 실제 관계 재구축 가능성을 서로 다른 층으로 분리한다. 수신(상대→나)·발신(나→상대)·과거인연 재접점도 섞지 않는다.'
+      : '- 궁합의 정적 구조와 선택 기간의 시기 활성도를 구분한다.'
   return [
-    `[별빛의 운명 · ${kind === 'marriage' ? '결혼운' : '궁합운'} 분석 요청]`,
+    `[별빛의 운명 · ${label} 분석 요청]`,
     `관계 상태: ${String(request.relationship_status ?? '')}`,
     `분석 모드: ${String(request.analysis_mode ?? kind)}`,
     `분석 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
@@ -692,10 +701,10 @@ function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Rec
     `상대 좌표: ${cp.time_known ? `${String(cp.latitude ?? '')}, ${String(cp.longitude ?? '')}` : '정밀 좌표 레이어 제외'}`,
     '',
     '해석 원칙:',
-    '- 정적 시너스트리와 기간별 진행 접점을 분리한다.',
-    '- 접점 수/오브를 연락·재회·결혼의 통계 확률처럼 말하지 않는다.',
+    '- 정적 synastry(시너스트리·궁합차트)와 기간별 transit(트랜짓·현재 행성 이동)/진행 접점을 분리한다.',
+    '- 접점 수·점수·오브를 연락·재회·결혼의 통계 확률처럼 말하지 않는다.',
     '- 상대의 사적인 속마음을 계산값만으로 단정하지 않는다.',
-    kind === 'marriage' ? '- 결혼 여부를 예언하지 않고 장기 결속·협력·긴장 활성도를 본다.' : '- 궁합의 구조와 시기 활성도를 구분한다.',
+    modeRule,
     '',
     '[원본 API 요청 JSON]',
     JSON.stringify(request, null, 2),
@@ -703,20 +712,22 @@ function relationshipPromptText(kind: 'compatibility' | 'marriage', request: Rec
     '[외부 AI 해석 지시]',
     '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 관계 계산값이다. 다른 천문력/사주 계산으로 덮어쓰지 말고 이 데이터를 해석의 단일 근거로 사용한다.',
     '- 오브가 좁은 실제 접점을 우선하고, 접점 수나 점수를 재회·결혼·연락 확률로 바꾸지 않는다.',
-    '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
+    '- 생시 미상으로 빠진 Moon(달)·ASC(상승점)·DSC(하강점)·MC(중천점)·IC(천저점)·하우스·진행 레이어는 추정하지 않는다.',
     '- 사주는 CALCULATED_DATA에 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고, 없는 천간합·신강/신약·용신·배우자성 등을 만들지 않는다.',
-    '- 결론→계산 근거→관계에서 실제 체감되는 패턴→시기 순서로 구체적으로 설명한다.',
+    kind === 'reunion' ? '- reunion_directional_context가 있으면 수신·발신·재접점을 각각 읽고, relationship.reunion_transits의 실제 트랜짓 날짜와 교차 검증한다. 한쪽 데이터가 없으면 없다고 명시한다.' : '',
+    '- 결론→가장 강한 계산 근거→관계에서 실제 체감되는 패턴→강한 시기/약한 시기→한계 순서로 구체적으로 설명한다.',
     '',
     '[CALCULATED_DATA · 원본 관계 계산 JSON]',
-    calculation ? JSON.stringify(calculation, null, 2) : '계산 결과 없음',
-  ].join('\n')
+    JSON.stringify(calculatedData, null, 2),
+  ].filter(Boolean).join('\n')
 }
 
-function relationshipResultText(kind: 'compatibility' | 'marriage', response: RelationshipApiResponse) {
+function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marriage', response: RelationshipApiResponse, reunionContext?: ReunionTimingContext | null) {
   const result = response.result
   const aspects = result.natal_synastry?.aspects ?? []
+  const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
   const lines = [
-    `[별빛의 운명 · ${kind === 'marriage' ? '결혼운' : '궁합운'} 전체 결과]`,
+    `[별빛의 운명 · ${label} 전체 결과]`,
     `엔진: ${response.engine} / API: ${response.api_version}`,
     `관계 상태: ${response.relationship_status}`,
     `기간: ${response.period.start} ~ ${response.period.end}`,
@@ -726,14 +737,36 @@ function relationshipResultText(kind: 'compatibility' | 'marriage', response: Re
     `- 다빈슨: ${result.davison?.available ? 'ON' : `OFF · ${result.davison?.reason ?? ''}`}`,
     `- 마크스: ${result.marks?.available ? 'ON' : `OFF · ${result.marks?.reason ?? ''}`}`,
   ]
-  aspects.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb ${aspect.orb.toFixed(2)}° · ${aspect.tone}`))
+  aspects.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb(오브) ${aspect.orb.toFixed(2)}° · ${aspect.tone}`))
+  if (kind === 'reunion' && reunionContext) {
+    lines.push('', '■ 재회 방향별 활성도')
+    const directional: Array<[string, FortuneStat | null]> = [
+      ['수신 · 상대→나', reunionContext.incoming],
+      ['발신 · 나→상대', reunionContext.outgoing],
+      ['과거인연 재접점', reunionContext.reconnection],
+    ]
+    directional.forEach(([name, stat]) => {
+      if (!stat) return
+      lines.push(`- ${name}: ${stat.average.toFixed(1)} · ${stat.band}`)
+      if (stat.best_days?.length) lines.push(`  강한 날짜: ${stat.best_days.slice(0,5).map((x)=>`${x.date} ${x.score.toFixed(1)}`).join(' · ')}`)
+      if (stat.caution_days?.length) lines.push(`  약한 날짜: ${stat.caution_days.slice(0,3).map((x)=>`${x.date} ${x.score.toFixed(1)}`).join(' · ')}`)
+    })
+  }
+  if (kind === 'reunion' && result.reunion_transits?.available) {
+    lines.push('', '■ 실제 transit(트랜짓·현재 행성 이동) 재접점')
+    result.reunion_transits.top_days.slice(0,10).forEach((day) => {
+      const hits = day.hits.slice(0,3).map((hit)=>`${hit.transit}→${hit.person === 'counterpart' ? '상대' : '나'} ${hit.target} ${hit.aspect} orb ${hit.orb.toFixed(2)}°`).join(' · ')
+      lines.push(`- ${day.date}: ${day.score.toFixed(1)} · ${hits}`)
+    })
+  }
   for (const month of result.months ?? []) {
     lines.push('', `■ ${month.calendar_month} / 대표일 ${month.representative_date}`)
     lines.push(`- 정밀 ${month.signal_summary.exact_contacts} · 조화 ${month.signal_summary.supportive_contacts} · 긴장 ${month.signal_summary.challenging_contacts}`)
-    month.signal_summary.tightest.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb ${aspect.orb.toFixed(2)}°`))
+    month.signal_summary.tightest.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb(오브) ${aspect.orb.toFixed(2)}°`))
   }
   if (result.limitations?.length) lines.push('', `제한사항: ${result.limitations.join(' ')}`)
-  lines.push('', '[원본 계산 JSON]', JSON.stringify(response, null, 2))
+  const raw = kind === 'reunion' ? { relationship: response, reunion_directional_context: reunionContext ?? null } : response
+  lines.push('', '[원본 계산 JSON]', JSON.stringify(raw, null, 2))
   return lines.join('\n')
 }
 
@@ -977,8 +1010,9 @@ export default function AppNext() {
             data: data.data ?? undefined,
           }
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
-          const currentEnd = periodEnd(queryDate, period)
-          if (!periodStart || (queryDate === periodStart && currentEnd === periodEndValue)) {
+          const currentStart = integratedCalendarYear ? `${integratedCalendarYear}-01-01` : queryDate
+          const currentEnd = integratedCalendarYear ? `${integratedCalendarYear}-12-31` : periodEnd(queryDate, period)
+          if (!periodStart || (currentStart === periodStart && currentEnd === periodEndValue)) {
             setAiInterpretation(annotatePayload(payload))
           }
           window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
@@ -1093,7 +1127,7 @@ export default function AppNext() {
     setReunionTimingLoading(true); setReunionTimingError('')
     try {
       const end = relationshipEndDate
-      if (integratedResult && integratedResult.period.start === queryDate && integratedResult.period.end === end) {
+      if (integratedResult && integratedResult.period.start === relationshipStartDate && integratedResult.period.end === end) {
         const cached = buildReunionTimingContext(integratedResult)
         setReunionTiming(cached)
         return cached
@@ -1257,16 +1291,19 @@ export default function AppNext() {
     if (!relationshipResult || !relationshipRequestSnapshot || archiveSaving) return
     setArchiveSaving(true); setArchiveStatus('관계 분석 기록 저장 중…')
     const kind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
+    const isReunion = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
     const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
+    const archiveRequest = isReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming } : relationshipRequestSnapshot
+    const archiveLabel = kind === 'marriage' ? '결혼운' : isReunion ? '재회운' : '궁합운'
     try {
     const saved = await saveArchive({
       kind,
       periodKey: relationshipPeriodKey,
-      title: `${kind === 'marriage' ? '결혼운' : '궁합운'} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,
+      title: `${archiveLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,
       periodStart: relationshipResult.period.start,
       periodEnd: relationshipResult.period.end,
       engine: relationshipResult.engine,
-      request: relationshipRequestSnapshot,
+      request: archiveRequest,
       result: relationshipResult as unknown as Record<string, unknown>,
     })
     setArchiveStatus(saved.cloudSynced ? '기록 저장 + Supabase 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
@@ -1313,6 +1350,15 @@ export default function AppNext() {
       const restoredDays = Math.max(7, Math.min(365, Math.round((new Date(`${item.periodEnd}T12:00:00Z`).getTime()-new Date(`${item.periodStart}T12:00:00Z`).getTime())/86400000)+1))
       setRelationshipDays(restoredDays)
       setRelationshipMode((request.relationship_status as RelationshipStatus) || 'dating')
+      const restoredAnalysisMode = String(request.analysis_mode ?? 'compatibility')
+      if (restoredAnalysisMode === 'reunion') {
+        setRelationshipPurpose('reunion')
+        const archivedContext = request.reunion_context
+        setReunionTiming(archivedContext && typeof archivedContext === 'object' ? archivedContext as ReunionTimingContext : null)
+      } else {
+        setRelationshipPurpose('compatibility')
+        setReunionTiming(null)
+      }
       if (request.analysis_mode === 'marriage_married') setMarriageMode('married')
       else if (request.analysis_mode === 'marriage_unmarried') setMarriageMode('unmarried')
       setCounterpart({
@@ -1339,7 +1385,10 @@ export default function AppNext() {
       const result = item.result as unknown as IntegratedApiResponse
       await handleCopy('저장 결과 전체복사', item.kind === 'precision' ? precisionResultText(result) : integratedResultText(result))
     } else {
-      await handleCopy('저장 결과 전체복사', relationshipResultText(item.kind, item.result as unknown as RelationshipApiResponse))
+      const analysisMode = String(item.request.analysis_mode ?? '')
+      const copyKind: 'compatibility' | 'reunion' | 'marriage' = item.kind === 'marriage' ? 'marriage' : analysisMode === 'reunion' ? 'reunion' : 'compatibility'
+      const archivedContext = item.request.reunion_context
+      await handleCopy('저장 결과 전체복사', relationshipResultText(copyKind, item.result as unknown as RelationshipApiResponse, archivedContext && typeof archivedContext === 'object' ? archivedContext as ReunionTimingContext : null))
     }
   }
 
@@ -1461,15 +1510,15 @@ export default function AppNext() {
               </div></details>
             </div>
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
+            <div className="calculation-range"><CalendarDays size={17}/><span>관계 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
             {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
             <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||apiStatus==='offline'}>{relationshipLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{relationshipLoading?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
 
             {relationshipResult && <div className="results-wrap">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {clampedRelationshipDays}일</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
               <div className="result-actions">
-                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':'compatibility', relationshipRequestSnapshot, relationshipResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
-                <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':'compatibility', relationshipResult))}><Copy size={15}/><span>결과 전체복사</span></button>
+                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveRelationshipRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}

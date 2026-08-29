@@ -65,6 +65,8 @@ export function AstrocartographyWorldMap({ map, purposes }: { map: AstroMap; pur
   const group = purposes[purpose]
   const defaultPlanets = PURPOSE_PLANETS[purpose] ?? ['Sun', 'Venus', 'Jupiter']
   const activePlanets = selectedPlanet ? [selectedPlanet] : expandedPlanets ? Object.keys(PLANET_LABELS) : defaultPlanets
+  const selectablePlanets = expandedPlanets ? Object.keys(PLANET_LABELS) : defaultPlanets
+  const angleLabel = (key: 'ALL'|'ASC'|'DC'|'MC'|'IC') => key === 'ALL' ? '전체' : key === 'DC' ? 'DSC' : key
   const lines = useMemo(() => map.lines.filter((line) => activePlanets.includes(line.planet) && (angle === 'ALL' || line.angle === angle)), [map.lines, activePlanets.join('|'), angle])
   const cities = group?.cities?.slice(0, 10) ?? []
 
@@ -103,15 +105,15 @@ export function AstrocartographyWorldMap({ map, purposes }: { map: AstroMap; pur
           })}
         </g>
       </svg>
-      <div className="astro-map-caption"><span><Sparkles size={13}/> 목적별 핵심 행성 {expandedPlanets ? '전체 표시' : '우선 표시'}</span><span>© OpenStreetMap contributors</span></div>
+      <div className="astro-map-caption"><span><Sparkles size={13}/> 목적별 핵심 행성 {expandedPlanets ? '전체 표시' : '우선 표시'}</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
     </div>
 
     <div className="astro-map-controls">
-      <div className="astro-angle-filter"><strong>각도선</strong>{(['ALL','ASC','DC','MC','IC'] as const).map((key)=><button type="button" key={key} className={angle===key?'is-active':''} onClick={()=>setAngle(key)}>{key==='ALL'?'전체':key}</button>)}</div>
-      <div className="astro-planet-filter"><strong>행성</strong><button type="button" className={!selectedPlanet&&!expandedPlanets?'is-active':''} onClick={()=>{setSelectedPlanet(null);setExpandedPlanets(false)}}>목적 핵심</button><button type="button" className={!selectedPlanet&&expandedPlanets?'is-active':''} onClick={()=>{setSelectedPlanet(null);setExpandedPlanets(true)}}>10행성</button>{defaultPlanets.map((planet)=><button type="button" key={planet} className={selectedPlanet===planet?'is-active':''} onClick={()=>setSelectedPlanet(selectedPlanet===planet?null:planet)}>{PLANET_LABELS[planet]}</button>)}</div>
+      <div className="astro-angle-filter"><strong>각도선</strong>{(['ALL','ASC','DC','MC','IC'] as const).map((key)=><button type="button" key={key} className={angle===key?'is-active':''} onClick={()=>setAngle(key)}>{angleLabel(key)}</button>)}</div>
+      <div className="astro-planet-filter"><strong>행성</strong><button type="button" className={!selectedPlanet&&!expandedPlanets?'is-active':''} onClick={()=>{setSelectedPlanet(null);setExpandedPlanets(false)}}>목적 핵심</button><button type="button" className={!selectedPlanet&&expandedPlanets?'is-active':''} onClick={()=>{setSelectedPlanet(null);setExpandedPlanets(true)}}>10행성</button>{selectablePlanets.map((planet)=><button type="button" key={planet} className={selectedPlanet===planet?'is-active':''} onClick={()=>setSelectedPlanet(selectedPlanet===planet?null:planet)}>{PLANET_LABELS[planet]}</button>)}</div>
     </div>
 
-    <div className="astro-angle-guide">{['ASC','DC','MC','IC'].map((key)=><span key={key}><b>{key}</b> {ANGLE_HELP[key]}</span>)}</div>
+    <div className="astro-angle-guide">{['ASC','DC','MC','IC'].map((key)=><span key={key}><b>{key==='DC'?'DSC':key}</b> {ANGLE_HELP[key]}</span>)}</div>
 
     <div className="astro-map-city-strip">
       {cities.slice(0,5).map((city,index)=><article key={`${purpose}-card-${city.city}`}><span><MapPin size={14}/>{index+1}</span><div><strong>{city.city} · {city.country}</strong><small>{city.evidence.slice(0,2).map((ev)=>`${PLANET_LABELS[ev.planet] ?? ev.planet}-${ev.angle} ${ev.separation_deg}°`).join(' · ') || '주요 각도선 근접도 종합'}</small></div><b>{city.score.toFixed(1)}</b></article>)}
