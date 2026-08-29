@@ -1,0 +1,48 @@
+name: Verify live marriage AI v10.1
+on:
+  push:
+    branches: [relationship-depth-v2-20260829]
+    paths: ['.github/workflows/verify-live-marriage-ai-v10-1.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Prepare live calculation and auth
+        run: |
+          API='https://astro-app-api-f7fn.onrender.com'; SUPA='https://dbynfabwfcakxayyggzi.supabase.co'; KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+          cat >/tmp/base.json <<'JSON'
+          {"user":{"name":"A","birth_date":"1991-03-21","birth_time":"07:26:00","time_known":true,"latitude":34.76,"longitude":127.66,"utc_offset_hours":9},"counterpart":{"name":"B","birth_date":"1992-02-09","birth_time":null,"time_known":false,"latitude":null,"longitude":null,"utc_offset_hours":9},"start_date":"2027-01-01","end_date":"2027-12-31","relationship_status":"dating","analysis_mode":"marriage_unmarried"}
+          JSON
+          curl -fsS --max-time 90 -H 'Content-Type: application/json' --data-binary @/tmp/base.json "$API/v1/relationship/western" >/tmp/calc.json
+          curl -fsS --max-time 30 -X POST "$SUPA/auth/v1/signup" -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}' >/tmp/auth.json
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/auth.json')); assert a.get('access_token'),a
+          open('/tmp/token','w').write(a['access_token'])
+          PY
+      - name: Verify both marriage modes
+        run: |
+          SUPA='https://dbynfabwfcakxayyggzi.supabase.co'; KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'; TOKEN=$(cat /tmp/token)
+          for PURPOSE in marriage_unmarried marriage_married; do
+            python - "$PURPOSE" <<'PY'
+          import json,sys
+          calc=json.load(open('/tmp/calc.json')); purpose=sys.argv[1]
+          calc['result']['analysis_mode']=purpose
+          json.dump({'calculation':calc,'purpose':purpose,'model':'gemini-3.7-flash'},open('/tmp/ai_req.json','w'),ensure_ascii=False)
+          PY
+            curl -fsS --max-time 150 -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/ai_req.json "$SUPA/functions/v1/relationship-interpret-v9-preview" >/tmp/ai.json
+            python - "$PURPOSE" <<'PY'
+          import json,sys
+          purpose=sys.argv[1]; d=json.load(open('/tmp/ai.json')); assert d.get('ok') is True,d
+          assert d.get('interpreter_version')=='relationship-v10.1-grounded-depth',d.get('interpreter_version')
+          x=d['data']; m=x['marriage_reading']; assert len(x.get('overview',''))>=300
+          assert len(m.get('bottom_line',''))>=260,(purpose,'bottom_line',len(m.get('bottom_line','')))
+          for k in ['bond','emotional_home','daily_life','conflict_repair','commitment_or_current_cycle','timing','caution']:
+              assert len(m.get(k,'').strip())>=170,(purpose,k,len(m.get(k,'').strip()))
+          out=json.dumps(x,ensure_ascii=False)
+          for bad in ['갑기합','을경합','병신합','정임합','무계합','신강','신약','용신','희신','기신','배우자성','합혼점수']:
+              assert bad not in out,(purpose,bad)
+          print('LIVE_MARRIAGE_V10_1_PASS',purpose,len(m['bottom_line']))
+          PY
+          done
