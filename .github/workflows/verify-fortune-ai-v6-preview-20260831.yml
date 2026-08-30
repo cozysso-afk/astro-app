@@ -69,10 +69,12 @@ jobs:
           rm .verify-fortune-ai-v6.ts
       - name: Verify cache design uses no schema change
         run: |
-          grep -q 'fortune-v6:${hash.slice(0,32)}' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'const kind=`${VERSION}:${hash.slice(0,32)}`' supabase/functions/fortune-interpret-v6-preview/index.ts
           grep -q 'period_start:periodStart,period_end:periodEnd' supabase/functions/fortune-interpret-v6-preview/index.ts
-          grep -q 'eq("kind",kind)' supabase/functions/fortune-interpret-v6-preview/index.ts
-          grep -q 'reused:true' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'fallback_from.eq.${preferred}' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q '.in("status",["queued","running"])' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'reused:true,inflight:true' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'reused:true,inflight:false' supabase/functions/fortune-interpret-v6-preview/index.ts
           echo CACHE_REUSE_STATIC_PASS
       - name: Verify no Gemini call in CI
         run: |
