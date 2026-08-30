@@ -1,0 +1,147 @@
+name: Verify Exact Saju Jie Segmentation 2026-08-31
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/patch_saju_jie_exact_v1.py'
+      - '.github/workflows/verify-saju-jie-exact-20260831.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/full-year-thai-hardening-20260831
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: api/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply exact Jie patch
+        run: python scripts/patch_saju_jie_exact_v1.py
+
+      - name: Install calculation dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Compile product modules
+        run: python -m py_compile integrated_fortune_v1.py api/main.py thai_astrology_v2.py relationship_western_v1.py
+
+      - name: Verify August Liqiu split in Korea timezone
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from integrated_fortune_v1 import _saju_payload
+
+          out=_saju_payload(date(1991,3,21),time(7,26),127.6622,9,'female',date(2026,8,1),date(2026,8,31))
+          assert out['ok'] is True, out
+          rows=out['monthly']
+          print('AUG_ROWS',rows)
+          assert len(rows)==2, rows
+          assert rows[0]['ganzhi']=='乙未', rows[0]
+          assert rows[1]['ganzhi']=='丙申', rows[1]
+          assert rows[0]['jie_name']=='小暑', rows[0]
+          assert rows[1]['jie_name']=='立秋', rows[1]
+          assert rows[1]['jie_name_ko']=='입추', rows[1]
+          assert rows[1]['segment_start']=='2026-08-07T20:42:43+09:00', rows[1]
+          assert rows[0]['segment_end_exclusive']==rows[1]['segment_start']
+          assert '정확시각' in rows[1]['boundary_note']
+          print('KOREA_LIQIU_EXACT_SPLIT_PASS',rows[1]['segment_start'])
+          PY
+
+      - name: Verify annual LiChun exact segmentation
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from integrated_fortune_v1 import _saju_payload, _lichun_for_year
+
+          out=_saju_payload(date(1991,3,21),time(7,26),127.6622,9,'female',date(2026,1,1),date(2026,12,31))
+          assert out['ok'] is True
+          rows=out['annual']
+          print('ANNUAL_ROWS',rows)
+          assert len(rows)==2, rows
+          assert rows[0]['ganzhi']!=rows[1]['ganzhi'], rows
+          exact=_lichun_for_year(2026,9).isoformat(timespec='seconds')
+          assert rows[0]['segment_end_exclusive']==exact, (rows,exact)
+          assert rows[1]['segment_start']==exact, (rows,exact)
+          assert rows[1]['start_jie']=='立春' and rows[1]['start_jie_ko']=='입춘'
+          assert rows[0]['ganzhi']=='乙巳', rows[0]
+          assert rows[1]['ganzhi']=='丙午', rows[1]
+          print('LICHUN_EXACT_SPLIT_PASS',exact)
+          PY
+
+      - name: Verify full-year Jie coverage has no gaps
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from integrated_fortune_v1 import _saju_payload
+          out=_saju_payload(date(1991,3,21),time(7,26),127.6622,9,'female',date(2026,1,1),date(2026,12,31))
+          rows=out['monthly']
+          print('MONTH_SEGMENT_COUNT',len(rows))
+          assert len(rows)>=12
+          assert rows[0]['segment_start'].startswith('2026-01-01T00:00:00+09:00')
+          assert rows[-1]['segment_end_exclusive'].startswith('2027-01-01T00:00:00+09:00')
+          for a,b in zip(rows,rows[1:]):
+              assert a['segment_end_exclusive']==b['segment_start'], (a,b)
+          assert all('jie_name' in r and 'next_jie' in r for r in rows)
+          print('FULL_YEAR_JIE_CONTIGUOUS_PASS')
+          PY
+
+      - name: Verify integrated response and consensus policy
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from integrated_fortune_v1 import build_integrated_fortune
+          out=build_integrated_fortune(
+              birth_date=date(1991,3,21),birth_time=time(7,26),latitude=34.7604,longitude=127.6622,
+              utc_offset_hours=9,gender='female',start_date=date(2026,8,7),end_date=date(2026,8,8))
+          assert out['ok'] is True
+          assert out['saju']['engine']=='lunar_python-1.4.8-true-solar-jie-exact'
+          assert len(out['saju']['monthly'])==2
+          thai_policy=out['consensus_policy']['thai']
+          assert '출생요일 baseline만' not in thai_policy
+          assert 'Mahathaksa/Taksajorn' in thai_policy
+          print('INTEGRATED_SAJU_JIE_PASS',out['engine'],thai_policy)
+          PY
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify user-facing accuracy copy
+        run: |
+          ! grep -q '절입 경계의 정확 시각까지 월 구간을 쪼갠 방식은 아직 아니며' web/src/AppNext.tsx
+          grep -q '세운은 立春(입춘), 월운은 각 절(節)의 정확 시각' web/src/AppNext.tsx
+          grep -q '같은 달력 연도·월 이름이 반복돼도 서로 다른 구간을 임의 병합하지 않는다' web/src/AppNext.tsx
+          ! grep -q '출생요일 baseline만 제공' integrated_fortune_v1.py
+          echo 'SAJU_UI_POLICY_COPY_PASS'
+
+      - name: Verify production isolation
+        run: |
+          test "$GITHUB_REF_NAME" = 'work/full-year-thai-hardening-20260831'
+          echo 'PRODUCTION_ISOLATION_PASS'
+
+      - name: Commit verified product files to work branch only
+        run: |
+          if git diff --quiet -- integrated_fortune_v1.py web/src/AppNext.tsx; then
+            echo 'No product diff to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py web/src/AppNext.tsx
+          git commit -m 'fix: split Saju annual and monthly flow at exact Jie boundaries'
+          git push origin HEAD:work/full-year-thai-hardening-20260831
