@@ -29,3 +29,54 @@
 .integrated-topic:nth-child(6n){background:linear-gradient(145deg,rgba(251,244,216,.86),rgba(255,252,241,.74),rgba(231,248,243,.70))!important}
 .integrated-time-evidence{padding:0!important;overflow:hidden}.integrated-time-evidence>summary{cursor:pointer;list-style:none;padding:15px 16px;font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.88rem;font-weight:750;color:#594c63}.integrated-time-evidence>summary::-webkit-details-marker{display:none}.integrated-time-evidence>summary::before{content:"＋";margin-right:8px;color:#806b92}.integrated-time-evidence[open]>summary::before{content:"－"}.integrated-time-evidence>.time-detail-list{padding:0 13px 14px}
 @media(max-width:430px){.integrated-topic{min-height:104px!important}.integrated-topic>strong{font-size:1.96rem!important}.birth-date-field input,.birth-time-field input{height:52px!important}}
+
+
+/* v15 · restore period-fortune IA + true iOS date vertical centering */
+.period-fortune-section{margin-top:4px!important}
+.period-fortune-report{margin-top:14px!important}
+.annual-fortune-range{margin:12px 0!important;padding:13px!important;border:1px solid rgba(126,101,153,.12)!important;border-radius:17px!important;background:linear-gradient(145deg,rgba(252,247,255,.82),rgba(241,250,248,.80))!important}
+.annual-range-badge{font-size:.68rem;font-weight:850;color:#765f8b;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid rgba(126,101,153,.12)}
+.annual-year-selector{margin-top:8px!important}
+.annual-calculation-range{background:linear-gradient(120deg,rgba(250,240,255,.80),rgba(235,250,247,.78))!important}
+
+/* iOS Safari: center the actual native date value vertically, not just its box. */
+.birth-date-field input[type="date"]{
+  height:52px!important;
+  min-height:52px!important;
+  box-sizing:border-box!important;
+  padding-top:0!important;
+  padding-bottom:0!important;
+  line-height:normal!important;
+}
+.birth-date-field input[type="date"]::-webkit-date-and-time-value{
+  display:flex!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  line-height:normal!important;
+}
+.birth-date-field input[type="date"]::-webkit-datetime-edit,
+.birth-date-field input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+  display:flex!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  line-height:normal!important;
+}
+.birth-date-field input[type="date"]::-webkit-datetime-edit-year-field,
+.birth-date-field input[type="date"]::-webkit-datetime-edit-month-field,
+.birth-date-field input[type="date"]::-webkit-datetime-edit-day-field,
+.birth-date-field input[type="date"]::-webkit-datetime-edit-text{
+  padding-top:0!important;
+  padding-bottom:0!important;
+  line-height:normal!important;
+}
