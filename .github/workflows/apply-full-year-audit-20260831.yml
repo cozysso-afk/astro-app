@@ -1,0 +1,146 @@
+name: Apply Full-Year Audit 2026-08-31
+
+on:
+  push:
+    branches:
+      - audit/full-year-fortune-20260831
+    paths:
+      - scripts/patch_full_year_audit_v1.py
+      - .github/workflows/apply-full-year-audit-20260831.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/full-year-fortune-20260831
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply branch-only fixes
+        run: python scripts/patch_full_year_audit_v1.py
+
+      - name: Install calculation dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Python syntax check
+        run: python -m py_compile integrated_fortune_v1.py relationship_western_v1.py api/main.py
+
+      - name: Verify ephemeris cache is mathematically identical
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import integrated_fortune_v1 as f
+          points=[
+              ('Sun', datetime(2026,1,2,1,0,tzinfo=timezone.utc)),
+              ('Mercury', datetime(2026,4,15,3,0,tzinfo=timezone.utc)),
+              ('Venus', datetime(2026,9,9,5,0,tzinfo=timezone.utc)),
+              ('Moon', datetime(2026,12,20,7,30,tzinfo=timezone.utc)),
+          ]
+          for body, dt in points:
+              cached=f._planet_lon(body,dt)
+              raw=f._planet_lon.__wrapped__(body,dt)
+              assert cached == raw, (body,cached,raw)
+              snap_cached=f._planet_snapshot(body,dt)
+              snap_raw=f._planet_snapshot.__wrapped__(body,dt)
+              assert snap_cached == snap_raw, (body,snap_cached,snap_raw)
+          print('EPHEMERIS_CACHE_EXACT_EQUALITY_PASS')
+          PY
+
+      - name: Verify dual Whole Sign and Placidus overlays
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from relationship_western_v1 import build_relationship_western
+          a={'name':'A','birth_date':date(1991,3,21),'birth_time':time(7,26),'time_known':True,'latitude':34.7604,'longitude':127.6622,'utc_offset_hours':9}
+          b={'name':'B','birth_date':date(1992,2,9),'birth_time':time(10,15),'time_known':True,'latitude':35.1595,'longitude':126.8526,'utc_offset_hours':9}
+          result=build_relationship_western(a,b,[(date(2026,8,1),date(2026,8,31))])
+          assert result['ok'] is True
+          assert 'Whole Sign + Placidus' in result['house_system']
+          overlays=result['house_overlays']
+          assert overlays['available'] is True
+          for direction in ['user_in_counterpart','counterpart_in_user']:
+              rows=overlays[direction]['all']
+              assert rows
+              assert all('whole_house' in row and 'placidus_house' in row for row in rows)
+          print('DUAL_HOUSE_OVERLAY_PASS')
+          PY
+
+      - name: Benchmark optimized 365-day integrated engine
+        run: |
+          python - <<'PY'
+          import resource, time
+          from datetime import date, time as dt_time
+          import integrated_fortune_v1 as f
+          profile=dict(birth_date=date(1991,3,21),birth_time=dt_time(7,26),latitude=34.7604,longitude=127.6622,utc_offset_hours=9,gender='female')
+          t0=time.perf_counter()
+          warm=f.build_integrated_fortune(**profile,start_date=date(2025,12,31),end_date=date(2025,12,31))
+          warm_t=time.perf_counter()-t0
+          f._daily_aggregate_cached.cache_clear()
+          # Retain ephemeris cache to model a warmed service whose requested annual days are not cached.
+          t0=time.perf_counter()
+          result=f.build_integrated_fortune(**profile,start_date=date(2026,1,1),end_date=date(2026,12,31))
+          elapsed=time.perf_counter()-t0
+          rss=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+          assert result['period']['day_count']==365
+          assert len(result['western']['months'])==12
+          for topic in ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']:
+              assert result['western']['overall'].get(topic) is not None, topic
+          assert result['western']['market']['calendar_mode']=='exact_xkrx'
+          print(f'OPTIMIZED_BENCH warmup={warm_t:.3f}s annual365={elapsed:.3f}s maxrss={rss:.1f}MiB')
+          print('PLANET_LON_CACHE',f._planet_lon.cache_info())
+          print('PLANET_SNAPSHOT_CACHE',f._planet_snapshot.cache_info())
+          PY
+
+      - name: Verify future KRX precision disclosure
+        run: |
+          python - <<'PY'
+          from datetime import date
+          import integrated_fortune_v1 as f
+          info=f._krx_calendar_precision(date(2028,1,1),date(2028,12,31))
+          assert info['mode']=='weekday_fallback', info
+          assert info['warning'], info
+          mixed=f._krx_calendar_precision(date(2027,8,1),date(2027,9,30))
+          assert mixed['mode']=='mixed', mixed
+          print('KRX_PRECISION_DISCLOSURE_PASS',info,mixed)
+          PY
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify production isolation markers
+        run: |
+          grep -q "if: github.ref == 'refs/heads/main'" .github/workflows/api-integrated-smoke.yml
+          grep -q 'Whole Sign + Placidus' relationship_western_v1.py
+          grep -q 'KRX 거래일 정밀도' web/src/AppNext.tsx
+          grep -q '홀사인 + 플라시두스 관계 하우스' web/src/AppNext.tsx
+          echo 'NO_PRODUCTION_CALLS_IN_THIS_WORKFLOW=TRUE'
+
+      - name: Commit verified source to audit branch only
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add integrated_fortune_v1.py relationship_western_v1.py web/src/AppNext.tsx supabase/functions/relationship-interpret-v9-preview/index.ts
+          if git diff --cached --quiet; then
+            echo 'No source changes'
+            exit 0
+          fi
+          git commit -m 'fix: optimize annual calculation and restore dual house overlays'
+          git push origin HEAD:audit/full-year-fortune-20260831
