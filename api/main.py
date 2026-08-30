@@ -19,7 +19,7 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v4.8-final-review"
+APP_VERSION = "api-fortune-v4.9-full-year-reunion-hardening"
 
 app = FastAPI(
     title="별빛의 운명 API",

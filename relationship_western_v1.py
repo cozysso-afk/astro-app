@@ -18,7 +18,7 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 
 import swisseph as swe
 
-ENGINE_VERSION = "relationship-western-v1.2-depth-focus"
+ENGINE_VERSION = "relationship-western-v1.3-dual-chart-timing"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -106,6 +106,76 @@ def _side_trigger_score(hits):
     return round(min(100.0, sum(top) / 2.35), 1)
 
 
+def _relationship_timing_band(score):
+    if score >= 70:
+        return "강함"
+    if score >= 55:
+        return "상승"
+    if score >= 40:
+        return "보통"
+    if score >= 25:
+        return "약함"
+    return "매우 약함"
+
+
+def _relationship_timing_stat(rows, key, label):
+    points = [
+        {"date": row["date"], "label": label, "score": float(row[key])}
+        for row in rows if isinstance(row.get(key), (int, float))
+    ]
+    if not points:
+        return None
+    avg = sum(point["score"] for point in points) / len(points)
+
+    def spaced(source, reverse, limit):
+        ordered = sorted(source, key=lambda x: x["score"], reverse=reverse)
+        selected = []
+        for point in ordered:
+            day = date.fromisoformat(point["date"])
+            if any(abs((day - date.fromisoformat(existing["date"])).days) <= 1 for existing in selected):
+                continue
+            selected.append({**point, "score": round(point["score"], 1)})
+            if len(selected) >= limit:
+                break
+        return selected
+
+    return {
+        "average": round(avg, 1),
+        "band": _relationship_timing_band(avg),
+        "spread": round(max(point["score"] for point in points) - min(point["score"] for point in points), 1),
+        "best_days": spaced(points, True, 7),
+        "caution_days": spaced(points, False, 5),
+    }
+
+
+def _relationship_directional_context(rows, start_date, end_date):
+    incoming_label = "상대측 차트의 관계 트랜짓 활성도 · 실제 연락 의도/확률 아님"
+    outgoing_label = "내 차트의 관계 트랜짓 활성도 · 실제 연락 결과 확률 아님"
+    reconnection_label = "두 차트 동시 재접점 활성도 · 실제 재회 확률 아님"
+    months = {}
+    for row in rows:
+        months.setdefault(row["date"][:7], []).append(row)
+    monthly = []
+    for month_key, month_rows in sorted(months.items()):
+        monthly.append({
+            "calendar_month": month_key,
+            "start": month_rows[0]["date"],
+            "end": month_rows[-1]["date"],
+            "incoming": _relationship_timing_stat(month_rows, "counterpart_score", incoming_label),
+            "outgoing": _relationship_timing_stat(month_rows, "user_score", outgoing_label),
+            "reconnection": _relationship_timing_stat(month_rows, "score", reconnection_label),
+        })
+    return {
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "incoming": _relationship_timing_stat(rows, "counterpart_score", incoming_label),
+        "outgoing": _relationship_timing_stat(rows, "user_score", outgoing_label),
+        "reconnection": _relationship_timing_stat(rows, "score", reconnection_label),
+        "months": monthly,
+        "source": "two-person relationship transit engine",
+        "policy": "incoming/outgoing are directional chart-activation proxies. They do not reveal private intent and are not event probabilities.",
+    }
+
+
 def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
     rows = []
     cursor = start_date
@@ -156,6 +226,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         "policy": "daily transits to both natal charts; descriptive activation, not contact/reunion probability",
         "top_days": top_days,
         "top_months": top_months[:12],
+        "directional_context": _relationship_directional_context(rows, start_date, end_date),
     }
 
 

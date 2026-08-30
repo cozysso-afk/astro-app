@@ -1,0 +1,63 @@
+name: Harden Full-Year Fortune 2026-08-30
+
+on:
+  push:
+    branches:
+      - perf/reunion-speed-20260830b
+    paths:
+      - .github/workflows/optimize-reunion-speed-20260830.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/reunion-speed-20260830b
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply full-year hardening patch
+        run: python scripts/patch_fortune_hardening_v2.py
+
+      - name: Python syntax check
+        run: python -m py_compile integrated_fortune_v1.py relationship_western_v1.py api/main.py
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify critical behavior
+        run: |
+          grep -q 'relationship-western-v1.3-dual-chart-timing' relationship_western_v1.py
+          grep -q 'directional_context' relationship_western_v1.py
+          grep -q 'integrated-fortune-v2.4-full-year-efficient' integrated_fortune_v1.py
+          grep -q '"대인관계", "연애", "연락", "재회"' integrated_fortune_v1.py
+          grep -q 'Calculation itself spends no Gemini credits' web/src/AppNext.tsx
+          grep -q 'Gemini(제미나이) 통합 정밀해설' web/src/AppNext.tsx
+          grep -q 'directional_context?: ReunionTimingContext' web/src/AppNext.tsx
+          grep -q 'usage:usage(raw)' supabase/functions/relationship-interpret-v9-preview/index.ts
+          ! grep -q 'void runAiInterpretation(calculation)' web/src/AppNext.tsx
+
+      - name: Commit verified source changes to branch
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add web/src/AppNext.tsx integrated_fortune_v1.py relationship_western_v1.py api/main.py supabase/functions/relationship-interpret-v9-preview/index.ts
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: harden full-year fortune and reunion flow"
+          git push origin HEAD:perf/reunion-speed-20260830b
