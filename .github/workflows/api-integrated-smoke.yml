@@ -26,11 +26,11 @@ jobs:
       - name: Run one-day integrated calculation with dummy profile
         run: |
           python - <<'PY'
-          from api.main import IntegratedFortuneRequest, FortuneProfile, health, integrated_fortune, meta
+          from api.main import IntegratedFortuneRequest, FortuneProfile, health, fortune_integrated, meta
           from datetime import date, time
 
           assert health()['status'] == 'ok'
-          assert 'fortune/integrated' in meta()['live_routes']
+          assert 'fortune/integrated' in meta()['routes']
           request = IntegratedFortuneRequest(
               profile=FortuneProfile(
                   name='dummy-smoke-profile',
@@ -44,7 +44,7 @@ jobs:
               start_date=date(2026, 8, 28),
               end_date=date(2026, 8, 28),
           )
-          result = integrated_fortune(request)
+          result = fortune_integrated(request)
           assert result['ok'] is True
           assert result['western']['ok'] is True
           assert result['saju']['ok'] is True
@@ -54,6 +54,7 @@ jobs:
           print('integrated-smoke-ok', result['engine'])
           PY
       - name: Verify Render live API has integrated route
+        if: github.ref == 'refs/heads/main'
         run: |
           python - <<'PY'
           import json
@@ -67,8 +68,8 @@ jobs:
                   with urllib.request.urlopen(url, timeout=15) as response:
                       payload = json.load(response)
                   last = payload
-                  if 'fortune/integrated' in payload.get('live_routes', []):
-                      print('render-integrated-live', payload.get('version'))
+                  if 'fortune/integrated' in payload.get('routes', []):
+                      print('render-integrated-live', payload.get('api_version'))
                       break
               except Exception as exc:
                   last = repr(exc)
@@ -77,6 +78,7 @@ jobs:
               raise SystemExit(f'Render integrated route not live: {last}')
           PY
       - name: Run Render live integrated POST
+        if: github.ref == 'refs/heads/main'
         run: |
           python - <<'PY'
           import json
