@@ -202,7 +202,7 @@ type IntegratedApiResponse = {
     }
     dayun?: Array<{ start_year: number; end_year: number; start_age: number; end_age: number; ganzhi: string }>
     annual?: Array<{ year: number; ganzhi: string; stem_ten_god: string; branch_links: string[] }>
-    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[] }>
+    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[]; boundary_note?: string }>
     not_calculated?: string[]
   }
   thai: {
@@ -853,6 +853,7 @@ export default function AppNext() {
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
   const [integratedLoading, setIntegratedLoading] = useState(false)
+  const [integratedProgress, setIntegratedProgress] = useState<{completed:number;total:number;percent:number}|null>(null)
   const [integratedError, setIntegratedError] = useState('')
   const [integratedRequestSnapshot, setIntegratedRequestSnapshot] = useState<Record<string, unknown> | null>(null)
   const [relationshipRequestSnapshot, setRelationshipRequestSnapshot] = useState<Record<string, unknown> | null>(null)
@@ -1122,6 +1123,7 @@ export default function AppNext() {
       end_date: integratedSelectionEnd,
     }
     const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
+    setIntegratedProgress(null)
     setIntegratedLoading(true)
     try {
       let calculation: IntegratedApiResponse | null = null
@@ -1170,6 +1172,7 @@ export default function AppNext() {
             throw new Error(job?.detail || '통합운세 계산 상태를 확인하지 못했어.')
           }
           transientFailures = 0
+          if (job?.progress && Number.isFinite(Number(job.progress.percent))) setIntegratedProgress({completed:Number(job.progress.completed??0),total:Number(job.progress.total??0),percent:Number(job.progress.percent??0)})
           if (job.status === 'failed') throw new Error(job.error || '통합운세 계산 작업이 실패했어.')
           if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
         }
@@ -1181,7 +1184,7 @@ export default function AppNext() {
       // Gemini interpretation is intentionally NOT automatic. Calculation itself spends no Gemini credits.
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
-    } finally { setIntegratedLoading(false) }
+    } finally { setIntegratedLoading(false); setIntegratedProgress(null) }
   }
 
   const runReunionTiming = async (): Promise<ReunionTimingContext | null> => {
@@ -1547,7 +1550,7 @@ export default function AppNext() {
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {integratedStartDate} ~ {integratedSelectionEnd} · {integratedCalendarYear?`${integratedCalendarYear}년 전체`:periodRangeLabel(period)}</span></div>
             <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 현재 출생요일 기준값만 사용해.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
-            <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'통합 계산 중…':'통합운세 실제 계산'}</span></button>
+            <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'통합 계산 준비 중…'):'통합운세 실제 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
@@ -1582,6 +1585,7 @@ export default function AppNext() {
                   </div>
                   <div className="saju-summary"><span>일간 <b>{integratedResult.saju.day_master}</b></span>{activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}</div>
                   {integratedResult.saju.true_solar && <div className="coordinate-note"><Sun size={16}/><span>법정시 {integratedResult.saju.true_solar.legal_local_time.slice(11,16)} → 진태양시 {integratedResult.saju.true_solar.true_solar_time.slice(11,16)} · 보정 {integratedResult.saju.true_solar.total_correction_minutes>0?'+':''}{integratedResult.saju.true_solar.total_correction_minutes.toFixed(1)}분</span></div>}
+                  {!!integratedResult.saju.monthly?.length && <p className="result-note">사주 월운 표시는 현재 달력 월 중 대표일의 절기월 간지야. 절입 경계의 정확 시각까지 월 구간을 쪼갠 방식은 아직 아니며, 원본 데이터의 boundary_note(경계 주석)를 보존해.</p>}
                 </> : <div className="status-banner error"><AlertTriangle size={16}/><span>{integratedResult.saju.error || '사주 계산에 실패했어.'}</span></div>}
               </section>
 

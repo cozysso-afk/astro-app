@@ -923,6 +923,7 @@ def _western_payload(
     utc_offset_hours: float,
     start_date: date,
     end_date: date,
+    progress_callback=None,
 ):
     birth_local = _aware_local(birth_date, birth_time, utc_offset_hours)
     birth_utc = birth_local.astimezone(timezone.utc)
@@ -938,10 +939,12 @@ def _western_payload(
         rows = [dict(packed_day["row"])]
         detail_days = [packed_day["detail"]]
     else:
-        rows = [
-            dict(_daily_aggregate_cached((start_date + timedelta(days=i)).isoformat(), natal_packed, houses_packed, float(utc_offset_hours)))
-            for i in range(day_count)
-        ]
+        rows = []
+        for i in range(day_count):
+            rows.append(dict(_daily_aggregate_cached((start_date + timedelta(days=i)).isoformat(), natal_packed, houses_packed, float(utc_offset_hours))))
+            completed = i + 1
+            if progress_callback and (completed == day_count or completed == 1 or completed % 5 == 0):
+                progress_callback(completed, day_count, "western_daily")
 
     market_rows = [r for r in rows if _is_market_day(date.fromisoformat(r["date"]))]
     overall = {
@@ -1211,6 +1214,7 @@ def build_integrated_fortune(
     gender: str,
     start_date: date,
     end_date: date,
+    progress_callback=None,
 ) -> dict[str, Any]:
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
@@ -1219,7 +1223,7 @@ def build_integrated_fortune(
         raise ValueError("integrated fortune range is limited to 366 days per request")
 
     western = _western_payload(
-        birth_date, birth_time, latitude, longitude, utc_offset_hours, start_date, end_date
+        birth_date, birth_time, latitude, longitude, utc_offset_hours, start_date, end_date, progress_callback
     )
     saju = _saju_payload(
         birth_date, birth_time, longitude, utc_offset_hours, gender, start_date, end_date
