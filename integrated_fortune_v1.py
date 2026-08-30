@@ -21,8 +21,8 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v2.3-interpersonal"
-WESTERN_ENGINE_VERSION = "western-period-engine-v6-interpersonal"
+ENGINE_VERSION = "integrated-fortune-v2.4-full-year-efficient"
+WESTERN_ENGINE_VERSION = "western-period-engine-v7-full-year-efficient"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
 
@@ -616,7 +616,7 @@ def _evidence_text(item: dict) -> str:
 
 def _detail_from_rows(day_value: date, rows: list[dict]):
     details = {}
-    keys = ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
+    keys = ["금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"]
     if _is_market_day(day_value):
         keys += ["투자심리", "수익실현", "신규진입", "투자주의"]
     for key in keys:
@@ -686,7 +686,7 @@ def _make_time_points(day_value: date, start_time: dt_time, end_time: dt_time, s
     return points
 
 
-def _scan_intraday(day_value: date, start_time: dt_time, end_time: dt_time, step_minutes: int, natal_lons: dict, natal_houses: dict, offset_hours: float):
+def _scan_intraday(day_value: date, start_time: dt_time, end_time: dt_time, step_minutes: int, natal_lons: dict, natal_houses: dict, offset_hours: float, topic_names=None):
     points = _make_time_points(day_value, start_time, end_time, step_minutes, offset_hours)
     if not points:
         return []
@@ -703,7 +703,8 @@ def _scan_intraday(day_value: date, start_time: dt_time, end_time: dt_time, step
         )
         snapshots = {**static_snapshots, **dyn_snap}
         records = static_records + dyn_rec
-        topics = {topic: _score_topic(topic, records, snapshots, natal_houses) for topic in TOPIC_SPECS}
+        selected_topics = tuple(topic_names) if topic_names is not None else tuple(TOPIC_SPECS)
+        topics = {topic: _score_topic(topic, records, snapshots, natal_houses) for topic in selected_topics}
         rows.append({"dt": point, **_derived_scores(topics), "topics": topics})
     return rows
 
@@ -723,14 +724,15 @@ def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tu
     day_value = date.fromisoformat(day_iso)
     natal_lons = _unpack_natal_lons(natal_packed)
     natal_houses = _unpack_houses(houses_packed)
-    life = _scan_intraday(day_value, dt_time(8, 0), dt_time(22, 0), 120, natal_lons, natal_houses, offset_hours)
-    market = _scan_intraday(day_value, dt_time(9, 0), dt_time(15, 30), 60, natal_lons, natal_houses, offset_hours) if _is_market_day(day_value) else []
+    life_topic_names = ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션")
+    life = _scan_intraday(day_value, dt_time(8, 0), dt_time(22, 0), 120, natal_lons, natal_houses, offset_hours, topic_names=life_topic_names)
+    market = _scan_intraday(day_value, dt_time(9, 0), dt_time(15, 30), 60, natal_lons, natal_houses, offset_hours, topic_names=("금전", "투자심리")) if _is_market_day(day_value) else []
     row = {
         "date": day_value.isoformat(),
         "label": f"{day_value.month}/{day_value.day}({WEEKDAY_KO[day_value.weekday()]})",
         "market_open": bool(market),
     }
-    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션", "수신신호", "발신적합", "과거인연접점"]:
+    for key in ["금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션", "수신신호", "발신적합", "과거인연접점"]:
         row[key] = _rows_avg(life, key)
     row["투자심리"] = _rows_avg(market, "투자심리") if market else None
     for key in ["수익실현", "신규진입", "투자주의"]:
@@ -772,7 +774,7 @@ def _window_with_step(rows: list[dict], key: str, size: int = 3):
 
 def _legacy_detail(day_value: date, timing_rows: list[dict], market_rows: list[dict]):
     details = {}
-    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]:
+    for key in ["금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"]:
         best, worst = _window_with_step(timing_rows, key, 3)
         if not best:
             continue
@@ -820,7 +822,7 @@ def _daily_detailed_cached(day_iso: str, natal_packed: tuple, houses_packed: tup
         "label": f"{day_value.month}/{day_value.day}({WEEKDAY_KO[day_value.weekday()]})",
         "market_open": bool(market),
     }
-    for key in ["금전", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]:
+    for key in ["금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"]:
         row[key] = _rows_avg(life, key)
     aggregated = {topic: _aggregate_topic_result(life, topic) for topic in TOPIC_SPECS}
     row.update(_relationship_direction_scores(aggregated))

@@ -82,6 +82,7 @@ type RelationshipApiResponse = {
         hits: Array<{ person: 'user'|'counterpart'; transit: string; aspect: string; target: string; orb: number; tone: string; score: number }>
       }>
       top_months: Array<{ calendar_month: string; score: number; top_dates: string[] }>
+      directional_context?: ReunionTimingContext
     }
   }
 }
@@ -257,6 +258,20 @@ type AiInterpretationResponse = {
   }
 }
 
+
+const GEMINI_USD_KRW_ESTIMATE = 1384
+function estimateGeminiUsage<T extends { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number }>(usage?: T) {
+  if (!usage) return null
+  const prompt = Number(usage.prompt_tokens ?? 0)
+  const candidate = Number(usage.candidate_tokens ?? 0)
+  const thought = Number(usage.thought_tokens ?? 0)
+  const intro = new Date() <= new Date('2026-12-31T23:59:59Z')
+  const calculatedUsd = (prompt / 1_000_000) * (intro ? .75 : 1.5) + ((candidate + thought) / 1_000_000) * (intro ? 3.75 : 7.5)
+  const usd = Number.isFinite(Number(usage.estimated_usd)) ? Number(usage.estimated_usd) : calculatedUsd
+  const krw = Number.isFinite(Number(usage.estimated_krw)) ? Number(usage.estimated_krw) : usd * GEMINI_USD_KRW_ESTIMATE
+  return { ...usage, estimated_usd: usd, estimated_krw: krw }
+}
+
 function AiInterpretationPanel({ result, loading, error, onRetry }: {
   result: AiInterpretationResponse | null
   loading: boolean
@@ -267,9 +282,10 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
   if (!result?.ok || !result.data) return null
   const data = result.data
+  const usage = estimateGeminiUsage(result.usage)
   return <section className="ai-interpret-card">
     <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">Gemini(제미나이) 통합 해설</span><h3>{data.headline || '통합 계산 해설'}</h3><small>실계산 결과를 바탕으로 한 자연어 해설</small></div></div>
-    {result.usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(result.usage.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(result.usage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(result.usage.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(result.usage.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(result.usage.estimated_krw ?? 0).toLocaleString()}원</b><small>최초 생성 예상치 · 저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
+    {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>최초 생성 예상치 · 저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
     <p className="ai-summary">{data.overall.summary}</p>
     {data.overall.dominant_pattern && <div className="ai-highlight"><strong>핵심 패턴</strong><span>{data.overall.dominant_pattern}</span></div>}
     <div className="ai-cluster-grid">
@@ -373,7 +389,7 @@ function humanizeEvidence(value: string) {
   text = text.replace(/orb\s*/gi, '오브 ')
   return text
 }
-const coreTopicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','재회','소식','컨디션']
+const coreTopicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션']
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
 const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
 const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
@@ -425,6 +441,7 @@ function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading,
   const chemistryText = chemistryTight.length ? chemistryTight.map((aspect)=>`${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°) — ${relationshipAspectMeaning(aspect)}`).join(' ') : 'Venus(금성)·Mars(화성)·Pluto(명왕성) 관련 확정 접점이 상위권에 적어서 끌림 하나로 관계를 설명하진 않을게.'
   const stabilityText = structureTight.length ? structureTight.map((aspect)=>`${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°) — ${relationshipAspectMeaning(aspect)}`).join(' ') : 'Saturn(토성)·Jupiter(목성)·교점 관련 확정 접점이 상위권에 적어서 장기 지속성은 현재 계산만으로 강하게 단정하기 어려워.'
   const timing = partnerExact ? '두 사람의 정확한 출생시간과 위치가 있어 진행 궁합차트·Davison(데이비슨)·Marks(마크스) 시기층까지 계산할 수 있어.' : '상대 출생시간이 없어서 Moon(달)·ASC(상승점)·DSC(하강점)·MC(중천점)·IC(천저점)처럼 시간에 민감한 요소와 정밀 진행 시기층은 제외했어. 대신 출생시간 없이 확정 가능한 행성 간 접점만 해석해.'
+  const usage = estimateGeminiUsage(ai?.usage)
   return <>
     <section className="relationship-reading-card">
       <span className="eyebrow">관계 구조 해설</span><h3>{headline}</h3>
@@ -434,7 +451,7 @@ function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading,
     </section>
     <div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini(제미나이) 관계 해석 중…':'Gemini(제미나이) 관계 정밀해석'}</span></button><small>원할 때만 AI 호출 · 완료 후 토큰/예상비용 표시</small></div>
     {aiError && <div className="status-banner error"><AlertTriangle size={16}/><span>{aiError}</span></div>}
-    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">Gemini(제미나이) 관계 해설</span><h3>{ai.data.headline}</h3>{ai.usage?.total_tokens?<details className="ai-meta-details relationship-meta-details"><summary>해설 생성 정보</summary><div className="relationship-ai-usage"><span>입력 {(ai.usage.prompt_tokens??0).toLocaleString()} · 출력 {(ai.usage.candidate_tokens??0).toLocaleString()} · 사고 {(ai.usage.thought_tokens??0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(ai.usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(ai.usage.estimated_krw??0).toLocaleString()}원</b></div></details>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}{isReunion&&ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{isMarriage&&ai.data.marriage_reading?.bottom_line&&<div className="marriage-ai-deep"><strong>{analysisMode==='marriage_unmarried'?'미혼 결혼운 · 정밀 해석':'기혼 결혼운 · 정밀 해석'}</strong><p className="marriage-ai-bottom">{ai.data.marriage_reading.bottom_line}</p><div className="marriage-ai-grid"><article><b>장기 결속력</b><p>{ai.data.marriage_reading.bond}</p></article><article><b>정서적 집</b><p>{ai.data.marriage_reading.emotional_home}</p></article><article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b><p>{ai.data.marriage_reading.conflict_repair}</p></article><article><b>{analysisMode==='marriage_unmarried'?'결혼 결정 흐름':'현재 결혼생활 주기'}</b><p>{ai.data.marriage_reading.commitment_or_current_cycle}</p></article><article><b>시기 흐름</b><p>{ai.data.marriage_reading.timing}</p></article><article><b>장기 주의점</b><p>{ai.data.marriage_reading.caution}</p></article><article><b>정밀도</b><p>{ai.data.marriage_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
+    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">Gemini(제미나이) 관계 해설</span><h3>{ai.data.headline}</h3>{usage?.total_tokens?<details className="ai-meta-details relationship-meta-details"><summary>해설 생성 정보</summary><div className="relationship-ai-usage"><span>입력 {(usage?.prompt_tokens??0).toLocaleString()} · 출력 {(usage?.candidate_tokens??0).toLocaleString()} · 사고 {(usage?.thought_tokens??0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(usage?.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw??0).toLocaleString()}원</b></div></details>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}{isReunion&&ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{isMarriage&&ai.data.marriage_reading?.bottom_line&&<div className="marriage-ai-deep"><strong>{analysisMode==='marriage_unmarried'?'미혼 결혼운 · 정밀 해석':'기혼 결혼운 · 정밀 해석'}</strong><p className="marriage-ai-bottom">{ai.data.marriage_reading.bottom_line}</p><div className="marriage-ai-grid"><article><b>장기 결속력</b><p>{ai.data.marriage_reading.bond}</p></article><article><b>정서적 집</b><p>{ai.data.marriage_reading.emotional_home}</p></article><article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b><p>{ai.data.marriage_reading.conflict_repair}</p></article><article><b>{analysisMode==='marriage_unmarried'?'결혼 결정 흐름':'현재 결혼생활 주기'}</b><p>{ai.data.marriage_reading.commitment_or_current_cycle}</p></article><article><b>시기 흐름</b><p>{ai.data.marriage_reading.timing}</p></article><article><b>장기 주의점</b><p>{ai.data.marriage_reading.caution}</p></article><article><b>정밀도</b><p>{ai.data.marriage_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
   </>
 }
 
@@ -569,8 +586,8 @@ function ReunionTimingPanel({ context, loading, error }: { context: ReunionTimin
   if (error) return <section className="result-card reunion-timing-card"><div className="result-card-title"><span>REUNION TIMING</span><strong>재회 시기 계산 오류</strong></div><div className="status-banner error"><AlertTriangle size={16}/><span>{error}</span></div></section>
   if (!context) return null
   const rows = [
-    { key: 'incoming', title: '상대 → 나 · 수신 신호', desc: '상대 쪽에서 연락·소식이 들어오는 흐름', stat: context.incoming },
-    { key: 'outgoing', title: '나 → 상대 · 발신 적합도', desc: '내가 먼저 연락했을 때 흐름이 받쳐주는 정도', stat: context.outgoing },
+    { key: 'incoming', title: '상대측 → 관계 · 수신 참고신호', desc: '상대 차트 쪽 관계 트랜짓 활성도. 실제 연락 의도나 확률은 아님', stat: context.incoming },
+    { key: 'outgoing', title: '나 → 상대 · 발신 참고신호', desc: '내 차트 쪽 관계 트랜짓 활성도. 실제 연락 결과 확률은 아님', stat: context.outgoing },
     { key: 'reconnection', title: '과거인연 · 재접점', desc: '끊겼던 관계가 다시 활성화되는 흐름', stat: context.reconnection },
   ] as const
   const monthRank = [...context.months]
@@ -583,7 +600,7 @@ function ReunionTimingPanel({ context, loading, error }: { context: ReunionTimin
     .slice(0, 4)
   return <section className="result-card reunion-timing-card">
     <div className="result-card-title"><span>REUNION TIMING</span><strong>재회운 · 연락 방향과 시기</strong></div>
-    <p className="result-note">0~100 값은 실제 연락 확률 %가 아니라 점성 계산의 상대 활성도 지수야. 수신과 발신을 섞지 않고 따로 봐.</p>
+    <p className="result-note">0~100 값은 실제 연락 확률 %가 아니라 점성 계산의 상대 활성도 지수야. 두 사람 차트의 방향별 활성도를 섞지 않고 따로 봐. 상대의 속마음이나 실제 행동 확률을 뜻하지 않아.</p>
     <div className="reunion-signal-grid">{rows.map(({key,title,desc,stat}) => <article key={key}><div><strong>{title}</strong><small>{desc}</small></div><b>{stat ? stat.average.toFixed(1) : '—'}</b><span>{stat ? reunionScoreBand(stat.average) : '계산 없음'}</span>{stat?.best_days?.length ? <div className="reunion-window-list"><em>강한 시기</em>{stat.best_days.slice(0,3).map((point)=><p key={`${key}-${point.date}`}><strong>{point.date}</strong><span>{point.label}</span><b>{point.score.toFixed(1)}</b></p>)}</div> : null}{stat?.caution_days?.length ? <div className="reunion-window-list is-low"><em>약한 시기</em>{stat.caution_days.slice(0,2).map((point)=><p key={`${key}-low-${point.date}`}><strong>{point.date}</strong><span>{point.label}</span><b>{point.score.toFixed(1)}</b></p>)}</div> : null}</article>)}</div>
     {monthRank.length>1 && <div className="reunion-month-rank"><strong>재접점 종합 활성도가 높은 월</strong><small>과거인연 50% · 수신 35% · 발신 15%로 화면 정렬만 한 참고지수야.</small>{monthRank.map((m,index)=><p key={m.calendar_month}><span>{index+1}. {m.calendar_month}</span><b>{m.score.toFixed(1)}</b></p>)}</div>}
   </section>
@@ -1098,26 +1115,64 @@ export default function AppNext() {
       start_date: integratedStartDate,
       end_date: integratedSelectionEnd,
     }
+    const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
     setIntegratedLoading(true)
     try {
-      const startResponse = await fetch(`${API_BASE}/v1/fortune/integrated/start`, {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
-      })
-      const started = await startResponse.json()
-      if (!startResponse.ok || !started?.job_id) throw new Error(started?.detail || started?.error || '통합운세 계산 작업을 시작하지 못했어.')
       let calculation: IntegratedApiResponse | null = null
-      for (let attempt=0; attempt<120; attempt++) {
-        await new Promise((resolve)=>window.setTimeout(resolve, 2000))
-        const pollResponse = await fetch(`${API_BASE}/v1/fortune/integrated/jobs/${encodeURIComponent(started.job_id)}`)
-        const job = await pollResponse.json()
-        if (!pollResponse.ok) throw new Error(job?.detail || '통합운세 계산 상태를 확인하지 못했어.')
-        if (job.status === 'failed') throw new Error(job.error || '통합운세 계산 작업이 실패했어.')
-        if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
+      let lastMessage = ''
+      for (let launch=0; launch<2 && !calculation; launch++) {
+        let startResponse: Response
+        try {
+          startResponse = await fetch(`${API_BASE}/v1/fortune/integrated/start`, {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+          })
+        } catch (error) {
+          lastMessage = error instanceof Error ? error.message : '통합운세 계산 서버 연결에 실패했어.'
+          if (launch === 0) { await sleep(1200); continue }
+          throw error
+        }
+        const started = await startResponse.json().catch(()=>({}))
+        if (!startResponse.ok || !started?.job_id) {
+          lastMessage = started?.detail || started?.error || '통합운세 계산 작업을 시작하지 못했어.'
+          if (launch === 0 && startResponse.status >= 500) { await sleep(1200); continue }
+          throw new Error(lastMessage)
+        }
+        let lostJob = false
+        let transientFailures = 0
+        for (let attempt=0; attempt<120; attempt++) {
+          await sleep(attempt < 12 ? 1000 : 2000)
+          let pollResponse: Response
+          try {
+            pollResponse = await fetch(`${API_BASE}/v1/fortune/integrated/jobs/${encodeURIComponent(started.job_id)}`)
+          } catch (error) {
+            transientFailures += 1
+            lastMessage = error instanceof Error ? error.message : '통합운세 계산 상태 확인 중 연결이 끊겼어.'
+            if (transientFailures <= 4) continue
+            throw error
+          }
+          const job = await pollResponse.json().catch(()=>({}))
+          if (pollResponse.status === 404) {
+            lostJob = true
+            lastMessage = job?.detail || '계산 작업이 서버 재시작으로 사라졌어.'
+            break
+          }
+          if (!pollResponse.ok) {
+            if ([502,503,504].includes(pollResponse.status) && transientFailures < 4) {
+              transientFailures += 1
+              continue
+            }
+            throw new Error(job?.detail || '통합운세 계산 상태를 확인하지 못했어.')
+          }
+          transientFailures = 0
+          if (job.status === 'failed') throw new Error(job.error || '통합운세 계산 작업이 실패했어.')
+          if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
+        }
+        if (!calculation && lostJob && launch === 0) { await sleep(900); continue }
       }
-      if (!calculation) throw new Error('정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
+      if (!calculation) throw new Error(lastMessage || '정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
       setIntegratedResult(calculation)
       setIntegratedRequestSnapshot(body)
-      void runAiInterpretation(calculation)
+      // Gemini interpretation is intentionally NOT automatic. Calculation itself spends no Gemini credits.
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
     } finally { setIntegratedLoading(false) }
@@ -1236,14 +1291,24 @@ export default function AppNext() {
     }
     setRelationshipLoading(true)
     const shouldRunReunionTiming = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
-    const reunionTask = shouldRunReunionTiming ? runReunionTiming() : null
     try {
       const response = await fetch(`${API_BASE}/v1/relationship/western`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '관계 계산 요청에 실패했어.')
-      setRelationshipResult(payload as RelationshipApiResponse)
+      const typed = payload as RelationshipApiResponse
+      setRelationshipResult(typed)
       setRelationshipRequestSnapshot(body as Record<string, unknown>)
-      if (reunionTask) void reunionTask
+      if (shouldRunReunionTiming) {
+        const direct = typed.result.reunion_transits?.directional_context
+        if (direct) {
+          setReunionTiming(direct)
+          setReunionTimingError('')
+          setReunionTimingLoading(false)
+        } else {
+          // Backward-compatible only: old backend can still use the previous integrated timing route.
+          void runReunionTiming()
+        }
+      }
     } catch (error) {
       setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
     } finally { setRelationshipLoading(false) }
@@ -1480,6 +1545,7 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
+              {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
@@ -1704,6 +1770,7 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <>
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.period.day_count}일 분석</span></div></div>
+              {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
 
               <section className="result-card">
