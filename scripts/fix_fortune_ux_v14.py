@@ -17,7 +17,7 @@ if period_contract not in app:
     raise SystemExit("period contract missing before patch")
 if period_selector_token not in app:
     raise SystemExit("period selector missing before patch")
-for token in ["key:'today'", "key:'week'", "key:'month'", "key:'year'"]:
+for token in ["key: 'today'", "key: 'week'", "key: 'month'", "key: 'year'"]:
     if token not in app:
         raise SystemExit(f"period option missing before patch: {token}")
 
@@ -88,7 +88,7 @@ elif new_invoke not in app:
 
 if period_contract not in app or period_selector_token not in app:
     raise SystemExit("period contract changed unexpectedly")
-for token in ["key:'today'", "key:'week'", "key:'month'", "key:'year'"]:
+for token in ["key: 'today'", "key: 'week'", "key: 'month'", "key: 'year'"]:
     if token not in app:
         raise SystemExit(f"period option changed unexpectedly: {token}")
 if "천체 흐름 리포트" in app:
