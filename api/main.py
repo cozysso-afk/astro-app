@@ -21,7 +21,7 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v5.1-bounded-calc-queue"
+APP_VERSION = "api-fortune-v5.2-purpose-scoped-relationship"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -291,8 +291,7 @@ def relationship_western(request: RelationshipRequest) -> dict:
 
     segments = _month_segments(request.start_date, request.end_date)
     try:
-        result = build_relationship_western(user_payload, cp_payload, segments)
-        result["analysis_mode"] = request.analysis_mode
+        result = build_relationship_western(user_payload, cp_payload, segments, analysis_mode=request.analysis_mode)
         try:
             result["saju_relationship"] = build_relationship_saju(user_payload, cp_payload)
         except Exception as saju_exc:

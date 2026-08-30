@@ -18,7 +18,7 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 
 import swisseph as swe
 
-ENGINE_VERSION = "relationship-western-v1.4-dual-house-audit"
+ENGINE_VERSION = "relationship-western-v1.5-purpose-scoped-transits"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -515,11 +515,12 @@ def _summary(aspect_sets):
     }
 
 
-def build_relationship_western(user_profile, counterpart_profile, month_segments):
+def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility"):
     """Return static and monthly advanced relationship layers.
 
     month_segments: iterable of (segment_start: date, segment_end: date); midpoint noon KST is used as
     the representative timing date. Exact partner birth time/place unlocks Davison and Marks layers.
+    Daily two-person reunion transit scanning runs only for analysis_mode="reunion".
     """
     month_segments = list(month_segments)
     result = {
@@ -565,7 +566,12 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "note": "Mathematical midpoint composite. Partner angles/Moon are omitted when partner time is unknown.",
     }
 
-    if month_segments:
+    result["analysis_mode"] = analysis_mode
+    result["daily_transit_policy"] = {
+        "reunion_scan": "enabled" if analysis_mode == "reunion" else "skipped",
+        "reason": "daily two-person reunion transit scan is purpose-specific; monthly progressed timing layers remain available for compatibility/marriage",
+    }
+    if month_segments and analysis_mode == "reunion":
         transit_layer = _build_reunion_transits(
             user_natal, cp_natal, month_segments[0][0], month_segments[-1][1], user_profile.get("utc_offset_hours", 9.0)
         )
