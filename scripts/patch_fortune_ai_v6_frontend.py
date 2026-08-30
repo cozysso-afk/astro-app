@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot verified switch for the isolated work branch.
 p = Path('web/src/AppNext.tsx')
 s = p.read_text(encoding='utf-8')
 old_slug = "fortune-interpret-v5-preview"
