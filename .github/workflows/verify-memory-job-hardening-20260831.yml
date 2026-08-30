@@ -1,0 +1,143 @@
+name: Verify Vector Memory and Calc Queue 2026-08-31
+
+on:
+  push:
+    branches:
+      - work/full-year-thai-hardening-20260831
+    paths:
+      - scripts/patch_memory_job_hardening_v3.py
+      - .github/workflows/verify-memory-job-hardening-20260831.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-memory-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/full-year-thai-hardening-20260831
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Apply bounded-memory patch
+        run: python scripts/patch_memory_job_hardening_v3.py
+
+      - name: Install calculation dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Compile
+        run: python -m py_compile integrated_fortune_v1.py thai_astrology_v2.py api/main.py
+
+      - name: Verify chunked vectors equal scalar ephemeris
+        env:
+          ASTRO_VECTOR_BATCH_SIZE: '384'
+        run: |
+          python - <<'PY'
+          from datetime import datetime,timezone,timedelta
+          import integrated_fortune_v1 as f
+          base=datetime(2026,1,1,0,0,tzinfo=timezone.utc)
+          moments=[base+timedelta(hours=7*i) for i in range(600)]
+          f._PLANET_PREWARM_LOCAL.values={}
+          for body in ['Moon','Mercury','Jupiter','Pluto']:
+              vec=f._vectorized_planet_longitudes(body,moments)
+              for moment in moments[::37]:
+                  scalar=f._planet_lon.__wrapped__(body,moment)
+                  diff=abs(vec[(body,moment)]-scalar)
+                  assert diff < 1e-10,(body,moment,diff)
+          print('CHUNKED_VECTOR_SCALAR_EQUALITY_PASS')
+          PY
+
+      - name: Produce scalar 31-day reference
+        env:
+          ASTRO_DISABLE_VECTOR_PREWARM: '1'
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date,time
+          import integrated_fortune_v1 as f
+          r=f.build_integrated_fortune(
+            birth_date=date(1990,6,15),birth_time=time(9,10),latitude=37.5665,longitude=126.978,utc_offset_hours=9,gender='female',
+            start_date=date(2026,9,1),end_date=date(2026,10,1),
+          )
+          reduced={'overall':r['western']['overall'],'relationship_signals':r['western']['relationship_signals'],'months':r['western']['months'],'market':r['western']['market'],'saju':r['saju'],'thai':r['thai']}
+          open('/tmp/scalar31.json','w',encoding='utf-8').write(json.dumps(reduced,ensure_ascii=False,sort_keys=True))
+          print('SCALAR31_READY')
+          PY
+
+      - name: Verify chunked 31-day functional equality
+        env:
+          ASTRO_VECTOR_BATCH_SIZE: '384'
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date,time
+          import integrated_fortune_v1 as f
+          r=f.build_integrated_fortune(
+            birth_date=date(1990,6,15),birth_time=time(9,10),latitude=37.5665,longitude=126.978,utc_offset_hours=9,gender='female',
+            start_date=date(2026,9,1),end_date=date(2026,10,1),
+          )
+          reduced={'overall':r['western']['overall'],'relationship_signals':r['western']['relationship_signals'],'months':r['western']['months'],'market':r['western']['market'],'saju':r['saju'],'thai':r['thai']}
+          scalar=json.loads(open('/tmp/scalar31.json',encoding='utf-8').read())
+          assert reduced==scalar,'chunked vector changed product result'
+          print('CHUNKED_VECTOR_31_RESULT_EQUALITY_PASS')
+          PY
+
+      - name: Benchmark 365 days with memory ceiling
+        env:
+          ASTRO_VECTOR_BATCH_SIZE: '384'
+        run: |
+          python - <<'PY'
+          import resource,time
+          from datetime import date,time as dt_time
+          import integrated_fortune_v1 as f
+          t0=time.perf_counter()
+          r=f.build_integrated_fortune(
+            birth_date=date(1990,6,15),birth_time=dt_time(9,10),latitude=37.5665,longitude=126.978,utc_offset_hours=9,gender='female',
+            start_date=date(2026,1,1),end_date=date(2026,12,31),
+          )
+          elapsed=time.perf_counter()-t0
+          rss=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+          assert r['period']['day_count']==365
+          assert elapsed < 30, elapsed
+          assert rss < 220, rss
+          print(f'BOUNDED_VECTOR_365_PASS annual365={elapsed:.3f}s maxrss={rss:.1f}MiB batch=384')
+          PY
+
+      - name: Verify queue default and internal job key hiding
+        run: |
+          python - <<'PY'
+          import time
+          import api.main as m
+          assert m._MAX_CALC_CONCURRENCY==1,m._MAX_CALC_CONCURRENCY
+          with m._calc_jobs_lock:
+              m._calc_jobs.clear(); m._calc_request_index.clear()
+              m._calc_jobs['testjob']={'created_ts':time.time(),'status':'running','request_key':'internal-hash','progress':{'completed':1,'total':365,'percent':0,'stage':'western_daily'}}
+          out=m.fortune_integrated_job('testjob')
+          assert 'request_key' not in out,out
+          assert out['status']=='running'
+          print('CALC_QUEUE_AND_RESPONSE_HYGIENE_PASS',out)
+          PY
+
+      - name: Verify production isolation
+        run: |
+          grep -q 'plan: free' render.yaml
+          grep -q 'ASTRO_VECTOR_BATCH_SIZE' integrated_fortune_v1.py
+          grep -q 'ASTRO_MAX_CALC_CONCURRENCY' api/main.py
+          echo 'NO_PRODUCTION_CALLS=TRUE'
+
+      - name: Commit verified product files to work branch only
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add integrated_fortune_v1.py api/main.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: bound annual vector memory and serialize heavy jobs'
+          git push origin HEAD:work/full-year-thai-hardening-20260831
