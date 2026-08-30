@@ -60,7 +60,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts"],suriyayat_lagna:false});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts"],suriyayat_lagna:false});
   if(!key)return res({ok:false,missing_key:true,error:"GEMINI_API_KEY가 설정되지 않았어."},503);
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
@@ -77,14 +77,17 @@ Deno.serve(async(req)=>{
     return res({ok:true,interpreter_version:VERSION,payload_bytes:new TextEncoder().encode(JSON.stringify(payload)).byteLength,payload_hash_prefix:hash.slice(0,16),thai:{mahathaksa:Boolean(payload?.thai?.mahathaksa),taksajorn:Boolean(payload?.thai?.taksajorn),suriyayat:Boolean(payload?.thai?.suriyayat),suriyayat_lagna:Boolean(payload?.thai?.suriyayat?.lagna?.available)},saju:{annual_segments:payload?.saju?.annual?.length??0,monthly_segments:payload?.saju?.monthly?.length??0},detail_days:payload?.western?.detail_days?.length??0});
   }
   if(b?.action==="start"){
-    const hash=await payloadHash(payload);const kind=`fortune-v6:${hash.slice(0,32)}`;const a=admin();
-    const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).eq("status","done").order("completed_at",{ascending:false}).limit(1).maybeSingle();
-    if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true},200);
+    const hash=await payloadHash(payload);const kind=`${VERSION}:${hash.slice(0,32)}`;const a=admin();
+    const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
+    const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
+    if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
+    const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status,model,created_at,updated_at").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
+    if(!pendingError&&pending?.id)return res({ok:true,job_id:pending.id,status:pending.status,interpreter_version:VERSION,reused:true,inflight:true},202);
     const periodStart=payload?.period?.start||null,periodEnd=payload?.period?.end||null;
     const {data,error}=await a.from("ai_interpret_jobs").insert({user_id:u.id,kind,status:"queued",model:preferred,period_start:periodStart,period_end:periodEnd}).select("id").single();
     if(error||!data?.id)return res({ok:false,error:`해설 작업 생성 실패: ${error?.message??"unknown"}`},500);
     const task=job(data.id,payload,preferred,key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);
-    return res({ok:true,job_id:data.id,status:"queued",interpreter_version:VERSION,reused:false},202);
+    return res({ok:true,job_id:data.id,status:"queued",interpreter_version:VERSION,reused:false,inflight:false},202);
   }
   const r:any=await calculate(payload,preferred,key);return res(r,r.ok?200:502);
 });
