@@ -1,0 +1,140 @@
+name: Verify Safe Suriyayat Integration 2026-08-31
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/patch_suriyayat_integration_v1.py'
+      - '.github/workflows/verify-suriyayat-integration-20260831.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/full-year-thai-hardening-20260831
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: api/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply Suriyayat integration patch
+        run: python scripts/patch_suriyayat_integration_v1.py
+
+      - name: Install dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Compile product modules
+        run: python -m py_compile thai_suriyayat_v1.py thai_astrology_v2.py integrated_fortune_v1.py ai_interpret_v1.py api/main.py
+
+      - name: Verify Thai layer exposes facts but not fake Lagna
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date,time
+          from thai_astrology_v2 import build_thai_fortune
+
+          out=build_thai_fortune(date(1991,3,21),time(7,26),date(2026,8,1),date(2027,7,31),utc_offset_hours=9)
+          assert out['ok'] is True
+          sur=out['suriyayat']
+          assert sur['available'] is True
+          assert sur['validation']['vectors']==30
+          assert sur['validation']['max_delta_arcmin']==4
+          assert sur['validation']['within_1_arcmin']==26
+          assert len(sur['natal']['positions'])==10
+          assert len(sur['period_start']['positions'])==10
+          assert len(sur['period_end']['positions'])==10
+          assert sur['lagna']['available'] is False
+          assert out['reliability']['suriyayat_10planet_positions']=='cross_validated_30_vectors_max_4_arcmin'
+          assert 'full Suriyayat 10-planet longitudes' not in out['not_calculated']
+          assert any('global-coordinate Suriyayat Lagna' in x for x in out['not_calculated'])
+          raw=json.dumps(out,ensure_ascii=False)
+          print('THAI_PAYLOAD_BYTES',len(raw.encode('utf-8')))
+          assert len(raw.encode('utf-8')) < 50000
+          print('THAI_SURIYAYAT_FACT_LAYER_PASS',sur['natal']['positions']['rahu']['display'],sur['natal']['positions']['ketu']['display'])
+          PY
+
+      - name: Verify integrated response keeps systems independent
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from integrated_fortune_v1 import build_integrated_fortune
+          out=build_integrated_fortune(
+            birth_date=date(1991,3,21),birth_time=time(7,26),latitude=34.7604,longitude=127.6622,
+            utc_offset_hours=9,gender='female',start_date=date(2026,8,7),end_date=date(2026,8,8))
+          assert out['ok'] is True
+          assert out['engine']=='integrated-fortune-v2.9-suriyayat-position-layer'
+          assert out['thai']['suriyayat']['available'] is True
+          assert out['thai']['suriyayat']['lagna']['available'] is False
+          policy=out['consensus_policy']['thai']
+          assert '교차검증 Suriyayat 10행성 위치' in policy
+          assert 'Western 수치점수에 합산하지 않음' in policy
+          # Saju exact-Jie hardening must survive Thai integration.
+          assert out['saju']['engine']=='lunar_python-1.4.8-true-solar-jie-exact'
+          assert len(out['saju']['monthly'])==2
+          print('INTEGRATED_INDEPENDENT_SYSTEMS_PASS')
+          PY
+
+      - name: Verify backend AI compact policy is calculation-only
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date,time
+          from integrated_fortune_v1 import build_integrated_fortune
+          from ai_interpret_v1 import _compact_calculation, SYSTEM_PROMPT
+          out=build_integrated_fortune(
+            birth_date=date(1991,3,21),birth_time=time(7,26),latitude=34.7604,longitude=127.6622,
+            utc_offset_hours=9,gender='female',start_date=date(2026,8,1),end_date=date(2026,8,31))
+          compact=_compact_calculation(out)
+          assert compact['thai']['suriyayat']['available'] is True
+          assert compact['thai']['suriyayat']['lagna']['available'] is False
+          assert 'Lagna·하우스·디그니티·애스펙트·사건판정 규칙은 아직 계산하지 않는다' in SYSTEM_PROMPT
+          assert '같은 달력 연도·월 표기가 반복되어도' in SYSTEM_PROMPT
+          size=len(json.dumps(compact,ensure_ascii=False).encode('utf-8'))
+          print('AI_COMPACT_BYTES',size)
+          assert size < 120000
+          print('AI_POLICY_SURIYAYAT_SAFE_PASS')
+          PY
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify visible Thai wording
+        run: |
+          grep -q 'Suriyayat(수리야얏) 10행성 위치 검증층 ON' web/src/AppNext.tsx
+          grep -q '30개 기준값 교차검산' web/src/AppNext.tsx
+          grep -q 'Suriyayat Lagna(라그나)' web/src/AppNext.tsx
+          ! grep -q 'Full Suriyayat(수리야얏) 10행성·Lagna' web/src/AppNext.tsx
+          grep -q 'planetary_position_facts_only' thai_astrology_v2.py
+          echo 'VISIBLE_SURIYAYAT_SCOPE_PASS'
+
+      - name: Verify production isolation
+        run: |
+          test "$GITHUB_REF_NAME" = 'work/full-year-thai-hardening-20260831'
+          echo 'PRODUCTION_ISOLATION_PASS'
+
+      - name: Commit verified product files to work branch only
+        run: |
+          if git diff --quiet -- thai_astrology_v2.py integrated_fortune_v1.py ai_interpret_v1.py web/src/AppNext.tsx; then
+            echo 'No product diff to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py integrated_fortune_v1.py ai_interpret_v1.py web/src/AppNext.tsx
+          git commit -m 'feat: add cross-validated Suriyayat 10-planet fact layer'
+          git push origin HEAD:work/full-year-thai-hardening-20260831
