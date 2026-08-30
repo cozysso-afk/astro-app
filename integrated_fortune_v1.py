@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import calendar
 import json
+import os
+import threading
 from pathlib import Path
 from datetime import date, datetime, time as dt_time, timedelta, timezone
 from functools import lru_cache
@@ -20,11 +22,11 @@ import swisseph as swe
 from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
+from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
 
-ENGINE_VERSION = "integrated-fortune-v2.5-ephemeris-cache-audit"
-WESTERN_ENGINE_VERSION = "western-period-engine-v8-ephemeris-cache-audit"
+ENGINE_VERSION = "integrated-fortune-v2.6-vector-prewarm-thai"
+WESTERN_ENGINE_VERSION = "western-period-engine-v9-vector-prewarm"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
-THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
 
 KST = pytz.timezone("Asia/Seoul")
 UTC = pytz.UTC
@@ -211,10 +213,18 @@ def _to_jd_ut(dt_utc: datetime):
     return swe.julday(dt_utc.year, dt_utc.month, dt_utc.day, hour, swe.GREG_CAL)
 
 
+_PLANET_PREWARM_LOCAL = threading.local()
+
+
 @lru_cache(maxsize=60000)
 def _planet_lon(body_name: str, dt_aware: datetime):
-    # Deterministic astronomical lookup. Annual scans revisit many identical
-    # timestamps across life/market scans and applying/separating windows.
+    # Deterministic astronomical lookup. Long annual scans can install a
+    # thread-local vectorized prewarm table; individual calls still pass through
+    # this exact function and then enter the normal LRU cache.
+    key = (body_name, dt_aware.astimezone(timezone.utc))
+    prewarm = getattr(_PLANET_PREWARM_LOCAL, "values", None)
+    if isinstance(prewarm, dict) and key in prewarm:
+        return float(prewarm[key])
     _, _, earth, targets, _, _, _ = _ephemeris_bundle()
     apparent = earth.at(_sf_time(dt_aware)).observe(targets[body_name]).apparent()
     _, lon, _ = apparent.frame_latlon(ecliptic_frame)
@@ -296,6 +306,66 @@ def _motion_window_hours(body: str):
     if body in {"Sun", "Mercury", "Venus", "Mars"}:
         return 1.0
     return 6.0
+
+
+def _vectorized_planet_longitudes(body_name: str, moments: list[datetime]) -> dict[tuple[str, datetime], float]:
+    if not moments:
+        return {}
+    unique = sorted({m.astimezone(timezone.utc) for m in moments})
+    ts, _, earth, targets, _, _, _ = _ephemeris_bundle()
+    sf_times = ts.from_datetimes(unique)
+    apparent = earth.at(sf_times).observe(targets[body_name]).apparent()
+    _, lon, _ = apparent.frame_latlon(ecliptic_frame)
+    raw = lon.degrees
+    values = list(raw) if hasattr(raw, "__iter__") else [raw]
+    return {(body_name, moment): float(value % 360.0) for moment, value in zip(unique, values)}
+
+
+def _install_period_ephemeris_prewarm(start_date: date, end_date: date, offset_hours: float) -> int:
+    # The legacy period sampling policy is preserved exactly. Only the expensive
+    # Skyfield ephemeris lookup is batched by planet/timestamp before the same
+    # scalar scoring functions consume it. Disable with ASTRO_DISABLE_VECTOR_PREWARM=1
+    # for regression comparison.
+    _PLANET_PREWARM_LOCAL.values = {}
+    if os.getenv("ASTRO_DISABLE_VECTOR_PREWARM", "").strip() == "1":
+        return 0
+    day_count = (end_date - start_date).days + 1
+    if day_count <= 1:
+        return 0
+
+    dynamic_queries: set[datetime] = set()
+    static_queries: set[datetime] = set()
+    for i in range(day_count):
+        day_value = start_date + timedelta(days=i)
+        life = _make_time_points(day_value, dt_time(8, 0), dt_time(22, 0), 120, offset_hours)
+        if life:
+            dynamic_queries.update(x.astimezone(timezone.utc) for x in life)
+            static_queries.add(life[len(life) // 2].astimezone(timezone.utc))
+        if _is_market_day(day_value):
+            market = _make_time_points(day_value, dt_time(9, 0), dt_time(15, 30), 60, offset_hours)
+            if market:
+                dynamic_queries.update(x.astimezone(timezone.utc) for x in market)
+                static_queries.add(market[len(market) // 2].astimezone(timezone.utc))
+
+    table: dict[tuple[str, datetime], float] = {}
+    for body in ("Sun", "Moon", "Mercury", "Venus", "Mars"):
+        h = timedelta(hours=_motion_window_hours(body))
+        needed = []
+        for moment in dynamic_queries:
+            needed.extend((moment, moment - h, moment + h))
+        table.update(_vectorized_planet_longitudes(body, needed))
+    for body in ("Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"):
+        h = timedelta(hours=_motion_window_hours(body))
+        needed = []
+        for moment in static_queries:
+            needed.extend((moment, moment - h, moment + h))
+        table.update(_vectorized_planet_longitudes(body, needed))
+    _PLANET_PREWARM_LOCAL.values = table
+    return len(table)
+
+
+def _clear_period_ephemeris_prewarm() -> None:
+    _PLANET_PREWARM_LOCAL.values = {}
 
 
 @lru_cache(maxsize=30000)
@@ -933,6 +1003,7 @@ def _western_payload(
     houses_packed = _pack_houses(natal_houses)
 
     day_count = (end_date - start_date).days + 1
+    prewarmed_longitudes = _install_period_ephemeris_prewarm(start_date, end_date, float(utc_offset_hours))
     detail_days = []
     if day_count == 1:
         packed_day = _daily_detailed_cached(start_date.isoformat(), natal_packed, houses_packed, float(utc_offset_hours))
@@ -981,6 +1052,7 @@ def _western_payload(
         })
 
     _, _, _, _, _, ephemeris_used, fallback_reason = _ephemeris_bundle()
+    _clear_period_ephemeris_prewarm()
     return {
         "ok": True,
         "engine": WESTERN_ENGINE_VERSION,
@@ -988,6 +1060,7 @@ def _western_payload(
         "ephemeris_fallback_reason": fallback_reason,
         "score_policy": "점수는 사건 발생 확률이 아니라 같은 분야 안의 상대 흐름",
         "method": ("이전 Streamlit 일일엔진과 동일: 생활점수 07:00~23:30/30분, 시간탐색 00:00~23:30/30분, KRX 09:00~15:30/15분" if day_count == 1 else "이전 Streamlit 기간엔진과 동일: 생활 08:00~22:00/120분, KRX 09:00~15:30/60분"),
+        "performance": {"vector_ephemeris_prewarm": bool(prewarmed_longitudes), "prewarmed_longitudes": prewarmed_longitudes},
         "natal": {
             "asc": round(natal_houses["asc"], 6),
             "mc": round(natal_houses["mc"], 6),
@@ -1182,26 +1255,8 @@ def _saju_payload(
         return {"ok": False, "engine": SAJU_ENGINE_VERSION, "error": f"{type(exc).__name__}: {exc}"}
 
 
-def _thai_payload(birth_date: date, birth_time: dt_time):
-    dt = datetime.combine(birth_date, birth_time)
-    shifted = dt - timedelta(hours=6)
-    thai_date = shifted.date()
-    weekday = thai_date.weekday()
-    start = datetime.combine(thai_date, dt_time(6, 0))
-    if weekday == 2 and dt >= start + timedelta(hours=12):
-        label, ruler, note = "수요일 밤", "Rahu(라후)", "수요일 18:00~다음날 05:59 라후 출생층"
-    else:
-        label, ruler, note = _THAI_DAY[weekday]
-    return {
-        "ok": True,
-        "engine": THAI_ENGINE_VERSION,
-        "thai_day": label,
-        "ruler": ruler,
-        "rule": note,
-        "day_boundary": "06:00 local; Wednesday night split at 18:00",
-        "predictive_status": "natal_baseline_only",
-        "consensus_policy": "Suriyayat/Thai transit 미구현이므로 기간·날짜 합의 점수에는 사용하지 않음",
-    }
+def _thai_payload(birth_date: date, birth_time: dt_time, start_date: date, end_date: date):
+    return build_thai_fortune(birth_date, birth_time, start_date, end_date)
 
 
 def build_integrated_fortune(
@@ -1228,7 +1283,7 @@ def build_integrated_fortune(
     saju = _saju_payload(
         birth_date, birth_time, longitude, utc_offset_hours, gender, start_date, end_date
     )
-    thai = _thai_payload(birth_date, birth_time)
+    thai = _thai_payload(birth_date, birth_time, start_date, end_date)
 
     return {
         "ok": True,

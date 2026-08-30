@@ -209,10 +209,15 @@ type IntegratedApiResponse = {
     ok: boolean
     engine: string
     thai_day: string
+    birth_planet?: { key:string; number:number; thai_name:string; label:string }
     ruler: string
     rule: string
+    mahathaksa?: { available:boolean; method:string; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }
+    taksajorn?: { available:boolean; method:string; method_variance_note?:string; segments:Array<{ start:string; end:string; age_in_progress:number; annual_boriwan:{ key:string; number:number; thai_name:string; label:string }; landed_center:boolean; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }> }
     predictive_status: string
     consensus_policy: string
+    reliability?: Record<string,string>
+    not_calculated?: string[]
   }
 }
 
@@ -695,7 +700,9 @@ function integratedResultText(result: IntegratedApiResponse) {
   lines.push('', '■ Thai(태국점성술)')
   lines.push(`- ${result.thai.thai_day} · ${result.thai.ruler}`)
   lines.push(`- 규칙: ${result.thai.rule}`)
+  for (const seg of result.thai.taksajorn?.segments ?? []) lines.push(`- Taksajorn(탁사쫀) ${seg.start}~${seg.end}: 나이 진행 ${seg.age_in_progress} · 연간 Boriwan ${seg.annual_boriwan.label}${seg.landed_center?' (중앙 착지→Jupiter 적용)':''}`)
   lines.push(`- 예측 상태: ${result.thai.predictive_status}`)
+  if (result.thai.not_calculated?.length) lines.push(`- 미계산: ${result.thai.not_calculated.join(', ')}`)
   lines.push('', '[원본 계산 JSON]', JSON.stringify(result, null, 2))
   return lines.join('\n')
 }
@@ -1590,9 +1597,10 @@ export default function AppNext() {
               </section>
 
               <section className="result-card">
-                <div className="result-card-title"><span>THAI</span><strong>태국 점성술 출생요일층</strong></div>
+                <div className="result-card-title"><span>THAI</span><strong>Mahathaksa(마하탁사) · Taksajorn(탁사쫀)</strong></div>
                 <div className="thai-baseline"><strong>{integratedResult.thai.thai_day}</strong><span>{integratedResult.thai.ruler}</span><p>{integratedResult.thai.rule}</p></div>
-                <p className="result-note">Thai transit(태국식 트랜짓)은 아직 구현하지 않았기 때문에 날짜별 예측 합의 점수에는 섞지 않아.</p>
+                {!!integratedResult.thai.taksajorn?.segments?.length && <div className="saju-list">{integratedResult.thai.taksajorn.segments.map((seg)=><div key={`${seg.start}-${seg.end}`}><strong>{seg.start} ~ {seg.end}</strong><span>나이 진행 {seg.age_in_progress} · 연간 Boriwan(브리완) {seg.annual_boriwan.label}{seg.landed_center?' · 중앙 착지 후 Jupiter(목성) 적용':''}</span></div>)}</div>}
+                <p className="result-note">Mahathaksa/Taksajorn은 독립 태국 기간층으로 계산해. Full Suriyayat(수리야얏) 10행성·Lagna(라그나)·태국식 Rahu/Ketu(라후/게투) 트랜짓은 검증 전이라 아직 만들거나 점수에 섞지 않아.</p>
               </section>
 
               {integratedResult.western.months.length>1 && <section className="result-card">
@@ -1763,9 +1771,12 @@ export default function AppNext() {
               <section className="result-card">
                 <div className="result-card-title"><span>THAI STATUS</span><strong>태국점성술 계산 상태</strong></div>
                 <div className="precision-kpi-grid"><div className="precision-kpi"><span>출생요일</span><strong>{integratedResult.thai.thai_day}</strong></div><div className="precision-kpi"><span>주재 행성</span><strong>{integratedResult.thai.ruler}</strong></div></div>
-                <div className="tight-row"><span>규칙</span><b>{integratedResult.thai.rule}</b></div>
+                <div className="tight-row"><span>Mahathaksa</span><b>{integratedResult.thai.mahathaksa?.available?'8궁 계산됨':'미계산'}</b></div>
+                <div className="tight-row"><span>Taksajorn</span><b>{integratedResult.thai.taksajorn?.available?'연령 기간 계산됨':'미계산'}</b></div>
                 <div className="tight-row"><span>예측 구현 상태</span><b>{integratedResult.thai.predictive_status}</b></div>
                 <div className="tight-row"><span>합의 정책</span><b>{integratedResult.thai.consensus_policy}</b></div>
+                {integratedResult.thai.taksajorn?.method_variance_note && <p className="result-note">{integratedResult.thai.taksajorn.method_variance_note}</p>}
+                {!!integratedResult.thai.not_calculated?.length && <p className="result-note">아직 미계산: {integratedResult.thai.not_calculated.join(' · ')}</p>}
               </section>
 
               <section className="result-card">
@@ -1815,8 +1826,9 @@ export default function AppNext() {
                   {integratedResult.saju.ok && integratedResult.saju.day_master && <span>사주 일간 <b>{integratedResult.saju.day_master}</b></span>}
                   {activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}
                   <span>Thai <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
+                  {integratedResult.thai.taksajorn?.segments?.[0] && <span>Taksajorn <b>{integratedResult.thai.taksajorn.segments[0].annual_boriwan.label}</b> · 나이 진행 {integratedResult.thai.taksajorn.segments[0].age_in_progress}</span>}
                 </div>
-                <p className="result-note">Thai는 아직 출생요일 baseline만 표시하며 날짜별 예측 점수에는 섞지 않아.</p>
+                <p className="result-note">Thai는 Mahathaksa/Taksajorn 기간층까지 계산하고, 검증 전 Suriyayat 행성 트랜짓은 합의 점수에 섞지 않아.</p>
               </details>
 
               <div className="result-actions home-result-actions">

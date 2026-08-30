@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.1-render-safe"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.2-thai-period-safe"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -115,7 +115,20 @@ def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
             "monthly": (saju.get("monthly") or [])[:14] if isinstance(saju.get("monthly"), list) else [],
             "not_calculated": saju.get("not_calculated"),
         },
-        "thai": {k: thai.get(k) for k in ("ok", "engine", "thai_day", "ruler", "rule", "predictive_status", "consensus_policy") if k in thai},
+        "thai": {
+            "ok": thai.get("ok"),
+            "engine": thai.get("engine"),
+            "thai_day": thai.get("thai_day"),
+            "birth_planet": thai.get("birth_planet"),
+            "ruler": thai.get("ruler"),
+            "rule": thai.get("rule"),
+            "mahathaksa": thai.get("mahathaksa"),
+            "taksajorn": thai.get("taksajorn"),
+            "predictive_status": thai.get("predictive_status"),
+            "consensus_policy": thai.get("consensus_policy"),
+            "reliability": thai.get("reliability"),
+            "not_calculated": thai.get("not_calculated"),
+        },
     }
 
 
@@ -203,7 +216,7 @@ SYSTEM_PROMPT = """너는 '별빛의 운명' 앱의 점성술 해설자다.
 반드시 CALCULATED_DATA JSON 안에 실제로 존재하는 값만 근거로 사용한다. JSON에 없는 행성 위치, 애스펙트, 하우스, 특정 시각, 사건, 확률을 절대 만들어내지 마라.
 Western 점수는 사건 발생 확률이 아니라 상대적 활성도다. 높은 점수를 '발생 가능성 몇 %'처럼 바꾸지 마라.
 사주에서 not_calculated에 있는 신강·신약, 용신·희신·기신, 형·파·해 전체 규칙은 임의 추정하지 마라.
-Thai는 predictive_status가 미구현이면 출생요일 baseline과 지배자 성격만 설명하고 날짜별 예측 합의에 섞지 마라.
+Thai는 mahathaksa와 taksajorn에 실제 데이터가 있을 때만 그 연령 구간과 8궁 배치를 설명한다. not_calculated의 Suriyayat(수리야얏) 행성·라그나·라후/게투는 절대 추정하지 말고, Thai 층을 Western 수치점수처럼 확률화하거나 임의 합산하지 마라.
 연애·연락·재회는 특정 사람이 연락한다, 돌아온다, 속마음이 이렇다처럼 타인의 사적 의도나 미래 행동을 단정하지 마라.
 컨디션은 질병·진단·치료를 예측하지 않는다. 금전은 수익률이나 투자 성공을 보장하지 않는다.
 현재 데이터에 시간대별 값이 없으면 특정 시각을 만들지 말고 '현재 엔진에는 시간대 근거가 없다'고 분명히 말한다.
@@ -231,7 +244,7 @@ OUTPUT_SHAPE = {
     "systems": {
         "western": "Western 계산이 말하는 핵심",
         "saju": "사주 원국/대운/세운/월운에서 계산된 범위만 설명",
-        "thai": "Thai baseline의 의미와 예측 한계",
+        "thai": "Thai 출생요일·Mahathaksa·Taksajorn의 실제 계산 범위와 Suriyayat 미구현 한계",
     },
     "priorities": ["현실 행동 1", "현실 행동 2", "현실 행동 3"],
     "topic_analysis": {

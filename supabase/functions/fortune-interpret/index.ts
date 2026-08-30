@@ -7,7 +7,7 @@ const MODELS: Record<string, string> = {
 };
 const DEFAULT_MODEL = "gemini-3.7-flash";
 const FALLBACK_MODEL = "gemini-3.6-flash";
-const INTERPRETER_VERSION = "supabase-ai-v3-evidence-first";
+const INTERPRETER_VERSION = "supabase-ai-v4-thai-period-safe";
 const TOPICS = ["금전", "학업", "시험", "직장", "이직", "연애", "재회", "소식", "컨디션", "투자심리", "수익실현", "신규진입", "투자주의"];
 const REL_SIGNALS = ["수신신호", "발신적합", "과거인연접점"];
 const INTRO_END = new Date("2026-12-31T23:59:59Z");
@@ -107,10 +107,15 @@ function compactCalculation(calculation: any) {
     thai: {
       engine: thai?.engine,
       thai_day: thai?.thai_day,
+      birth_planet: thai?.birth_planet ?? null,
       ruler: thai?.ruler,
       rule: thai?.rule,
+      mahathaksa: thai?.mahathaksa ?? null,
+      taksajorn: thai?.taksajorn ?? null,
       predictive_status: thai?.predictive_status,
       consensus_policy: thai?.consensus_policy,
+      reliability: thai?.reliability ?? null,
+      not_calculated: Array.isArray(thai?.not_calculated) ? thai.not_calculated : [],
     },
   };
 }
@@ -119,7 +124,7 @@ const SYSTEM_PROMPT = `너는 '별빛의 운명' 앱의 점성술 해설자다.
 입력은 이미 계산 엔진이 만든 Western(서양점성술), 사주, Thai(태국점성술) 결과다. 너는 계산자가 아니라 해설자다.
 반드시 CALCULATED_DATA 안에 실제로 존재하는 값만 근거로 사용한다. 없는 행성 위치, 애스펙트, 하우스, 특정 시각, 사건, 확률을 만들지 마라.
 Western 점수는 사건 확률이 아니라 같은 분야 안에서 비교하는 상대 활성도다. 확률처럼 말하지 마라.
-사주의 not_calculated 항목은 임의 추정하지 마라. Thai predictive_status가 미구현이면 출생요일 baseline만 설명하고 날짜별 합의에 섞지 마라.
+사주의 not_calculated 항목은 임의 추정하지 마라. Thai는 mahathaksa와 taksajorn에 실제로 들어온 연령구간·8궁만 해석하고, not_calculated의 Suriyayat(수리야얏) 행성·라그나·라후/게투를 추정하지 마라. Thai 층을 Western 수치점수처럼 임의 합산하거나 확률화하지 마라.
 연애·연락·재회는 특정 상대의 속마음이나 미래 행동을 단정하지 마라. 금전·투자는 수익률이나 가격 방향을 보장하지 마라.
 detail_days에 시간창과 evidence가 있으면 적극 사용해 왜/언제를 설명하고, 시간 근거가 없으면 특정 시각을 만들지 마라.
 직장과 이직, 학업과 시험, 금전과 소식을 반드시 구분한다.
@@ -158,7 +163,7 @@ const OUTPUT_SHAPE = {
   systems: {
     western: "Western 계산 핵심",
     saju: "사주 계산 범위 핵심",
-    thai: "Thai baseline 의미와 한계",
+    thai: "Thai 출생요일·Mahathaksa·Taksajorn의 실제 범위와 Suriyayat 미구현 한계",
   },
   priorities: ["현실 행동 1", "현실 행동 2", "현실 행동 3"],
   topic_analysis: Object.fromEntries(TOPICS.map((topic) => [topic, {

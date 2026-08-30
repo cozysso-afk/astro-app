@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import threading
 import time
@@ -19,7 +21,7 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v4.9-full-year-reunion-hardening"
+APP_VERSION = "api-fortune-v5.0-dedup-thai-period"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -116,6 +118,7 @@ _ai_jobs: dict[str, dict] = {}
 _ai_jobs_lock = threading.Lock()
 _calc_jobs: dict[str, dict] = {}
 _calc_jobs_lock = threading.Lock()
+_calc_request_index: dict[str, str] = {}
 _JOB_TTL_SECONDS = 1800
 
 def _prune_jobs(store: dict, lock: threading.Lock):
@@ -124,6 +127,20 @@ def _prune_jobs(store: dict, lock: threading.Lock):
         stale = [key for key, value in store.items() if float(value.get("created_ts", 0)) < cutoff]
         for key in stale:
             store.pop(key, None)
+        if store is _calc_jobs:
+            live = set(store)
+            for request_key, job_id in list(_calc_request_index.items()):
+                if job_id not in live:
+                    _calc_request_index.pop(request_key, None)
+
+
+def _calc_request_key(payload: dict) -> str:
+    normalized = {
+        key: value.isoformat() if hasattr(value, "isoformat") else value
+        for key, value in payload.items()
+    }
+    raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
     if end_date < start_date:
@@ -234,6 +251,7 @@ def fortune_interpret_job(job_id: str) -> dict:
     if not job:
         raise HTTPException(status_code=404, detail="AI job not found or expired")
     job.pop("created_ts", None)
+    job.pop("request_key", None)
     return {"job_id": job_id, **job}
 
 
@@ -311,7 +329,6 @@ def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
 @app.post("/v1/fortune/integrated/start")
 def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
     _prune_jobs(_calc_jobs, _calc_jobs_lock)
-    job_id = uuid.uuid4().hex
     profile = request.profile
     payload = {
         "birth_date": profile.birth_date,
@@ -323,14 +340,22 @@ def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
         "start_date": request.start_date,
         "end_date": request.end_date,
     }
-    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="queued")
+    request_key = _calc_request_key(payload)
+    with _calc_jobs_lock:
+        existing_id = _calc_request_index.get(request_key)
+        existing = _calc_jobs.get(existing_id or "") if existing_id else None
+        if existing and existing.get("status") in {"queued", "running", "done"}:
+            return {"ok": True, "job_id": existing_id, "status": existing.get("status"), "reused": True}
+        job_id = uuid.uuid4().hex
+        _calc_jobs[job_id] = {"created_ts": time.time(), "status": "queued", "request_key": request_key}
+        _calc_request_index[request_key] = job_id
     threading.Thread(
         target=_run_calc_job,
         args=(job_id, payload),
         daemon=True,
         name=f"fortune-calc-{job_id[:8]}",
     ).start()
-    return {"ok": True, "job_id": job_id, "status": "queued"}
+    return {"ok": True, "job_id": job_id, "status": "queued", "reused": False}
 
 
 @app.get("/v1/fortune/integrated/jobs/{job_id}")
