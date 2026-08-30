@@ -21,7 +21,7 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 
-APP_VERSION = "api-fortune-v5.0-dedup-thai-period"
+APP_VERSION = "api-fortune-v5.1-bounded-calc-queue"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -119,6 +119,11 @@ _ai_jobs_lock = threading.Lock()
 _calc_jobs: dict[str, dict] = {}
 _calc_jobs_lock = threading.Lock()
 _calc_request_index: dict[str, str] = {}
+try:
+    _MAX_CALC_CONCURRENCY = max(1, min(2, int(os.getenv("ASTRO_MAX_CALC_CONCURRENCY", "1"))))
+except ValueError:
+    _MAX_CALC_CONCURRENCY = 1
+_calc_semaphore = threading.Semaphore(_MAX_CALC_CONCURRENCY)
 _JOB_TTL_SECONDS = 1800
 
 def _prune_jobs(store: dict, lock: threading.Lock):
@@ -181,15 +186,18 @@ def _run_ai_job(job_id: str, calculation: dict, model: str):
 
 
 def _run_calc_job(job_id: str, payload: dict):
-    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running", progress={"completed": 0, "total": int((payload["end_date"] - payload["start_date"]).days + 1), "percent": 0, "stage": "starting"})
-    def on_progress(completed: int, total: int, stage: str):
-        percent = int(round((completed / max(1, total)) * 100))
-        _set_job(_calc_jobs, _calc_jobs_lock, job_id, progress={"completed": completed, "total": total, "percent": percent, "stage": stage})
-    try:
-        result = build_integrated_fortune(**payload, progress_callback=on_progress)
-        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", progress={"completed": int((payload["end_date"] - payload["start_date"]).days + 1), "total": int((payload["end_date"] - payload["start_date"]).days + 1), "percent": 100, "stage": "done"}, result=result)
-    except Exception as exc:  # noqa: BLE001
-        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+    total_days = int((payload["end_date"] - payload["start_date"]).days + 1)
+    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="queued", progress={"completed": 0, "total": total_days, "percent": 0, "stage": "queued"})
+    with _calc_semaphore:
+        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running", progress={"completed": 0, "total": total_days, "percent": 0, "stage": "starting"})
+        def on_progress(completed: int, total: int, stage: str):
+            percent = int(round((completed / max(1, total)) * 100))
+            _set_job(_calc_jobs, _calc_jobs_lock, job_id, progress={"completed": completed, "total": total, "percent": percent, "stage": stage})
+        try:
+            result = build_integrated_fortune(**payload, progress_callback=on_progress)
+            _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", progress={"completed": total_days, "total": total_days, "percent": 100, "stage": "done"}, result=result)
+        except Exception as exc:  # noqa: BLE001
+            _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/health")
@@ -314,16 +322,17 @@ def relationship_western(request: RelationshipRequest) -> dict:
 @app.post("/v1/fortune/integrated")
 def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
     profile = request.profile
-    return build_integrated_fortune(
-        birth_date=profile.birth_date,
-        birth_time=profile.birth_time,
-        latitude=profile.latitude,
-        longitude=profile.longitude,
-        utc_offset_hours=profile.utc_offset_hours,
-        gender=profile.gender,
-        start_date=request.start_date,
-        end_date=request.end_date,
-    )
+    with _calc_semaphore:
+        return build_integrated_fortune(
+            birth_date=profile.birth_date,
+            birth_time=profile.birth_time,
+            latitude=profile.latitude,
+            longitude=profile.longitude,
+            utc_offset_hours=profile.utc_offset_hours,
+            gender=profile.gender,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
 
 
 @app.post("/v1/fortune/integrated/start")
@@ -366,4 +375,5 @@ def fortune_integrated_job(job_id: str) -> dict:
     if not job:
         raise HTTPException(status_code=404, detail="calculation job not found or expired")
     job.pop("created_ts", None)
+    job.pop("request_key", None)
     return {"job_id": job_id, **job}

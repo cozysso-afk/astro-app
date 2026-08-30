@@ -24,8 +24,8 @@ from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
 
-ENGINE_VERSION = "integrated-fortune-v2.6-vector-prewarm-thai"
-WESTERN_ENGINE_VERSION = "western-period-engine-v9-vector-prewarm"
+ENGINE_VERSION = "integrated-fortune-v2.7-bounded-vector-thai"
+WESTERN_ENGINE_VERSION = "western-period-engine-v10-bounded-vector"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 
 KST = pytz.timezone("Asia/Seoul")
@@ -313,12 +313,25 @@ def _vectorized_planet_longitudes(body_name: str, moments: list[datetime]) -> di
         return {}
     unique = sorted({m.astimezone(timezone.utc) for m in moments})
     ts, _, earth, targets, _, _, _ = _ephemeris_bundle()
-    sf_times = ts.from_datetimes(unique)
-    apparent = earth.at(sf_times).observe(targets[body_name]).apparent()
-    _, lon, _ = apparent.frame_latlon(ecliptic_frame)
-    raw = lon.degrees
-    values = list(raw) if hasattr(raw, "__iter__") else [raw]
-    return {(body_name, moment): float(value % 360.0) for moment, value in zip(unique, values)}
+    # Skyfield vectorization is dramatically faster than one observation per
+    # timestamp, but one 45k-point vector can temporarily consume too much RAM
+    # for Render free (512 MB). Chunking retains the same math with a bounded
+    # working set. The table itself is small and remains thread-local.
+    try:
+        batch_size = max(64, min(2048, int(os.getenv("ASTRO_VECTOR_BATCH_SIZE", "384"))))
+    except ValueError:
+        batch_size = 384
+    out: dict[tuple[str, datetime], float] = {}
+    for start in range(0, len(unique), batch_size):
+        batch = unique[start:start + batch_size]
+        sf_times = ts.from_datetimes(batch)
+        apparent = earth.at(sf_times).observe(targets[body_name]).apparent()
+        _, lon, _ = apparent.frame_latlon(ecliptic_frame)
+        raw = lon.degrees
+        values = list(raw) if hasattr(raw, "__iter__") else [raw]
+        for moment, value in zip(batch, values):
+            out[(body_name, moment)] = float(value % 360.0)
+    return out
 
 
 def _install_period_ephemeris_prewarm(start_date: date, end_date: date, offset_hours: float) -> int:
