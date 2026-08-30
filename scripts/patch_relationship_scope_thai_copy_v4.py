@@ -52,11 +52,10 @@ for old, new in replacements.items():
     s = s.replace(old, new, 1)
 
 # Keep external prompt strict about actual Thai data and unimplemented Suriyayat.
-external_anchor = '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.'
-external_add = external_anchor + "\n    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 mahathaksa/taksajorn에 실제 들어온 값만 사용하고, not_calculated의 Suriyayat(수리야얏) 항목은 추정하지 않는다.'"
+external_anchor = "    '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',\n"
+external_add = external_anchor + "    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 mahathaksa/taksajorn에 실제 들어온 값만 사용하고, not_calculated의 Suriyayat(수리야얏) 항목은 추정하지 않는다.',\n"
 assert external_anchor in s, 'external prompt safety anchor missing'
 s = s.replace(external_anchor, external_add, 1)
 p.write_text(s, encoding='utf-8')
 
 print('PATCH_RELATIONSHIP_SCOPE_THAI_COPY_V4_APPLIED')
-# workflow trigger
