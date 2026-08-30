@@ -214,6 +214,7 @@ type IntegratedApiResponse = {
     rule: string
     mahathaksa?: { available:boolean; method:string; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }
     taksajorn?: { available:boolean; method:string; method_variance_note?:string; segments:Array<{ start:string; end:string; age_in_progress:number; annual_boriwan:{ key:string; number:number; thai_name:string; label:string }; landed_center:boolean; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }> }
+    suriyayat?: { available:boolean; engine:string; source_commit?:string; time_basis:string; validation?:{status:string;reference?:string;vectors?:number;dates?:number;max_delta_arcmin?:number;within_1_arcmin?:number}; natal?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_start?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_end?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; lagna?:{available:boolean;reason?:string}; interpretation_status?:string; policy?:string }
     predictive_status: string
     consensus_policy: string
     reliability?: Record<string,string>
@@ -661,7 +662,7 @@ function integratedPromptText(request: Record<string, unknown>, calculation?: In
     '- Western 점수는 사건 확률이 아니라 상대적 활성도다.',
     '- 사주는 진태양시 보정을 사용하고, 엔진이 계산하지 않은 신강·신약/용희기신 등을 임의 생성하지 않는다.',
     '- 사주 annual(세운)은 입춘, monthly(월운)은 각 절(節)의 정확시각 경계로 분할된 구간이다. 같은 달력 연도·월 이름이 반복돼도 서로 다른 구간을 임의 병합하지 않는다.',
-    '- Thai(태국점성술)는 Mahathaksa(마하탁사)·Taksajorn(탁사쫀)의 실제 계산 구간만 독립적으로 해석한다. Full Suriyayat(수리야얏) 행성·Lagna(라그나)·Rahu/Ketu(라후/게투) 트랜짓은 검증 전이므로 만들거나 Western(서양점성술) 수치점수에 임의 합산하지 않는다.',
+    '- Thai(태국점성술)는 Mahathaksa(마하탁사)·Taksajorn(탁사쫀)과 교차검증된 Suriyayat(수리야얏) 10행성 위치 사실을 독립적으로 읽는다. Lagna(라그나)·하우스·애스펙트·사건판정 규칙은 미검증이므로 만들거나 Western(서양점성술) 수치점수에 임의 합산하지 않는다.',
     '',
     '[원본 API 요청 JSON]',
     JSON.stringify(request, null, 2),
@@ -669,7 +670,7 @@ function integratedPromptText(request: Record<string, unknown>, calculation?: In
     '[외부 AI 해석 지시]',
     '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 값이다. 행성 위치·하우스·점수·사주를 다시 계산하거나 임의 수정하지 말고 이 값만 근거로 해석한다.',
     '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',
-    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 mahathaksa/taksajorn에 실제 들어온 값만 사용하고, not_calculated의 Suriyayat(수리야얏) 항목은 추정하지 않는다.',
+    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 mahathaksa/taksajorn/suriyayat에 실제 들어온 값만 사용한다. suriyayat.positions는 위치 사실로만 읽고 Lagna·하우스·애스펙트·사건 확률을 새로 만들지 않으며 not_calculated 항목은 추정하지 않는다.',
     '- 전문용어는 한국어 뜻을 붙이고, 결론→계산 근거→현실에서 체감되는 방식→시기 순서로 설명한다.',
     '',
     '[CALCULATED_DATA · 원본 계산 JSON]',
@@ -703,6 +704,13 @@ function integratedResultText(result: IntegratedApiResponse) {
   lines.push(`- ${result.thai.thai_day} · ${result.thai.ruler}`)
   lines.push(`- 규칙: ${result.thai.rule}`)
   for (const seg of result.thai.taksajorn?.segments ?? []) lines.push(`- Taksajorn(탁사쫀) ${seg.start}~${seg.end}: 나이 진행 ${seg.age_in_progress} · 연간 Boriwan ${seg.annual_boriwan.label}${seg.landed_center?' (중앙 착지→Jupiter 적용)':''}`)
+  if (result.thai.suriyayat?.available) {
+    lines.push(`- Suriyayat 10행성: 검증됨 · 기준 ${result.thai.suriyayat.time_basis} · 최대 검산오차 ${result.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}각분`)
+    const natal = result.thai.suriyayat.natal?.positions ?? {}
+    const natalText = Object.entries(natal).map(([key,row])=>`${key} ${row.display}`).join(' · ')
+    if (natalText) lines.push(`- Suriyayat 출생위치: ${natalText}`)
+    lines.push(`- Suriyayat Lagna: ${result.thai.suriyayat.lagna?.available?'계산됨':'미계산 · 글로벌 좌표 공식 검증 대기'}`)
+  }
   lines.push(`- 예측 상태: ${result.thai.predictive_status}`)
   if (result.thai.not_calculated?.length) lines.push(`- 미계산: ${result.thai.not_calculated.join(', ')}`)
   lines.push('', '[원본 계산 JSON]', JSON.stringify(result, null, 2))
@@ -1557,7 +1565,7 @@ export default function AppNext() {
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">통합 흐름 계산</span><h2>통합운세</h2><p>Western(서양점성술) 기간 흐름, 진태양시 보정 사주, Thai(태국점성술) Mahathaksa(마하탁사)·Taksajorn(탁사쫀) 기간층을 각각 계산해 한 화면에서 비교해.</p></div></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {integratedStartDate} ~ {integratedSelectionEnd} · {integratedCalendarYear?`${integratedCalendarYear}년 전체`:periodRangeLabel(period)}</span></div>
-            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일 규칙과 Mahathaksa(마하탁사)·Taksajorn(탁사쫀) 기간층을 계산하며 Full Suriyayat(수리야얏) 트랜짓은 아직 검증 전이야.</span></div>
+            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀)과 교차검증된 Suriyayat(수리야얏) 10행성 위치를 계산해. Suriyayat Lagna(라그나)·하우스·예측규칙은 아직 검증 전이야.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'통합 계산 준비 중…'):'통합운세 실제 계산'}</span></button>
 
@@ -1602,7 +1610,8 @@ export default function AppNext() {
                 <div className="result-card-title"><span>THAI</span><strong>Mahathaksa(마하탁사) · Taksajorn(탁사쫀)</strong></div>
                 <div className="thai-baseline"><strong>{integratedResult.thai.thai_day}</strong><span>{integratedResult.thai.ruler}</span><p>{integratedResult.thai.rule}</p></div>
                 {!!integratedResult.thai.taksajorn?.segments?.length && <div className="saju-list">{integratedResult.thai.taksajorn.segments.map((seg)=><div key={`${seg.start}-${seg.end}`}><strong>{seg.start} ~ {seg.end}</strong><span>나이 진행 {seg.age_in_progress} · 연간 Boriwan(브리완) {seg.annual_boriwan.label}{seg.landed_center?' · 중앙 착지 후 Jupiter(목성) 적용':''}</span></div>)}</div>}
-                <p className="result-note">Mahathaksa/Taksajorn은 독립 태국 기간층으로 계산해. Full Suriyayat(수리야얏) 10행성·Lagna(라그나)·태국식 Rahu/Ketu(라후/게투) 트랜짓은 검증 전이라 아직 만들거나 점수에 섞지 않아.</p>
+                {integratedResult.thai.suriyayat?.available && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>Suriyayat(수리야얏) 10행성 위치 검증층 ON · 30개 기준값 교차검산 · 최대 오차 {integratedResult.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}각분. Lagna(라그나)는 글로벌 좌표 공식 검증 전이라 OFF.</span></div>}
+                <p className="result-note">Mahathaksa/Taksajorn은 태국 기간층, Suriyayat은 현재 검증된 10행성 위치 사실층이야. Lagna·하우스·애스펙트·사건판정은 아직 만들지 않고 Western 점수에도 섞지 않아.</p>
               </section>
 
               {integratedResult.western.months.length>1 && <section className="result-card">
@@ -1775,6 +1784,8 @@ export default function AppNext() {
                 <div className="precision-kpi-grid"><div className="precision-kpi"><span>출생요일</span><strong>{integratedResult.thai.thai_day}</strong></div><div className="precision-kpi"><span>주재 행성</span><strong>{integratedResult.thai.ruler}</strong></div></div>
                 <div className="tight-row"><span>Mahathaksa</span><b>{integratedResult.thai.mahathaksa?.available?'8궁 계산됨':'미계산'}</b></div>
                 <div className="tight-row"><span>Taksajorn</span><b>{integratedResult.thai.taksajorn?.available?'연령 기간 계산됨':'미계산'}</b></div>
+                <div className="tight-row"><span>Suriyayat 10행성 위치</span><b>{integratedResult.thai.suriyayat?.available?`교차검증됨 · 최대 Δ${integratedResult.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}′`:'미계산'}</b></div>
+                <div className="tight-row"><span>Suriyayat Lagna(라그나)</span><b>{integratedResult.thai.suriyayat?.lagna?.available?'계산됨':'미계산 · 글로벌 공식 검증 대기'}</b></div>
                 <div className="tight-row"><span>예측 구현 상태</span><b>{integratedResult.thai.predictive_status}</b></div>
                 <div className="tight-row"><span>합의 정책</span><b>{integratedResult.thai.consensus_policy}</b></div>
                 {integratedResult.thai.taksajorn?.method_variance_note && <p className="result-note">{integratedResult.thai.taksajorn.method_variance_note}</p>}
@@ -1830,7 +1841,7 @@ export default function AppNext() {
                   <span>Thai <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
                   {integratedResult.thai.taksajorn?.segments?.[0] && <span>Taksajorn <b>{integratedResult.thai.taksajorn.segments[0].annual_boriwan.label}</b> · 나이 진행 {integratedResult.thai.taksajorn.segments[0].age_in_progress}</span>}
                 </div>
-                <p className="result-note">Thai는 Mahathaksa/Taksajorn 기간층까지 계산하고, 검증 전 Suriyayat 행성 트랜짓은 합의 점수에 섞지 않아.</p>
+                <p className="result-note">Thai는 Mahathaksa/Taksajorn 기간층과 교차검증 Suriyayat 10행성 위치까지 계산해. Suriyayat Lagna·하우스·예측규칙은 미검증이라 합의 점수에 섞지 않아.</p>
               </details>
 
               <div className="result-actions home-result-actions">

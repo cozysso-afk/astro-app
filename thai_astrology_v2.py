@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Traditional Thai astrology layers that can be computed without pretending to
-implement the full Suriyayat planetary canon.
+"""Traditional Thai astrology layers with cross-validated Suriyayat planet facts.
+
+Suriyayat Lagna and predictive interpretation rules remain intentionally disabled
+until they have independent global-coordinate/traditional-rule validation.
 
 Implemented here:
 - Thai weekday ruler with the 06:00 local-day boundary and Wednesday-night Rahu.
@@ -9,19 +11,24 @@ Implemented here:
   age-in-progress method, including the traditional centre slot after Sun and
   the Jupiter fallback when the count lands in the centre.
 
+Implemented as factual positions only:
+- Cross-validated Suriyayat Sun/Moon/Mars/Mercury/Jupiter/Venus/Saturn/Rahu/
+  Thai Ketu/Uranus longitudes for the natal instant and selected-period endpoints.
+
 Not implemented here:
-- Full Suriyayat 10-planet longitudes, Lagna, Thai Ketu, dignities or planetary
-  ingress/transit. Those remain explicitly unavailable rather than being
-  approximated with Western tropical or generic Lahiri sidereal positions.
+- Global-coordinate Suriyayat Lagna, houses/dignities/aspect judgement, exact
+  ingress scanner, or event-probability conversion.
 """
 
 from __future__ import annotations
 
 import calendar
-from datetime import date, datetime, time as dt_time, timedelta
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 from typing import Any
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-v2.0"
+from thai_suriyayat_v1 import ENGINE_VERSION as SURIYAYAT_ENGINE_VERSION, SOURCE_COMMIT as SURIYAYAT_SOURCE_COMMIT, calculate_positions_for_instant
+
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.1"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -149,11 +156,70 @@ def _period_boundaries(birth_date: date, start_date: date, end_date: date) -> li
     return sorted(set(boundaries))
 
 
+def _compact_suriyayat_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    positions = {}
+    for key, row in (snapshot.get("positions") or {}).items():
+        positions[key] = {
+            "arcmin": row.get("arcmin"),
+            "longitude_deg": row.get("longitude_deg"),
+            "sign_index": row.get("sign_index"),
+            "sign_ko": row.get("sign_ko"),
+            "degree": row.get("degree"),
+            "minute": row.get("minute"),
+            "display": row.get("display"),
+        }
+    return {
+        "instant": snapshot.get("instant"),
+        "suriyayat_reference_time": snapshot.get("suriyayat_reference_time"),
+        "positions": positions,
+    }
+
+
+def _suriyayat_layer(
+    birth_date: date,
+    birth_time: dt_time,
+    start_date: date,
+    end_date: date,
+    utc_offset_hours: float,
+) -> dict[str, Any]:
+    local_tz = timezone(timedelta(hours=float(utc_offset_hours)))
+    natal_instant = datetime.combine(birth_date, birth_time, tzinfo=local_tz)
+    start_instant = datetime.combine(start_date, dt_time(12, 0), tzinfo=local_tz)
+    end_instant = datetime.combine(end_date, dt_time(12, 0), tzinfo=local_tz)
+    natal = calculate_positions_for_instant(natal_instant)
+    start_snapshot = calculate_positions_for_instant(start_instant)
+    end_snapshot = start_snapshot if end_date == start_date else calculate_positions_for_instant(end_instant)
+    return {
+        "available": True,
+        "engine": SURIYAYAT_ENGINE_VERSION,
+        "source_commit": SURIYAYAT_SOURCE_COMMIT,
+        "time_basis": "Bangkok historical local mean time UTC+06:42",
+        "validation": {
+            "status": "cross_validated",
+            "reference": "myhora Suriyayat August 2026 table + public MIT reference implementation",
+            "vectors": 30,
+            "dates": 3,
+            "max_delta_arcmin": 4,
+            "within_1_arcmin": 26,
+        },
+        "natal": _compact_suriyayat_snapshot(natal),
+        "period_start": _compact_suriyayat_snapshot(start_snapshot),
+        "period_end": _compact_suriyayat_snapshot(end_snapshot),
+        "lagna": {
+            "available": False,
+            "reason": "Global-coordinate Suriyayat Lagna is not independently validated; Thailand province-offset lookup is not reused for Korean/world birthplaces.",
+        },
+        "interpretation_status": "planetary_position_facts_only",
+        "policy": "Traditional 10-planet position facts only. No Western-score blending, no Thai house/aspect judgement, and no event probability.",
+    }
+
+
 def build_thai_fortune(
     birth_date: date,
     birth_time: dt_time,
     start_date: date,
     end_date: date,
+    utc_offset_hours: float = 9.0,
 ) -> dict[str, Any]:
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
@@ -161,6 +227,7 @@ def build_thai_fortune(
     day_key = _thai_day_key(birth_date, birth_time)
     thai_day, birth_planet, rule = _DAY_META[day_key]
     natal_wheel = _wheel(birth_planet)
+    suriyayat = _suriyayat_layer(birth_date, birth_time, start_date, end_date, utc_offset_hours)
 
     segments = []
     boundaries = _period_boundaries(birth_date, start_date, end_date)
@@ -198,19 +265,22 @@ def build_thai_fortune(
             "segments": segments,
             "method_variance_note": "Thai schools use more than one Taksajorn counting convention; this engine exposes the selected one-year-per-bhumi method instead of treating it as the only school.",
         },
-        "predictive_status": "period_layer_available_no_suriyayat_transit",
-        "consensus_policy": "Mahathaksa/Taksajorn period facts are available as an independent Thai layer. Full Suriyayat planetary transit is not yet verified, so Thai data is not converted into Western-style numerical timing scores.",
+        "suriyayat": suriyayat,
+        "predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_no_lagna_rules",
+        "consensus_policy": "Mahathaksa/Taksajorn period facts and cross-validated Suriyayat 10-planet positions are available as independent Thai layers. Lagna/house/aspect/event rules are not yet validated and nothing is converted into Western-style probability scores.",
         "reliability": {
             "weekday_rule": "established_rule",
             "mahathaksa_wheel": "established_table_rule",
             "taksajorn": "documented_method_variant",
-            "suriyayat_transit": "not_implemented",
+            "suriyayat_10planet_positions": "cross_validated_30_vectors_max_4_arcmin",
+            "suriyayat_lagna": "not_implemented",
+            "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
-            "full Suriyayat 10-planet longitudes",
-            "Suriyayat Lagna",
-            "Thai Ketu formula",
-            "Rahu mean/true school selection",
-            "Suriyayat transit/ingress",
+            "global-coordinate Suriyayat Lagna",
+            "Suriyayat houses/dignities/aspect judgement",
+            "exact Suriyayat ingress scanner",
+            "alternate Rahu true-school selection",
+            "Suriyayat event/probability conversion",
         ],
     }

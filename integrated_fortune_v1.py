@@ -24,7 +24,7 @@ from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
 
-ENGINE_VERSION = "integrated-fortune-v2.8-saju-jie-exact-thai"
+ENGINE_VERSION = "integrated-fortune-v2.9-suriyayat-position-layer"
 WESTERN_ENGINE_VERSION = "western-period-engine-v10-bounded-vector"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-jie-exact"
 
@@ -1386,8 +1386,8 @@ def _saju_payload(
         return {"ok": False, "engine": SAJU_ENGINE_VERSION, "error": f"{type(exc).__name__}: {exc}"}
 
 
-def _thai_payload(birth_date: date, birth_time: dt_time, start_date: date, end_date: date):
-    return build_thai_fortune(birth_date, birth_time, start_date, end_date)
+def _thai_payload(birth_date: date, birth_time: dt_time, start_date: date, end_date: date, utc_offset_hours: float):
+    return build_thai_fortune(birth_date, birth_time, start_date, end_date, utc_offset_hours=utc_offset_hours)
 
 
 def build_integrated_fortune(
@@ -1414,7 +1414,7 @@ def build_integrated_fortune(
     saju = _saju_payload(
         birth_date, birth_time, longitude, utc_offset_hours, gender, start_date, end_date
     )
-    thai = _thai_payload(birth_date, birth_time, start_date, end_date)
+    thai = _thai_payload(birth_date, birth_time, start_date, end_date, utc_offset_hours)
 
     return {
         "ok": True,
@@ -1431,6 +1431,6 @@ def build_integrated_fortune(
         "consensus_policy": {
             "western": "기간별 생활 주제 상대지수. 사건 확률이 아님.",
             "saju": "진태양시 보정 원국·대운·세운·월운의 계산 사실을 제공. 용희기신 등 미계산 항목은 추정하지 않음.",
-            "thai": "Mahathaksa/Taksajorn 기간층은 독립 계산. 검증 전 Full Suriyayat Lagna/태국식 트랜짓은 Western 수치점수에 임의 합산하지 않음.",
+            "thai": "Mahathaksa/Taksajorn + 교차검증 Suriyayat 10행성 위치를 독립 사실층으로 제공. Lagna/하우스/예측규칙 미검증 항목은 추정하거나 Western 수치점수에 합산하지 않음.",
         },
     }
