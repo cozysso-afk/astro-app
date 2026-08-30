@@ -1,0 +1,100 @@
+name: Research Suriyayat Crosscheck 2026-08-31
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/research-suriyayat-crosscheck-20260831.yml'
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch myhora Suriyayat August 2026 and extract day 1 row
+        run: |
+          python - <<'PY'
+          import re, urllib.request
+          from html import unescape
+          from html.parser import HTMLParser
+
+          url='https://myhora.com/calendar/astro-suriyayas.aspx'
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+          html=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','ignore')
+          print('MYHORA_FETCH_BYTES',len(html))
+          print('HAS_AUG_2569', 'สิงหาคม 2569' in html)
+          print('HAS_UTC_0642', 'UTC+06:42' in html)
+          # Persist source for shell inspection if parser assumptions fail.
+          open('/tmp/myhora.html','w',encoding='utf-8').write(html)
+
+          class T(HTMLParser):
+              def __init__(self): super().__init__(); self.rows=[]; self.row=None; self.cell=None
+              def handle_starttag(self,tag,attrs):
+                  if tag=='tr': self.row=[]
+                  elif tag in ('td','th') and self.row is not None: self.cell=[]
+              def handle_data(self,data):
+                  if self.cell is not None: self.cell.append(data)
+              def handle_endtag(self,tag):
+                  if tag in ('td','th') and self.cell is not None and self.row is not None:
+                      text=' '.join(' '.join(self.cell).split())
+                      self.row.append(unescape(text)); self.cell=None
+                  elif tag=='tr' and self.row is not None:
+                      if self.row: self.rows.append(self.row)
+                      self.row=None
+          p=T(); p.feed(html)
+          candidates=[r for r in p.rows if r and (r[0]=='1' or (len(r)>1 and r[1]=='1'))]
+          print('TABLE_ROWS',len(p.rows),'DAY1_CANDIDATES',len(candidates))
+          for i,r in enumerate(candidates[:10]): print('DAY1_ROW',i,r)
+          # Print rows containing the known Mars ingress event as an independent semantic anchor.
+          for r in p.rows:
+              joined=' | '.join(r)
+              if 'อังคาร' in joined and 'มิถุน' in joined:
+                  print('MARS_INGRESS_ROW',r)
+          PY
+      - name: Run kongesque thai-astrology reference vectors
+        run: |
+          mkdir -p /tmp/thai-ref && cd /tmp/thai-ref
+          npm init -y >/dev/null 2>&1
+          npm install thai-astrology@latest >/dev/null 2>&1
+          node - <<'JS'
+          const ta=require('thai-astrology')
+          const vectors=[
+            {label:'myhora-day1-24h-as-next-midnight',day:2,monthTh:8,yearBe:2569,hour:0,minute:0,province:'กรุงเทพมหานคร'},
+            {label:'myhora-day1-24h-as-day1-24',day:1,monthTh:8,yearBe:2569,hour:24,minute:0,province:'กรุงเทพมหานคร'},
+            {label:'library-readme-vector',day:15,monthTh:9,yearBe:2566,hour:14,minute:45,province:'กรุงเทพมหานคร'},
+          ]
+          for (const v of vectors) {
+            try {
+              const out=ta.generateThaiAstrologyChart(v)
+              console.log('THAI_ASTRO_VECTOR',v.label,JSON.stringify({positions:out.positions,sunPosition:out.sunPosition,channels:ta.formatChannelOutputs(out)}))
+            } catch(e) { console.log('THAI_ASTRO_VECTOR_ERROR',v.label,String(e)) }
+          }
+          JS
+      - name: Fetch independent Horomutelu public page claims
+        run: |
+          python - <<'PY'
+          import re, urllib.request
+          u='https://www.horomutelu.in.th/'
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+          try:
+              h=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','ignore')
+              text=re.sub(r'<[^>]+>',' ',h)
+              text=' '.join(text.split())
+              print('HOROMUTELU_FETCH_BYTES',len(h))
+              for needle in ['myhora','1 ลิปดา','สุริยยาตร์','อันโตนาที']:
+                  print('HOROMUTELU_HAS',needle,needle in text)
+              print('HOROMUTELU_SNIPPET',text[:1200])
+          except Exception as e:
+              print('HOROMUTELU_FETCH_ERROR',repr(e))
+          PY
+      - name: Mark research only
+        run: |
+          echo 'RESEARCH_ONLY_NO_PRODUCT_WRITE_PASS'
+          test "$GITHUB_REF_NAME" = 'work/full-year-thai-hardening-20260831'
