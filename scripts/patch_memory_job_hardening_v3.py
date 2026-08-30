@@ -36,7 +36,8 @@ new='''def _vectorized_planet_longitudes(body_name: str, moments: list[datetime]
         _, lon, _ = apparent.frame_latlon(ecliptic_frame)
         raw = lon.degrees
         values = list(raw) if hasattr(raw, "__iter__") else [raw]
-        out.update((body_name, moment), float(value % 360.0)) for moment, value in zip(batch, values)
+        for moment, value in zip(batch, values):
+            out[(body_name, moment)] = float(value % 360.0)
     return out
 '''
 assert old in s, 'vector helper anchor missing'
