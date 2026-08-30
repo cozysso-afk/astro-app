@@ -1132,16 +1132,13 @@ export default function AppNext() {
         setReunionTiming(cached)
         return cached
       }
-      const latitude = parseOptionalNumber(birthProfile.latitude)
-      const longitude = parseOptionalNumber(birthProfile.longitude)
-      if (latitude === null || longitude === null) throw new Error('내 출생지역 좌표가 필요해.')
       const body = {
         profile: {
-          name: birthProfile.name || null,
+          name: birthProfile.name || '나',
           birth_date: birthProfile.birthDate,
           birth_time: birthProfile.birthTime,
-          latitude,
-          longitude,
+          latitude: Number(birthProfile.latitude),
+          longitude: Number(birthProfile.longitude),
           utc_offset_hours: Number(birthProfile.utcOffset || 9),
           gender: birthProfile.gender,
           place_key: birthProfile.placeKey,
@@ -1149,19 +1146,64 @@ export default function AppNext() {
         start_date: relationshipStartDate,
         end_date: end,
       }
-      const startResponse = await fetch(`${API_BASE}/v1/fortune/integrated/start`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
-      const started = await startResponse.json()
-      if (!startResponse.ok || !started?.job_id) throw new Error(started?.detail || started?.error || '재회 시기 계산을 시작하지 못했어.')
+
+      const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
       let calculation: IntegratedApiResponse | null = null
-      for (let attempt=0; attempt<120; attempt++) {
-        await new Promise((resolve)=>window.setTimeout(resolve, 2000))
-        const pollResponse = await fetch(`${API_BASE}/v1/fortune/integrated/jobs/${encodeURIComponent(started.job_id)}`)
-        const job = await pollResponse.json()
-        if (!pollResponse.ok) throw new Error(job?.detail || '재회 시기 계산 상태를 확인하지 못했어.')
-        if (job.status === 'failed') throw new Error(job.error || '재회 시기 계산이 실패했어.')
-        if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
+      let lastMessage = ''
+
+      for (let launch=0; launch<2 && !calculation; launch++) {
+        let startResponse: Response
+        try {
+          startResponse = await fetch(`${API_BASE}/v1/fortune/integrated/start`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+        } catch (error) {
+          lastMessage = error instanceof Error ? error.message : '재회 시기 계산 서버 연결에 실패했어.'
+          if (launch === 0) { await sleep(1200); continue }
+          throw error
+        }
+        const started = await startResponse.json().catch(()=>({}))
+        if (!startResponse.ok || !started?.job_id) {
+          lastMessage = started?.detail || started?.error || '재회 시기 계산을 시작하지 못했어.'
+          if (launch === 0 && startResponse.status >= 500) { await sleep(1200); continue }
+          throw new Error(lastMessage)
+        }
+
+        let lostJob = false
+        let transientFailures = 0
+        for (let attempt=0; attempt<120; attempt++) {
+          await sleep(attempt < 12 ? 1000 : 2000)
+          let pollResponse: Response
+          try {
+            pollResponse = await fetch(`${API_BASE}/v1/fortune/integrated/jobs/${encodeURIComponent(started.job_id)}`)
+          } catch (error) {
+            transientFailures += 1
+            lastMessage = error instanceof Error ? error.message : '재회 시기 계산 상태 확인 중 연결이 끊겼어.'
+            if (transientFailures <= 4) continue
+            throw error
+          }
+          const job = await pollResponse.json().catch(()=>({}))
+          if (pollResponse.status === 404) {
+            lostJob = true
+            lastMessage = job?.detail || '계산 작업이 서버 재시작으로 사라졌어.'
+            break
+          }
+          if (!pollResponse.ok) {
+            if ([502,503,504].includes(pollResponse.status) && transientFailures < 4) {
+              transientFailures += 1
+              continue
+            }
+            throw new Error(job?.detail || '재회 시기 계산 상태를 확인하지 못했어.')
+          }
+          transientFailures = 0
+          if (job.status === 'failed') throw new Error(job.error || '재회 시기 계산이 실패했어.')
+          if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
+        }
+        if (!calculation && lostJob && launch === 0) {
+          await sleep(900)
+          continue
+        }
       }
-      if (!calculation) throw new Error('재회 시기 계산 시간이 길어지고 있어. 다시 시도해줘.')
+
+      if (!calculation) throw new Error(lastMessage || '재회 시기 계산 시간이 길어지고 있어. 다시 시도해줘.')
       const context = buildReunionTimingContext(calculation)
       setReunionTiming(context)
       return context
@@ -1179,28 +1221,29 @@ export default function AppNext() {
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
     const body = {
       user: {
-        name: birthProfile.name || null, birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, time_known: true,
-        latitude: parseOptionalNumber(birthProfile.latitude), longitude: parseOptionalNumber(birthProfile.longitude), utc_offset_hours: Number(birthProfile.utcOffset || 9),
+        name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, time_known: true,
+        latitude: Number(birthProfile.latitude), longitude: Number(birthProfile.longitude), utc_offset_hours: Number(birthProfile.utcOffset || 9),
       },
       counterpart: {
-        name: counterpart.name || null, birth_date: counterpart.birthDate,
-        birth_time: counterpart.timeKnown ? counterpart.birthTime : null, time_known: counterpart.timeKnown,
-        latitude: counterpart.timeKnown ? parseOptionalNumber(counterpart.latitude) : null,
-        longitude: counterpart.timeKnown ? parseOptionalNumber(counterpart.longitude) : null,
-        utc_offset_hours: Number(counterpart.utcOffset || 9),
+        name: counterpart.name || '상대', birth_date: counterpart.birthDate, birth_time: counterpart.timeKnown ? counterpart.birthTime : null,
+        time_known: counterpart.timeKnown, latitude: counterpart.timeKnown ? Number(counterpart.latitude) : null,
+        longitude: counterpart.timeKnown ? Number(counterpart.longitude) : null, utc_offset_hours: Number(counterpart.utcOffset || 9),
       },
-      start_date: relationshipStartDate, end_date: relationshipEndDate,
+      start_date: relationshipStartDate,
+      end_date: relationshipEndDate,
       relationship_status: selectedTool === 'marriage' ? (marriageMode === 'married' ? 'married' : 'dating') : (relationshipPurpose === 'reunion' ? 'single' : relationshipMode),
       analysis_mode: selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose,
     }
     setRelationshipLoading(true)
+    const shouldRunReunionTiming = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
+    const reunionTask = shouldRunReunionTiming ? runReunionTiming() : null
     try {
       const response = await fetch(`${API_BASE}/v1/relationship/western`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '관계 계산 요청에 실패했어.')
       setRelationshipResult(payload as RelationshipApiResponse)
       setRelationshipRequestSnapshot(body as Record<string, unknown>)
-      if (selectedTool === 'compatibility' && relationshipPurpose === 'reunion') await runReunionTiming()
+      if (reunionTask) void reunionTask
     } catch (error) {
       setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
     } finally { setRelationshipLoading(false) }
@@ -1520,7 +1563,7 @@ export default function AppNext() {
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>관계 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
             {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
-            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||apiStatus==='offline'}>{relationshipLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{relationshipLoading?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
+            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
 
             {relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
