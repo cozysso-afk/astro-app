@@ -1,0 +1,37 @@
+name: Verify Production 2026-08-30
+
+on:
+  push:
+    branches:
+      - perf/reunion-speed-20260830b
+    paths:
+      - .github/workflows/verify-production-20260830.yml
+  workflow_dispatch:
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Render health
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6; do
+            body="$(curl -fsS --max-time 25 https://astro-app-api-f7fn.onrender.com/health || true)"
+            echo "Render attempt $i: $body"
+            if echo "$body" | grep -q 'api-fortune-v4.9-full-year-reunion-hardening'; then
+              echo "RENDER_V49_PASS"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Render did not report v4.9 during verification window"
+          exit 1
+
+      - name: Check production frontend
+        if: always()
+        run: |
+          set -euo pipefail
+          html="$(curl -fsSL --max-time 25 https://astro-app-web-ten.vercel.app/)"
+          echo "$html" | grep -q '<div id="root"'
+          echo "VERCEL_FRONTEND_HTTP_PASS"
