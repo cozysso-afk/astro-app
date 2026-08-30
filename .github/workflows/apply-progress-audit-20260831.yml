@@ -1,0 +1,89 @@
+name: Verify Annual Progress 2026-08-31
+
+on:
+  push:
+    branches:
+      - audit/full-year-fortune-20260831
+    paths:
+      - scripts/patch_progress_transparency_v1.py
+      - .github/workflows/apply-progress-audit-20260831.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-progress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/full-year-fortune-20260831
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply progress patch
+        run: python scripts/patch_progress_transparency_v1.py
+      - name: Install calculation dependencies
+        run: pip install -r api/requirements.txt
+      - name: Compile
+        run: python -m py_compile integrated_fortune_v1.py api/main.py relationship_western_v1.py
+      - name: Verify deterministic progress callback
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from integrated_fortune_v1 import build_integrated_fortune
+          events=[]
+          result=build_integrated_fortune(
+            birth_date=date(1991,3,21),birth_time=time(7,26),latitude=34.7604,longitude=127.6622,utc_offset_hours=9,gender='female',
+            start_date=date(2026,1,1),end_date=date(2026,1,10),
+            progress_callback=lambda completed,total,stage: events.append((completed,total,stage)),
+          )
+          assert result['period']['day_count']==10
+          assert events[0]==(1,10,'western_daily'), events
+          assert events[-1]==(10,10,'western_daily'), events
+          assert all(events[i][0] <= events[i+1][0] for i in range(len(events)-1))
+          print('REAL_PROGRESS_CALLBACK_PASS',events)
+          PY
+      - name: Verify API job progress mutation locally
+        run: |
+          python - <<'PY'
+          import time
+          from datetime import date,time as dt_time
+          import api.main as m
+          job_id='audit-progress'
+          payload={'birth_date':date(1991,3,21),'birth_time':dt_time(7,26),'latitude':34.7604,'longitude':127.6622,'utc_offset_hours':9,'gender':'female','start_date':date(2026,2,1),'end_date':date(2026,2,7)}
+          m._set_job(m._calc_jobs,m._calc_jobs_lock,job_id,status='queued')
+          m._run_calc_job(job_id,payload)
+          job=m._calc_jobs[job_id]
+          assert job['status']=='done',job
+          assert job['progress']['percent']==100,job['progress']
+          assert job['progress']['completed']==7
+          print('API_JOB_PROGRESS_PASS',job['progress'])
+          PY
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Verify no production access and UI markers
+        run: |
+          grep -q 'integratedProgress.completed' web/src/AppNext.tsx
+          grep -q 'boundary_note' web/src/AppNext.tsx
+          echo 'NO_PRODUCTION_CALLS=TRUE'
+      - name: Commit verified progress patch to audit branch only
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add integrated_fortune_v1.py api/main.py web/src/AppNext.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'feat: show real annual calculation progress'
+          git push origin HEAD:audit/full-year-fortune-20260831
