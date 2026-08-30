@@ -61,8 +61,8 @@ jobs:
           from datetime import datetime,timedelta,timezone
           from thai_suriyayat_v1 import calculate_positions_for_instant
           kst=timezone(timedelta(hours=9))
-          out=calculate_positions_for_instant(datetime(2026,8,2,3,18,tzinfo=kst))
-          # 03:18 KST is 00:00 at UTC+06:42.
+          out=calculate_positions_for_instant(datetime(2026,8,2,2,18,tzinfo=kst))
+          # UTC+09:00 is 2h18 ahead of Bangkok historical LMT UTC+06:42.
           assert out['suriyayat_reference_time'].startswith('2026-08-02T00:00+06:42'),out
           assert out['lagna']['available'] is False
           assert len(out['positions'])==10
