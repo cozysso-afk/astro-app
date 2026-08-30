@@ -164,10 +164,13 @@ def _run_ai_job(job_id: str, calculation: dict, model: str):
 
 
 def _run_calc_job(job_id: str, payload: dict):
-    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running")
+    _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="running", progress={"completed": 0, "total": int((payload["end_date"] - payload["start_date"]).days + 1), "percent": 0, "stage": "starting"})
+    def on_progress(completed: int, total: int, stage: str):
+        percent = int(round((completed / max(1, total)) * 100))
+        _set_job(_calc_jobs, _calc_jobs_lock, job_id, progress={"completed": completed, "total": total, "percent": percent, "stage": stage})
     try:
-        result = build_integrated_fortune(**payload)
-        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", result=result)
+        result = build_integrated_fortune(**payload, progress_callback=on_progress)
+        _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", progress={"completed": int((payload["end_date"] - payload["start_date"]).days + 1), "total": int((payload["end_date"] - payload["start_date"]).days + 1), "percent": 100, "stage": "done"}, result=result)
     except Exception as exc:  # noqa: BLE001
         _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
 

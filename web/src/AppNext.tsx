@@ -70,6 +70,12 @@ type RelationshipApiResponse = {
   result: {
     limitations?: string[]
     natal_synastry?: { available: boolean; partner_time_exact: boolean; aspects: Aspect[]; note?: string }
+    house_overlays?: {
+      available: boolean
+      precision_note?: string
+      user_in_counterpart?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
+      counterpart_in_user?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
+    }
     davison?: { available: boolean; reason?: string }
     marks?: { available: boolean; reason?: string }
     months?: RelationshipMonth[]
@@ -178,7 +184,7 @@ type IntegratedApiResponse = {
     natal: { asc: number; mc: number }
     overall: Record<string, FortuneStat | null>
     relationship_signals: Record<string, FortuneStat | null>
-    market?: { has_open_session: boolean; session_count: number; session_dates: string[] }
+    market?: { has_open_session: boolean; session_count: number; session_dates: string[]; calendar_mode?: string; calendar_exact_range?: string[] | null; calendar_warning?: string | null }
     detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>
     months: FortuneMonth[]
   }
@@ -196,7 +202,7 @@ type IntegratedApiResponse = {
     }
     dayun?: Array<{ start_year: number; end_year: number; start_age: number; end_age: number; ganzhi: string }>
     annual?: Array<{ year: number; ganzhi: string; stem_ten_god: string; branch_links: string[] }>
-    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[] }>
+    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[]; boundary_note?: string }>
     not_calculated?: string[]
   }
   thai: {
@@ -392,7 +398,7 @@ function humanizeEvidence(value: string) {
 const coreTopicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션']
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
 const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
-const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
+const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',연락:'💌',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
 const topicDisplay = (topic:string) => `${topicEmoji[topic] ?? '✦'} ${topic}`
 const relationshipDayPresets = [7,31,90,180,365]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
@@ -847,6 +853,7 @@ export default function AppNext() {
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
   const [integratedLoading, setIntegratedLoading] = useState(false)
+  const [integratedProgress, setIntegratedProgress] = useState<{completed:number;total:number;percent:number}|null>(null)
   const [integratedError, setIntegratedError] = useState('')
   const [integratedRequestSnapshot, setIntegratedRequestSnapshot] = useState<Record<string, unknown> | null>(null)
   const [relationshipRequestSnapshot, setRelationshipRequestSnapshot] = useState<Record<string, unknown> | null>(null)
@@ -1116,6 +1123,7 @@ export default function AppNext() {
       end_date: integratedSelectionEnd,
     }
     const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
+    setIntegratedProgress(null)
     setIntegratedLoading(true)
     try {
       let calculation: IntegratedApiResponse | null = null
@@ -1164,6 +1172,7 @@ export default function AppNext() {
             throw new Error(job?.detail || '통합운세 계산 상태를 확인하지 못했어.')
           }
           transientFailures = 0
+          if (job?.progress && Number.isFinite(Number(job.progress.percent))) setIntegratedProgress({completed:Number(job.progress.completed??0),total:Number(job.progress.total??0),percent:Number(job.progress.percent??0)})
           if (job.status === 'failed') throw new Error(job.error || '통합운세 계산 작업이 실패했어.')
           if (job.status === 'done') { calculation = job.result as IntegratedApiResponse; break }
         }
@@ -1175,7 +1184,7 @@ export default function AppNext() {
       // Gemini interpretation is intentionally NOT automatic. Calculation itself spends no Gemini credits.
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
-    } finally { setIntegratedLoading(false) }
+    } finally { setIntegratedLoading(false); setIntegratedProgress(null) }
   }
 
   const runReunionTiming = async (): Promise<ReunionTimingContext | null> => {
@@ -1541,7 +1550,7 @@ export default function AppNext() {
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {integratedStartDate} ~ {integratedSelectionEnd} · {integratedCalendarYear?`${integratedCalendarYear}년 전체`:periodRangeLabel(period)}</span></div>
             <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 현재 출생요일 기준값만 사용해.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
-            <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'통합 계산 중…':'통합운세 실제 계산'}</span></button>
+            <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'통합 계산 준비 중…'):'통합운세 실제 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
@@ -1558,6 +1567,7 @@ export default function AppNext() {
               <section className="result-card">
                 <div className="result-card-title"><span>WESTERN</span><strong>서양점성술 기간 흐름</strong></div>
                 <p className="result-note">{integratedResult.western.score_policy} · {integratedResult.western.ephemeris}</p>
+                {integratedResult.western.market?.calendar_warning && <div className="status-banner subtle"><AlertTriangle size={16}/><span>KRX 거래일 정밀도: {integratedResult.western.market.calendar_warning}</span></div>}
                 <div className="integrated-topic-grid">
                   {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
@@ -1575,6 +1585,7 @@ export default function AppNext() {
                   </div>
                   <div className="saju-summary"><span>일간 <b>{integratedResult.saju.day_master}</b></span>{activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}</div>
                   {integratedResult.saju.true_solar && <div className="coordinate-note"><Sun size={16}/><span>법정시 {integratedResult.saju.true_solar.legal_local_time.slice(11,16)} → 진태양시 {integratedResult.saju.true_solar.true_solar_time.slice(11,16)} · 보정 {integratedResult.saju.true_solar.total_correction_minutes>0?'+':''}{integratedResult.saju.true_solar.total_correction_minutes.toFixed(1)}분</span></div>}
+                  {!!integratedResult.saju.monthly?.length && <p className="result-note">사주 월운 표시는 현재 달력 월 중 대표일의 절기월 간지야. 절입 경계의 정확 시각까지 월 구간을 쪼갠 방식은 아직 아니며, 원본 데이터의 boundary_note(경계 주석)를 보존해.</p>}
                 </> : <div className="status-banner error"><AlertTriangle size={16}/><span>{integratedResult.saju.error || '사주 계산에 실패했어.'}</span></div>}
               </section>
 
@@ -1643,6 +1654,10 @@ export default function AppNext() {
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
               <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} />
+              {partnerTimeExact&&relationshipResult.result.house_overlays?.available&&<section className="result-card"><div className="result-card-title"><span>HOUSE OVERLAY</span><strong>홀사인 + 플라시두스 관계 하우스</strong></div><p className="result-note">한 체계로 덮어쓰지 않고 둘 다 보여줘. 숫자가 다르면 서로 다른 해석층이고, 같으면 중첩 근거로 봐.</p><div className="month-list">{[
+                {title:'내 행성 → 상대 하우스',rows:relationshipResult.result.house_overlays.user_in_counterpart?.relationship_houses??[]},
+                {title:'상대 행성 → 내 하우스',rows:relationshipResult.result.house_overlays.counterpart_in_user?.relationship_houses??[]},
+              ].map((group)=><div className="month-card" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 관계 하우스 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · 플라시두스 {row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></section>}
               <details className="result-card relationship-evidence-details">
                 <summary>기본 관계 구조 · 계산 근거 펼치기</summary>
                 <div className="relationship-evidence-body">
