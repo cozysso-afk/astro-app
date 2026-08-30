@@ -1,0 +1,75 @@
+name: Verify Suriyayat Python Port 2026-08-31
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'thai_suriyayat_v1.py'
+      - '.github/workflows/verify-suriyayat-python-port-20260831.yml'
+
+jobs:
+  verify-port:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/full-year-thai-hardening-20260831
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile candidate
+        run: python -m py_compile thai_suriyayat_v1.py
+      - name: Crosscheck 30 myhora planet positions
+        run: |
+          python - <<'PY'
+          from thai_suriyayat_v1 import calculate_positions_civil
+
+          def arc(sign,deg,minute): return sign*1800+deg*60+minute
+          def dist(a,b):
+              d=abs(a-b)%21600
+              return min(d,21600-d)
+          vectors=[
+            ('2026-08-01 24:00',1,{'sun':arc(3,14,49),'moon':arc(10,23,11),'mars':arc(1,28,36),'mercury':arc(3,2,7),'jupiter':arc(3,13,44),'venus':arc(5,0,43),'saturn':arc(11,14,42),'rahu':arc(10,5,56),'ketu':arc(8,9,12),'uranus':arc(1,17,48)}),
+            ('2026-08-02 24:00',2,{'sun':arc(3,15,45),'moon':arc(11,6,13),'mars':arc(1,29,18),'mercury':arc(3,3,36),'jupiter':arc(3,13,58),'venus':arc(5,1,37),'saturn':arc(11,14,40),'rahu':arc(10,5,53),'ketu':arc(8,8,40),'uranus':arc(1,17,50)}),
+            ('2026-08-04 24:00',4,{'sun':arc(3,17,40),'moon':arc(0,3,1),'mars':arc(2,0,38),'mercury':arc(3,6,36),'jupiter':arc(3,14,27),'venus':arc(5,3,36),'saturn':arc(11,14,35),'rahu':arc(10,5,47),'ketu':arc(8,7,36),'uranus':arc(1,17,52)}),
+          ]
+          all_deltas=[]
+          for label,day,expected in vectors:
+              actual=calculate_positions_civil(year_ad=2026,month=8,day=day,hour=24,minute=0)
+              deltas={k:dist(actual[k],v) for k,v in expected.items()}
+              all_deltas.extend(deltas.values())
+              print('VECTOR',label,'deltas',deltas,'max',max(deltas.values()))
+              assert max(deltas.values())<=4, (label,actual,expected,deltas)
+          assert len(all_deltas)==30
+          print('MYHORA_30_POSITION_PASS','max_delta_arcmin',max(all_deltas),'exact_or_1arcmin',sum(d<=1 for d in all_deltas))
+          PY
+      - name: Verify critical Rahu Ketu and Mars ingress vectors
+        run: |
+          python - <<'PY'
+          from thai_suriyayat_v1 import calculate_positions_civil
+          a=calculate_positions_civil(year_ad=2026,month=8,day=1,hour=24,minute=0)
+          b=calculate_positions_civil(year_ad=2026,month=8,day=4,hour=24,minute=0)
+          assert a['rahu']==10*1800+5*60+56
+          assert a['ketu']==8*1800+9*60+12
+          assert b['mars']==2*1800+0*60+38
+          print('RAHU_KETU_MARS_INGRESS_PASS')
+          PY
+      - name: Verify physical instant converts to Bangkok LMT
+        run: |
+          python - <<'PY'
+          from datetime import datetime,timedelta,timezone
+          from thai_suriyayat_v1 import calculate_positions_for_instant
+          kst=timezone(timedelta(hours=9))
+          out=calculate_positions_for_instant(datetime(2026,8,2,3,18,tzinfo=kst))
+          # 03:18 KST is 00:00 at UTC+06:42.
+          assert out['suriyayat_reference_time'].startswith('2026-08-02T00:00+06:42'),out
+          assert out['lagna']['available'] is False
+          assert len(out['positions'])==10
+          assert out['positions']['ketu']['planet_ko']=='태국 게투'
+          print('BANGKOK_LMT_INSTANT_PASS',out['suriyayat_reference_time'])
+          PY
+      - name: Verify product isolation
+        run: |
+          test "$GITHUB_REF_NAME" = 'work/full-year-thai-hardening-20260831'
+          echo 'CANDIDATE_ONLY_NO_INTEGRATION_PASS'
