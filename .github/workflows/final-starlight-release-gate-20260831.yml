@@ -75,6 +75,7 @@ jobs:
           assert 'required.push("marriage_reading")' in edge
           print('CRITICAL_GUARDS_PASS')
           PY
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
       - name: Verify clean release diff
         run: |
