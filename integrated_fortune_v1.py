@@ -24,9 +24,9 @@ from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
 
-ENGINE_VERSION = "integrated-fortune-v2.7-bounded-vector-thai"
+ENGINE_VERSION = "integrated-fortune-v2.8-saju-jie-exact-thai"
 WESTERN_ENGINE_VERSION = "western-period-engine-v10-bounded-vector"
-SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
+SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-jie-exact"
 
 KST = pytz.timezone("Asia/Seoul")
 UTC = pytz.UTC
@@ -1142,6 +1142,131 @@ def _branch_links(target_branch: str, natal_branches: dict):
     return links
 
 
+_CST = timezone(timedelta(hours=8))
+_JIE_KO = {
+    "小寒": "소한", "立春": "입춘", "惊蛰": "경칩", "驚蟄": "경칩", "清明": "청명",
+    "立夏": "입하", "芒种": "망종", "芒種": "망종", "小暑": "소서", "立秋": "입추",
+    "白露": "백로", "寒露": "한로", "立冬": "입동", "大雪": "대설",
+}
+
+
+def _fixed_timezone(offset_hours: float):
+    return timezone(timedelta(hours=float(offset_hours)))
+
+
+def _aware_to_lunar_exact(value: datetime):
+    cst = value.astimezone(_CST)
+    return Solar.fromYmdHms(cst.year, cst.month, cst.day, cst.hour, cst.minute, cst.second).getLunar()
+
+
+def _jie_solar_to_target(solar, offset_hours: float) -> datetime:
+    cst = datetime(
+        int(solar.getYear()), int(solar.getMonth()), int(solar.getDay()),
+        int(solar.getHour()), int(solar.getMinute()), int(solar.getSecond()),
+        tzinfo=_CST,
+    )
+    return cst.astimezone(_fixed_timezone(offset_hours))
+
+
+def _next_jie(current):
+    # Moving one civil day beyond the exact boundary prevents getNextJie() from
+    # returning the same Jie object on implementations that treat equality as current.
+    return current.getSolar().next(1).getLunar().getNextJie()
+
+
+def _jie_boundaries_for_range(start_date: date, end_date: date, offset_hours: float):
+    target_tz = _fixed_timezone(offset_hours)
+    range_start = datetime.combine(start_date, dt_time(0, 0), tzinfo=target_tz)
+    range_end_exclusive = datetime.combine(end_date + timedelta(days=1), dt_time(0, 0), tzinfo=target_tz)
+    current = _aware_to_lunar_exact(range_start).getPrevJie()
+    boundaries = []
+    seen = set()
+    for _ in range(40):
+        solar = current.getSolar()
+        instant = _jie_solar_to_target(solar, offset_hours)
+        key = (current.getName(), instant.isoformat())
+        if key in seen:
+            raise RuntimeError('duplicate Jie boundary while iterating')
+        seen.add(key)
+        boundaries.append({
+            'name': current.getName(),
+            'name_ko': _JIE_KO.get(current.getName(), current.getName()),
+            'instant': instant,
+        })
+        if instant > range_end_exclusive + timedelta(days=45):
+            break
+        current = _next_jie(current)
+    boundaries.sort(key=lambda row: row['instant'])
+    return range_start, range_end_exclusive, boundaries
+
+
+def _month_jie_segments(start_date: date, end_date: date, offset_hours: float):
+    range_start, range_end_exclusive, boundaries = _jie_boundaries_for_range(start_date, end_date, offset_hours)
+    rows = []
+    for idx in range(len(boundaries) - 1):
+        active = boundaries[idx]
+        nxt = boundaries[idx + 1]
+        seg_start = max(range_start, active['instant'])
+        seg_end = min(range_end_exclusive, nxt['instant'])
+        if seg_start >= seg_end:
+            continue
+        midpoint = seg_start + (seg_end - seg_start) / 2
+        lunar = _aware_to_lunar_exact(midpoint)
+        gz = lunar.getMonthInGanZhiExact()
+        rows.append({
+            'calendar_month': f'{seg_start.year}-{seg_start.month:02d}',
+            'segment_start': seg_start.isoformat(timespec='seconds'),
+            'segment_end_exclusive': seg_end.isoformat(timespec='seconds'),
+            'jie_name': active['name'],
+            'jie_name_ko': active['name_ko'],
+            'next_jie': nxt['name'],
+            'next_jie_ko': nxt['name_ko'],
+            'representative_time': midpoint.isoformat(timespec='seconds'),
+            'ganzhi': gz,
+        })
+    return rows
+
+
+def _lichun_for_year(year: int, offset_hours: float):
+    # lunar_python Solar/JieQi timestamps are China Standard Time (UTC+8).
+    probe = Solar.fromYmdHms(int(year), 2, 1, 12, 0, 0).getLunar()
+    solar = probe.getJieQiTable().get('立春')
+    if solar is None:
+        raise RuntimeError(f'立春 boundary unavailable for {year}')
+    return _jie_solar_to_target(solar, offset_hours)
+
+
+def _annual_lichun_segments(start_date: date, end_date: date, offset_hours: float):
+    target_tz = _fixed_timezone(offset_hours)
+    range_start = datetime.combine(start_date, dt_time(0, 0), tzinfo=target_tz)
+    range_end_exclusive = datetime.combine(end_date + timedelta(days=1), dt_time(0, 0), tzinfo=target_tz)
+    boundaries = [
+        {'name': '立春', 'name_ko': '입춘', 'instant': _lichun_for_year(y, offset_hours)}
+        for y in range(start_date.year - 1, end_date.year + 2)
+    ]
+    boundaries.sort(key=lambda row: row['instant'])
+    rows = []
+    for idx in range(len(boundaries) - 1):
+        active = boundaries[idx]
+        nxt = boundaries[idx + 1]
+        seg_start = max(range_start, active['instant'])
+        seg_end = min(range_end_exclusive, nxt['instant'])
+        if seg_start >= seg_end:
+            continue
+        midpoint = seg_start + (seg_end - seg_start) / 2
+        lunar = _aware_to_lunar_exact(midpoint)
+        rows.append({
+            'year': seg_start.year,
+            'segment_start': seg_start.isoformat(timespec='seconds'),
+            'segment_end_exclusive': seg_end.isoformat(timespec='seconds'),
+            'start_jie': active['name'],
+            'start_jie_ko': active['name_ko'],
+            'representative_time': midpoint.isoformat(timespec='seconds'),
+            'ganzhi': lunar.getYearInGanZhiExact(),
+        })
+    return rows
+
+
 def _saju_payload(
     birth_date: date,
     birth_time: dt_time,
@@ -1217,30 +1342,23 @@ def _saju_payload(
                 continue
 
         years = []
-        for y in range(start_date.year, end_date.year + 1):
-            rep = Solar.fromYmdHms(y, 7, 1, 12, 0, 0).getLunar()
-            gz = rep.getYearInGanZhiExact()
+        for row in _annual_lichun_segments(start_date, end_date, utc_offset_hours):
+            gz = row["ganzhi"]
             years.append({
-                "year": y,
-                "ganzhi": gz,
+                **row,
                 "stem_ten_god": _ten_god(day_master, gz[:1]),
                 "branch_links": _branch_links(gz[1:2], branches),
+                "boundary_note": "세운은 立春(입춘) 정확시각 경계. lunar_python UTC+8 절기시각을 프로필 UTC 오프셋으로 변환함.",
             })
 
         months = []
-        for seg_start, seg_end in _month_segments(start_date, end_date):
-            rep_date = seg_start + (seg_end - seg_start) // 2
-            rep = Solar.fromYmdHms(rep_date.year, rep_date.month, rep_date.day, 12, 0, 0).getLunar()
-            gz = rep.getMonthInGanZhiExact()
+        for row in _month_jie_segments(start_date, end_date, utc_offset_hours):
+            gz = row["ganzhi"]
             months.append({
-                "calendar_month": f"{seg_start.year}-{seg_start.month:02d}",
-                "segment_start": seg_start.isoformat(),
-                "segment_end": seg_end.isoformat(),
-                "representative_date": rep_date.isoformat(),
-                "ganzhi": gz,
+                **row,
                 "stem_ten_god": _ten_god(day_master, gz[:1]),
                 "branch_links": _branch_links(gz[1:2], branches),
-                "boundary_note": "월 중 대표일의 절기월 간지. 절입 경계 정확시각은 별도 노출하지 않음.",
+                "boundary_note": "월운은 절(節) 정확시각 경계. lunar_python UTC+8 절기시각을 프로필 UTC 오프셋으로 변환함.",
             })
 
         try:
@@ -1313,6 +1431,6 @@ def build_integrated_fortune(
         "consensus_policy": {
             "western": "기간별 생활 주제 상대지수. 사건 확률이 아님.",
             "saju": "진태양시 보정 원국·대운·세운·월운의 계산 사실을 제공. 용희기신 등 미계산 항목은 추정하지 않음.",
-            "thai": "출생요일 baseline만 제공. Suriyayat transit 미구현이므로 기간 예측 합의에 포함하지 않음.",
+            "thai": "Mahathaksa/Taksajorn 기간층은 독립 계산. 검증 전 Full Suriyayat Lagna/태국식 트랜짓은 Western 수치점수에 임의 합산하지 않음.",
         },
     }

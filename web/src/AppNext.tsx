@@ -201,8 +201,8 @@ type IntegratedApiResponse = {
       total_correction_minutes: number
     }
     dayun?: Array<{ start_year: number; end_year: number; start_age: number; end_age: number; ganzhi: string }>
-    annual?: Array<{ year: number; ganzhi: string; stem_ten_god: string; branch_links: string[] }>
-    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[]; boundary_note?: string }>
+    annual?: Array<{ year: number; ganzhi: string; stem_ten_god: string; branch_links: string[]; segment_start?: string; segment_end_exclusive?: string; start_jie?: string; start_jie_ko?: string; representative_time?: string; boundary_note?: string }>
+    monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[]; segment_start?: string; segment_end_exclusive?: string; representative_time?: string; jie_name?: string; jie_name_ko?: string; next_jie?: string; next_jie_ko?: string; boundary_note?: string }>
     not_calculated?: string[]
   }
   thai: {
@@ -660,6 +660,7 @@ function integratedPromptText(request: Record<string, unknown>, calculation?: In
     '- Western(서양점성술), 사주, Thai(태국점성술)를 서로 다른 체계로 분리해서 본다.',
     '- Western 점수는 사건 확률이 아니라 상대적 활성도다.',
     '- 사주는 진태양시 보정을 사용하고, 엔진이 계산하지 않은 신강·신약/용희기신 등을 임의 생성하지 않는다.',
+    '- 사주 annual(세운)은 입춘, monthly(월운)은 각 절(節)의 정확시각 경계로 분할된 구간이다. 같은 달력 연도·월 이름이 반복돼도 서로 다른 구간을 임의 병합하지 않는다.',
     '- Thai(태국점성술)는 Mahathaksa(마하탁사)·Taksajorn(탁사쫀)의 실제 계산 구간만 독립적으로 해석한다. Full Suriyayat(수리야얏) 행성·Lagna(라그나)·Rahu/Ketu(라후/게투) 트랜짓은 검증 전이므로 만들거나 Western(서양점성술) 수치점수에 임의 합산하지 않는다.',
     '',
     '[원본 API 요청 JSON]',
@@ -694,8 +695,8 @@ function integratedResultText(result: IntegratedApiResponse) {
     lines.push(`- 일간: ${result.saju.day_master ?? ''}`)
     if (result.saju.true_solar) lines.push(`- 진태양시: ${result.saju.true_solar.true_solar_time} (보정 ${result.saju.true_solar.total_correction_minutes.toFixed(1)}분)`)
     for (const row of result.saju.dayun ?? []) lines.push(`- 대운: ${row.start_year}~${row.end_year} ${row.ganzhi} (${row.start_age}~${row.end_age}세)`)
-    for (const row of result.saju.annual ?? []) lines.push(`- ${row.year} 세운: ${row.ganzhi} · ${row.stem_ten_god} · ${row.branch_links.join(', ') || '지지 연결 없음'}`)
-    for (const row of result.saju.monthly ?? []) lines.push(`- ${row.calendar_month} 월운: ${row.ganzhi} · ${row.stem_ten_god} · ${row.branch_links.join(', ') || '지지 연결 없음'}`)
+    for (const row of result.saju.annual ?? []) lines.push(`- ${row.year} 세운${row.segment_start&&row.segment_end_exclusive?` · ${row.segment_start} ~ ${row.segment_end_exclusive}`:''}${row.start_jie_ko?` · ${row.start_jie_ko}(${row.start_jie}) 기준`:''}: ${row.ganzhi} · ${row.stem_ten_god} · ${row.branch_links.join(', ') || '지지 연결 없음'}`)
+    for (const row of result.saju.monthly ?? []) lines.push(`- ${row.calendar_month} 월운${row.segment_start&&row.segment_end_exclusive?` · ${row.segment_start} ~ ${row.segment_end_exclusive}`:''}${row.jie_name_ko?` · ${row.jie_name_ko}(${row.jie_name}) 시작`:''}: ${row.ganzhi} · ${row.stem_ten_god} · ${row.branch_links.join(', ') || '지지 연결 없음'}`)
     if (result.saju.not_calculated?.length) lines.push(`- 미계산 항목: ${result.saju.not_calculated.join(', ')}`)
   }
   lines.push('', '■ Thai(태국점성술)')
@@ -1593,7 +1594,7 @@ export default function AppNext() {
                   </div>
                   <div className="saju-summary"><span>일간 <b>{integratedResult.saju.day_master}</b></span>{activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}</div>
                   {integratedResult.saju.true_solar && <div className="coordinate-note"><Sun size={16}/><span>법정시 {integratedResult.saju.true_solar.legal_local_time.slice(11,16)} → 진태양시 {integratedResult.saju.true_solar.true_solar_time.slice(11,16)} · 보정 {integratedResult.saju.true_solar.total_correction_minutes>0?'+':''}{integratedResult.saju.true_solar.total_correction_minutes.toFixed(1)}분</span></div>}
-                  {!!integratedResult.saju.monthly?.length && <p className="result-note">사주 월운 표시는 현재 달력 월 중 대표일의 절기월 간지야. 절입 경계의 정확 시각까지 월 구간을 쪼갠 방식은 아직 아니며, 원본 데이터의 boundary_note(경계 주석)를 보존해.</p>}
+                  {!!integratedResult.saju.monthly?.length && <p className="result-note">사주 세운은 立春(입춘), 월운은 각 절(節)의 정확 시각을 경계로 구간을 나눠. 절기 시각은 lunar_python의 UTC+8 계산시각을 네 프로필 UTC 오프셋으로 변환해 표시해.</p>}
                 </> : <div className="status-banner error"><AlertTriangle size={16}/><span>{integratedResult.saju.error || '사주 계산에 실패했어.'}</span></div>}
               </section>
 
@@ -1763,8 +1764,8 @@ export default function AppNext() {
                   {integratedResult.saju.elements && <><div className="subsection-title">오행 카운트</div><div className="element-grid">{Object.entries(integratedResult.saju.elements).map(([name,count])=><div key={name}><span>{name}</span><strong>{count}</strong></div>)}</div></>}
                   {integratedResult.saju.true_solar && <div className="coordinate-note"><Sun size={16}/><span>법정 출생시 {integratedResult.saju.true_solar.legal_local_time} → 진태양시 {integratedResult.saju.true_solar.true_solar_time} · 총 보정 {integratedResult.saju.true_solar.total_correction_minutes>0?'+':''}{integratedResult.saju.true_solar.total_correction_minutes.toFixed(2)}분</span></div>}
                   {(integratedResult.saju.dayun?.length??0)>0 && <details className="precision-details" open><summary>대운 전체</summary><div className="precision-details-body">{integratedResult.saju.dayun?.map((row)=><div className="tight-row" key={`${row.start_year}-${row.ganzhi}`}><span>{row.start_year}~{row.end_year} · {row.start_age}~{row.end_age}세</span><b>{row.ganzhi}</b></div>)}</div></details>}
-                  {(integratedResult.saju.annual?.length??0)>0 && <details className="precision-details"><summary>세운 전체</summary><div className="precision-details-body">{integratedResult.saju.annual?.map((row)=><div className="tight-row" key={`${row.year}-${row.ganzhi}`}><span>{row.year} · {row.stem_ten_god} · {row.branch_links.join(', ')||'연결 없음'}</span><b>{row.ganzhi}</b></div>)}</div></details>}
-                  {(integratedResult.saju.monthly?.length??0)>0 && <details className="precision-details"><summary>월운 전체</summary><div className="precision-details-body">{integratedResult.saju.monthly?.map((row)=><div className="tight-row" key={`${row.calendar_month}-${row.ganzhi}`}><span>{row.calendar_month} · {row.stem_ten_god} · {row.branch_links.join(', ')||'연결 없음'}</span><b>{row.ganzhi}</b></div>)}</div></details>}
+                  {(integratedResult.saju.annual?.length??0)>0 && <details className="precision-details"><summary>세운 전체 · 입춘 경계</summary><div className="precision-details-body">{integratedResult.saju.annual?.map((row,index)=><div className="tight-row" key={`${row.year}-${row.ganzhi}-${index}`}><span>{row.segment_start&&row.segment_end_exclusive?`${row.segment_start} ~ ${row.segment_end_exclusive}`:`${row.year}`} · {row.start_jie_ko?`${row.start_jie_ko}(${row.start_jie}) · `:''}{row.stem_ten_god} · {row.branch_links.join(', ')||'연결 없음'}</span><b>{row.ganzhi}</b></div>)}</div></details>}
+                  {(integratedResult.saju.monthly?.length??0)>0 && <details className="precision-details"><summary>월운 전체 · 절(節) 경계</summary><div className="precision-details-body">{integratedResult.saju.monthly?.map((row,index)=><div className="tight-row" key={`${row.calendar_month}-${row.ganzhi}-${index}`}><span>{row.segment_start&&row.segment_end_exclusive?`${row.segment_start} ~ ${row.segment_end_exclusive}`:row.calendar_month} · {row.jie_name_ko?`${row.jie_name_ko}(${row.jie_name}) · `:''}{row.stem_ten_god} · {row.branch_links.join(', ')||'연결 없음'}</span><b>{row.ganzhi}</b></div>)}</div></details>}
                   {(integratedResult.saju.not_calculated?.length??0)>0 && <><div className="subsection-title">엔진 미계산 · 임의 추정 금지</div><div className="precision-badge-row">{integratedResult.saju.not_calculated?.map((item)=><span key={item}>{item}</span>)}</div></>}
                 </> : <div className="status-banner error"><AlertTriangle size={16}/><span>{integratedResult.saju.error||'사주 계산 원자료가 없어.'}</span></div>}
               </section>
