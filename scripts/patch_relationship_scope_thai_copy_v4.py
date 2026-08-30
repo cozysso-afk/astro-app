@@ -59,3 +59,4 @@ s = s.replace(external_anchor, external_add, 1)
 p.write_text(s, encoding='utf-8')
 
 print('PATCH_RELATIONSHIP_SCOPE_THAI_COPY_V4_APPLIED')
+# workflow trigger
