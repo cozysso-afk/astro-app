@@ -31,6 +31,17 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Normalize patch newline anchor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/patch_full_year_audit_v1.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("금지.\\\\n'", "금지.\\n'")
+          s=s.replace("않는다.\\\\n'", "않는다.\\n'")
+          p.write_text(s,encoding='utf-8')
+          PY
+
       - name: Apply branch-only fixes
         run: python scripts/patch_full_year_audit_v1.py
 
@@ -88,10 +99,9 @@ jobs:
           import integrated_fortune_v1 as f
           profile=dict(birth_date=date(1991,3,21),birth_time=dt_time(7,26),latitude=34.7604,longitude=127.6622,utc_offset_hours=9,gender='female')
           t0=time.perf_counter()
-          warm=f.build_integrated_fortune(**profile,start_date=date(2025,12,31),end_date=date(2025,12,31))
+          f.build_integrated_fortune(**profile,start_date=date(2025,12,31),end_date=date(2025,12,31))
           warm_t=time.perf_counter()-t0
           f._daily_aggregate_cached.cache_clear()
-          # Retain ephemeris cache to model a warmed service whose requested annual days are not cached.
           t0=time.perf_counter()
           result=f.build_integrated_fortune(**profile,start_date=date(2026,1,1),end_date=date(2026,12,31))
           elapsed=time.perf_counter()-t0
@@ -137,7 +147,7 @@ jobs:
         run: |
           git config user.name "cozysso-afk"
           git config user.email "cozysso@gmail.com"
-          git add integrated_fortune_v1.py relationship_western_v1.py web/src/AppNext.tsx supabase/functions/relationship-interpret-v9-preview/index.ts
+          git add integrated_fortune_v1.py relationship_western_v1.py web/src/AppNext.tsx supabase/functions/relationship-interpret-v9-preview/index.ts scripts/patch_full_year_audit_v1.py
           if git diff --cached --quiet; then
             echo 'No source changes'
             exit 0
