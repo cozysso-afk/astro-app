@@ -246,7 +246,7 @@ OUTPUT_SHAPE = {
     "systems": {
         "western": "Western 계산이 말하는 핵심",
         "saju": "사주 원국/대운/세운/월운에서 계산된 범위만 설명",
-        "thai": "Thai 출생요일·Mahathaksa·Taksajorn의 실제 계산 범위와 Suriyayat 미구현 한계",
+        "thai": "Thai 출생요일·Mahathaksa·Taksajorn과 검증된 Suriyayat 10행성 위치 사실층, Suriyayat Lagna 미구현 한계",
     },
     "priorities": ["현실 행동 1", "현실 행동 2", "현실 행동 3"],
     "topic_analysis": {
