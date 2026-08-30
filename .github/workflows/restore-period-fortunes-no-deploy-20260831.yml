@@ -1,0 +1,86 @@
+name: Restore period fortunes no deploy 2026-08-31
+
+on:
+  push:
+    branches:
+      - fix/restore-period-fortunes-no-deploy-20260831
+    paths:
+      - .github/workflows/restore-period-fortunes-no-deploy-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/restore-period-fortunes-no-deploy-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply period fortune IA and iOS date fix
+        run: python scripts/restore_period_fortunes_no_deploy_20260831.py
+
+      - name: Verify information architecture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/AppNext.tsx').read_text()
+          assert '<div className="section-label">기간 운세</div>' in s
+          assert 'period-fortune-report' in s
+          assert '통합운세 기간 선택' not in s
+          assert '선택한 일일·주간·월간·연간 범위에서' not in s
+          assert "selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : queryDate" in s
+          assert "selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)" in s
+          assert 'aria-label="연간 통합운세 연도 선택"' in s
+          assert '정밀분석 기간 선택' in s
+          for label in ['오늘','주간','월간','연간']:
+              assert f"label: '{label}'" in s
+          print('PERIOD_AND_INTEGRATED_IA_PASS')
+          PY
+
+      - name: Verify iOS date vertical centering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/fortune-ux-v14.css').read_text()
+          for token in [
+              'v15 · restore period-fortune IA',
+              '.birth-date-field input[type="date"]::-webkit-date-and-time-value',
+              'height:100%!important',
+              'align-items:center!important',
+              'justify-content:center!important',
+              '::-webkit-datetime-edit-fields-wrapper',
+          ]:
+              assert token in s, token
+          print('IOS_DATE_VERTICAL_CENTER_PASS')
+          PY
+
+      - name: Frontend production build only
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Diff safety
+        run: |
+          git diff --check
+          git status --short
+
+      - name: Commit verified product changes to work branch only
+        run: |
+          git rm scripts/restore_period_fortunes_no_deploy_20260831.py .github/workflows/restore-period-fortunes-no-deploy-20260831.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/fortune-ux-v14.css
+          git commit -m 'fix: restore separate period fortunes and annual integrated tool [no deploy]'
+          git push origin HEAD:fix/restore-period-fortunes-no-deploy-20260831
