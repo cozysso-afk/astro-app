@@ -1,0 +1,92 @@
+name: Fix fortune UX v13
+
+on:
+  push:
+    branches:
+      - fix/annual-fortune-ui-thai-20260831
+    paths:
+      - .github/workflows/fix-fortune-ux-v13.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/annual-fortune-ui-thai-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Apply UX and relationship AI patch
+        run: python scripts/fix_fortune_ux_v13.py
+
+      - name: Verify annual-only integrated UX
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/AppNext.tsx').read_text()
+          assert '천체 흐름 리포트' not in s
+          assert s.count('연간 통합운세') >= 2
+          assert '정밀분석 기간 선택' in s
+          assert '연애 · 연락 · 재접점 연간 신호' in s
+          assert "selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : queryDate" in s
+          print('ANNUAL_UX_OK')
+          PY
+
+      - name: Verify iOS date centering and luminous score cards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/fortune-ux-v13.css').read_text()
+          for token in ['::-webkit-date-and-time-value','::-webkit-datetime-edit-fields-wrapper','font-variant-numeric:tabular-nums','Bodoni 72','backdrop-filter:blur']:
+              assert token in s, token
+          print('IOS_DATE_AND_SCORE_STYLE_OK')
+          PY
+
+      - name: Typecheck relationship Edge Function
+        run: deno check supabase/functions/relationship-interpret-v9-preview/index.ts
+
+      - name: Verify purpose-specific relationship schema
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('supabase/functions/relationship-interpret-v9-preview/index.ts').read_text()
+          assert 'relationship-v10.2-purpose-schema' in s
+          assert 'responseSchema:schemaFor(purpose)' in s
+          assert 'required.push("reunion_reading")' in s
+          assert 'required.push("marriage_reading")' in s
+          assert 'return respond(result,200)' in s
+          assert 'result.ok?200:502' not in s
+          print('RELATIONSHIP_AI_SCHEMA_OK')
+          PY
+
+      - name: Frontend production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Diff safety
+        run: |
+          git diff --check
+          git status --short
+
+      - name: Commit verified product changes only
+        run: |
+          git rm scripts/fix_fortune_ux_v13.py .github/workflows/fix-fortune-ux-v13.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/main.tsx web/src/fortune-ux-v13.css supabase/functions/relationship-interpret-v9-preview/index.ts
+          git commit -m 'fix: restore annual fortune UX and harden reunion AI'
+          git push origin HEAD:fix/annual-fortune-ui-thai-20260831
