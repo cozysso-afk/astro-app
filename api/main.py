@@ -69,13 +69,14 @@ class RelationshipProfile(BaseModel):
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
 
     def engine_payload(self) -> dict:
+        exact_time = bool(self.time_known and self.birth_time is not None)
         return {
             "name": self.name or "",
             "birth_date": self.birth_date,
-            "birth_time": self.birth_time,
-            "time_known": bool(self.time_known and self.birth_time is not None),
-            "latitude": self.latitude,
-            "longitude": self.longitude,
+            "birth_time": self.birth_time if exact_time else None,
+            "time_known": exact_time,
+            "latitude": self.latitude if exact_time else None,
+            "longitude": self.longitude if exact_time else None,
             "utc_offset_hours": self.utc_offset_hours,
         }
 
@@ -286,8 +287,15 @@ def relationship_western(request: RelationshipRequest) -> dict:
     user_payload = request.user.engine_payload()
     cp_payload = request.counterpart.engine_payload()
 
-    if user_payload["birth_time"] is None:
+    if not request.user.time_known or request.user.birth_time is None:
         raise HTTPException(status_code=422, detail="user birth_time is required for the precision relationship engine")
+    if request.user.latitude is None or request.user.longitude is None:
+        raise HTTPException(status_code=422, detail="user birth coordinates are required for the precision relationship engine")
+    if request.counterpart.time_known:
+        if request.counterpart.birth_time is None:
+            raise HTTPException(status_code=422, detail="counterpart birth_time is required when time_known=true")
+        if request.counterpart.latitude is None or request.counterpart.longitude is None:
+            raise HTTPException(status_code=422, detail="counterpart birth coordinates are required when time_known=true")
 
     segments = _month_segments(request.start_date, request.end_date)
     try:

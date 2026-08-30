@@ -885,6 +885,8 @@ export default function AppNext() {
   const [legacyArchiveOpen, setLegacyArchiveOpen] = useState<ArchiveItem | null>(null)
   const [uiSettings, setUiSettings] = useState(() => loadUiSettings())
   const [actionNotice, setActionNotice] = useState('')
+  const relationshipRevisionRef = useRef(0)
+  const restoringRelationshipRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -913,6 +915,25 @@ export default function AppNext() {
   useEffect(() => {
     window.localStorage.setItem(AI_MODEL_STORAGE_KEY, aiModel)
   }, [aiModel])
+
+  useEffect(() => {
+    relationshipRevisionRef.current += 1
+    if (restoringRelationshipRef.current) {
+      restoringRelationshipRef.current = false
+      return
+    }
+    if (!relationshipResult && !relationshipRequestSnapshot && !relationshipAi && !reunionTiming) return
+    setRelationshipResult(null)
+    setRelationshipRequestSnapshot(null)
+    setRelationshipAi(null)
+    setRelationshipAiError('')
+    setRelationshipError('')
+    setReunionTiming(null)
+    setReunionTimingError('')
+    setRelationshipLoading(false)
+    setRelationshipAiLoading(false)
+    setReunionTimingLoading(false)
+  }, [selectedTool, relationshipMode, relationshipPurpose, marriageMode, relationshipDays, relationshipCalendarYear, queryDate, birthProfile, counterpart])
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -1205,11 +1226,13 @@ export default function AppNext() {
   }
 
   const runReunionTiming = async (): Promise<ReunionTimingContext | null> => {
+    const revision = relationshipRevisionRef.current
     setReunionTimingLoading(true); setReunionTimingError('')
     try {
       const end = relationshipEndDate
       if (integratedResult && integratedResult.period.start === relationshipStartDate && integratedResult.period.end === end) {
         const cached = buildReunionTimingContext(integratedResult)
+        if (revision !== relationshipRevisionRef.current) return null
         setReunionTiming(cached)
         return cached
       }
@@ -1286,29 +1309,41 @@ export default function AppNext() {
 
       if (!calculation) throw new Error(lastMessage || '재회 시기 계산 시간이 길어지고 있어. 다시 시도해줘.')
       const context = buildReunionTimingContext(calculation)
+      if (revision !== relationshipRevisionRef.current) return null
       setReunionTiming(context)
       return context
     } catch (error) {
+      if (revision !== relationshipRevisionRef.current) return null
       const message = error instanceof Error ? error.message : '재회 시기 계산 중 오류가 발생했어.'
       setReunionTimingError(message)
       return null
-    } finally { setReunionTimingLoading(false) }
+    } finally {
+      if (revision === relationshipRevisionRef.current) setReunionTimingLoading(false)
+    }
   }
 
   const runRelationship = async () => {
+    const revision = relationshipRevisionRef.current + 1
+    relationshipRevisionRef.current = revision
     setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError(''); setReunionTiming(null); setReunionTimingError('')
     if (!birthProfile.birthDate || !birthProfile.birthTime) { setRelationshipError('먼저 내정보에서 본인 생년월일과 출생시간을 저장해줘.'); return }
+    const userLatitude = parseOptionalNumber(birthProfile.latitude)
+    const userLongitude = parseOptionalNumber(birthProfile.longitude)
+    if (userLatitude === null || userLongitude === null) { setRelationshipError('먼저 내정보에서 본인 출생지역까지 저장해줘. 정밀 관계 계산에는 위치 좌표가 필요해.'); return }
     if (!counterpart.birthDate) { setRelationshipError('상대 생년월일은 반드시 필요해.'); return }
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
+    const counterpartLatitude = counterpart.timeKnown ? parseOptionalNumber(counterpart.latitude) : null
+    const counterpartLongitude = counterpart.timeKnown ? parseOptionalNumber(counterpart.longitude) : null
+    if (counterpart.timeKnown && (counterpartLatitude === null || counterpartLongitude === null)) { setRelationshipError('상대 출생시간을 안다면 출생지역도 선택해줘. 모르면 “출생시간 모름”을 체크해줘.'); return }
     const body = {
       user: {
         name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, time_known: true,
-        latitude: Number(birthProfile.latitude), longitude: Number(birthProfile.longitude), utc_offset_hours: Number(birthProfile.utcOffset || 9),
+        latitude: userLatitude, longitude: userLongitude, utc_offset_hours: Number(birthProfile.utcOffset || 9),
       },
       counterpart: {
         name: counterpart.name || '상대', birth_date: counterpart.birthDate, birth_time: counterpart.timeKnown ? counterpart.birthTime : null,
-        time_known: counterpart.timeKnown, latitude: counterpart.timeKnown ? Number(counterpart.latitude) : null,
-        longitude: counterpart.timeKnown ? Number(counterpart.longitude) : null, utc_offset_hours: Number(counterpart.utcOffset || 9),
+        time_known: counterpart.timeKnown, latitude: counterpartLatitude,
+        longitude: counterpartLongitude, utc_offset_hours: Number(counterpart.utcOffset || 9),
       },
       start_date: relationshipStartDate,
       end_date: relationshipEndDate,
@@ -1322,6 +1357,7 @@ export default function AppNext() {
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '관계 계산 요청에 실패했어.')
       const typed = payload as RelationshipApiResponse
+      if (revision !== relationshipRevisionRef.current) return
       setRelationshipResult(typed)
       setRelationshipRequestSnapshot(body as Record<string, unknown>)
       if (shouldRunReunionTiming) {
@@ -1336,14 +1372,19 @@ export default function AppNext() {
         }
       }
     } catch (error) {
-      setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
-    } finally { setRelationshipLoading(false) }
+      if (revision === relationshipRevisionRef.current) setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
+    } finally {
+      if (revision === relationshipRevisionRef.current) setRelationshipLoading(false)
+    }
   }
 
 
   const runRelationshipAi = async () => {
     if (!relationshipResult) return
-    const analysisMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
+    const revision = relationshipRevisionRef.current
+    const currentMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
+    const snapshotMode = String(relationshipRequestSnapshot?.analysis_mode ?? '')
+    const analysisMode = (snapshotMode || currentMode) as RelationshipAnalysisMode
     if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
@@ -1362,10 +1403,13 @@ export default function AppNext() {
       }
       const payload = data as RelationshipAiResponse
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
+      if (revision !== relationshipRevisionRef.current) return
       setRelationshipAi(annotatePayload(payload))
     } catch (error) {
-      setRelationshipAiError(error instanceof Error ? error.message : '관계 AI 해설을 불러오지 못했어.')
-    } finally { setRelationshipAiLoading(false) }
+      if (revision === relationshipRevisionRef.current) setRelationshipAiError(error instanceof Error ? error.message : '관계 AI 해설을 불러오지 못했어.')
+    } finally {
+      if (revision === relationshipRevisionRef.current) setRelationshipAiLoading(false)
+    }
   }
 
 
@@ -1492,6 +1536,14 @@ export default function AppNext() {
       setIntegratedRequestSnapshot(item.request)
       setSelectedTool(item.kind)
     } else {
+      restoringRelationshipRef.current = true
+      relationshipRevisionRef.current += 1
+      setRelationshipAi(null)
+      setRelationshipAiError('')
+      setRelationshipLoading(false)
+      setRelationshipAiLoading(false)
+      setReunionTimingLoading(false)
+      setReunionTimingError('')
       const request = item.request
       const cp = (request.counterpart ?? {}) as Record<string, unknown>
       const known = cp.time_known !== false
