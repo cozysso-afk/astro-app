@@ -43,7 +43,7 @@ jobs:
           PY
       - name: Verify annual compact payload and cache key
         run: |
-          deno eval --allow-read - <<'TS'
+          cat > .verify-fortune-ai-v6.ts <<'TS'
           import {compactCalculation,payloadHash,SYSTEM,VERSION} from './supabase/functions/fortune-interpret-v6-preview/core.ts';
           const calc=JSON.parse(await Deno.readTextFile('/tmp/annual-calc.json'));
           const p=compactCalculation(calc);
@@ -65,6 +65,8 @@ jobs:
           if(!SYSTEM.includes('segment_start와 segment_end_exclusive')) throw new Error('exact Jie guard missing');
           console.log('ANNUAL_AI_PAYLOAD_PASS',h1.slice(0,16));
           TS
+          deno run --allow-read .verify-fortune-ai-v6.ts
+          rm .verify-fortune-ai-v6.ts
       - name: Verify cache design uses no schema change
         run: |
           grep -q 'fortune-v6:${hash.slice(0,32)}' supabase/functions/fortune-interpret-v6-preview/index.ts
