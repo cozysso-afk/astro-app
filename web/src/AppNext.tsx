@@ -1349,7 +1349,17 @@ export default function AppNext() {
     try {
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
-      if (error) throw error
+      if (error) {
+        let detail = ''
+        const context = (error as { context?: Response }).context
+        if (context) {
+          try {
+            const body = await context.clone().json() as { error?: string }
+            detail = body?.error ?? ''
+          } catch { /* fall back to SDK message */ }
+        }
+        throw new Error(detail || error.message)
+      }
       const payload = data as RelationshipAiResponse
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
       setRelationshipAi(annotatePayload(payload))
@@ -1563,7 +1573,7 @@ export default function AppNext() {
           <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{tools.map(({key,label,desc,icon:Icon,tone})=><button key={key} className={`tool-card ${selectedTool===key?'is-selected':''}`} type="button" onClick={()=>{setSelectedTool(key); if(key==='compatibility'||key==='marriage'){setRelationshipDays(365);setRelationshipCalendarYear(null);} if(key==='location'){setLocationError('');setLocationResult(null)}}}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">통합 흐름 계산</span><h2>통합운세</h2><p>Western(서양점성술) 기간 흐름, 진태양시 보정 사주, Thai(태국점성술) Mahathaksa(마하탁사)·Taksajorn(탁사쫀) 기간층을 각각 계산해 한 화면에서 비교해.</p></div></div>
+            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">통합 흐름 계산</span><h2>통합운세</h2><p>선택한 일일·주간·월간·연간 범위에서 금전·학업·시험·직장·연애·연락·재회·컨디션 흐름을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산하고 한 화면에서 비교해.</p></div></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {integratedStartDate} ~ {integratedSelectionEnd} · {integratedCalendarYear?`${integratedCalendarYear}년 전체`:periodRangeLabel(period)}</span></div>
             <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀)과 교차검증된 Suriyayat(수리야얏) 10행성 위치를 계산해. Suriyayat Lagna(라그나)·하우스·예측규칙은 아직 검증 전이야.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
@@ -1589,7 +1599,16 @@ export default function AppNext() {
                   {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
                 {topIntegratedTopics.length>0 && <div className="best-window"><span>가장 강한 흐름</span><strong>{topIntegratedTopics.slice(0,3).map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
+                {cautionIntegratedTopics.length>0 && <div className="best-window caution-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
+
+              {orderedRelationshipSignals.length > 0 && <section className="result-card integrated-relationship-flow"><div className="result-card-title"><span>RELATIONSHIP</span><strong>연애 · 연락 · 재접점 흐름</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`integrated-signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신·발신·재접점은 서로 섞지 않아. 점수는 사건 확률이 아니라 선택 기간의 상대적 활성도야.</p></section>}
+
+              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MONEY · MARKET</span><strong>금전 · 주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`integrated-market-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자주의는 높을수록 좋은 점수가 아니라 위험 경계가 강하다는 뜻이야.</p></section>}
+
+              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card integrated-date-highlights"><div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>{bestIntegratedDays.map((point)=><div className="tight-row" key={`integrated-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}{cautionIntegratedDays.map((point)=><div className="tight-row" key={`integrated-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}<p className="result-note">선택 기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p></section>}
+
+              {integratedResult.western.detail_days?.length ? <details className="result-card integrated-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`integrated-day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`integrated-${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`integrated-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
 
               <section className="result-card">
                 <div className="result-card-title"><span>SAJU</span><strong>사주 원국 · 진태양시</strong></div>
@@ -1798,62 +1817,7 @@ export default function AppNext() {
               </section>
             </div>}
           </section>}
-          {selectedTool==='integrated' && <section className="tool-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">천체 흐름 리포트</span><h2>{period==='today'?'오늘의 리포트':`${periods.find((item)=>item.key===period)?.label} 리포트`}</h2><p>{queryDate} → {integratedSelectionEnd} · 통합운세 실계산 요약</p></div></div>
 
-            {!integratedMatchesSelection && <>
-              <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 아래 버튼은 통합운세와 같은 Render 실계산을 한 번만 실행하고, 그 응답을 이 홈 리포트와 상세 통합운세가 함께 재사용해.</span></div>
-              {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
-              <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'리포트 계산 중…':`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label} 리포트 계산`}</span></button>
-            </>}
-
-            {integratedMatchesSelection && integratedResult && <>
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실계산 리포트 준비 완료</strong><span>{integratedResult.period.day_count}일 분석</span></div></div>
-              {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
-              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
-
-              <section className="result-card">
-                <div className="result-card-title"><span>핵심 흐름</span><strong>핵심 흐름</strong></div>
-                <div className="integrated-topic-grid">
-                  {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={`home-top-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
-                </div>
-                {cautionIntegratedTopics.length>0 && <div className="best-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
-              </section>
-
-              {orderedRelationshipSignals.length > 0 && <section className="result-card"><div className="result-card-title"><span>연락 방향</span><strong>연락 방향 보조지표</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신은 들어오는 흐름, 발신은 내가 먼저 움직일 때의 적합도, 재접점은 과거 인연 활성도를 따로 본 값이야. 셋 다 사건 확률은 아니야.</p></section>}
-
-              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>투자 흐름</span><strong>주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`market-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자심리=판단의 열기, 수익실현=정리 적합도, 신규진입=새 포지션 적합도, 투자주의=위험 경계지수야. 투자주의만 높을수록 좋은 게 아니라 더 조심해야 한다는 뜻이야.</p></section>}
-
-              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card">
-                <div className="result-card-title"><span>시기</span><strong>좋은 날짜 · 주의 날짜</strong></div>
-                {bestIntegratedDays.map((point)=><div className="tight-row" key={`best-${point.date}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-                {cautionIntegratedDays.map((point)=><div className="tight-row" key={`caution-${point.date}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-                <p className="result-note">날짜 점수는 사건 확률이 아니라 기존 Western 기간엔진의 상대적 활성도야.</p>
-              </section>}
-
-              {integratedResult.western.detail_days?.length ? <section className="result-card"><div className="result-card-title"><span>TIME FLOW</span><strong>시간 흐름 · 계산 근거</strong></div><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></section> : null}
-
-              <details className="result-card system-summary-details">
-                <summary>사주·Thai(태국점성술) 계산 근거</summary>
-                <div className="saju-summary">
-                  {integratedResult.saju.ok && integratedResult.saju.day_master && <span>사주 일간 <b>{integratedResult.saju.day_master}</b></span>}
-                  {activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}
-                  <span>Thai <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
-                  {integratedResult.thai.taksajorn?.segments?.[0] && <span>Taksajorn <b>{integratedResult.thai.taksajorn.segments[0].annual_boriwan.label}</b> · 나이 진행 {integratedResult.thai.taksajorn.segments[0].age_in_progress}</span>}
-                </div>
-                <p className="result-note">Thai는 Mahathaksa/Taksajorn 기간층과 교차검증 Suriyayat 10행성 위치까지 계산해. Suriyayat Lagna·하우스·예측규칙은 미검증이라 합의 점수에 섞지 않아.</p>
-              </details>
-
-              <div className="result-actions home-result-actions">
-                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
-                <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
-                <button className="save-action" type="button" onClick={saveIntegratedRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
-              </div>
-              {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
-              {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-              <button className="primary-button" type="button" onClick={()=>setSelectedTool('integrated')}><Search size={18}/><span>상세 통합운세 보기</span></button>
-            </>}
-          </section>}
         </>}
 
         {mainView === 'profile' && <section className="form-card profile-form-card">

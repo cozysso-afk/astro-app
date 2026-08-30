@@ -1,0 +1,31 @@
+/* v14 · integrated result de-duplication + iOS date + luminous scores */
+.birth-date-field input[type="date"],
+.birth-time-field input[type="time"],
+.date-control input[type="date"]{width:100%!important;min-width:0!important;text-align:center!important;font-variant-numeric:tabular-nums lining-nums!important;font-feature-settings:"tnum" 1,"lnum" 1!important}
+.birth-date-field input[type="date"]::-webkit-date-and-time-value,
+.birth-time-field input[type="time"]::-webkit-date-and-time-value,
+.date-control input[type="date"]::-webkit-date-and-time-value{display:block!important;width:100%!important;margin:0!important;padding:0!important;text-align:center!important}
+.birth-date-field input[type="date"]::-webkit-datetime-edit,
+.birth-time-field input[type="time"]::-webkit-datetime-edit,
+.date-control input[type="date"]::-webkit-datetime-edit{display:flex!important;width:100%!important;min-width:0!important;justify-content:center!important;align-items:center!important;padding:0!important}
+.birth-date-field input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.birth-time-field input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.date-control input[type="date"]::-webkit-datetime-edit-fields-wrapper{display:flex!important;width:100%!important;justify-content:center!important;align-items:center!important}
+.birth-date-field input[type="date"]::-webkit-calendar-picker-indicator,
+.birth-time-field input[type="time"]::-webkit-calendar-picker-indicator{margin-left:3px!important;opacity:.48!important}
+.field-grid{grid-template-columns:minmax(0,1.16fr) minmax(0,.84fr)!important;gap:13px 10px!important}
+.birth-date-field input,.birth-time-field input{font-size:.9rem!important;font-weight:760!important;letter-spacing:.01em!important}
+.integrated-topic{position:relative!important;isolation:isolate!important;overflow:hidden!important;min-height:106px!important;align-content:center!important;padding:15px 10px 14px!important;border:1px solid rgba(255,255,255,.78)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 0 rgba(121,93,147,.035),0 13px 30px rgba(88,68,112,.08),0 2px 8px rgba(83,65,99,.035)!important;backdrop-filter:blur(16px) saturate(132%)!important;-webkit-backdrop-filter:blur(16px) saturate(132%)!important}
+.integrated-topic::before{content:"";position:absolute;z-index:-1;inset:-34% 34% 40% -22%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.96),rgba(255,255,255,0) 69%);pointer-events:none}
+.integrated-topic::after{content:"✦";position:absolute;right:10px;top:7px;color:rgba(255,255,255,.9);font-size:.76rem;text-shadow:0 0 10px rgba(255,255,255,.95);pointer-events:none}
+.integrated-topic>span{position:relative;z-index:1;color:#62536c!important;font-size:.79rem!important;font-weight:820!important;letter-spacing:-.015em!important}
+.integrated-topic>strong{position:relative;z-index:1;font-family:"Bodoni 72",Didot,"Iowan Old Style",Georgia,serif!important;font-variant-numeric:tabular-nums lining-nums!important;font-feature-settings:"tnum" 1,"lnum" 1!important;font-size:2.03rem!important;line-height:1.02!important;font-weight:600!important;letter-spacing:.018em!important;color:#654778!important;text-shadow:0 1px 0 rgba(255,255,255,.98),0 5px 17px rgba(105,73,133,.13)!important}
+.integrated-topic>small{position:relative;z-index:1;color:#83748b!important;font-size:.7rem!important;font-weight:720!important}
+.integrated-topic:nth-child(6n+1){background:linear-gradient(145deg,rgba(255,242,230,.84),rgba(255,250,243,.70),rgba(242,236,255,.72))!important}
+.integrated-topic:nth-child(6n+2){background:linear-gradient(145deg,rgba(239,232,255,.86),rgba(252,247,255,.72),rgba(231,248,246,.72))!important}
+.integrated-topic:nth-child(6n+3){background:linear-gradient(145deg,rgba(226,248,242,.84),rgba(247,252,249,.74),rgba(236,240,255,.70))!important}
+.integrated-topic:nth-child(6n+4){background:linear-gradient(145deg,rgba(230,242,255,.86),rgba(250,251,255,.73),rgba(248,234,255,.69))!important}
+.integrated-topic:nth-child(6n+5){background:linear-gradient(145deg,rgba(255,232,243,.85),rgba(255,249,252,.73),rgba(239,238,255,.70))!important}
+.integrated-topic:nth-child(6n){background:linear-gradient(145deg,rgba(251,244,216,.86),rgba(255,252,241,.74),rgba(231,248,243,.70))!important}
+.integrated-time-evidence{padding:0!important;overflow:hidden}.integrated-time-evidence>summary{cursor:pointer;list-style:none;padding:15px 16px;font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.88rem;font-weight:750;color:#594c63}.integrated-time-evidence>summary::-webkit-details-marker{display:none}.integrated-time-evidence>summary::before{content:"＋";margin-right:8px;color:#806b92}.integrated-time-evidence[open]>summary::before{content:"－"}.integrated-time-evidence>.time-detail-list{padding:0 13px 14px}
+@media(max-width:430px){.integrated-topic{min-height:104px!important}.integrated-topic>strong{font-size:1.96rem!important}.birth-date-field input,.birth-time-field input{height:52px!important}}
