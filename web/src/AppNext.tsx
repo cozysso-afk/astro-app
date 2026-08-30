@@ -70,6 +70,12 @@ type RelationshipApiResponse = {
   result: {
     limitations?: string[]
     natal_synastry?: { available: boolean; partner_time_exact: boolean; aspects: Aspect[]; note?: string }
+    house_overlays?: {
+      available: boolean
+      precision_note?: string
+      user_in_counterpart?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
+      counterpart_in_user?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
+    }
     davison?: { available: boolean; reason?: string }
     marks?: { available: boolean; reason?: string }
     months?: RelationshipMonth[]
@@ -178,7 +184,7 @@ type IntegratedApiResponse = {
     natal: { asc: number; mc: number }
     overall: Record<string, FortuneStat | null>
     relationship_signals: Record<string, FortuneStat | null>
-    market?: { has_open_session: boolean; session_count: number; session_dates: string[] }
+    market?: { has_open_session: boolean; session_count: number; session_dates: string[]; calendar_mode?: string; calendar_exact_range?: string[] | null; calendar_warning?: string | null }
     detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>
     months: FortuneMonth[]
   }
@@ -392,7 +398,7 @@ function humanizeEvidence(value: string) {
 const coreTopicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션']
 const marketTopicOrder = ['투자심리','수익실현','신규진입','투자주의']
 const topicOrder = [...coreTopicOrder, ...marketTopicOrder]
-const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
+const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',연락:'💌',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
 const topicDisplay = (topic:string) => `${topicEmoji[topic] ?? '✦'} ${topic}`
 const relationshipDayPresets = [7,31,90,180,365]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
@@ -1558,6 +1564,7 @@ export default function AppNext() {
               <section className="result-card">
                 <div className="result-card-title"><span>WESTERN</span><strong>서양점성술 기간 흐름</strong></div>
                 <p className="result-note">{integratedResult.western.score_policy} · {integratedResult.western.ephemeris}</p>
+                {integratedResult.western.market?.calendar_warning && <div className="status-banner subtle"><AlertTriangle size={16}/><span>KRX 거래일 정밀도: {integratedResult.western.market.calendar_warning}</span></div>}
                 <div className="integrated-topic-grid">
                   {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
                 </div>
@@ -1643,6 +1650,10 @@ export default function AppNext() {
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
               <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} />
+              {partnerTimeExact&&relationshipResult.result.house_overlays?.available&&<section className="result-card"><div className="result-card-title"><span>HOUSE OVERLAY</span><strong>홀사인 + 플라시두스 관계 하우스</strong></div><p className="result-note">한 체계로 덮어쓰지 않고 둘 다 보여줘. 숫자가 다르면 서로 다른 해석층이고, 같으면 중첩 근거로 봐.</p><div className="month-list">{[
+                {title:'내 행성 → 상대 하우스',rows:relationshipResult.result.house_overlays.user_in_counterpart?.relationship_houses??[]},
+                {title:'상대 행성 → 내 하우스',rows:relationshipResult.result.house_overlays.counterpart_in_user?.relationship_houses??[]},
+              ].map((group)=><div className="month-card" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 관계 하우스 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · 플라시두스 {row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></section>}
               <details className="result-card relationship-evidence-details">
                 <summary>기본 관계 구조 · 계산 근거 펼치기</summary>
                 <div className="relationship-evidence-body">

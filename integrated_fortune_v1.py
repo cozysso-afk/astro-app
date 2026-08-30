@@ -21,8 +21,8 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
-ENGINE_VERSION = "integrated-fortune-v2.4-full-year-efficient"
-WESTERN_ENGINE_VERSION = "western-period-engine-v7-full-year-efficient"
+ENGINE_VERSION = "integrated-fortune-v2.5-ephemeris-cache-audit"
+WESTERN_ENGINE_VERSION = "western-period-engine-v8-ephemeris-cache-audit"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar"
 THAI_ENGINE_VERSION = "thai-weekday-baseline-v1"
 
@@ -211,7 +211,10 @@ def _to_jd_ut(dt_utc: datetime):
     return swe.julday(dt_utc.year, dt_utc.month, dt_utc.day, hour, swe.GREG_CAL)
 
 
+@lru_cache(maxsize=60000)
 def _planet_lon(body_name: str, dt_aware: datetime):
+    # Deterministic astronomical lookup. Annual scans revisit many identical
+    # timestamps across life/market scans and applying/separating windows.
     _, _, earth, targets, _, _, _ = _ephemeris_bundle()
     apparent = earth.at(_sf_time(dt_aware)).observe(targets[body_name]).apparent()
     _, lon, _ = apparent.frame_latlon(ecliptic_frame)
@@ -295,7 +298,10 @@ def _motion_window_hours(body: str):
     return 6.0
 
 
+@lru_cache(maxsize=30000)
 def _planet_snapshot(body: str, query_dt_utc: datetime):
+    # Cached snapshots preserve the exact same lon/past/future math while
+    # avoiding duplicate Skyfield observations at overlapping scan times.
     h = _motion_window_hours(body)
     past = query_dt_utc - timedelta(hours=h)
     future = query_dt_utc + timedelta(hours=h)
@@ -549,25 +555,53 @@ def _derived_scores(topic_results: dict):
 
 
 @lru_cache(maxsize=1)
-def _krx_session_set() -> frozenset[str]:
+def _krx_calendar_data():
     path = Path(__file__).resolve().parent / "data" / "krx_sessions_2020_2027.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         values = payload.get("sessions") if isinstance(payload, dict) else payload
+        coverage = payload.get("range") if isinstance(payload, dict) else None
         if isinstance(values, list):
-            return frozenset(str(x) for x in values)
+            start = str(coverage[0]) if isinstance(coverage, list) and len(coverage) >= 2 else "2020-01-01"
+            end = str(coverage[1]) if isinstance(coverage, list) and len(coverage) >= 2 else "2027-08-27"
+            return frozenset(str(x) for x in values), start, end
     except Exception:
         pass
-    return frozenset()
+    return frozenset(), None, None
+
+
+def _krx_session_set() -> frozenset[str]:
+    return _krx_calendar_data()[0]
+
+
+def _krx_calendar_precision(start_date: date, end_date: date):
+    sessions, exact_start, exact_end = _krx_calendar_data()
+    if not sessions or not exact_start or not exact_end:
+        return {
+            "mode": "weekday_fallback",
+            "exact_range": None,
+            "warning": "XKRX 정확 거래일 캘린더를 읽지 못해 평일 기준으로 계산함",
+        }
+    start_iso, end_iso = start_date.isoformat(), end_date.isoformat()
+    if exact_start <= start_iso and end_iso <= exact_end:
+        mode = "exact_xkrx"
+        warning = None
+    elif end_iso < exact_start or start_iso > exact_end:
+        mode = "weekday_fallback"
+        warning = f"{exact_end} 이후(또는 {exact_start} 이전)는 확정 XKRX 휴장일 데이터 범위 밖이라 평일 기준을 사용함"
+    else:
+        mode = "mixed"
+        warning = f"{exact_start}~{exact_end}는 XKRX 정확 거래일, 범위 밖 날짜는 평일 기준을 함께 사용함"
+    return {"mode": mode, "exact_range": [exact_start, exact_end], "warning": warning}
 
 
 def _is_market_day(day_value: date) -> bool:
-    # Runtime stays lightweight: the exact XKRX calendar is precomputed at build
-    # time through the currently available range. Outside it we explicitly fall
-    # back to weekdays instead of loading pandas/exchange_calendars in Render.
-    sessions = _krx_session_set()
+    # Runtime stays lightweight: exact XKRX sessions are precomputed. Outside
+    # their explicit coverage we retain the old weekday fallback, but now expose
+    # that precision downgrade in the response instead of silently implying exactness.
+    sessions, exact_start, exact_end = _krx_calendar_data()
     iso = day_value.isoformat()
-    if sessions and "2020-01-01" <= iso <= "2027-08-27":
+    if sessions and exact_start and exact_end and exact_start <= iso <= exact_end:
         return iso in sessions
     return day_value.weekday() < 5
 
@@ -917,10 +951,14 @@ def _western_payload(
     relationship_signals = {
         key: _period_stats(rows, key) for key in ["수신신호", "발신적합", "과거인연접점"]
     }
+    market_precision = _krx_calendar_precision(start_date, end_date)
     market_info = {
         "has_open_session": bool(market_rows),
         "session_count": len(market_rows),
         "session_dates": [r["date"] for r in market_rows],
+        "calendar_mode": market_precision["mode"],
+        "calendar_exact_range": market_precision["exact_range"],
+        "calendar_warning": market_precision["warning"],
     }
     # Intraday evidence is returned for a single selected day. Multi-day reports
     # keep best/caution dates but avoid multiplying expensive intraday scans.

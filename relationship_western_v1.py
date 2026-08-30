@@ -18,7 +18,7 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 
 import swisseph as swe
 
-ENGINE_VERSION = "relationship-western-v1.3-dual-chart-timing"
+ENGINE_VERSION = "relationship-western-v1.4-dual-house-audit"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -276,13 +276,20 @@ def _planet_positions(jd, include_moon=True):
 def _angles(jd, lat, lon):
     if lat is None or lon is None:
         return {}
-    cusps, ascmc = swe.houses(float(jd), float(lat), float(lon), b"P")
+    placidus_cusps, ascmc = swe.houses(float(jd), float(lat), float(lon), b"P")
+    asc = _norm(ascmc[0])
+    asc_sign = int(asc // 30.0)
+    whole_cusps = [float(((asc_sign + i) % 12) * 30.0) for i in range(12)]
+    placidus = [round(_norm(x), 6) for x in placidus_cusps]
     return {
-        "ASC": round(_norm(ascmc[0]), 6),
+        "ASC": round(asc, 6),
         "MC": round(_norm(ascmc[1]), 6),
         "DSC": round(_norm(ascmc[0] + 180.0), 6),
         "IC": round(_norm(ascmc[1] + 180.0), 6),
-        "cusps": [round(_norm(x), 6) for x in cusps],
+        # `cusps` remains a backward-compatible Placidus alias.
+        "cusps": placidus,
+        "placidus_cusps": placidus,
+        "whole_cusps": whole_cusps,
     }
 
 
@@ -435,22 +442,41 @@ def _house_of_longitude(cusps, longitude):
     return None
 
 
+def _whole_sign_house(asc_longitude, longitude):
+    asc_sign = int(_norm(asc_longitude) // 30.0)
+    planet_sign = int(_norm(longitude) // 30.0)
+    return (planet_sign - asc_sign) % 12 + 1
+
+
 def _house_overlays(source_chart, target_chart, source_label, target_label):
-    cusps = (target_chart.get("angles") or {}).get("cusps")
-    if not cusps:
+    angles = target_chart.get("angles") or {}
+    placidus_cusps = angles.get("placidus_cusps") or angles.get("cusps")
+    asc = angles.get("ASC")
+    if not placidus_cusps or asc is None:
         return {"available": False, "reason": f"{target_label} exact birth time/place required for house overlays"}
     rows=[]
     for planet, info in (source_chart.get("positions") or {}).items():
-        house=_house_of_longitude(cusps, info["lon"])
-        if house:
-            rows.append({"source": source_label, "planet": planet, "target": target_label, "house": house})
+        placidus_house = _house_of_longitude(placidus_cusps, info["lon"])
+        whole_house = _whole_sign_house(asc, info["lon"])
+        if placidus_house or whole_house:
+            rows.append({
+                "source": source_label,
+                "planet": planet,
+                "target": target_label,
+                # backward-compatible field; new consumers should use both fields below.
+                "house": placidus_house,
+                "placidus_house": placidus_house,
+                "whole_house": whole_house,
+            })
+    relationship_houses = {4,5,7,8}
     priority={4:0,5:1,7:2,8:3,1:4,10:5}
-    rows.sort(key=lambda x:(priority.get(x["house"],9), x["house"], x["planet"]))
+    rows.sort(key=lambda x:(min(priority.get(x.get("whole_house"),9), priority.get(x.get("placidus_house"),9)), x["planet"]))
     return {
         "available": True,
+        "systems": ["Whole Sign", "Placidus"],
         "all": rows,
-        "relationship_houses": [x for x in rows if x["house"] in {4,5,7,8}],
-        "note": "4=가정/정서적 기반, 5=연애/즐거움, 7=파트너십, 8=친밀감/공유자원. 사건 보장이나 궁합 점수가 아님",
+        "relationship_houses": [x for x in rows if x.get("whole_house") in relationship_houses or x.get("placidus_house") in relationship_houses],
+        "note": "Whole Sign(홀사인)과 Placidus(플라시두스)를 병행. 4=가정/정서적 기반, 5=연애/즐거움, 7=파트너십, 8=친밀감/공유자원. 두 체계가 다르면 각각 분리해서 읽고 사건 보장/궁합 점수로 합산하지 않음",
     }
 
 
@@ -500,7 +526,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "ok": True,
         "engine": ENGINE_VERSION,
         "zodiac": "tropical",
-        "house_system": "Placidus for exact-time natal/Davison/Marks charts",
+        "house_system": "Whole Sign + Placidus for exact-time natal/Davison/Marks charts",
         "secondary_key": "1 ephemeris day = 1 tropical year of life (365.2422 days)",
         "tertiary_key": f"Tertiary I: 1 ephemeris day = {TROPICAL_MONTH_DAYS} life days; completed lunar months",
         "orb_policy": "natal 3-6° by point; secondary 1.5°; tertiary 1.0°; major aspects + quincunx",
@@ -531,7 +557,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "available": bool(user_exact and cp_exact),
         "user_in_counterpart": _house_overlays(user_natal, cp_natal, "user", "counterpart"),
         "counterpart_in_user": _house_overlays(cp_natal, user_natal, "counterpart", "user"),
-        "precision_note": "Both exact birth times/places required. Unknown partner time disables partner-house overlays rather than estimating them." if not cp_exact else "Exact-time Placidus house overlays available.",
+        "precision_note": "Both exact birth times/places required. Unknown partner time disables partner-house overlays rather than estimating them." if not cp_exact else "Exact-time Whole Sign + Placidus house overlays available.",
     }
     result["composite"] = {
         "available": True,

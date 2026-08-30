@@ -249,8 +249,8 @@ rel_path.write_text(r, encoding='utf-8')
 edge_path = Path('supabase/functions/relationship-interpret-v9-preview/index.ts')
 if edge_path.exists():
     e = edge_path.read_text(encoding='utf-8')
-    needle = '- 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.\\n'
-    addition = needle + '- 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.\\n'
+    needle = '- 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.\n'
+    addition = needle + '- 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.\n'
     assert needle in e, 'edge house prompt anchor missing'
     e = e.replace(needle, addition, 1)
     edge_path.write_text(e, encoding='utf-8')
