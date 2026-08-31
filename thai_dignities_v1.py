@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Research-only Thai house-lord and basic planetary-status facts.
+"""Research-only Thai house-lord and planetary standard-table facts.
 
-Phase 2-B1 intentionally implements only table lookups that can be stated as
+Phase 2-B/2-C intentionally implements only table lookups that can be stated as
 factual positions. It does not attach predictions, benefic/malefic scores,
 event probabilities, house meanings, or Gemini interpretation.
 
@@ -10,17 +10,19 @@ Validated table scope:
 - ประ
 - อุจ
 - นิจ
+- ราชาโชค / เทวีโชค
+- มหาจักร / จุลจักร
 
 The supported standard table is the traditional 1..8 Thai planet set:
 Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu. Thai Ketu and Uranus
-remain explicitly unsupported in this dignity layer rather than being guessed.
+remain explicitly unsupported in this standard-table layer rather than guessed.
 """
 
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-ENGINE_VERSION = "thai-dignities-research-v1.0-basic-table"
+ENGINE_VERSION = "thai-dignities-research-v1.1-advanced-standards"
 
 SIGNS = (
     ("Aries", "เมษ", "양자리"),
@@ -64,8 +66,8 @@ SIGN_LORDS = (
     "jupiter",   # Pisces
 )
 
-# Each status is a set of sign indices by planet. Multiple statuses are allowed
-# because some tables overlap (for example Mercury in Virgo is both Kaset and Uj).
+# Basic standards. Multiple statuses are allowed because some tables overlap
+# (for example Mercury in Virgo is both Kaset and Uj).
 DIGNITY_SIGNS = {
     "kaset": {
         "sun": (4,), "moon": (3,), "mars": (0, 7), "mercury": (2, 5),
@@ -90,6 +92,34 @@ STATUS_META = {
     "pra": {"thai": "ประ", "label": "pra"},
     "ucca": {"thai": "อุจ", "label": "exaltation sign"},
     "nicha": {"thai": "นิจ", "label": "fall sign"},
+}
+
+# Additional Thai standard tables. These are kept separate from the basic
+# dignity statuses so later interpretation work cannot silently impose a rank.
+ADVANCED_STANDARD_SIGNS = {
+    "rachayok": {
+        "sun": (2,), "moon": (5,), "mars": (1,), "mercury": (4,),
+        "jupiter": (0,), "venus": (3,), "saturn": (7,), "rahu": (6,),
+    },
+    "thewiyok": {
+        "sun": (8,), "moon": (11,), "mars": (7,), "mercury": (10,),
+        "jupiter": (6,), "venus": (9,), "saturn": (1,), "rahu": (0,),
+    },
+    "mahachak": {
+        "sun": (3,), "moon": (0,), "mars": (5,), "mercury": (4,),
+        "jupiter": (7,), "venus": (8,), "saturn": (1,), "rahu": (9,),
+    },
+    "julachak": {
+        "sun": (9,), "moon": (6,), "mars": (11,), "mercury": (10,),
+        "jupiter": (1,), "venus": (2,), "saturn": (7,), "rahu": (3,),
+    },
+}
+
+ADVANCED_META = {
+    "rachayok": {"thai": "ราชาโชค", "label": "Rachayok table position"},
+    "thewiyok": {"thai": "เทวีโชค", "label": "Thewiyok table position"},
+    "mahachak": {"thai": "มหาจักร", "label": "Mahachak table position"},
+    "julachak": {"thai": "จุลจักร", "label": "Julachak table position"},
 }
 
 
@@ -128,6 +158,20 @@ def dignity_statuses_for_planet(*, planet_key: str, sign_index: int) -> list[dic
     return out
 
 
+def advanced_standard_statuses_for_planet(*, planet_key: str, sign_index: int) -> list[dict[str, Any]]:
+    if planet_key not in PLANETS:
+        return []
+    idx = int(sign_index)
+    if not 0 <= idx <= 11:
+        raise ValueError("sign_index must be within 0..11")
+    out: list[dict[str, Any]] = []
+    for status_key in ("rachayok", "thewiyok", "mahachak", "julachak"):
+        if idx in ADVANCED_STANDARD_SIGNS[status_key][planet_key]:
+            meta = ADVANCED_META[status_key]
+            out.append({"key": status_key, "thai": meta["thai"], "label": meta["label"]})
+    return out
+
+
 def _resolve_sign(row: Mapping[str, Any]) -> int:
     if row.get("sign_index") is None:
         raise ValueError("position requires sign_index")
@@ -151,7 +195,8 @@ def build_dignity_research(planet_positions: Mapping[str, Mapping[str, Any]]) ->
             "sign": _sign_payload(sign_index),
             "sign_lord": house_lord_for_sign(sign_index),
             "statuses": dignity_statuses_for_planet(planet_key=key, sign_index=sign_index) if supported else [],
-            "unsupported_reason": None if supported else "No validated basic dignity table in this research layer for this body.",
+            "advanced_standards": advanced_standard_statuses_for_planet(planet_key=key, sign_index=sign_index) if supported else [],
+            "unsupported_reason": None if supported else "No validated Thai standard table in this research layer for this body.",
         }
 
     return {
@@ -164,16 +209,19 @@ def build_dignity_research(planet_positions: Mapping[str, Mapping[str, Any]]) ->
             "house_lord_and_kaset": "traditional Thai Kaset table",
             "pra": "traditional Thai Pra table",
             "ucca_nicha": "traditional Thai Uj/Nij table",
+            "rachayok_thewiyok": "traditional Thai Rachayok/Thewiyok sign tables",
+            "mahachak_julachak": "traditional Thai Mahachak/Julachak sign tables",
         },
         "promotion_gate": {
             "table_facts_validated": True,
+            "advanced_standard_table_facts_validated": True,
             "interpretive_strength_validated": False,
             "house_meanings_allowed": False,
             "scores_allowed": False,
             "event_judgement_allowed": False,
             "gemini_interpretation_allowed": False,
         },
-        "policy": "Table facts only. Multiple statuses may coexist; no rank, score, good/bad judgement, or prediction is produced.",
+        "policy": "Table facts only. Basic and advanced statuses may coexist; no rank, score, good/bad judgement, or prediction is produced.",
     }
 
 
