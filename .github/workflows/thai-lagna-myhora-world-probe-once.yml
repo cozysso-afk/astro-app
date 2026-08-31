@@ -1,0 +1,111 @@
+name: Thai Lagna MyHora world numeric probe
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-lagna-myhora-world-probe-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check requests beautifulsoup4
+      - name: Probe MyHora world-coordinate numeric tables
+        run: |
+          python - <<'PY'
+          import re, requests, time
+          from bs4 import BeautifulSoup
+          from urllib.parse import urlencode
+
+          base='https://www.myhora.com'
+          landing=base+'/astrology/thai.aspx'
+          endpoint=base+'/astrology/thai/calendar-ascendant.aspx'
+          ua='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+          cases=[
+            ('Yeosu','19910321072600','34.7604','127.6622','9.00'),
+            ('Seoul','19910321072600','37.5665','126.9780','9.00'),
+            ('Tokyo','19910321072600','35.6762','139.6503','9.00'),
+            ('NewYork','19910321072600','40.7128','-74.0060','-5.00'),
+          ]
+          headers={
+            'User-Agent':ua,
+            'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language':'th-TH,th;q=0.9,en-US;q=0.7,en;q=0.5',
+            'Referer':landing,
+            'Cache-Control':'no-cache',
+          }
+
+          def text_block(html):
+            soup=BeautifulSoup(html,'html.parser')
+            strings=list(soup.stripped_strings)
+            # Keep the first Suriyayat Lagna table plus criteria text only.
+            try:
+              start=next(i for i,s in enumerate(strings) if s.startswith('ลัคนา เวลา'))
+            except StopIteration:
+              start=0
+            end=min(len(strings), start+120)
+            return strings[start:end]
+
+          for name,ndate,lat,lon,utc in cases:
+            print('\n=== CASE',name,'===')
+            success=False
+            # Try no cid first so explicit coordinates are authoritative; then
+            # known calendar defaults only as fallbacks. Never accept a result
+            # unless returned criteria text contains the requested coordinates.
+            variants=[
+              {'ndate':ndate,'lat':lat,'lon':lon,'utc':utc,'pid':'1','aid':'40'},
+              {'ndate':ndate,'lat':lat,'lon':lon,'utc':utc,'cid':'0','pid':'1','aid':'40'},
+              {'ndate':ndate,'lat':lat,'lon':lon,'utc':utc,'cid':'215','pid':'1','aid':'40'},
+            ]
+            for vi,params in enumerate(variants,1):
+              s=requests.Session()
+              try:
+                warm=s.get(landing,headers=headers,timeout=30)
+                print('VARIANT',vi,'WARM',warm.status_code,'cookies',bool(s.cookies))
+                r=s.get(endpoint,params=params,headers=headers,timeout=30,allow_redirects=True)
+                print('VARIANT',vi,'GET',r.status_code,'URL',r.url,'BYTES',len(r.content))
+                if r.status_code != 200:
+                  continue
+                r.encoding=r.apparent_encoding or 'utf-8'
+                plain=' '.join(BeautifulSoup(r.text,'html.parser').stripped_strings)
+                coord_ok=(lat in plain and lon.rstrip('0').rstrip('.') in plain)
+                # Decimal rendering may be converted to DMS, so also accept a
+                # criteria block if URL retains exact coordinates and the page
+                # explicitly contains the Lagna criteria marker.
+                criteria=('เกณฑ์คำนวณลัคนา' in plain)
+                url_ok=(f'lat={lat}' in r.url and f'lon={lon}' in r.url)
+                print('CHECK coord_text=',coord_ok,'criteria=',criteria,'url_coords=',url_ok)
+                block=text_block(r.text)
+                print('BLOCK_BEGIN')
+                for item in block:
+                  print(item)
+                print('BLOCK_END')
+                if criteria and url_ok and any('อันโตนาทีสามัญ' in x for x in block):
+                  success=True
+                  print('WORLD_NUMERIC_PAGE_ACCEPTED',name,'variant',vi)
+                  break
+              except Exception as exc:
+                print('VARIANT_ERROR',vi,type(exc).__name__,str(exc)[:300])
+              time.sleep(1)
+            print('CASE_RESULT',name,'ACCEPTED' if success else 'NO_USABLE_PAGE')
+          PY
+      - name: Clean one-shot workflow
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/thai-lagna-myhora-world-probe-once.yml
+          git commit -m 'chore: clean MyHora world numeric probe workflow'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
