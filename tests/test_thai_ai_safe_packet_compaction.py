@@ -89,7 +89,19 @@ class ThaiPhase2G51AiSafePacketCompactionTests(unittest.TestCase):
         packet = compact["ai_safe_descriptive_packet"]
         self.assertEqual(packet["route_count"], 12)
         self.assertEqual(packet["routes"][0]["route_key"], "H1:mars->H10")
+        self.assertEqual(packet["routes"][0]["source_topic_domains"], ["self"])
+        self.assertEqual(packet["routes"][0]["carrier_planet"]["key"], "mars")
+        self.assertEqual(packet["routes"][0]["destination_context_domains"], ["career"])
         self.assertEqual(packet["routes"][0]["interpretation_level"], "descriptive_nonpredictive")
+
+    def test_transport_packet_keeps_safe_semantics_but_drops_duplicate_relation_detail(self):
+        compact = _compact_thai_suriyayat(self._suriyayat(True))
+        packet = compact["ai_safe_descriptive_packet"]
+        self.assertEqual(len(packet["routes"]), 12)
+        for route in packet["routes"]:
+            self.assertIn("basic_status_modifiers", route)
+            self.assertNotIn("relation_context_tags", route)
+        self.assertLess(len(json.dumps(packet, ensure_ascii=False)), 6000)
 
     def test_second_whitelist_strips_research_policy_prediction_and_score(self):
         compact = _compact_thai_suriyayat(self._suriyayat(True))

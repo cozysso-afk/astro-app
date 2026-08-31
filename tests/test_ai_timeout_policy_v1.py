@@ -19,16 +19,43 @@ class GeminiTimeoutPolicyTests(unittest.TestCase):
         first=call.call_args_list[0].kwargs
         second=call.call_args_list[1].kwargs
         self.assertEqual(first["timeout_seconds"],34.0)
-        self.assertEqual(first["thinking_level"],"high")
+        self.assertEqual(first["thinking_level"],"medium")
         self.assertFalse(first["compact_output"])
         self.assertEqual(second["timeout_seconds"],34.0)
-        self.assertEqual(second["thinking_level"],"medium")
+        self.assertEqual(second["thinking_level"],"low")
         self.assertTrue(second["compact_output"])
         self.assertLess(first["timeout_seconds"],40.0)
         self.assertLess(second["timeout_seconds"],40.0)
 
-    def test_interpreter_version_marks_structured_json_hotfix(self):
-        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.3-thai-legacy-schema-compatible")
+    def test_interpreter_version_marks_transport_budget_hotfix(self):
+        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.4-thai-transport-budgeted")
+
+    def test_double_failure_preserves_fallback_transport_diagnostics(self):
+        primary={
+            "ok":False,
+            "error":"primary timeout",
+            "model":"gemini-3.7-flash",
+            "thinking_level":"medium",
+            "elapsed_seconds":34.01,
+        }
+        fallback={
+            "ok":False,
+            "error":"fallback timeout",
+            "model":"gemini-3.6-flash",
+            "thinking_level":"low",
+            "compact_output":True,
+            "timeout_seconds":34.0,
+            "elapsed_seconds":34.02,
+            "request_chars":32000,
+        }
+        with patch.dict(os.environ,{"GEMINI_API_KEY":"test-key"},clear=False):
+            with patch("ai_interpret_v1._call_model_with_thai_output_safety",side_effect=[primary,fallback]):
+                result=ai.interpret_integrated_fortune({},"gemini-3.7-flash")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["fallback_error"],"fallback timeout")
+        self.assertEqual(result["fallback_diagnostics"]["model"],"gemini-3.6-flash")
+        self.assertEqual(result["fallback_diagnostics"]["thinking_level"],"low")
+        self.assertEqual(result["fallback_diagnostics"]["request_chars"],32000)
 
 
 if __name__ == "__main__":
