@@ -1,0 +1,147 @@
+name: Thai Phase 2F1 contextual evidence graph
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2f1-context-graph-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Attach research-only contextual evidence graph
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'from thai_house_lord_routes_v1 import build_house_lord_routes_research\n':
+                  'from thai_house_lord_routes_v1 import build_house_lord_routes_research\nfrom thai_context_graph_v1 import build_context_graph_research\n',
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.8-phase2e2-house-lord-routes-research"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.9-phase2f1-context-graph-research"',
+              '    house_lord_routes_research = build_house_lord_routes_research(\n        houses_research=houses_research,\n        house_lords_research=house_lords_research,\n        dignities_research=dignities_research,\n    )\n\n    return {':
+                  '    house_lord_routes_research = build_house_lord_routes_research(\n        houses_research=houses_research,\n        house_lords_research=house_lords_research,\n        dignities_research=dignities_research,\n    )\n    context_graph_research = build_context_graph_research(\n        house_lord_routes_research=house_lord_routes_research,\n        houses_research=houses_research,\n        aspects_research=aspects_research,\n        planet_pairs_research=planet_pairs_research,\n        semantics_research=semantics_research,\n        interpretation_policy_research=interpretation_policy_research,\n    )\n\n    return {',
+              '        "house_lord_routes_research": house_lord_routes_research,\n        "dignities_research": dignities_research,':
+                  '        "house_lord_routes_research": house_lord_routes_research,\n        "context_graph_research": context_graph_research,\n        "dignities_research": dignities_research,',
+              '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_dignity_aspect_planet_pair_semantics_policy_research",':
+                  '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_context_graph_dignity_aspect_planet_pair_semantics_policy_research",',
+              '            "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",\n            "suriyayat_context_graph": "research_only_evidence_join_with_conflicts_preserved",\n            "suriyayat_predictive_rules": "not_implemented",',
+              '            "Suriyayat house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",':
+                  '            "Suriyayat context-graph synthesis into outcomes, house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Phase 2F1 anchor: ' + old[:160])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2F1 full 120-test regression matrix
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          for pattern in \
+            test_thai_context_graph_v1.py \
+            test_thai_context_graph_integration.py \
+            test_thai_house_lord_routes_v1.py \
+            test_thai_house_lord_routes_integration.py \
+            test_thai_planet_pairs_v1.py \
+            test_thai_planet_pairs_integration.py \
+            test_thai_interpretation_policy_v1.py \
+            test_thai_interpretation_policy_integration.py \
+            test_thai_semantics_v1.py \
+            test_thai_phase2c_labels_standards.py \
+            test_thai_dignities_v1.py \
+            test_thai_aspects_v1.py \
+            test_thai_rules_phase2b_integration.py \
+            'test_thai_houses*.py' \
+            'test_thai_lagna*.py' \
+            test_ai_thai_research_isolation.py
+          do
+            python -m unittest discover -s tests -p "$pattern" -v
+          done
+
+      - name: Compile Thai modules
+        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_context_graph_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify evidence graph and all synthesis gates stay closed
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation
+          from thai_astrology_v2 import build_thai_fortune
+
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          suri = thai['suriyayat']
+          graph = suri['context_graph_research']
+          assert graph['available'] is True and graph['research_only'] is True
+          assert len(graph['route_contexts']) == 12
+          assert [r['source_house']['house_number'] for r in graph['route_contexts']] == list(range(1,13))
+          for row in graph['route_contexts']:
+              assert row['net_valence'] is None
+              assert row['combined_judgement'] is None
+              assert row['prediction'] is None
+              assert row['score'] is None
+              for rel in row['evidence']['planet_relations']:
+                  assert rel['aspect_strength_percent'] is None
+                  assert rel['pair_net_valence'] is None
+                  assert rel['combined_effect'] is None
+          gate = graph['promotion_gate']
+          assert gate['context_graph_structure_validated'] is True
+          assert gate['route_context_join_validated'] is True
+          assert gate['pair_multilabel_join_validated'] is True
+          assert gate['advanced_standard_meaning_validated'] is False
+          assert gate['aspect_strength_canonicalized'] is False
+          assert gate['net_valence_allowed'] is False
+          assert gate['combined_judgement_allowed'] is False
+          assert gate['scores_allowed'] is False
+          assert gate['event_judgement_allowed'] is False
+          assert gate['gemini_interpretation_allowed'] is False
+          assert suri['lagna']['available'] is False
+          compact_suri = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          assert 'context_graph_research' not in compact_suri
+          encoded = json.dumps(compact_suri, ensure_ascii=False)
+          assert 'multi_label_pair_overlap_present' not in encoded
+          assert 'aspect_strength_canonical_percent' not in encoded
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.9-phase2f1-context-graph-research'
+          print('PHASE2F1_CONTEXT_EVIDENCE_GRAPH_PASS_CONFLICTS_PRESERVED_SYNTHESIS_GEMINI_BLOCKED')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2F1 state and clean workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_context_graph_v1.py tests/test_thai_context_graph_v1.py tests/test_thai_context_graph_integration.py tests/test_thai_house_lord_routes_integration.py
+          git rm -f .github/workflows/thai-phase2f1-context-graph-once.yml
+          git commit -m 'research: validate Thai contextual evidence graph'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
