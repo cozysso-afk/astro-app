@@ -27,8 +27,9 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 from typing import Any
 
 from thai_suriyayat_v1 import ENGINE_VERSION as SURIYAYAT_ENGINE_VERSION, SOURCE_COMMIT as SURIYAYAT_SOURCE_COMMIT, calculate_positions_for_instant
+from thai_lagna_v1 import ENGINE_VERSION as LAGNA_RESEARCH_ENGINE_VERSION, build_suriyayat_lagna_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.1"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.2-lagna-research"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -181,6 +182,8 @@ def _suriyayat_layer(
     start_date: date,
     end_date: date,
     utc_offset_hours: float,
+    latitude: float | None,
+    longitude: float | None,
 ) -> dict[str, Any]:
     local_tz = timezone(timedelta(hours=float(utc_offset_hours)))
     natal_instant = datetime.combine(birth_date, birth_time, tzinfo=local_tz)
@@ -189,6 +192,13 @@ def _suriyayat_layer(
     natal = calculate_positions_for_instant(natal_instant)
     start_snapshot = calculate_positions_for_instant(start_instant)
     end_snapshot = start_snapshot if end_date == start_date else calculate_positions_for_instant(end_instant)
+    lagna_research = build_suriyayat_lagna_research(
+        birth_date=birth_date,
+        birth_time=birth_time,
+        latitude=latitude,
+        longitude=longitude,
+        utc_offset_hours=utc_offset_hours,
+    )
     return {
         "available": True,
         "engine": SURIYAYAT_ENGINE_VERSION,
@@ -207,9 +217,10 @@ def _suriyayat_layer(
         "period_end": _compact_suriyayat_snapshot(end_snapshot),
         "lagna": {
             "available": False,
-            "reason": "Global-coordinate Suriyayat Lagna is not independently validated; Thailand province-offset lookup is not reused for Korean/world birthplaces.",
+            "reason": "Global-coordinate Suriyayat Lagna is still research-only. Candidate methods are exposed separately and are not used for houses, dignity, scoring, or Gemini interpretation.",
         },
-        "interpretation_status": "planetary_position_facts_only",
+        "lagna_research": lagna_research,
+        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_research",
         "policy": "Traditional 10-planet position facts only. No Western-score blending, no Thai house/aspect judgement, and no event probability.",
     }
 
@@ -220,6 +231,8 @@ def build_thai_fortune(
     start_date: date,
     end_date: date,
     utc_offset_hours: float = 9.0,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> dict[str, Any]:
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
@@ -227,7 +240,7 @@ def build_thai_fortune(
     day_key = _thai_day_key(birth_date, birth_time)
     thai_day, birth_planet, rule = _DAY_META[day_key]
     natal_wheel = _wheel(birth_planet)
-    suriyayat = _suriyayat_layer(birth_date, birth_time, start_date, end_date, utc_offset_hours)
+    suriyayat = _suriyayat_layer(birth_date, birth_time, start_date, end_date, utc_offset_hours, latitude, longitude)
 
     segments = []
     boundaries = _period_boundaries(birth_date, start_date, end_date)
@@ -273,11 +286,12 @@ def build_thai_fortune(
             "mahathaksa_wheel": "established_table_rule",
             "taksajorn": "documented_method_variant",
             "suriyayat_10planet_positions": "cross_validated_30_vectors_max_4_arcmin",
-            "suriyayat_lagna": "not_implemented",
+            "suriyayat_lagna": "research_only_not_promoted",
+            "suriyayat_lagna_research_engine": LAGNA_RESEARCH_ENGINE_VERSION,
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
-            "global-coordinate Suriyayat Lagna",
+            "validated/promoted global-coordinate Suriyayat Lagna",
             "Suriyayat houses/dignities/aspect judgement",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",

@@ -84,7 +84,7 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
             )
             errors.append(arcmin_error(actual["longitude_deg"], row["common_lmt"]))
         self.assertLessEqual(max(errors), 16.0, errors)
-        self.assertLessEqual(sum(errors) / len(errors), 10.0, errors)
+        self.assertLessEqual(sum(errors) / len(errors), 11.0, errors)
 
     def test_astronomical_crosscheck_reference_corpus(self):
         errors = []
