@@ -64,10 +64,13 @@ class ThaiPhase2E1PlanetPairIntegrationTests(unittest.TestCase):
         thai = self._thai()
         self.assertFalse(thai["suriyayat"]["lagna"]["available"])
         self.assertIn("pair", thai["suriyayat"]["interpretation_status"])
-        self.assertEqual(
-            thai["engine"],
-            "thai-mahathaksa-taksajorn-suriyayat-v2.7-phase2e1-planetpairs-research",
-        )
+        # This is a Phase 2E1 regression contract, not a permanent pin to the
+        # Phase 2E1 top-level engine version. Later research phases may bump the
+        # engine while the pair layer must remain attached and gated correctly.
+        self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
+        research = thai["suriyayat"]["planet_pairs_research"]
+        self.assertEqual(research["engine"], "thai-planet-pairs-research-v1.0-multilabel")
+        self.assertFalse(research["promotion_gate"]["gemini_interpretation_allowed"])
 
 
 if __name__ == "__main__":
