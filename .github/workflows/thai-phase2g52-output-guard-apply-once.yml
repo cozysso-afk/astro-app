@@ -1,0 +1,292 @@
+name: Thai Phase 2G5.2 output guard apply once
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2g52-output-guard-apply-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Patch Gemini output safety integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('ai_interpret_v1.py')
+          text = path.read_text(encoding='utf-8')
+
+          old_import = '''from thai_lagna_product_v1 import (
+              ENGINE_VERSION as THAI_LAGNA_PRODUCT_ENGINE_VERSION,
+              lagna_numeric_identity_is_valid,
+              product_routes_are_complete,
+          )
+          '''
+          old_import = old_import.replace('          ', '')
+          new_import = old_import + '''from thai_ai_output_guard_v1 import (
+              build_thai_output_fallback,
+              inspect_thai_output_safety,
+              strict_thai_retry_instruction,
+              thai_output_guard_required,
+          )
+          '''.replace('          ', '')
+          if old_import not in text:
+              raise SystemExit('missing Thai Lagna import block')
+          text = text.replace(old_import, new_import, 1)
+
+          old_version = 'AI_INTERPRETER_VERSION = "mobile-ai-v2.7-thai-lagna-fail-closed"'
+          new_version = 'AI_INTERPRETER_VERSION = "mobile-ai-v2.8-thai-output-guard-retry-fallback"'
+          if old_version not in text:
+              raise SystemExit('missing AI interpreter version anchor')
+          text = text.replace(old_version, new_version, 1)
+
+          old_sig = 'def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, timeout_seconds: float = 24.0, thinking_level: str = "high") -> dict[str, Any]:'
+          new_sig = 'def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, timeout_seconds: float = 24.0, thinking_level: str = "high", strict_thai_output_guard: bool = False) -> dict[str, Any]:'
+          if old_sig not in text:
+              raise SystemExit('missing _call_model signature anchor')
+          text = text.replace(old_sig, new_sig, 1)
+
+          old_prompt_start = '''    safe_model = urllib.parse.quote(model_name, safe="-._")
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
+              prompt = (
+          '''.replace('              ', '    ')
+          new_prompt_start = '''    safe_model = urllib.parse.quote(model_name, safe="-._")
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
+              compact_calculation = _compact_calculation(calculation)
+              strict_instruction = strict_thai_retry_instruction() if strict_thai_output_guard else ""
+              prompt = (
+          '''.replace('              ', '    ')
+          if old_prompt_start not in text:
+              raise SystemExit('missing prompt start anchor')
+          text = text.replace(old_prompt_start, new_prompt_start, 1)
+
+          old_payload = '''        + json.dumps(_compact_calculation(calculation), ensure_ascii=False, separators=(",", ":"), default=str)
+              )
+          '''.replace('              ', '    ')
+          new_payload = '''        + json.dumps(compact_calculation, ensure_ascii=False, separators=(",", ":"), default=str)
+                  + strict_instruction
+              )
+          '''.replace('              ', '    ')
+          if old_payload not in text:
+              raise SystemExit('missing compact calculation prompt anchor')
+          text = text.replace(old_payload, new_payload, 1)
+
+          old_validation = '''        validated = _validate_output(parsed)
+                  if not validated:
+                      return {"ok": False, "error": "AI 해설 응답 구조를 검증하지 못했어.", "model": model_name}
+          '''.replace('                  ', '        ')
+          new_validation = old_validation + '''        guard = inspect_thai_output_safety(
+                    validated,
+                    thai_packet_present=thai_output_guard_required(compact_calculation),
+                )
+                if not guard.get("safe"):
+                    return {
+                        "ok": False,
+                        "error": "Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",
+                        "model": model_name,
+                        "interpreter_version": AI_INTERPRETER_VERSION,
+                        "thinking_level": thinking_level,
+                        "output_guard_failed": True,
+                        "guard_violations": guard.get("violations") or [],
+                        "guard_engine": guard.get("guard_engine"),
+                        "unsafe_data": validated,
+                    }
+          '''.replace('                ', '        ')
+          if old_validation not in text:
+              raise SystemExit('missing output validation anchor')
+          text = text.replace(old_validation, new_validation, 1)
+
+          interpret_anchor = '\n\ndef interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: str | None = None) -> dict[str, Any]:\n'
+          if interpret_anchor not in text:
+              raise SystemExit('missing interpret function anchor')
+          wrapper = '''
+
+          def _call_model_with_thai_output_safety(
+              calculation: dict[str, Any],
+              model_name: str,
+              api_key: str,
+              *,
+              timeout_seconds: float,
+              thinking_level: str,
+          ) -> dict[str, Any]:
+              """One strict retry for Thai output violations, then non-Thai fallback."""
+              first = _call_model(
+                  calculation,
+                  model_name,
+                  api_key,
+                  timeout_seconds=timeout_seconds,
+                  thinking_level=thinking_level,
+                  strict_thai_output_guard=False,
+              )
+              if first.get("output_guard_failed") is not True:
+                  return first
+
+              retry = _call_model(
+                  calculation,
+                  model_name,
+                  api_key,
+                  timeout_seconds=timeout_seconds,
+                  thinking_level=thinking_level,
+                  strict_thai_output_guard=True,
+              )
+              if retry.get("ok"):
+                  retry["thai_safety_retry"] = True
+                  retry["thai_safety_retry_reason"] = "output_guard"
+                  return retry
+
+              unsafe = retry.get("unsafe_data") if isinstance(retry.get("unsafe_data"), dict) else first.get("unsafe_data")
+              fallback = build_thai_output_fallback(unsafe)
+              fallback_validated = _validate_output(fallback) if isinstance(fallback, dict) else None
+              fallback_guard = inspect_thai_output_safety(fallback_validated, thai_packet_present=True) if fallback_validated else {"safe": False}
+              if fallback_validated and fallback_guard.get("safe"):
+                  return {
+                      "ok": True,
+                      "data": fallback_validated,
+                      "model": retry.get("model") or first.get("model") or model_name,
+                      "interpreter_version": AI_INTERPRETER_VERSION,
+                      "thinking_level": retry.get("thinking_level") or first.get("thinking_level") or thinking_level,
+                      "thai_safety_retry": True,
+                      "thai_safety_fallback": True,
+                      "thai_safety_retry_error": retry.get("error"),
+                      "thai_safety_guard_violations": retry.get("guard_violations") or first.get("guard_violations") or [],
+                  }
+
+              retry["thai_safety_retry"] = True
+              retry["thai_safety_fallback_failed"] = True
+              return retry
+          '''.replace('          ', '')
+          text = text.replace(interpret_anchor, wrapper + interpret_anchor, 1)
+
+          old_primary = '    primary = _call_model(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")'
+          new_primary = '    primary = _call_model_with_thai_output_safety(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")'
+          old_fallback = '    fallback = _call_model(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=16.0, thinking_level="medium")'
+          new_fallback = '    fallback = _call_model_with_thai_output_safety(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=16.0, thinking_level="medium")'
+          if old_primary not in text or old_fallback not in text:
+              raise SystemExit('missing interpret call anchors')
+          text = text.replace(old_primary, new_primary, 1).replace(old_fallback, new_fallback, 1)
+          path.write_text(text, encoding='utf-8')
+
+          workflow = Path('.github/workflows/thai-phase2g5-product-promotion-once.yml')
+          w = workflow.read_text(encoding='utf-8')
+          replacements = {
+              'name: Thai Phase 2G5.1 fail-closed regression': 'name: Thai Phase 2G5.2 output safety regression',
+              '      - \'ai_interpret_v1.py\'': '      - \'ai_interpret_v1.py\'\n      - \'thai_ai_output_guard_v1.py\'',
+              '      - name: Run Phase 2G5.1 exact 221-test regression matrix': '      - name: Run Phase 2G5.2 exact 239-test regression matrix',
+              "              'test_thai_lagna_product_v1.py', 'test_thai_lagna_product_integration.py',": "              'test_thai_ai_output_guard_v1.py', 'test_thai_ai_output_guard_integration.py',\n              'test_thai_lagna_product_v1.py', 'test_thai_lagna_product_integration.py',",
+              "          print(f'PHASE2G51_DISCOVERED_TESTS={total}')": "          print(f'PHASE2G52_DISCOVERED_TESTS={total}')",
+              '          if total != 221:': '          if total != 239:',
+              "              raise SystemExit(f'expected 221 tests, discovered {total}')": "              raise SystemExit(f'expected 239 tests, discovered {total}')",
+              "          print(f'PHASE2G51_RESULT={result.testsRun}/{total}')": "          print(f'PHASE2G52_RESULT={result.testsRun}/{total}')",
+              'thai_lagna_product_v1.py thai_astrology_v2.py ai_interpret_v1.py': 'thai_lagna_product_v1.py thai_ai_output_guard_v1.py thai_astrology_v2.py ai_interpret_v1.py',
+              "          print('PHASE2G51_FAIL_CLOSED_PRODUCT_SCOPE_PASS')": "          print('PHASE2G52_OUTPUT_GUARD_PRODUCT_SCOPE_PASS')",
+          }
+          for old, new in replacements.items():
+              if old not in w:
+                  raise SystemExit('missing persistent workflow anchor: ' + old)
+              w = w.replace(old, new, 1)
+          workflow.write_text(w, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run exact 239-test Thai regression matrix
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import sys
+          import unittest
+          patterns = [
+              'test_thai_ai_output_guard_v1.py', 'test_thai_ai_output_guard_integration.py',
+              'test_thai_lagna_product_v1.py', 'test_thai_lagna_product_integration.py',
+              'test_thai_lagna_promotion_audit_v1.py', 'test_thai_lagna_promotion_audit_integration.py',
+              'test_thai_ai_safe_packet_v1.py', 'test_thai_ai_safe_packet_integration.py',
+              'test_thai_ai_safe_packet_compaction.py', 'test_thai_phase2g2_profile_differential.py',
+              'test_thai_phase2g2_profile_differential_integration.py', 'test_thai_school_policy_v1.py',
+              'test_thai_school_policy_integration.py', 'test_thai_dignity_exceptions_v1.py',
+              'test_thai_dignity_exceptions_integration.py', 'test_thai_descriptive_synthesis_v1.py',
+              'test_thai_descriptive_synthesis_integration.py', 'test_thai_context_graph_v1.py',
+              'test_thai_context_graph_integration.py', 'test_thai_house_lord_routes_v1.py',
+              'test_thai_house_lord_routes_integration.py', 'test_thai_planet_pairs_v1.py',
+              'test_thai_planet_pairs_integration.py', 'test_thai_interpretation_policy_v1.py',
+              'test_thai_interpretation_policy_integration.py', 'test_thai_semantics_v1.py',
+              'test_thai_phase2c_labels_standards.py', 'test_thai_dignities_v1.py',
+              'test_thai_aspects_v1.py', 'test_thai_rules_phase2b_integration.py',
+              'test_thai_houses*.py', 'test_thai_lagna_boundary_gold.py', 'test_thai_lagna_phase1d.py',
+              'test_thai_lagna_v1.py', 'test_thai_lagna_world_gold.py', 'test_ai_thai_research_isolation.py',
+          ]
+          loader = unittest.defaultTestLoader
+          suite = unittest.TestSuite()
+          total = 0
+          for pattern in patterns:
+              found = loader.discover('tests', pattern=pattern)
+              count = found.countTestCases()
+              print(f'{pattern}: {count}')
+              total += count
+              suite.addTests(found)
+          print(f'PHASE2G52_DISCOVERED_TESTS={total}')
+          if total != 239:
+              raise SystemExit(f'expected 239 tests, discovered {total}')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          print(f'PHASE2G52_RESULT={result.testsRun}/{total}')
+          if not result.wasSuccessful():
+              sys.exit(1)
+          PY
+
+      - name: Compile output guard and AI modules
+        run: python -m py_compile thai_ai_output_guard_v1.py ai_interpret_v1.py thai_astrology_v2.py thai_lagna_product_v1.py
+
+      - name: Verify fallback is fail-safe and non-predictive
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from thai_ai_output_guard_v1 import build_thai_output_fallback, inspect_thai_output_safety
+          bad = {
+              'headline': '점검',
+              'overall': {'summary': 'Western은 점검이 필요해. Thai Lagna상 반드시 연락이 온다.', 'dominant_pattern':'', 'best_phase':'', 'caution_phase':''},
+              'clusters': {'relationship':'재회 확률 90%야.', 'work_study':'', 'money_news':'', 'investment':'', 'condition':''},
+              'systems': {'western':'Western 근거', 'saju':'', 'thai':'Suriyayat 기준 9월 3일 반드시 재회한다.'},
+              'priorities': [], 'topic_analysis': {}, 'limits': '',
+          }
+          guard = inspect_thai_output_safety(bad, thai_packet_present=True)
+          assert guard['safe'] is False
+          codes = {x['code'] for x in guard['violations']}
+          assert 'numeric_probability' in codes
+          assert 'deterministic_event' in codes
+          assert 'thai_exact_timing' in codes
+          fallback = build_thai_output_fallback(bad)
+          assert fallback['systems']['thai'] == ''
+          assert 'Western은 점검이 필요해' in fallback['overall']['summary']
+          assert inspect_thai_output_safety(fallback, thai_packet_present=True)['safe'] is True
+          print('PHASE2G52_MALICIOUS_OUTPUT_FALLBACK_PASS')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit verified G5.2 integration and remove apply workflow
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ai_interpret_v1.py .github/workflows/thai-phase2g5-product-promotion-once.yml
+          git rm -f .github/workflows/thai-phase2g52-output-guard-apply-once.yml
+          git commit -m 'feat: enforce Thai Gemini output safety retry and fallback'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
