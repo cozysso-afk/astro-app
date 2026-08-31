@@ -38,8 +38,9 @@ from thai_planet_pairs_v1 import build_planet_pair_research
 from thai_house_lord_routes_v1 import build_house_lord_routes_research
 from thai_context_graph_v1 import build_context_graph_research
 from thai_descriptive_synthesis_v1 import build_descriptive_synthesis_research
+from thai_dignity_exceptions_v1 import build_dignity_exception_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.10-phase2f2-descriptive-synthesis-research"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.11-phase2f3-dignity-exception-candidates"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -232,6 +233,11 @@ def _suriyayat_layer(
     natal_positions = natal.get("positions") or {}
     dignities_research = build_dignity_research(natal_positions)
     aspects_research = build_aspect_research(natal_positions)
+    dignity_exceptions_research = build_dignity_exception_research(
+        dignities_research=dignities_research,
+        aspects_research=aspects_research,
+        houses_research=houses_research,
+    )
     planet_pairs_research = build_planet_pair_research(aspects_research)
     semantics_research = build_semantics_research(
         houses_research=houses_research,
@@ -294,6 +300,7 @@ def _suriyayat_layer(
         "context_graph_research": context_graph_research,
         "descriptive_synthesis_research": descriptive_synthesis_research,
         "dignities_research": dignities_research,
+        "dignity_exceptions_research": dignity_exceptions_research,
         "aspects_research": aspects_research,
         "planet_pairs_research": planet_pairs_research,
         "semantics_research": semantics_research,
@@ -375,11 +382,12 @@ def build_thai_fortune(
             "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",
             "suriyayat_context_graph": "research_only_evidence_join_with_conflicts_preserved",
             "suriyayat_descriptive_synthesis": "research_only_nonpredictive_composition",
+            "suriyayat_dignity_exception_candidates": "research_only_school_variant_candidates_not_applied",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
             "validated/promoted global-coordinate Suriyayat Lagna",
-            "Suriyayat predictive/final synthesis into outcomes, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",
+            "Suriyayat predictive/final synthesis into outcomes, application of school-variant dignity exceptions, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",
             "Suriyayat event/probability conversion",
