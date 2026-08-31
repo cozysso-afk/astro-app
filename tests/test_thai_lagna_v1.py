@@ -5,6 +5,7 @@ import math
 import unittest
 from datetime import date, time
 
+from thai_astrology_v2 import build_thai_fortune
 from thai_lagna_v1 import (
     angular_delta_deg,
     build_suriyayat_lagna_research,
@@ -120,6 +121,22 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
             self.assertTrue(math.isfinite(value))
             self.assertGreaterEqual(value, 0.0)
             self.assertLess(value, 360.0)
+
+    def test_product_layer_keeps_lagna_unavailable(self):
+        result = build_thai_fortune(
+            birth_date=date(1991, 3, 21), birth_time=time(7, 26),
+            start_date=date(2026, 8, 31), end_date=date(2026, 8, 31),
+            utc_offset_hours=9.0,
+            latitude=34.7604, longitude=127.6622,
+        )
+        suri = result["suriyayat"]
+        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna_research"]["research_only"])
+        self.assertEqual(
+            suri["lagna_research"]["promotion_status"],
+            "research_only_not_for_interpretation",
+        )
+        self.assertFalse(suri["lagna_research"]["promotion_gate"]["gemini_interpretation_allowed"])
 
     def test_common_method_marks_latitude_as_unused(self):
         result = calculate_common_anto_0600(
