@@ -1,0 +1,216 @@
+name: Thai Phase 2G3 AI-safe packet retry
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2g3-ai-safe-packet-retry.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Attach Lagna-gated Thai AI-safe packet and double whitelist
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'from thai_school_policy_v1 import build_source_policy_research\n':
+                  'from thai_school_policy_v1 import build_source_policy_research\nfrom thai_ai_safe_packet_v1 import build_ai_safe_packet_research\n',
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.13-phase2g2-profile-differential-gold"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.14-phase2g3-ai-safe-packet-lagna-gated"',
+              '    descriptive_synthesis_research = build_descriptive_synthesis_research(\n        context_graph_research=context_graph_research,\n        planet_pairs_research=planet_pairs_research,\n    )\n\n    return {':
+                  '    descriptive_synthesis_research = build_descriptive_synthesis_research(\n        context_graph_research=context_graph_research,\n        planet_pairs_research=planet_pairs_research,\n    )\n    lagna_gate = lagna_research.get("promotion_gate") or {}\n    lagna_product_interpretation_ready = bool(\n        lagna_gate.get("lagna_numeric_position_validated") is True\n        and lagna_gate.get("houses_allowed") is True\n        and lagna_gate.get("gemini_interpretation_allowed") is True\n    )\n    ai_safe_packet_research = build_ai_safe_packet_research(\n        descriptive_synthesis_research=descriptive_synthesis_research,\n        lagna_product_available=lagna_product_interpretation_ready,\n    )\n\n    return {',
+              '        "descriptive_synthesis_research": descriptive_synthesis_research,\n        "dignities_research": dignities_research,':
+                  '        "descriptive_synthesis_research": descriptive_synthesis_research,\n        "ai_safe_packet_research": ai_safe_packet_research,\n        "dignities_research": dignities_research,',
+              '            "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",\n            "suriyayat_ai_safe_packet": "whitelist_validated_but_gemini_blocked_until_lagna_product_promotion",\n            "suriyayat_predictive_rules": "not_implemented",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Thai Phase 2G3 astrology anchor: ' + old[:180])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('ai_interpret_v1.py')
+          text = path.read_text(encoding='utf-8')
+          helper = (
+              'def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:\n'
+              '    if not isinstance(value, dict):\n'
+              '        return {}\n'
+              '    gate = value.get("promotion_gate") if isinstance(value.get("promotion_gate"), dict) else {}\n'
+              '    if value.get("eligible_for_gemini") is not True or gate.get("gemini_interpretation_allowed") is not True:\n'
+              '        return {}\n'
+              '    routes = []\n'
+              '    for row in value.get("routes") or []:\n'
+              '        if not isinstance(row, dict) or row.get("interpretation_level") != "descriptive_nonpredictive":\n'
+              '            continue\n'
+              '        carrier = row.get("carrier_planet") if isinstance(row.get("carrier_planet"), dict) else {}\n'
+              '        modifiers = []\n'
+              '        for item in row.get("basic_status_modifiers") or []:\n'
+              '            if isinstance(item, dict):\n'
+              '                modifiers.append({"status_key": item.get("status_key"), "functional_direction": item.get("functional_direction")})\n'
+              '        relations = []\n'
+              '        for item in row.get("relation_context_tags") or []:\n'
+              '            if not isinstance(item, dict):\n'
+              '                continue\n'
+              '            pair_classes = []\n'
+              '            for pair in item.get("pair_classes") or []:\n'
+              '                if isinstance(pair, dict):\n'
+              '                    pair_classes.append({"key": pair.get("key"), "functional_domain": pair.get("functional_domain")})\n'
+              '            relations.append({"counterpart_planet": item.get("counterpart_planet"), "relation_key": item.get("relation_key"), "pair_classes": pair_classes, "pair_multi_label": bool(item.get("pair_multi_label"))})\n'
+              '        routes.append({"route_key": row.get("route_key"), "source_topic_domains": list(row.get("source_topic_domains") or []), "carrier_planet": {"key": carrier.get("key"), "archetype_domains": list(carrier.get("archetype_domains") or [])}, "destination_context_domains": list(row.get("destination_context_domains") or []), "basic_status_modifiers": modifiers, "relation_context_tags": relations, "interpretation_level": "descriptive_nonpredictive"})\n'
+              '    if not routes:\n'
+              '        return {}\n'
+              '    return {"engine": value.get("engine"), "mode": "descriptive_nonpredictive", "route_count": len(routes), "routes": routes}\n\n\n'
+          )
+          anchor = 'def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:\n'
+          if anchor not in text:
+              raise SystemExit('missing Thai Phase 2G3 AI helper anchor')
+          text = text.replace(anchor, helper + anchor, 1)
+          old = '    return {key: value.get(key) for key in allowed if key in value}\n\n\ndef _compact_calculation'
+          new = '    out = {key: value.get(key) for key in allowed if key in value}\n    packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_research"))\n    if packet:\n        out["ai_safe_descriptive_packet"] = packet\n    return out\n\n\ndef _compact_calculation'
+          if old not in text:
+              raise SystemExit('missing Thai Phase 2G3 compactor return anchor')
+          text = text.replace(old, new, 1)
+          old_version = 'AI_INTERPRETER_VERSION = "mobile-ai-v2.4-suriyayat-research-isolated"'
+          if old_version not in text:
+              raise SystemExit('missing Thai Phase 2G3 AI version anchor')
+          text = text.replace(old_version, 'AI_INTERPRETER_VERSION = "mobile-ai-v2.5-thai-safe-packet-lagna-gated"', 1)
+          old_prompt = 'Thai는 mahathaksa/taksajorn과 suriyayat에 실제 데이터가 있을 때만 사용한다. suriyayat.positions는 교차검증된 전통 10행성 위치 사실이지만 Lagna·하우스·디그니티·애스펙트·사건판정 규칙은 아직 계산하지 않는다. not_calculated 항목은 절대 추정하지 말고, Thai 층을 Western 수치점수처럼 확률화하거나 임의 합산하지 마라.'
+          new_prompt = 'Thai는 mahathaksa/taksajorn과 suriyayat에 실제 데이터가 있을 때만 사용한다. suriyayat의 교차검증된 10행성 위치 사실을 사용할 수 있다. ai_safe_descriptive_packet이 실제 payload에 포함된 경우에만 그 패킷 안의 descriptive_nonpredictive 하우스-주인-도착맥락을 설명에 사용할 수 있고, 패킷이 없으면 Lagna·하우스를 추정하지 마라. 패킷이 있어도 학파 예외, 최종 길흉, 사건, 타이밍, 확률, 점수로 확장하지 마라. not_calculated 항목은 절대 추정하지 말고 Thai 층을 Western 수치점수처럼 확률화하거나 임의 합산하지 마라.'
+          if old_prompt not in text:
+              raise SystemExit('missing Thai Phase 2G3 prompt anchor')
+          text = text.replace(old_prompt, new_prompt, 1)
+          old_shape = '"thai": "Thai 출생요일·Mahathaksa·Taksajorn과 검증된 Suriyayat 10행성 위치 사실층, Suriyayat Lagna 미구현 한계",'
+          new_shape = '"thai": "Thai 출생요일·Mahathaksa·Taksajorn과 검증된 Suriyayat 사실층. ai_safe_descriptive_packet이 있을 때만 비예측형 하우스 경로 맥락을 추가 설명하고, 없으면 Lagna·하우스를 추정하지 않음",'
+          if old_shape not in text:
+              raise SystemExit('missing Thai Phase 2G3 output-shape anchor')
+          text = text.replace(old_shape, new_shape, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2G3 full 190-test regression matrix
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import sys
+          import unittest
+          patterns = [
+              'test_thai_ai_safe_packet_v1.py', 'test_thai_ai_safe_packet_integration.py',
+              'test_thai_ai_safe_packet_compaction.py', 'test_thai_phase2g2_profile_differential.py',
+              'test_thai_phase2g2_profile_differential_integration.py', 'test_thai_school_policy_v1.py',
+              'test_thai_school_policy_integration.py', 'test_thai_dignity_exceptions_v1.py',
+              'test_thai_dignity_exceptions_integration.py', 'test_thai_descriptive_synthesis_v1.py',
+              'test_thai_descriptive_synthesis_integration.py', 'test_thai_context_graph_v1.py',
+              'test_thai_context_graph_integration.py', 'test_thai_house_lord_routes_v1.py',
+              'test_thai_house_lord_routes_integration.py', 'test_thai_planet_pairs_v1.py',
+              'test_thai_planet_pairs_integration.py', 'test_thai_interpretation_policy_v1.py',
+              'test_thai_interpretation_policy_integration.py', 'test_thai_semantics_v1.py',
+              'test_thai_phase2c_labels_standards.py', 'test_thai_dignities_v1.py',
+              'test_thai_aspects_v1.py', 'test_thai_rules_phase2b_integration.py',
+              'test_thai_houses*.py', 'test_thai_lagna*.py', 'test_ai_thai_research_isolation.py',
+          ]
+          loader = unittest.defaultTestLoader
+          suite = unittest.TestSuite()
+          total = 0
+          for pattern in patterns:
+              found = loader.discover('tests', pattern=pattern)
+              total += found.countTestCases()
+              suite.addTests(found)
+          print(f'PHASE2G3_DISCOVERED_TESTS={total}')
+          if total != 190:
+              raise SystemExit(f'expected 190 tests, discovered {total}')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              sys.exit(1)
+          PY
+
+      - name: Compile Thai and AI modules
+        run: |
+          python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_context_graph_v1.py thai_descriptive_synthesis_v1.py thai_dignity_exceptions_v1.py thai_school_policy_v1.py thai_ai_safe_packet_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify current Lagna gate keeps Gemini payload unchanged
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation, _compact_thai_suriyayat
+          from thai_astrology_v2 import build_thai_fortune
+
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.14-phase2g3-ai-safe-packet-lagna-gated'
+          packet = thai['suriyayat']['ai_safe_packet_research']
+          assert packet['available'] is True and packet['route_count'] == 12
+          assert packet['promotion_gate']['ai_safe_whitelist_validated'] is True
+          assert packet['dependencies']['lagna_product_available'] is False
+          assert packet['eligible_for_gemini'] is False
+          assert packet['promotion_gate']['gemini_interpretation_allowed'] is False
+          compact = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          encoded = json.dumps(compact, ensure_ascii=False)
+          assert 'ai_safe_descriptive_packet' not in compact
+          assert 'descriptive_nonpredictive' not in encoded
+          assert 'literal_exception' not in encoded
+
+          synthetic = {
+              'available': True,
+              'ai_safe_packet_research': {
+                  'eligible_for_gemini': True,
+                  'engine': 'safe-test',
+                  'routes': [{
+                      'route_key': 'H1:mars:H10', 'source_topic_domains': ['self'],
+                      'carrier_planet': {'key': 'mars', 'archetype_domains': ['action']},
+                      'destination_context_domains': ['career'], 'basic_status_modifiers': [],
+                      'relation_context_tags': [], 'interpretation_level': 'descriptive_nonpredictive',
+                  }],
+                  'promotion_gate': {'gemini_interpretation_allowed': True},
+                  'school_policy_research': {'literal_exception': True},
+                  'prediction': 'forbidden', 'score': 999,
+              },
+          }
+          allowed = _compact_thai_suriyayat(synthetic)['ai_safe_descriptive_packet']
+          allowed_json = json.dumps(allowed, ensure_ascii=False)
+          assert allowed['route_count'] == 1
+          assert 'literal_exception' not in allowed_json
+          assert 'prediction' not in allowed_json
+          assert 'score' not in allowed_json
+          print('PHASE2G3_AI_SAFE_PACKET_PASS_DOUBLE_WHITELIST_LAGNA_GATE_BLOCKS_CURRENT_GEMINI')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2G3 state and clean workflows
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py ai_interpret_v1.py thai_ai_safe_packet_v1.py tests/test_thai_ai_safe_packet_v1.py tests/test_thai_ai_safe_packet_integration.py tests/test_thai_ai_safe_packet_compaction.py
+          git rm -f .github/workflows/thai-phase2g3-ai-safe-packet-once.yml .github/workflows/thai-phase2g3-ai-safe-packet-retry.yml
+          git commit -m 'research: validate Lagna-gated Thai AI-safe packet'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
