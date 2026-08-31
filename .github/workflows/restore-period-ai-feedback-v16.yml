@@ -72,11 +72,24 @@ jobs:
       - name: Backend and Thai syntax gate
         run: python -m py_compile api/main.py integrated_fortune_v1.py thai_astrology_v2.py thai_suriyayat_v1.py relationship_western_v1.py
 
-      - name: Frontend production build
-        working-directory: web
+      - name: Frontend production build with failure capture
         run: |
-          npm ci
-          npm run build
+          set +e
+          cd web
+          npm ci > ../build-v16.log 2>&1
+          ci_status=$?
+          if [ $ci_status -eq 0 ]; then npm run build >> ../build-v16.log 2>&1; build_status=$?; else build_status=$ci_status; fi
+          cd ..
+          cat build-v16.log
+          if [ $build_status -ne 0 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add build-v16.log
+            git commit -m 'debug: capture v16 build error'
+            git push origin HEAD:fix/restore-period-ai-feedback-20260831
+            exit $build_status
+          fi
+          rm build-v16.log
 
       - name: Diff safety
         run: |
