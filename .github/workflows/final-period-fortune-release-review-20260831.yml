@@ -1,0 +1,105 @@
+name: Final period fortune release review 2026-08-31
+
+on:
+  push:
+    branches:
+      - fix/restore-period-fortunes-no-deploy-20260831
+    paths:
+      - .github/workflows/final-period-fortune-release-review-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  final-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/restore-period-fortunes-no-deploy-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply final review fixes
+        run: python scripts/final_period_fortune_release_review_20260831.py
+
+      - name: Verify period/integrated separation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/AppNext.tsx').read_text()
+          assert '<div className="section-label">기간 운세</div>' in s
+          assert 'period-fortune-report' in s
+          assert '통합운세 기간 선택' not in s
+          assert 'aria-label="연간 통합운세 연도 선택"' in s
+          assert "selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : queryDate" in s
+          assert "selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)" in s
+          assert '선택한 기간 운세 실계산의 원자료' in s
+          assert '기간 운세와 같은 실계산 엔진을 사용해' in s
+          print('IA_SEPARATION_PASS')
+          PY
+
+      - name: Verify annual integrated archive contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/AppNext.tsx').read_text()
+          assert "const integratedArchivePeriod: PeriodKey = 'year'" in s
+          assert "const integratedArchiveYear = Number(integratedResult.period.start.slice(0,4)) || annualFortuneYear" in s
+          assert 'title: `${label} 통합운세 · ${integratedResult.period.start}`' in s
+          assert "const integratedArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period" not in s
+          print('ANNUAL_ARCHIVE_PASS')
+          PY
+
+      - name: Verify context-switch error hygiene
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/AppNext.tsx').read_text()
+          assert "setSelectedTool(null);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)" in s
+          assert "setPeriod(key);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)" in s
+          print('CONTEXT_HYGIENE_PASS')
+          PY
+
+      - name: Verify iOS date centering remains intact
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('web/src/fortune-ux-v14.css').read_text()
+          for token in [
+              '.birth-date-field input[type="date"]::-webkit-date-and-time-value',
+              'height:100%!important',
+              'align-items:center!important',
+              'justify-content:center!important',
+              '::-webkit-datetime-edit-fields-wrapper',
+          ]:
+              assert token in s, token
+          print('IOS_DATE_CENTER_PASS')
+          PY
+
+      - name: Frontend typecheck and production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Diff safety
+        run: |
+          git diff --check
+          git status --short
+
+      - name: Commit final reviewed product tree to work branch
+        run: |
+          git rm scripts/final_period_fortune_release_review_20260831.py .github/workflows/final-period-fortune-release-review-20260831.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx web/src/fortune-ux-v14.css
+          git commit -m 'fix: finalize period fortune separation before release'
+          git push origin HEAD:fix/restore-period-fortunes-no-deploy-20260831
