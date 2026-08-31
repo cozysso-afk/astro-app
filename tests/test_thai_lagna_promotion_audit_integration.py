@@ -32,9 +32,10 @@ class ThaiPhase2G4LagnaPromotionAuditIntegrationTests(unittest.TestCase):
         self.assertFalse(audit["automatic_promotion_allowed"])
         self.assertFalse(audit["product_state_changed"])
 
-    def test_product_lagna_and_current_gemini_gate_remain_closed(self):
+    def test_explicit_product_promotion_does_not_mutate_research_gates(self):
         suri = self._thai()["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna_product_promotion"]["explicit_promotion"])
         lagna_gate = suri["lagna_research"]["promotion_gate"]
         self.assertTrue(lagna_gate["lagna_numeric_position_validated"])
         self.assertFalse(lagna_gate["houses_allowed"])
@@ -43,17 +44,22 @@ class ThaiPhase2G4LagnaPromotionAuditIntegrationTests(unittest.TestCase):
         self.assertFalse(packet["eligible_for_gemini"])
         self.assertFalse(packet["promotion_gate"]["lagna_dependency_satisfied"])
         self.assertFalse(packet["promotion_gate"]["gemini_interpretation_allowed"])
+        product_packet = suri["ai_safe_packet_product"]
+        self.assertTrue(product_packet["eligible_for_gemini"])
+        self.assertTrue(product_packet["promotion_gate"]["gemini_interpretation_allowed"])
 
-    def test_audit_and_safe_packet_do_not_leak_into_current_gemini_payload(self):
+    def test_audit_stays_isolated_while_product_packet_is_whitelisted(self):
         thai = self._thai()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         compact_suri = compact["thai"]["suriyayat"]
         self.assertNotIn("lagna_promotion_audit_research", compact_suri)
-        self.assertNotIn("ai_safe_descriptive_packet", compact_suri)
+        self.assertNotIn("ai_safe_packet_research", compact_suri)
+        self.assertEqual(compact_suri["ai_safe_descriptive_packet"]["route_count"], 12)
         encoded = json.dumps(compact_suri, ensure_ascii=False)
         self.assertNotIn("descriptive_house_context_product_promotion_ready", encoded)
-        self.assertNotIn("source_topic_domains", encoded)
         self.assertNotIn("literal_exception", encoded)
+        for forbidden in ("prediction", "score", "probability", "net_effect"):
+            self.assertNotIn(forbidden, encoded)
 
 
 if __name__ == "__main__":

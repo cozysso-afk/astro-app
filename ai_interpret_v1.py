@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.5-thai-safe-packet-lagna-gated"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.6-thai-lagna-descriptive-product"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -70,13 +70,38 @@ def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:
     return {"engine": value.get("engine"), "mode": "descriptive_nonpredictive", "route_count": len(routes), "routes": routes}
 
 
-def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
-    """Whitelist interpreted Suriyayat facts and exclude every research layer.
+def _compact_thai_product_lagna(value: Any) -> dict[str, Any]:
+    """Expose only validated numeric Lagna facts to the interpretation payload."""
+    if not isinstance(value, dict) or value.get("available") is not True:
+        return {"available": False}
+    validation = value.get("validation") if isinstance(value.get("validation"), dict) else {}
+    return {
+        "available": True,
+        "engine": value.get("engine"),
+        "method_key": value.get("method_key"),
+        "method": value.get("method"),
+        "method_thai": value.get("method_thai"),
+        "longitude_deg": value.get("longitude_deg"),
+        "sign_index": value.get("sign_index"),
+        "sign_en": value.get("sign_en"),
+        "sign_th": value.get("sign_th"),
+        "sign_ko": value.get("sign_ko"),
+        "degree": value.get("degree"),
+        "minute": value.get("minute"),
+        "second": value.get("second"),
+        "display": value.get("display"),
+        "validation": {
+            "numeric_position_validated": validation.get("numeric_position_validated") is True,
+            "global_coordinates_independently_validated": validation.get("global_coordinates_independently_validated") is True,
+            "world_numeric_checks": validation.get("world_numeric_checks"),
+            "reference": validation.get("reference"),
+        },
+        "interpretation_scope": value.get("interpretation_scope"),
+    }
 
-    Lagna/house experiments intentionally live inside calculation results for
-    diagnostics, but Gemini must not see them until their separate product and
-    interpretation gates are explicitly promoted.
-    """
+
+def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
+    """Whitelist product Suriyayat facts and exclude every research-only layer."""
     if not isinstance(value, dict):
         return {}
     allowed = (
@@ -88,12 +113,13 @@ def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
         "natal",
         "period_start",
         "period_end",
-        "lagna",
         "interpretation_status",
-        "policy",
     )
     out = {key: value.get(key) for key in allowed if key in value}
-    packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_research"))
+    out["lagna"] = _compact_thai_product_lagna(value.get("lagna"))
+    packet = _compact_thai_ai_safe_packet(
+        value.get("ai_safe_packet_product") or value.get("ai_safe_packet_research")
+    )
     if packet:
         out["ai_safe_descriptive_packet"] = packet
     return out
@@ -440,4 +466,3 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
         return fallback
     primary["fallback_error"] = fallback.get("error")
     return primary
-

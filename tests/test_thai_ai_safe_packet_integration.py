@@ -36,14 +36,18 @@ class ThaiPhase2G3AiSafePacketIntegrationTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, encoded)
 
-    def test_current_product_lagna_state_keeps_packet_out_of_gemini_payload(self):
+    def test_promoted_product_packet_is_whitelisted_without_raw_research(self):
         thai = self._thai()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         compact_suri = compact["thai"]["suriyayat"]
         self.assertNotIn("ai_safe_packet_research", compact_suri)
+        packet = compact_suri["ai_safe_descriptive_packet"]
+        self.assertEqual(packet["mode"], "descriptive_nonpredictive")
+        self.assertEqual(packet["route_count"], 12)
         encoded = json.dumps(compact_suri, ensure_ascii=False)
-        self.assertNotIn("descriptive_nonpredictive", encoded)
-        self.assertNotIn("source_topic_domains", encoded)
+        self.assertIn("source_topic_domains", encoded)
+        for forbidden in ("literal_exception", "prediction", "score", "probability", "net_effect"):
+            self.assertNotIn(forbidden, encoded)
 
     def test_packet_gate_cannot_open_product_school_or_predictive_layers(self):
         suri = self._thai()["suriyayat"]
@@ -60,7 +64,16 @@ class ThaiPhase2G3AiSafePacketIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["timing_prediction_allowed"])
         self.assertFalse(gate["probability_allowed"])
         self.assertFalse(gate["scores_allowed"])
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertTrue(product_gate["gemini_descriptive_packet_allowed"])
+        for key in (
+            "school_policy_allowed", "exception_application_allowed",
+            "net_valence_allowed", "final_good_bad_judgement_allowed",
+            "predictive_interpretation_allowed", "event_judgement_allowed",
+            "timing_prediction_allowed", "probability_allowed", "scores_allowed",
+        ):
+            self.assertFalse(product_gate[key], key)
 
 
 if __name__ == "__main__":

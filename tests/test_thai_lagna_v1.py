@@ -203,7 +203,7 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
         self.assertEqual(validation["world_reference"]["numeric_checks"], 16)
         self.assertEqual(validation["world_reference"]["common_lmt"]["max_error_arcmin"], 0.732)
 
-    def test_product_layer_keeps_lagna_unavailable(self):
+    def test_product_layer_promotes_numeric_lagna_without_mutating_research_gate(self):
         result = build_thai_fortune(
             birth_date=date(1991, 3, 21), birth_time=time(7, 26),
             start_date=date(2026, 8, 31), end_date=date(2026, 8, 31),
@@ -211,13 +211,22 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
             latitude=34.7604, longitude=127.6622,
         )
         suri = result["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        self.assertEqual(suri["lagna"]["method_key"], "common_anto_0600_lmt")
+        self.assertEqual(
+            suri["lagna"]["longitude_deg"],
+            suri["lagna_research"]["common_anto_0600_lmt"]["longitude_deg"],
+        )
         self.assertTrue(suri["lagna_research"]["research_only"])
         self.assertEqual(
             suri["lagna_research"]["promotion_status"],
             "research_only_not_for_interpretation",
         )
         self.assertFalse(suri["lagna_research"]["promotion_gate"]["gemini_interpretation_allowed"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertTrue(product_gate["numeric_lagna_product_allowed"])
+        self.assertFalse(product_gate["predictive_interpretation_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
 
     def test_common_method_marks_latitude_as_unused(self):
         result = calculate_common_anto_0600(

@@ -53,7 +53,7 @@ class ThaiPhase2G1SourcePolicyIntegrationTests(unittest.TestCase):
         self.assertNotIn("standard_reach_overlay", encoded)
         self.assertNotIn("ucca_standard_reach", encoded)
 
-    def test_product_selection_and_all_predictive_gates_remain_closed(self):
+    def test_school_selection_and_all_predictive_gates_remain_closed_after_lagna_promotion(self):
         thai = self._thai()
         suri = thai["suriyayat"]
         layer = suri["school_policy_research"]
@@ -68,7 +68,15 @@ class ThaiPhase2G1SourcePolicyIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["probability_allowed"])
         self.assertFalse(gate["scores_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(product_gate["school_policy_allowed"])
+        self.assertFalse(product_gate["exception_application_allowed"])
+        self.assertFalse(product_gate["predictive_interpretation_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
+        self.assertFalse(product_gate["timing_prediction_allowed"])
+        self.assertFalse(product_gate["probability_allowed"])
+        self.assertFalse(product_gate["scores_allowed"])
 
 
 if __name__ == "__main__":

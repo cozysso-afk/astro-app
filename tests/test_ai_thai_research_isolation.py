@@ -83,9 +83,10 @@ class ThaiResearchAiIsolationTests(unittest.TestCase):
             {
                 "available", "engine", "source_commit", "time_basis", "validation",
                 "natal", "period_start", "period_end", "lagna",
-                "interpretation_status", "policy",
+                "interpretation_status",
             },
         )
+        self.assertNotIn("policy", suriyayat)
 
 
 if __name__ == "__main__":

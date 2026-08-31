@@ -46,7 +46,7 @@ class ThaiPhase2F3DignityExceptionIntegrationTests(unittest.TestCase):
         self.assertNotIn("reciprocal_kaset_exchange", encoded)
         self.assertNotIn("base_status_overridden", encoded)
 
-    def test_school_policy_and_interpretation_gates_stay_closed(self):
+    def test_school_policy_and_exception_gates_stay_closed_after_lagna_promotion(self):
         thai = self._thai()
         suri = thai["suriyayat"]
         layer = suri["dignity_exceptions_research"]
@@ -63,7 +63,13 @@ class ThaiPhase2F3DignityExceptionIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["event_judgement_allowed"])
         self.assertFalse(gate["scores_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(product_gate["school_policy_allowed"])
+        self.assertFalse(product_gate["exception_application_allowed"])
+        self.assertFalse(product_gate["final_good_bad_judgement_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
+        self.assertFalse(product_gate["scores_allowed"])
 
 
 if __name__ == "__main__":

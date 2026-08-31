@@ -35,17 +35,21 @@ class ThaiPhase2F2DescriptiveSynthesisIntegrationTests(unittest.TestCase):
             self.assertIsNone(row["unresolved"]["probability"])
             self.assertIsNone(row["unresolved"]["combined_good_bad_judgement"])
 
-    def test_descriptive_synthesis_is_not_sent_to_gemini(self):
+    def test_raw_synthesis_is_stripped_and_only_safe_product_packet_is_sent(self):
         thai = self._thai()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         compact_suri = compact["thai"]["suriyayat"]
         self.assertNotIn("descriptive_synthesis_research", compact_suri)
+        packet = compact_suri["ai_safe_descriptive_packet"]
+        self.assertEqual(packet["mode"], "descriptive_nonpredictive")
+        self.assertEqual(packet["route_count"], 12)
         encoded = json.dumps(compact_suri, ensure_ascii=False)
-        self.assertNotIn("descriptive_nonpredictive", encoded)
-        self.assertNotIn("source_topic_domains", encoded)
-        self.assertNotIn("carrier_planet", encoded)
+        self.assertIn("source_topic_domains", encoded)
+        self.assertIn("carrier_planet", encoded)
+        for forbidden in ("unresolved", "final_interpretation", "prediction", "score", "probability"):
+            self.assertNotIn(forbidden, encoded)
 
-    def test_only_descriptive_research_gate_is_opened(self):
+    def test_only_whitelisted_descriptive_product_gate_is_opened(self):
         thai = self._thai()
         suri = thai["suriyayat"]
         gate = suri["descriptive_synthesis_research"]["promotion_gate"]
@@ -60,7 +64,17 @@ class ThaiPhase2F2DescriptiveSynthesisIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["probability_allowed"])
         self.assertFalse(gate["scores_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertTrue(product_gate["descriptive_house_context_allowed"])
+        self.assertTrue(product_gate["gemini_descriptive_packet_allowed"])
+        for key in (
+            "school_policy_allowed", "exception_application_allowed", "net_valence_allowed",
+            "final_good_bad_judgement_allowed", "predictive_interpretation_allowed",
+            "event_judgement_allowed", "timing_prediction_allowed", "probability_allowed",
+            "scores_allowed",
+        ):
+            self.assertFalse(product_gate[key], key)
 
 
 if __name__ == "__main__":

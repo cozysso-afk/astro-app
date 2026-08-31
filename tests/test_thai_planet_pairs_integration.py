@@ -50,20 +50,23 @@ class ThaiPhase2E1PlanetPairIntegrationTests(unittest.TestCase):
             self.assertIn(["moon", "jupiter"], catalog["enemy"]["pairs"])
             self.assertIn(["moon", "jupiter"], catalog["element"]["pairs"])
 
-    def test_pair_research_is_not_sent_to_gemini(self):
+    def test_raw_pair_research_is_stripped_but_safe_relation_tags_are_whitelisted(self):
         thai = self._thai()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         compact_suri = compact["thai"]["suriyayat"]
         self.assertNotIn("planet_pairs_research", compact_suri)
+        packet = compact_suri["ai_safe_descriptive_packet"]
+        self.assertEqual(packet["route_count"], 12)
         encoded = json.dumps(compact_suri, ensure_ascii=False)
-        self.assertNotIn("affinity_trust_support", encoded)
-        self.assertNotIn("friction_tension_conflict", encoded)
-        self.assertNotIn("multi_label", encoded)
+        self.assertNotIn("pair_tables", encoded)
+        self.assertNotIn("active_natal_pair_tags", encoded)
+        for forbidden in ("net_effect", "final_judgement", "prediction", "score", "probability"):
+            self.assertNotIn(forbidden, encoded)
 
-    def test_product_lagna_and_interpretation_gates_stay_closed(self):
+    def test_product_lagna_is_promoted_but_pair_judgement_gates_stay_closed(self):
         thai = self._thai()
         suri = thai["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         # This is a Phase 2E1 feature contract, not a permanent dependency on
         # later top-level status wording or engine version labels.
         self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
@@ -79,6 +82,10 @@ class ThaiPhase2E1PlanetPairIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["combined_judgement_allowed"])
         self.assertFalse(gate["event_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(product_gate["net_valence_allowed"])
+        self.assertFalse(product_gate["final_good_bad_judgement_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
 
 
 if __name__ == "__main__":

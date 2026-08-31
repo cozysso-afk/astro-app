@@ -89,7 +89,7 @@ class ThaiPhase2D1SemanticVocabularyTests(unittest.TestCase):
         self.assertFalse(gate["event_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
 
-    def test_real_calculation_semantics_stay_out_of_gemini_payload_after_integration(self):
+    def test_research_semantics_stay_out_while_safe_vocabulary_is_whitelisted(self):
         thai = build_thai_fortune(
             birth_date=date(1991, 3, 21), birth_time=time(7, 26),
             start_date=date(2026, 8, 31), end_date=date(2026, 8, 31),
@@ -106,8 +106,13 @@ class ThaiPhase2D1SemanticVocabularyTests(unittest.TestCase):
         # the word "semantics" and are not research payload leakage.
         self.assertNotIn("semantics_research", compact_suri)
         serialized_suri = json.dumps(compact_suri, ensure_ascii=False)
-        self.assertNotIn("stable_strong", serialized_suri)
-        self.assertNotIn("higher_education", serialized_suri)
+        self.assertIn("basic_status_modifiers", serialized_suri)
+        self.assertIn("source_topic_domains", serialized_suri)
+        for forbidden in (
+            "advanced_standard_semantics", "combined_judgement", "prediction",
+            "score", "probability", "aspect_strength_percent",
+        ):
+            self.assertNotIn(forbidden, serialized_suri)
 
 
 if __name__ == "__main__":

@@ -72,10 +72,10 @@ class ThaiPhase2F1ContextGraphIntegrationTests(unittest.TestCase):
         self.assertNotIn("aspect_strength_canonical_percent", encoded)
         self.assertNotIn("co_occupying_planets", encoded)
 
-    def test_product_lagna_and_all_synthesis_gates_remain_closed(self):
+    def test_product_lagna_is_promoted_but_context_graph_judgement_gates_remain_closed(self):
         thai = self._thai()
         suri = thai["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         gate = suri["context_graph_research"]["promotion_gate"]
         self.assertFalse(gate["advanced_standard_meaning_validated"])
         self.assertFalse(gate["aspect_strength_canonicalized"])
@@ -84,6 +84,10 @@ class ThaiPhase2F1ContextGraphIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["scores_allowed"])
         self.assertFalse(gate["event_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(product_gate["net_valence_allowed"])
+        self.assertFalse(product_gate["final_good_bad_judgement_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
 
 
 if __name__ == "__main__":

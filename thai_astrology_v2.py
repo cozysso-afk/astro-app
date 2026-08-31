@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Traditional Thai astrology layers with cross-validated Suriyayat planet facts.
 
-Suriyayat Lagna and predictive interpretation rules remain intentionally disabled
-until they have independent global-coordinate/traditional-rule validation.
+Suriyayat Lagna is product-enabled only as a validated numeric position plus a
+whitelisted, non-predictive descriptive house-context packet. Predictive Thai
+interpretation rules remain intentionally disabled.
 
 Implemented here:
 - Thai weekday ruler with the 06:00 local-day boundary and Wednesday-night Rahu.
@@ -16,9 +17,8 @@ Implemented as factual positions only:
   Thai Ketu/Uranus longitudes for the natal instant and selected-period endpoints.
 
 Not promoted here:
-- Global-coordinate Suriyayat Lagna is available only as a non-interpreted
-  research candidate. Houses/dignities/aspect judgement, exact ingress scanner,
-  and event-probability conversion remain disabled.
+- School-policy selection, dignity/aspect judgement, final good/bad synthesis,
+  exact ingress scanning, event timing, probability and scores remain disabled.
 """
 
 from __future__ import annotations
@@ -42,8 +42,9 @@ from thai_dignity_exceptions_v1 import build_dignity_exception_research
 from thai_school_policy_v1 import build_source_policy_research
 from thai_ai_safe_packet_v1 import build_ai_safe_packet_research
 from thai_lagna_promotion_audit_v1 import build_lagna_promotion_audit
+from thai_lagna_product_v1 import build_lagna_product_promotion
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.15-phase2g4-lagna-promotion-audit"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.16-phase2g5-lagna-descriptive-product"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -298,6 +299,13 @@ def _suriyayat_layer(
         school_policy_research=school_policy_research,
         ai_safe_packet_research=ai_safe_packet_research,
     )
+    lagna_product_promotion = build_lagna_product_promotion(
+        lagna_research=lagna_research,
+        promotion_audit=lagna_promotion_audit_research,
+        descriptive_synthesis_research=descriptive_synthesis_research,
+        explicit_enable=True,
+    )
+    ai_safe_packet_product = lagna_product_promotion.get("ai_safe_packet_product") or {}
 
     return {
         "available": True,
@@ -315,9 +323,9 @@ def _suriyayat_layer(
         "natal": _compact_suriyayat_snapshot(natal),
         "period_start": _compact_suriyayat_snapshot(start_snapshot),
         "period_end": _compact_suriyayat_snapshot(end_snapshot),
-        "lagna": {
+        "lagna": lagna_product_promotion.get("lagna") or {
             "available": False,
-            "reason": "Global-coordinate Suriyayat Lagna is still research-only. Candidate methods are exposed separately and are not used for houses, dignity, scoring, or Gemini interpretation.",
+            "reason": "Explicit Lagna product promotion failed closed.",
         },
         "lagna_research": lagna_research,
         "houses_research": houses_research,
@@ -326,7 +334,9 @@ def _suriyayat_layer(
         "context_graph_research": context_graph_research,
         "descriptive_synthesis_research": descriptive_synthesis_research,
         "ai_safe_packet_research": ai_safe_packet_research,
+        "ai_safe_packet_product": ai_safe_packet_product,
         "lagna_promotion_audit_research": lagna_promotion_audit_research,
+        "lagna_product_promotion": lagna_product_promotion,
         "dignities_research": dignities_research,
         "dignity_exceptions_research": dignity_exceptions_research,
         "school_policy_research": school_policy_research,
@@ -334,8 +344,8 @@ def _suriyayat_layer(
         "planet_pairs_research": planet_pairs_research,
         "semantics_research": semantics_research,
         "interpretation_policy_research": interpretation_policy_research,
-        "interpretation_status": "planetary_position_facts_plus_nonpredictive_descriptive_synthesis_and_research_context_layers",
-        "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",
+        "interpretation_status": "planetary_position_facts_plus_promoted_numeric_lagna_and_whitelisted_nonpredictive_house_context",
+        "policy": "Validated numeric Lagna and whitelist-only descriptive house context are promoted. School-variant exceptions, final good/bad judgement, event timing, probability and scores remain disabled.",
     }
 
 
@@ -400,7 +410,7 @@ def build_thai_fortune(
             "mahathaksa_wheel": "established_table_rule",
             "taksajorn": "documented_method_variant",
             "suriyayat_10planet_positions": "cross_validated_30_vectors_max_4_arcmin",
-            "suriyayat_lagna": "research_only_not_promoted",
+            "suriyayat_lagna": "product_promoted_numeric_position_descriptive_only",
             "suriyayat_lagna_research_engine": LAGNA_RESEARCH_ENGINE_VERSION,
             "suriyayat_whole_sign_houses": "research_only_structure_connected",
             "suriyayat_house_lords_and_standard_tables": "research_only_table_facts_including_house_labels_and_advanced_standards",
@@ -414,13 +424,14 @@ def build_thai_fortune(
             "suriyayat_dignity_exception_candidates": "research_only_school_variant_candidates_not_applied",
             "suriyayat_source_policy_profiles": "research_only_explicit_comparison_default_none",
             "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",
-            "suriyayat_ai_safe_packet": "whitelist_validated_but_gemini_blocked_until_lagna_product_promotion",
-            "suriyayat_lagna_product_promotion_audit": "research_only_prerequisite_matrix_no_state_change",
+            "suriyayat_ai_safe_packet": "product_enabled_double_whitelist_descriptive_nonpredictive_only",
+            "suriyayat_lagna_product_promotion_audit": "passed_before_explicit_phase2g5_product_promotion",
+            "suriyayat_lagna_product_promotion": "numeric_lagna_plus_safe_descriptive_packet_only",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
-            "validated/promoted global-coordinate Suriyayat Lagna",
-            "Suriyayat production school-policy selection or actual exception application, predictive/final synthesis into outcomes, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",
+            "Suriyayat predictive use of promoted Lagna beyond whitelist-only descriptive house context",
+            "Suriyayat production school-policy selection or actual exception application, predictive/final synthesis into outcomes, concrete event outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",
             "Suriyayat event/probability conversion",

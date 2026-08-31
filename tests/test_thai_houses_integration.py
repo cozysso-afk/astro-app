@@ -21,10 +21,10 @@ class ThaiWholeSignHouseResearchIntegrationTests(unittest.TestCase):
             longitude=127.6622,
         )
 
-    def test_calculation_contains_noninterpreted_house_research_layer(self):
+    def test_calculation_promotes_numeric_lagna_but_keeps_house_layer_research_only(self):
         thai = self._yeosu()
         suri = thai["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         houses = suri["houses_research"]
         self.assertTrue(houses["available"])
         self.assertTrue(houses["research_only"])
@@ -55,7 +55,7 @@ class ThaiWholeSignHouseResearchIntegrationTests(unittest.TestCase):
         self.assertTrue(houses["research_only"])
         self.assertIn("validated Lagna", houses["reason"])
 
-    def test_real_integrated_calculation_still_strips_house_and_lagna_research_from_ai(self):
+    def test_integrated_payload_strips_house_research_but_keeps_product_lagna(self):
         thai = self._yeosu()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         suri = compact["thai"]["suriyayat"]
@@ -63,7 +63,11 @@ class ThaiWholeSignHouseResearchIntegrationTests(unittest.TestCase):
         self.assertNotIn("houses_research", suri)
         serialized = json.dumps(compact, ensure_ascii=False)
         self.assertNotIn("thai_whole_sign_from_validated_suriyayat_lagna", serialized)
-        self.assertNotIn("common_anto_0600_lmt", serialized)
+        self.assertEqual(suri["lagna"]["method_key"], "common_anto_0600_lmt")
+        self.assertEqual(
+            suri["lagna"]["longitude_deg"],
+            thai["suriyayat"]["lagna_research"]["common_anto_0600_lmt"]["longitude_deg"],
+        )
 
     def test_research_house_gate_stays_closed(self):
         houses = self._yeosu()["suriyayat"]["houses_research"]

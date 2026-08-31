@@ -1,4 +1,4 @@
-name: Thai Phase 2G5 descriptive product promotion
+name: Thai Phase 2G5 product regression
 
 on:
   push:
@@ -6,9 +6,15 @@ on:
       - feature/thai-lagna-phase1-real-20260831
     paths:
       - '.github/workflows/thai-phase2g5-product-promotion-once.yml'
+      - 'thai_astrology_v2.py'
+      - 'thai_lagna_product_v1.py'
+      - 'ai_interpret_v1.py'
+      - 'tests/test_thai_*.py'
+      - 'tests/test_ai_thai_research_isolation.py'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -16,62 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feature/thai-lagna-phase1-real-20260831
           fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Explicitly promote validated numeric Lagna and safe descriptive packet
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('thai_astrology_v2.py')
-          text = path.read_text(encoding='utf-8')
-          replacements = {
-              'from thai_lagna_promotion_audit_v1 import build_lagna_promotion_audit\n':
-                  'from thai_lagna_promotion_audit_v1 import build_lagna_promotion_audit\nfrom thai_lagna_product_v1 import build_lagna_product_promotion\n',
-              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.15-phase2g4-lagna-promotion-audit"':
-                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.16-phase2g5-lagna-descriptive-product"',
-              '    lagna_promotion_audit_research = build_lagna_promotion_audit(\n        lagna_research=lagna_research,\n        houses_research=houses_research,\n        dignities_research=dignities_research,\n        aspects_research=aspects_research,\n        descriptive_synthesis_research=descriptive_synthesis_research,\n        school_policy_research=school_policy_research,\n        ai_safe_packet_research=ai_safe_packet_research,\n    )\n\n    return {':
-                  '    lagna_promotion_audit_research = build_lagna_promotion_audit(\n        lagna_research=lagna_research,\n        houses_research=houses_research,\n        dignities_research=dignities_research,\n        aspects_research=aspects_research,\n        descriptive_synthesis_research=descriptive_synthesis_research,\n        school_policy_research=school_policy_research,\n        ai_safe_packet_research=ai_safe_packet_research,\n    )\n    lagna_product_promotion = build_lagna_product_promotion(\n        lagna_research=lagna_research,\n        promotion_audit=lagna_promotion_audit_research,\n        descriptive_synthesis_research=descriptive_synthesis_research,\n        explicit_enable=True,\n    )\n    ai_safe_packet_product = lagna_product_promotion.get("ai_safe_packet_product") or {}\n\n    return {',
-              '        "lagna": {\n            "available": False,\n            "reason": "Global-coordinate Suriyayat Lagna is still research-only. Candidate methods are exposed separately and are not used for houses, dignity, scoring, or Gemini interpretation.",\n        },':
-                  '        "lagna": lagna_product_promotion.get("lagna") or {"available": False, "reason": "Explicit Lagna product promotion failed closed."},',
-              '        "ai_safe_packet_research": ai_safe_packet_research,\n        "lagna_promotion_audit_research": lagna_promotion_audit_research,':
-                  '        "ai_safe_packet_research": ai_safe_packet_research,\n        "ai_safe_packet_product": ai_safe_packet_product,\n        "lagna_promotion_audit_research": lagna_promotion_audit_research,\n        "lagna_product_promotion": lagna_product_promotion,',
-              '        "interpretation_status": "planetary_position_facts_plus_nonpredictive_descriptive_synthesis_and_research_context_layers",':
-                  '        "interpretation_status": "planetary_position_facts_plus_promoted_numeric_lagna_and_whitelisted_nonpredictive_house_context",',
-              '        "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",':
-                  '        "policy": "Validated numeric Lagna and whitelist-only descriptive house context are promoted. School-variant exceptions, final good/bad judgement, event timing, probability and scores remain disabled.",',
-              '            "suriyayat_lagna": "research_only_not_promoted",':
-                  '            "suriyayat_lagna": "product_promoted_numeric_position_descriptive_only",',
-              '            "suriyayat_ai_safe_packet": "whitelist_validated_but_gemini_blocked_until_lagna_product_promotion",':
-                  '            "suriyayat_ai_safe_packet": "product_enabled_double_whitelist_descriptive_nonpredictive_only",',
-              '            "suriyayat_lagna_product_promotion_audit": "research_only_prerequisite_matrix_no_state_change",':
-                  '            "suriyayat_lagna_product_promotion_audit": "passed_before_explicit_phase2g5_product_promotion",\n            "suriyayat_lagna_product_promotion": "numeric_lagna_plus_safe_descriptive_packet_only",',
-              '            "validated/promoted global-coordinate Suriyayat Lagna",\n            "Suriyayat production school-policy selection or actual exception application, predictive/final synthesis into outcomes, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",':
-                  '            "Suriyayat predictive use of promoted Lagna beyond whitelist-only descriptive house context",\n            "Suriyayat production school-policy selection or actual exception application, predictive/final synthesis into outcomes, concrete event outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",',
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit('missing Thai Phase 2G5 astrology anchor: ' + old[:220])
-              text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
-
-          path = Path('ai_interpret_v1.py')
-          text = path.read_text(encoding='utf-8')
-          old = '    packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_research"))\n'
-          new = '    packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_product") or value.get("ai_safe_packet_research"))\n'
-          if old not in text:
-              raise SystemExit('missing Thai Phase 2G5 compactor packet anchor')
-          text = text.replace(old, new, 1)
-          old_version = 'AI_INTERPRETER_VERSION = "mobile-ai-v2.5-thai-safe-packet-lagna-gated"'
-          if old_version not in text:
-              raise SystemExit('missing Thai Phase 2G5 AI version anchor')
-          text = text.replace(old_version, 'AI_INTERPRETER_VERSION = "mobile-ai-v2.6-thai-lagna-descriptive-product"', 1)
-          path.write_text(text, encoding='utf-8')
-          PY
 
       - name: Install Swiss Ephemeris dependency
         run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
@@ -81,7 +36,9 @@ jobs:
           PYTHONPATH: .
         run: |
           python - <<'PY'
-          import sys, unittest
+          import sys
+          import unittest
+
           patterns = [
               'test_thai_lagna_product_v1.py', 'test_thai_lagna_product_integration.py',
               'test_thai_lagna_promotion_audit_v1.py', 'test_thai_lagna_promotion_audit_integration.py',
@@ -113,6 +70,7 @@ jobs:
           if total != 215:
               raise SystemExit(f'expected 215 tests, discovered {total}')
           result = unittest.TextTestRunner(verbosity=2).run(suite)
+          print(f'PHASE2G5_RESULT={result.testsRun}/{total}')
           if not result.wasSuccessful():
               sys.exit(1)
           PY
@@ -127,9 +85,19 @@ jobs:
           python - <<'PY'
           import json
           from datetime import date, time
+
           from ai_interpret_v1 import _compact_calculation
           from thai_astrology_v2 import build_thai_fortune
-          thai = build_thai_fortune(birth_date=date(1991,3,21), birth_time=time(7,26), start_date=date(2026,8,31), end_date=date(2026,8,31), utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622)
+
+          thai = build_thai_fortune(
+              birth_date=date(1991, 3, 21),
+              birth_time=time(7, 26),
+              start_date=date(2026, 8, 31),
+              end_date=date(2026, 8, 31),
+              utc_offset_hours=9.0,
+              latitude=34.7604,
+              longitude=127.6622,
+          )
           assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.16-phase2g5-lagna-descriptive-product'
           suri = thai['suriyayat']
           assert suri['lagna']['available'] is True
@@ -138,30 +106,32 @@ jobs:
           assert promotion['explicit_promotion'] is True
           assert promotion['promotion_gate']['numeric_lagna_product_allowed'] is True
           assert promotion['promotion_gate']['gemini_descriptive_packet_allowed'] is True
-          for key in ('school_policy_allowed','exception_application_allowed','net_valence_allowed','final_good_bad_judgement_allowed','predictive_interpretation_allowed','event_judgement_allowed','timing_prediction_allowed','probability_allowed','scores_allowed'):
-              assert promotion['promotion_gate'][key] is False
+          for key in (
+              'school_policy_allowed', 'exception_application_allowed', 'net_valence_allowed',
+              'final_good_bad_judgement_allowed', 'predictive_interpretation_allowed',
+              'event_judgement_allowed', 'timing_prediction_allowed', 'probability_allowed',
+              'scores_allowed',
+          ):
+              assert promotion['promotion_gate'][key] is False, key
           packet = suri['ai_safe_packet_product']
-          assert packet['eligible_for_gemini'] is True and packet['route_count'] == 12
-          compact = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          assert packet['eligible_for_gemini'] is True
+          assert packet['route_count'] == 12
+          compact = _compact_calculation(
+              {'period': {'day_count': 1}, 'thai': thai}
+          )['thai']['suriyayat']
           assert compact['lagna']['available'] is True
           assert compact['ai_safe_descriptive_packet']['route_count'] == 12
           encoded = json.dumps(compact, ensure_ascii=False)
-          for forbidden in ('lagna_research','school_policy_research','literal_exception','prediction','score','probability','net_effect'):
-              assert forbidden not in encoded
+          for forbidden in (
+              'lagna_research', 'school_policy_research', 'literal_exception',
+              'prediction', 'score', 'probability', 'net_effect',
+          ):
+              assert forbidden not in encoded, forbidden
           assert suri['lagna_research']['research_only'] is True
           assert suri['lagna_research']['promotion_gate']['houses_allowed'] is False
           assert suri['lagna_research']['promotion_gate']['gemini_interpretation_allowed'] is False
-          print('PHASE2G5_PRODUCT_PROMOTION_PASS_NUMERIC_LAGNA_SAFE_DESCRIPTIVE_GEMINI_ONLY_PREDICTION_SCHOOL_SCORE_BLOCKED')
+          print('PHASE2G5_PRODUCT_PROMOTION_SCOPE_PASS')
           PY
 
-      - name: Check whitespace
-        run: git diff --check
-
-      - name: Commit Phase 2G5 and clean workflow
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add thai_astrology_v2.py ai_interpret_v1.py thai_lagna_product_v1.py tests/test_thai_lagna_product_v1.py tests/test_thai_lagna_product_integration.py
-          git rm -f .github/workflows/thai-phase2g5-product-promotion-once.yml
-          git commit -m 'research: promote validated Thai Lagna descriptive product layer'
-          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
+      - name: Check committed diff whitespace
+        run: git diff --check HEAD^ HEAD

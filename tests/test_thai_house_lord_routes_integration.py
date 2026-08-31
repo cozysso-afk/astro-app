@@ -39,7 +39,7 @@ class ThaiPhase2E2HouseLordRouteIntegrationTests(unittest.TestCase):
             self.assertIsNone(row["score"])
             self.assertIsNone(row["lord_position_context"]["status_judgement"])
 
-    def test_routes_are_stripped_from_gemini_payload(self):
+    def test_raw_routes_are_stripped_but_safe_descriptive_routes_are_whitelisted(self):
         thai = self._thai()
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
         compact_suri = compact["thai"]["suriyayat"]
@@ -47,12 +47,16 @@ class ThaiPhase2E2HouseLordRouteIntegrationTests(unittest.TestCase):
         encoded = json.dumps(compact_suri, ensure_ascii=False)
         self.assertNotIn("subject_domain_carried_by_house_lord", encoded)
         self.assertNotIn("placement_context_or_modifier", encoded)
-        self.assertNotIn("route_key", encoded)
+        packet = compact_suri["ai_safe_descriptive_packet"]
+        self.assertEqual(packet["route_count"], 12)
+        self.assertTrue(all(row.get("route_key") for row in packet["routes"]))
+        for forbidden in ("final_interpretation", "prediction", "score", "probability"):
+            self.assertNotIn(forbidden, encoded)
 
-    def test_product_lagna_and_synthesis_gates_stay_closed(self):
+    def test_product_lagna_is_promoted_but_route_judgement_gates_stay_closed(self):
         thai = self._thai()
         suri = thai["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         routes = suri["house_lord_routes_research"]
         self.assertTrue(routes["available"])
         self.assertEqual(len(routes["routes"]), 12)
@@ -61,6 +65,10 @@ class ThaiPhase2E2HouseLordRouteIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["pair_or_aspect_synthesis_allowed"])
         self.assertFalse(gate["combined_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertTrue(product_gate["gemini_descriptive_packet_allowed"])
+        self.assertFalse(product_gate["net_valence_allowed"])
+        self.assertFalse(product_gate["final_good_bad_judgement_allowed"])
         self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
 
 

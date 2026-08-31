@@ -72,15 +72,20 @@ class ThaiRulesPhase2BIntegrationTests(unittest.TestCase):
         self.assertNotIn("เกษตร", serialized)
         self.assertNotIn("ตรีโกณ", serialized)
 
-    def test_product_lagna_and_rule_interpretation_remain_disabled(self):
+    def test_product_lagna_is_promoted_but_rule_interpretation_remains_disabled(self):
         suri = self._build()["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         self.assertTrue(suri["dignities_research"]["research_only"])
         self.assertTrue(suri["aspects_research"]["research_only"])
         self.assertFalse(suri["dignities_research"]["promotion_gate"]["gemini_interpretation_allowed"])
         self.assertFalse(suri["aspects_research"]["promotion_gate"]["gemini_interpretation_allowed"])
         self.assertNotIn("score", suri["dignities_research"])
         self.assertNotIn("prediction", suri["aspects_research"])
+        product_gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(product_gate["exception_application_allowed"])
+        self.assertFalse(product_gate["predictive_interpretation_allowed"])
+        self.assertFalse(product_gate["event_judgement_allowed"])
+        self.assertFalse(product_gate["scores_allowed"])
 
 
 if __name__ == "__main__":

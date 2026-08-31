@@ -45,12 +45,16 @@ class ThaiPhase2D2PolicyIntegrationTests(unittest.TestCase):
         self.assertNotIn("source_a", encoded)
         self.assertNotIn("source_b", encoded)
 
-    def test_main_product_lagna_stays_unavailable(self):
+    def test_product_lagna_is_promoted_without_promoting_research_policy(self):
         suri = self._thai()["suriyayat"]
-        self.assertFalse(suri["lagna"]["available"])
+        self.assertTrue(suri["lagna"]["available"])
         self.assertTrue(suri["lagna_research"]["research_only"])
         self.assertTrue(suri["semantics_research"]["research_only"])
         self.assertTrue(suri["interpretation_policy_research"]["research_only"])
+        gate = suri["lagna_product_promotion"]["promotion_gate"]
+        self.assertFalse(gate["school_policy_allowed"])
+        self.assertFalse(gate["final_good_bad_judgement_allowed"])
+        self.assertFalse(gate["predictive_interpretation_allowed"])
 
 
 if __name__ == "__main__":
