@@ -1,0 +1,68 @@
+name: Thai Lagna world gold error diagnostic
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-lagna-world-error-diagnostic-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+      - name: Compare engine against four MyHora world gold vectors
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from thai_lagna_v1 import calculate_common_anto_0600, calculate_common_anto_actual_sunrise, angular_delta_deg
+
+          def deg(sign,d,m): return sign*30+d+m/60
+          cases=[
+            ('Yeosu',34.7604,127.6622,9.0,
+             {'actual':deg(11,19,22),'actual_lmt':deg(11,12,1),'fixed':deg(11,27,37),'fixed_lmt':deg(11,20,16)}),
+            ('Seoul',37.5665,126.9780,9.0,
+             {'actual':deg(11,18,37),'actual_lmt':deg(11,10,35),'fixed':deg(11,27,37),'fixed_lmt':deg(11,19,35)}),
+            ('Tokyo',35.6762,139.6503,9.0,
+             {'actual':deg(0,1,22),'actual_lmt':deg(0,6,1),'fixed':deg(11,27,37),'fixed_lmt':deg(0,2,16)}),
+            ('NewYork',40.7128,-74.0060,-5.0,
+             {'actual':deg(11,28,41),'actual_lmt':deg(11,29,40),'fixed':deg(11,28,11),'fixed_lmt':deg(11,29,10)}),
+          ]
+          all_errors={k:[] for k in ('actual','actual_lmt','fixed','fixed_lmt')}
+          for name,lat,lon,utc,exp in cases:
+            actual=calculate_common_anto_actual_sunrise(birth_date=date(1991,3,21),birth_time=time(7,26),latitude=lat,longitude=lon,utc_offset_hours=utc,adjust_local_mean_time=False)
+            actual_lmt=calculate_common_anto_actual_sunrise(birth_date=date(1991,3,21),birth_time=time(7,26),latitude=lat,longitude=lon,utc_offset_hours=utc,adjust_local_mean_time=True)
+            fixed=calculate_common_anto_0600(birth_date=date(1991,3,21),birth_time=time(7,26),longitude=lon,utc_offset_hours=utc,adjust_local_mean_time=False)
+            fixed_lmt=calculate_common_anto_0600(birth_date=date(1991,3,21),birth_time=time(7,26),longitude=lon,utc_offset_hours=utc,adjust_local_mean_time=True)
+            got={'actual':actual,'actual_lmt':actual_lmt,'fixed':fixed,'fixed_lmt':fixed_lmt}
+            print('\nCASE',name,'lat',lat,'lon',lon,'utc',utc)
+            for key in ('actual','actual_lmt','fixed','fixed_lmt'):
+              err=abs(angular_delta_deg(got[key]['longitude_deg'],exp[key]))*60
+              all_errors[key].append(err)
+              print(key,'ENGINE',got[key]['sign_en'],f"{got[key]['degree']:02d}°{got[key]['minute']:02d}'",'deg=',round(got[key]['longitude_deg'],6),'MYHORA=',round(exp[key],6),'ERROR_ARCMIN=',round(err,3))
+            print('SUNRISE',actual.get('sunrise_local'),'LMT_MIN',fixed_lmt.get('local_mean_time_correction_minutes'))
+          print('\nSUMMARY')
+          for key,errs in all_errors.items():
+            print(key,'MAX',round(max(errs),3),'MEAN',round(sum(errs)/len(errs),3),'VALUES',[round(x,3) for x in errs])
+          PY
+      - name: Clean one-shot workflow
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/thai-lagna-world-error-diagnostic-once.yml
+          git commit -m 'chore: clean Thai Lagna world error diagnostic workflow'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
