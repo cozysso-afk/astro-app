@@ -113,7 +113,7 @@ jobs:
         run: |
           rm -rf __pycache__ api/__pycache__
           git rm -f --ignore-unmatch build-v16.log
-          git rm scripts/restore_period_ai_feedback_v16.py .github/workflows/restore-period-ai-feedback-v16.yml
+          git rm -f scripts/restore_period_ai_feedback_v16.py .github/workflows/restore-period-ai-feedback-v16.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add web/src/AppNext.tsx web/src/lib/archive.ts web/src/lib/readingCache.ts web/src/period-ai-feedback-v16.css web/src/main.tsx
