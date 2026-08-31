@@ -2,7 +2,7 @@
 """Research-only Suriyayat Lagna candidates.
 
 This module deliberately does NOT promote a Thai Lagna into production
-interpretation yet.  It provides two independently inspectable candidates:
+interpretation yet.  It provides three independently inspectable candidates:
 
 1) common_anto_0600_lmt
    Traditional อันโตนาทีสามัญ (common Antoanatee) using the fixed 12-sign
@@ -11,7 +11,13 @@ interpretation yet.  It provides two independently inspectable candidates:
    method because it depends on legal UTC offset + longitude, not a Thailand
    province lookup table.
 
-2) astronomical_suriyayat_sidereal
+2) common_anto_actual_sunrise_lmt
+   Traditional common Antoanatee using the astronomical local sunrise for the
+   birthplace, with the same optional Local Mean Time correction. The sunrise
+   definition is Swiss Ephemeris CALC_RISE default (upper limb + refraction),
+   selected by independent MyHora comparison.
+
+3) astronomical_suriyayat_sidereal
    Latitude/longitude-aware astronomical cross-check.  Swiss Ephemeris gives
    the physical tropical Ascendant; the result is mapped into the Suriyayat
    fixed-zodiac frame using the difference between the tropical Sun and the
@@ -44,7 +50,7 @@ import swisseph as swe
 
 from thai_suriyayat_v1 import calculate_positions_for_instant
 
-ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.1-bangkok-7vector"
+ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.2-actual-sunrise"
 
 VALIDATION = {
     "status": "bangkok_era_spanning_validated_global_pending",
@@ -54,10 +60,11 @@ VALIDATION = {
     "coordinates": {"latitude": 13.752555, "longitude": 100.494066, "utc_offset_hours": 7.0},
     "common_0600": {"max_error_arcmin": 15.75, "mean_error_arcmin": 5.791},
     "common_lmt": {"max_error_arcmin": 15.695, "mean_error_arcmin": 6.03},
+    "actual_sunrise": {"vectors": 5, "year_span": "1777-2026", "max_error_arcmin": 8.500, "mean_error_arcmin": 2.708, "lmt_max_error_arcmin": 8.445, "lmt_mean_error_arcmin": 2.623},
     "astronomical_crosscheck": {"max_error_arcmin": 33.957, "mean_error_arcmin": 16.219},
     "global_coordinates_compute_supported": True,
     "global_coordinates_independently_validated": False,
-    "note": "Bangkok references span 249 years. Korea/world coordinates compute without Thailand province tables, but an independent non-Thailand reference corpus is still required before promotion.",
+    "note": "Bangkok references span 249 years. The actual-sunrise common method is separately validated against MyHora. Korea/world coordinates compute without Thailand province tables, but an independent non-Thailand reference corpus is still required before promotion.",
 }
 
 # Traditional common Antoanatee durations in civil minutes.
@@ -219,6 +226,124 @@ def calculate_common_anto_0600(
     }
 
 
+
+def _common_longitude_from_sun_and_elapsed(sun_longitude: float, elapsed_minutes: float) -> float:
+    sun_arcmin = _wrap360(sun_longitude) * 60.0
+    sun_sign = int(sun_arcmin // 1800.0) % 12
+    sun_within_deg = (sun_arcmin - sun_sign * 1800.0) / 60.0
+    anchor = (
+        sum(COMMON_SIGN_DURATIONS_MINUTES[:sun_sign])
+        + COMMON_SIGN_DURATIONS_MINUTES[sun_sign] * (sun_within_deg / 30.0)
+    )
+    target = (anchor + float(elapsed_minutes)) % 1440.0
+    cumulative = 0.0
+    for index, duration in enumerate(COMMON_SIGN_DURATIONS_MINUTES):
+        end = cumulative + duration
+        if cumulative <= target < end or index == 11:
+            degree_in_sign = ((target - cumulative) * 30.0) / duration
+            return _wrap360(index * 30.0 + degree_in_sign)
+        cumulative = end
+    raise RuntimeError("common Antoanatee duration table did not resolve")
+
+
+def _datetime_from_julian_ut(jd_ut: float) -> datetime:
+    year, month, day, hour_float = swe.revjul(float(jd_ut), swe.GREG_CAL)
+    seconds = int(round(hour_float * 3600.0))
+    base = datetime(year, month, day, tzinfo=timezone.utc)
+    return base + timedelta(seconds=seconds)
+
+
+def _actual_sunrise_local(
+    *,
+    birth_date: date,
+    latitude: float,
+    longitude: float,
+    utc_offset_hours: float,
+) -> datetime | None:
+    latitude = float(latitude)
+    longitude = float(longitude)
+    if not -90.0 <= latitude <= 90.0:
+        raise ValueError("latitude must be within -90..90")
+    if not -180.0 <= longitude <= 180.0:
+        raise ValueError("longitude must be within -180..180")
+    local_midnight = _local_datetime(birth_date, dt_time(0, 0), utc_offset_hours)
+    jd_start = _julian_ut(local_midnight)
+    result, tret = swe.rise_trans(
+        jd_start,
+        swe.SUN,
+        swe.CALC_RISE,
+        (longitude, latitude, 0.0),
+        0.0,
+        15.0,
+        swe.FLG_SWIEPH,
+    )
+    if result < 0:
+        return None
+    local_tz = timezone(timedelta(hours=float(utc_offset_hours)))
+    return _datetime_from_julian_ut(float(tret[0])).astimezone(local_tz)
+
+
+def calculate_common_anto_actual_sunrise(
+    *,
+    birth_date: date,
+    birth_time: dt_time,
+    latitude: float,
+    longitude: float,
+    utc_offset_hours: float,
+    adjust_local_mean_time: bool,
+) -> dict[str, Any]:
+    """Common Antoanatee using astronomical local sunrise.
+
+    Independent MyHora comparisons select Swiss Ephemeris' default CALC_RISE
+    definition (upper limb with atmospheric refraction) over disc-centre and
+    no-refraction alternatives. MyHora references also fit the Suriyayat Sun at
+    the birth instant as the dial anchor substantially better than replacing it
+    with the Sun longitude at sunrise. This remains research-only.
+    """
+    local_instant = _local_datetime(birth_date, birth_time, utc_offset_hours)
+    sunrise = _actual_sunrise_local(
+        birth_date=birth_date,
+        latitude=latitude,
+        longitude=longitude,
+        utc_offset_hours=utc_offset_hours,
+    )
+    if sunrise is None:
+        return {
+            "available": False,
+            "research_only": True,
+            "engine": ENGINE_VERSION,
+            "method": "common_anto_actual_sunrise_lmt" if adjust_local_mean_time else "common_anto_actual_sunrise_legal_time",
+            "reason": "No astronomical sunrise was resolved for the civil date/location (polar-day/night case possible).",
+        }
+
+    sun_longitude = _suriyayat_sun_longitude(local_instant)
+    raw_elapsed = (local_instant - sunrise).total_seconds() / 60.0
+    lmt_correction = local_mean_time_correction_minutes(longitude, utc_offset_hours)
+    working_elapsed = raw_elapsed + (lmt_correction if adjust_local_mean_time else 0.0)
+    longitude_deg = _common_longitude_from_sun_and_elapsed(sun_longitude, working_elapsed)
+    packed = _pack_longitude(longitude_deg)
+    return {
+        "available": True,
+        "research_only": True,
+        "engine": ENGINE_VERSION,
+        "method": "common_anto_actual_sunrise_lmt" if adjust_local_mean_time else "common_anto_actual_sunrise_legal_time",
+        "method_thai": "อันโตนาทีสามัญ สมผุสอาทิตย์อุทัย ปรับเวลาท้องถิ่น" if adjust_local_mean_time else "อันโตนาทีสามัญ สมผุสอาทิตย์อุทัย",
+        "latitude_used": True,
+        "longitude_used": True,
+        "latitude": round(float(latitude), 6),
+        "longitude": round(float(longitude), 6),
+        "utc_offset_hours": float(utc_offset_hours),
+        "sunrise_local": sunrise.isoformat(),
+        "sunrise_definition": "Swiss Ephemeris CALC_RISE default: upper limb + atmospheric refraction",
+        "suriyayat_sun_anchor": "birth_instant",
+        "sun_longitude_deg": round(sun_longitude, 6),
+        "raw_elapsed_from_sunrise_minutes": round(raw_elapsed, 6),
+        "local_mean_time_correction_minutes": round(lmt_correction, 6),
+        "working_elapsed_minutes": round(working_elapsed, 6),
+        **packed,
+        "policy": "Research candidate only; actual local sunrise is astronomical, while common Antoanatee uses the traditional fixed sign-duration table.",
+    }
+
 def _julian_ut(local_instant: datetime) -> float:
     utc = local_instant.astimezone(timezone.utc)
     hour = utc.hour + utc.minute / 60.0 + utc.second / 3600.0 + utc.microsecond / 3_600_000_000.0
@@ -310,6 +435,22 @@ def build_suriyayat_lagna_research(
         utc_offset_hours=utc_offset_hours,
         adjust_local_mean_time=True,
     )
+    actual_sunrise_legal = calculate_common_anto_actual_sunrise(
+        birth_date=birth_date,
+        birth_time=birth_time,
+        latitude=float(latitude),
+        longitude=float(longitude),
+        utc_offset_hours=utc_offset_hours,
+        adjust_local_mean_time=False,
+    )
+    actual_sunrise_lmt = calculate_common_anto_actual_sunrise(
+        birth_date=birth_date,
+        birth_time=birth_time,
+        latitude=float(latitude),
+        longitude=float(longitude),
+        utc_offset_hours=utc_offset_hours,
+        adjust_local_mean_time=True,
+    )
     astronomical = calculate_astronomical_suriyayat_candidate(
         birth_date=birth_date,
         birth_time=birth_time,
@@ -325,9 +466,12 @@ def build_suriyayat_lagna_research(
         "engine": ENGINE_VERSION,
         "promotion_status": "research_only_not_for_interpretation",
         "selected_traditional_candidate": "common_anto_0600_lmt",
+        "validated_secondary_traditional_candidate": "common_anto_actual_sunrise_lmt",
         "validation": VALIDATION,
         "common_anto_0600_legal_time": common_legal,
         "common_anto_0600_lmt": common_lmt,
+        "common_anto_actual_sunrise_legal_time": actual_sunrise_legal,
+        "common_anto_actual_sunrise_lmt": actual_sunrise_lmt,
         "astronomical_suriyayat_sidereal_crosscheck": astronomical,
         "candidate_delta_deg": round(delta, 6),
         "candidate_delta_arcmin": round(delta * 60.0, 3),
@@ -336,6 +480,7 @@ def build_suriyayat_lagna_research(
             "completed": [
                 "era-spanning independent MyHora Bangkok corpus (7 vectors, 1777-2026)",
                 "documented common Antoanatee 06:00 + LMT method",
+                "actual-local-sunrise common Antoanatee candidate against independent MyHora references",
                 "world-coordinate computation without Thailand province lookup",
             ],
             "required": [
