@@ -40,8 +40,9 @@ from thai_context_graph_v1 import build_context_graph_research
 from thai_descriptive_synthesis_v1 import build_descriptive_synthesis_research
 from thai_dignity_exceptions_v1 import build_dignity_exception_research
 from thai_school_policy_v1 import build_source_policy_research
+from thai_ai_safe_packet_v1 import build_ai_safe_packet_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.13-phase2g2-profile-differential-gold"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.14-phase2g3-ai-safe-packet-lagna-gated"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -277,6 +278,16 @@ def _suriyayat_layer(
         context_graph_research=context_graph_research,
         planet_pairs_research=planet_pairs_research,
     )
+    lagna_gate = lagna_research.get("promotion_gate") or {}
+    lagna_product_interpretation_ready = bool(
+        lagna_gate.get("lagna_numeric_position_validated") is True
+        and lagna_gate.get("houses_allowed") is True
+        and lagna_gate.get("gemini_interpretation_allowed") is True
+    )
+    ai_safe_packet_research = build_ai_safe_packet_research(
+        descriptive_synthesis_research=descriptive_synthesis_research,
+        lagna_product_available=lagna_product_interpretation_ready,
+    )
 
     return {
         "available": True,
@@ -304,6 +315,7 @@ def _suriyayat_layer(
         "house_lord_routes_research": house_lord_routes_research,
         "context_graph_research": context_graph_research,
         "descriptive_synthesis_research": descriptive_synthesis_research,
+        "ai_safe_packet_research": ai_safe_packet_research,
         "dignities_research": dignities_research,
         "dignity_exceptions_research": dignity_exceptions_research,
         "school_policy_research": school_policy_research,
@@ -391,6 +403,7 @@ def build_thai_fortune(
             "suriyayat_dignity_exception_candidates": "research_only_school_variant_candidates_not_applied",
             "suriyayat_source_policy_profiles": "research_only_explicit_comparison_default_none",
             "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",
+            "suriyayat_ai_safe_packet": "whitelist_validated_but_gemini_blocked_until_lagna_product_promotion",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [

@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.4-suriyayat-research-isolated"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.5-thai-safe-packet-lagna-gated"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -40,6 +40,36 @@ def _compact_stat(value: Any) -> Any:
     return out
 
 
+def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    gate = value.get("promotion_gate") if isinstance(value.get("promotion_gate"), dict) else {}
+    if value.get("eligible_for_gemini") is not True or gate.get("gemini_interpretation_allowed") is not True:
+        return {}
+    routes = []
+    for row in value.get("routes") or []:
+        if not isinstance(row, dict) or row.get("interpretation_level") != "descriptive_nonpredictive":
+            continue
+        carrier = row.get("carrier_planet") if isinstance(row.get("carrier_planet"), dict) else {}
+        modifiers = []
+        for item in row.get("basic_status_modifiers") or []:
+            if isinstance(item, dict):
+                modifiers.append({"status_key": item.get("status_key"), "functional_direction": item.get("functional_direction")})
+        relations = []
+        for item in row.get("relation_context_tags") or []:
+            if not isinstance(item, dict):
+                continue
+            pair_classes = []
+            for pair in item.get("pair_classes") or []:
+                if isinstance(pair, dict):
+                    pair_classes.append({"key": pair.get("key"), "functional_domain": pair.get("functional_domain")})
+            relations.append({"counterpart_planet": item.get("counterpart_planet"), "relation_key": item.get("relation_key"), "pair_classes": pair_classes, "pair_multi_label": bool(item.get("pair_multi_label"))})
+        routes.append({"route_key": row.get("route_key"), "source_topic_domains": list(row.get("source_topic_domains") or []), "carrier_planet": {"key": carrier.get("key"), "archetype_domains": list(carrier.get("archetype_domains") or [])}, "destination_context_domains": list(row.get("destination_context_domains") or []), "basic_status_modifiers": modifiers, "relation_context_tags": relations, "interpretation_level": "descriptive_nonpredictive"})
+    if not routes:
+        return {}
+    return {"engine": value.get("engine"), "mode": "descriptive_nonpredictive", "route_count": len(routes), "routes": routes}
+
+
 def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
     """Whitelist interpreted Suriyayat facts and exclude every research layer.
 
@@ -62,7 +92,11 @@ def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
         "interpretation_status",
         "policy",
     )
-    return {key: value.get(key) for key in allowed if key in value}
+    out = {key: value.get(key) for key in allowed if key in value}
+    packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_research"))
+    if packet:
+        out["ai_safe_descriptive_packet"] = packet
+    return out
 
 
 def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
@@ -243,7 +277,7 @@ SYSTEM_PROMPT = """너는 '별빛의 운명' 앱의 점성술 해설자다.
 Western 점수는 사건 발생 확률이 아니라 상대적 활성도다. 높은 점수를 '발생 가능성 몇 %'처럼 바꾸지 마라.
 사주에서 not_calculated에 있는 신강·신약, 용신·희신·기신, 형·파·해 전체 규칙은 임의 추정하지 마라.
 사주 annual은 입춘, monthly는 절(節) 정확시각 경계로 이미 분할된 구간이다. 같은 달력 연도·월 표기가 반복되어도 서로 다른 간지 구간을 임의 병합하지 마라.
-Thai는 mahathaksa/taksajorn과 suriyayat에 실제 데이터가 있을 때만 사용한다. suriyayat.positions는 교차검증된 전통 10행성 위치 사실이지만 Lagna·하우스·디그니티·애스펙트·사건판정 규칙은 아직 계산하지 않는다. not_calculated 항목은 절대 추정하지 말고, Thai 층을 Western 수치점수처럼 확률화하거나 임의 합산하지 마라.
+Thai는 mahathaksa/taksajorn과 suriyayat에 실제 데이터가 있을 때만 사용한다. suriyayat의 교차검증된 10행성 위치 사실을 사용할 수 있다. ai_safe_descriptive_packet이 실제 payload에 포함된 경우에만 그 패킷 안의 descriptive_nonpredictive 하우스-주인-도착맥락을 설명에 사용할 수 있고, 패킷이 없으면 Lagna·하우스를 추정하지 마라. 패킷이 있어도 학파 예외, 최종 길흉, 사건, 타이밍, 확률, 점수로 확장하지 마라. not_calculated 항목은 절대 추정하지 말고 Thai 층을 Western 수치점수처럼 확률화하거나 임의 합산하지 마라.
 연애·연락·재회는 특정 사람이 연락한다, 돌아온다, 속마음이 이렇다처럼 타인의 사적 의도나 미래 행동을 단정하지 마라.
 컨디션은 질병·진단·치료를 예측하지 않는다. 금전은 수익률이나 투자 성공을 보장하지 않는다.
 현재 데이터에 시간대별 값이 없으면 특정 시각을 만들지 말고 '현재 엔진에는 시간대 근거가 없다'고 분명히 말한다.
@@ -271,7 +305,7 @@ OUTPUT_SHAPE = {
     "systems": {
         "western": "Western 계산이 말하는 핵심",
         "saju": "사주 원국/대운/세운/월운에서 계산된 범위만 설명",
-        "thai": "Thai 출생요일·Mahathaksa·Taksajorn과 검증된 Suriyayat 10행성 위치 사실층, Suriyayat Lagna 미구현 한계",
+        "thai": "Thai 출생요일·Mahathaksa·Taksajorn과 검증된 Suriyayat 사실층. ai_safe_descriptive_packet이 있을 때만 비예측형 하우스 경로 맥락을 추가 설명하고, 없으면 Lagna·하우스를 추정하지 않음",
     },
     "priorities": ["현실 행동 1", "현실 행동 2", "현실 행동 3"],
     "topic_analysis": {
