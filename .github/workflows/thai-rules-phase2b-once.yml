@@ -1,0 +1,139 @@
+name: Thai rules Phase 2B research gate
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-rules-phase2b-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Attach factual Phase 2B rules to Suriyayat research diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+
+          old_import = 'from thai_houses_v1 import build_whole_sign_houses_research\n'
+          new_import = old_import + 'from thai_dignities_v1 import build_dignity_research, build_house_lords_research\nfrom thai_aspects_v1 import build_aspect_research\n'
+          if old_import not in text:
+              raise SystemExit('house import anchor missing')
+          text = text.replace(old_import, new_import, 1)
+
+          old_version = 'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.2-lagna-research"'
+          new_version = 'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.3-phase2b-research"'
+          if old_version not in text:
+              raise SystemExit('engine version anchor missing')
+          text = text.replace(old_version, new_version, 1)
+
+          old_block = '''            houses_research = build_whole_sign_houses_research(\n                lagna_longitude_deg=float(selected["longitude_deg"]),\n                planet_positions=natal.get("positions") or {},\n            )\n    return {'''
+          new_block = '''            houses_research = build_whole_sign_houses_research(\n                lagna_longitude_deg=float(selected["longitude_deg"]),\n                planet_positions=natal.get("positions") or {},\n            )\n\n    natal_positions = natal.get("positions") or {}\n    dignities_research = build_dignity_research(natal_positions)\n    aspects_research = build_aspect_research(natal_positions)\n    house_lords_research: dict[str, Any] = {\n        "available": False,\n        "research_only": True,\n        "reason": "Validated whole-sign houses are required before house-lord research can be built.",\n        "promotion_gate": {\n            "house_lord_interpretation_allowed": False,\n            "gemini_interpretation_allowed": False,\n        },\n    }\n    if houses_research.get("available"):\n        house_lords_research = build_house_lords_research(houses_research.get("houses") or [])\n\n    return {'''
+          if old_block not in text:
+              raise SystemExit('house research block anchor missing')
+          text = text.replace(old_block, new_block, 1)
+
+          old_return = '''        "lagna_research": lagna_research,\n        "houses_research": houses_research,\n        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_and_house_research",\n        "policy": "Traditional 10-planet position facts only. No Western-score blending, no Thai house/aspect judgement, and no event probability.",'''
+          new_return = '''        "lagna_research": lagna_research,\n        "houses_research": houses_research,\n        "house_lords_research": house_lords_research,\n        "dignities_research": dignities_research,\n        "aspects_research": aspects_research,\n        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_research",\n        "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",'''
+          if old_return not in text:
+              raise SystemExit('Suriyayat return block anchor missing')
+          text = text.replace(old_return, new_return, 1)
+
+          text = text.replace(
+              '"predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_no_lagna_rules",',
+              '"predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_research_only_lagna_house_dignity_aspect_facts",',
+              1,
+          )
+          text = text.replace(
+              '"consensus_policy": "Mahathaksa/Taksajorn period facts and cross-validated Suriyayat 10-planet positions are available as independent Thai layers. Lagna/house/aspect/event rules are not yet validated and nothing is converted into Western-style probability scores.",',
+              '"consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Validated Lagna position plus Whole Sign, house-lord, basic dignity-table and sign-relation facts are research diagnostics only; no meaning or Western-style probability score is derived from them.",',
+              1,
+          )
+          old_rel = '''            "suriyayat_lagna": "research_only_not_promoted",\n            "suriyayat_lagna_research_engine": LAGNA_RESEARCH_ENGINE_VERSION,\n            "suriyayat_predictive_rules": "not_implemented",'''
+          new_rel = '''            "suriyayat_lagna": "research_only_not_promoted",\n            "suriyayat_lagna_research_engine": LAGNA_RESEARCH_ENGINE_VERSION,\n            "suriyayat_whole_sign_houses": "research_only_structure_connected",\n            "suriyayat_house_lords_basic_dignities": "research_only_table_facts",\n            "suriyayat_sign_aspects": "research_only_geometry_facts",\n            "suriyayat_predictive_rules": "not_implemented",'''
+          if old_rel not in text:
+              raise SystemExit('reliability block anchor missing')
+          text = text.replace(old_rel, new_rel, 1)
+          text = text.replace(
+              '            "Suriyayat houses/dignities/aspect judgement",',
+              '            "Suriyayat house meanings, dignity strength/meaning, aspect strength/pair interpretation",',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+      - name: Run Phase 2B dignity table tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_dignities_v1.py' -v
+      - name: Run Phase 2B aspect geometry tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_aspects_v1.py' -v
+      - name: Run Phase 2B integration tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_rules_phase2b_integration.py' -v
+      - name: Run Phase 2A house regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_houses*.py' -v
+      - name: Run all Lagna regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
+      - name: Run Gemini research isolation regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_ai_thai_research_isolation.py' -v
+      - name: Compile Thai research modules
+        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_astrology_v2.py ai_interpret_v1.py
+      - name: Verify all interpretation gates remain closed
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from thai_astrology_v2 import build_thai_fortune
+          r=build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )['suriyayat']
+          assert r['lagna']['available'] is False
+          assert r['houses_research']['promotion_gate']['houses_allowed_in_product'] is False
+          assert r['house_lords_research']['promotion_gate']['house_lord_interpretation_allowed'] is False
+          assert r['dignities_research']['promotion_gate']['scores_allowed'] is False
+          assert r['dignities_research']['promotion_gate']['event_judgement_allowed'] is False
+          assert r['aspects_research']['promotion_gate']['strength_percent_allowed'] is False
+          assert r['aspects_research']['promotion_gate']['pair_meaning_allowed'] is False
+          assert r['dignities_research']['promotion_gate']['gemini_interpretation_allowed'] is False
+          assert r['aspects_research']['promotion_gate']['gemini_interpretation_allowed'] is False
+          print('PHASE2B_FACTS_CONNECTED_ALL_INTERPRETATION_GATES_CLOSED')
+          PY
+      - name: Check whitespace
+        run: git diff --check
+      - name: Commit Phase 2B state and clean workflow
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_dignities_v1.py thai_aspects_v1.py tests/test_thai_dignities_v1.py tests/test_thai_aspects_v1.py tests/test_thai_rules_phase2b_integration.py
+          git rm -f .github/workflows/thai-rules-phase2b-once.yml
+          git commit -m 'research: add Thai house-lord dignity and aspect fact layers'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
