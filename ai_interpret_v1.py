@@ -19,7 +19,7 @@ from thai_ai_output_guard_v1 import (
     thai_output_guard_required,
 )
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.8-thai-output-guard-retry-fallback"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.8.1-thai-output-guard-timeout-headroom"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -561,11 +561,11 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
     # Render free workers were observed to recycle around a ~40s long outbound
     # generation. Keep each model call well below that boundary. The primary
     # retains high thinking; fallback uses medium thinking to guarantee a result.
-    primary = _call_model_with_thai_output_safety(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")
+    primary = _call_model_with_thai_output_safety(calculation, model, api_key, timeout_seconds=34.0, thinking_level="high")
     if primary.get("ok") or model == AI_FALLBACK_MODEL:
         return primary
 
-    fallback = _call_model_with_thai_output_safety(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=16.0, thinking_level="medium")
+    fallback = _call_model_with_thai_output_safety(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=28.0, thinking_level="medium")
     if fallback.get("ok"):
         fallback["fallback_from"] = model
         fallback["fallback_reason"] = primary.get("error")
