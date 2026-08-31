@@ -1,0 +1,22 @@
+/* v16 · period AI auto-cache + summary/detail + personal outcome feedback */
+.period-ai-card{display:grid;gap:11px;margin-top:14px;padding:15px;border:1px solid rgba(163,142,183,.22);border-radius:19px;background:linear-gradient(145deg,rgba(255,253,250,.96),rgba(246,239,252,.91),rgba(235,248,246,.88));box-shadow:0 14px 32px rgba(82,65,101,.085),inset 0 1px 0 rgba(255,255,255,.96)}
+.period-ai-card.is-loading{grid-template-columns:auto 1fr;align-items:center}
+.period-ai-kicker{font-size:.66rem;letter-spacing:.12em;font-weight:900;color:#887394}
+.period-ai-card h3{margin:2px 0 0;font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:1.02rem;line-height:1.42;color:#4f4059}
+.period-ai-summary{margin:0;color:#62586a;font-size:.84rem;line-height:1.72;white-space:pre-wrap}
+.period-ai-chips{display:flex;flex-wrap:wrap;gap:6px}
+.period-ai-chip{padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid rgba(151,129,172,.14);font-size:.68rem;font-weight:800;color:#6b5a77}
+.period-ai-cache-note{display:flex;align-items:center;gap:6px;color:#6e7e79;font-size:.66rem;font-weight:760}
+.period-ai-details{border-top:1px solid rgba(139,117,157,.12);padding-top:4px}
+.period-ai-details>summary{cursor:pointer;list-style:none;padding:9px 2px 4px;color:#5a4864;font-size:.78rem;font-weight:900}
+.period-ai-details>summary::-webkit-details-marker{display:none}.period-ai-details>summary::before{content:"＋";margin-right:7px;color:#8a7497}.period-ai-details[open]>summary::before{content:"－"}
+.period-ai-detail-body{display:grid;gap:11px;padding-top:10px}
+.period-ai-section{padding:12px 13px;border-radius:14px;background:rgba(255,255,255,.63);border:1px solid rgba(164,144,180,.12)}
+.period-ai-section>strong{display:block;margin-bottom:6px;color:#51435b;font-size:.76rem}.period-ai-section p{margin:0;color:#655b6b;font-size:.77rem;line-height:1.68;white-space:pre-wrap}
+.period-ai-topic-list{display:grid;gap:8px}.period-ai-topic{padding:10px 11px;border-radius:12px;background:rgba(251,248,252,.84);border-left:3px solid rgba(128,103,149,.42)}
+.period-ai-topic strong{display:block;color:#51445a;font-size:.75rem}.period-ai-topic b{display:block;margin:4px 0;color:#6b5577;font-size:.74rem}.period-ai-topic p{margin:3px 0;color:#685e6e;font-size:.73rem;line-height:1.62}
+.period-ai-cost{display:flex;justify-content:space-between;gap:8px;align-items:center;padding-top:4px;color:#7a6e80;font-size:.64rem}.period-ai-cost b{color:#5e4c68}.period-ai-cost small{color:#8b8190}
+.period-ai-retry{justify-self:start;border:1px solid rgba(144,119,164,.2);border-radius:11px;padding:8px 10px;background:rgba(255,255,255,.76);color:#66536f;font-weight:800}
+.outcome-card{margin-top:14px;padding:0;overflow:hidden}.outcome-card>summary{cursor:pointer;list-style:none;padding:14px 15px;color:#584862;font-size:.8rem;font-weight:900}.outcome-card>summary::-webkit-details-marker{display:none}.outcome-card>summary::before{content:"🧪";margin-right:7px}
+.outcome-form{display:grid;gap:11px;padding:0 14px 15px}.outcome-note{margin:0;color:#756b7c;font-size:.7rem;line-height:1.55}.outcome-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.outcome-form label{display:grid;gap:5px;color:#67596f;font-size:.67rem;font-weight:800}.outcome-form select,.outcome-form input[type="text"]{width:100%;min-width:0;min-height:43px;border:1px solid rgba(157,138,174,.22);border-radius:12px;background:rgba(255,255,255,.88);padding:0 11px;color:#4f4555;font:inherit}.outcome-check{display:flex!important;grid-column:1/-1;align-items:center;gap:8px!important}.outcome-check input{width:17px;height:17px}.outcome-save{min-height:44px;border:0;border-radius:13px;background:linear-gradient(135deg,#806b91,#6f8294);color:white;font-weight:880}.outcome-saved{padding:9px 11px;border-radius:11px;background:rgba(231,247,239,.78);color:#557066;font-size:.7rem;font-weight:800}
+@media(max-width:430px){.period-ai-card{padding:14px 13px}.period-ai-card h3{font-size:.98rem}.period-ai-summary{font-size:.81rem}.outcome-grid{grid-template-columns:1fr}.outcome-check{grid-column:auto}.period-ai-cost{align-items:flex-start;flex-direction:column}}

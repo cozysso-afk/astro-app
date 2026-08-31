@@ -8,6 +8,7 @@ import { AstrocartographyWorldMap } from './AstrocartographyWorldMap'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
+import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
@@ -427,6 +428,103 @@ function relationshipAspectMeaning(aspect: Aspect) {
   if (aspect.a === 'True Node' || aspect.b === 'True Node') return '익숙함이나 의미 부여가 강해질 수 있지만 운명·재회 확정의 증거는 아니야. 반복 패턴을 살피는 근거로 보는 게 맞아.'
   return supportive ? '이 기능은 비교적 자연스럽게 연결되는 조화 접점이야. 관계 전체가 좋다는 뜻은 아니야.' : tense ? '자극과 마찰이 반복되기 쉬운 긴장 접점이야. 나쁘다는 뜻보다 조율이 필요한 힘이 강하다는 의미야.' : '강한 결합이나 혼합 효과가 나타나는 접점이야. 상황에 따라 협력과 부담이 함께 나타날 수 있어.'
 }
+
+type OutcomeEvent = '' | 'none' | 'received' | 'sent' | 'both'
+type OutcomeTimeBucket = '' | 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night'
+type OutcomeChannel = '' | 'message' | 'dm' | 'call' | 'in_person' | 'other'
+type DailyOutcomeRecord = {
+  date: string
+  event: OutcomeEvent
+  past_connection: boolean
+  event_time_bucket: OutcomeTimeBucket
+  channel: OutcomeChannel
+  note: string
+  saved_at: string
+  scores: Record<string, number | null>
+}
+
+const OUTCOME_STORAGE_KEY = 'starlight-destiny.relationship-outcomes.v2'
+
+function emptyOutcome(dateValue: string): DailyOutcomeRecord {
+  return { date: dateValue, event: '', past_connection: false, event_time_bucket: '', channel: '', note: '', saved_at: '', scores: {} }
+}
+
+function readDailyOutcomes(): DailyOutcomeRecord[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(OUTCOME_STORAGE_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((row)=>row && typeof row.date === 'string') : []
+  } catch { return [] }
+}
+
+function readDailyOutcome(dateValue: string): DailyOutcomeRecord | null {
+  return readDailyOutcomes().find((row)=>row.date === dateValue) ?? null
+}
+
+function writeDailyOutcome(record: DailyOutcomeRecord) {
+  const current = readDailyOutcomes()
+  const next = [record, ...current.filter((row)=>row.date !== record.date)]
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .slice(0, 500)
+  window.localStorage.setItem(OUTCOME_STORAGE_KEY, JSON.stringify(next))
+}
+
+function summarizeDailyOutcomes(records: DailyOutcomeRecord[]) {
+  const usable = records.filter((row)=>row.event)
+  const contact = usable.filter((row)=>row.event === 'received' || row.event === 'both')
+  const none = usable.filter((row)=>row.event === 'none')
+  const mean = (rows: DailyOutcomeRecord[], key: string) => {
+    const values = rows.map((row)=>row.scores[key]).filter((value): value is number=>typeof value === 'number' && Number.isFinite(value))
+    return values.length ? values.reduce((sum,value)=>sum+value,0)/values.length : null
+  }
+  return {
+    n: usable.length,
+    contactN: contact.length,
+    noneN: none.length,
+    incomingContact: mean(contact,'수신신호'),
+    incomingNone: mean(none,'수신신호'),
+    reconnectionContact: mean(contact,'재접점'),
+    reconnectionNone: mean(none,'재접점'),
+  }
+}
+
+function PeriodAiInterpretationPanel({ result, loading, error, cacheSource, onRetry }: {
+  result: AiInterpretationResponse | null
+  loading: boolean
+  error: string
+  cacheSource: 'local' | 'server' | 'fresh' | ''
+  onRetry: () => void
+}) {
+  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>자연어 해설을 불러오는 중…</h3><p className="period-ai-summary">저장본이 있으면 바로 읽고, 없을 때만 Gemini를 한 번 호출해.</p></div></section>
+  if (error && !result) return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>자연어 해설을 아직 불러오지 못했어</h3><p className="period-ai-summary">{error}</p><button className="period-ai-retry" type="button" onClick={onRetry}>해설 다시 확인</button></section>
+  if (!result?.ok || !result.data) return null
+  const data = result.data
+  const usage = estimateGeminiUsage(result.usage)
+  const cached = cacheSource === 'local' || cacheSource === 'server'
+  return <section className="period-ai-card">
+    <span className="period-ai-kicker">GEMINI PERIOD SUMMARY</span>
+    <h3>{data.headline || '기간 흐름 요약'}</h3>
+    <p className="period-ai-summary">{data.overall.summary}</p>
+    <div className="period-ai-chips">
+      {data.overall.best_phase && <span className="period-ai-chip">좋은 흐름 · {data.overall.best_phase}</span>}
+      {data.overall.caution_phase && <span className="period-ai-chip">주의 흐름 · {data.overall.caution_phase}</span>}
+    </div>
+    <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 해설 즉시 조회 · 이번 Gemini API 재호출 0회' : '최초 해설 자동 저장 완료 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>
+    {usage?.total_tokens ? <div className="period-ai-cost"><span>최초 생성 · 입력 {(usage.prompt_tokens??0).toLocaleString()} / 출력 {(usage.candidate_tokens??0).toLocaleString()} / 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>저장본 재조회 비용 0원</small></div> : null}
+    <details className="period-ai-details">
+      <summary>상세 해설 보기</summary>
+      <div className="period-ai-detail-body">
+        {data.overall.dominant_pattern && <div className="period-ai-section"><strong>기간을 관통하는 패턴</strong><p>{data.overall.dominant_pattern}</p></div>}
+        <div className="period-ai-section"><strong>분야별 종합</strong><p>{[data.clusters.relationship&&`관계 · ${data.clusters.relationship}`,data.clusters.work_study&&`일·학업 · ${data.clusters.work_study}`,data.clusters.money_news&&`돈·소식 · ${data.clusters.money_news}`,data.clusters.investment&&`투자 · ${data.clusters.investment}`,data.clusters.condition&&`컨디션 · ${data.clusters.condition}`].filter(Boolean).join('\n\n')}</p></div>
+        {!!data.priorities?.length && <div className="period-ai-section"><strong>우선순위</strong><p>{data.priorities.map((item,index)=>`${index+1}. ${item}`).join('\n')}</p></div>}
+        <div className="period-ai-topic-list">{Object.entries(data.topic_analysis ?? {}).map(([topic,item])=><article className="period-ai-topic" key={topic}><strong>{topic}</strong><b>{item.verdict}</b>{item.reason&&<p>근거 · {item.reason}</p>}{item.timing&&<p>시기 · {item.timing}</p>}{item.action&&<p>활용 · {item.action}</p>}{item.avoid&&<p>피할 것 · {item.avoid}</p>}<p>확신도 · {item.confidence}{item.confidence_reason?` · ${item.confidence_reason}`:''}</p></article>)}</div>
+        <div className="period-ai-section"><strong>체계별 교차해석</strong><p>{[data.systems?.western&&`서양점성술 · ${data.systems.western}`,data.systems?.saju&&`사주 · ${data.systems.saju}`,data.systems?.thai&&`태국점성술 · ${data.systems.thai}`].filter(Boolean).join('\n\n')}</p></div>
+        {data.limits && <div className="period-ai-section"><strong>해설 한계</strong><p>{data.limits}</p></div>}
+      </div>
+    </details>
+  </section>
+}
+
 function relationshipLimitKo(text: string) {
   if (text.includes('Partner exact birth time/place missing')) return '상대의 정확한 출생시간·장소가 없어 데이비슨·마크스·마크스 3차 진행은 추정하지 않고 제외했어.'
   if (text.includes('Exact partner birth time')) return '상대의 정확한 출생시간이 없어 해당 정밀 진행 레이어는 계산하지 않았어.'
@@ -461,7 +559,7 @@ function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading,
       <div className="relationship-reading-grid"><article><strong>대화 · 소통</strong><p>{communicationText}</p></article><article><strong>끌림 · 자극</strong><p>{chemistryText}</p></article><article><strong>지속성 · 성장</strong><p>{stabilityText}</p></article><article><strong>타이밍 정밀도</strong><p>{timing}</p></article></div>
       <div className="relationship-key-aspects"><strong>가장 강한 접점</strong>{tight.slice(0,3).map((aspect,index)=><div key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><b>{aspectText(aspect)} · 오브 {aspect.orb.toFixed(2)}°</b><p>{relationshipAspectMeaning(aspect)}</p></div>)}</div>
     </section>
-    <div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini(제미나이) 관계 해석 중…':'Gemini(제미나이) 관계 정밀해석'}</span></button><small>원할 때만 AI 호출 · 완료 후 토큰/예상비용 표시</small></div>
+    {!ai?.ok&&<div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini(제미나이) 관계 해석 중…':'Gemini(제미나이) 관계 정밀해석'}</span></button><small>최초 1회 생성 후 자동 저장 · 같은 계산값은 저장본 즉시 조회</small></div>}
     {aiError && <div className="status-banner error"><AlertTriangle size={16}/><span>{aiError}</span></div>}
     {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">Gemini(제미나이) 관계 해설</span><h3>{ai.data.headline}</h3>{usage?.total_tokens?<details className="ai-meta-details relationship-meta-details"><summary>해설 생성 정보</summary><div className="relationship-ai-usage"><span>입력 {(usage?.prompt_tokens??0).toLocaleString()} · 출력 {(usage?.candidate_tokens??0).toLocaleString()} · 사고 {(usage?.thought_tokens??0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(usage?.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw??0).toLocaleString()}원</b></div></details>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}{isReunion&&ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{isMarriage&&ai.data.marriage_reading?.bottom_line&&<div className="marriage-ai-deep"><strong>{analysisMode==='marriage_unmarried'?'미혼 결혼운 · 정밀 해석':'기혼 결혼운 · 정밀 해석'}</strong><p className="marriage-ai-bottom">{ai.data.marriage_reading.bottom_line}</p><div className="marriage-ai-grid"><article><b>장기 결속력</b><p>{ai.data.marriage_reading.bond}</p></article><article><b>정서적 집</b><p>{ai.data.marriage_reading.emotional_home}</p></article><article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b><p>{ai.data.marriage_reading.conflict_repair}</p></article><article><b>{analysisMode==='marriage_unmarried'?'결혼 결정 흐름':'현재 결혼생활 주기'}</b><p>{ai.data.marriage_reading.commitment_or_current_cycle}</p></article><article><b>시기 흐름</b><p>{ai.data.marriage_reading.timing}</p></article><article><b>장기 주의점</b><p>{ai.data.marriage_reading.caution}</p></article><article><b>정밀도</b><p>{ai.data.marriage_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
   </>
@@ -869,6 +967,12 @@ export default function AppNext() {
   const aiPollRef = useRef<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
+  const [aiCacheSource, setAiCacheSource] = useState<'local'|'server'|'fresh'|''>('')
+  const [, setRelationshipAiCacheSource] = useState<'local'|'fresh'|''>('')
+  const aiRequestRef = useRef('')
+  const [outcomeDraft, setOutcomeDraft] = useState<DailyOutcomeRecord>(()=>emptyOutcome(queryDate))
+  const [outcomeSaved, setOutcomeSaved] = useState(false)
+  const [outcomeNonce, setOutcomeNonce] = useState(0)
   const [integratedLoading, setIntegratedLoading] = useState(false)
   const [integratedProgress, setIntegratedProgress] = useState<{completed:number;total:number;percent:number}|null>(null)
   const [integratedError, setIntegratedError] = useState('')
@@ -926,6 +1030,7 @@ export default function AppNext() {
     setRelationshipResult(null)
     setRelationshipRequestSnapshot(null)
     setRelationshipAi(null)
+    setRelationshipAiCacheSource('')
     setRelationshipAiError('')
     setRelationshipError('')
     setReunionTiming(null)
@@ -966,6 +1071,12 @@ export default function AppNext() {
   useEffect(() => {
     if (mainView === 'settings') void refreshPushState()
   }, [mainView])
+
+  useEffect(() => {
+    const existing = readDailyOutcome(queryDate)
+    setOutcomeDraft(existing ?? emptyOutcome(queryDate))
+    setOutcomeSaved(false)
+  }, [queryDate])
 
   useEffect(() => {
     window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(uiSettings))
@@ -1051,7 +1162,7 @@ export default function AppNext() {
     setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
   }
 
-  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string) => {
+  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = 90, requestForArchive?: Record<string, unknown>) => {
     if (!jobId || aiPollRef.current === jobId) return
     aiPollRef.current = jobId
     setAiLoading(true); setAiError('')
@@ -1073,13 +1184,24 @@ export default function AppNext() {
             data: data.data ?? undefined,
           }
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
-          const currentStart = integratedCalendarYear ? `${integratedCalendarYear}-01-01` : queryDate
-          const currentEnd = integratedCalendarYear ? `${integratedCalendarYear}-12-31` : periodEnd(queryDate, period)
+          const annotated = annotatePayload(payload)
+          if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', annotated, ttlDays)
+          const currentStart = integratedStartDate
+          const currentEnd = integratedSelectionEnd
           if (!periodStart || (currentStart === periodStart && currentEnd === periodEndValue)) {
-            setAiInterpretation(annotatePayload(payload))
+            setAiInterpretation(annotated)
+            setAiCacheSource(data?.reused ? 'server' : 'fresh')
+          }
+          if (requestForArchive && selectedTool === null && periodStart && periodEndValue) {
+            const calc = integratedResult
+            if (calc && calc.period.start === periodStart && calc.period.end === periodEndValue) {
+              const archiveRequest = {...requestForArchive, archive_mode:'period_fortune_v16'}
+              void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${periodStart}`,periodStart,periodEnd:periodEndValue,engine:calc.engine,request:archiveRequest,result:calc as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForArchive)}`)
+            }
           }
           window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
           setAiConfigured(true)
+          aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
@@ -1104,18 +1226,37 @@ export default function AppNext() {
     const raw = window.localStorage.getItem(AI_JOB_STORAGE_KEY)
     if (!raw) return
     try {
-      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string }
-      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd)
+      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }
+      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? 90, saved.request)
     } catch {
       window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
       setAiLoading(false)
     }
   }
 
-  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult) => {
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
     if (!calculation) return
-    setAiLoading(true); setAiError(''); setAiInterpretation(null)
+    const requestForCache = requestOverride ?? { start_date: calculation.period.start, end_date: calculation.period.end }
+    const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
+    const ttlDays = selectedTool === 'integrated' || period === 'year' ? 370 : period === 'today' ? 90 : 30
+    if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
+    aiRequestRef.current = cacheId
+    setAiLoading(true); setAiError('')
     try {
+      const cached = await readReadingCache<AiInterpretationResponse>(cacheId)
+      if (cached?.ok && cached.data) {
+        const annotated = annotatePayload(cached)
+        setAiInterpretation(annotated)
+        setAiCacheSource('local')
+        setAiLoading(false)
+        if (selectedTool === null) {
+          const archiveRequest = {...requestForCache, archive_mode:'period_fortune_v16'}
+          void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForCache)}`)
+        }
+        return
+      }
+      setAiInterpretation(null)
+      setAiCacheSource('')
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', {
         body: { action: 'start', calculation, model: aiModel },
@@ -1125,17 +1266,45 @@ export default function AppNext() {
         if (data?.missing_key) setAiConfigured(false)
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
-      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end }
+      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
       window.localStorage.setItem(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
       setAiConfigured(true)
-      void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd)
+      void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
     } catch (error) {
       window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
       setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
     }
   }
+
+
+  useEffect(() => {
+    if (mainView !== 'home' || integratedLoading || !birthProfile.birthDate || !birthProfile.birthTime) return
+    if (!(selectedTool === null || selectedTool === 'integrated' || selectedTool === 'precision')) return
+    const latitude = parseOptionalNumber(birthProfile.latitude)
+    const longitude = parseOptionalNumber(birthProfile.longitude)
+    if (latitude === null || longitude === null) return
+    const body: Record<string,unknown> = {
+      profile: { name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey },
+      start_date: integratedStartDate,
+      end_date: integratedSelectionEnd,
+    }
+    const cacheId = fortuneCalculationCacheId(body)
+    let cancelled = false
+    void (async()=>{
+      const cached = await readReadingCache<{request:Record<string,unknown>;result:IntegratedApiResponse}>(cacheId)
+      if (cancelled || !cached?.result) return
+      if (cached.result.period.start !== integratedStartDate || cached.result.period.end !== integratedSelectionEnd) return
+      setIntegratedResult(cached.result)
+      setIntegratedRequestSnapshot(cached.request)
+      setIntegratedError('')
+      setIntegratedProgress(null)
+      if (selectedTool === null) void runAiInterpretation(cached.result, cached.request)
+    })()
+    return ()=>{cancelled=true}
+  }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile.birthDate, birthProfile.birthTime, birthProfile.latitude, birthProfile.longitude, birthProfile.utcOffset, birthProfile.gender, birthProfile.placeKey, aiModel])
 
   const runIntegrated = async () => {
     setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')
@@ -1160,6 +1329,14 @@ export default function AppNext() {
       },
       start_date: integratedStartDate,
       end_date: integratedSelectionEnd,
+    }
+    const calculationCacheId = fortuneCalculationCacheId(body as unknown as Record<string,unknown>)
+    const cachedCalculation = await readReadingCache<{request:Record<string,unknown>;result:IntegratedApiResponse}>(calculationCacheId)
+    if (cachedCalculation?.result && cachedCalculation.result.period.start === integratedStartDate && cachedCalculation.result.period.end === integratedSelectionEnd) {
+      setIntegratedResult(cachedCalculation.result)
+      setIntegratedRequestSnapshot(cachedCalculation.request)
+      if (selectedTool === null) void runAiInterpretation(cachedCalculation.result, cachedCalculation.request)
+      return
     }
     const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
     setIntegratedProgress(null)
@@ -1220,7 +1397,14 @@ export default function AppNext() {
       if (!calculation) throw new Error(lastMessage || '정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
       setIntegratedResult(calculation)
       setIntegratedRequestSnapshot(body)
-      // Gemini interpretation is intentionally NOT automatic. Calculation itself spends no Gemini credits.
+      const calcTtlDays = selectedTool === 'integrated' || period === 'year' ? 370 : period === 'today' ? 90 : 30
+      await writeReadingCache(calculationCacheId, 'fortune-calculation', {request:body as unknown as Record<string,unknown>, result:calculation}, calcTtlDays)
+      if (selectedTool === null) {
+        const archiveRequest = {...body, archive_mode:'period_fortune_v16'} as unknown as Record<string,unknown>
+        void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>},`period:${calculationCacheId}`)
+        void runAiInterpretation(calculation, body as unknown as Record<string,unknown>)
+      }
+      // Period fortunes auto-interpret once and cache. Integrated/precision keep explicit AI controls.
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
     } finally { setIntegratedLoading(false); setIntegratedProgress(null) }
@@ -1387,8 +1571,16 @@ export default function AppNext() {
     const snapshotMode = String(relationshipRequestSnapshot?.analysis_mode ?? '')
     const analysisMode = (snapshotMode || currentMode) as RelationshipAnalysisMode
     if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
+    const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, reunionTiming)
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
+      const cached = await readReadingCache<RelationshipAiResponse>(relationshipCacheId)
+      if (cached?.ok && cached.data) {
+        if (revision !== relationshipRevisionRef.current) return
+        setRelationshipAi(annotatePayload(cached))
+        setRelationshipAiCacheSource('local')
+        return
+      }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
       if (error) {
@@ -1405,7 +1597,10 @@ export default function AppNext() {
       const payload = data as RelationshipAiResponse
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
       if (revision !== relationshipRevisionRef.current) return
-      setRelationshipAi(annotatePayload(payload))
+      const annotated = annotatePayload(payload)
+      await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, 370)
+      setRelationshipAi(annotated)
+      setRelationshipAiCacheSource('fresh')
     } catch (error) {
       if (revision === relationshipRevisionRef.current) setRelationshipAiError(error instanceof Error ? error.message : '관계 AI 해설을 불러오지 못했어.')
     } finally {
@@ -1452,6 +1647,7 @@ export default function AppNext() {
       engine: integratedResult.engine,
       request: integratedRequestSnapshot,
       result: integratedResult as unknown as Record<string, unknown>,
+      interpretation: aiInterpretation as unknown as Record<string,unknown> | undefined,
     })
     setArchiveStatus(saved.cloudSynced ? '기록 저장 + Supabase 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
     setActionNotice('기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
@@ -1497,6 +1693,7 @@ export default function AppNext() {
       engine: relationshipResult.engine,
       request: archiveRequest,
       result: relationshipResult as unknown as Record<string, unknown>,
+      interpretation: relationshipAi as unknown as Record<string,unknown> | undefined,
     })
     setArchiveStatus(saved.cloudSynced ? '기록 저장 + Supabase 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
     setActionNotice('관계 분석 기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
@@ -1521,9 +1718,23 @@ export default function AppNext() {
   }
 
   function restoreArchive(item: ArchiveItem) {
-    if (item.kind === 'daily' || item.kind === 'outcome') {
+    const currentPeriodArchive = item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16'
+    if ((item.kind === 'daily' && !currentPeriodArchive) || item.kind === 'outcome') {
       setLegacyArchiveOpen(item)
       setMainView('history')
+      return
+    }
+    if (currentPeriodArchive) {
+      setLegacyArchiveOpen(null)
+      setQueryDate(item.periodStart)
+      setPeriod(item.periodKey)
+      setIntegratedCalendarYear(null)
+      setSelectedTool(null)
+      setIntegratedResult(item.result as unknown as IntegratedApiResponse)
+      setIntegratedRequestSnapshot(item.request)
+      setAiInterpretation(item.interpretation as unknown as AiInterpretationResponse || null)
+      setAiCacheSource(item.interpretation ? 'local' : '')
+      setMainView('home')
       return
     }
     setLegacyArchiveOpen(null)
@@ -1536,11 +1747,14 @@ export default function AppNext() {
       setRelationshipCalendarYear(null)
       setIntegratedResult(item.result as unknown as IntegratedApiResponse)
       setIntegratedRequestSnapshot(item.request)
+      setAiInterpretation(item.interpretation as unknown as AiInterpretationResponse || null)
+      setAiCacheSource(item.interpretation ? 'local' : '')
       setSelectedTool(item.kind)
     } else {
       restoringRelationshipRef.current = true
       relationshipRevisionRef.current += 1
-      setRelationshipAi(null)
+      setRelationshipAi(item.interpretation as unknown as RelationshipAiResponse || null)
+      setRelationshipAiCacheSource(item.interpretation ? 'local' : '')
       setRelationshipAiError('')
       setRelationshipLoading(false)
       setRelationshipAiLoading(false)
@@ -1577,12 +1791,16 @@ export default function AppNext() {
         utcOffset: String(cp.utc_offset_hours ?? 9),
         timeKnown: known,
       })
-      setSelectedTool(item.kind)
+      setSelectedTool(item.kind === 'marriage' ? 'marriage' : 'compatibility')
     }
     setMainView('home')
   }
 
   async function copyArchiveResult(item: ArchiveItem) {
+    if (item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16') {
+      await handleCopy('기간운세 전체복사', integratedResultText(item.result as unknown as IntegratedApiResponse))
+      return
+    }
     if (item.kind === 'daily' || item.kind === 'outcome') {
       await handleCopy('이전 기록 전체복사', JSON.stringify(item.result, null, 2))
       return
@@ -1596,6 +1814,43 @@ export default function AppNext() {
       const archivedContext = item.request.reunion_context
       await handleCopy('저장 결과 전체복사', relationshipResultText(copyKind, item.result as unknown as RelationshipApiResponse, archivedContext && typeof archivedContext === 'object' ? archivedContext as ReunionTimingContext : null))
     }
+  }
+
+
+  const outcomeCalibration = useMemo(() => {
+    void outcomeNonce
+    return summarizeDailyOutcomes(readDailyOutcomes())
+  }, [outcomeNonce])
+
+  async function saveDailyOutcome() {
+    if (!integratedResult || period !== 'today' || !outcomeDraft.event) {
+      setActionNotice('실제 연락 결과를 먼저 선택해줘.')
+      window.setTimeout(()=>setActionNotice(''),1800)
+      return
+    }
+    const signals = integratedResult.western.relationship_signals ?? {}
+    const overall = integratedResult.western.overall ?? {}
+    const record: DailyOutcomeRecord = {
+      ...outcomeDraft,
+      date: queryDate,
+      note: outcomeDraft.note.trim().slice(0,200),
+      saved_at: new Date().toISOString(),
+      scores: {
+        '수신신호': signals['수신신호']?.average ?? null,
+        '발신적합': signals['발신적합']?.average ?? null,
+        '재접점': signals['과거인연재접점']?.average ?? null,
+        '연락': overall['연락']?.average ?? null,
+        '재회': overall['재회']?.average ?? null,
+        '연애': overall['연애']?.average ?? null,
+        '소식': overall['소식']?.average ?? null,
+      },
+    }
+    writeDailyOutcome(record)
+    setOutcomeDraft(record)
+    setOutcomeSaved(true)
+    setOutcomeNonce((value)=>value+1)
+    void saveArchive({kind:'outcome',periodKey:'today',title:`실제 결과 · ${queryDate}`,periodStart:queryDate,periodEnd:queryDate,engine:'relationship-outcome-v2',request:{date:queryDate,archive_mode:'personal_outcome_v16'},result:record as unknown as Record<string,unknown>},`outcome:${queryDate}`)
+    window.setTimeout(()=>setOutcomeSaved(false),2200)
   }
 
   async function removeArchive(item: ArchiveItem) {
@@ -1890,6 +2145,7 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <>
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>{period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
+              <PeriodAiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}/>
 
               <section className="result-card">
                 <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
@@ -1916,6 +2172,24 @@ export default function AppNext() {
                   <span>Thai(태국점성술) <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
                 </div>
               </section>
+
+
+              {period==='today' && <details className="result-card outcome-card">
+                <summary>실제 결과 기록 · 개인보정</summary>
+                <div className="outcome-form">
+                  <p className="outcome-note">연락이 온 날뿐 아니라 연락이 없던 날도 같이 기록해야 비교가 덜 치우쳐. 현재 점수를 즉시 바꾸는 용도가 아니라, 네 기록이 쌓일수록 수신·재접점 지표가 실제 경험과 얼마나 맞는지 개인별로 검증하는 데이터야.</p>
+                  <div className="outcome-grid">
+                    <label><span>이 날 실제 연락 결과</span><select value={outcomeDraft.event} onChange={(e)=>setOutcomeDraft({...outcomeDraft,event:e.target.value as OutcomeEvent})}><option value="">기록 안 함</option><option value="none">연락 없음</option><option value="received">연락 받음</option><option value="sent">내가 먼저 보냄</option><option value="both">서로 주고받음</option></select></label>
+                    <label><span>연락 시각대</span><select value={outcomeDraft.event_time_bucket} onChange={(e)=>setOutcomeDraft({...outcomeDraft,event_time_bucket:e.target.value as OutcomeTimeBucket})}><option value="">시간 기록 안 함</option><option value="dawn">새벽 00~06</option><option value="morning">오전 06~12</option><option value="afternoon">오후 12~18</option><option value="evening">저녁 18~22</option><option value="night">밤 22~24</option></select></label>
+                    <label><span>연락 경로</span><select value={outcomeDraft.channel} onChange={(e)=>setOutcomeDraft({...outcomeDraft,channel:e.target.value as OutcomeChannel})}><option value="">경로 기록 안 함</option><option value="message">문자·메신저</option><option value="dm">DM·SNS</option><option value="call">전화</option><option value="in_person">직접 만남</option><option value="other">기타</option></select></label>
+                    <label><span>짧은 메모</span><input type="text" maxLength={200} value={outcomeDraft.note} onChange={(e)=>setOutcomeDraft({...outcomeDraft,note:e.target.value})} placeholder="예: 저녁에 먼저 전화 옴"/></label>
+                    <label className="outcome-check"><input type="checkbox" checked={outcomeDraft.past_connection} onChange={(e)=>setOutcomeDraft({...outcomeDraft,past_connection:e.target.checked})}/><span>과거 인연 관련 연락</span></label>
+                  </div>
+                  <button className="outcome-save" type="button" onClick={()=>void saveDailyOutcome()}>실제 결과 저장</button>
+                  {outcomeSaved && <div className="outcome-saved">저장 완료 · 이후 개인보정 비교에 포함할게.</div>}
+                  <p className="outcome-note">개인보정 기록 {outcomeCalibration.n}일{outcomeCalibration.n<5?` · 비교 시작까지 ${5-outcomeCalibration.n}일 더 필요`:outcomeCalibration.contactN&&outcomeCalibration.noneN?` · 연락 받은 날 수신 평균 ${outcomeCalibration.incomingContact?.toFixed(1)??'—'} / 연락 없는 날 ${outcomeCalibration.incomingNone?.toFixed(1)??'—'} · 재접점 ${outcomeCalibration.reconnectionContact?.toFixed(1)??'—'} / ${outcomeCalibration.reconnectionNone?.toFixed(1)??'—'}`:' · 연락 있음/없음 양쪽 표본이 더 필요'}</p>
+                </div>
+              </details>}
             </>}
           </section>}
 
@@ -1952,7 +2226,7 @@ export default function AppNext() {
           {archiveLoading && archiveItems.length===0 && <div className="status-banner subtle"><LoaderCircle className="spin" size={16}/><span>저장된 기록을 불러오는 중…</span></div>}
           {!archiveLoading && !archiveError && archiveItems.length===0 && <div className="archive-empty"><History size={22}/><strong>저장된 기록 0개</strong><span>클라우드 연결은 정상이고, 현재 세션에 저장된 분석 결과가 아직 없어. 계산 결과에서 “기록 저장”을 누르면 여기에 쌓여.</span><button className="archive-empty-action" type="button" onClick={()=>switchMainView('home')}><Home size={15}/>홈에서 계산하고 기록 저장하기</button></div>}
           <div className="archive-list">{archiveItems.map((item)=><article className="archive-card" key={item.id}>
-            <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{item.kind==='integrated'?'통합운세':item.kind==='precision'?'정밀분석':item.kind==='marriage'?'결혼운':item.kind==='compatibility'?'궁합운':item.kind==='daily'?'이전 일일운세':'결과 기록'}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
+            <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{item.kind==='integrated'?'통합운세':item.kind==='precision'?'정밀분석':item.kind==='marriage'?'결혼운':item.kind==='compatibility'?'궁합운':item.kind==='daily'?(item.request.archive_mode==='period_fortune_v16'?(item.periodKey==='today'?'오늘운세':item.periodKey==='week'?'주간운세':item.periodKey==='month'?'월간운세':'연간운세'):'이전 일일운세'):'결과 기록'}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
             <div className="archive-actions">
               <button type="button" onClick={()=>restoreArchive(item)}><Search size={14}/>다시 열기</button>
               <button type="button" onClick={()=>copyArchiveResult(item)}><Copy size={14}/>전체복사</button>

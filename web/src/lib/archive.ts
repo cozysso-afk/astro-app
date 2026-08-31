@@ -14,6 +14,7 @@ export type ArchiveItem = {
   engine: string
   request: Record<string, unknown>
   result: Record<string, unknown>
+  interpretation?: Record<string, unknown>
   createdAt: string
   syncState: 'local' | 'cloud'
 }
@@ -81,71 +82,67 @@ function calculationJson(item: ArchiveItem) {
     period_key: item.periodKey,
     request: item.request,
     result: item.result,
+    interpretation: item.interpretation ?? null,
   }
 }
 
 async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<ArchiveItem> {
-  if (item.cloudId) return item
+  const isFortune = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
+  const table = isFortune ? 'readings' : 'relationship_readings'
+  let cloudId = item.cloudId
+  let cloudCreatedAt: string | undefined
 
-  let data: { id: string; created_at: string | null } | null = null
-
-  if (item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome') {
-    const response = await supabase
-      .from('readings')
-      .insert({
-        user_id: userId,
-        profile_id: null,
-        reading_type: item.kind,
-        period_start: item.periodStart,
-        period_end: item.periodEnd,
-        engine_version: item.engine,
-        calculation_json: calculationJson(item),
-        interpretation_json: { archive_v: 1 },
-        summary: item.title,
-      })
+  if (!cloudId) {
+    const existing = await supabase
+      .from(table)
       .select('id, created_at')
-      .single()
-    if (response.error) throw response.error
-    data = response.data
-  } else {
-    const response = await supabase
-      .from('relationship_readings')
-      .insert({
-        user_id: userId,
-        profile_id: null,
-        counterpart_id: null,
-        reading_type: item.kind,
-        relationship_status: String(item.request.relationship_status ?? ''),
-        period_start: item.periodStart,
-        period_end: item.periodEnd,
-        engine_version: item.engine,
-        calculation_json: calculationJson(item),
-        interpretation_json: { archive_v: 1 },
-        summary: item.title,
-      })
-      .select('id, created_at')
-      .single()
-    if (response.error) throw response.error
-    data = response.data
+      .eq('user_id', userId)
+      .contains('calculation_json', { archive_v: 1, local_id: item.id })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!existing.error && existing.data?.id) {
+      cloudId = String(existing.data.id)
+      cloudCreatedAt = String(existing.data.created_at ?? item.createdAt)
+    }
   }
 
-  if (!data) throw new Error('Supabase 저장 결과가 비어 있어.')
+  const common = {
+    period_start: item.periodStart,
+    period_end: item.periodEnd,
+    engine_version: item.engine,
+    calculation_json: calculationJson(item),
+    interpretation_json: { archive_v: 1, ai: item.interpretation ?? null },
+    summary: item.title,
+  }
+  const payload = isFortune
+    ? { user_id: userId, profile_id: null, reading_type: item.kind, ...common }
+    : { user_id: userId, profile_id: null, counterpart_id: null, reading_type: item.kind, relationship_status: String(item.request.relationship_status ?? ''), ...common }
+
+  const response = cloudId
+    ? await supabase.from(table).update(payload).eq('id', cloudId).eq('user_id', userId).select('id, created_at').single()
+    : await supabase.from(table).insert(payload).select('id, created_at').single()
+  if (response.error) throw response.error
+  if (!response.data?.id) throw new Error('Supabase 저장 결과가 비어 있어.')
+
   const synced: ArchiveItem = {
     ...item,
-    cloudId: String(data.id),
-    createdAt: String(data.created_at ?? item.createdAt),
+    cloudId: String(response.data.id),
+    createdAt: String(response.data.created_at ?? cloudCreatedAt ?? item.createdAt),
     syncState: 'cloud',
   }
   upsertLocal(synced)
   return synced
 }
 
-export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 'syncState'>): Promise<ArchiveSaveResult> {
+export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 'syncState'>, stableId?: string): Promise<ArchiveSaveResult> {
+  const previous = stableId ? loadLocal().find((row)=>row.id === stableId) : undefined
   let item: ArchiveItem = {
     ...input,
-    id: newId(),
-    createdAt: new Date().toISOString(),
-    syncState: 'local',
+    id: stableId ?? newId(),
+    cloudId: previous?.cloudId,
+    createdAt: previous?.createdAt ?? new Date().toISOString(),
+    syncState: previous?.syncState ?? 'local',
   }
   upsertLocal(item)
 
@@ -156,11 +153,7 @@ export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 
     item = await uploadLocalItem(item, auth.userId)
     return { item, cloudSynced: true }
   } catch (error) {
-    return {
-      item,
-      cloudSynced: false,
-      cloudError: error instanceof Error ? error.message : 'Supabase 동기화에 실패했어.',
-    }
+    return { item, cloudSynced: false, cloudError: error instanceof Error ? error.message : 'Supabase 동기화에 실패했어.' }
   }
 }
 
@@ -179,6 +172,8 @@ function cloudRowToItem(
   const result = calculation.result && typeof calculation.result === 'object'
     ? calculation.result as Record<string, unknown>
     : {}
+  const interpretationEnvelope = row.interpretation_json && typeof row.interpretation_json === 'object' ? row.interpretation_json as Record<string,unknown> : {}
+  const interpretation = interpretationEnvelope.ai && typeof interpretationEnvelope.ai === 'object' ? interpretationEnvelope.ai as Record<string,unknown> : (calculation.interpretation && typeof calculation.interpretation === 'object' ? calculation.interpretation as Record<string,unknown> : undefined)
   const rawKind = String(row.reading_type || kindFallback)
   const kind: ArchiveKind = rawKind === 'marriage' || rawKind === 'compatibility' || rawKind === 'integrated' || rawKind === 'precision' || rawKind === 'daily' || rawKind === 'outcome'
     ? rawKind
@@ -200,13 +195,14 @@ function cloudRowToItem(
     engine: String(row.engine_version || ''),
     request,
     result,
+    interpretation,
     createdAt: String(row.created_at || new Date().toISOString()),
     syncState: 'cloud',
   }
 }
 
 async function fetchCloudItems(): Promise<ArchiveItem[]> {
-  const columns = 'id, reading_type, period_start, period_end, engine_version, calculation_json, summary, created_at'
+  const columns = 'id, reading_type, period_start, period_end, engine_version, calculation_json, interpretation_json, summary, created_at'
   const [fortune, relationship] = await Promise.all([
     supabase.from('readings').select(columns).order('created_at', { ascending: false }).limit(100),
     supabase.from('relationship_readings').select(columns).order('created_at', { ascending: false }).limit(100),
