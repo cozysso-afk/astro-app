@@ -54,6 +54,7 @@ class GeminiStructuredOutputPolicyTests(unittest.TestCase):
         self.assertEqual(config["maxOutputTokens"], 16000)
         self.assertEqual(config["responseMimeType"], "application/json")
         self.assertEqual(config["responseSchema"], ai.AI_RESPONSE_SCHEMA)
+        self.assertNotIn("additionalProperties", json.dumps(config["responseSchema"]))
         self.assertEqual(config["responseSchema"]["required"], list(ai.OUTPUT_SHAPE))
         topic_schema = config["responseSchema"]["properties"]["topic_analysis"]
         self.assertEqual(topic_schema["required"], ai.TOPIC_ORDER)

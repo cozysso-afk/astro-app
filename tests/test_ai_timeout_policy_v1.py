@@ -28,7 +28,7 @@ class GeminiTimeoutPolicyTests(unittest.TestCase):
         self.assertLess(second["timeout_seconds"],40.0)
 
     def test_interpreter_version_marks_structured_json_hotfix(self):
-        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.2-thai-structured-json-headroom")
+        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.3-thai-legacy-schema-compatible")
 
 
 if __name__ == "__main__":
