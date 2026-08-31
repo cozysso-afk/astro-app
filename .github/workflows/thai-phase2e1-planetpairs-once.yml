@@ -1,0 +1,171 @@
+name: Thai Phase 2E1 planet pair research gate
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2e1-planetpairs-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Attach planet archetypes and multi-label pair facts as research only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'from thai_interpretation_policy_v1 import build_interpretation_policy_research\n':
+                  'from thai_interpretation_policy_v1 import build_interpretation_policy_research\nfrom thai_planet_pairs_v1 import build_planet_pair_research\n',
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.6-phase2d2-policy-research"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.7-phase2e1-planetpairs-research"',
+              '    aspects_research = build_aspect_research(natal_positions)\n    semantics_research = build_semantics_research(': 
+                  '    aspects_research = build_aspect_research(natal_positions)\n    planet_pairs_research = build_planet_pair_research(aspects_research)\n    semantics_research = build_semantics_research(',
+              '        "aspects_research": aspects_research,\n        "semantics_research": semantics_research,':
+                  '        "aspects_research": aspects_research,\n        "planet_pairs_research": planet_pairs_research,\n        "semantics_research": semantics_research,',
+              '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_semantics_policy_research",':
+                  '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_planet_pair_semantics_policy_research",',
+              '"consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. A research-only consensus registry now records which semantic claims are stable and which remain school-dependent or numerically conflicting. Disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",':
+                  '"consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Traditional eight-planet archetype vocabulary and the stable multi-label pair tables (friend/enemy/element/equal-power) are research facts only. Pair overlap is preserved, including Moon-Jupiter as both element and enemy. Net pair valence, disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",',
+              '            "suriyayat_interpretation_consensus_registry": "research_only_preserves_source_conflicts",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_interpretation_consensus_registry": "research_only_preserves_source_conflicts",\n            "suriyayat_planet_archetypes_and_pair_tables": "research_only_multilabel_pair_facts",\n            "suriyayat_predictive_rules": "not_implemented",',
+              '            "Suriyayat concrete house outcomes, advanced-standard meanings/ranking, aspect strength/pair interpretation, combined judgement",':
+                  '            "Suriyayat concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Phase 2E1 anchor: ' + old[:120])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2E1 planet pair tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_v1.py' -v
+
+      - name: Run Phase 2E1 integration tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_integration.py' -v
+
+      - name: Run Phase 2D2 policy regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_v1.py' -v
+
+      - name: Run Phase 2D2 integration regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_integration.py' -v
+
+      - name: Run Phase 2D1 semantics regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_semantics_v1.py' -v
+
+      - name: Run Phase 2C regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_phase2c_labels_standards.py' -v
+
+      - name: Run dignity regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_dignities_v1.py' -v
+
+      - name: Run aspect regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_aspects_v1.py' -v
+
+      - name: Run Phase 2B integration regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_rules_phase2b_integration.py' -v
+
+      - name: Run house regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_houses*.py' -v
+
+      - name: Run Lagna regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
+
+      - name: Run Gemini research isolation regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_ai_thai_research_isolation.py' -v
+
+      - name: Compile Thai modules
+        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify multi-label overlap and closed interpretation gates
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation
+          from thai_astrology_v2 import build_thai_fortune
+          from thai_planet_pairs_v1 import classify_pair
+
+          assert classify_pair('moon', 'jupiter') == ['enemy', 'element']
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          suri = thai['suriyayat']
+          pair = suri['planet_pairs_research']
+          gate = pair['promotion_gate']
+          assert pair['research_only'] is True
+          assert gate['pair_membership_tables_validated'] is True
+          assert gate['multi_label_overlap_preserved'] is True
+          assert gate['pair_net_valence_allowed'] is False
+          assert gate['pair_strength_score_allowed'] is False
+          assert gate['combined_judgement_allowed'] is False
+          assert gate['event_judgement_allowed'] is False
+          assert gate['gemini_interpretation_allowed'] is False
+          assert suri['lagna']['available'] is False
+          compact_suri = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          assert 'planet_pairs_research' not in compact_suri
+          encoded = json.dumps(compact_suri, ensure_ascii=False)
+          assert 'affinity_trust_support' not in encoded
+          assert 'friction_tension_conflict' not in encoded
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.7-phase2e1-planetpairs-research'
+          print('PHASE2E1_PLANET_ARCHETYPES_AND_MULTILABEL_PAIR_FACTS_PASS_INTERPRETATION_BLOCKED')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2E1 state and clean workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_planet_pairs_v1.py tests/test_thai_planet_pairs_v1.py tests/test_thai_planet_pairs_integration.py
+          git rm -f .github/workflows/thai-phase2e1-planetpairs-once.yml
+          git commit -m 'research: validate Thai planet archetypes and multi-label pair facts'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
