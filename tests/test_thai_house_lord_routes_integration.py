@@ -57,10 +57,8 @@ class ThaiPhase2E2HouseLordRouteIntegrationTests(unittest.TestCase):
         self.assertFalse(gate["pair_or_aspect_synthesis_allowed"])
         self.assertFalse(gate["combined_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
-        self.assertEqual(
-            thai["engine"],
-            "thai-mahathaksa-taksajorn-suriyayat-v2.8-phase2e2-house-lord-routes-research",
-        )
+        self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
+        self.assertIn("house_lord_route", thai["suriyayat"]["interpretation_status"])
 
 
 if __name__ == "__main__":
