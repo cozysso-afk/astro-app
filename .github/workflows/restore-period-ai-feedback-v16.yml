@@ -40,6 +40,18 @@ jobs:
       - name: Apply restored period AI and feedback contracts
         run: python scripts/restore_period_ai_feedback_v16.py
 
+      - name: Fix archive tool narrowing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/AppNext.tsx')
+          s=p.read_text()
+          old="      setSelectedTool(item.kind)\n    }\n    setMainView('home')"
+          new="      setSelectedTool(item.kind === 'marriage' ? 'marriage' : 'compatibility')\n    }\n    setMainView('home')"
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+          PY
+
       - name: Static feature gate
         run: |
           python - <<'PY'
@@ -62,6 +74,7 @@ jobs:
             'stable_archive':'stableId?: string' in archive,
             'indexeddb':"starlight-destiny-reading-cache-v1" in cache,
             'mobile_css':'.period-ai-card' in css and '.outcome-card' in css,
+            'archive_tool_narrowing':"setSelectedTool(item.kind === 'marriage' ? 'marriage' : 'compatibility')" in app,
           }
           failed=[name for name,ok in checks.items() if not ok]
           print(checks)
@@ -85,11 +98,11 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add build-v16.log
-            git commit -m 'debug: capture v16 build error'
+            git commit -m 'debug: capture v16 build error' || true
             git push origin HEAD:fix/restore-period-ai-feedback-20260831
             exit $build_status
           fi
-          rm build-v16.log
+          rm -f build-v16.log
 
       - name: Diff safety
         run: |
@@ -99,6 +112,7 @@ jobs:
       - name: Commit verified product changes to work branch
         run: |
           rm -rf __pycache__ api/__pycache__
+          git rm -f --ignore-unmatch build-v16.log
           git rm scripts/restore_period_ai_feedback_v16.py .github/workflows/restore-period-ai-feedback-v16.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
