@@ -1439,8 +1439,9 @@ export default function AppNext() {
   async function saveIntegratedRecord() {
     if (!integratedResult || !integratedRequestSnapshot || archiveSaving) return
     setArchiveSaving(true); setArchiveStatus('기록 저장 중…')
-    const integratedArchivePeriod: PeriodKey = integratedCalendarYear ? 'year' : period
-    const label = integratedCalendarYear ? `${integratedCalendarYear}년` : (periods.find((item) => item.key === period)?.label ?? period)
+    const integratedArchivePeriod: PeriodKey = 'year'
+    const integratedArchiveYear = Number(integratedResult.period.start.slice(0,4)) || annualFortuneYear
+    const label = `${integratedArchiveYear}년`
     try {
     const saved = await saveArchive({
       kind: 'integrated',
@@ -1625,10 +1626,10 @@ export default function AppNext() {
           <section className="section-block period-fortune-section">
             <div className="section-label">기간 운세</div>
             <div className="period-grid" role="tablist" aria-label="기간 운세">
-              {periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${selectedTool===null&&period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setSelectedTool(null);setIntegratedCalendarYear(null)}}><Icon size={17}/><span>{label}</span></button>)}
+              {periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${selectedTool===null&&period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setSelectedTool(null);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)}}><Icon size={17}/><span>{label}</span></button>)}
             </div>
           </section>
-          {selectedTool==='precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid">{periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setIntegratedCalendarYear(null)}}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
+          {selectedTool==='precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid">{periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)}}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
           <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{tools.map(({key,label,desc,icon:Icon,tone})=><button key={key} className={`tool-card ${selectedTool===key?'is-selected':''}`} type="button" onClick={()=>{setSelectedTool(key); if(key==='compatibility'||key==='marriage'){setRelationshipDays(365);setRelationshipCalendarYear(null);} if(key==='location'){setLocationError('');setLocationResult(null)}}}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
@@ -1640,7 +1641,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
+              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>연간 통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
               {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
               <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()}/>
               <div className="result-actions">
@@ -1793,9 +1794,9 @@ export default function AppNext() {
           </section>}
 
           {selectedTool === 'precision' && <section className="tool-panel precision-panel">
-            <div className="tool-panel-heading"><span className="tool-icon tone-sage"><Search size={22}/></span><div><span className="eyebrow">정밀 계산</span><h2>정밀분석</h2><p>새 점수를 만들지 않고 운영 중인 통합 실계산의 원자료를 더 깊게 펼쳐봐. Western(서양점성술) 세부 지표, 사주 원자료, Thai(태국점성술) 상태와 원본 JSON(제이슨·데이터 형식)까지 확인할 수 있어.</p></div></div>
+            <div className="tool-panel-heading"><span className="tool-icon tone-sage"><Search size={22}/></span><div><span className="eyebrow">정밀 계산</span><h2>정밀분석</h2><p>새 점수를 만들지 않고 선택한 기간 운세 실계산의 원자료를 더 깊게 펼쳐봐. Western(서양점성술) 세부 지표, 사주 원자료, Thai(태국점성술) 상태와 원본 JSON(제이슨·데이터 형식)까지 확인할 수 있어.</p></div></div>
             <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
-            <div className="coordinate-note"><Search size={16}/><span>통합운세와 같은 실계산 결과를 재사용해. 같은 날짜·기간 계산이 이미 있으면 다시 호출하지 않고 동일 결과를 정밀 화면에서 펼쳐 보여줘.</span></div>
+            <div className="coordinate-note"><Search size={16}/><span>기간 운세와 같은 실계산 엔진을 사용해. 같은 날짜·기간 계산이 이미 있으면 다시 호출하지 않고 동일 결과를 정밀 화면에서 펼쳐 보여줘.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             {!integratedMatchesSelection && <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Search size={18}/>}<span>{integratedLoading?'정밀 계산 중…':'정밀분석 실제 계산'}</span></button>}
 
