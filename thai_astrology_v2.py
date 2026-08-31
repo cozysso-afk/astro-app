@@ -30,8 +30,10 @@ from typing import Any
 from thai_suriyayat_v1 import ENGINE_VERSION as SURIYAYAT_ENGINE_VERSION, SOURCE_COMMIT as SURIYAYAT_SOURCE_COMMIT, calculate_positions_for_instant
 from thai_lagna_v1 import ENGINE_VERSION as LAGNA_RESEARCH_ENGINE_VERSION, build_suriyayat_lagna_research
 from thai_houses_v1 import build_whole_sign_houses_research
+from thai_dignities_v1 import build_dignity_research, build_house_lords_research
+from thai_aspects_v1 import build_aspect_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.2-lagna-research"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.3-phase2b-research"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -220,6 +222,22 @@ def _suriyayat_layer(
                 lagna_longitude_deg=float(selected["longitude_deg"]),
                 planet_positions=natal.get("positions") or {},
             )
+
+    natal_positions = natal.get("positions") or {}
+    dignities_research = build_dignity_research(natal_positions)
+    aspects_research = build_aspect_research(natal_positions)
+    house_lords_research: dict[str, Any] = {
+        "available": False,
+        "research_only": True,
+        "reason": "Validated whole-sign houses are required before house-lord research can be built.",
+        "promotion_gate": {
+            "house_lord_interpretation_allowed": False,
+            "gemini_interpretation_allowed": False,
+        },
+    }
+    if houses_research.get("available"):
+        house_lords_research = build_house_lords_research(houses_research.get("houses") or [])
+
     return {
         "available": True,
         "engine": SURIYAYAT_ENGINE_VERSION,
@@ -242,8 +260,11 @@ def _suriyayat_layer(
         },
         "lagna_research": lagna_research,
         "houses_research": houses_research,
-        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_and_house_research",
-        "policy": "Traditional 10-planet position facts only. No Western-score blending, no Thai house/aspect judgement, and no event probability.",
+        "house_lords_research": house_lords_research,
+        "dignities_research": dignities_research,
+        "aspects_research": aspects_research,
+        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_research",
+        "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",
     }
 
 
@@ -301,8 +322,8 @@ def build_thai_fortune(
             "method_variance_note": "Thai schools use more than one Taksajorn counting convention; this engine exposes the selected one-year-per-bhumi method instead of treating it as the only school.",
         },
         "suriyayat": suriyayat,
-        "predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_no_lagna_rules",
-        "consensus_policy": "Mahathaksa/Taksajorn period facts and cross-validated Suriyayat 10-planet positions are available as independent Thai layers. Lagna/house/aspect/event rules are not yet validated and nothing is converted into Western-style probability scores.",
+        "predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_research_only_lagna_house_dignity_aspect_facts",
+        "consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Validated Lagna position plus Whole Sign, house-lord, basic dignity-table and sign-relation facts are research diagnostics only; no meaning or Western-style probability score is derived from them.",
         "reliability": {
             "weekday_rule": "established_rule",
             "mahathaksa_wheel": "established_table_rule",
@@ -310,11 +331,14 @@ def build_thai_fortune(
             "suriyayat_10planet_positions": "cross_validated_30_vectors_max_4_arcmin",
             "suriyayat_lagna": "research_only_not_promoted",
             "suriyayat_lagna_research_engine": LAGNA_RESEARCH_ENGINE_VERSION,
+            "suriyayat_whole_sign_houses": "research_only_structure_connected",
+            "suriyayat_house_lords_basic_dignities": "research_only_table_facts",
+            "suriyayat_sign_aspects": "research_only_geometry_facts",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
             "validated/promoted global-coordinate Suriyayat Lagna",
-            "Suriyayat houses/dignities/aspect judgement",
+            "Suriyayat house meanings, dignity strength/meaning, aspect strength/pair interpretation",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",
             "Suriyayat event/probability conversion",
