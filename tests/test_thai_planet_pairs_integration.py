@@ -62,15 +62,23 @@ class ThaiPhase2E1PlanetPairIntegrationTests(unittest.TestCase):
 
     def test_product_lagna_and_interpretation_gates_stay_closed(self):
         thai = self._thai()
-        self.assertFalse(thai["suriyayat"]["lagna"]["available"])
-        self.assertIn("pair", thai["suriyayat"]["interpretation_status"])
-        # This is a Phase 2E1 regression contract, not a permanent pin to the
-        # Phase 2E1 top-level engine version. Later research phases may bump the
-        # engine while the pair layer must remain attached and gated correctly.
+        suri = thai["suriyayat"]
+        self.assertFalse(suri["lagna"]["available"])
+        # This is a Phase 2E1 feature contract, not a permanent dependency on
+        # later top-level status wording or engine version labels.
         self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
-        research = thai["suriyayat"]["planet_pairs_research"]
+        research = suri["planet_pairs_research"]
+        self.assertTrue(research["available"])
+        self.assertTrue(research["research_only"])
         self.assertEqual(research["engine"], "thai-planet-pairs-research-v1.0-multilabel")
-        self.assertFalse(research["promotion_gate"]["gemini_interpretation_allowed"])
+        self.assertEqual(len(research["planet_archetypes"]), 8)
+        gate = research["promotion_gate"]
+        self.assertTrue(gate["pair_membership_tables_validated"])
+        self.assertTrue(gate["multi_label_overlap_preserved"])
+        self.assertFalse(gate["pair_net_valence_allowed"])
+        self.assertFalse(gate["combined_judgement_allowed"])
+        self.assertFalse(gate["event_judgement_allowed"])
+        self.assertFalse(gate["gemini_interpretation_allowed"])
 
 
 if __name__ == "__main__":
