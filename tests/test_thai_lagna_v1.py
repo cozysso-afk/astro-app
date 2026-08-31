@@ -28,29 +28,41 @@ def arcmin_error(actual: float, expected: float) -> float:
     return abs(angular_delta_deg(actual, expected)) * 60.0
 
 
-# Independent MyHora reference pages captured during Phase-1 research.
-# These are three different dates/times and deliberately include different signs.
+# Independent MyHora Bangkok Suriyayat Lagna references captured during
+# Phase-1 research. They span 1777..2026 instead of fitting one modern epoch.
+# Each row records three distinct MyHora methods:
+# - common: common Antoanatee, fixed 06:00 sunrise anchor
+# - common_lmt: same common method with local-mean-time correction
+# - sidereal: MyHora sidereal-time / latitude-aware reference, used only as a
+#   cross-check because our astronomical mapping is not promoted as Thai canon.
 MYHORA_BANGKOK = (
     {
-        "date": date(2026, 1, 7),
-        "time": time(8, 9),
-        "common": deg(10, 8, 17),       # Aquarius 8°17′
-        "common_lmt": deg(10, 2, 39),   # Aquarius 2°39′
-        "sidereal": deg(9, 13, 17),     # Capricorn 13°17′
+        "date": date(1777, 5, 14), "time": time(6, 42),
+        "common": deg(1, 16, 19), "common_lmt": deg(1, 10, 41), "sidereal": deg(1, 14, 40),
     },
     {
-        "date": date(2026, 3, 24),
-        "time": time(14, 15),
-        "common": deg(4, 0, 59),        # Leo 0°59′
-        "common_lmt": deg(3, 26, 41),   # Cancer 26°41′
-        "sidereal": deg(3, 9, 25),      # Cancer 9°25′
+        "date": date(1862, 3, 6), "time": time(0, 0),
+        "common": deg(7, 10, 31), "common_lmt": deg(7, 6, 45), "sidereal": deg(7, 13, 14),
     },
     {
-        "date": date(2026, 4, 20),
-        "time": time(23, 42),
-        "common": deg(8, 14, 5),        # Sagittarius 14°05′
-        "common_lmt": deg(8, 9, 35),    # Sagittarius 9°35′
-        "sidereal": deg(8, 18, 44),     # Sagittarius 18°44′
+        "date": date(1871, 1, 22), "time": time(23, 41),
+        "common": deg(6, 14, 3), "common_lmt": deg(6, 10, 50), "sidereal": deg(6, 0, 4),
+    },
+    {
+        "date": date(1959, 7, 1), "time": time(0, 18),
+        "common": deg(11, 7, 21), "common_lmt": deg(11, 2, 51), "sidereal": deg(11, 16, 28),
+    },
+    {
+        "date": date(2026, 1, 7), "time": time(8, 9),
+        "common": deg(10, 8, 17), "common_lmt": deg(10, 2, 39), "sidereal": deg(9, 13, 17),
+    },
+    {
+        "date": date(2026, 3, 24), "time": time(14, 15),
+        "common": deg(4, 0, 59), "common_lmt": deg(3, 26, 41), "sidereal": deg(3, 9, 25),
+    },
+    {
+        "date": date(2026, 4, 20), "time": time(23, 42),
+        "common": deg(8, 14, 5), "common_lmt": deg(8, 9, 35), "sidereal": deg(8, 18, 44),
     },
 )
 
@@ -70,9 +82,11 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
                 adjust_local_mean_time=False,
             )
             errors.append(arcmin_error(actual["longitude_deg"], row["common"]))
-        # Current port tracks the published common-dial references closely.
+        # Seven independent references spanning 249 years: observed max 15.75′,
+        # mean 5.791′. Keep the gate slightly above observed values, not fitted
+        # to a single row.
         self.assertLessEqual(max(errors), 16.0, errors)
-        self.assertLessEqual(sum(errors) / len(errors), 10.0, errors)
+        self.assertLessEqual(sum(errors) / len(errors), 7.0, errors)
 
     def test_common_anto_lmt_reference_corpus(self):
         errors = []
@@ -83,8 +97,9 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
                 adjust_local_mean_time=True,
             )
             errors.append(arcmin_error(actual["longitude_deg"], row["common_lmt"]))
+        # Observed max 15.695′, mean 6.030′ across the same 1777..2026 corpus.
         self.assertLessEqual(max(errors), 16.0, errors)
-        self.assertLessEqual(sum(errors) / len(errors), 11.0, errors)
+        self.assertLessEqual(sum(errors) / len(errors), 7.0, errors)
 
     def test_astronomical_crosscheck_reference_corpus(self):
         errors = []
@@ -95,8 +110,9 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
                 utc_offset_hours=BANGKOK_UTC,
             )
             errors.append(arcmin_error(actual["longitude_deg"], row["sidereal"]))
-        # This is intentionally a cross-check, not the promoted rule. Jan has
-        # a larger offset, which is exactly why Phase 1 keeps it research-only.
+        # Observed max 33.957′ and mean 16.219′. This looser result is useful
+        # evidence that the astronomical frame-mapping should remain a secondary
+        # cross-check rather than the selected traditional candidate.
         self.assertLessEqual(max(errors), 36.0, errors)
         self.assertLessEqual(sum(errors) / len(errors), 18.0, errors)
 
@@ -121,6 +137,19 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
             self.assertTrue(math.isfinite(value))
             self.assertGreaterEqual(value, 0.0)
             self.assertLess(value, 360.0)
+
+    def test_research_metadata_records_reference_quality(self):
+        result = build_suriyayat_lagna_research(
+            birth_date=date(1991, 3, 21), birth_time=time(7, 26),
+            latitude=34.7604, longitude=127.6622, utc_offset_hours=9.0,
+        )
+        validation = result["validation"]
+        self.assertEqual(validation["reference"], "MyHora Bangkok Suriyayat Lagna")
+        self.assertEqual(validation["vectors"], 7)
+        self.assertEqual(validation["year_span"], "1777-2026")
+        self.assertEqual(validation["common_lmt"]["max_error_arcmin"], 15.695)
+        self.assertEqual(validation["common_lmt"]["mean_error_arcmin"], 6.03)
+        self.assertFalse(validation["global_coordinates_independently_validated"])
 
     def test_product_layer_keeps_lagna_unavailable(self):
         result = build_thai_fortune(
