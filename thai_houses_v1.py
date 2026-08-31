@@ -136,9 +136,11 @@ def build_whole_sign_houses_research(
         "lagna_sign": _sign_payload(lagna_sign),
         "houses": houses,
         "planet_placements": placements,
-        "validation_status": "structural_rule_under_phase2a_test",
+        "validation_status": "whole_sign_rule_documented_structure_tested_research_only",
+        "reference_rule": "MyHora Thai astrology help: house equals 30-degree zodiac sign; the Lagna sign is house 1 (Whole Sign).",
         "promotion_gate": {
             "lagna_numeric_position_required": True,
+            "house_structure_rule_documented": True,
             "house_structure_interpretation_validated": False,
             "houses_allowed_in_product": False,
             "dignities_allowed": False,

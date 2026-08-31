@@ -29,6 +29,7 @@ from typing import Any
 
 from thai_suriyayat_v1 import ENGINE_VERSION as SURIYAYAT_ENGINE_VERSION, SOURCE_COMMIT as SURIYAYAT_SOURCE_COMMIT, calculate_positions_for_instant
 from thai_lagna_v1 import ENGINE_VERSION as LAGNA_RESEARCH_ENGINE_VERSION, build_suriyayat_lagna_research
+from thai_houses_v1 import build_whole_sign_houses_research
 
 ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.2-lagna-research"
 
@@ -200,6 +201,25 @@ def _suriyayat_layer(
         longitude=longitude,
         utc_offset_hours=utc_offset_hours,
     )
+    houses_research: dict[str, Any] = {
+        "available": False,
+        "research_only": True,
+        "reason": "A validated Lagna numeric position is required before whole-sign house research can be built.",
+        "promotion_gate": {
+            "houses_allowed_in_product": False,
+            "gemini_interpretation_allowed": False,
+        },
+    }
+    if (
+        lagna_research.get("available")
+        and (lagna_research.get("validation") or {}).get("global_coordinates_independently_validated") is True
+    ):
+        selected = lagna_research.get("common_anto_0600_lmt") or {}
+        if selected.get("available") and selected.get("longitude_deg") is not None:
+            houses_research = build_whole_sign_houses_research(
+                lagna_longitude_deg=float(selected["longitude_deg"]),
+                planet_positions=natal.get("positions") or {},
+            )
     return {
         "available": True,
         "engine": SURIYAYAT_ENGINE_VERSION,
@@ -221,7 +241,8 @@ def _suriyayat_layer(
             "reason": "Global-coordinate Suriyayat Lagna is still research-only. Candidate methods are exposed separately and are not used for houses, dignity, scoring, or Gemini interpretation.",
         },
         "lagna_research": lagna_research,
-        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_research",
+        "houses_research": houses_research,
+        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_and_house_research",
         "policy": "Traditional 10-planet position facts only. No Western-score blending, no Thai house/aspect judgement, and no event probability.",
     }
 
