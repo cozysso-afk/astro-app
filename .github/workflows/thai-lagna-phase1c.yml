@@ -27,7 +27,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2 requests beautifulsoup4
 
       - name: Apply Phase-1C patch
-        run: python scripts/phase1c_patch.py
+        run: PYTHONPATH=. python scripts/phase1c_patch.py
 
       - name: Syntax gate
         run: python -m py_compile thai_lagna_v1.py thai_astrology_v2.py integrated_fortune_v1.py api/main.py
