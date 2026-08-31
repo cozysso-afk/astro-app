@@ -31,19 +31,21 @@ jobs:
           path = Path('ai_interpret_v1.py')
           text = path.read_text(encoding='utf-8')
 
-          old_import = """from thai_lagna_product_v1 import (
-              ENGINE_VERSION as THAI_LAGNA_PRODUCT_ENGINE_VERSION,
-              lagna_numeric_identity_is_valid,
-              product_routes_are_complete,
+          old_import = (
+              "from thai_lagna_product_v1 import (\n"
+              "    ENGINE_VERSION as THAI_LAGNA_PRODUCT_ENGINE_VERSION,\n"
+              "    lagna_numeric_identity_is_valid,\n"
+              "    product_routes_are_complete,\n"
+              ")\n"
           )
-          """.replace("          ", "")
-          new_import = old_import + """from thai_ai_output_guard_v1 import (
-              build_thai_output_fallback,
-              inspect_thai_output_safety,
-              strict_thai_retry_instruction,
-              thai_output_guard_required,
+          new_import = old_import + (
+              "from thai_ai_output_guard_v1 import (\n"
+              "    build_thai_output_fallback,\n"
+              "    inspect_thai_output_safety,\n"
+              "    strict_thai_retry_instruction,\n"
+              "    thai_output_guard_required,\n"
+              ")\n"
           )
-          """.replace("          ", "")
           if old_import not in text:
               raise SystemExit('missing Thai Lagna import block')
           text = text.replace(old_import, new_import, 1)
@@ -60,36 +62,37 @@ jobs:
               raise SystemExit('missing _call_model signature anchor')
           text = text.replace(old_sig, new_sig, 1)
 
-          old_prompt_start = """    safe_model = urllib.parse.quote(model_name, safe="-._")
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
-              prompt = (
-          """.replace("              ", "    ")
-          new_prompt_start = """    safe_model = urllib.parse.quote(model_name, safe="-._")
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
-              compact_calculation = _compact_calculation(calculation)
-              strict_instruction = strict_thai_retry_instruction() if strict_thai_output_guard else ""
-              prompt = (
-          """.replace("              ", "    ")
+          old_prompt_start = (
+              '    safe_model = urllib.parse.quote(model_name, safe="-._")\n'
+              '    url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"\n'
+              '    prompt = (\n'
+          )
+          new_prompt_start = (
+              '    safe_model = urllib.parse.quote(model_name, safe="-._")\n'
+              '    url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"\n'
+              '    compact_calculation = _compact_calculation(calculation)\n'
+              '    strict_instruction = strict_thai_retry_instruction() if strict_thai_output_guard else ""\n'
+              '    prompt = (\n'
+          )
           if old_prompt_start not in text:
               raise SystemExit('missing prompt start anchor')
           text = text.replace(old_prompt_start, new_prompt_start, 1)
 
-          old_payload = """        + json.dumps(_compact_calculation(calculation), ensure_ascii=False, separators=(",", ":"), default=str)
-              )
-          """.replace("              ", "    ")
-          new_payload = """        + json.dumps(compact_calculation, ensure_ascii=False, separators=(",", ":"), default=str)
-              + strict_instruction
-              )
-          """.replace("              ", "    ")
+          old_payload = (
+              '        + json.dumps(_compact_calculation(calculation), ensure_ascii=False, separators=(",", ":"), default=str)\n'
+              '    )\n'
+          )
+          new_payload = (
+              '        + json.dumps(compact_calculation, ensure_ascii=False, separators=(",", ":"), default=str)\n'
+              '        + strict_instruction\n'
+              '    )\n'
+          )
           if old_payload not in text:
               raise SystemExit('missing compact calculation prompt anchor')
           text = text.replace(old_payload, new_payload, 1)
 
-          old_validation = """        validated = _validate_output(parsed)
-              if not validated:
-                  return {"ok": False, "error": "AI 해설 응답 구조를 검증하지 못했어.", "model": model_name}
-          """.replace("              ", "        ")
-          new_validation = old_validation + """        guard = inspect_thai_output_safety(
+          guard_marker = '        usage = raw.get("usageMetadata", {}) if isinstance(raw, dict) else {}\n'
+          guard_block = '''        guard = inspect_thai_output_safety(
               validated,
               thai_packet_present=thai_output_guard_required(compact_calculation),
           )
@@ -105,70 +108,75 @@ jobs:
                   "guard_engine": guard.get("guard_engine"),
                   "unsafe_data": validated,
               }
-          """
-          if old_validation not in text:
-              raise SystemExit('missing output validation anchor')
-          text = text.replace(old_validation, new_validation, 1)
+          '''
+          # Normalize the block to the exact 8-space function-body indentation.
+          guard_block = ''.join(
+              (line[10:] if line.startswith('          ') else line)
+              for line in guard_block.splitlines(keepends=True)
+          )
+          if guard_marker not in text:
+              raise SystemExit('missing usage metadata insertion anchor')
+          text = text.replace(guard_marker, guard_block + guard_marker, 1)
 
           interpret_anchor = '\n\ndef interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: str | None = None) -> dict[str, Any]:\n'
           if interpret_anchor not in text:
               raise SystemExit('missing interpret function anchor')
-          wrapper = """
+          wrapper = '''
 
-          def _call_model_with_thai_output_safety(
-              calculation: dict[str, Any],
-              model_name: str,
-              api_key: str,
-              *,
-              timeout_seconds: float,
-              thinking_level: str,
-          ) -> dict[str, Any]:
-              \"\"\"One strict retry for Thai output violations, then non-Thai fallback.\"\"\"
-              first = _call_model(
-                  calculation,
-                  model_name,
-                  api_key,
-                  timeout_seconds=timeout_seconds,
-                  thinking_level=thinking_level,
-                  strict_thai_output_guard=False,
-              )
-              if first.get("output_guard_failed") is not True:
-                  return first
+def _call_model_with_thai_output_safety(
+    calculation: dict[str, Any],
+    model_name: str,
+    api_key: str,
+    *,
+    timeout_seconds: float,
+    thinking_level: str,
+) -> dict[str, Any]:
+    """One strict retry for Thai output violations, then non-Thai fallback."""
+    first = _call_model(
+        calculation,
+        model_name,
+        api_key,
+        timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
+        strict_thai_output_guard=False,
+    )
+    if first.get("output_guard_failed") is not True:
+        return first
 
-              retry = _call_model(
-                  calculation,
-                  model_name,
-                  api_key,
-                  timeout_seconds=timeout_seconds,
-                  thinking_level=thinking_level,
-                  strict_thai_output_guard=True,
-              )
-              if retry.get("ok"):
-                  retry["thai_safety_retry"] = True
-                  retry["thai_safety_retry_reason"] = "output_guard"
-                  return retry
+    retry = _call_model(
+        calculation,
+        model_name,
+        api_key,
+        timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
+        strict_thai_output_guard=True,
+    )
+    if retry.get("ok"):
+        retry["thai_safety_retry"] = True
+        retry["thai_safety_retry_reason"] = "output_guard"
+        return retry
 
-              unsafe = retry.get("unsafe_data") if isinstance(retry.get("unsafe_data"), dict) else first.get("unsafe_data")
-              fallback = build_thai_output_fallback(unsafe)
-              fallback_validated = _validate_output(fallback) if isinstance(fallback, dict) else None
-              fallback_guard = inspect_thai_output_safety(fallback_validated, thai_packet_present=True) if fallback_validated else {"safe": False}
-              if fallback_validated and fallback_guard.get("safe"):
-                  return {
-                      "ok": True,
-                      "data": fallback_validated,
-                      "model": retry.get("model") or first.get("model") or model_name,
-                      "interpreter_version": AI_INTERPRETER_VERSION,
-                      "thinking_level": retry.get("thinking_level") or first.get("thinking_level") or thinking_level,
-                      "thai_safety_retry": True,
-                      "thai_safety_fallback": True,
-                      "thai_safety_retry_error": retry.get("error"),
-                      "thai_safety_guard_violations": retry.get("guard_violations") or first.get("guard_violations") or [],
-                  }
+    unsafe = retry.get("unsafe_data") if isinstance(retry.get("unsafe_data"), dict) else first.get("unsafe_data")
+    fallback = build_thai_output_fallback(unsafe)
+    fallback_validated = _validate_output(fallback) if isinstance(fallback, dict) else None
+    fallback_guard = inspect_thai_output_safety(fallback_validated, thai_packet_present=True) if fallback_validated else {"safe": False}
+    if fallback_validated and fallback_guard.get("safe"):
+        return {
+            "ok": True,
+            "data": fallback_validated,
+            "model": retry.get("model") or first.get("model") or model_name,
+            "interpreter_version": AI_INTERPRETER_VERSION,
+            "thinking_level": retry.get("thinking_level") or first.get("thinking_level") or thinking_level,
+            "thai_safety_retry": True,
+            "thai_safety_fallback": True,
+            "thai_safety_retry_error": retry.get("error"),
+            "thai_safety_guard_violations": retry.get("guard_violations") or first.get("guard_violations") or [],
+        }
 
-              retry["thai_safety_retry"] = True
-              retry["thai_safety_fallback_failed"] = True
-              return retry
-          """.replace("          ", "")
+    retry["thai_safety_retry"] = True
+    retry["thai_safety_fallback_failed"] = True
+    return retry
+'''
           text = text.replace(interpret_anchor, wrapper + interpret_anchor, 1)
 
           old_primary = '    primary = _call_model(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")'
