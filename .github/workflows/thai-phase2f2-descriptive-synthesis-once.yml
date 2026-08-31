@@ -1,0 +1,152 @@
+name: Thai Phase 2F2 descriptive synthesis
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2f2-descriptive-synthesis-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Attach non-predictive descriptive synthesis research
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'from thai_context_graph_v1 import build_context_graph_research\n':
+                  'from thai_context_graph_v1 import build_context_graph_research\nfrom thai_descriptive_synthesis_v1 import build_descriptive_synthesis_research\n',
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.9-phase2f1-context-graph-research"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.10-phase2f2-descriptive-synthesis-research"',
+              '    context_graph_research = build_context_graph_research(\n        house_lord_routes_research=house_lord_routes_research,\n        houses_research=houses_research,\n        aspects_research=aspects_research,\n        planet_pairs_research=planet_pairs_research,\n        semantics_research=semantics_research,\n        interpretation_policy_research=interpretation_policy_research,\n    )\n\n    return {':
+                  '    context_graph_research = build_context_graph_research(\n        house_lord_routes_research=house_lord_routes_research,\n        houses_research=houses_research,\n        aspects_research=aspects_research,\n        planet_pairs_research=planet_pairs_research,\n        semantics_research=semantics_research,\n        interpretation_policy_research=interpretation_policy_research,\n    )\n    descriptive_synthesis_research = build_descriptive_synthesis_research(\n        context_graph_research=context_graph_research,\n        planet_pairs_research=planet_pairs_research,\n    )\n\n    return {',
+              '        "context_graph_research": context_graph_research,\n        "dignities_research": dignities_research,':
+                  '        "context_graph_research": context_graph_research,\n        "descriptive_synthesis_research": descriptive_synthesis_research,\n        "dignities_research": dignities_research,',
+              '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_context_graph_dignity_aspect_planet_pair_semantics_policy_research",':
+                  '"interpretation_status": "planetary_position_facts_plus_nonpredictive_descriptive_synthesis_and_research_context_layers",',
+              '            "suriyayat_context_graph": "research_only_evidence_join_with_conflicts_preserved",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_context_graph": "research_only_evidence_join_with_conflicts_preserved",\n            "suriyayat_descriptive_synthesis": "research_only_nonpredictive_composition",\n            "suriyayat_predictive_rules": "not_implemented",',
+              '            "Suriyayat context-graph synthesis into outcomes, house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",':
+                  '            "Suriyayat predictive/final synthesis into outcomes, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Phase 2F2 anchor: ' + old[:180])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2F2 full 132-test regression matrix
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          for pattern in \
+            test_thai_descriptive_synthesis_v1.py \
+            test_thai_descriptive_synthesis_integration.py \
+            test_thai_context_graph_v1.py \
+            test_thai_context_graph_integration.py \
+            test_thai_house_lord_routes_v1.py \
+            test_thai_house_lord_routes_integration.py \
+            test_thai_planet_pairs_v1.py \
+            test_thai_planet_pairs_integration.py \
+            test_thai_interpretation_policy_v1.py \
+            test_thai_interpretation_policy_integration.py \
+            test_thai_semantics_v1.py \
+            test_thai_phase2c_labels_standards.py \
+            test_thai_dignities_v1.py \
+            test_thai_aspects_v1.py \
+            test_thai_rules_phase2b_integration.py \
+            'test_thai_houses*.py' \
+            'test_thai_lagna*.py' \
+            test_ai_thai_research_isolation.py
+          do
+            python -m unittest discover -s tests -p "$pattern" -v
+          done
+
+      - name: Compile Thai modules
+        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_context_graph_v1.py thai_descriptive_synthesis_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify descriptive synthesis opens no predictive gates
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation
+          from thai_astrology_v2 import build_thai_fortune
+
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          suri = thai['suriyayat']
+          synth = suri['descriptive_synthesis_research']
+          assert synth['available'] is True and synth['research_only'] is True
+          assert len(synth['route_descriptions']) == 12
+          for row in synth['route_descriptions']:
+              assert row['allowed_descriptive_claim']['interpretation_level'] == 'descriptive_nonpredictive'
+              assert row['final_interpretation'] is None
+              assert row['prediction'] is None
+              assert row['score'] is None
+              assert row['unresolved']['event_outcome'] is None
+              assert row['unresolved']['timing'] is None
+              assert row['unresolved']['probability'] is None
+          gate = synth['promotion_gate']
+          assert gate['descriptive_composition_validated'] is True
+          assert gate['planet_archetype_context_validated'] is True
+          assert gate['basic_status_modifier_validated'] is True
+          assert gate['relation_tag_composition_validated'] is True
+          assert gate['pair_multilabel_preservation_validated'] is True
+          assert gate['advanced_standard_meaning_allowed'] is False
+          assert gate['aspect_strength_allowed'] is False
+          assert gate['pair_net_valence_allowed'] is False
+          assert gate['net_valence_allowed'] is False
+          assert gate['final_interpretation_allowed'] is False
+          assert gate['event_judgement_allowed'] is False
+          assert gate['timing_prediction_allowed'] is False
+          assert gate['probability_allowed'] is False
+          assert gate['scores_allowed'] is False
+          assert gate['gemini_interpretation_allowed'] is False
+          assert suri['lagna']['available'] is False
+          compact_suri = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          assert 'descriptive_synthesis_research' not in compact_suri
+          encoded = json.dumps(compact_suri, ensure_ascii=False)
+          assert 'descriptive_nonpredictive' not in encoded
+          assert 'source_topic_domains' not in encoded
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.10-phase2f2-descriptive-synthesis-research'
+          print('PHASE2F2_DESCRIPTIVE_COMPOSITION_PASS_FINAL_PREDICTION_SCORE_GEMINI_BLOCKED')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2F2 state and clean workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_descriptive_synthesis_v1.py tests/test_thai_descriptive_synthesis_v1.py tests/test_thai_descriptive_synthesis_integration.py
+          git rm -f .github/workflows/thai-phase2f2-descriptive-synthesis-once.yml
+          git commit -m 'research: validate Thai nonpredictive descriptive synthesis'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
