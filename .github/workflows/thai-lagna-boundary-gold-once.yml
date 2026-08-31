@@ -1,0 +1,59 @@
+name: Thai Lagna boundary gold verification
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-lagna-boundary-gold-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Thai Lagna test dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+      - name: Run permanent boundary gold vectors
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna_boundary_gold.py' -v
+      - name: Run complete Thai Lagna regression suite
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
+      - name: Confirm research promotion gate stays closed
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from thai_lagna_v1 import build_suriyayat_lagna_research
+          result = build_suriyayat_lagna_research(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              latitude=34.7604, longitude=127.6622, utc_offset_hours=9.0,
+          )
+          assert result['research_only'] is True
+          assert result['validation']['global_coordinates_independently_validated'] is False
+          assert result['promotion_gate']['houses_allowed'] is False
+          assert result['promotion_gate']['dignities_allowed'] is False
+          assert result['promotion_gate']['gemini_interpretation_allowed'] is False
+          print('PROMOTION_GATE_CLOSED')
+          PY
+      - name: Clean one-shot workflow
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/thai-lagna-boundary-gold-once.yml
+          git commit -m 'chore: clean Thai Lagna boundary verification workflow'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
