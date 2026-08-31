@@ -15,9 +15,10 @@ Implemented as factual positions only:
 - Cross-validated Suriyayat Sun/Moon/Mars/Mercury/Jupiter/Venus/Saturn/Rahu/
   Thai Ketu/Uranus longitudes for the natal instant and selected-period endpoints.
 
-Not implemented here:
-- Global-coordinate Suriyayat Lagna, houses/dignities/aspect judgement, exact
-  ingress scanner, or event-probability conversion.
+Not promoted here:
+- Global-coordinate Suriyayat Lagna is available only as a non-interpreted
+  research candidate. Houses/dignities/aspect judgement, exact ingress scanner,
+  and event-probability conversion remain disabled.
 """
 
 from __future__ import annotations

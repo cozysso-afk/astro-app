@@ -44,7 +44,21 @@ import swisseph as swe
 
 from thai_suriyayat_v1 import calculate_positions_for_instant
 
-ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.0"
+ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.1-bangkok-7vector"
+
+VALIDATION = {
+    "status": "bangkok_era_spanning_validated_global_pending",
+    "reference": "MyHora Bangkok Suriyayat Lagna",
+    "vectors": 7,
+    "year_span": "1777-2026",
+    "coordinates": {"latitude": 13.752555, "longitude": 100.494066, "utc_offset_hours": 7.0},
+    "common_0600": {"max_error_arcmin": 15.75, "mean_error_arcmin": 5.791},
+    "common_lmt": {"max_error_arcmin": 15.695, "mean_error_arcmin": 6.03},
+    "astronomical_crosscheck": {"max_error_arcmin": 33.957, "mean_error_arcmin": 16.219},
+    "global_coordinates_compute_supported": True,
+    "global_coordinates_independently_validated": False,
+    "note": "Bangkok references span 249 years. Korea/world coordinates compute without Thailand province tables, but an independent non-Thailand reference corpus is still required before promotion.",
+}
 
 # Traditional common Antoanatee durations in civil minutes.
 # Aries..Pisces; total = 1440 minutes.
@@ -311,6 +325,7 @@ def build_suriyayat_lagna_research(
         "engine": ENGINE_VERSION,
         "promotion_status": "research_only_not_for_interpretation",
         "selected_traditional_candidate": "common_anto_0600_lmt",
+        "validation": VALIDATION,
         "common_anto_0600_legal_time": common_legal,
         "common_anto_0600_lmt": common_lmt,
         "astronomical_suriyayat_sidereal_crosscheck": astronomical,
@@ -318,11 +333,14 @@ def build_suriyayat_lagna_research(
         "candidate_delta_arcmin": round(delta * 60.0, 3),
         "boundary_risk": bool(delta >= 5.0 or common_lmt["sign_index"] != astronomical["sign_index"]),
         "promotion_gate": {
+            "completed": [
+                "era-spanning independent MyHora Bangkok corpus (7 vectors, 1777-2026)",
+                "documented common Antoanatee 06:00 + LMT method",
+                "world-coordinate computation without Thailand province lookup",
+            ],
             "required": [
-                "independent reference corpus across multiple dates",
-                "multiple latitudes/longitudes/timezones",
-                "sign-boundary stress cases",
-                "documented selected Thai Lagna school",
+                "independent non-Thailand reference corpus across multiple latitudes/longitudes/timezones",
+                "sign-boundary stress cases against independent references",
             ],
             "houses_allowed": False,
             "dignities_allowed": False,
