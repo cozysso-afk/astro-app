@@ -148,6 +148,11 @@ jobs:
 
       - name: Final repository cleanliness check
         run: |
+          echo '=== STATUS BEFORE EXPECTED ARTIFACT CLEANUP ==='
+          git status --short
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          rm -rf web/dist web/node_modules
+          echo '=== STATUS AFTER EXPECTED ARTIFACT CLEANUP ==='
           git status --short
           test -z "$(git status --porcelain)"
           echo 'THAI_PREPR_FULL_AUDIT_PASS'
