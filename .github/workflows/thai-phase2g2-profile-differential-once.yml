@@ -1,0 +1,197 @@
+name: Thai Phase 2G2 profile differential gold
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2g2-profile-differential-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Mark Phase 2G2 differential validation metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.12-phase2g1-source-policy-profiles"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.13-phase2g2-profile-differential-gold"',
+              '            "suriyayat_source_policy_profiles": "research_only_explicit_comparison_default_none",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_source_policy_profiles": "research_only_explicit_comparison_default_none",\n            "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",\n            "suriyayat_predictive_rules": "not_implemented",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Phase 2G2 anchor: ' + old[:180])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2G2 full 174-test regression matrix
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import sys
+          import unittest
+
+          patterns = [
+              'test_thai_phase2g2_profile_differential.py',
+              'test_thai_phase2g2_profile_differential_integration.py',
+              'test_thai_school_policy_v1.py',
+              'test_thai_school_policy_integration.py',
+              'test_thai_dignity_exceptions_v1.py',
+              'test_thai_dignity_exceptions_integration.py',
+              'test_thai_descriptive_synthesis_v1.py',
+              'test_thai_descriptive_synthesis_integration.py',
+              'test_thai_context_graph_v1.py',
+              'test_thai_context_graph_integration.py',
+              'test_thai_house_lord_routes_v1.py',
+              'test_thai_house_lord_routes_integration.py',
+              'test_thai_planet_pairs_v1.py',
+              'test_thai_planet_pairs_integration.py',
+              'test_thai_interpretation_policy_v1.py',
+              'test_thai_interpretation_policy_integration.py',
+              'test_thai_semantics_v1.py',
+              'test_thai_phase2c_labels_standards.py',
+              'test_thai_dignities_v1.py',
+              'test_thai_aspects_v1.py',
+              'test_thai_rules_phase2b_integration.py',
+              'test_thai_houses*.py',
+              'test_thai_lagna*.py',
+              'test_ai_thai_research_isolation.py',
+          ]
+          loader = unittest.defaultTestLoader
+          suite = unittest.TestSuite()
+          total = 0
+          for pattern in patterns:
+              found = loader.discover('tests', pattern=pattern)
+              count = found.countTestCases()
+              print(f'{pattern}: {count}')
+              total += count
+              suite.addTests(found)
+          print(f'PHASE2G2_DISCOVERED_TESTS={total}')
+          if total != 174:
+              raise SystemExit(f'expected 174 tests, discovered {total}')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful():
+              sys.exit(1)
+          PY
+
+      - name: Compile Thai modules
+        run: |
+          python -m py_compile \
+            thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py \
+            thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py \
+            thai_house_lord_routes_v1.py thai_context_graph_v1.py thai_descriptive_synthesis_v1.py \
+            thai_dignity_exceptions_v1.py thai_school_policy_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify Phase 2G2 invariant contract and Gemini isolation
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import copy
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation
+          from thai_astrology_v2 import build_thai_fortune
+          from thai_school_policy_v1 import build_source_policy_research
+
+          def candidate(rule, planets):
+              return {
+                  'rule_key': rule, 'thai_rule': rule, 'planets': planets,
+                  'evidence': {}, 'candidate_effect': 'synthetic_gold',
+                  'support_status': 'synthetic_gold', 'school_variance': True,
+                  'detected': True, 'applied': False, 'base_status_overridden': False,
+                  'replacement_status': None, 'net_valence': None, 'prediction': None, 'score': None,
+              }
+
+          synthetic = {
+              'available': True, 'research_only': True, 'base_dignities_unchanged': True,
+              'candidates': [
+                  candidate('pra_opposition_to_kaset', ['sun','saturn']),
+                  candidate('nicha_opposition_to_ucca', ['moon','mars']),
+                  candidate('reciprocal_kaset_exchange', ['mercury','jupiter']),
+                  candidate('pra_nicha_dusthana_reversal', ['venus']),
+              ],
+          }
+          views = {
+              key: build_source_policy_research(
+                  dignity_exceptions_research=copy.deepcopy(synthetic), selected_profile=key
+              )['selected']
+              for key in ('none','literal_exception','standard_reach_overlay')
+          }
+          assert views['none']['projected_count'] == 0
+          assert views['literal_exception']['projected_count'] == 3
+          assert views['standard_reach_overlay']['projected_count'] == 1
+          identities = [
+              [(row['rule_key'], tuple(row['planets'])) for row in view['decisions']]
+              for view in views.values()
+          ]
+          assert identities[0] == identities[1] == identities[2]
+          protected = (
+              'rule_key','planets','candidate_detected','base_status_mutated',
+              'exception_applied_to_engine','final_judgement','prediction','score'
+          )
+          for idx in range(len(identities[0])):
+              rows = [view['decisions'][idx] for view in views.values()]
+              for key in protected:
+                  assert rows[0][key] == rows[1][key] == rows[2][key]
+          for view in views.values():
+              assert view['base_dignities_mutated'] is False
+              assert view['engine_exception_application_count'] == 0
+              assert view['final_judgement'] is None
+              assert view['prediction'] is None
+              assert view['score'] is None
+
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.13-phase2g2-profile-differential-gold'
+          layer = thai['suriyayat']['school_policy_research']
+          assert layer['selected_profile'] == 'none'
+          assert layer['actual_engine_exception_application_count'] == 0
+          assert layer['base_dignities_mutated'] is False
+          assert layer['promotion_gate']['production_school_selection_allowed'] is False
+          assert layer['promotion_gate']['final_interpretation_allowed'] is False
+          assert layer['promotion_gate']['gemini_interpretation_allowed'] is False
+          compact = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          encoded = json.dumps(compact, ensure_ascii=False)
+          assert 'school_policy_research' not in compact
+          assert 'literal_exception' not in encoded
+          assert 'standard_reach_overlay' not in encoded
+          print('PHASE2G2_DIFFERENTIAL_GOLD_PASS_PROFILE_CHANGES_PROJECTION_ONLY_BASE_ENGINE_GEMINI_UNCHANGED')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2G2 metadata and clean workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py tests/test_thai_phase2g2_profile_differential.py tests/test_thai_phase2g2_profile_differential_integration.py
+          git rm -f .github/workflows/thai-phase2g2-profile-differential-once.yml
+          git commit -m 'research: validate Thai profile differential gold matrix'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
