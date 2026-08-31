@@ -1,0 +1,111 @@
+name: Thai Lagna Duduang foreign numeric probe
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-lagna-duduang-numeric-probe.yml
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check requests beautifulsoup4
+      - name: POST foreign coordinates to independent Duduang calculator
+        run: |
+          python - <<'PY'
+          import json, re, requests
+          from bs4 import BeautifulSoup
+
+          base='https://www.duduang.com'
+          page=base+'/%E0%B9%82%E0%B8%AB%E0%B8%A3%E0%B8%B2%E0%B8%A8%E0%B8%B2%E0%B8%AA%E0%B8%95%E0%B8%A3%E0%B9%8C%E0%B9%84%E0%B8%97%E0%B8%A2/'
+          session=requests.Session()
+          headers={
+            'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+            'Referer':page,
+            'Origin':base,
+            'X-Requested-With':'XMLHttpRequest',
+          }
+          warm=session.get(page,timeout=30,headers={'User-Agent':headers['User-Agent']})
+          print('WARMUP',warm.status_code,'cookies=',session.cookies.get_dict())
+          warm.raise_for_status()
+
+          # Inspect year UI to determine whether the endpoint expects Gregorian or BE.
+          soup=BeautifulSoup(warm.text,'html.parser')
+          for ident in ('year','day','month','hour','minute','location','lat','long','country'):
+            tag=soup.find(id=ident)
+            if tag:
+              print('UI_FIELD',ident,'tag=',tag.name,'name=',tag.get('name'),'value=',tag.get('value'))
+              if tag.name=='select':
+                opts=[(o.get('value'),o.get_text(' ',strip=True)) for o in tag.find_all('option')[:12]]
+                print('UI_OPTIONS',ident,opts)
+
+          cases=[
+            ('Yeosu-user-Gregorian',21,3,1991,7,26,34.7604,127.6622),
+            ('Yeosu-user-BE',21,3,2534,7,26,34.7604,127.6622),
+            ('Seoul-2026-Gregorian',24,3,2026,14,26,37.5665,126.9780),
+            ('Seoul-2026-BE',24,3,2569,14,26,37.5665,126.9780),
+            ('Tokyo-2026-Gregorian',20,4,2026,23,49,35.6762,139.6503),
+            ('NewYork-2026-Gregorian',24,3,2026,14,26,40.7128,-74.0060),
+          ]
+
+          thai_tokens=('ลัคนา','องศา','ราศี','เมษ','พฤษภ','มิถุน','กรกฎ','สิงห์','กันย์','ตุล','พิจิก','ธนู','มกร','กุมภ์','มีน')
+
+          for label,day,month,year,hour,minute,lat,lon in cases:
+            payload={
+              'day':str(day),'month':str(month),'year':str(year),
+              'hour':str(hour),'minute':str(minute),
+              'location':'2','country':'','province':'','districts':'',
+              'lat':str(lat),'long':str(lon),
+              'jday':'0','jmonth':'0','jyear':'0','t':'0','ca':'1',
+            }
+            r=session.post(base+'/ajax/2-thai.php',data=payload,headers=headers,timeout=30)
+            print('\n=== CASE',label,'HTTP',r.status_code,'BYTES',len(r.content),'===')
+            print('CONTENT_TYPE',r.headers.get('content-type'))
+            if r.status_code != 200:
+              print(r.text[:1000])
+              continue
+            r.encoding=r.apparent_encoding or 'utf-8'
+            text=' '.join(BeautifulSoup(r.text,'html.parser').stripped_strings)
+            print('TEXT_HEAD',text[:1600])
+            for token in thai_tokens:
+              start=0
+              count=0
+              while count < 4:
+                i=text.find(token,start)
+                if i<0: break
+                print('AROUND',token, text[max(0,i-220):i+700])
+                start=i+len(token)
+                count+=1
+            # Show likely chart-related ids/classes/data attributes without dumping whole HTML.
+            parsed=BeautifulSoup(r.text,'html.parser')
+            candidates=[]
+            for tag in parsed.find_all(True):
+              attrs=' '.join([str(tag.get('id','')), ' '.join(tag.get('class',[])), str(tag.get('data-id','')), str(tag.get('data-value',''))])
+              body=tag.get_text(' ',strip=True)
+              hay=(attrs+' '+body).lower()
+              if any(k in hay for k in ['ลัคนา','lagna','lakna','ascendant','planet-0','ดาว 0','ราศี']):
+                candidates.append((tag.name,attrs,body[:500]))
+            print('CANDIDATES',json.dumps(candidates[:40],ensure_ascii=False))
+            # Extract all degree-like text fragments to help identify a chart position.
+            degfrags=re.findall(r'[^<>\s]{0,25}(?:องศา|°|º)[^<>\s]{0,25}',text)
+            print('DEG_FRAGMENTS',json.dumps(degfrags[:80],ensure_ascii=False))
+          PY
+      - name: Clean numeric probe workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/thai-lagna-duduang-numeric-probe.yml
+          git commit -m 'chore: clean Duduang foreign numeric probe'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
