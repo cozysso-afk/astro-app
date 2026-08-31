@@ -37,8 +37,9 @@ from thai_interpretation_policy_v1 import build_interpretation_policy_research
 from thai_planet_pairs_v1 import build_planet_pair_research
 from thai_house_lord_routes_v1 import build_house_lord_routes_research
 from thai_context_graph_v1 import build_context_graph_research
+from thai_descriptive_synthesis_v1 import build_descriptive_synthesis_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.9-phase2f1-context-graph-research"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.10-phase2f2-descriptive-synthesis-research"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -261,6 +262,10 @@ def _suriyayat_layer(
         semantics_research=semantics_research,
         interpretation_policy_research=interpretation_policy_research,
     )
+    descriptive_synthesis_research = build_descriptive_synthesis_research(
+        context_graph_research=context_graph_research,
+        planet_pairs_research=planet_pairs_research,
+    )
 
     return {
         "available": True,
@@ -287,12 +292,13 @@ def _suriyayat_layer(
         "house_lords_research": house_lords_research,
         "house_lord_routes_research": house_lord_routes_research,
         "context_graph_research": context_graph_research,
+        "descriptive_synthesis_research": descriptive_synthesis_research,
         "dignities_research": dignities_research,
         "aspects_research": aspects_research,
         "planet_pairs_research": planet_pairs_research,
         "semantics_research": semantics_research,
         "interpretation_policy_research": interpretation_policy_research,
-        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_context_graph_dignity_aspect_planet_pair_semantics_policy_research",
+        "interpretation_status": "planetary_position_facts_plus_nonpredictive_descriptive_synthesis_and_research_context_layers",
         "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",
     }
 
@@ -368,11 +374,12 @@ def build_thai_fortune(
             "suriyayat_planet_archetypes_and_pair_tables": "research_only_multilabel_pair_facts",
             "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",
             "suriyayat_context_graph": "research_only_evidence_join_with_conflicts_preserved",
+            "suriyayat_descriptive_synthesis": "research_only_nonpredictive_composition",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
             "validated/promoted global-coordinate Suriyayat Lagna",
-            "Suriyayat context-graph synthesis into outcomes, house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",
+            "Suriyayat predictive/final synthesis into outcomes, concrete house outcomes, advanced-standard meanings/ranking, canonical aspect strength, net pair valence, pair-event interpretation, combined good/bad judgement",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",
             "Suriyayat event/probability conversion",
