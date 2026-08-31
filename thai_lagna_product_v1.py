@@ -11,16 +11,113 @@ predictive judgement, event timing, probability or scores.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Mapping
 
 from thai_ai_safe_packet_v1 import build_ai_safe_packet_research
 
-ENGINE_VERSION = "thai-lagna-product-promotion-v1.0-descriptive-only"
+ENGINE_VERSION = "thai-lagna-product-promotion-v1.1-fail-closed"
 SELECTED_METHOD_KEY = "common_anto_0600_lmt"
+INTERPRETATION_SCOPE = "descriptive_nonpredictive_house_context_only"
+MIN_WORLD_NUMERIC_CHECKS = 16
+PRODUCT_SIGNS = (
+    ("Aries", "เมษ", "양자리"),
+    ("Taurus", "พฤษภ", "황소자리"),
+    ("Gemini", "มิถุน", "쌍둥이자리"),
+    ("Cancer", "กรกฎ", "게자리"),
+    ("Leo", "สิงห์", "사자자리"),
+    ("Virgo", "กันย์", "처녀자리"),
+    ("Libra", "ตุล", "천칭자리"),
+    ("Scorpio", "พิจิก", "전갈자리"),
+    ("Sagittarius", "ธนู", "사수자리"),
+    ("Capricorn", "มกร", "염소자리"),
+    ("Aquarius", "กุมภ์", "물병자리"),
+    ("Pisces", "มีน", "물고기자리"),
+)
+_ROUTE_KEY_RE = re.compile(r"^H([1-9]|1[0-2]):[a-z][a-z0-9_]*->H([1-9]|1[0-2])$")
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _packed_identity(longitude: float) -> tuple[int, int, int, int]:
+    total_arcmin = longitude * 60.0
+    sign_index = int(total_arcmin // 1800.0) % 12
+    within_arcmin = total_arcmin - sign_index * 1800.0
+    degree = int(within_arcmin // 60.0)
+    minute_float = within_arcmin - degree * 60.0
+    minute = int(minute_float)
+    second = int(round((minute_float - minute) * 60.0))
+    if second >= 60:
+        minute += 1
+        second -= 60
+    if minute >= 60:
+        degree += 1
+        minute -= 60
+    if degree >= 30:
+        sign_index = (sign_index + 1) % 12
+        degree -= 30
+    return sign_index, degree, minute, second
+
+
+def lagna_numeric_identity_is_valid(value: Any, *, require_product_contract: bool = False) -> bool:
+    """Validate that every exposed Lagna identity field describes one position."""
+    row = _mapping(value)
+    if row.get("available") is not True or row.get("method") != SELECTED_METHOD_KEY:
+        return False
+    if isinstance(row.get("longitude_deg"), bool) or not isinstance(row.get("longitude_deg"), (int, float)):
+        return False
+    if any(isinstance(row.get(key), bool) or not isinstance(row.get(key), int) for key in ("sign_index", "degree", "minute", "second")):
+        return False
+
+    longitude = float(row["longitude_deg"])
+    if not math.isfinite(longitude) or not 0.0 <= longitude < 360.0:
+        return False
+    expected_sign, expected_degree, expected_minute, expected_second = _packed_identity(longitude)
+    if (
+        row.get("sign_index"), row.get("degree"), row.get("minute"), row.get("second")
+    ) != (expected_sign, expected_degree, expected_minute, expected_second):
+        return False
+
+    sign_en, sign_th, sign_ko = PRODUCT_SIGNS[expected_sign]
+    if (row.get("sign_en"), row.get("sign_th"), row.get("sign_ko")) != (sign_en, sign_th, sign_ko):
+        return False
+    if row.get("display") != f"{sign_ko} {expected_degree}°{expected_minute:02d}′{expected_second:02d}″":
+        return False
+
+    if not require_product_contract:
+        return True
+    validation = _mapping(row.get("validation"))
+    return bool(
+        row.get("engine") == ENGINE_VERSION
+        and row.get("method_key") == SELECTED_METHOD_KEY
+        and row.get("interpretation_scope") == INTERPRETATION_SCOPE
+        and validation.get("numeric_position_validated") is True
+        and validation.get("global_coordinates_independently_validated") is True
+        and isinstance(validation.get("world_numeric_checks"), int)
+        and not isinstance(validation.get("world_numeric_checks"), bool)
+        and validation.get("world_numeric_checks") >= MIN_WORLD_NUMERIC_CHECKS
+    )
+
+
+def product_routes_are_complete(value: Any) -> bool:
+    """Require one unique structural route for each source house H1..H12."""
+    if not isinstance(value, list) or len(value) != 12:
+        return False
+    source_houses: set[int] = set()
+    route_keys: set[str] = set()
+    for row in value:
+        route = _mapping(row)
+        route_key = route.get("route_key")
+        if not isinstance(route_key, str):
+            return False
+        match = _ROUTE_KEY_RE.fullmatch(route_key)
+        if match is None or route.get("interpretation_level") != "descriptive_nonpredictive":
+            return False
+        source_houses.add(int(match.group(1)))
+        route_keys.add(route_key)
+    return source_houses == set(range(1, 13)) and len(route_keys) == 12
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -78,13 +175,9 @@ def build_lagna_product_promotion(
     candidate = _mapping(research.get(SELECTED_METHOD_KEY))
     if candidate.get("available") is not True:
         return _blocked("Selected validated Lagna candidate is unavailable.")
-    try:
-        longitude = float(candidate.get("longitude_deg"))
-        sign_index = int(candidate.get("sign_index"))
-    except (TypeError, ValueError):
-        return _blocked("Selected Lagna candidate has invalid numeric position fields.")
-    if not math.isfinite(longitude) or not (0.0 <= longitude < 360.0) or not (0 <= sign_index <= 11):
-        return _blocked("Selected Lagna candidate is outside valid zodiac bounds.")
+    if not lagna_numeric_identity_is_valid(candidate):
+        return _blocked("Selected Lagna candidate has inconsistent numeric or zodiac identity fields.")
+    sign_index = int(candidate["sign_index"])
 
     packet = build_ai_safe_packet_research(
         descriptive_synthesis_research=descriptive_synthesis_research,
@@ -95,6 +188,7 @@ def build_lagna_product_promotion(
         and packet.get("eligible_for_gemini") is True
         and _mapping(packet.get("promotion_gate")).get("gemini_interpretation_allowed") is True
         and int(packet.get("route_count") or 0) == 12
+        and product_routes_are_complete(packet.get("routes"))
     ):
         return _blocked("Sanitized descriptive AI packet failed promotion requirements.")
 
@@ -121,7 +215,7 @@ def build_lagna_product_promotion(
             "world_numeric_checks": int(world_ref.get("numeric_checks") or 0),
             "reference": validation.get("reference"),
         },
-        "interpretation_scope": "descriptive_nonpredictive_house_context_only",
+        "interpretation_scope": INTERPRETATION_SCOPE,
         "predictive_interpretation_allowed": False,
         "event_judgement_allowed": False,
         "timing_prediction_allowed": False,

@@ -11,7 +11,7 @@ def _synthesis():
     routes = []
     for idx in range(1, 13):
         routes.append({
-            "route_key": f"H{idx}:mars:H{idx}",
+            "route_key": f"H{idx}:mars->H{idx}",
             "composition": {
                 "source_topic_domains": [f"source_{idx}"],
                 "carrier_planet": {"key": "mars", "archetype_domains": ["action"]},
@@ -76,7 +76,7 @@ def _audit():
     }
 
 
-class ThaiPhase2G5LagnaProductPromotionTests(unittest.TestCase):
+class ThaiPhase2G51LagnaProductPromotionTests(unittest.TestCase):
     def _build(self, **overrides):
         values = {
             "lagna_research": _lagna(),
@@ -162,6 +162,26 @@ class ThaiPhase2G5LagnaProductPromotionTests(unittest.TestCase):
             lagna["common_anto_0600_lmt"]["longitude_deg"] = bad
             result = self._build(lagna_research=lagna)
             self.assertFalse(result["available"])
+
+    def test_longitude_sign_and_display_identity_must_agree(self):
+        mutations = {
+            "sign_index": lambda row: row.update(sign_index=11),
+            "degree": lambda row: row.update(degree=4),
+            "display": lambda row: row.update(display="물고기자리 3°27′22″"),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name):
+                lagna = copy.deepcopy(_lagna())
+                mutate(lagna["common_anto_0600_lmt"])
+                result = self._build(lagna_research=lagna)
+                self.assertFalse(result["available"])
+
+    def test_product_packet_requires_unique_complete_source_house_routes(self):
+        synthesis = _synthesis()
+        synthesis["route_descriptions"][-1] = copy.deepcopy(synthesis["route_descriptions"][0])
+        result = self._build(descriptive_synthesis_research=synthesis)
+        self.assertFalse(result["available"])
+        self.assertEqual(result["ai_safe_packet_product"], {})
 
 
 if __name__ == "__main__":

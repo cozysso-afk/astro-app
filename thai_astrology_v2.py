@@ -44,7 +44,7 @@ from thai_ai_safe_packet_v1 import build_ai_safe_packet_research
 from thai_lagna_promotion_audit_v1 import build_lagna_promotion_audit
 from thai_lagna_product_v1 import build_lagna_product_promotion
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.16-phase2g5-lagna-descriptive-product"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.17-phase2g5-1-fail-closed"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")

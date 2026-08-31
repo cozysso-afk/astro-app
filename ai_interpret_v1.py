@@ -7,7 +7,13 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.6-thai-lagna-descriptive-product"
+from thai_lagna_product_v1 import (
+    ENGINE_VERSION as THAI_LAGNA_PRODUCT_ENGINE_VERSION,
+    lagna_numeric_identity_is_valid,
+    product_routes_are_complete,
+)
+
+AI_INTERPRETER_VERSION = "mobile-ai-v2.7-thai-lagna-fail-closed"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -44,7 +50,24 @@ def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     gate = value.get("promotion_gate") if isinstance(value.get("promotion_gate"), dict) else {}
-    if value.get("eligible_for_gemini") is not True or gate.get("gemini_interpretation_allowed") is not True:
+    blocked_gates = (
+        "school_policy_allowed",
+        "exception_application_allowed",
+        "net_valence_allowed",
+        "final_good_bad_judgement_allowed",
+        "event_judgement_allowed",
+        "timing_prediction_allowed",
+        "probability_allowed",
+        "scores_allowed",
+    )
+    if not (
+        value.get("eligible_for_gemini") is True
+        and value.get("research_only") is False
+        and value.get("product_promotion_engine") == THAI_LAGNA_PRODUCT_ENGINE_VERSION
+        and gate.get("gemini_interpretation_allowed") is True
+        and all(gate.get(key) is False for key in blocked_gates)
+        and product_routes_are_complete(value.get("routes"))
+    ):
         return {}
     routes = []
     for row in value.get("routes") or []:
@@ -72,7 +95,7 @@ def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:
 
 def _compact_thai_product_lagna(value: Any) -> dict[str, Any]:
     """Expose only validated numeric Lagna facts to the interpretation payload."""
-    if not isinstance(value, dict) or value.get("available") is not True:
+    if not lagna_numeric_identity_is_valid(value, require_product_contract=True):
         return {"available": False}
     validation = value.get("validation") if isinstance(value.get("validation"), dict) else {}
     return {
@@ -117,11 +140,10 @@ def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
     )
     out = {key: value.get(key) for key in allowed if key in value}
     out["lagna"] = _compact_thai_product_lagna(value.get("lagna"))
-    packet = _compact_thai_ai_safe_packet(
-        value.get("ai_safe_packet_product") or value.get("ai_safe_packet_research")
-    )
-    if packet:
-        out["ai_safe_descriptive_packet"] = packet
+    if out["lagna"].get("available") is True:
+        packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_product"))
+        if packet:
+            out["ai_safe_descriptive_packet"] = packet
     return out
 
 

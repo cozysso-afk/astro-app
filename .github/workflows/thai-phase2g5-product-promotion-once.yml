@@ -1,4 +1,4 @@
-name: Thai Phase 2G5 product regression
+name: Thai Phase 2G5.1 fail-closed regression
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
       - name: Install Swiss Ephemeris dependency
         run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
 
-      - name: Run Phase 2G5 exact 215-test regression matrix
+      - name: Run Phase 2G5.1 exact 221-test regression matrix
         env:
           PYTHONPATH: .
         run: |
@@ -66,11 +66,11 @@ jobs:
               print(f'{pattern}: {count}')
               total += count
               suite.addTests(found)
-          print(f'PHASE2G5_DISCOVERED_TESTS={total}')
-          if total != 215:
-              raise SystemExit(f'expected 215 tests, discovered {total}')
+          print(f'PHASE2G51_DISCOVERED_TESTS={total}')
+          if total != 221:
+              raise SystemExit(f'expected 221 tests, discovered {total}')
           result = unittest.TextTestRunner(verbosity=2).run(suite)
-          print(f'PHASE2G5_RESULT={result.testsRun}/{total}')
+          print(f'PHASE2G51_RESULT={result.testsRun}/{total}')
           if not result.wasSuccessful():
               sys.exit(1)
           PY
@@ -83,6 +83,7 @@ jobs:
           PYTHONPATH: .
         run: |
           python - <<'PY'
+          import copy
           import json
           from datetime import date, time
 
@@ -98,12 +99,14 @@ jobs:
               latitude=34.7604,
               longitude=127.6622,
           )
-          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.16-phase2g5-lagna-descriptive-product'
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.17-phase2g5-1-fail-closed'
           suri = thai['suriyayat']
           assert suri['lagna']['available'] is True
           assert suri['lagna']['method_key'] == 'common_anto_0600_lmt'
           promotion = suri['lagna_product_promotion']
+          assert promotion['available'] is True
           assert promotion['explicit_promotion'] is True
+          assert promotion['engine'] == 'thai-lagna-product-promotion-v1.1-fail-closed'
           assert promotion['promotion_gate']['numeric_lagna_product_allowed'] is True
           assert promotion['promotion_gate']['gemini_descriptive_packet_allowed'] is True
           for key in (
@@ -130,7 +133,22 @@ jobs:
           assert suri['lagna_research']['research_only'] is True
           assert suri['lagna_research']['promotion_gate']['houses_allowed'] is False
           assert suri['lagna_research']['promotion_gate']['gemini_interpretation_allowed'] is False
-          print('PHASE2G5_PRODUCT_PROMOTION_SCOPE_PASS')
+
+          malformed = copy.deepcopy(suri)
+          malformed['lagna']['longitude_deg'] = 999.0
+          malformed_compact = _compact_calculation(
+              {'period': {'day_count': 1}, 'thai': {'suriyayat': malformed}}
+          )['thai']['suriyayat']
+          assert malformed_compact['lagna'] == {'available': False}
+          assert 'ai_safe_descriptive_packet' not in malformed_compact
+
+          research_fallback = copy.deepcopy(suri)
+          research_fallback['ai_safe_packet_research'] = research_fallback.pop('ai_safe_packet_product')
+          research_compact = _compact_calculation(
+              {'period': {'day_count': 1}, 'thai': {'suriyayat': research_fallback}}
+          )['thai']['suriyayat']
+          assert 'ai_safe_descriptive_packet' not in research_compact
+          print('PHASE2G51_FAIL_CLOSED_PRODUCT_SCOPE_PASS')
           PY
 
       - name: Check committed diff whitespace
