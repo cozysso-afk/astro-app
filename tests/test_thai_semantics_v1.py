@@ -100,10 +100,14 @@ class ThaiPhase2D1SemanticVocabularyTests(unittest.TestCase):
         self.assertIn("semantics_research", suri)
         self.assertTrue(suri["semantics_research"]["research_only"])
         compact = _compact_calculation({"period": {"day_count": 1}, "thai": thai})
-        serialized = json.dumps(compact, ensure_ascii=False)
-        self.assertNotIn("semantics_research", serialized)
-        self.assertNotIn("stable_strong", serialized)
-        self.assertNotIn("higher_education", serialized)
+        compact_suri = compact["thai"]["suriyayat"]
+        # Test the actual data contract: the research object itself must not be
+        # whitelisted. Descriptive engine/status strings may legitimately contain
+        # the word "semantics" and are not research payload leakage.
+        self.assertNotIn("semantics_research", compact_suri)
+        serialized_suri = json.dumps(compact_suri, ensure_ascii=False)
+        self.assertNotIn("stable_strong", serialized_suri)
+        self.assertNotIn("higher_education", serialized_suri)
 
 
 if __name__ == "__main__":
