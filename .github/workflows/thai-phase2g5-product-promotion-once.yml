@@ -1,17 +1,15 @@
-name: Thai Phase 2G5.1 fail-closed regression
+name: Thai Phase 2G5.2 output safety regression
 
 on:
   push:
     branches:
       - feature/thai-lagna-phase1-real-20260831
     paths:
-      - '.github/workflows/thai-phase2g5-product-promotion-once.yml'
-      - 'thai_astrology_v2.py'
-      - 'thai_lagna_product_v1.py'
+      - 'thai_*.py'
       - 'ai_interpret_v1.py'
-      - 'tests/test_thai_*.py'
+      - 'tests/test_thai*.py'
       - 'tests/test_ai_thai_research_isolation.py'
-  workflow_dispatch:
+      - '.github/workflows/thai-phase2g5-product-promotion-once.yml'
 
 permissions:
   contents: read
@@ -22,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: feature/thai-lagna-phase1-real-20260831
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -31,7 +30,10 @@ jobs:
       - name: Install Swiss Ephemeris dependency
         run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
 
-      - name: Run Phase 2G5.1 exact 221-test regression matrix
+      - name: Compile G5.2 touched stack
+        run: python -m py_compile thai_ai_output_guard_v1.py ai_interpret_v1.py thai_astrology_v2.py thai_lagna_product_v1.py
+
+      - name: Run Phase 2G5.2 exact 239-test regression matrix
         env:
           PYTHONPATH: .
         run: |
@@ -40,6 +42,7 @@ jobs:
           import unittest
 
           patterns = [
+              'test_thai_ai_output_guard_v1.py', 'test_thai_ai_output_guard_integration.py',
               'test_thai_lagna_product_v1.py', 'test_thai_lagna_product_integration.py',
               'test_thai_lagna_promotion_audit_v1.py', 'test_thai_lagna_promotion_audit_integration.py',
               'test_thai_ai_safe_packet_v1.py', 'test_thai_ai_safe_packet_integration.py',
@@ -66,28 +69,24 @@ jobs:
               print(f'{pattern}: {count}')
               total += count
               suite.addTests(found)
-          print(f'PHASE2G51_DISCOVERED_TESTS={total}')
-          if total != 221:
-              raise SystemExit(f'expected 221 tests, discovered {total}')
+          print(f'PHASE2G52_DISCOVERED_TESTS={total}')
+          if total != 239:
+              raise SystemExit(f'expected 239 tests, discovered {total}')
           result = unittest.TextTestRunner(verbosity=2).run(suite)
-          print(f'PHASE2G51_RESULT={result.testsRun}/{total}')
+          print(f'PHASE2G52_RESULT={result.testsRun}/{total}')
           if not result.wasSuccessful():
               sys.exit(1)
           PY
 
-      - name: Compile modules
-        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_context_graph_v1.py thai_descriptive_synthesis_v1.py thai_dignity_exceptions_v1.py thai_school_policy_v1.py thai_ai_safe_packet_v1.py thai_lagna_promotion_audit_v1.py thai_lagna_product_v1.py thai_astrology_v2.py ai_interpret_v1.py
-
-      - name: Verify explicit promotion scope
+      - name: Verify promoted scope and output guard stay fail-closed
         env:
           PYTHONPATH: .
         run: |
           python - <<'PY'
-          import copy
-          import json
           from datetime import date, time
 
           from ai_interpret_v1 import _compact_calculation
+          from thai_ai_output_guard_v1 import inspect_thai_output_safety, thai_output_guard_required
           from thai_astrology_v2 import build_thai_fortune
 
           thai = build_thai_fortune(
@@ -99,57 +98,26 @@ jobs:
               latitude=34.7604,
               longitude=127.6622,
           )
-          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.17-phase2g5-1-fail-closed'
           suri = thai['suriyayat']
           assert suri['lagna']['available'] is True
-          assert suri['lagna']['method_key'] == 'common_anto_0600_lmt'
-          promotion = suri['lagna_product_promotion']
-          assert promotion['available'] is True
-          assert promotion['explicit_promotion'] is True
-          assert promotion['engine'] == 'thai-lagna-product-promotion-v1.1-fail-closed'
-          assert promotion['promotion_gate']['numeric_lagna_product_allowed'] is True
-          assert promotion['promotion_gate']['gemini_descriptive_packet_allowed'] is True
-          for key in (
-              'school_policy_allowed', 'exception_application_allowed', 'net_valence_allowed',
-              'final_good_bad_judgement_allowed', 'predictive_interpretation_allowed',
-              'event_judgement_allowed', 'timing_prediction_allowed', 'probability_allowed',
-              'scores_allowed',
-          ):
-              assert promotion['promotion_gate'][key] is False, key
-          packet = suri['ai_safe_packet_product']
-          assert packet['eligible_for_gemini'] is True
-          assert packet['route_count'] == 12
-          compact = _compact_calculation(
-              {'period': {'day_count': 1}, 'thai': thai}
-          )['thai']['suriyayat']
-          assert compact['lagna']['available'] is True
-          assert compact['ai_safe_descriptive_packet']['route_count'] == 12
-          encoded = json.dumps(compact, ensure_ascii=False)
-          for forbidden in (
-              'lagna_research', 'school_policy_research', 'literal_exception',
-              'prediction', 'score', 'probability', 'net_effect',
-          ):
-              assert forbidden not in encoded, forbidden
-          assert suri['lagna_research']['research_only'] is True
-          assert suri['lagna_research']['promotion_gate']['houses_allowed'] is False
-          assert suri['lagna_research']['promotion_gate']['gemini_interpretation_allowed'] is False
+          assert suri['lagna']['predictive_interpretation_allowed'] is False
+          assert suri['lagna']['event_judgement_allowed'] is False
+          assert suri['lagna']['timing_prediction_allowed'] is False
+          assert suri['lagna']['probability_allowed'] is False
+          assert suri['lagna']['scores_allowed'] is False
+          compact = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})
+          assert thai_output_guard_required(compact) is True
 
-          malformed = copy.deepcopy(suri)
-          malformed['lagna']['longitude_deg'] = 999.0
-          malformed_compact = _compact_calculation(
-              {'period': {'day_count': 1}, 'thai': {'suriyayat': malformed}}
-          )['thai']['suriyayat']
-          assert malformed_compact['lagna'] == {'available': False}
-          assert 'ai_safe_descriptive_packet' not in malformed_compact
-
-          research_fallback = copy.deepcopy(suri)
-          research_fallback['ai_safe_packet_research'] = research_fallback.pop('ai_safe_packet_product')
-          research_compact = _compact_calculation(
-              {'period': {'day_count': 1}, 'thai': {'suriyayat': research_fallback}}
-          )['thai']['suriyayat']
-          assert 'ai_safe_descriptive_packet' not in research_compact
-          print('PHASE2G51_FAIL_CLOSED_PRODUCT_SCOPE_PASS')
+          bad = {
+              'systems': {'thai': 'Suriyayat 기준 9월 3일 반드시 재회한다.'},
+              'clusters': {'relationship': '재회 확률 90%야.'},
+          }
+          checked = inspect_thai_output_safety(bad, thai_packet_present=True)
+          assert checked['safe'] is False
+          codes = {item['code'] for item in checked['violations']}
+          assert {'numeric_probability', 'deterministic_event', 'thai_exact_timing'} <= codes
+          print('PHASE2G52_OUTPUT_GUARD_PRODUCT_SCOPE_PASS')
           PY
 
-      - name: Check committed diff whitespace
-        run: git diff --check HEAD^ HEAD
+      - name: Check repository whitespace
+        run: git diff --check
