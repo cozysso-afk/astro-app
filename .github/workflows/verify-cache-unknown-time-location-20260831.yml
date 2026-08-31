@@ -1,0 +1,96 @@
+name: Verify cache retention and unknown-time location
+
+on:
+  push:
+    branches:
+      - fix/extend-cache-unknown-time-location-20260831
+    paths:
+      - .github/workflows/verify-cache-unknown-time-location-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/extend-cache-unknown-time-location-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply cache/location fix
+        run: python scripts/extend_cache_unknown_time_location_20260831.py
+
+      - name: Static regression gate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          app=Path('web/src/AppNext.tsx').read_text()
+          api=Path('api/main.py').read_text()
+          expected={"today: 180","week: 370","month: 730","year: 1825"}
+          for token in expected:
+              assert token in app, token
+          assert app.count('fortuneCacheTtlDays(period, selectedTool)') >= 2
+          assert 'RELATIONSHIP_AI_CACHE_TTL_DAYS = 1825' in app
+          assert "writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)" in app
+          assert '<KoreaBirthplaceSelector value={counterpart}' in app
+          assert '<KoreaBirthplaceSelector disabled={!counterpart.timeKnown}' not in app
+          assert 'value={counterpart.latitude} disabled={!counterpart.timeKnown}' not in app
+          assert 'value={counterpart.longitude} disabled={!counterpart.timeKnown}' not in app
+          assert 'value={counterpart.utcOffset} disabled={!counterpart.timeKnown}' not in app
+          assert 'const counterpartLatitude = parseOptionalNumber(counterpart.latitude)' in app
+          assert "latitude: cp.latitude != null ? String(cp.latitude) : ''" in app
+          assert '"latitude": self.latitude,' in api
+          assert '"longitude": self.longitude,' in api
+          assert '"latitude": self.latitude if exact_time else None' not in api
+          print('CACHE_LOCATION_STATIC_PASS')
+          PY
+
+      - name: Verify unknown-time engine safety contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          rel=Path('relationship_western_v1.py').read_text()
+          api=Path('api/main.py').read_text()
+          # Birthplace metadata may survive, while time-sensitive calculations remain disabled.
+          assert 'cp_exact = bool(counterpart_profile.get("time_known")' in rel
+          assert 'include_angles=time_known and profile.get("latitude") is not None' in rel
+          assert 'include_moon=time_known' in rel
+          assert 'if user_exact and cp_exact:' in rel
+          assert '"birth_time": self.birth_time if exact_time else None' in api
+          assert '"time_known": exact_time' in api
+          print('UNKNOWN_TIME_SAFETY_PASS')
+          PY
+
+      - name: Python syntax gate
+        run: python -m py_compile api/main.py relationship_western_v1.py relationship_saju_v1.py integrated_fortune_v1.py thai_astrology_v2.py thai_suriyayat_v1.py
+
+      - name: Frontend production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Diff safety
+        run: |
+          git diff --check
+          git status --short
+
+      - name: Commit verified product changes to branch only
+        run: |
+          rm -rf __pycache__ api/__pycache__
+          git rm -f scripts/extend_cache_unknown_time_location_20260831.py .github/workflows/verify-cache-unknown-time-location-20260831.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx api/main.py
+          git commit -m 'fix: extend fortune cache and keep birthplace with unknown time'
+          git push origin HEAD:fix/extend-cache-unknown-time-location-20260831
