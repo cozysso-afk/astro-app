@@ -1,0 +1,66 @@
+name: Gemini timeout hotfix audit once
+
+on:
+  push:
+    branches:
+      - audit/gemini-timeout-hotfix-verify-20260831
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b6d6d64ffb914c2488fe866a8bd4c83e0064471f
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install production dependencies
+        run: python -m pip install -r api/requirements.txt
+      - name: Verify clean diff contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          count=$(git diff --name-only origin/main...HEAD | wc -l | tr -d ' ')
+          echo "changed_files=$count"
+          test "$count" = "2"
+          git diff --name-only origin/main...HEAD | sort > /tmp/files.txt
+          printf 'ai_interpret_v1.py\ntests/test_ai_timeout_policy_v1.py\n' > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/files.txt
+          git diff --check origin/main...HEAD
+      - name: Compile runtime and focused test
+        run: python -m py_compile ai_interpret_v1.py tests/test_ai_timeout_policy_v1.py
+      - name: Run full repository tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Production-style FastAPI health smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 >/tmp/uvicorn.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/tmp/health.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/health.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json'))
+          assert d.get('status')=='ok'
+          PY
+      - name: Verify timeout policy values
+        run: |
+          python - <<'PY'
+          import ai_interpret_v1 as ai
+          assert ai.AI_INTERPRETER_VERSION == 'mobile-ai-v2.8.1-thai-output-guard-timeout-headroom'
+          print('AI_INTERPRETER_VERSION=',ai.AI_INTERPRETER_VERSION)
+          PY
+          grep -F 'timeout_seconds=34.0, thinking_level="high"' ai_interpret_v1.py
+          grep -F 'timeout_seconds=28.0, thinking_level="medium"' ai_interpret_v1.py
+          echo GEMINI_TIMEOUT_HOTFIX_AUDIT_PASS
