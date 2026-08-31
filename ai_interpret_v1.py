@@ -19,7 +19,7 @@ from thai_ai_output_guard_v1 import (
     thai_output_guard_required,
 )
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.8.2-thai-structured-json-headroom"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.8.3-thai-legacy-schema-compatible"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -386,7 +386,6 @@ def _response_schema_from_shape(value: Any) -> dict[str, Any]:
             "type": "OBJECT",
             "properties": {key: _response_schema_from_shape(item) for key, item in value.items()},
             "required": list(value),
-            "additionalProperties": False,
         }
     if isinstance(value, list):
         sample = value[0] if value else ""
