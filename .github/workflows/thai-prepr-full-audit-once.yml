@@ -113,21 +113,32 @@ jobs:
               sys.exit(1)
           PY
 
-      - name: FastAPI import and health smoke
+      - name: Production-style FastAPI health smoke
         env:
           PYTHONPATH: .
         run: |
-          python - <<'PY'
-          from fastapi.testclient import TestClient
-          from api.main import app
-
-          client = TestClient(app)
-          response = client.get('/health')
-          print('HEALTH_STATUS=', response.status_code)
-          print('HEALTH_BODY=', response.text[:1000])
-          assert response.status_code == 200
-          print('FASTAPI_HEALTH_SMOKE_PASS')
-          PY
+          set -euo pipefail
+          uvicorn api.main:app --host 127.0.0.1 --port 8765 >/tmp/astro-uvicorn.log 2>&1 &
+          UVICORN_PID=$!
+          cleanup() {
+            kill "$UVICORN_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/health >/tmp/astro-health.json; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ok" -ne 1 ]; then
+            cat /tmp/astro-uvicorn.log
+            exit 1
+          fi
+          cat /tmp/astro-health.json
+          echo
+          echo 'FASTAPI_UVICORN_HEALTH_SMOKE_PASS'
 
       - name: Frontend production build
         working-directory: web
