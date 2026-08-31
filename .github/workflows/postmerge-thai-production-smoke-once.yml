@@ -89,7 +89,7 @@ jobs:
           assert (d.get('saju') or {}).get('ok') is True
           thai=d.get('thai') or {}
           assert thai.get('ok') is True
-          assert thai.get('predictive_status')=='mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_product_promoted_numeric_lagna_and_descriptive_house_context'
+          assert thai.get('predictive_status')=='mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_promoted_descriptive_lagna_context_no_prediction'
           print(label,'PASS',d.get('engine'),thai.get('engine'))
           PY
           }
