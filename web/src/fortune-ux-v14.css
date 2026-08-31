@@ -80,3 +80,49 @@
   padding-bottom:0!important;
   line-height:normal!important;
 }
+
+
+/* v17 · iOS native time centering + standalone safe area */
+.birth-time-field input[type="time"]{
+  height:52px!important;
+  min-height:52px!important;
+  box-sizing:border-box!important;
+  padding-top:0!important;
+  padding-bottom:0!important;
+  line-height:normal!important;
+}
+.birth-time-field input[type="time"]::-webkit-date-and-time-value{
+  display:flex!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  line-height:normal!important;
+}
+.birth-time-field input[type="time"]::-webkit-datetime-edit,
+.birth-time-field input[type="time"]::-webkit-datetime-edit-fields-wrapper{
+  display:flex!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  line-height:normal!important;
+}
+.birth-time-field input[type="time"]::-webkit-datetime-edit-hour-field,
+.birth-time-field input[type="time"]::-webkit-datetime-edit-minute-field,
+.birth-time-field input[type="time"]::-webkit-datetime-edit-ampm-field,
+.birth-time-field input[type="time"]::-webkit-datetime-edit-text{
+  padding-top:0!important;
+  padding-bottom:0!important;
+  line-height:normal!important;
+}
+@media (display-mode: standalone) and (max-width:600px){
+  .page-content{padding-top:max(58px,calc(env(safe-area-inset-top) + 14px))!important}
+}
