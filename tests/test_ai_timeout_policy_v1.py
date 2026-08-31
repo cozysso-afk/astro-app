@@ -20,13 +20,15 @@ class GeminiTimeoutPolicyTests(unittest.TestCase):
         second=call.call_args_list[1].kwargs
         self.assertEqual(first["timeout_seconds"],34.0)
         self.assertEqual(first["thinking_level"],"high")
-        self.assertEqual(second["timeout_seconds"],28.0)
+        self.assertFalse(first["compact_output"])
+        self.assertEqual(second["timeout_seconds"],34.0)
         self.assertEqual(second["thinking_level"],"medium")
+        self.assertTrue(second["compact_output"])
         self.assertLess(first["timeout_seconds"],40.0)
         self.assertLess(second["timeout_seconds"],40.0)
 
-    def test_interpreter_version_marks_timeout_headroom_hotfix(self):
-        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.1-thai-output-guard-timeout-headroom")
+    def test_interpreter_version_marks_structured_json_hotfix(self):
+        self.assertEqual(ai.AI_INTERPRETER_VERSION,"mobile-ai-v2.8.2-thai-structured-json-headroom")
 
 
 if __name__ == "__main__":
