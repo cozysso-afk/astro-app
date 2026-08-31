@@ -2041,10 +2041,10 @@ export default function AppNext() {
               </details>
               {!partnerTimeExact ? <section className="result-card">
                 <div className="result-card-title"><span>정밀도</span><strong>출생시간 미상 · 일부 시기층 제외</strong></div>
-                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간·정확 장소가 없어 진행 궁합차트·진행 합성차트·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
+                <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간을 몰라 진행 궁합차트·진행 합성차트·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 입력한 출생지역은 기록에 보존하지만 시간민감 각도·하우스 계산에는 사용하지 않아. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
                 <p className="result-note">현재는 출생시간 없이도 확정 가능한 행성 간 기본 궁합 접점만 해석 근거로 사용해.</p>
               </section> : resultMonths.length>0 && <section className="result-card"><div className="result-card-title"><span>시기</span><strong>기간별 정밀 접점</strong></div><p className="result-note">접점 수는 사건 확률이 아니야. 독립 레이어에서 반복되는 정밀 접점을 보는 용도야.</p><div className="month-list">{resultMonths.map((month)=><div className="month-card" key={`${month.calendar_month}-${month.representative_date}`}><div className="month-title"><strong>{month.calendar_month}</strong><span>대표일 {month.representative_date}</span></div><div className="month-metrics"><span><b>{month.signal_summary.exact_contacts}</b> 정밀</span><span><b>{month.signal_summary.supportive_contacts}</b> 조화</span><span><b>{month.signal_summary.challenging_contacts}</b> 긴장</span></div>{month.signal_summary.tightest.slice(0,3).map((aspect,index)=><div className="tight-row" key={index}><span>{aspectText(aspect)}</span><b>{aspect.orb.toFixed(2)}°</b></div>)}</div>)}</div></section>}
-              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.map(relationshipLimitKo).join(' ') : '상대 출생시간/장소가 없어 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
+              {(relationshipResult.result.limitations?.length??0)>0 && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{partnerTimeExact ? relationshipResult.result.limitations?.map(relationshipLimitKo).join(' ') : '상대 출생시간을 몰라 데이비슨·마크스·3차 진행은 임의 추정하지 않고 제외했어.'}</span></div>}
             </div>}
           </section>}
 
