@@ -1,4 +1,4 @@
-name: Thai Phase 2E2 house-lord route research gate
+name: Thai Phase 2E2 house-lord route retry gate
 
 on:
   push:
@@ -57,75 +57,29 @@ jobs:
       - name: Install Swiss Ephemeris dependency
         run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
 
-      - name: Run Phase 2E2 house-lord route tests
+      - name: Run Phase 2E2 full 105-test regression matrix
         env:
           PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_house_lord_routes_v1.py' -v
-
-      - name: Run Phase 2E2 integration tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_house_lord_routes_integration.py' -v
-
-      - name: Run Phase 2E1 planet pair regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_v1.py' -v
-
-      - name: Run Phase 2E1 integration regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_integration.py' -v
-
-      - name: Run Phase 2D2 policy regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_v1.py' -v
-
-      - name: Run Phase 2D2 integration regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_integration.py' -v
-
-      - name: Run Phase 2D1 semantics regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_semantics_v1.py' -v
-
-      - name: Run Phase 2C regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_phase2c_labels_standards.py' -v
-
-      - name: Run dignity regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_dignities_v1.py' -v
-
-      - name: Run aspect regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_aspects_v1.py' -v
-
-      - name: Run Phase 2B integration regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_rules_phase2b_integration.py' -v
-
-      - name: Run house regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_houses*.py' -v
-
-      - name: Run Lagna regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
-
-      - name: Run Gemini research isolation regressions
-        env:
-          PYTHONPATH: .
-        run: python -m unittest discover -s tests -p 'test_ai_thai_research_isolation.py' -v
+        run: |
+          set -euo pipefail
+          for pattern in \
+            test_thai_house_lord_routes_v1.py \
+            test_thai_house_lord_routes_integration.py \
+            test_thai_planet_pairs_v1.py \
+            test_thai_planet_pairs_integration.py \
+            test_thai_interpretation_policy_v1.py \
+            test_thai_interpretation_policy_integration.py \
+            test_thai_semantics_v1.py \
+            test_thai_phase2c_labels_standards.py \
+            test_thai_dignities_v1.py \
+            test_thai_aspects_v1.py \
+            test_thai_rules_phase2b_integration.py \
+            'test_thai_houses*.py' \
+            'test_thai_lagna*.py' \
+            test_ai_thai_research_isolation.py
+          do
+            python -m unittest discover -s tests -p "$pattern" -v
+          done
 
       - name: Compile Thai modules
         run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_astrology_v2.py ai_interpret_v1.py
@@ -147,8 +101,7 @@ jobs:
           )
           suri = thai['suriyayat']
           routes = suri['house_lord_routes_research']
-          assert routes['available'] is True
-          assert routes['research_only'] is True
+          assert routes['available'] is True and routes['research_only'] is True
           assert len(routes['routes']) == 12
           assert [x['source_house']['house_number'] for x in routes['routes']] == list(range(1,13))
           for row in routes['routes']:
@@ -182,7 +135,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add thai_astrology_v2.py thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_integration.py
+          git add thai_astrology_v2.py thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_integration.py tests/test_thai_planet_pairs_integration.py
           git rm -f .github/workflows/thai-phase2e2-house-lord-routes-once.yml
           git commit -m 'research: validate Thai house-lord source destination routes'
           git push origin HEAD:feature/thai-lagna-phase1-real-20260831
