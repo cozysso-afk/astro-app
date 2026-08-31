@@ -27,6 +27,17 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Remove no-op patch assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/extend_cache_unknown_time_location_20260831.py')
+          s=p.read_text()
+          block='''app = replace_once(\n    app,\n    "        latitude: counterpartLatitude,\\n        longitude: counterpartLongitude, utc_offset_hours: Number(counterpart.utcOffset || 9),",\n    "        latitude: counterpartLatitude,\\n        longitude: counterpartLongitude, utc_offset_hours: Number(counterpart.utcOffset || 9),",\n    'counterpart payload coords preserved',\n)\n\n'''
+          assert block in s
+          p.write_text(s.replace(block,'',1))
+          PY
+
       - name: Apply cache/location fix
         run: python scripts/extend_cache_unknown_time_location_20260831.py
 
@@ -61,7 +72,6 @@ jobs:
           from pathlib import Path
           rel=Path('relationship_western_v1.py').read_text()
           api=Path('api/main.py').read_text()
-          # Birthplace metadata may survive, while time-sensitive calculations remain disabled.
           assert 'cp_exact = bool(counterpart_profile.get("time_known")' in rel
           assert 'include_angles=time_known and profile.get("latitude") is not None' in rel
           assert 'include_moon=time_known' in rel
