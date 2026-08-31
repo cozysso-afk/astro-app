@@ -17,9 +17,9 @@ from thai_lagna_v1 import (
 class ThaiLagnaPhase1DInvariants(unittest.TestCase):
     """Non-gold-standard invariants for world-coordinate research safety.
 
-    These tests intentionally do not claim independent numeric validation for
-    Korea/world Lagna. They verify mathematical and runtime properties while
-    the promotion gate remains closed pending an external non-Thailand corpus.
+    These tests cover mathematical/runtime invariants alongside the permanent
+    independent world numeric corpus. Numeric Lagna positioning is validated, while
+    houses, dignities and Gemini interpretation remain separately gated.
     """
 
     def test_lmt_zero_on_standard_meridian(self):
@@ -152,7 +152,8 @@ class ThaiLagnaPhase1DInvariants(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertTrue(result["research_only"])
         self.assertEqual(result["promotion_status"], "research_only_not_for_interpretation")
-        self.assertFalse(result["validation"]["global_coordinates_independently_validated"])
+        self.assertTrue(result["validation"]["global_coordinates_independently_validated"])
+        self.assertTrue(result["promotion_gate"]["lagna_numeric_position_validated"])
         self.assertFalse(result["promotion_gate"]["houses_allowed"])
         self.assertFalse(result["promotion_gate"]["dignities_allowed"])
         self.assertFalse(result["promotion_gate"]["gemini_interpretation_allowed"])

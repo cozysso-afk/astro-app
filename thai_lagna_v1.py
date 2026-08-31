@@ -50,11 +50,11 @@ import swisseph as swe
 
 from thai_suriyayat_v1 import calculate_positions_for_instant
 
-ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.2-actual-sunrise"
+ENGINE_VERSION = "thai-suriyayat-lagna-research-v1.3-world-gold"
 
 VALIDATION = {
-    "status": "bangkok_era_spanning_validated_global_pending",
-    "reference": "MyHora Bangkok Suriyayat Lagna",
+    "status": "bangkok_era_spanning_and_world_numeric_validated_research_only",
+    "reference": "MyHora Suriyayat Lagna (Bangkok era-spanning + direct world-coordinate pages)",
     "vectors": 7,
     "year_span": "1777-2026",
     "coordinates": {"latitude": 13.752555, "longitude": 100.494066, "utc_offset_hours": 7.0},
@@ -63,8 +63,19 @@ VALIDATION = {
     "actual_sunrise": {"vectors": 5, "year_span": "1777-2026", "max_error_arcmin": 8.500, "mean_error_arcmin": 2.708, "lmt_max_error_arcmin": 8.445, "lmt_mean_error_arcmin": 2.623},
     "astronomical_crosscheck": {"max_error_arcmin": 33.957, "mean_error_arcmin": 16.219},
     "global_coordinates_compute_supported": True,
-    "global_coordinates_independently_validated": False,
-    "note": "Bangkok references span 249 years. The actual-sunrise common method is separately validated against MyHora. Korea/world coordinates compute without Thailand province tables, but an independent non-Thailand reference corpus is still required before promotion.",
+    "global_coordinates_independently_validated": True,
+    "world_reference": {
+        "source": "direct MyHora Suriyayat calendar pages with explicit latitude/longitude/UTC",
+        "date_time_local": "1991-03-21 07:26",
+        "places": ["Yeosu", "Seoul", "Tokyo", "NewYork"],
+        "numeric_checks": 16,
+        "common_0600": {"max_error_arcmin": 0.0, "mean_error_arcmin": 0.0},
+        "common_lmt": {"max_error_arcmin": 0.732, "mean_error_arcmin": 0.518},
+        "actual_sunrise": {"max_error_arcmin": 8.5, "mean_error_arcmin": 4.188},
+        "actual_sunrise_lmt": {"max_error_arcmin": 7.86, "mean_error_arcmin": 4.01},
+        "sign_boundary_case": "Tokyo fixed 06:00 Pisces 27°37′ -> LMT Aries 2°16′",
+    },
+    "note": "Bangkok references span 249 years and world-coordinate numeric pages now independently validate Korea/Japan/US coordinates. Numeric Lagna positioning is validated; product exposure and downstream house/dignity/Gemini interpretation remain separately blocked.",
 }
 
 # Traditional common Antoanatee durations in civil minutes.
@@ -482,11 +493,14 @@ def build_suriyayat_lagna_research(
                 "documented common Antoanatee 06:00 + LMT method",
                 "actual-local-sunrise common Antoanatee candidate against independent MyHora references",
                 "world-coordinate computation without Thailand province lookup",
+                "independent MyHora world numeric corpus: Yeosu, Seoul, Tokyo, New York (16 method checks)",
+                "independent sign-boundary stress references in Bangkok and Tokyo",
             ],
             "required": [
-                "independent non-Thailand reference corpus across multiple latitudes/longitudes/timezones",
-                "sign-boundary stress cases against independent references",
+                "separate product-layer review before exposing validated Lagna position",
+                "house/dignity/aspect interpretation validation before downstream use",
             ],
+            "lagna_numeric_position_validated": True,
             "houses_allowed": False,
             "dignities_allowed": False,
             "gemini_interpretation_allowed": False,

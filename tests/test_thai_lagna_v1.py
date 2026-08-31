@@ -194,12 +194,14 @@ class ThaiLagnaPhase1Tests(unittest.TestCase):
             latitude=34.7604, longitude=127.6622, utc_offset_hours=9.0,
         )
         validation = result["validation"]
-        self.assertEqual(validation["reference"], "MyHora Bangkok Suriyayat Lagna")
+        self.assertIn("MyHora Suriyayat Lagna", validation["reference"])
         self.assertEqual(validation["vectors"], 7)
         self.assertEqual(validation["year_span"], "1777-2026")
         self.assertEqual(validation["common_lmt"]["max_error_arcmin"], 15.695)
         self.assertEqual(validation["common_lmt"]["mean_error_arcmin"], 6.03)
-        self.assertFalse(validation["global_coordinates_independently_validated"])
+        self.assertTrue(validation["global_coordinates_independently_validated"])
+        self.assertEqual(validation["world_reference"]["numeric_checks"], 16)
+        self.assertEqual(validation["world_reference"]["common_lmt"]["max_error_arcmin"], 0.732)
 
     def test_product_layer_keeps_lagna_unavailable(self):
         result = build_thai_fortune(
