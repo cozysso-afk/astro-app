@@ -19,7 +19,7 @@ from thai_ai_output_guard_v1 import (
     thai_output_guard_required,
 )
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.8.1-thai-output-guard-timeout-headroom"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.8.2-thai-structured-json-headroom"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -27,7 +27,8 @@ AI_SUPPORTED_MODELS = {
 AI_DEFAULT_MODEL = "gemini-3.7-flash"
 AI_FALLBACK_MODEL = "gemini-3.6-flash"
 AI_DEFAULT_THINKING_LEVEL = "high"
-AI_MAX_OUTPUT_TOKENS = 7600
+AI_MAX_OUTPUT_TOKENS = 16000
+AI_COMPACT_MAX_OUTPUT_TOKENS = 10000
 TOPIC_ORDER = ["금전", "투자심리", "수익실현", "신규진입", "투자주의", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
 GEMINI_INTRO_END = (2026, 12, 31)
 GEMINI_INTRO_INPUT_PER_M = 0.75
@@ -378,16 +379,54 @@ OUTPUT_SHAPE = {
 }
 
 
-def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, timeout_seconds: float = 24.0, thinking_level: str = "high", strict_thai_output_guard: bool = False) -> dict[str, Any]:
+def _response_schema_from_shape(value: Any) -> dict[str, Any]:
+    """Convert the documented output contract into Gemini's JSON schema subset."""
+    if isinstance(value, dict):
+        return {
+            "type": "OBJECT",
+            "properties": {key: _response_schema_from_shape(item) for key, item in value.items()},
+            "required": list(value),
+            "additionalProperties": False,
+        }
+    if isinstance(value, list):
+        sample = value[0] if value else ""
+        return {"type": "ARRAY", "items": _response_schema_from_shape(sample)}
+    return {"type": "STRING", "description": str(value)}
+
+
+AI_RESPONSE_SCHEMA = _response_schema_from_shape(OUTPUT_SHAPE)
+for _topic in TOPIC_ORDER:
+    AI_RESPONSE_SCHEMA["properties"]["topic_analysis"]["properties"][_topic]["properties"]["confidence"]["enum"] = [
+        "높음",
+        "보통",
+        "낮음",
+    ]
+
+
+def _call_model(
+    calculation: dict[str, Any],
+    model_name: str,
+    api_key: str,
+    *,
+    timeout_seconds: float = 24.0,
+    thinking_level: str = "high",
+    strict_thai_output_guard: bool = False,
+    compact_output: bool = False,
+) -> dict[str, Any]:
     safe_model = urllib.parse.quote(model_name, safe="-._")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
     compact_calculation = _compact_calculation(calculation)
     strict_instruction = strict_thai_retry_instruction() if strict_thai_output_guard else ""
+    completion_instruction = (
+        "이전 시도가 불완전하거나 지연됐을 수 있어. 각 문자열은 한 문장으로 압축하되 "
+        "responseSchema의 모든 필드를 빠짐없이 채우고 반드시 완전한 JSON으로 끝내."
+        if compact_output
+        else "각 문자열은 근거를 보존하되 간결하게 쓰고 responseSchema의 모든 필드를 빠짐없이 채워."
+    )
     prompt = (
         "아래 통합 계산 결과를 종합 해석해. 생활·관계·학업·진로·금전·투자 분야를 빠짐없이 채워. "
-        "현재 데이터에 없는 시간대나 천체 사건은 만들지 마.\n\n"
-        "OUTPUT_SHAPE:\n"
-        + json.dumps(OUTPUT_SHAPE, ensure_ascii=False, separators=(",", ":"))
+        "현재 데이터에 없는 시간대나 천체 사건은 만들지 마. "
+        + completion_instruction
         + "\n\nCALCULATED_DATA:\n"
         + json.dumps(compact_calculation, ensure_ascii=False, separators=(",", ":"), default=str)
         + strict_instruction
@@ -396,8 +435,9 @@ def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, t
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": AI_MAX_OUTPUT_TOKENS,
+            "maxOutputTokens": AI_COMPACT_MAX_OUTPUT_TOKENS if compact_output else AI_MAX_OUTPUT_TOKENS,
             "responseMimeType": "application/json",
+            "responseSchema": AI_RESPONSE_SCHEMA,
             "thinkingConfig": {"thinkingLevel": thinking_level},
         },
     }
@@ -423,7 +463,29 @@ def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, t
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             response_text = "\n".join(lines).strip()
-        parsed = json.loads(response_text)
+        try:
+            parsed = json.loads(response_text)
+        except json.JSONDecodeError as exc:
+            candidate = raw.get("candidates", [{}])[0] if isinstance(raw, dict) else {}
+            usage = raw.get("usageMetadata", {}) if isinstance(raw, dict) else {}
+            return {
+                "ok": False,
+                "error": "Gemini 구조화 JSON 응답이 완결되지 않았어.",
+                "model": model_name,
+                "interpreter_version": AI_INTERPRETER_VERSION,
+                "thinking_level": thinking_level,
+                "compact_output": compact_output,
+                "response_incomplete": True,
+                "finish_reason": candidate.get("finishReason"),
+                "json_error": f"{exc.msg} at line {exc.lineno} column {exc.colno}",
+                "response_chars": len(response_text),
+                "usage": {
+                    "prompt_tokens": int(usage.get("promptTokenCount", 0) or 0),
+                    "candidate_tokens": int(usage.get("candidatesTokenCount", 0) or 0),
+                    "thought_tokens": int(usage.get("thoughtsTokenCount", 0) or 0),
+                    "total_tokens": int(usage.get("totalTokenCount", 0) or 0),
+                },
+            }
         validated = _validate_output(parsed)
         if not validated:
             return {"ok": False, "error": "AI 해설 응답 구조를 검증하지 못했어.", "model": model_name}
@@ -500,6 +562,7 @@ def _call_model_with_thai_output_safety(
     *,
     timeout_seconds: float,
     thinking_level: str,
+    compact_output: bool = False,
 ) -> dict[str, Any]:
     """Retry a Thai output violation once, then omit Thai explanation safely."""
     first = _call_model(
@@ -509,6 +572,7 @@ def _call_model_with_thai_output_safety(
         timeout_seconds=timeout_seconds,
         thinking_level=thinking_level,
         strict_thai_output_guard=False,
+        compact_output=compact_output,
     )
     if first.get("output_guard_failed") is not True:
         return first
@@ -520,6 +584,7 @@ def _call_model_with_thai_output_safety(
         timeout_seconds=timeout_seconds,
         thinking_level=thinking_level,
         strict_thai_output_guard=True,
+        compact_output=compact_output,
     )
     if retry.get("ok"):
         retry["thai_safety_retry"] = True
@@ -558,14 +623,28 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
         return {"ok": False, "missing_key": True, "error": "Render 계산 서버에 GEMINI_API_KEY가 설정되지 않았어.", **ai_status()}
 
     model = preferred_model if preferred_model in AI_SUPPORTED_MODELS else AI_DEFAULT_MODEL
-    # Render free workers were observed to recycle around a ~40s long outbound
-    # generation. Keep each model call well below that boundary. The primary
-    # retains high thinking; fallback uses medium thinking to guarantee a result.
-    primary = _call_model_with_thai_output_safety(calculation, model, api_key, timeout_seconds=34.0, thinking_level="high")
+    # Keep each outbound call below the observed ~40s Render worker risk boundary.
+    # The primary preserves high-thinking quality with enough room to finish the
+    # schema. The fallback uses a compact schema-complete response at medium.
+    primary = _call_model_with_thai_output_safety(
+        calculation,
+        model,
+        api_key,
+        timeout_seconds=34.0,
+        thinking_level="high",
+        compact_output=False,
+    )
     if primary.get("ok") or model == AI_FALLBACK_MODEL:
         return primary
 
-    fallback = _call_model_with_thai_output_safety(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=28.0, thinking_level="medium")
+    fallback = _call_model_with_thai_output_safety(
+        calculation,
+        AI_FALLBACK_MODEL,
+        api_key,
+        timeout_seconds=34.0,
+        thinking_level="medium",
+        compact_output=True,
+    )
     if fallback.get("ok"):
         fallback["fallback_from"] = model
         fallback["fallback_reason"] = primary.get("error")
