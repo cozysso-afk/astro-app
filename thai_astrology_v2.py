@@ -41,7 +41,7 @@ from thai_descriptive_synthesis_v1 import build_descriptive_synthesis_research
 from thai_dignity_exceptions_v1 import build_dignity_exception_research
 from thai_school_policy_v1 import build_source_policy_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.12-phase2g1-source-policy-profiles"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.13-phase2g2-profile-differential-gold"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -390,6 +390,7 @@ def build_thai_fortune(
             "suriyayat_descriptive_synthesis": "research_only_nonpredictive_composition",
             "suriyayat_dignity_exception_candidates": "research_only_school_variant_candidates_not_applied",
             "suriyayat_source_policy_profiles": "research_only_explicit_comparison_default_none",
+            "suriyayat_source_policy_differential": "synthetic_gold_and_real_profile_invariants_validated_projection_only",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
