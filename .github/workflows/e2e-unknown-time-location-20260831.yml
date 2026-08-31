@@ -1,0 +1,69 @@
+name: E2E unknown-time birthplace relationship path
+
+on:
+  push:
+    branches:
+      - fix/extend-cache-unknown-time-location-20260831
+    paths:
+      - .github/workflows/e2e-unknown-time-location-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/extend-cache-unknown-time-location-20260831
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API runtime dependencies
+        run: pip install -q -r api/requirements.txt
+
+      - name: Exercise unknown-time birthplace safety
+        run: |
+          python - <<'PY'
+          from datetime import date, time
+          from api.main import RelationshipProfile
+          from relationship_western_v1 import _profile_chart, build_relationship_western
+
+          cp_model = RelationshipProfile(
+              name='상대', birth_date=date(1992,2,9), birth_time=None, time_known=False,
+              latitude=35.1595, longitude=126.8526, utc_offset_hours=9,
+          )
+          cp_payload = cp_model.engine_payload()
+          assert cp_payload['time_known'] is False
+          assert cp_payload['birth_time'] is None
+          assert cp_payload['latitude'] == 35.1595
+          assert cp_payload['longitude'] == 126.8526
+
+          cp_chart = _profile_chart(cp_payload, allow_unknown_time=True)
+          assert cp_chart is not None
+          assert 'Moon' not in cp_chart['positions']
+          assert cp_chart['angles'] == {}
+
+          user = {
+              'name':'나','birth_date':date(1991,3,21),'birth_time':time(7,26),'time_known':True,
+              'latitude':34.7604,'longitude':127.6622,'utc_offset_hours':9,
+          }
+          result = build_relationship_western(user, cp_payload, [(date(2026,8,31),date(2026,8,31))], analysis_mode='compatibility')
+          assert result['ok'] is True
+          assert result['natal_synastry']['partner_time_exact'] is False
+          assert result['house_overlays']['available'] is False
+          assert result['davison']['available'] is False
+          assert result['marks']['available'] is False
+          print('UNKNOWN_TIME_WITH_BIRTHPLACE_RUNTIME_PASS')
+          PY
+
+      - name: Remove temporary workflow after success
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/e2e-unknown-time-location-20260831.yml
+          git commit -m 'chore: remove temporary unknown-time E2E workflow'
+          git push origin HEAD:fix/extend-cache-unknown-time-location-20260831
