@@ -1,0 +1,177 @@
+name: Post-merge Thai production smoke once
+
+on:
+  push:
+    branches:
+      - audit/postmerge-thai-smoke-20260831
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Frontend reachability
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -L -sS -o /tmp/web.html -w '%{http_code}' --max-time 60 https://astro-app-web-ten.vercel.app/)
+          echo "frontend_http=$code"
+          test "$code" = "200"
+          test -s /tmp/web.html
+
+      - name: Wait for production API to expose merged engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          ready=0
+          for i in $(seq 1 30); do
+            echo "attempt=$i"
+            if curl -fsS --max-time 90 "$API/health" -o /tmp/health.json && curl -fsS --max-time 90 "$API/v1/meta" -o /tmp/meta.json; then
+              cat /tmp/health.json
+              python - <<'PY'
+          import json
+          m=json.load(open('/tmp/meta.json'))
+          print('api_version=',m.get('api_version'))
+          print('integrated_engine=',m.get('integrated_engine'))
+          print('ai_interpretation=',m.get('ai_interpretation'))
+          PY
+              if python - <<'PY'
+          import json,sys
+          m=json.load(open('/tmp/meta.json'))
+          ai=str(m.get('ai_interpretation') or '')
+          ok=(m.get('integrated_engine')=='integrated-fortune-v2.10-thai-lagna-research' and 'mobile-ai-v2.8-thai-output-guard-retry-fallback' in ai)
+          sys.exit(0 if ok else 1)
+          PY
+              then
+                ready=1
+                break
+              fi
+            fi
+            sleep 20
+          done
+          test "$ready" = "1"
+
+      - name: Production integrated fortune smoke - today week month year
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          PROFILE='{"name":"Production Smoke","birth_date":"1990-01-01","birth_time":"12:00:00","latitude":37.5665,"longitude":126.9780,"utc_offset_hours":9,"gender":"female"}'
+
+          run_calc () {
+            label="$1"; start="$2"; end="$3"
+            payload=$(jq -nc --argjson p "$PROFILE" --arg s "$start" --arg e "$end" '{profile:$p,start_date:$s,end_date:$e}')
+            curl -fsS --max-time 90 -H 'Content-Type: application/json' -d "$payload" "$API/v1/fortune/integrated/start" > "/tmp/${label}_start.json"
+            job=$(jq -r '.job_id' "/tmp/${label}_start.json")
+            test -n "$job"; test "$job" != null
+            echo "$label job=$job"
+            doneflag=0
+            for i in $(seq 1 180); do
+              curl -fsS --max-time 60 "$API/v1/fortune/integrated/jobs/$job" > "/tmp/${label}_job.json"
+              status=$(jq -r '.status' "/tmp/${label}_job.json")
+              if [ "$status" = done ]; then doneflag=1; break; fi
+              if [ "$status" = failed ]; then cat "/tmp/${label}_job.json"; exit 1; fi
+              if (( i % 10 == 0 )); then jq '{status,progress}' "/tmp/${label}_job.json"; fi
+              sleep 5
+            done
+            test "$doneflag" = "1"
+            jq '.result' "/tmp/${label}_job.json" > "/tmp/${label}_calc.json"
+            python - "$label" <<'PY'
+          import json,sys
+          label=sys.argv[1]
+          d=json.load(open(f'/tmp/{label}_calc.json'))
+          assert d.get('ok') is True, d.get('error')
+          assert (d.get('western') or {}).get('ok') is True
+          assert (d.get('saju') or {}).get('ok') is True
+          thai=d.get('thai') or {}
+          assert thai.get('ok') is True
+          assert thai.get('predictive_status')=='mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_product_promoted_numeric_lagna_and_descriptive_house_context'
+          print(label,'PASS',d.get('engine'),thai.get('engine'))
+          PY
+          }
+
+          run_calc today 2026-08-31 2026-08-31
+          run_calc week 2026-08-31 2026-09-06
+          run_calc month 2026-08-01 2026-08-31
+          run_calc year 2026-01-01 2026-12-31
+
+      - name: Verify promoted Thai Lagna and safety gates on production calculation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/today_calc.json'))
+          s=((d.get('thai') or {}).get('suriyayat') or {})
+          lagna=s.get('lagna') or {}
+          assert lagna.get('available') is True
+          assert lagna.get('interpretation_scope')=='descriptive_nonpredictive_house_context_only'
+          assert lagna.get('predictive_interpretation_allowed') is False
+          assert lagna.get('event_judgement_allowed') is False
+          assert lagna.get('timing_prediction_allowed') is False
+          assert lagna.get('probability_allowed') is False
+          assert lagna.get('scores_allowed') is False
+          promo=s.get('lagna_product_promotion') or {}
+          gate=promo.get('promotion_gate') or {}
+          assert gate.get('numeric_lagna_product_allowed') is True
+          assert gate.get('descriptive_house_context_allowed') is True
+          assert gate.get('gemini_descriptive_packet_allowed') is True
+          for key in ('school_policy_allowed','exception_application_allowed','net_valence_allowed','final_good_bad_judgement_allowed','predictive_interpretation_allowed','event_judgement_allowed','timing_prediction_allowed','probability_allowed','scores_allowed'):
+              assert gate.get(key) is False,(key,gate.get(key))
+          packet=s.get('ai_safe_packet_product') or {}
+          assert packet.get('available') is True
+          assert packet.get('eligible_for_gemini') is True
+          assert packet.get('research_only') is False
+          assert packet.get('route_count')==12
+          assert len(packet.get('routes') or [])==12
+          assert s.get('interpretation_status')=='planetary_position_facts_plus_promoted_numeric_lagna_and_whitelisted_nonpredictive_house_context'
+          print('lagna=',lagna.get('display'))
+          print('Thai product promotion PASS; route_count=',packet.get('route_count'))
+          PY
+
+      - name: One production Gemini interpretation smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://astro-app-api-f7fn.onrender.com'
+          jq -nc --slurpfile c /tmp/today_calc.json '{calculation:$c[0],model:"gemini-3.7-flash"}' > /tmp/interpret_req.json
+          curl -fsS --max-time 90 -H 'Content-Type: application/json' --data-binary @/tmp/interpret_req.json "$API/v1/fortune/interpret/start" > /tmp/ai_start.json
+          job=$(jq -r '.job_id' /tmp/ai_start.json)
+          test -n "$job"; test "$job" != null
+          echo "ai_job=$job"
+          doneflag=0
+          for i in $(seq 1 60); do
+            curl -fsS --max-time 60 "$API/v1/fortune/interpret/jobs/$job" > /tmp/ai_job.json
+            status=$(jq -r '.status' /tmp/ai_job.json)
+            if [ "$status" = done ]; then doneflag=1; break; fi
+            if [ "$status" = failed ]; then cat /tmp/ai_job.json; exit 1; fi
+            sleep 5
+          done
+          test "$doneflag" = "1"
+          python - <<'PY'
+          import json,re
+          j=json.load(open('/tmp/ai_job.json'))
+          r=j.get('result') or {}
+          assert r.get('ok') is True,r
+          assert r.get('interpreter_version')=='mobile-ai-v2.8-thai-output-guard-retry-fallback',r.get('interpreter_version')
+          data=r.get('data') or {}
+          thai=((data.get('systems') or {}).get('thai') or '').strip()
+          assert thai,'Thai explanation was blank/fallback-only'
+          text=json.dumps(data,ensure_ascii=False)
+          assert not re.search(r'(?<!\d)(?:100|\d{1,2})(?:\.\d+)?\s*%',text),text[:500]
+          forbidden=['대길','대흉','길흉 점수']
+          assert not any(x in text for x in forbidden)
+          print('Gemini PASS')
+          print('model=',r.get('model'))
+          print('retry=',r.get('thai_safety_retry',False),'fallback=',r.get('thai_safety_fallback',False))
+          print('thai=',thai[:500])
+          print('headline=',data.get('headline'))
+          print('usage=',r.get('usage'))
+          PY
+
+      - name: Final production smoke marker
+        run: echo POSTMERGE_THAI_PRODUCTION_SMOKE_PASS
