@@ -1,0 +1,112 @@
+name: Thai houses Phase 2A calculation integration
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-houses-phase2a-integrate-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Attach research-only whole-sign houses to Thai calculation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          old_import = 'from thai_lagna_v1 import ENGINE_VERSION as LAGNA_RESEARCH_ENGINE_VERSION, build_suriyayat_lagna_research\n'
+          new_import = old_import + 'from thai_houses_v1 import build_whole_sign_houses_research\n'
+          if old_import not in text:
+              raise SystemExit('Thai Lagna import anchor missing')
+          text = text.replace(old_import, new_import, 1)
+
+          old_block = '''    lagna_research = build_suriyayat_lagna_research(\n        birth_date=birth_date,\n        birth_time=birth_time,\n        latitude=latitude,\n        longitude=longitude,\n        utc_offset_hours=utc_offset_hours,\n    )\n    return {'''
+          new_block = '''    lagna_research = build_suriyayat_lagna_research(\n        birth_date=birth_date,\n        birth_time=birth_time,\n        latitude=latitude,\n        longitude=longitude,\n        utc_offset_hours=utc_offset_hours,\n    )\n    houses_research: dict[str, Any] = {\n        "available": False,\n        "research_only": True,\n        "reason": "A validated Lagna numeric position is required before whole-sign house research can be built.",\n        "promotion_gate": {\n            "houses_allowed_in_product": False,\n            "gemini_interpretation_allowed": False,\n        },\n    }\n    if (\n        lagna_research.get("available")\n        and (lagna_research.get("validation") or {}).get("global_coordinates_independently_validated") is True\n    ):\n        selected = lagna_research.get("common_anto_0600_lmt") or {}\n        if selected.get("available") and selected.get("longitude_deg") is not None:\n            houses_research = build_whole_sign_houses_research(\n                lagna_longitude_deg=float(selected["longitude_deg"]),\n                planet_positions=natal.get("positions") or {},\n            )\n    return {'''
+          if old_block not in text:
+              raise SystemExit('lagna research construction anchor missing')
+          text = text.replace(old_block, new_block, 1)
+
+          old_return = '        "lagna_research": lagna_research,\n        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_research",'
+          new_return = '        "lagna_research": lagna_research,\n        "houses_research": houses_research,\n        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_and_house_research",'
+          if old_return not in text:
+              raise SystemExit('suriyayat return anchor missing')
+          text = text.replace(old_return, new_return, 1)
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('thai_houses_v1.py')
+          text = path.read_text(encoding='utf-8')
+          old = '        "validation_status": "structural_rule_under_phase2a_test",\n        "promotion_gate": {\n            "lagna_numeric_position_required": True,'
+          new = '        "validation_status": "whole_sign_rule_documented_structure_tested_research_only",\n        "reference_rule": "MyHora Thai astrology help: house equals 30-degree zodiac sign; the Lagna sign is house 1 (Whole Sign).",\n        "promotion_gate": {\n            "lagna_numeric_position_required": True,\n            "house_structure_rule_documented": True,'
+          if old not in text:
+              raise SystemExit('house metadata anchor missing')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+      - name: Run house unit tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_houses_v1.py' -v
+      - name: Run house integration tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_houses_integration.py' -v
+      - name: Run Lagna regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
+      - name: Run AI research isolation regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_ai_thai_research_isolation.py' -v
+      - name: Compile touched modules
+        run: python -m py_compile thai_houses_v1.py thai_lagna_v1.py thai_astrology_v2.py ai_interpret_v1.py
+      - name: Verify product and interpretation gates remain closed
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from datetime import date,time
+          from thai_astrology_v2 import build_thai_fortune
+          r=build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )['suriyayat']
+          assert r['lagna']['available'] is False
+          assert r['lagna_research']['promotion_gate']['houses_allowed'] is False
+          assert r['houses_research']['research_only'] is True
+          assert r['houses_research']['promotion_gate']['house_structure_rule_documented'] is True
+          assert r['houses_research']['promotion_gate']['house_structure_interpretation_validated'] is False
+          assert r['houses_research']['promotion_gate']['houses_allowed_in_product'] is False
+          assert r['houses_research']['promotion_gate']['dignities_allowed'] is False
+          assert r['houses_research']['promotion_gate']['aspects_allowed'] is False
+          assert r['houses_research']['promotion_gate']['gemini_interpretation_allowed'] is False
+          print('PHASE2A_CALCULATION_CONNECTED_INTERPRETATION_BLOCKED')
+          PY
+      - name: Check whitespace
+        run: git diff --check
+      - name: Commit Phase 2A integration and clean workflow
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_houses_v1.py tests/test_thai_houses_integration.py
+          git rm -f .github/workflows/thai-houses-phase2a-integrate-once.yml
+          git commit -m 'research: connect Thai whole-sign houses to calculation diagnostics'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
