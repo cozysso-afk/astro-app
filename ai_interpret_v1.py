@@ -12,8 +12,14 @@ from thai_lagna_product_v1 import (
     lagna_numeric_identity_is_valid,
     product_routes_are_complete,
 )
+from thai_ai_output_guard_v1 import (
+    build_thai_output_fallback,
+    inspect_thai_output_safety,
+    strict_thai_retry_instruction,
+    thai_output_guard_required,
+)
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.7-thai-lagna-fail-closed"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.8-thai-output-guard-retry-fallback"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -372,16 +378,19 @@ OUTPUT_SHAPE = {
 }
 
 
-def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, timeout_seconds: float = 24.0, thinking_level: str = "high") -> dict[str, Any]:
+def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, timeout_seconds: float = 24.0, thinking_level: str = "high", strict_thai_output_guard: bool = False) -> dict[str, Any]:
     safe_model = urllib.parse.quote(model_name, safe="-._")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent"
+    compact_calculation = _compact_calculation(calculation)
+    strict_instruction = strict_thai_retry_instruction() if strict_thai_output_guard else ""
     prompt = (
         "아래 통합 계산 결과를 종합 해석해. 생활·관계·학업·진로·금전·투자 분야를 빠짐없이 채워. "
         "현재 데이터에 없는 시간대나 천체 사건은 만들지 마.\n\n"
         "OUTPUT_SHAPE:\n"
         + json.dumps(OUTPUT_SHAPE, ensure_ascii=False, separators=(",", ":"))
         + "\n\nCALCULATED_DATA:\n"
-        + json.dumps(_compact_calculation(calculation), ensure_ascii=False, separators=(",", ":"), default=str)
+        + json.dumps(compact_calculation, ensure_ascii=False, separators=(",", ":"), default=str)
+        + strict_instruction
     )
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
@@ -418,6 +427,22 @@ def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, t
         validated = _validate_output(parsed)
         if not validated:
             return {"ok": False, "error": "AI 해설 응답 구조를 검증하지 못했어.", "model": model_name}
+        guard = inspect_thai_output_safety(
+            validated,
+            thai_packet_present=thai_output_guard_required(compact_calculation),
+        )
+        if not guard.get("safe"):
+            return {
+                "ok": False,
+                "error": "Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",
+                "model": model_name,
+                "interpreter_version": AI_INTERPRETER_VERSION,
+                "thinking_level": thinking_level,
+                "output_guard_failed": True,
+                "guard_violations": guard.get("violations") or [],
+                "guard_engine": guard.get("guard_engine"),
+                "unsafe_data": validated,
+            }
         usage = raw.get("usageMetadata", {}) if isinstance(raw, dict) else {}
         prompt_tokens = int(usage.get("promptTokenCount", 0) or 0)
         candidate_tokens = int(usage.get("candidatesTokenCount", 0) or 0)
@@ -468,6 +493,65 @@ def _call_model(calculation: dict[str, Any], model_name: str, api_key: str, *, t
         return {"ok": False, "error": f"AI 해설 호출 실패: {type(exc).__name__}: {exc}", "model": model_name}
 
 
+def _call_model_with_thai_output_safety(
+    calculation: dict[str, Any],
+    model_name: str,
+    api_key: str,
+    *,
+    timeout_seconds: float,
+    thinking_level: str,
+) -> dict[str, Any]:
+    """Retry a Thai output violation once, then omit Thai explanation safely."""
+    first = _call_model(
+        calculation,
+        model_name,
+        api_key,
+        timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
+        strict_thai_output_guard=False,
+    )
+    if first.get("output_guard_failed") is not True:
+        return first
+
+    retry = _call_model(
+        calculation,
+        model_name,
+        api_key,
+        timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
+        strict_thai_output_guard=True,
+    )
+    if retry.get("ok"):
+        retry["thai_safety_retry"] = True
+        retry["thai_safety_retry_reason"] = "output_guard"
+        return retry
+
+    unsafe = retry.get("unsafe_data") if isinstance(retry.get("unsafe_data"), dict) else first.get("unsafe_data")
+    fallback = build_thai_output_fallback(unsafe)
+    fallback_validated = _validate_output(fallback) if isinstance(fallback, dict) else None
+    fallback_guard = (
+        inspect_thai_output_safety(fallback_validated, thai_packet_present=True)
+        if fallback_validated
+        else {"safe": False}
+    )
+    if fallback_validated and fallback_guard.get("safe"):
+        return {
+            "ok": True,
+            "data": fallback_validated,
+            "model": retry.get("model") or first.get("model") or model_name,
+            "interpreter_version": AI_INTERPRETER_VERSION,
+            "thinking_level": retry.get("thinking_level") or first.get("thinking_level") or thinking_level,
+            "thai_safety_retry": True,
+            "thai_safety_fallback": True,
+            "thai_safety_retry_error": retry.get("error"),
+            "thai_safety_guard_violations": retry.get("guard_violations") or first.get("guard_violations") or [],
+        }
+
+    retry["thai_safety_retry"] = True
+    retry["thai_safety_fallback_failed"] = True
+    return retry
+
+
 def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: str | None = None) -> dict[str, Any]:
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -477,11 +561,11 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
     # Render free workers were observed to recycle around a ~40s long outbound
     # generation. Keep each model call well below that boundary. The primary
     # retains high thinking; fallback uses medium thinking to guarantee a result.
-    primary = _call_model(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")
+    primary = _call_model_with_thai_output_safety(calculation, model, api_key, timeout_seconds=22.0, thinking_level="high")
     if primary.get("ok") or model == AI_FALLBACK_MODEL:
         return primary
 
-    fallback = _call_model(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=16.0, thinking_level="medium")
+    fallback = _call_model_with_thai_output_safety(calculation, AI_FALLBACK_MODEL, api_key, timeout_seconds=16.0, thinking_level="medium")
     if fallback.get("ok"):
         fallback["fallback_from"] = model
         fallback["fallback_reason"] = primary.get("error")
