@@ -1,0 +1,55 @@
+name: Thai Lagna independent Duduang probe
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - .github/workflows/thai-lagna-duduang-probe.yml
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check requests beautifulsoup4
+      - name: Inspect independent calculator form and scripts
+        run: |
+          python - <<'PY'
+          import requests
+          from bs4 import BeautifulSoup
+          url='https://www.duduang.com/%E0%B9%82%E0%B8%AB%E0%B8%A3%E0%B8%B2%E0%B8%A8%E0%B8%B2%E0%B8%AA%E0%B8%95%E0%B8%A3%E0%B9%8C%E0%B9%84%E0%B8%97%E0%B8%A2/'
+          r=requests.get(url,timeout=30,headers={'User-Agent':'Mozilla/5.0'})
+          print('HTTP',r.status_code,'FINAL',r.url,'BYTES',len(r.content))
+          r.raise_for_status()
+          soup=BeautifulSoup(r.text,'html.parser')
+          for i,form in enumerate(soup.find_all('form')):
+            print('\nFORM',i,'action=',form.get('action'),'method=',form.get('method'),'id=',form.get('id'),'class=',form.get('class'))
+            for tag in form.find_all(['input','select','button','textarea']):
+              print('FIELD',tag.name,'name=',tag.get('name'),'id=',tag.get('id'),'type=',tag.get('type'),'value=',tag.get('value'))
+              if tag.name=='select':
+                opts=[(o.get('value'),o.get_text(' ',strip=True)) for o in tag.find_all('option')[:8]]
+                print('OPTIONS',opts)
+          print('\nSCRIPTS')
+          for script in soup.find_all('script'):
+            src=script.get('src')
+            if src: print(src)
+            elif script.string and any(k in script.string.lower() for k in ['ajax','fetch(','latitude','longitude','horoscope']):
+              print('INLINE',script.string[:2500])
+          PY
+      - name: Clean probe workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/thai-lagna-duduang-probe.yml
+          git commit -m 'chore: clean independent Duduang probe'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
