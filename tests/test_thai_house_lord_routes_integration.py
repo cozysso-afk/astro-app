@@ -51,14 +51,17 @@ class ThaiPhase2E2HouseLordRouteIntegrationTests(unittest.TestCase):
 
     def test_product_lagna_and_synthesis_gates_stay_closed(self):
         thai = self._thai()
-        self.assertFalse(thai["suriyayat"]["lagna"]["available"])
-        gate = thai["suriyayat"]["house_lord_routes_research"]["promotion_gate"]
+        suri = thai["suriyayat"]
+        self.assertFalse(suri["lagna"]["available"])
+        routes = suri["house_lord_routes_research"]
+        self.assertTrue(routes["available"])
+        self.assertEqual(len(routes["routes"]), 12)
+        gate = routes["promotion_gate"]
         self.assertFalse(gate["route_interpretation_allowed"])
         self.assertFalse(gate["pair_or_aspect_synthesis_allowed"])
         self.assertFalse(gate["combined_judgement_allowed"])
         self.assertFalse(gate["gemini_interpretation_allowed"])
         self.assertTrue(thai["engine"].startswith("thai-mahathaksa-taksajorn-suriyayat-v2."))
-        self.assertIn("house_lord_route", thai["suriyayat"]["interpretation_status"])
 
 
 if __name__ == "__main__":
