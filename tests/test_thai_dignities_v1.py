@@ -60,9 +60,15 @@ class ThaiDignityPhase2B1Tests(unittest.TestCase):
             "uranus": {"sign_index": 1},
         })
         for key in ("thai_ketu", "uranus"):
-            self.assertFalse(result["planets"][key]["supported"])
-            self.assertEqual(result["planets"][key]["statuses"], [])
-            self.assertIn("No validated basic dignity table", result["planets"][key]["unsupported_reason"])
+            planet = result["planets"][key]
+            self.assertFalse(planet["supported"])
+            self.assertEqual(planet["statuses"], [])
+            self.assertEqual(planet.get("advanced_standards"), [])
+            reason = planet["unsupported_reason"]
+            self.assertIsInstance(reason, str)
+            self.assertIn("No validated", reason)
+            self.assertIn("table", reason)
+            self.assertIn("research layer", reason)
 
     def test_house_lords_follow_whole_sign_house_rows(self):
         houses = [
