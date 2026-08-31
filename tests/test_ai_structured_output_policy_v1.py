@@ -51,7 +51,7 @@ class GeminiStructuredOutputPolicyTests(unittest.TestCase):
         request = urlopen.call_args.args[0]
         body = json.loads(request.data.decode("utf-8"))
         config = body["generationConfig"]
-        self.assertEqual(config["maxOutputTokens"], 16000)
+        self.assertEqual(config["maxOutputTokens"], 12000)
         self.assertEqual(config["responseMimeType"], "application/json")
         self.assertEqual(config["responseSchema"], ai.AI_RESPONSE_SCHEMA)
         self.assertNotIn("additionalProperties", json.dumps(config["responseSchema"]))
@@ -77,14 +77,35 @@ class GeminiStructuredOutputPolicyTests(unittest.TestCase):
                 "gemini-3.6-flash",
                 "test-key",
                 timeout_seconds=34.0,
-                thinking_level="medium",
+                thinking_level="low",
                 compact_output=True,
             )
 
         self.assertTrue(result["ok"])
         body = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
-        self.assertEqual(body["generationConfig"]["maxOutputTokens"], 10000)
+        self.assertEqual(body["generationConfig"]["maxOutputTokens"], 8000)
         self.assertIn("각 문자열은 한 문장으로 압축", body["contents"][0]["parts"][0]["text"])
+
+    def test_transport_failure_preserves_elapsed_request_diagnostics(self):
+        with patch(
+            "ai_interpret_v1.urllib.request.urlopen",
+            side_effect=TimeoutError("test timeout"),
+        ):
+            result = ai._call_model(
+                {},
+                "gemini-3.6-flash",
+                "test-key",
+                timeout_seconds=34.0,
+                thinking_level="low",
+                compact_output=True,
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["timeout_seconds"], 34.0)
+        self.assertEqual(result["thinking_level"], "low")
+        self.assertTrue(result["compact_output"])
+        self.assertGreater(result["request_chars"], 0)
+        self.assertGreaterEqual(result["elapsed_seconds"], 0)
 
     def test_truncated_json_preserves_finish_reason_and_usage_for_diagnosis(self):
         truncated = '{"headline":"핵심","overall":{"summary":"끝나지 않은 문장'

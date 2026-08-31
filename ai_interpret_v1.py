@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,16 +20,16 @@ from thai_ai_output_guard_v1 import (
     thai_output_guard_required,
 )
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.8.3-thai-legacy-schema-compatible"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.8.4-thai-transport-budgeted"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
 }
 AI_DEFAULT_MODEL = "gemini-3.7-flash"
 AI_FALLBACK_MODEL = "gemini-3.6-flash"
-AI_DEFAULT_THINKING_LEVEL = "high"
-AI_MAX_OUTPUT_TOKENS = 16000
-AI_COMPACT_MAX_OUTPUT_TOKENS = 10000
+AI_DEFAULT_THINKING_LEVEL = "medium"
+AI_MAX_OUTPUT_TOKENS = 12000
+AI_COMPACT_MAX_OUTPUT_TOKENS = 8000
 TOPIC_ORDER = ["금전", "투자심리", "수익실현", "신규진입", "투자주의", "학업", "시험", "직장", "이직", "연애", "연락", "재회", "소식", "컨디션"]
 GEMINI_INTRO_END = (2026, 12, 31)
 GEMINI_INTRO_INPUT_PER_M = 0.75
@@ -84,20 +85,94 @@ def _compact_thai_ai_safe_packet(value: Any) -> dict[str, Any]:
         modifiers = []
         for item in row.get("basic_status_modifiers") or []:
             if isinstance(item, dict):
-                modifiers.append({"status_key": item.get("status_key"), "functional_direction": item.get("functional_direction")})
-        relations = []
-        for item in row.get("relation_context_tags") or []:
-            if not isinstance(item, dict):
-                continue
-            pair_classes = []
-            for pair in item.get("pair_classes") or []:
-                if isinstance(pair, dict):
-                    pair_classes.append({"key": pair.get("key"), "functional_domain": pair.get("functional_domain")})
-            relations.append({"counterpart_planet": item.get("counterpart_planet"), "relation_key": item.get("relation_key"), "pair_classes": pair_classes, "pair_multi_label": bool(item.get("pair_multi_label"))})
-        routes.append({"route_key": row.get("route_key"), "source_topic_domains": list(row.get("source_topic_domains") or []), "carrier_planet": {"key": carrier.get("key"), "archetype_domains": list(carrier.get("archetype_domains") or [])}, "destination_context_domains": list(row.get("destination_context_domains") or []), "basic_status_modifiers": modifiers, "relation_context_tags": relations, "interpretation_level": "descriptive_nonpredictive"})
+                modifiers.append({
+                    "status_key": item.get("status_key"),
+                    "functional_direction": item.get("functional_direction"),
+                })
+        routes.append({
+            "route_key": row.get("route_key"),
+            "source_topic_domains": list(row.get("source_topic_domains") or []),
+            "carrier_planet": {
+                "key": carrier.get("key"),
+                "archetype_domains": list(carrier.get("archetype_domains") or []),
+            },
+            "destination_context_domains": list(row.get("destination_context_domains") or []),
+            "basic_status_modifiers": modifiers,
+            "interpretation_level": "descriptive_nonpredictive",
+        })
     if not routes:
         return {}
     return {"engine": value.get("engine"), "mode": "descriptive_nonpredictive", "route_count": len(routes), "routes": routes}
+
+
+def _compact_thai_planet(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {key: value.get(key) for key in ("key", "label") if value.get(key) is not None}
+
+
+def _compact_thai_wheel(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    rows = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "bhumi_key": item.get("bhumi_key"),
+            "bhumi_label": item.get("bhumi_label"),
+            "planet": _compact_thai_planet(item.get("planet")),
+        })
+    return rows
+
+
+def _compact_thai_mahathaksa(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "available": value.get("available") is True,
+        "wheel": _compact_thai_wheel(value.get("wheel")),
+    }
+
+
+def _compact_thai_taksajorn(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    segments = []
+    for item in value.get("segments") or []:
+        if not isinstance(item, dict):
+            continue
+        segments.append({
+            "start": item.get("start"),
+            "end": item.get("end"),
+            "age_in_progress": item.get("age_in_progress"),
+            "annual_boriwan": _compact_thai_planet(item.get("annual_boriwan")),
+            "landed_center": bool(item.get("landed_center")),
+            "wheel": _compact_thai_wheel(item.get("wheel")),
+        })
+    return {
+        "available": value.get("available") is True,
+        "segments": segments,
+        "method_variance_note": value.get("method_variance_note"),
+    }
+
+
+def _compact_thai_position_snapshot(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    positions = value.get("positions") if isinstance(value.get("positions"), dict) else {}
+    return {
+        "instant": value.get("instant"),
+        "positions": {
+            str(planet): {
+                key: row.get(key)
+                for key in ("longitude_deg", "sign_index", "sign_ko", "degree", "minute", "display")
+                if row.get(key) is not None
+            }
+            for planet, row in positions.items()
+            if isinstance(row, dict)
+        },
+    }
 
 
 def _compact_thai_product_lagna(value: Any) -> dict[str, Any]:
@@ -134,18 +209,13 @@ def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
     """Whitelist product Suriyayat facts and exclude every research-only layer."""
     if not isinstance(value, dict):
         return {}
-    allowed = (
-        "available",
-        "engine",
-        "source_commit",
-        "time_basis",
-        "validation",
-        "natal",
-        "period_start",
-        "period_end",
-        "interpretation_status",
-    )
+    allowed = ("available", "engine", "source_commit", "time_basis", "validation", "interpretation_status")
     out = {key: value.get(key) for key in allowed if key in value}
+    out["natal"] = _compact_thai_position_snapshot(value.get("natal"))
+    period_start = _compact_thai_position_snapshot(value.get("period_start"))
+    period_end = _compact_thai_position_snapshot(value.get("period_end"))
+    out["period_start"] = period_start
+    out["period_end"] = {"same_as": "period_start"} if period_end == period_start else period_end
     out["lagna"] = _compact_thai_product_lagna(value.get("lagna"))
     if out["lagna"].get("available") is True:
         packet = _compact_thai_ai_safe_packet(value.get("ai_safe_packet_product"))
@@ -199,6 +269,7 @@ def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
 
     saju = calculation.get("saju") if isinstance(calculation.get("saju"), dict) else {}
     thai = calculation.get("thai") if isinstance(calculation.get("thai"), dict) else {}
+    thai_reliability = thai.get("reliability") if isinstance(thai.get("reliability"), dict) else {}
     profile = calculation.get("profile") if isinstance(calculation.get("profile"), dict) else {}
     return {
         "api_version": calculation.get("api_version"),
@@ -236,12 +307,25 @@ def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
             "birth_planet": thai.get("birth_planet"),
             "ruler": thai.get("ruler"),
             "rule": thai.get("rule"),
-            "mahathaksa": thai.get("mahathaksa"),
-            "taksajorn": thai.get("taksajorn"),
+            "mahathaksa": _compact_thai_mahathaksa(thai.get("mahathaksa")),
+            "taksajorn": _compact_thai_taksajorn(thai.get("taksajorn")),
             "suriyayat": _compact_thai_suriyayat(thai.get("suriyayat")),
             "predictive_status": thai.get("predictive_status"),
             "consensus_policy": thai.get("consensus_policy"),
-            "reliability": thai.get("reliability"),
+            "reliability": {
+                key: thai_reliability.get(key)
+                for key in (
+                    "weekday_rule",
+                    "mahathaksa_wheel",
+                    "taksajorn",
+                    "suriyayat_10planet_positions",
+                    "suriyayat_lagna",
+                    "suriyayat_ai_safe_packet",
+                    "suriyayat_lagna_product_promotion",
+                    "suriyayat_predictive_rules",
+                )
+                if key in thai_reliability
+            },
             "not_calculated": thai.get("not_calculated"),
         },
     }
@@ -446,6 +530,18 @@ def _call_model(
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
         method="POST",
     )
+    started = time.monotonic()
+
+    def request_diagnostics() -> dict[str, Any]:
+        return {
+            "interpreter_version": AI_INTERPRETER_VERSION,
+            "thinking_level": thinking_level,
+            "compact_output": compact_output,
+            "timeout_seconds": timeout_seconds,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+            "request_chars": len(request.data or b""),
+        }
+
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             raw = json.loads(response.read().decode("utf-8"))
@@ -471,9 +567,7 @@ def _call_model(
                 "ok": False,
                 "error": "Gemini 구조화 JSON 응답이 완결되지 않았어.",
                 "model": model_name,
-                "interpreter_version": AI_INTERPRETER_VERSION,
-                "thinking_level": thinking_level,
-                "compact_output": compact_output,
+                **request_diagnostics(),
                 "response_incomplete": True,
                 "finish_reason": candidate.get("finishReason"),
                 "json_error": f"{exc.msg} at line {exc.lineno} column {exc.colno}",
@@ -487,7 +581,12 @@ def _call_model(
             }
         validated = _validate_output(parsed)
         if not validated:
-            return {"ok": False, "error": "AI 해설 응답 구조를 검증하지 못했어.", "model": model_name}
+            return {
+                "ok": False,
+                "error": "AI 해설 응답 구조를 검증하지 못했어.",
+                "model": model_name,
+                **request_diagnostics(),
+            }
         guard = inspect_thai_output_safety(
             validated,
             thai_packet_present=thai_output_guard_required(compact_calculation),
@@ -497,8 +596,7 @@ def _call_model(
                 "ok": False,
                 "error": "Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",
                 "model": model_name,
-                "interpreter_version": AI_INTERPRETER_VERSION,
-                "thinking_level": thinking_level,
+                **request_diagnostics(),
                 "output_guard_failed": True,
                 "guard_violations": guard.get("violations") or [],
                 "guard_engine": guard.get("guard_engine"),
@@ -521,8 +619,7 @@ def _call_model(
             "ok": True,
             "data": validated,
             "model": model_name,
-            "interpreter_version": AI_INTERPRETER_VERSION,
-            "thinking_level": thinking_level,
+            **request_diagnostics(),
             "usage": {
                 "prompt_tokens": prompt_tokens,
                 "candidate_tokens": candidate_tokens,
@@ -549,9 +646,21 @@ def _call_model(
             message = "Gemini 서버가 일시적으로 불안정해."
         else:
             message = f"Gemini API 오류({exc.code})"
-        return {"ok": False, "error": message, "detail": detail, "error_code": exc.code, "model": model_name}
+        return {
+            "ok": False,
+            "error": message,
+            "detail": detail,
+            "error_code": exc.code,
+            "model": model_name,
+            **request_diagnostics(),
+        }
     except Exception as exc:
-        return {"ok": False, "error": f"AI 해설 호출 실패: {type(exc).__name__}: {exc}", "model": model_name}
+        return {
+            "ok": False,
+            "error": f"AI 해설 호출 실패: {type(exc).__name__}: {exc}",
+            "model": model_name,
+            **request_diagnostics(),
+        }
 
 
 def _call_model_with_thai_output_safety(
@@ -623,14 +732,15 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
 
     model = preferred_model if preferred_model in AI_SUPPORTED_MODELS else AI_DEFAULT_MODEL
     # Keep each outbound call below the observed ~40s Render worker risk boundary.
-    # The primary preserves high-thinking quality with enough room to finish the
-    # schema. The fallback uses a compact schema-complete response at medium.
+    # Gemini 3.7 Flash defaults to medium thinking; this structured synthesis does
+    # not need high reasoning. The emergency fallback uses low thinking and a
+    # compact schema-complete response so a long-form answer cannot starve it.
     primary = _call_model_with_thai_output_safety(
         calculation,
         model,
         api_key,
         timeout_seconds=34.0,
-        thinking_level="high",
+        thinking_level="medium",
         compact_output=False,
     )
     if primary.get("ok") or model == AI_FALLBACK_MODEL:
@@ -641,7 +751,7 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
         AI_FALLBACK_MODEL,
         api_key,
         timeout_seconds=34.0,
-        thinking_level="medium",
+        thinking_level="low",
         compact_output=True,
     )
     if fallback.get("ok"):
@@ -649,4 +759,20 @@ def interpret_integrated_fortune(calculation: dict[str, Any], preferred_model: s
         fallback["fallback_reason"] = primary.get("error")
         return fallback
     primary["fallback_error"] = fallback.get("error")
+    primary["fallback_diagnostics"] = {
+        key: fallback.get(key)
+        for key in (
+            "model",
+            "interpreter_version",
+            "thinking_level",
+            "compact_output",
+            "timeout_seconds",
+            "elapsed_seconds",
+            "request_chars",
+            "error_code",
+            "response_incomplete",
+            "finish_reason",
+        )
+        if fallback.get(key) is not None
+    }
     return primary
