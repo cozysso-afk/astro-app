@@ -35,8 +35,9 @@ from thai_aspects_v1 import build_aspect_research
 from thai_semantics_v1 import build_semantics_research
 from thai_interpretation_policy_v1 import build_interpretation_policy_research
 from thai_planet_pairs_v1 import build_planet_pair_research
+from thai_house_lord_routes_v1 import build_house_lord_routes_research
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.7-phase2e1-planetpairs-research"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.8-phase2e2-house-lord-routes-research"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -246,6 +247,11 @@ def _suriyayat_layer(
     }
     if houses_research.get("available"):
         house_lords_research = build_house_lords_research(houses_research.get("houses") or [])
+    house_lord_routes_research = build_house_lord_routes_research(
+        houses_research=houses_research,
+        house_lords_research=house_lords_research,
+        dignities_research=dignities_research,
+    )
 
     return {
         "available": True,
@@ -270,12 +276,13 @@ def _suriyayat_layer(
         "lagna_research": lagna_research,
         "houses_research": houses_research,
         "house_lords_research": house_lords_research,
+        "house_lord_routes_research": house_lord_routes_research,
         "dignities_research": dignities_research,
         "aspects_research": aspects_research,
         "planet_pairs_research": planet_pairs_research,
         "semantics_research": semantics_research,
         "interpretation_policy_research": interpretation_policy_research,
-        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_planet_pair_semantics_policy_research",
+        "interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_dignity_aspect_planet_pair_semantics_policy_research",
         "policy": "Traditional position/table/whole-sign geometry facts only. No Western-score blending, no Thai house/dignity/aspect meaning judgement, and no event probability.",
     }
 
@@ -335,7 +342,7 @@ def build_thai_fortune(
         },
         "suriyayat": suriyayat,
         "predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_research_only_lagna_house_dignity_aspect_facts",
-        "consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Traditional eight-planet archetype vocabulary and the stable multi-label pair tables (friend/enemy/element/equal-power) are research facts only. Pair overlap is preserved, including Moon-Jupiter as both element and enemy. Net pair valence, disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",
+        "consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Research now preserves the Thai house reading order as source house -> house lord -> destination house, while keeping planet archetypes and multi-label pair tables as facts only. Route interpretation, net pair valence, disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",
         "reliability": {
             "weekday_rule": "established_rule",
             "mahathaksa_wheel": "established_table_rule",
@@ -349,11 +356,12 @@ def build_thai_fortune(
             "suriyayat_semantic_vocabulary": "research_only_neutral_house_domains_and_basic_status_direction",
             "suriyayat_interpretation_consensus_registry": "research_only_preserves_source_conflicts",
             "suriyayat_planet_archetypes_and_pair_tables": "research_only_multilabel_pair_facts",
+            "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",
             "suriyayat_predictive_rules": "not_implemented",
         },
         "not_calculated": [
             "validated/promoted global-coordinate Suriyayat Lagna",
-            "Suriyayat concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",
+            "Suriyayat house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",
             "exact Suriyayat ingress scanner",
             "alternate Rahu true-school selection",
             "Suriyayat event/probability conversion",
