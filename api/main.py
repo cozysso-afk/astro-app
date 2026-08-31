@@ -75,8 +75,8 @@ class RelationshipProfile(BaseModel):
             "birth_date": self.birth_date,
             "birth_time": self.birth_time if exact_time else None,
             "time_known": exact_time,
-            "latitude": self.latitude if exact_time else None,
-            "longitude": self.longitude if exact_time else None,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "utc_offset_hours": self.utc_offset_hours,
         }
 

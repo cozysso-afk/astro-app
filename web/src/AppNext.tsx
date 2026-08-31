@@ -321,6 +321,19 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   </section>
 }
 
+const PERIOD_CACHE_TTL_DAYS: Record<PeriodKey, number> = {
+  today: 180,
+  week: 370,
+  month: 730,
+  year: 1825,
+}
+const RELATIONSHIP_AI_CACHE_TTL_DAYS = 1825
+
+function fortuneCacheTtlDays(periodKey: PeriodKey, tool: ToolKey | null) {
+  if (tool === 'integrated') return PERIOD_CACHE_TTL_DAYS.year
+  return PERIOD_CACHE_TTL_DAYS[periodKey]
+}
+
 const periods = [
   { key: 'today' as const, label: '오늘', icon: Sun },
   { key: 'week' as const, label: '주간', icon: CalendarDays },
@@ -836,7 +849,7 @@ function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', 
     `본인: ${String(user.name ?? '나')} / ${String(user.birth_date ?? '')} ${String(user.birth_time ?? '')}`,
     `본인 좌표: ${String(user.latitude ?? '')}, ${String(user.longitude ?? '')} / UTC ${String(user.utc_offset_hours ?? '')}`,
     `상대: ${String(cp.name ?? '상대')} / ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
-    `상대 좌표: ${cp.time_known ? `${String(cp.latitude ?? '')}, ${String(cp.longitude ?? '')}` : '정밀 좌표 레이어 제외'}`,
+    `상대 출생지역 좌표: ${cp.latitude != null && cp.longitude != null ? `${String(cp.latitude)}, ${String(cp.longitude)} / UTC ${String(cp.utc_offset_hours ?? '')}` : '미입력'}${cp.time_known ? '' : ' · 생시 모름: 각도·하우스 등 시간민감 레이어에서는 사용하지 않음'}`,
     '',
     '해석 원칙:',
     '- 정적 synastry(시너스트리·궁합차트)와 기간별 transit(트랜짓·현재 행성 이동)/진행 접점을 분리한다.',
@@ -1162,7 +1175,7 @@ export default function AppNext() {
     setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
   }
 
-  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = 90, requestForArchive?: Record<string, unknown>) => {
+  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = PERIOD_CACHE_TTL_DAYS.today, requestForArchive?: Record<string, unknown>) => {
     if (!jobId || aiPollRef.current === jobId) return
     aiPollRef.current = jobId
     setAiLoading(true); setAiError('')
@@ -1227,7 +1240,7 @@ export default function AppNext() {
     if (!raw) return
     try {
       const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }
-      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? 90, saved.request)
+      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
     } catch {
       window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
       setAiLoading(false)
@@ -1238,7 +1251,7 @@ export default function AppNext() {
     if (!calculation) return
     const requestForCache = requestOverride ?? { start_date: calculation.period.start, end_date: calculation.period.end }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
-    const ttlDays = selectedTool === 'integrated' || period === 'year' ? 370 : period === 'today' ? 90 : 30
+    const ttlDays = fortuneCacheTtlDays(period, selectedTool)
     if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
@@ -1397,7 +1410,7 @@ export default function AppNext() {
       if (!calculation) throw new Error(lastMessage || '정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
       setIntegratedResult(calculation)
       setIntegratedRequestSnapshot(body)
-      const calcTtlDays = selectedTool === 'integrated' || period === 'year' ? 370 : period === 'today' ? 90 : 30
+      const calcTtlDays = fortuneCacheTtlDays(period, selectedTool)
       await writeReadingCache(calculationCacheId, 'fortune-calculation', {request:body as unknown as Record<string,unknown>, result:calculation}, calcTtlDays)
       if (selectedTool === null) {
         const archiveRequest = {...body, archive_mode:'period_fortune_v16'} as unknown as Record<string,unknown>
@@ -1517,8 +1530,8 @@ export default function AppNext() {
     if (userLatitude === null || userLongitude === null) { setRelationshipError('먼저 내정보에서 본인 출생지역까지 저장해줘. 정밀 관계 계산에는 위치 좌표가 필요해.'); return }
     if (!counterpart.birthDate) { setRelationshipError('상대 생년월일은 반드시 필요해.'); return }
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
-    const counterpartLatitude = counterpart.timeKnown ? parseOptionalNumber(counterpart.latitude) : null
-    const counterpartLongitude = counterpart.timeKnown ? parseOptionalNumber(counterpart.longitude) : null
+    const counterpartLatitude = parseOptionalNumber(counterpart.latitude)
+    const counterpartLongitude = parseOptionalNumber(counterpart.longitude)
     if (counterpart.timeKnown && (counterpartLatitude === null || counterpartLongitude === null)) { setRelationshipError('상대 출생시간을 안다면 출생지역도 선택해줘. 모르면 “출생시간 모름”을 체크해줘.'); return }
     const body = {
       user: {
@@ -1598,7 +1611,7 @@ export default function AppNext() {
       if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
       if (revision !== relationshipRevisionRef.current) return
       const annotated = annotatePayload(payload)
-      await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, 370)
+      await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
       setRelationshipAi(annotated)
       setRelationshipAiCacheSource('fresh')
     } catch (error) {
@@ -1786,8 +1799,8 @@ export default function AppNext() {
         name: String(cp.name ?? ''),
         birthDate: String(cp.birth_date ?? ''),
         birthTime: known ? String(cp.birth_time ?? '').slice(0, 5) : '',
-        latitude: known && cp.latitude != null ? String(cp.latitude) : '',
-        longitude: known && cp.longitude != null ? String(cp.longitude) : '',
+        latitude: cp.latitude != null ? String(cp.latitude) : '',
+        longitude: cp.longitude != null ? String(cp.longitude) : '',
         utcOffset: String(cp.utc_offset_hours ?? 9),
         timeKnown: known,
       })
@@ -1983,12 +1996,12 @@ export default function AppNext() {
               <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
               <label className="field birth-time-field"><span>출생시간</span><input type="time" value={counterpart.birthTime} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,birthTime:e.target.value})}/></label>
-              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime})}/><span>상대 출생시간 모름 — 달·각도·다빈슨/마크스 일부 정밀 레이어는 자동 제외</span></label>
-              <KoreaBirthplaceSelector disabled={!counterpart.timeKnown} value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
+              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime})}/><span>상대 출생시간 모름 — 출생지역은 그대로 기록 가능 · Moon(달)·각도·하우스·다빈슨/마크스 등 시간민감 레이어만 자동 제외</span></label>
+              <KoreaBirthplaceSelector value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
               <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
-                <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>
-                <label className="field"><span>경도</span><input inputMode="decimal" value={counterpart.longitude} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,longitude:e.target.value,placeKey:''})}/></label>
-                <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={counterpart.utcOffset} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,utcOffset:e.target.value})}/></label>
+                <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>
+                <label className="field"><span>경도</span><input inputMode="decimal" value={counterpart.longitude} onChange={(e)=>setCounterpart({...counterpart,longitude:e.target.value,placeKey:''})}/></label>
+                <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={counterpart.utcOffset} onChange={(e)=>setCounterpart({...counterpart,utcOffset:e.target.value})}/></label>
               </div></details>
             </div>
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
