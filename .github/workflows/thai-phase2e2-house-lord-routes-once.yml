@@ -1,0 +1,188 @@
+name: Thai Phase 2E2 house-lord route research gate
+
+on:
+  push:
+    branches:
+      - feature/thai-lagna-phase1-real-20260831
+    paths:
+      - '.github/workflows/thai-phase2e2-house-lord-routes-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/thai-lagna-phase1-real-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Attach house-lord routes as research structure only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('thai_astrology_v2.py')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'from thai_planet_pairs_v1 import build_planet_pair_research\n':
+                  'from thai_planet_pairs_v1 import build_planet_pair_research\nfrom thai_house_lord_routes_v1 import build_house_lord_routes_research\n',
+              'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.7-phase2e1-planetpairs-research"':
+                  'ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.8-phase2e2-house-lord-routes-research"',
+              '    if houses_research.get("available"):\n        house_lords_research = build_house_lords_research(houses_research.get("houses") or [])\n\n    return {':
+                  '    if houses_research.get("available"):\n        house_lords_research = build_house_lords_research(houses_research.get("houses") or [])\n    house_lord_routes_research = build_house_lord_routes_research(\n        houses_research=houses_research,\n        house_lords_research=house_lords_research,\n        dignities_research=dignities_research,\n    )\n\n    return {',
+              '        "house_lords_research": house_lords_research,\n        "dignities_research": dignities_research,':
+                  '        "house_lords_research": house_lords_research,\n        "house_lord_routes_research": house_lord_routes_research,\n        "dignities_research": dignities_research,',
+              '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_dignity_aspect_planet_pair_semantics_policy_research",':
+                  '"interpretation_status": "planetary_position_facts_plus_noninterpreted_lagna_house_lord_route_dignity_aspect_planet_pair_semantics_policy_research",',
+              '"consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Traditional eight-planet archetype vocabulary and the stable multi-label pair tables (friend/enemy/element/equal-power) are research facts only. Pair overlap is preserved, including Moon-Jupiter as both element and enemy. Net pair valence, disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",':
+                  '"consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain the interpreted Thai layers. Research now preserves the Thai house reading order as source house -> house lord -> destination house, while keeping planet archetypes and multi-label pair tables as facts only. Route interpretation, net pair valence, disputed aspect percentages, advanced-standard meanings, combined judgement, event claims and Western-style probability scores remain disabled.",',
+              '            "suriyayat_planet_archetypes_and_pair_tables": "research_only_multilabel_pair_facts",\n            "suriyayat_predictive_rules": "not_implemented",':
+                  '            "suriyayat_planet_archetypes_and_pair_tables": "research_only_multilabel_pair_facts",\n            "suriyayat_house_lord_routes": "research_only_source_lord_destination_structure",\n            "suriyayat_predictive_rules": "not_implemented",',
+              '            "Suriyayat concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",':
+                  '            "Suriyayat house-lord route outcome interpretation, concrete house outcomes, advanced-standard meanings/ranking, aspect strength, net pair valence, pair-event interpretation, combined judgement",',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('missing Phase 2E2 anchor: ' + old[:140])
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install Swiss Ephemeris dependency
+        run: python -m pip install --disable-pip-version-check pyswisseph==2.10.3.2
+
+      - name: Run Phase 2E2 house-lord route tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_house_lord_routes_v1.py' -v
+
+      - name: Run Phase 2E2 integration tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_house_lord_routes_integration.py' -v
+
+      - name: Run Phase 2E1 planet pair regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_v1.py' -v
+
+      - name: Run Phase 2E1 integration regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_planet_pairs_integration.py' -v
+
+      - name: Run Phase 2D2 policy regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_v1.py' -v
+
+      - name: Run Phase 2D2 integration regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_interpretation_policy_integration.py' -v
+
+      - name: Run Phase 2D1 semantics regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_semantics_v1.py' -v
+
+      - name: Run Phase 2C regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_phase2c_labels_standards.py' -v
+
+      - name: Run dignity regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_dignities_v1.py' -v
+
+      - name: Run aspect regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_aspects_v1.py' -v
+
+      - name: Run Phase 2B integration regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_rules_phase2b_integration.py' -v
+
+      - name: Run house regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_houses*.py' -v
+
+      - name: Run Lagna regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_thai_lagna*.py' -v
+
+      - name: Run Gemini research isolation regressions
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_ai_thai_research_isolation.py' -v
+
+      - name: Compile Thai modules
+        run: python -m py_compile thai_lagna_v1.py thai_houses_v1.py thai_dignities_v1.py thai_aspects_v1.py thai_semantics_v1.py thai_interpretation_policy_v1.py thai_planet_pairs_v1.py thai_house_lord_routes_v1.py thai_astrology_v2.py ai_interpret_v1.py
+
+      - name: Verify route structure and closed synthesis gates
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, time
+          from ai_interpret_v1 import _compact_calculation
+          from thai_astrology_v2 import build_thai_fortune
+
+          thai = build_thai_fortune(
+              birth_date=date(1991,3,21), birth_time=time(7,26),
+              start_date=date(2026,8,31), end_date=date(2026,8,31),
+              utc_offset_hours=9.0, latitude=34.7604, longitude=127.6622,
+          )
+          suri = thai['suriyayat']
+          routes = suri['house_lord_routes_research']
+          assert routes['available'] is True
+          assert routes['research_only'] is True
+          assert len(routes['routes']) == 12
+          assert [x['source_house']['house_number'] for x in routes['routes']] == list(range(1,13))
+          for row in routes['routes']:
+              assert row['interpretation'] is None
+              assert row['combined_judgement'] is None
+              assert row['prediction'] is None
+              assert row['score'] is None
+          gate = routes['promotion_gate']
+          assert gate['route_structure_validated'] is True
+          assert gate['route_interpretation_allowed'] is False
+          assert gate['dignity_net_valence_allowed'] is False
+          assert gate['pair_or_aspect_synthesis_allowed'] is False
+          assert gate['combined_judgement_allowed'] is False
+          assert gate['event_judgement_allowed'] is False
+          assert gate['scores_allowed'] is False
+          assert gate['gemini_interpretation_allowed'] is False
+          assert suri['lagna']['available'] is False
+          compact_suri = _compact_calculation({'period': {'day_count': 1}, 'thai': thai})['thai']['suriyayat']
+          assert 'house_lord_routes_research' not in compact_suri
+          encoded = json.dumps(compact_suri, ensure_ascii=False)
+          assert 'subject_domain_carried_by_house_lord' not in encoded
+          assert 'placement_context_or_modifier' not in encoded
+          assert thai['engine'] == 'thai-mahathaksa-taksajorn-suriyayat-v2.8-phase2e2-house-lord-routes-research'
+          print('PHASE2E2_SOURCE_HOUSE_LORD_DESTINATION_ROUTES_PASS_SYNTHESIS_AND_GEMINI_BLOCKED')
+          PY
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit Phase 2E2 state and clean workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add thai_astrology_v2.py thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_v1.py tests/test_thai_house_lord_routes_integration.py
+          git rm -f .github/workflows/thai-phase2e2-house-lord-routes-once.yml
+          git commit -m 'research: validate Thai house-lord source destination routes'
+          git push origin HEAD:feature/thai-lagna-phase1-real-20260831
