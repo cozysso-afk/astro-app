@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-AI_INTERPRETER_VERSION = "mobile-ai-v2.3-suriyayat-position-safe"
+AI_INTERPRETER_VERSION = "mobile-ai-v2.4-suriyayat-research-isolated"
 AI_SUPPORTED_MODELS = {
     "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
     "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -38,6 +38,31 @@ def _compact_stat(value: Any) -> Any:
         if isinstance(rows, list):
             out[key] = rows[:2]
     return out
+
+
+def _compact_thai_suriyayat(value: Any) -> dict[str, Any]:
+    """Whitelist interpreted Suriyayat facts and exclude every research layer.
+
+    Lagna/house experiments intentionally live inside calculation results for
+    diagnostics, but Gemini must not see them until their separate product and
+    interpretation gates are explicitly promoted.
+    """
+    if not isinstance(value, dict):
+        return {}
+    allowed = (
+        "available",
+        "engine",
+        "source_commit",
+        "time_basis",
+        "validation",
+        "natal",
+        "period_start",
+        "period_end",
+        "lagna",
+        "interpretation_status",
+        "policy",
+    )
+    return {key: value.get(key) for key in allowed if key in value}
 
 
 def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
@@ -124,7 +149,7 @@ def _compact_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
             "rule": thai.get("rule"),
             "mahathaksa": thai.get("mahathaksa"),
             "taksajorn": thai.get("taksajorn"),
-            "suriyayat": thai.get("suriyayat"),
+            "suriyayat": _compact_thai_suriyayat(thai.get("suriyayat")),
             "predictive_status": thai.get("predictive_status"),
             "consensus_policy": thai.get("consensus_policy"),
             "reliability": thai.get("reliability"),
