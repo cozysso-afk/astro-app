@@ -2,7 +2,7 @@
 """Research-only Thai whole-sign house mapper.
 
 This module starts Phase 2-A after the Suriyayat Lagna numeric position layer
-passed independent MyHora world-coordinate validation.  It deliberately does
+passed independent MyHora world-coordinate validation. It deliberately does
 not promote house interpretation into the product.
 
 Rule under test:
@@ -12,8 +12,11 @@ Rule under test:
 - a planet's research house is determined only by its Suriyayat sign relative
   to the Lagna sign.
 
-No dignity, aspect, event score, probability, or Gemini interpretation belongs
-in this module.
+Phase 2-C additionally attaches the established Thai house names only. The
+names are labels, not permission to derive house meanings or predictions.
+
+No dignity meaning, aspect meaning, event score, probability, or Gemini
+interpretation belongs in this module.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
-ENGINE_VERSION = "thai-whole-sign-houses-research-v1.0"
+ENGINE_VERSION = "thai-whole-sign-houses-research-v1.1-house-labels"
 METHOD = "thai_whole_sign_from_validated_suriyayat_lagna"
 
 SIGNS = (
@@ -37,6 +40,22 @@ SIGNS = (
     ("Capricorn", "มกร", "염소자리"),
     ("Aquarius", "กุมภ์", "물병자리"),
     ("Pisces", "มีน", "물고기자리"),
+)
+
+# Established Thai 12-house sequence counted from Lagna.
+HOUSE_NAMES = (
+    ("tanu", "ตนุ"),
+    ("kutumba", "กฎุมพะ"),
+    ("sahajja", "สหัชชะ"),
+    ("bandhu", "พันธุ"),
+    ("putta", "ปุตตะ"),
+    ("ari", "อริ"),
+    ("patni", "ปัตนิ"),
+    ("marana", "มรณะ"),
+    ("subha", "ศุภะ"),
+    ("kamma", "กัมมะ"),
+    ("labha", "ลาภะ"),
+    ("vinasa", "วินาศ"),
 )
 
 
@@ -81,6 +100,13 @@ def _sign_payload(sign_index: int) -> dict[str, Any]:
     }
 
 
+def _house_name_payload(house_number: int) -> dict[str, Any]:
+    if not 1 <= int(house_number) <= 12:
+        raise ValueError("house_number must be within 1..12")
+    key, thai = HOUSE_NAMES[int(house_number) - 1]
+    return {"house_name_key": key, "house_name_thai": thai}
+
+
 def _resolve_object_sign(row: Mapping[str, Any]) -> int:
     if row.get("sign_index") is not None:
         sign_index = int(row["sign_index"])
@@ -106,6 +132,7 @@ def build_whole_sign_houses_research(
         sign_index = (lagna_sign + house_number - 1) % 12
         houses.append({
             "house_number": house_number,
+            **_house_name_payload(house_number),
             **_sign_payload(sign_index),
         })
 
@@ -114,11 +141,13 @@ def build_whole_sign_houses_research(
         if not isinstance(row, Mapping):
             raise ValueError(f"planet position {key!r} must be a mapping")
         sign_index = _resolve_object_sign(row)
+        house_number = house_number_for_sign(
+            lagna_sign_index=lagna_sign,
+            object_sign_index=sign_index,
+        )
         placements[str(key)] = {
-            "house_number": house_number_for_sign(
-                lagna_sign_index=lagna_sign,
-                object_sign_index=sign_index,
-            ),
+            "house_number": house_number,
+            **_house_name_payload(house_number),
             **_sign_payload(sign_index),
             "longitude_deg": (
                 _wrap360(_finite_float(row["longitude_deg"], f"{key}.longitude_deg"))
@@ -136,16 +165,18 @@ def build_whole_sign_houses_research(
         "lagna_sign": _sign_payload(lagna_sign),
         "houses": houses,
         "planet_placements": placements,
-        "validation_status": "whole_sign_rule_documented_structure_tested_research_only",
-        "reference_rule": "MyHora Thai astrology help: house equals 30-degree zodiac sign; the Lagna sign is house 1 (Whole Sign).",
+        "validation_status": "whole_sign_rule_and_house_name_sequence_documented_research_only",
+        "reference_rule": "Thai astrology: the Lagna sign is house 1 and houses follow the fixed 12-name sequence through Vinasa.",
         "promotion_gate": {
             "lagna_numeric_position_required": True,
             "house_structure_rule_documented": True,
+            "house_name_labels_validated": True,
             "house_structure_interpretation_validated": False,
+            "house_meanings_allowed": False,
             "houses_allowed_in_product": False,
             "dignities_allowed": False,
             "aspects_allowed": False,
             "gemini_interpretation_allowed": False,
         },
-        "policy": "Research structure only: whole-sign membership, no house meanings or predictive judgement.",
+        "policy": "Research structure and labels only: whole-sign membership and established house names, no house meanings or predictive judgement.",
     }
