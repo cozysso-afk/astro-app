@@ -73,6 +73,63 @@
   cursor: not-allowed;
 }
 
+.archive-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  padding: 5px;
+  border: 1px solid rgba(112, 92, 77, 0.1);
+  border-radius: 15px;
+  background: #faf6f0;
+}
+
+.archive-tab {
+  min-width: 0;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #857267;
+  background: transparent;
+  font-size: 0.77rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.archive-tab strong {
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  background: rgba(255,255,255,.72);
+}
+
+.archive-tab.active {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(88, 67, 54, .08);
+}
+
+.archive-tab.fortune.active {
+  color: #735945;
+  border-color: rgba(146, 111, 80, .14);
+  background: linear-gradient(135deg, #fffaf2, #f5eadb);
+}
+
+.archive-tab.verification.active {
+  color: #55756d;
+  border-color: rgba(86, 126, 116, .14);
+  background: linear-gradient(135deg, #edf8f3, #eef3fb);
+}
+
 .archive-empty {
   display: grid;
   justify-items: center;
@@ -86,9 +143,19 @@
   background: #fffdf9;
 }
 
+.archive-empty-verification {
+  border-color: rgba(92, 130, 121, .18);
+  color: #728c85;
+  background: linear-gradient(145deg, #fbfffd, #f4f8fb);
+}
+
 .archive-empty strong {
   color: #5a473a;
   font-size: 0.77rem;
+}
+
+.archive-empty-verification strong {
+  color: #4f6e66;
 }
 
 .archive-empty span {
@@ -107,6 +174,11 @@
   border: 1px solid rgba(92, 62, 43, 0.1);
   border-radius: 16px;
   background: #fffefa;
+}
+
+.archive-card-verification {
+  border-color: rgba(88, 126, 117, .13);
+  background: linear-gradient(145deg, #fdfffe, #f7fafc);
 }
 
 .archive-card-top {
@@ -194,6 +266,11 @@
   }
 
   .archive-actions button {
+    font-size: 0.75rem;
+  }
+
+  .archive-tab {
+    padding: 0 9px;
     font-size: 0.75rem;
   }
 }
