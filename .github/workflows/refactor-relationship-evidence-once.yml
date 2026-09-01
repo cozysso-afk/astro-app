@@ -1,0 +1,69 @@
+name: Refactor relationship evidence once
+
+on:
+  push:
+    branches:
+      - refactor/relationship-evidence-panel-20260901
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/relationship-evidence-panel-20260901
+          fetch-depth: 0
+
+      - name: Extract relationship evidence details
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app_path = Path('web/src/AppNext.tsx')
+          workflow_path = Path('.github/workflows/refactor-relationship-evidence-once.yml')
+          original = app_path.read_text()
+          text = original
+
+          start_marker = '              <details className="result-card relationship-evidence-details">'
+          end_marker = '              {!partnerTimeExact ? <section className="result-card">'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          old_block = text[start:end]
+          if '기본 관계 구조 · 계산 근거 펼치기' not in old_block or 'natalAspects.slice(0,8)' not in old_block:
+              raise SystemExit('Unexpected relationship evidence block')
+
+          text = text[:start] + '              <RelationshipEvidenceDetails aspects={natalAspects} />\n' + text[end:]
+
+          count_block = """  const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length\n  const natalChallenging = natalAspects.filter((aspect) => aspect.tone === 'challenging').length\n  const natalMixed = natalAspects.filter((aspect) => aspect.tone === 'mixed').length\n"""
+          if count_block not in text:
+              raise SystemExit('Derived evidence counters not found')
+          text = text.replace(count_block, '', 1)
+
+          import_anchor = "import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'\n"
+          if import_anchor not in text:
+              raise SystemExit('RelationshipEvidenceDetails import anchor missing')
+          text = text.replace(import_anchor, import_anchor + "import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'\n", 1)
+
+          app_path.write_text(text)
+          workflow_path.unlink()
+          print(f'AppNext bytes: {len(original.encode())} -> {len(text.encode())}')
+          PY
+
+      - name: Build web
+        working-directory: web
+        run: npm ci && npm run build
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/AppNext.tsx web/src/RelationshipEvidenceDetails.tsx .github/workflows/refactor-relationship-evidence-once.yml
+          git diff --cached --check
+          git commit -m "refactor(web): extract relationship evidence details"
+          git push origin HEAD:refactor/relationship-evidence-panel-20260901
