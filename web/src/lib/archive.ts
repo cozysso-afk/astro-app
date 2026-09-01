@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { ensureSupabaseSession, supabase } from './supabase'
 
 export type ArchiveKind = 'integrated' | 'compatibility' | 'marriage' | 'precision' | 'daily' | 'outcome'
 export type ArchivePeriod = 'today' | 'week' | 'month' | 'year'
@@ -103,15 +103,12 @@ function upsertLocal(item: ArchiveItem): LocalPersistResult {
 
 async function ensureArchiveUser() {
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError) return { userId: null as string | null, error: sessionError.message }
-    if (sessionData.session?.user?.id) return { userId: sessionData.session.user.id, error: null as string | null }
-
-    const { data, error } = await supabase.auth.signInAnonymously()
-    if (error || !data.user?.id) {
-      return { userId: null as string | null, error: error?.message || '익명 사용자 세션을 만들지 못했어.' }
+    const session = await ensureSupabaseSession()
+    const userId = session.user?.id
+    if (!userId) {
+      return { userId: null as string | null, error: '익명 사용자 세션에 사용자 ID가 없어.' }
     }
-    return { userId: data.user.id, error: null as string | null }
+    return { userId, error: null as string | null }
   } catch (error) {
     return { userId: null as string | null, error: error instanceof Error ? error.message : '클라우드 기록 세션을 확인하지 못했어.' }
   }

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type Session } from '@supabase/supabase-js'
 
 const DEFAULT_SUPABASE_URL = 'https://dbynfabwfcakxayyggzi.supabase.co'
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
@@ -15,7 +15,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 })
 
-export async function ensureSupabaseSession() {
+let sessionBootstrap: Promise<Session> | null = null
+
+async function createOrGetSession(): Promise<Session> {
   const current = await supabase.auth.getSession()
   if (current.error) throw current.error
   if (current.data.session) return current.data.session
@@ -25,4 +27,15 @@ export async function ensureSupabaseSession() {
     throw created.error ?? new Error('클라우드 기록 세션을 만들지 못했어.')
   }
   return created.data.session
+}
+
+export async function ensureSupabaseSession(): Promise<Session> {
+  if (sessionBootstrap) return sessionBootstrap
+
+  sessionBootstrap = createOrGetSession()
+  try {
+    return await sessionBootstrap
+  } finally {
+    sessionBootstrap = null
+  }
 }
