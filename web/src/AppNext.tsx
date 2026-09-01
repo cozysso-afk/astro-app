@@ -41,6 +41,7 @@ import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AiInterpretationPanel } from './AiInterpretationPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
+import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { ArchiveView } from './ArchiveView'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
@@ -492,9 +493,6 @@ export default function AppNext() {
   const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)
   const rawNatalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
   const natalAspects = partnerTimeExact ? rawNatalAspects : rawNatalAspects.filter((aspect) => !relationshipTimeSensitivePoints.has(aspect.a) && !relationshipTimeSensitivePoints.has(aspect.b))
-  const natalSupportive = natalAspects.filter((aspect) => aspect.tone === 'supportive').length
-  const natalChallenging = natalAspects.filter((aspect) => aspect.tone === 'challenging').length
-  const natalMixed = natalAspects.filter((aspect) => aspect.tone === 'mixed').length
   const orderedIntegratedTopics = integratedResult
     ? coreTopicOrder
         .map((topic) => ({ topic, stat: integratedResult.western.overall[topic] }))
@@ -1408,20 +1406,7 @@ export default function AppNext() {
                 {title:'내 행성 → 상대 하우스',rows:relationshipResult.result.house_overlays.user_in_counterpart?.relationship_houses??[]},
                 {title:'상대 행성 → 내 하우스',rows:relationshipResult.result.house_overlays.counterpart_in_user?.relationship_houses??[]},
               ].map((group)=><div className="month-card" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 관계 하우스 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · 플라시두스 {row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></section>}
-              <details className="result-card relationship-evidence-details">
-                <summary>기본 관계 구조 · 계산 근거 펼치기</summary>
-                <div className="relationship-evidence-body">
-                <div className="result-card-title"><span>기본 궁합</span><strong>계산 근거</strong></div>
-                <p className="result-note">아래 숫자는 관계 점수나 재회 확률이 아니라, 허용 오브 안에서 포착된 주요 천체 각의 개수야.</p>
-                <div className="metric-grid">
-                  <div className="metric"><strong>{natalAspects.length}</strong><span>주요 각</span></div>
-                  <div className="metric"><strong>{natalSupportive}</strong><span>조화 각</span></div>
-                  <div className="metric"><strong>{natalChallenging}</strong><span>긴장 각</span></div>
-                </div>
-                {natalMixed>0 && <p className="result-note">혼합 각 {natalMixed}개 · 개수만으로 관계의 좋고 나쁨을 판정하지 않아.</p>}
-                <div className="aspect-list">{natalAspects.slice(0,8).map((aspect,index)=><div className="aspect-row" key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><span className={`tone-dot ${aspect.tone}`}/><div><strong>{aspectText(aspect)}</strong><span>오브 {aspect.orb.toFixed(2)}° · {aspect.tone==='supportive'?'조화':aspect.tone==='challenging'?'긴장':'혼합'}</span></div></div>)}</div>
-                </div>
-              </details>
+              <RelationshipEvidenceDetails aspects={natalAspects} />
               {!partnerTimeExact ? <section className="result-card">
                 <div className="result-card-title"><span>정밀도</span><strong>출생시간 미상 · 일부 시기층 제외</strong></div>
                 <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간을 몰라 진행 궁합차트·진행 합성차트·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 입력한 출생지역은 기록에 보존하지만 시간민감 각도·하우스 계산에는 사용하지 않아. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
