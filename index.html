@@ -64,8 +64,31 @@
     const PUSH_ENABLED_MARKER = 'astro_push_enabled_v1';
 
     function launchedFromHomeScreen() {
-      return window.navigator.standalone === true ||
-             window.matchMedia('(display-mode: standalone)').matches;
+      try {
+        if (window.navigator.standalone === true) return true;
+        return typeof window.matchMedia === 'function' &&
+               window.matchMedia('(display-mode: standalone)').matches;
+      } catch (error) {
+        console.warn('Standalone mode detection failed', error);
+        return false;
+      }
+    }
+
+    function readPushEnabled() {
+      try {
+        return window.localStorage.getItem(PUSH_ENABLED_MARKER) === '1';
+      } catch (error) {
+        console.warn('Push marker read failed', error);
+        return false;
+      }
+    }
+
+    function rememberPushEnabled() {
+      try {
+        window.localStorage.setItem(PUSH_ENABLED_MARKER, '1');
+      } catch (error) {
+        console.warn('Push marker save failed', error);
+      }
     }
 
     function pushConfig() {
@@ -167,7 +190,7 @@
           await OneSignal.User.PushSubscription.optIn();
         }
         if (OneSignal.Notifications.permission && OneSignal.User.PushSubscription.optedIn) {
-          localStorage.setItem(PUSH_ENABLED_MARKER, '1');
+          rememberPushEnabled();
           if (status) status.textContent = '✅ 알림이 켜졌어. 이제 운세 알림을 받을 수 있어.';
           setTimeout(openApp, 700);
         } else {
@@ -194,7 +217,7 @@
       if (!standalone) return;
 
       // 실제 알림을 눌러 들어온 경우나 이미 알림 설정을 마친 경우는 즉시 앱으로 보낸다.
-      if (fromPush || localStorage.getItem(PUSH_ENABLED_MARKER) === '1') {
+      if (fromPush || readPushEnabled()) {
         setTimeout(openApp, 180);
         return;
       }
@@ -209,7 +232,7 @@
       try {
         const state = await initializePush();
         if (state.supported && state.permission && state.optedIn) {
-          localStorage.setItem(PUSH_ENABLED_MARKER, '1');
+          rememberPushEnabled();
           setTimeout(openApp, 180);
           return;
         }
