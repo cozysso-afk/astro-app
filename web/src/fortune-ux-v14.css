@@ -1,4 +1,6 @@
 /* v14 · integrated result de-duplication + iOS date + luminous scores */
+.server-pill{font-size:.72rem!important;line-height:1.3!important;white-space:nowrap!important}
+.nav-item{font-size:.72rem!important}
 .birth-date-field input[type="date"],
 .birth-time-field input[type="time"],
 .date-control input[type="date"]{width:100%!important;min-width:0!important;text-align:center!important;font-variant-numeric:tabular-nums lining-nums!important;font-feature-settings:"tnum" 1,"lnum" 1!important}

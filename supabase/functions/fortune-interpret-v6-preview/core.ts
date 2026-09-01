@@ -1,11 +1,13 @@
-export const VERSION = "supabase-ai-v6-exact-jie-suriyayat-safe";
+import { compactThaiProductSuriyayat } from "./thaiContract.ts";
+
+export const VERSION = "supabase-ai-v7-thai-lagna-output-guard";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
   "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
 };
 export const DEFAULT_MODEL = "gemini-3.7-flash";
 export const FALLBACK_MODEL = "gemini-3.6-flash";
-export const TOPICS = ["금전","학업","시험","직장","이직","대인관계","연애","재회","소식","컨디션","투자심리","수익실현","신규진입","투자주의"] as const;
+export const TOPICS = ["금전","학업","시험","직장","이직","대인관계","연애","연락","재회","소식","컨디션","투자심리","수익실현","신규진입","투자주의"] as const;
 export const REL = ["수신신호","발신적합","과거인연접점"] as const;
 
 function num(v: unknown){ const n=Number(v??0); return Number.isFinite(n)?n:0; }
@@ -40,11 +42,6 @@ function wheel(w:any){
 }
 function sajuAnnual(rows:any){ return Array.isArray(rows)?rows.slice(0,6).map((x:any)=>({year:x?.year,ganzhi:x?.ganzhi,stem_ten_god:x?.stem_ten_god,branch_links:x?.branch_links??[],segment_start:x?.segment_start,segment_end_exclusive:x?.segment_end_exclusive,start_jie:x?.start_jie,start_jie_ko:x?.start_jie_ko,representative_time:x?.representative_time,boundary_note:x?.boundary_note})):[]; }
 function sajuMonthly(rows:any){ return Array.isArray(rows)?rows.slice(0,16).map((x:any)=>({calendar_month:x?.calendar_month,ganzhi:x?.ganzhi,stem_ten_god:x?.stem_ten_god,branch_links:x?.branch_links??[],segment_start:x?.segment_start,segment_end_exclusive:x?.segment_end_exclusive,representative_time:x?.representative_time,jie_name:x?.jie_name,jie_name_ko:x?.jie_name_ko,next_jie:x?.next_jie,next_jie_ko:x?.next_jie_ko,boundary_note:x?.boundary_note})):[]; }
-function suriPositions(x:any){
-  const p=x?.positions&&typeof x.positions==="object"?x.positions:{};
-  return {instant:x?.instant,suriyayat_reference_time:x?.suriyayat_reference_time,positions:Object.fromEntries(Object.entries(p).map(([k,v]:any)=>[k,{display:v?.display,longitude_deg:v?.longitude_deg}]))};
-}
-
 export function compactCalculation(calc:any){
   const w=calc?.western??{}, overall:Record<string,any>={}, rel:Record<string,any>={};
   for(const k of TOPICS){const s=compactStat(w?.overall?.[k]);if(s)overall[k]=s;}
@@ -77,7 +74,7 @@ export function compactCalculation(calc:any){
     thai:{engine:th?.engine,thai_day:th?.thai_day,birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,
       mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel)}:null,
       taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,
-      suriyayat:sy?.available?{available:true,engine:sy?.engine,time_basis:sy?.time_basis,validation:sy?.validation??null,natal:suriPositions(sy?.natal),period_start:suriPositions(sy?.period_start),period_end:suriPositions(sy?.period_end),lagna:sy?.lagna??{available:false},interpretation_status:sy?.interpretation_status,policy:sy?.policy}:null,
+      suriyayat:compactThaiProductSuriyayat(sy),
       predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
   });
 }
@@ -99,17 +96,18 @@ export const SYSTEM=`너는 '별빛의 운명'의 정밀 운세 해설자다. �
 - 사주 annual/monthly의 segment_start와 segment_end_exclusive는 立春(입춘)·節(절) 정확시각 경계다. 같은 달력 연도·월 표기가 반복되어도 구간이 다르면 절대로 합치지 않는다. 대표일로 월 전체를 뭉개지 않는다.
 - 사주의 not_calculated에 있는 신강·신약, 용신·희신·기신 등은 임의 추정하지 않는다.
 - Thai(태국점성술)의 Mahathaksa(마하탁사)·Taksajorn(탁사쫀)은 payload에 있는 8궁 배치와 실제 기간구간만 해석한다. method_variance_note가 있으면 다른 학파가 있음을 한계로 인정한다.
-- Suriyayat(수리야얏) 10행성은 교차검증된 '위치 사실층'이다. natal/period_start/period_end의 별자리·도수 변화는 사실로 설명할 수 있지만, payload에 없는 길흉·디그니티·하우스·애스펙트·사건 의미를 위치만 보고 만들어내지 않는다.
-- Suriyayat Lagna(라그나)가 available=false이면 Thai 하우스·각도점·라그나 기반 해석은 전부 금지한다.
+- Suriyayat(수리야얏) 10행성은 교차검증된 '위치 사실층'이다. 위치 변화는 사실로 설명할 수 있지만, payload에 없는 길흉·디그니티·애스펙트·사건 의미를 만들지 않는다.
+- Suriyayat Lagna(라그나)는 ai_safe_descriptive_packet이 실제 payload에 있고 12개 경로가 완전할 때만 사용한다. 그 패킷의 source house → lord → destination house 연결을 비예측형 맥락으로만 설명한다.
+- ai_safe_descriptive_packet이 없으면 Lagna·Thai 하우스를 추정하지 않는다. 패킷이 있어도 학파 예외, 최종 길흉, 사건, 정확한 미래 날짜·시각, 확률, 점수로 확장하지 않는다.
 - Western·사주·Thai는 독립 체계다. 서로 같은 주제를 실제 데이터로 지지할 때만 교차해서 말하고 숫자를 임의 합산하지 않는다.
 - 내부 JSON 키나 true/false를 사용자 문장에 노출하지 않는다. 모든 영어·한자·전문용어는 바로 괄호에 한국어 뜻/읽기를 붙인다.
 - 뻔한 심리상담 문구, 희망고문, 공포조장을 피한다. 근거가 약하면 약하다고 말한다. 한국어 반말. 출력은 JSON만 반환한다.`;
 
 const topicSchema={type:"OBJECT",properties:{verdict:{type:"STRING"},reason:{type:"STRING"},timing:{type:"STRING"},action:{type:"STRING"},avoid:{type:"STRING"},confidence:{type:"STRING",enum:["높음","보통","낮음"]},confidence_reason:{type:"STRING"}},required:["verdict","reason","timing","action","avoid","confidence","confidence_reason"]};
-export const SCHEMA:any={type:"OBJECT",properties:{headline:{type:"STRING"},overall:{type:"OBJECT",properties:{summary:{type:"STRING"},dominant_pattern:{type:"STRING"},best_phase:{type:"STRING"},caution_phase:{type:"STRING"}},required:["summary","dominant_pattern","best_phase","caution_phase"]},clusters:{type:"OBJECT",properties:{relationship:{type:"STRING"},work_study:{type:"STRING"},money_news:{type:"STRING"},investment:{type:"STRING"},condition:{type:"STRING"}},required:["relationship","work_study","money_news","investment","condition"]},contact_flow:{type:"OBJECT",properties:{incoming:{type:"STRING"},outgoing:{type:"STRING"},reconnection:{type:"STRING"}},required:["incoming","outgoing","reconnection"]},investment_reading:{type:"OBJECT",properties:{psychology:{type:"STRING"},realization:{type:"STRING"},entry:{type:"STRING"},risk:{type:"STRING"}},required:["psychology","realization","entry","risk"]},systems:{type:"OBJECT",properties:{western:{type:"STRING"},saju:{type:"STRING"},thai:{type:"STRING"}},required:["western","saju","thai"]},priorities:{type:"ARRAY",items:{type:"STRING"}},topic_analysis:{type:"OBJECT",properties:Object.fromEntries(TOPICS.map(k=>[k,topicSchema]))},limits:{type:"STRING"}},required:["headline","overall","clusters","contact_flow","investment_reading","systems","priorities","topic_analysis","limits"]};
+export const SCHEMA:any={type:"OBJECT",properties:{headline:{type:"STRING"},overall:{type:"OBJECT",properties:{summary:{type:"STRING"},dominant_pattern:{type:"STRING"},best_phase:{type:"STRING"},caution_phase:{type:"STRING"}},required:["summary","dominant_pattern","best_phase","caution_phase"]},clusters:{type:"OBJECT",properties:{relationship:{type:"STRING"},work_study:{type:"STRING"},money_news:{type:"STRING"},investment:{type:"STRING"},condition:{type:"STRING"}},required:["relationship","work_study","money_news","investment","condition"]},contact_flow:{type:"OBJECT",properties:{incoming:{type:"STRING"},outgoing:{type:"STRING"},reconnection:{type:"STRING"}},required:["incoming","outgoing","reconnection"]},investment_reading:{type:"OBJECT",properties:{psychology:{type:"STRING"},realization:{type:"STRING"},entry:{type:"STRING"},risk:{type:"STRING"}},required:["psychology","realization","entry","risk"]},systems:{type:"OBJECT",properties:{western:{type:"STRING"},saju:{type:"STRING"},thai:{type:"STRING"}},required:["western","saju","thai"]},priorities:{type:"ARRAY",items:{type:"STRING"}},topic_analysis:{type:"OBJECT",properties:Object.fromEntries(TOPICS.map(k=>[k,topicSchema])),required:[...TOPICS]},limits:{type:"STRING"}},required:["headline","overall","clusters","contact_flow","investment_reading","systems","priorities","topic_analysis","limits"]};
 
 export function validateOutput(o:any){
-  if(!o||typeof o!=="object")return null; const a:any={};
-  for(const k of TOPICS){const x=o?.topic_analysis?.[k];if(!x)continue;const c=txt(x.confidence,20);a[k]={verdict:txt(x.verdict,700),reason:txt(x.reason,1600),timing:txt(x.timing,900),action:txt(x.action,600),avoid:txt(x.avoid,600),confidence:["높음","보통","낮음"].includes(c)?c:"보통",confidence_reason:txt(x.confidence_reason,600)};}
+  if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.contact_flow||!o.investment_reading||!o.systems||!o.topic_analysis)return null; const a:any={};
+  for(const k of TOPICS){const x=o.topic_analysis[k];if(!x||typeof x!=="object")return null;const c=txt(x.confidence,20);a[k]={verdict:txt(x.verdict,700),reason:txt(x.reason,1600),timing:txt(x.timing,900),action:txt(x.action,600),avoid:txt(x.avoid,600),confidence:["높음","보통","낮음"].includes(c)?c:"보통",confidence_reason:txt(x.confidence_reason,600)};}
   return deep({headline:txt(o.headline,240),overall:{summary:txt(o?.overall?.summary,2200),dominant_pattern:txt(o?.overall?.dominant_pattern,1500),best_phase:txt(o?.overall?.best_phase,1100),caution_phase:txt(o?.overall?.caution_phase,1100)},clusters:{relationship:txt(o?.clusters?.relationship,1500),work_study:txt(o?.clusters?.work_study,1500),money_news:txt(o?.clusters?.money_news,1300),investment:txt(o?.clusters?.investment,1400),condition:txt(o?.clusters?.condition,1000)},contact_flow:{incoming:txt(o?.contact_flow?.incoming,1200),outgoing:txt(o?.contact_flow?.outgoing,1200),reconnection:txt(o?.contact_flow?.reconnection,1200)},investment_reading:{psychology:txt(o?.investment_reading?.psychology,900),realization:txt(o?.investment_reading?.realization,900),entry:txt(o?.investment_reading?.entry,900),risk:txt(o?.investment_reading?.risk,900)},systems:{western:txt(o?.systems?.western,1200),saju:txt(o?.systems?.saju,1400),thai:txt(o?.systems?.thai,1200)},priorities:Array.isArray(o?.priorities)?o.priorities.slice(0,4).map((x:any)=>txt(x,450)):[],topic_analysis:a,limits:txt(o.limits,1200)});
 }

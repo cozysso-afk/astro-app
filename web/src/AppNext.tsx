@@ -215,7 +215,7 @@ type IntegratedApiResponse = {
     rule: string
     mahathaksa?: { available:boolean; method:string; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }
     taksajorn?: { available:boolean; method:string; method_variance_note?:string; segments:Array<{ start:string; end:string; age_in_progress:number; annual_boriwan:{ key:string; number:number; thai_name:string; label:string }; landed_center:boolean; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }> }
-    suriyayat?: { available:boolean; engine:string; source_commit?:string; time_basis:string; validation?:{status:string;reference?:string;vectors?:number;dates?:number;max_delta_arcmin?:number;within_1_arcmin?:number}; natal?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_start?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_end?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; lagna?:{available:boolean;reason?:string}; interpretation_status?:string; policy?:string }
+    suriyayat?: { available:boolean; engine:string; source_commit?:string; time_basis:string; validation?:{status:string;reference?:string;vectors?:number;dates?:number;max_delta_arcmin?:number;within_1_arcmin?:number}; natal?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_start?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_end?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; lagna?:{available:boolean;reason?:string;display?:string;longitude_deg?:number;sign_index?:number;sign_ko?:string;degree?:number;minute?:number;second?:number;interpretation_scope?:string;validation?:{numeric_position_validated?:boolean;global_coordinates_independently_validated?:boolean;world_numeric_checks?:number}}; ai_safe_packet_product?:{eligible_for_gemini?:boolean;research_only?:boolean;route_count?:number;routes?:Array<{route_key?:string;interpretation_level?:string}>}; interpretation_status?:string; policy?:string }
     predictive_status: string
     consensus_policy: string
     reliability?: Record<string,string>
@@ -257,7 +257,7 @@ type AiInterpretationResponse = {
   model?: string
   fallback_from?: string
   interpreter_version?: string
-  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; billable_output_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number; price_phase?: string }
+  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; billable_output_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number; price_phase?: string; attempt_count?: number; thai_safety_retry?: boolean; thai_safety_fallback?: boolean }
   data?: {
     headline: string
     overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string }
@@ -298,7 +298,7 @@ function AiInterpretationPanel({ result, loading, error, onRetry }: {
   const usage = estimateGeminiUsage(result.usage)
   return <section className="ai-interpret-card">
     <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">Gemini(제미나이) 통합 해설</span><h3>{data.headline || '통합 계산 해설'}</h3><small>실계산 결과를 바탕으로 한 자연어 해설</small></div></div>
-    {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>최초 생성 예상치 · 저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
+    {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>누적 예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>{(usage.attempt_count??1)>1?`${usage.attempt_count}회 생성 시도 합산 · `:''}{usage.thai_safety_fallback?'Thai 안전 대체 결과 적용 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
     <p className="ai-summary">{data.overall.summary}</p>
     {data.overall.dominant_pattern && <div className="ai-highlight"><strong>핵심 패턴</strong><span>{data.overall.dominant_pattern}</span></div>}
     <div className="ai-cluster-grid">
@@ -523,7 +523,7 @@ function PeriodAiInterpretationPanel({ result, loading, error, cacheSource, onRe
       {data.overall.caution_phase && <span className="period-ai-chip">주의 흐름 · {data.overall.caution_phase}</span>}
     </div>
     <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 해설 즉시 조회 · 이번 Gemini API 재호출 0회' : '최초 해설 자동 저장 완료 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>
-    {usage?.total_tokens ? <div className="period-ai-cost"><span>최초 생성 · 입력 {(usage.prompt_tokens??0).toLocaleString()} / 출력 {(usage.candidate_tokens??0).toLocaleString()} / 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>저장본 재조회 비용 0원</small></div> : null}
+    {usage?.total_tokens ? <div className="period-ai-cost"><span>해설 생성 누적 · 입력 {(usage.prompt_tokens??0).toLocaleString()} / 출력 {(usage.candidate_tokens??0).toLocaleString()} / 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>{(usage.attempt_count??1)>1?`${usage.attempt_count}회 생성 시도 합산 · `:''}{usage.thai_safety_fallback?'Thai 안전 대체 결과 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장본 재조회 비용 0원</small></div> : null}
     <details className="period-ai-details">
       <summary>상세 해설 보기</summary>
       <div className="period-ai-detail-body">
@@ -773,7 +773,7 @@ function integratedPromptText(request: Record<string, unknown>, calculation?: In
     '- Western 점수는 사건 확률이 아니라 상대적 활성도다.',
     '- 사주는 진태양시 보정을 사용하고, 엔진이 계산하지 않은 신강·신약/용희기신 등을 임의 생성하지 않는다.',
     '- 사주 annual(세운)은 입춘, monthly(월운)은 각 절(節)의 정확시각 경계로 분할된 구간이다. 같은 달력 연도·월 이름이 반복돼도 서로 다른 구간을 임의 병합하지 않는다.',
-    '- Thai(태국점성술)는 Mahathaksa(마하탁사)·Taksajorn(탁사쫀)과 교차검증된 Suriyayat(수리야얏) 10행성 위치 사실을 독립적으로 읽는다. Lagna(라그나)·하우스·애스펙트·사건판정 규칙은 미검증이므로 만들거나 Western(서양점성술) 수치점수에 임의 합산하지 않는다.',
+    '- Thai(태국점성술)는 Mahathaksa(마하탁사)·Taksajorn(탁사쫀), 교차검증된 Suriyayat(수리야얏) 10행성 위치, 검증된 numeric Lagna(숫자 라그나)와 whitelist-only 12개 하우스 경로를 서로 구분해 읽는다. 하우스 경로는 비예측형 맥락으로만 설명하며 Western(서양점성술) 수치점수에 합산하지 않는다.',
     '',
     '[원본 API 요청 JSON]',
     JSON.stringify(request, null, 2),
@@ -781,7 +781,7 @@ function integratedPromptText(request: Record<string, unknown>, calculation?: In
     '[외부 AI 해석 지시]',
     '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 값이다. 행성 위치·하우스·점수·사주를 다시 계산하거나 임의 수정하지 말고 이 값만 근거로 해석한다.',
     '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',
-    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 mahathaksa/taksajorn/suriyayat에 실제 들어온 값만 사용한다. suriyayat.positions는 위치 사실로만 읽고 Lagna·하우스·애스펙트·사건 확률을 새로 만들지 않으며 not_calculated 항목은 추정하지 않는다.',
+    '- Thai(태국점성술)는 CALCULATED_DATA.thai의 실제 값만 사용한다. ai_safe_packet_product가 제품 계약을 만족할 때만 Lagna와 source house → lord → destination house 연결을 비예측형으로 설명한다. 학파 예외·최종 길흉·사건·정확한 미래 시기·확률·점수는 만들지 않으며 not_calculated 항목은 추정하지 않는다.',
     '- 전문용어는 한국어 뜻을 붙이고, 결론→계산 근거→현실에서 체감되는 방식→시기 순서로 설명한다.',
     '',
     '[CALCULATED_DATA · 원본 계산 JSON]',
@@ -820,7 +820,8 @@ function integratedResultText(result: IntegratedApiResponse) {
     const natal = result.thai.suriyayat.natal?.positions ?? {}
     const natalText = Object.entries(natal).map(([key,row])=>`${key} ${row.display}`).join(' · ')
     if (natalText) lines.push(`- Suriyayat 출생위치: ${natalText}`)
-    lines.push(`- Suriyayat Lagna: ${result.thai.suriyayat.lagna?.available?'계산됨':'미계산 · 글로벌 좌표 공식 검증 대기'}`)
+    lines.push(`- Suriyayat Lagna: ${result.thai.suriyayat.lagna?.available?(result.thai.suriyayat.lagna.display||'검증된 숫자 위치 계산됨'):'제품 계약 미충족 · 해설 제외'}`)
+    lines.push(`- 비예측형 하우스 경로: ${result.thai.suriyayat.ai_safe_packet_product?.eligible_for_gemini&&result.thai.suriyayat.ai_safe_packet_product?.route_count===12?'12개 검증됨':'해설 제외'}`)
   }
   lines.push(`- 예측 상태: ${result.thai.predictive_status}`)
   if (result.thai.not_calculated?.length) lines.push(`- 미계산: ${result.thai.not_calculated.join(', ')}`)
@@ -1099,9 +1100,9 @@ export default function AppNext() {
 
   const apiLabel = useMemo(() => {
     if (apiStatus === 'warming') return '계산 서버 깨우는 중'
-    if (apiStatus === 'online') return apiVersion ? `계산 서버 연결됨 · ${apiVersion}` : '계산 서버 연결됨'
+    if (apiStatus === 'online') return '계산 서버 정상'
     return '계산 서버 대기 중'
-  }, [apiStatus, apiVersion])
+  }, [apiStatus])
 
   const selectedToolInfo = selectedTool ? tools.find((tool) => tool.key === selectedTool) : null
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
@@ -1192,7 +1193,7 @@ export default function AppNext() {
             ok: true,
             model: data.model,
             fallback_from: data.fallback_from,
-            interpreter_version: data.interpreter_version || 'supabase-ai-v6-exact-jie-suriyayat-safe',
+            interpreter_version: data.interpreter_version || 'supabase-ai-v7-thai-lagna-output-guard',
             usage: data.usage ?? undefined,
             data: data.data ?? undefined,
           }
@@ -1904,7 +1905,7 @@ export default function AppNext() {
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
             <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>setIntegratedCalendarYear(Number(e.target.value))}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
             <div className="calculation-range annual-calculation-range"><CalendarDays size={17}/><span>연간 분석 {integratedStartDate} ~ {integratedSelectionEnd} · {annualFortuneYear}년 전체</span></div>
-            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀)과 교차검증된 Suriyayat(수리야얏) 10행성 위치를 계산해. Suriyayat Lagna(라그나)·하우스·예측규칙은 아직 검증 전이야.</span></div>
+            <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀), 교차검증된 Suriyayat(수리야얏) 10행성 위치와 숫자 Lagna(라그나)를 계산해. 검증된 12개 하우스 연결은 맥락 설명에만 쓰고 사건·시기·확률·점수는 예측하지 않아.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
@@ -1955,11 +1956,11 @@ export default function AppNext() {
               </section>
 
               <section className="result-card">
-                <div className="result-card-title"><span>THAI</span><strong>Mahathaksa(마하탁사) · Taksajorn(탁사쫀)</strong></div>
+                <div className="result-card-title"><span>THAI</span><strong>Mahathaksa · Taksajorn · Suriyayat Lagna</strong></div>
                 <div className="thai-baseline"><strong>{integratedResult.thai.thai_day}</strong><span>{integratedResult.thai.ruler}</span><p>{integratedResult.thai.rule}</p></div>
                 {!!integratedResult.thai.taksajorn?.segments?.length && <div className="saju-list">{integratedResult.thai.taksajorn.segments.map((seg)=><div key={`${seg.start}-${seg.end}`}><strong>{seg.start} ~ {seg.end}</strong><span>나이 진행 {seg.age_in_progress} · 연간 Boriwan(브리완) {seg.annual_boriwan.label}{seg.landed_center?' · 중앙 착지 후 Jupiter(목성) 적용':''}</span></div>)}</div>}
-                {integratedResult.thai.suriyayat?.available && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>Suriyayat(수리야얏) 10행성 위치 검증층 ON · 30개 기준값 교차검산 · 최대 오차 {integratedResult.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}각분. Lagna(라그나)는 글로벌 좌표 공식 검증 전이라 OFF.</span></div>}
-                <p className="result-note">Mahathaksa/Taksajorn은 태국 기간층, Suriyayat은 현재 검증된 10행성 위치 사실층이야. Lagna·하우스·애스펙트·사건판정은 아직 만들지 않고 Western 점수에도 섞지 않아.</p>
+                {integratedResult.thai.suriyayat?.available && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>Suriyayat(수리야얏) 10행성 위치 검증층 ON · 30개 기준값 교차검산 · 최대 오차 {integratedResult.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}각분. {integratedResult.thai.suriyayat.lagna?.available?`Lagna ${integratedResult.thai.suriyayat.lagna.display||'숫자 위치'} 검증 완료.`:'Lagna 제품 계약 미충족으로 해설 제외.'}</span></div>}
+                <p className="result-note">Mahathaksa/Taksajorn은 태국 기간층, Suriyayat은 검증된 위치 사실층이야. Lagna와 12개 하우스 연결은 비예측형 맥락만 설명하며, 학파 예외·최종 길흉·사건·정확한 미래 시기·확률·점수는 만들지 않고 Western 점수에도 섞지 않아.</p>
               </section>
 
               {integratedResult.western.months.length>1 && <section className="result-card">
@@ -2133,9 +2134,10 @@ export default function AppNext() {
                 <div className="tight-row"><span>Mahathaksa</span><b>{integratedResult.thai.mahathaksa?.available?'8궁 계산됨':'미계산'}</b></div>
                 <div className="tight-row"><span>Taksajorn</span><b>{integratedResult.thai.taksajorn?.available?'연령 기간 계산됨':'미계산'}</b></div>
                 <div className="tight-row"><span>Suriyayat 10행성 위치</span><b>{integratedResult.thai.suriyayat?.available?`교차검증됨 · 최대 Δ${integratedResult.thai.suriyayat.validation?.max_delta_arcmin ?? '—'}′`:'미계산'}</b></div>
-                <div className="tight-row"><span>Suriyayat Lagna(라그나)</span><b>{integratedResult.thai.suriyayat?.lagna?.available?'계산됨':'미계산 · 글로벌 공식 검증 대기'}</b></div>
-                <div className="tight-row"><span>예측 구현 상태</span><b>{integratedResult.thai.predictive_status}</b></div>
-                <div className="tight-row"><span>합의 정책</span><b>{integratedResult.thai.consensus_policy}</b></div>
+                <div className="tight-row"><span>Suriyayat Lagna(라그나)</span><b>{integratedResult.thai.suriyayat?.lagna?.available?(integratedResult.thai.suriyayat.lagna.display||'검증된 숫자 위치 계산됨'):'제품 계약 미충족 · 해설 제외'}</b></div>
+                <div className="tight-row"><span>하우스 설명 경로</span><b>{integratedResult.thai.suriyayat?.ai_safe_packet_product?.eligible_for_gemini&&integratedResult.thai.suriyayat.ai_safe_packet_product.route_count===12?'12개 검증됨 · 비예측 설명만':'AI 해설 제외'}</b></div>
+                <div className="tight-row"><span>설명 범위</span><b>검증된 위치·하우스 맥락만</b></div>
+                <div className="tight-row"><span>예측 제한</span><b>사건·시기·확률·점수 미제공</b></div>
                 {integratedResult.thai.taksajorn?.method_variance_note && <p className="result-note">{integratedResult.thai.taksajorn.method_variance_note}</p>}
                 {!!integratedResult.thai.not_calculated?.length && <p className="result-note">아직 미계산: {integratedResult.thai.not_calculated.join(' · ')}</p>}
               </section>
@@ -2151,9 +2153,9 @@ export default function AppNext() {
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">PERIOD FORTUNE</span><h2>{period==='today'?'오늘의 운세':`${periods.find((item)=>item.key===period)?.label}운세`}</h2><p>{queryDate} → {integratedSelectionEnd} · 선택한 기간만 따로 보는 기간 운세야.</p></div></div>
 
             {!integratedMatchesSelection && <>
-              <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 통합운세 메뉴와는 별개로 이 기간의 흐름만 계산해.</span></div>
+              <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 버튼을 누르면 계산 후 Gemini 자연어 해설도 자동 생성해. 최초 생성은 API 사용량이 발생할 수 있고, 같은 계산의 저장본 재조회는 다시 호출하지 않아.</span></div>
               {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
-              <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'기간 운세 계산 중…':`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 계산`}</span></button>
+              <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'기간 운세 계산 중…':`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 + AI 해설 생성`}</span></button>
             </>}
 
             {integratedMatchesSelection && integratedResult && <>
