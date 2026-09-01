@@ -148,7 +148,7 @@
 .integrated-topic small { font-size: .69rem; }
 .best-window span { font-size: .72rem; }
 .best-window strong { font-size: .84rem; line-height: 1.55; }
-.result-note { font-size: .76rem !important; line-height:1.58 !important; }
+.result-note { font-size: .76rem; line-height:1.58; }
 .time-detail-list { display:grid; gap:10px; }
 .time-detail-list details { border:1px solid rgba(176,181,205,.25); border-radius:15px; padding:11px 12px; background:rgba(255,255,255,.68); }
 .time-detail-list summary { font-weight:850; color:#55485f; font-size:.84rem; }
