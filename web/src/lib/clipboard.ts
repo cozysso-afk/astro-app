@@ -9,18 +9,26 @@ export async function copyToClipboard(text: string) {
   } catch {
     // iOS/private browsing fallback below.
   }
+
+  let area: HTMLTextAreaElement | null = null
   try {
-    const area = document.createElement('textarea')
+    area = document.createElement('textarea')
     area.value = text
     area.setAttribute('readonly', '')
     area.style.position = 'fixed'
     area.style.opacity = '0'
     document.body.appendChild(area)
     area.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(area)
-    return ok
+    return document.execCommand('copy')
   } catch {
     return false
+  } finally {
+    if (area?.parentNode) {
+      try {
+        area.parentNode.removeChild(area)
+      } catch {
+        // Cleanup must not turn a failed copy attempt into an app error.
+      }
+    }
   }
 }
