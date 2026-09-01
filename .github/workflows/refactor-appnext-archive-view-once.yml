@@ -42,7 +42,7 @@ jobs:
               raise SystemExit('ArchiveView import anchor missing')
           text = text.replace(import_anchor, import_anchor + "import { ArchiveView } from './ArchiveView'\n", 1)
 
-          new_block = "        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={()=>setLegacyArchiveOpen(null)} onGoHome={()=>switchMainView('home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}\n\n"
+          new_block = "        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}\n\n"
           text = text[:start] + new_block + text[end:]
           app_path.write_text(text)
           workflow_path.unlink()
