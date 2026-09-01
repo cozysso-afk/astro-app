@@ -1,0 +1,51 @@
+name: Refactor location results once
+on:
+  push:
+    branches: [refactor/location-results-20260901]
+    paths:
+      - '.github/workflows/refactor-location-results-once.yml'
+permissions:
+  contents: write
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/location-results-20260901
+          fetch-depth: 0
+      - name: Extract location results
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/AppNext.tsx')
+          w=Path('.github/workflows/refactor-location-results-once.yml')
+          s=p.read_text()
+          old_import="import { AstrocartographyWorldMap } from './AstrocartographyWorldMap'\n"
+          assert old_import in s, 'map import missing'
+          s=s.replace(old_import, '', 1)
+          anchor="import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'\n"
+          assert anchor in s, 'component import anchor missing'
+          s=s.replace(anchor, anchor+"import { LocationResults } from './LocationResults'\n", 1)
+          panel=s.index("          {selectedTool === 'location' && <section className=\"tool-panel location-panel\">")
+          start=s.index('            {locationResult && <div className="results-wrap">', panel)
+          end_marker='            </div>}\n          </section>}'
+          end=s.index(end_marker, start)
+          s=s[:start]+'            {locationResult && <LocationResults result={locationResult} annotateText={annotateUserFacingText} />}\n'+s[end+len('            </div>}\n'):]
+          p.write_text(s)
+          w.unlink()
+          PY
+          cd web
+          npm ci
+          npm run build
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/AppNext.tsx web/src/LocationResults.tsx .github/workflows/refactor-location-results-once.yml
+          git diff --cached --check
+          git commit -m "refactor(web): extract location results"
+          git push origin HEAD:refactor/location-results-20260901
