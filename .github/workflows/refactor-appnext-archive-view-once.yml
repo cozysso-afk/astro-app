@@ -49,6 +49,7 @@ jobs:
 
           print(f'AppNext bytes: {len(original.encode())} -> {len(text.encode())}')
           PY
+          nl -ba web/src/AppNext.tsx | sed -n '1605,1618p'
 
       - name: Build web
         working-directory: web
