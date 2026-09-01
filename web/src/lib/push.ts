@@ -46,19 +46,35 @@ function loadSdk() {
   if (window.__starlightOneSignal) return Promise.resolve(window.__starlightOneSignal)
   if (window.__starlightOneSignalLoading) return window.__starlightOneSignalLoading
 
-  window.__starlightOneSignalLoading = new Promise<OneSignalLike>((resolve, reject) => {
+  const loading = new Promise<OneSignalLike>((resolve, reject) => {
     window.OneSignalDeferred = window.OneSignalDeferred || []
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${SDK_URL}"]`)
-    if (!existing) {
-      const script = document.createElement('script')
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${SDK_URL}"]`)
+    let timer = 0
+    let settled = false
+    let deferred: ((oneSignal: OneSignalLike) => void | Promise<void>) | null = null
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      if (timer) window.clearTimeout(timer)
+      if (deferred && window.OneSignalDeferred) {
+        window.OneSignalDeferred = window.OneSignalDeferred.filter((callback) => callback !== deferred)
+      }
+      if (!window.__starlightOneSignal) script?.remove()
+      reject(error)
+    }
+    if (!script) {
+      script = document.createElement('script')
       script.src = SDK_URL
       script.defer = true
-      script.onerror = () => reject(new Error('알림 서비스를 불러오지 못했어.'))
+      script.onerror = () => fail(new Error('알림 서비스를 불러오지 못했어.'))
       document.head.appendChild(script)
+    } else {
+      script.onerror = () => fail(new Error('알림 서비스를 불러오지 못했어.'))
     }
 
-    const timer = window.setTimeout(() => reject(new Error('알림 서비스 연결 시간이 초과됐어.')), 12000)
-    window.OneSignalDeferred!.push(async (OneSignal) => {
+    timer = window.setTimeout(() => fail(new Error('알림 서비스 연결 시간이 초과됐어.')), 12000)
+    deferred = async (OneSignal) => {
+      if (settled) return
       try {
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
@@ -68,16 +84,22 @@ function loadSdk() {
           notifyButton: { enable: false },
           allowLocalhostAsSecureOrigin: true,
         })
+        if (settled) return
+        settled = true
         window.__starlightOneSignal = OneSignal
         window.clearTimeout(timer)
         resolve(OneSignal)
       } catch (error) {
-        window.clearTimeout(timer)
-        reject(error instanceof Error ? error : new Error(String(error)))
+        fail(error instanceof Error ? error : new Error(String(error)))
       }
-    })
+    }
+    window.OneSignalDeferred.push(deferred)
   })
-  return window.__starlightOneSignalLoading
+  window.__starlightOneSignalLoading = loading
+  void loading.catch(() => {
+    if (window.__starlightOneSignalLoading === loading) window.__starlightOneSignalLoading = undefined
+  })
+  return loading
 }
 
 function snapshot(OneSignal: OneSignalLike): PushSnapshot {
