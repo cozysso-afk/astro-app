@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
-  LoaderCircle, MapPin, Moon, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
+  LoaderCircle, MapPin, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
@@ -48,6 +48,7 @@ import { SettingsView } from './SettingsView'
 import { AppHeader, BottomNavigation } from './AppChrome'
 import { analysisTools as tools, fortunePeriods as periods, HomeControls } from './HomeControls'
 import { DailyOutcomeCard, type DailyOutcomeRecord } from './DailyOutcomeCard'
+import { PeriodFortunePanel } from './PeriodFortunePanel'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
 import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'
@@ -1493,15 +1494,17 @@ export default function AppNext() {
             </div>}
           </section>}
 
-          {selectedTool===null && <section className="tool-panel period-fortune-report">
-            <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Moon size={22}/></span><div><span className="eyebrow">PERIOD FORTUNE</span><h2>{period==='today'?'오늘의 운세':`${periods.find((item)=>item.key===period)?.label}운세`}</h2><p>{queryDate} → {integratedSelectionEnd} · 선택한 기간만 따로 보는 기간 운세야.</p></div></div>
-
-            {!integratedMatchesSelection && <>
-              <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 버튼을 누르면 계산 후 Gemini 자연어 해설도 자동 생성해. 최초 생성은 API 사용량이 발생할 수 있고, 같은 계산의 저장본 재조회는 다시 호출하지 않아.</span></div>
-              {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
-              <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?'기간 운세 계산 중…':`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 + AI 해설 생성`}</span></button>
-            </>}
-
+          {selectedTool===null && <PeriodFortunePanel
+            title={period==='today'?'오늘의 운세':`${periods.find((item)=>item.key===period)?.label}운세`}
+            startDate={queryDate}
+            endDate={integratedSelectionEnd}
+            ready={integratedMatchesSelection}
+            loading={integratedLoading}
+            offline={apiStatus==='offline'}
+            error={integratedError}
+            buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 + AI 해설 생성`}
+            onCalculate={runIntegrated}
+          >
             {integratedMatchesSelection && integratedResult && <>
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>{period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
               <PeriodAiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}/>
@@ -1541,7 +1544,7 @@ export default function AppNext() {
                 onSave={()=>void saveDailyOutcome()}
               />}
             </>}
-          </section>}
+          </PeriodFortunePanel>}
 
         </>}
 
