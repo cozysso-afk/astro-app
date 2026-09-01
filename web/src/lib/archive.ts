@@ -50,9 +50,34 @@ function loadLocal(): ArchiveItem[] {
   }
 }
 
+function isQuotaExceeded(error: unknown) {
+  return typeof DOMException !== 'undefined'
+    && error instanceof DOMException
+    && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+}
+
 function persistLocal(items: ArchiveItem[]) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 200)))
+  const unsyncedCount = items.filter((item) => !item.cloudId).length
+  let syncedBudget = Math.max(0, 200 - unsyncedCount)
+  let next = items.filter((item) => {
+    if (!item.cloudId) return true
+    if (syncedBudget <= 0) return false
+    syncedBudget -= 1
+    return true
+  })
+  while (true) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      return
+    } catch (error) {
+      if (!isQuotaExceeded(error)) throw error
+      let evictIndex = next.length - 1
+      while (evictIndex >= 0 && !next[evictIndex].cloudId) evictIndex -= 1
+      if (evictIndex < 0) throw error
+      next = next.filter((_, index) => index !== evictIndex)
+    }
+  }
 }
 
 function upsertLocal(item: ArchiveItem) {
