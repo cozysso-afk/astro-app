@@ -1015,10 +1015,10 @@ def _read_local_remember_token():
         return ""
     storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
     expression = (
-        "(()=>{"
+        "(()=>{try{"
         f"const v=localStorage.getItem({storage_name_js});"
         f"return v===null?{json.dumps(REMEMBER_EMPTY_SENTINEL)}:v;"
-        "})()"
+        f"}}catch(e){{return {json.dumps(REMEMBER_EMPTY_SENTINEL)};}}}})()"
     )
     value = streamlit_js_eval(
         js_expressions=expression,
@@ -1039,10 +1039,10 @@ def _write_local_remember_token(token):
     storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
     token_js = json.dumps(token)
     expression = (
-        "(()=>{"
+        "(()=>{try{"
         f"localStorage.setItem({storage_name_js},{token_js});"
         f"return localStorage.getItem({storage_name_js})==={token_js}?'ok':'fail';"
-        "})()"
+        "}catch(e){return 'fail';}})()"
     )
     token_fp = hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
     value = streamlit_js_eval(
@@ -1059,10 +1059,10 @@ def _delete_local_remember_token(nonce):
         return "unavailable"
     storage_name_js = json.dumps(REMEMBER_STORAGE_NAME)
     expression = (
-        "(()=>{"
+        "(()=>{try{"
         f"localStorage.removeItem({storage_name_js});"
         f"return localStorage.getItem({storage_name_js})===null?'ok':'fail';"
-        "})()"
+        "}catch(e){return 'fail';}})()"
     )
     value = streamlit_js_eval(
         js_expressions=expression,

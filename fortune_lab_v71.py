@@ -421,7 +421,7 @@ def _read_record(cache_id,suffix="gemini"):
     if streamlit_js_eval is None:
         return ""
     key_js=json.dumps(_storage_key(cache_id,suffix))
-    value=streamlit_js_eval(js_expressions=f"(()=>{{const v=localStorage.getItem({key_js});return v===null?'__EMPTY__':v;}})()",key=f"fortune_lab_read_{cache_id}_{suffix}")
+    value=streamlit_js_eval(js_expressions=f"(()=>{{try{{const v=localStorage.getItem({key_js});return v===null?'__EMPTY__':v;}}catch(e){{return '__EMPTY__';}}}})()",key=f"fortune_lab_read_{cache_id}_{suffix}")
     if value is None:
         return None
     if str(value)=="__EMPTY__":
