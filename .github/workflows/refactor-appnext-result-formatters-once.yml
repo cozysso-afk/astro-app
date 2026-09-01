@@ -45,10 +45,12 @@ jobs:
           topics_path.write_text('/* Shared fortune topic ordering for UI and copy/result output. */\n\n' + topics_exported + '\n')
           text = text[:topics_start] + text[topics_end:]
 
-          # Aspect labels + formatter are presentation-only and are shared by screen and copy output.
+          # Aspect labels + formatter are presentation-only and shared by screen/copy output.
+          # planetLabels stays exported because AppNext also uses it in the house-overlay UI.
           labels_start = text.index('const planetLabels:')
           labels_end = text.index('const hanjaReading:', labels_start)
           labels_block = text[labels_start:labels_end].rstrip()
+          labels_block = labels_block.replace('const planetLabels:', 'export const planetLabels:', 1)
           text = text[:labels_start] + text[labels_end:]
 
           aspect_start = text.index('function aspectText(aspect: Aspect)')
@@ -86,14 +88,14 @@ jobs:
               + labels_block + '\n\n' + aspect_block + '\n\n' + formatter_block + '\n'
           )
 
-          # Reconnect AppNext to the moved helpers without changing any call sites.
+          # Reconnect AppNext to the moved helpers without changing call sites.
           import_anchor = "import { estimateGeminiUsage } from './lib/aiUsage'\n"
           if import_anchor not in text:
               raise SystemExit('AppNext import anchor missing')
           new_imports = (
               "import { copyToClipboard } from './lib/clipboard'\n"
               "import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'\n"
-              "import { aspectText, integratedPromptText, integratedResultText, relationshipPromptText, relationshipResultText, precisionPromptText, precisionResultText } from './lib/resultFormatters'\n"
+              "import { aspectText, planetLabels, integratedPromptText, integratedResultText, relationshipPromptText, relationshipResultText, precisionPromptText, precisionResultText } from './lib/resultFormatters'\n"
           )
           text = text.replace(import_anchor, import_anchor + new_imports, 1)
           app_path.write_text(text)
