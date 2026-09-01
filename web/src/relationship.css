@@ -112,7 +112,7 @@ input:focus-visible {
 .field > span {
   margin-left: 2px;
   color: #806a5b;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
@@ -309,7 +309,7 @@ input:focus-visible {
 
 .result-card-title > span {
   color: #a17a5a;
-  font-size: 0.54rem;
+  font-size: 0.75rem;
   font-weight: 850;
   letter-spacing: 0.13em;
 }
@@ -350,7 +350,7 @@ input:focus-visible {
 
 .metric span {
   color: #8b786a;
-  font-size: 0.57rem;
+  font-size: 0.75rem;
 }
 
 .aspect-list {
@@ -373,12 +373,12 @@ input:focus-visible {
 
 .aspect-row strong {
   color: #46362d;
-  font-size: 0.69rem;
+  font-size: 0.78rem;
 }
 
 .aspect-row span:last-child {
   color: #938176;
-  font-size: 0.58rem;
+  font-size: 0.75rem;
 }
 
 .tone-dot {
@@ -419,7 +419,7 @@ input:focus-visible {
 
 .month-title span {
   color: #9a8779;
-  font-size: 0.56rem;
+  font-size: 0.75rem;
 }
 
 .month-metrics {
@@ -434,7 +434,7 @@ input:focus-visible {
   border-radius: 999px;
   color: #7c695c;
   background: #f2e8dc;
-  font-size: 0.57rem;
+  font-size: 0.75rem;
 }
 
 .month-metrics b {
@@ -448,7 +448,7 @@ input:focus-visible {
   padding: 5px 0;
   border-top: 1px dashed rgba(91, 66, 48, 0.09);
   color: #74645a;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
 }
 
 .tight-row b {
@@ -493,7 +493,7 @@ input:focus-visible {
   .field input,
   .field select {
     height: 43px;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
   }
 
   .relationship-mode-row button {

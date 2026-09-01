@@ -47,6 +47,7 @@ import { ProfileView } from './ProfileView'
 import { SettingsView } from './SettingsView'
 import { AppHeader, BottomNavigation } from './AppChrome'
 import { analysisTools as tools, fortunePeriods as periods, HomeControls } from './HomeControls'
+import { DailyOutcomeCard, type DailyOutcomeRecord } from './DailyOutcomeCard'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
 import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'
@@ -135,20 +136,6 @@ const topicDisplay = (topic:string) => `${topicEmoji[topic] ?? '✦'} ${topic}`
 const relationshipDayPresets = [7,31,90,180,365]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
 const relationshipTimeSensitivePoints = new Set(['Moon','ASC','DSC','MC','IC'])
-
-type OutcomeEvent = '' | 'none' | 'received' | 'sent' | 'both'
-type OutcomeTimeBucket = '' | 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night'
-type OutcomeChannel = '' | 'message' | 'dm' | 'call' | 'in_person' | 'other'
-type DailyOutcomeRecord = {
-  date: string
-  event: OutcomeEvent
-  past_connection: boolean
-  event_time_bucket: OutcomeTimeBucket
-  channel: OutcomeChannel
-  note: string
-  saved_at: string
-  scores: Record<string, number | null>
-}
 
 const OUTCOME_STORAGE_KEY = 'starlight-destiny.relationship-outcomes.v2'
 
@@ -1546,22 +1533,13 @@ export default function AppNext() {
               </section>
 
 
-              {period==='today' && <details className="result-card outcome-card">
-                <summary>실제 결과 기록 · 개인보정</summary>
-                <div className="outcome-form">
-                  <p className="outcome-note">연락이 온 날뿐 아니라 연락이 없던 날도 같이 기록해야 비교가 덜 치우쳐. 현재 점수를 즉시 바꾸는 용도가 아니라, 네 기록이 쌓일수록 수신·재접점 지표가 실제 경험과 얼마나 맞는지 개인별로 검증하는 데이터야.</p>
-                  <div className="outcome-grid">
-                    <label><span>이 날 실제 연락 결과</span><select value={outcomeDraft.event} onChange={(e)=>setOutcomeDraft({...outcomeDraft,event:e.target.value as OutcomeEvent})}><option value="">기록 안 함</option><option value="none">연락 없음</option><option value="received">연락 받음</option><option value="sent">내가 먼저 보냄</option><option value="both">서로 주고받음</option></select></label>
-                    <label><span>연락 시각대</span><select value={outcomeDraft.event_time_bucket} onChange={(e)=>setOutcomeDraft({...outcomeDraft,event_time_bucket:e.target.value as OutcomeTimeBucket})}><option value="">시간 기록 안 함</option><option value="dawn">새벽 00~06</option><option value="morning">오전 06~12</option><option value="afternoon">오후 12~18</option><option value="evening">저녁 18~22</option><option value="night">밤 22~24</option></select></label>
-                    <label><span>연락 경로</span><select value={outcomeDraft.channel} onChange={(e)=>setOutcomeDraft({...outcomeDraft,channel:e.target.value as OutcomeChannel})}><option value="">경로 기록 안 함</option><option value="message">문자·메신저</option><option value="dm">DM·SNS</option><option value="call">전화</option><option value="in_person">직접 만남</option><option value="other">기타</option></select></label>
-                    <label><span>짧은 메모</span><input type="text" maxLength={200} value={outcomeDraft.note} onChange={(e)=>setOutcomeDraft({...outcomeDraft,note:e.target.value})} placeholder="예: 저녁에 먼저 전화 옴"/></label>
-                    <label className="outcome-check"><input type="checkbox" checked={outcomeDraft.past_connection} onChange={(e)=>setOutcomeDraft({...outcomeDraft,past_connection:e.target.checked})}/><span>과거 인연 관련 연락</span></label>
-                  </div>
-                  <button className="outcome-save" type="button" onClick={()=>void saveDailyOutcome()}>실제 결과 저장</button>
-                  {outcomeSaved && <div className="outcome-saved">저장 완료 · 이후 개인보정 비교에 포함할게.</div>}
-                  <p className="outcome-note">개인보정 기록 {outcomeCalibration.n}일{outcomeCalibration.n<5?` · 비교 시작까지 ${5-outcomeCalibration.n}일 더 필요`:outcomeCalibration.contactN&&outcomeCalibration.noneN?` · 연락 받은 날 수신 평균 ${outcomeCalibration.incomingContact?.toFixed(1)??'—'} / 연락 없는 날 ${outcomeCalibration.incomingNone?.toFixed(1)??'—'} · 재접점 ${outcomeCalibration.reconnectionContact?.toFixed(1)??'—'} / ${outcomeCalibration.reconnectionNone?.toFixed(1)??'—'}`:' · 연락 있음/없음 양쪽 표본이 더 필요'}</p>
-                </div>
-              </details>}
+              {period==='today' && <DailyOutcomeCard
+                draft={outcomeDraft}
+                saved={outcomeSaved}
+                calibration={outcomeCalibration}
+                onChange={setOutcomeDraft}
+                onSave={()=>void saveDailyOutcome()}
+              />}
             </>}
           </section>}
 

@@ -19,14 +19,14 @@
   border-radius: 11px;
   color: #7d6c61;
   background: #faf5ed;
-  font-size: 0.58rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .location-data-status b {
   flex: 0 0 auto;
   color: #7b684f;
-  font-size: 0.57rem;
+  font-size: 0.75rem;
 }
 
 .location-data-status.ready {
@@ -56,7 +56,7 @@
   align-items: center;
   padding: 0 11px;
   color: #7c695c;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
   list-style: none;

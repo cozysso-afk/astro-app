@@ -1,6 +1,6 @@
 /* v14 · integrated result de-duplication + iOS date + luminous scores */
-.server-pill{font-size:.72rem!important;line-height:1.3!important;white-space:nowrap!important}
-.nav-item{font-size:.72rem!important}
+.server-pill{font-size:.75rem!important;line-height:1.3!important;white-space:nowrap!important}
+.nav-item{font-size:.75rem!important}
 .birth-date-field input[type="date"],
 .birth-time-field input[type="time"],
 .date-control input[type="date"]{width:100%!important;min-width:0!important;text-align:center!important;font-variant-numeric:tabular-nums lining-nums!important;font-feature-settings:"tnum" 1,"lnum" 1!important}
@@ -22,7 +22,7 @@
 .integrated-topic::after{content:"✦";position:absolute;right:10px;top:7px;color:rgba(255,255,255,.9);font-size:.76rem;text-shadow:0 0 10px rgba(255,255,255,.95);pointer-events:none}
 .integrated-topic>span{position:relative;z-index:1;color:#62536c!important;font-size:.79rem!important;font-weight:820!important;letter-spacing:-.015em!important}
 .integrated-topic>strong{position:relative;z-index:1;font-family:"Bodoni 72",Didot,"Iowan Old Style",Georgia,serif!important;font-variant-numeric:tabular-nums lining-nums!important;font-feature-settings:"tnum" 1,"lnum" 1!important;font-size:2.03rem!important;line-height:1.02!important;font-weight:600!important;letter-spacing:.018em!important;color:#654778!important;text-shadow:0 1px 0 rgba(255,255,255,.98),0 5px 17px rgba(105,73,133,.13)!important}
-.integrated-topic>small{position:relative;z-index:1;color:#83748b!important;font-size:.7rem!important;font-weight:720!important}
+.integrated-topic>small{position:relative;z-index:1;color:#83748b!important;font-size:.75rem!important;font-weight:720!important}
 .integrated-topic:nth-child(6n+1){background:linear-gradient(145deg,rgba(255,242,230,.84),rgba(255,250,243,.70),rgba(242,236,255,.72))!important}
 .integrated-topic:nth-child(6n+2){background:linear-gradient(145deg,rgba(239,232,255,.86),rgba(252,247,255,.72),rgba(231,248,246,.72))!important}
 .integrated-topic:nth-child(6n+3){background:linear-gradient(145deg,rgba(226,248,242,.84),rgba(247,252,249,.74),rgba(236,240,255,.70))!important}
@@ -37,7 +37,7 @@
 .period-fortune-section{margin-top:4px!important}
 .period-fortune-report{margin-top:14px!important}
 .annual-fortune-range{margin:12px 0!important;padding:13px!important;border:1px solid rgba(126,101,153,.12)!important;border-radius:17px!important;background:linear-gradient(145deg,rgba(252,247,255,.82),rgba(241,250,248,.80))!important}
-.annual-range-badge{font-size:.68rem;font-weight:850;color:#765f8b;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid rgba(126,101,153,.12)}
+.annual-range-badge{font-size:.75rem;font-weight:850;color:#765f8b;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid rgba(126,101,153,.12)}
 .annual-year-selector{margin-top:8px!important}
 .annual-calculation-range{background:linear-gradient(120deg,rgba(250,240,255,.80),rgba(235,250,247,.78))!important}
 

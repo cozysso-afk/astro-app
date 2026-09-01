@@ -23,7 +23,7 @@
 .ai-interpret-card.is-loading strong,
 .ai-interpret-card.is-error strong { display:block; color:#493f52; font-size:.8rem; margin-top:3px; }
 .ai-interpret-card.is-loading p,
-.ai-interpret-card.is-error p { margin:5px 0 0; color:#81768a; font-size:.65rem; line-height:1.55; }
+.ai-interpret-card.is-error p { margin:5px 0 0; color:#81768a; font-size:.78rem; line-height:1.6; }
 .ai-interpret-card.is-error button {
   margin-top:10px; min-height:36px; padding:0 12px; border-radius:12px;
   border:1px solid rgba(180,170,199,.4); background:rgba(255,255,255,.85); color:#705f7d; font-weight:800;
@@ -112,12 +112,12 @@
 .ai-priorities p, .ai-system-note p { font-size: .84rem; line-height: 1.68; }
 .ai-details summary { font-size: .88rem; padding: 5px 0; }
 .ai-topic-title strong { font-size: .94rem; }
-.ai-topic-title span { font-size: .68rem; }
+.ai-topic-title span { font-size: .75rem; }
 .ai-topic-list p { font-size: .84rem; line-height: 1.7; }
 .ai-limits { font-size: .74rem; line-height: 1.62; }
 .ai-usage-card { display:grid; gap:5px; padding:12px 14px; border-radius:16px; background:linear-gradient(135deg,rgba(239,232,250,.9),rgba(229,247,244,.88)); border:1px solid rgba(170,178,204,.28); }
 .ai-usage-card strong { font-size:.82rem; color:#51445d; }
-.ai-usage-card span, .ai-usage-card small { font-size:.73rem; line-height:1.5; color:#786d80; }
+.ai-usage-card span, .ai-usage-card small { font-size:.75rem; line-height:1.55; color:#786d80; }
 .ai-usage-card b { font-size:.84rem; color:#6a5676; }
 .ai-settings-card strong, .ai-api-state strong { font-size:.9rem; }
 .ai-settings-card small, .ai-api-state small { font-size:.78rem; line-height:1.5; }
