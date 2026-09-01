@@ -102,21 +102,23 @@ export function ArchiveView({
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  const indexedItems = useMemo(() => items.map((item) => ({ item, searchText: searchableArchiveText(item) })), [items])
-  const fortuneRows = indexedItems.filter(({item}) => item.kind !== 'outcome')
-  const verificationRows = indexedItems.filter(({item}) => item.kind === 'outcome')
-  const fortuneItems = fortuneRows.map(({item}) => item)
-  const verificationItems = verificationRows.map(({item}) => item)
-  const sectionRows = section === 'fortune' ? fortuneRows : verificationRows
   const normalizedQuery = normalizeSearchValue(query)
+  const hasTextQuery = Boolean(normalizedQuery)
+  const fortuneItems = useMemo(() => items.filter((item) => item.kind !== 'outcome'), [items])
+  const verificationItems = useMemo(() => items.filter((item) => item.kind === 'outcome'), [items])
+  const sectionItems = section === 'fortune' ? fortuneItems : verificationItems
+  const searchIndex = useMemo(() => {
+    if (!hasTextQuery) return null
+    return new Map(items.map((item) => [item.id, searchableArchiveText(item)]))
+  }, [hasTextQuery, items])
   const hasSearchFilter = Boolean(normalizedQuery || dateFrom || dateTo || (section === 'fortune' && typeFilter !== 'all'))
 
-  const visibleItems = sectionRows.filter(({item, searchText}) => {
+  const visibleItems = useMemo(() => sectionItems.filter((item) => {
     if (section === 'fortune' && typeFilter !== 'all' && archiveTypeKey(item) !== typeFilter) return false
-    if (normalizedQuery && !searchText.includes(normalizedQuery)) return false
+    if (hasTextQuery && !(searchIndex?.get(item.id) ?? '').includes(normalizedQuery)) return false
     return matchesDateRange(item, dateField, dateFrom, dateTo)
-  }).map(({item}) => item)
-  const sectionItemCount = sectionRows.length
+  }), [dateField, dateFrom, dateTo, hasTextQuery, normalizedQuery, searchIndex, section, sectionItems, typeFilter])
+  const sectionItemCount = sectionItems.length
 
   const emptyTitle = section === 'fortune' ? '저장된 운세 기록이 없어' : '아직 검증 기록이 없어'
   const emptyDescription = section === 'fortune'
