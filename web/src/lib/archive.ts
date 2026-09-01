@@ -34,9 +34,12 @@ export type ArchiveListResult = {
 }
 
 const STORAGE_KEY = 'starlight-destiny.archive.v1'
+const CLOUD_PAGE_SIZE = 100
 
 type LocalPersistResult = { ok: true } | { ok: false; error: string }
 type UploadLocalItemResult = { item: ArchiveItem; local: LocalPersistResult }
+type CloudArchiveTable = 'readings' | 'relationship_readings'
+type CloudFetchResult = { items: ArchiveItem[]; warnings: string[] }
 
 function newId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -260,19 +263,64 @@ function cloudRowToItem(
   }
 }
 
-async function fetchCloudItems(): Promise<ArchiveItem[]> {
-  const columns = 'id, reading_type, period_start, period_end, engine_version, calculation_json, interpretation_json, summary, created_at'
-  const [fortune, relationship] = await Promise.all([
-    supabase.from('readings').select(columns).order('created_at', { ascending: false }).limit(100),
-    supabase.from('relationship_readings').select(columns).order('created_at', { ascending: false }).limit(100),
-  ])
-  if (fortune.error) throw fortune.error
-  if (relationship.error) throw relationship.error
+const cloudColumns = 'id, reading_type, period_start, period_end, engine_version, calculation_json, interpretation_json, summary, created_at'
 
-  return [
-    ...(fortune.data ?? []).map((row) => cloudRowToItem(row as Record<string, unknown>, 'integrated')),
-    ...(relationship.data ?? []).map((row) => cloudRowToItem(row as Record<string, unknown>, 'compatibility')),
-  ].filter((row): row is ArchiveItem => Boolean(row))
+async function fetchCloudTable(table: CloudArchiveTable, kindFallback: ArchiveKind, userId: string): Promise<ArchiveItem[]> {
+  const items: ArchiveItem[] = []
+  let from = 0
+
+  while (true) {
+    const page = await supabase
+      .from(table)
+      .select(cloudColumns)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(from, from + CLOUD_PAGE_SIZE - 1)
+    if (page.error) throw page.error
+
+    const rows = page.data ?? []
+    items.push(...rows
+      .map((row) => cloudRowToItem(row as Record<string, unknown>, kindFallback))
+      .filter((row): row is ArchiveItem => Boolean(row)))
+
+    if (rows.length < CLOUD_PAGE_SIZE) break
+    from += CLOUD_PAGE_SIZE
+  }
+
+  return items
+}
+
+function cloudFetchError(label: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '조회 실패')
+  return `${label} 클라우드 조회 실패: ${message}`
+}
+
+async function fetchCloudItems(userId: string): Promise<CloudFetchResult> {
+  const [fortune, relationship] = await Promise.allSettled([
+    fetchCloudTable('readings', 'integrated', userId),
+    fetchCloudTable('relationship_readings', 'compatibility', userId),
+  ])
+
+  const items: ArchiveItem[] = []
+  const warnings: string[] = []
+  let successfulTables = 0
+
+  if (fortune.status === 'fulfilled') {
+    successfulTables += 1
+    items.push(...fortune.value)
+  } else {
+    warnings.push(cloudFetchError('운세 기록', fortune.reason))
+  }
+
+  if (relationship.status === 'fulfilled') {
+    successfulTables += 1
+    items.push(...relationship.value)
+  } else {
+    warnings.push(cloudFetchError('관계 기록', relationship.reason))
+  }
+
+  if (successfulTables === 0) throw new Error(warnings.join(' / ') || '클라우드 기록을 불러오지 못했어.')
+  return { items, warnings }
 }
 
 export async function listArchive(): Promise<ArchiveListResult> {
@@ -298,14 +346,15 @@ export async function listArchive(): Promise<ArchiveListResult> {
   local = loadLocal()
 
   try {
-    const cloud = await fetchCloudItems()
+    const cloud = await fetchCloudItems(auth.userId)
     const merged = new Map<string, ArchiveItem>()
     local.forEach((item) => merged.set(item.id, item))
-    cloud.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }))
+    cloud.items.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }))
     const items = [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     const cache = persistLocal(items)
     const warnings = [
       syncError,
+      ...cloud.warnings,
       cache.ok ? undefined : `클라우드 기록은 불러왔지만 이 브라우저 캐시에는 저장하지 못했어: ${cache.error}`,
     ].filter(Boolean).join(' / ')
     return { items, cloudAvailable: true, cloudError: warnings || undefined }
