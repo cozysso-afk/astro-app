@@ -35,15 +35,19 @@ jobs:
           block = text[start:end].rstrip()
           if block.count('function AiInterpretationPanel') != 1:
               raise SystemExit('Unexpected AiInterpretationPanel block')
-          block = block.replace('function AiInterpretationPanel', 'export function AiInterpretationPanel', 1)
           block = block.replace(
-              '  onRetry: () => void\n}) {',
-              '  onRetry: () => void\n  topics: string[]\n}) {',
+              'function AiInterpretationPanel({ result, loading, error, onRetry }: {',
+              'export function AiInterpretationPanel({ result, loading, error, onRetry, topics }: {',
+              1,
+          )
+          block = block.replace(
+              '  onRetry: () => void\n',
+              '  onRetry: () => void\n  topics: string[]\n',
               1,
           )
           block = block.replace('topicOrder.map((topic)=>{', 'topics.map((topic)=>{', 1)
-          if 'topicOrder.map((topic)=>{' in block:
-              raise SystemExit('topicOrder dependency still present')
+          if 'topicOrder.map((topic)=>{' in block or 'topics: string[]' not in block:
+              raise SystemExit('Failed to isolate topicOrder dependency')
 
           panel_path.write_text(
               "import { AlertTriangle, LoaderCircle, Sparkles } from 'lucide-react'\n"
