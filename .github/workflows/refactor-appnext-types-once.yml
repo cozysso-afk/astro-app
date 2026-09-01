@@ -1,0 +1,78 @@
+name: Refactor AppNext types once
+
+on:
+  push:
+    branches:
+      - refactor/appnext-types-20260901
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/appnext-types-20260901
+          fetch-depth: 0
+
+      - name: Extract AppNext type contracts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app_path = Path('web/src/AppNext.tsx')
+          types_path = Path('web/src/appTypes.ts')
+          workflow_path = Path('.github/workflows/refactor-appnext-types-once.yml')
+
+          text = app_path.read_text()
+          start_marker = 'type PeriodKey ='
+          end_marker = 'const GEMINI_USD_KRW_ESTIMATE'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          block = text[start:end].rstrip()
+
+          names = re.findall(r'(?m)^type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=', block)
+          if not names:
+              raise SystemExit('No top-level AppNext types found')
+          if len(names) != len(set(names)):
+              raise SystemExit('Duplicate top-level type names found')
+
+          exported = re.sub(r'(?m)^type\s+', 'export type ', block)
+          types_path.write_text(
+              '/* Shared UI/API type contracts extracted from AppNext.tsx. */\n\n' + exported + '\n'
+          )
+
+          stripped = text[:start] + text[end:]
+          import_anchor = 'const DEFAULT_API_BASE'
+          import_pos = stripped.index(import_anchor)
+          import_stmt = "import type {\n  " + ',\n  '.join(names) + "\n} from './appTypes'\n\n"
+          if "from './appTypes'" in stripped:
+              raise SystemExit('appTypes import already exists')
+          stripped = stripped[:import_pos] + import_stmt + stripped[import_pos:]
+          app_path.write_text(stripped)
+
+          # One-shot workflow: remove itself in the same refactor commit.
+          workflow_path.unlink()
+
+          print(f'Extracted {len(names)} type contracts: {", ".join(names)}')
+          print(f'AppNext bytes: {len(text.encode())} -> {len(stripped.encode())}')
+          PY
+
+      - name: Build web
+        working-directory: web
+        run: npm ci && npm run build
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/AppNext.tsx web/src/appTypes.ts .github/workflows/refactor-appnext-types-once.yml
+          git diff --cached --check
+          git commit -m "refactor(web): extract AppNext type contracts"
+          git push origin HEAD:refactor/appnext-types-20260901
