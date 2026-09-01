@@ -48,8 +48,8 @@ html[data-keyboard-open='true'] .bottom-nav{display:none!important}
 /* Relationship range is independent from integrated fortune period. */
 .relationship-range-block{padding:14px!important}
 .relationship-range-buttons{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:6px!important}
-.relationship-range-buttons button{padding:0 4px!important;font-size:.67rem!important}
-.relationship-custom-days{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(130,114,150,.1);font-size:.7rem;color:#6e6375}
+.relationship-range-buttons button{padding:0 4px!important;font-size:.75rem!important}
+.relationship-custom-days{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(130,114,150,.1);font-size:.75rem;color:#6e6375}
 .relationship-custom-days span{font-weight:800}
 .relationship-custom-days label{display:flex;align-items:center;gap:6px}
 .relationship-custom-days input{width:76px;height:34px;border:1px solid rgba(129,113,150,.16);border-radius:11px;background:rgba(255,255,255,.82);text-align:center;font-weight:800;color:#504454}
@@ -86,9 +86,9 @@ html[data-keyboard-open='true'] .bottom-nav{display:none!important}
 .location-purpose-card>strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.94rem}
 .location-rank-list{display:grid;gap:7px;margin-top:9px}
 .location-rank-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;background:linear-gradient(145deg,rgba(245,240,255,.8),rgba(240,250,248,.75))}
-.location-rank-row>span:first-child{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.8);font-weight:800;font-size:.68rem}
-.location-rank-row div{min-width:0;display:grid;gap:2px}.location-rank-row strong{font-size:.78rem}.location-rank-row small{font-size:.63rem;color:#827787}.location-rank-row b{font-size:.86rem;color:#6f5981}
-.location-evidence{font-size:.7rem!important;line-height:1.55!important;color:#756b7b!important}
+.location-rank-row>span:first-child{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.8);font-weight:800;font-size:.75rem}
+.location-rank-row div{min-width:0;display:grid;gap:2px}.location-rank-row strong{font-size:.8rem}.location-rank-row small{font-size:.75rem;color:#827787}.location-rank-row b{font-size:.86rem;color:#6f5981}
+.location-evidence{font-size:.75rem!important;line-height:1.65!important;color:#756b7b!important}
 
 /* Save feedback is immediately visible, not buried below long results. */
 .save-action:disabled{opacity:.65!important}

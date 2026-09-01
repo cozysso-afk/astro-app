@@ -225,7 +225,7 @@ input:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: #88786d;
 }
 
@@ -424,7 +424,7 @@ input:focus-visible {
 .tool-card > span:last-child {
   margin-top: 5px;
   color: #8a796d;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   line-height: 1.48;
 }
 
@@ -462,7 +462,7 @@ input:focus-visible {
 .report-copy p {
   margin: 5px 0 0;
   color: #85746a;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -520,13 +520,13 @@ input:focus-visible {
   }
 
   .hero-row p {
-    font-size: 0.71rem;
+    font-size: 0.75rem;
   }
 
   .period-button {
     gap: 4px;
     padding: 0 4px;
-    font-size: 0.69rem;
+    font-size: 0.75rem;
   }
 
   .tool-card {

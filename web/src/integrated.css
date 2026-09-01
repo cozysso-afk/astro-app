@@ -73,7 +73,7 @@
 
 .pillar-grid span {
   color: #907b6b;
-  font-size: 0.56rem;
+  font-size: 0.75rem;
 }
 
 .pillar-grid strong {
@@ -93,7 +93,7 @@
   border-radius: 999px;
   color: #766356;
   background: #f5ede2;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
 }
 
 .saju-summary b {
@@ -115,15 +115,15 @@
 
 .thai-baseline span {
   color: #72806d;
-  font-size: 0.66rem;
+  font-size: 0.78rem;
   font-weight: 800;
 }
 
 .thai-baseline p {
   margin: 3px 0 0;
   color: #7b8677;
-  font-size: 0.61rem;
-  line-height: 1.45;
+  font-size: 0.76rem;
+  line-height: 1.58;
 }
 
 @media (max-width: 420px) {
@@ -145,8 +145,8 @@
 .integrated-topic { padding: 13px 10px; gap: 5px; }
 .integrated-topic span { font-size: .76rem; }
 .integrated-topic strong { font-size: 1.22rem; }
-.integrated-topic small { font-size: .69rem; }
-.best-window span { font-size: .72rem; }
+.integrated-topic small { font-size: .75rem; }
+.best-window span { font-size: .75rem; }
 .best-window strong { font-size: .84rem; line-height: 1.55; }
 .result-note { font-size: .76rem; line-height:1.58; }
 .time-detail-list { display:grid; gap:10px; }
