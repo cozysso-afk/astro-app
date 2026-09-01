@@ -3,10 +3,11 @@ import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
   LoaderCircle, MapPin, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
-import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
+import { deleteArchive, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
 import type {
@@ -148,7 +149,7 @@ function emptyOutcome(dateValue: string): DailyOutcomeRecord {
 function readDailyOutcomes(): DailyOutcomeRecord[] {
   if (typeof window === 'undefined') return []
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(OUTCOME_STORAGE_KEY) || '[]')
+    const parsed = JSON.parse(readLocalStorage(OUTCOME_STORAGE_KEY) || '[]')
     return Array.isArray(parsed) ? parsed.filter((row)=>row && typeof row.date === 'string') : []
   } catch { return [] }
 }
@@ -162,7 +163,7 @@ function writeDailyOutcome(record: DailyOutcomeRecord) {
   const next = [record, ...current.filter((row)=>row.date !== record.date)]
     .sort((a,b)=>b.date.localeCompare(a.date))
     .slice(0, 500)
-  window.localStorage.setItem(OUTCOME_STORAGE_KEY, JSON.stringify(next))
+  return writeLocalStorage(OUTCOME_STORAGE_KEY, JSON.stringify(next))
 }
 
 function summarizeDailyOutcomes(records: DailyOutcomeRecord[]) {
@@ -236,7 +237,7 @@ function parseOptionalNumber(value: string) {
 function loadUiSettings() {
   if (typeof window === 'undefined') return { glow: true, motion: true }
   try {
-    const raw = window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY)
+    const raw = readLocalStorage(UI_SETTINGS_STORAGE_KEY)
     if (!raw) return { glow: true, motion: true }
     const parsed = JSON.parse(raw) as Partial<{ glow: boolean; motion: boolean }>
     return { glow: parsed.glow !== false, motion: parsed.motion !== false }
@@ -247,15 +248,14 @@ function loadUiSettings() {
 
 
 function loadAiModel() {
-  if (typeof window === 'undefined') return 'gemini-3.7-flash'
-  const saved = window.localStorage.getItem(AI_MODEL_STORAGE_KEY)
+  const saved = readLocalStorage(AI_MODEL_STORAGE_KEY)
   return saved === 'gemini-3.6-flash' ? saved : 'gemini-3.7-flash'
 }
 
 function loadStoredProfile(): BirthProfile {
   if (typeof window === 'undefined') return emptyProfile
   try {
-    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY)
+    const raw = readLocalStorage(PROFILE_STORAGE_KEY)
     if (!raw) return emptyProfile
     const parsed = { ...emptyProfile, ...(JSON.parse(raw) as Partial<BirthProfile>) }
     if (parsed.placeKey && !parsed.placeKey.includes('::')) parsed.placeKey = ''
@@ -306,6 +306,23 @@ function buildReunionTimingContext(result: IntegratedApiResponse): ReunionTiming
 
 function compactPlace(value: unknown) {
   return String(value ?? '').replace('::', ' ') || '위치 미표기'
+}
+
+function archiveSaveSucceeded(result: ArchiveSaveResult) {
+  return result.localSaved || result.cloudSynced
+}
+
+function archiveSaveMessage(result: ArchiveSaveResult, label: string) {
+  if (result.cloudSynced) {
+    return result.localSaved
+      ? `${label} 저장 + 클라우드 동기화 완료`
+      : `${label} 클라우드 저장 완료 · 이 브라우저 로컬 저장소는 사용할 수 없어`
+  }
+  if (result.localSaved) {
+    return `이 기기에 ${label} 저장 완료 · 클라우드 동기화 대기${result.cloudError ? ` (${result.cloudError})` : ''}`
+  }
+  const details = [result.localError, result.cloudError].filter(Boolean).join(' / ')
+  return `${label} 저장 실패 · 이 기기와 클라우드 모두 저장하지 못했어${details ? ` (${details})` : ''}`
 }
 
 export default function AppNext() {
@@ -393,7 +410,7 @@ export default function AppNext() {
 }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(AI_MODEL_STORAGE_KEY, aiModel)
+    writeLocalStorage(AI_MODEL_STORAGE_KEY, aiModel)
   }, [aiModel])
 
   useEffect(() => {
@@ -455,7 +472,7 @@ export default function AppNext() {
   }, [queryDate])
 
   useEffect(() => {
-    window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(uiSettings))
+    writeLocalStorage(UI_SETTINGS_STORAGE_KEY, JSON.stringify(uiSettings))
     document.documentElement.dataset.celestialGlow = uiSettings.glow ? 'on' : 'off'
     document.documentElement.dataset.celestialMotion = uiSettings.motion ? 'on' : 'off'
   }, [uiSettings])
@@ -549,8 +566,14 @@ export default function AppNext() {
   }
 
   const saveBirthProfile = () => {
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(birthProfile))
-    setProfileSaved(true); window.setTimeout(() => setProfileSaved(false), 1800)
+    const saved = writeLocalStorage(PROFILE_STORAGE_KEY, JSON.stringify(birthProfile))
+    setProfileSaved(saved)
+    if (saved) {
+      window.setTimeout(() => setProfileSaved(false), 1800)
+      return
+    }
+    setActionNotice('브라우저 저장소를 사용할 수 없어. 프로필은 현재 앱 세션에서만 유지돼.')
+    window.setTimeout(() => setActionNotice(''), 3200)
   }
 
   const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = PERIOD_CACHE_TTL_DAYS.today, requestForArchive?: Record<string, unknown>) => {
@@ -590,13 +613,13 @@ export default function AppNext() {
               void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${periodStart}`,periodStart,periodEnd:periodEndValue,engine:calc.engine,request:archiveRequest,result:calc as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForArchive)}`)
             }
           }
-          window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(AI_JOB_STORAGE_KEY)
           setAiConfigured(true)
           aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
-          window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(AI_JOB_STORAGE_KEY)
           throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
@@ -608,19 +631,19 @@ export default function AppNext() {
       setAiError(message.includes('non-2xx') ? 'AI 해설 상태 확인이 잠시 끊겼어. 앱을 다시 열면 이어서 확인해.' : message)
     } finally {
       aiPollRef.current = null
-      setAiLoading(Boolean(window.localStorage.getItem(AI_JOB_STORAGE_KEY)))
+      setAiLoading(Boolean(readLocalStorage(AI_JOB_STORAGE_KEY)))
     }
   }
 
   const resumeAiInterpretationJob = () => {
     if (document.visibilityState === 'hidden') return
-    const raw = window.localStorage.getItem(AI_JOB_STORAGE_KEY)
+    const raw = readLocalStorage(AI_JOB_STORAGE_KEY)
     if (!raw) return
     try {
       const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }
       if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
     } catch {
-      window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+      removeLocalStorage(AI_JOB_STORAGE_KEY)
       setAiLoading(false)
     }
   }
@@ -658,11 +681,15 @@ export default function AppNext() {
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
-      window.localStorage.setItem(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
+      const jobPersisted = writeLocalStorage(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
       setAiConfigured(true)
       void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
+      if (!jobPersisted) {
+        setActionNotice('브라우저 저장소를 사용할 수 없어. AI 해설은 이 화면을 열어둔 동안 계속 확인할게.')
+        window.setTimeout(()=>setActionNotice(''),3200)
+      }
     } catch (error) {
-      window.localStorage.removeItem(AI_JOB_STORAGE_KEY)
+      removeLocalStorage(AI_JOB_STORAGE_KEY)
       setAiLoading(false)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
@@ -1040,8 +1067,8 @@ export default function AppNext() {
       result: integratedResult as unknown as Record<string, unknown>,
       interpretation: aiInterpretation as unknown as Record<string,unknown> | undefined,
     })
-    setArchiveStatus(saved.cloudSynced ? '기록 저장 + 클라우드 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
-    setActionNotice('기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
+    setArchiveStatus(archiveSaveMessage(saved, '기록'))
+    setActionNotice(archiveSaveSucceeded(saved) ? '기록 저장 완료' : '기록 저장 실패'); window.setTimeout(()=>setActionNotice(''),2200)
     if (mainView === 'history') await refreshArchive()
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '기록 저장 실패') } finally { setArchiveSaving(false) }
   }
@@ -1061,8 +1088,8 @@ export default function AppNext() {
       request: integratedRequestSnapshot,
       result: integratedResult as unknown as Record<string, unknown>,
     })
-    setArchiveStatus(saved.cloudSynced ? '정밀분석 기록 저장 + 클라우드 동기화 완료' : `이 기기에 정밀분석 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
-    setActionNotice('정밀분석 기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
+    setArchiveStatus(archiveSaveMessage(saved, '정밀분석 기록'))
+    setActionNotice(archiveSaveSucceeded(saved) ? '정밀분석 기록 저장 완료' : '정밀분석 기록 저장 실패'); window.setTimeout(()=>setActionNotice(''),2200)
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '정밀분석 기록 저장 실패') } finally { setArchiveSaving(false) }
   }
 
@@ -1086,8 +1113,8 @@ export default function AppNext() {
       result: relationshipResult as unknown as Record<string, unknown>,
       interpretation: relationshipAi as unknown as Record<string,unknown> | undefined,
     })
-    setArchiveStatus(saved.cloudSynced ? '기록 저장 + 클라우드 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
-    setActionNotice('관계 분석 기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
+    setArchiveStatus(archiveSaveMessage(saved, '관계 분석 기록'))
+    setActionNotice(archiveSaveSucceeded(saved) ? '관계 분석 기록 저장 완료' : '관계 분석 기록 저장 실패'); window.setTimeout(()=>setActionNotice(''),2200)
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '관계 분석 기록 저장 실패') } finally { setArchiveSaving(false) }
   }
 
@@ -1236,12 +1263,22 @@ export default function AppNext() {
         '소식': overall['소식']?.average ?? null,
       },
     }
-    writeDailyOutcome(record)
+    const localOutcomeSaved = writeDailyOutcome(record)
+    const archived = await saveArchive({kind:'outcome',periodKey:'today',title:`실제 결과 · ${queryDate}`,periodStart:queryDate,periodEnd:queryDate,engine:'relationship-outcome-v2',request:{date:queryDate,archive_mode:'personal_outcome_v16'},result:record as unknown as Record<string,unknown>},`outcome:${queryDate}`)
+    const savedSomewhere = localOutcomeSaved || archiveSaveSucceeded(archived)
+    if (!savedSomewhere) {
+      setOutcomeSaved(false)
+      setActionNotice(archiveSaveMessage(archived, '실제 결과'))
+      window.setTimeout(()=>setActionNotice(''),3200)
+      return
+    }
     setOutcomeDraft(record)
     setOutcomeSaved(true)
-    setOutcomeNonce((value)=>value+1)
-    void saveArchive({kind:'outcome',periodKey:'today',title:`실제 결과 · ${queryDate}`,periodStart:queryDate,periodEnd:queryDate,engine:'relationship-outcome-v2',request:{date:queryDate,archive_mode:'personal_outcome_v16'},result:record as unknown as Record<string,unknown>},`outcome:${queryDate}`)
-    window.setTimeout(()=>setOutcomeSaved(false),2200)
+    if (localOutcomeSaved) setOutcomeNonce((value)=>value+1)
+    if (!localOutcomeSaved && archived.cloudSynced) setActionNotice('실제 결과는 클라우드에 저장했어. 이 브라우저 로컬 저장소는 사용할 수 없어.')
+    else if (!archived.cloudSynced) setActionNotice('실제 결과를 이 기기에 저장했어. 클라우드 동기화는 대기 중이야.')
+    else setActionNotice('실제 결과 저장 완료')
+    window.setTimeout(()=>{ setOutcomeSaved(false); setActionNotice('') },2200)
   }
 
   async function removeArchive(item: ArchiveItem) {

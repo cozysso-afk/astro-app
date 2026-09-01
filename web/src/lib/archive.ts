@@ -21,7 +21,9 @@ export type ArchiveItem = {
 
 export type ArchiveSaveResult = {
   item: ArchiveItem
+  localSaved: boolean
   cloudSynced: boolean
+  localError?: string
   cloudError?: string
 }
 
@@ -32,6 +34,9 @@ export type ArchiveListResult = {
 }
 
 const STORAGE_KEY = 'starlight-destiny.archive.v1'
+
+type LocalPersistResult = { ok: true } | { ok: false; error: string }
+type UploadLocalItemResult = { item: ArchiveItem; local: LocalPersistResult }
 
 function newId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -56,8 +61,14 @@ function isQuotaExceeded(error: unknown) {
     && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
 }
 
-function persistLocal(items: ArchiveItem[]) {
-  if (typeof window === 'undefined') return
+function localStorageErrorMessage(error: unknown) {
+  return isQuotaExceeded(error)
+    ? '브라우저 저장 공간이 부족해.'
+    : '브라우저 저장소를 사용할 수 없어.'
+}
+
+function persistLocal(items: ArchiveItem[]): LocalPersistResult {
+  if (typeof window === 'undefined') return { ok: false, error: '브라우저 저장소를 사용할 수 없어.' }
   const unsyncedCount = items.filter((item) => !item.cloudId).length
   let syncedBudget = Math.max(0, 200 - unsyncedCount)
   let next = items.filter((item) => {
@@ -69,35 +80,38 @@ function persistLocal(items: ArchiveItem[]) {
   while (true) {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-      return
+      return { ok: true }
     } catch (error) {
-      if (!isQuotaExceeded(error)) throw error
+      if (!isQuotaExceeded(error)) return { ok: false, error: localStorageErrorMessage(error) }
       let evictIndex = next.length - 1
       while (evictIndex >= 0 && !next[evictIndex].cloudId) evictIndex -= 1
-      if (evictIndex < 0) throw error
+      if (evictIndex < 0) return { ok: false, error: localStorageErrorMessage(error) }
       next = next.filter((_, index) => index !== evictIndex)
     }
   }
 }
 
-function upsertLocal(item: ArchiveItem) {
+function upsertLocal(item: ArchiveItem): LocalPersistResult {
   const items = loadLocal()
   const next = [item, ...items.filter((row) => row.id !== item.id)]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  persistLocal(next)
-  return item
+  return persistLocal(next)
 }
 
 async function ensureArchiveUser() {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError) return { userId: null as string | null, error: sessionError.message }
-  if (sessionData.session?.user?.id) return { userId: sessionData.session.user.id, error: null as string | null }
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) return { userId: null as string | null, error: sessionError.message }
+    if (sessionData.session?.user?.id) return { userId: sessionData.session.user.id, error: null as string | null }
 
-  const { data, error } = await supabase.auth.signInAnonymously()
-  if (error || !data.user?.id) {
-    return { userId: null as string | null, error: error?.message || '익명 사용자 세션을 만들지 못했어.' }
+    const { data, error } = await supabase.auth.signInAnonymously()
+    if (error || !data.user?.id) {
+      return { userId: null as string | null, error: error?.message || '익명 사용자 세션을 만들지 못했어.' }
+    }
+    return { userId: data.user.id, error: null as string | null }
+  } catch (error) {
+    return { userId: null as string | null, error: error instanceof Error ? error.message : '클라우드 기록 세션을 확인하지 못했어.' }
   }
-  return { userId: data.user.id, error: null as string | null }
 }
 
 function calculationJson(item: ArchiveItem) {
@@ -111,7 +125,7 @@ function calculationJson(item: ArchiveItem) {
   }
 }
 
-async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<ArchiveItem> {
+async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<UploadLocalItemResult> {
   const isFortune = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
   const table = isFortune ? 'readings' : 'relationship_readings'
   let cloudId = item.cloudId
@@ -156,8 +170,8 @@ async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<Archi
     createdAt: String(response.data.created_at ?? cloudCreatedAt ?? item.createdAt),
     syncState: 'cloud',
   }
-  upsertLocal(synced)
-  return synced
+  const local = upsertLocal(synced)
+  return { item: synced, local }
 }
 
 export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 'syncState'>, stableId?: string): Promise<ArchiveSaveResult> {
@@ -169,16 +183,36 @@ export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 
     createdAt: previous?.createdAt ?? new Date().toISOString(),
     syncState: previous?.syncState ?? 'local',
   }
-  upsertLocal(item)
+  const initialLocal = upsertLocal(item)
+  const initialLocalError = initialLocal.ok ? undefined : initialLocal.error
 
   const auth = await ensureArchiveUser()
-  if (!auth.userId) return { item, cloudSynced: false, cloudError: auth.error || undefined }
+  if (!auth.userId) {
+    return {
+      item,
+      localSaved: initialLocal.ok,
+      localError: initialLocalError,
+      cloudSynced: false,
+      cloudError: auth.error || undefined,
+    }
+  }
 
   try {
-    item = await uploadLocalItem(item, auth.userId)
-    return { item, cloudSynced: true }
+    const uploaded = await uploadLocalItem(item, auth.userId)
+    item = uploaded.item
+    const localSaved = initialLocal.ok || uploaded.local.ok
+    const localError = localSaved
+      ? undefined
+      : (uploaded.local.ok ? initialLocalError : uploaded.local.error)
+    return { item, localSaved, localError, cloudSynced: true }
   } catch (error) {
-    return { item, cloudSynced: false, cloudError: error instanceof Error ? error.message : '클라우드 동기화에 실패했어.' }
+    return {
+      item,
+      localSaved: initialLocal.ok,
+      localError: initialLocalError,
+      cloudSynced: false,
+      cloudError: error instanceof Error ? error.message : '클라우드 동기화에 실패했어.',
+    }
   }
 }
 
@@ -269,8 +303,12 @@ export async function listArchive(): Promise<ArchiveListResult> {
     local.forEach((item) => merged.set(item.id, item))
     cloud.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }))
     const items = [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    persistLocal(items)
-    return { items, cloudAvailable: true, cloudError: syncError }
+    const cache = persistLocal(items)
+    const warnings = [
+      syncError,
+      cache.ok ? undefined : `클라우드 기록은 불러왔지만 이 브라우저 캐시에는 저장하지 못했어: ${cache.error}`,
+    ].filter(Boolean).join(' / ')
+    return { items, cloudAvailable: true, cloudError: warnings || undefined }
   } catch (error) {
     return {
       items: local.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -281,7 +319,8 @@ export async function listArchive(): Promise<ArchiveListResult> {
 }
 
 export async function deleteArchive(item: ArchiveItem) {
-  persistLocal(loadLocal().filter((row) => row.id !== item.id))
+  const localDelete = persistLocal(loadLocal().filter((row) => row.id !== item.id))
+  if (!localDelete.ok) throw new Error(localDelete.error)
   if (!item.cloudId) return
   const response = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
     ? await supabase.from('readings').delete().eq('id', item.cloudId)
