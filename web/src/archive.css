@@ -16,7 +16,7 @@
   border-radius: 12px;
   color: #725d4e;
   background: #fffdfa;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -51,7 +51,7 @@
   border-radius: 13px;
   color: #75675d;
   background: #f8f2e9;
-  font-size: 0.61rem;
+  font-size: 0.75rem;
 }
 
 .archive-sync-row > span {
@@ -92,7 +92,8 @@
 }
 
 .archive-empty span {
-  font-size: 0.61rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .archive-list {
@@ -124,15 +125,15 @@
 .archive-card-top strong {
   overflow: hidden;
   color: #44342b;
-  font-size: 0.74rem;
+  font-size: 0.85rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .archive-card-top small {
   color: #938176;
-  font-size: 0.55rem;
-  line-height: 1.4;
+  font-size: 0.74rem;
+  line-height: 1.5;
 }
 
 .archive-kind,
@@ -142,7 +143,7 @@
   align-items: center;
   gap: 4px;
   border-radius: 999px;
-  font-size: 0.52rem;
+  font-size: 0.68rem;
   font-weight: 850;
 }
 
@@ -189,11 +190,11 @@
 
 @media (max-width: 420px) {
   .result-actions button {
-    font-size: 0.58rem;
+    font-size: 0.72rem;
   }
 
   .archive-actions button {
-    font-size: 0.57rem;
+    font-size: 0.72rem;
   }
 }
 
@@ -214,17 +215,17 @@
 .legacy-archive-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
 .legacy-archive-head > div { min-width:0; display:grid; gap:5px; }
 .legacy-archive-head strong { color:#44394b; font-size:.82rem; line-height:1.45; }
-.legacy-archive-head small { color:#918797; font-size:.57rem; }
+.legacy-archive-head small { color:#817887; font-size:.72rem; line-height:1.5; }
 .legacy-archive-head button {
   flex:0 0 auto; min-height:34px; padding:0 11px; border-radius:11px;
   border:1px solid rgba(166,175,194,.34); color:#685d70; font-weight:750;
   background:rgba(255,255,255,.86);
 }
-.legacy-archive-detail > p { margin:0; color:#756b7b; font-size:.64rem; line-height:1.55; }
+.legacy-archive-detail > p { margin:0; color:#756b7b; font-size:.75rem; line-height:1.6; }
 .legacy-archive-detail details { border:1px solid rgba(177,185,202,.28); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.72); }
-.legacy-archive-detail summary { padding:11px 12px; color:#675c70; font-size:.63rem; font-weight:800; cursor:pointer; }
+.legacy-archive-detail summary { padding:11px 12px; color:#675c70; font-size:.75rem; font-weight:800; cursor:pointer; }
 .legacy-archive-detail pre {
   max-height:360px; overflow:auto; margin:0; padding:12px; border-top:1px solid rgba(177,185,202,.22);
-  color:#514957; background:rgba(248,249,253,.88); font-size:10px; line-height:1.55; white-space:pre-wrap; word-break:break-word;
+  color:#514957; background:rgba(248,249,253,.88); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word;
   -webkit-overflow-scrolling:touch;
 }

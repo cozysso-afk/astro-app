@@ -22,7 +22,7 @@ export async function ensureSupabaseSession() {
 
   const created = await supabase.auth.signInAnonymously()
   if (created.error || !created.data.session) {
-    throw created.error ?? new Error('Supabase 익명 세션을 만들지 못했어.')
+    throw created.error ?? new Error('클라우드 기록 세션을 만들지 못했어.')
   }
   return created.data.session
 }

@@ -119,6 +119,6 @@
 .ai-usage-card strong { font-size:.82rem; color:#51445d; }
 .ai-usage-card span, .ai-usage-card small { font-size:.73rem; line-height:1.5; color:#786d80; }
 .ai-usage-card b { font-size:.84rem; color:#6a5676; }
-.ai-settings-card strong, .ai-api-state strong { font-size:.86rem; }
-.ai-settings-card small, .ai-api-state small { font-size:.72rem; }
+.ai-settings-card strong, .ai-api-state strong { font-size:.9rem; }
+.ai-settings-card small, .ai-api-state small { font-size:.78rem; line-height:1.5; }
 .ai-settings-card select { font-size:.78rem; height:44px; }
