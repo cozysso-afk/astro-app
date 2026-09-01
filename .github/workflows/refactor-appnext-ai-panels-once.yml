@@ -1,0 +1,98 @@
+name: Refactor AppNext AI panels once
+
+on:
+  push:
+    branches:
+      - refactor/appnext-ai-panels-20260901
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/appnext-ai-panels-20260901
+          fetch-depth: 0
+
+      - name: Extract reusable AI usage helper and period panel
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app_path = Path('web/src/AppNext.tsx')
+          helper_path = Path('web/src/lib/aiUsage.ts')
+          panel_path = Path('web/src/PeriodAiInterpretationPanel.tsx')
+          workflow_path = Path('.github/workflows/refactor-appnext-ai-panels-once.yml')
+
+          original = app_path.read_text()
+          text = original
+
+          helper_start = text.index('const GEMINI_USD_KRW_ESTIMATE = 1384')
+          helper_end = text.index('function AiInterpretationPanel', helper_start)
+          helper_block = text[helper_start:helper_end].rstrip()
+          if helper_block.count('function estimateGeminiUsage') != 1:
+              raise SystemExit('Unexpected estimateGeminiUsage block')
+          helper_block = helper_block.replace(
+              'function estimateGeminiUsage',
+              'export function estimateGeminiUsage',
+              1,
+          )
+          helper_path.write_text(
+              '/* Gemini usage/cost estimate shared by result panels. */\n\n' + helper_block + '\n'
+          )
+          text = text[:helper_start] + text[helper_end:]
+
+          panel_start = text.index('function PeriodAiInterpretationPanel')
+          panel_end = text.index('function relationshipLimitKo', panel_start)
+          panel_block = text[panel_start:panel_end].rstrip()
+          if panel_block.count('function PeriodAiInterpretationPanel') != 1:
+              raise SystemExit('Unexpected PeriodAiInterpretationPanel block')
+          panel_block = panel_block.replace(
+              'function PeriodAiInterpretationPanel',
+              'export function PeriodAiInterpretationPanel',
+              1,
+          )
+          panel_path.write_text(
+              "import { CheckCircle2, LoaderCircle } from 'lucide-react'\n"
+              "import type { AiInterpretationResponse } from './appTypes'\n"
+              "import { estimateGeminiUsage } from './lib/aiUsage'\n\n"
+              + panel_block + '\n'
+          )
+          text = text[:panel_start] + text[panel_end:]
+
+          import_anchor = 'const DEFAULT_API_BASE'
+          import_pos = text.index(import_anchor)
+          new_imports = (
+              "import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'\n"
+              "import { estimateGeminiUsage } from './lib/aiUsage'\n\n"
+          )
+          if "from './PeriodAiInterpretationPanel'" in text or "from './lib/aiUsage'" in text:
+              raise SystemExit('Target imports already exist')
+          text = text[:import_pos] + new_imports + text[import_pos:]
+          app_path.write_text(text)
+
+          workflow_path.unlink()
+
+          print(f'AppNext bytes: {len(original.encode())} -> {len(text.encode())}')
+          print(f'aiUsage bytes: {len(helper_path.read_bytes())}')
+          print(f'PeriodAiInterpretationPanel bytes: {len(panel_path.read_bytes())}')
+          PY
+
+      - name: Build web
+        working-directory: web
+        run: npm ci && npm run build
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/AppNext.tsx web/src/lib/aiUsage.ts web/src/PeriodAiInterpretationPanel.tsx .github/workflows/refactor-appnext-ai-panels-once.yml
+          git diff --cached --check
+          git commit -m "refactor(web): extract period AI panel and usage helper"
+          git push origin HEAD:refactor/appnext-ai-panels-20260901
