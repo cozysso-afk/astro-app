@@ -1,14 +1,16 @@
 import { AlertTriangle } from 'lucide-react'
-import type { RelationshipApiResponse } from './appTypes'
+import type { Aspect, RelationshipApiResponse } from './appTypes'
+import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { aspectText, planetLabels } from './lib/resultFormatters'
 
 type RelationshipPrecisionDetailsProps = {
   result: RelationshipApiResponse
   partnerTimeExact: boolean
+  aspects: Aspect[]
   formatLimit: (value: string) => string
 }
 
-export function RelationshipPrecisionDetails({ result, partnerTimeExact, formatLimit }: RelationshipPrecisionDetailsProps) {
+export function RelationshipPrecisionDetails({ result, partnerTimeExact, aspects, formatLimit }: RelationshipPrecisionDetailsProps) {
   const resultMonths = result.result.months ?? []
   const houseOverlays = result.result.house_overlays
 
@@ -17,6 +19,7 @@ export function RelationshipPrecisionDetails({ result, partnerTimeExact, formatL
       {title:'내 행성 → 상대 하우스',rows:houseOverlays.user_in_counterpart?.relationship_houses??[]},
       {title:'상대 행성 → 내 하우스',rows:houseOverlays.counterpart_in_user?.relationship_houses??[]},
     ].map((group)=><div className="month-card" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 관계 하우스 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · 플라시두스 {row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></section>}
+    <RelationshipEvidenceDetails aspects={aspects} />
     {!partnerTimeExact ? <section className="result-card">
       <div className="result-card-title"><span>정밀도</span><strong>출생시간 미상 · 일부 시기층 제외</strong></div>
       <div className="status-banner subtle"><AlertTriangle size={16}/><span>상대 출생시간을 몰라 진행 궁합차트·진행 합성차트·Davison(데이비슨)·Marks(마크스) 정밀 시기층은 추정하지 않았어. 입력한 출생지역은 기록에 보존하지만 시간민감 각도·하우스 계산에는 사용하지 않아. 이 상태에서 0은 재회 가능성 0%나 관계 점수 0점을 뜻하지 않아.</span></div>
