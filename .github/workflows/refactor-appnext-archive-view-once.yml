@@ -37,19 +37,18 @@ jobs:
           if old_block.count('archive-list') != 1 or old_block.count('legacyArchiveOpen') < 1:
               raise SystemExit('Unexpected archive view block')
 
+          new_block = "        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}\n\n"
+          text = text[:start] + new_block + text[end:]
+
           import_anchor = "import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'\n"
           if import_anchor not in text:
               raise SystemExit('ArchiveView import anchor missing')
           text = text.replace(import_anchor, import_anchor + "import { ArchiveView } from './ArchiveView'\n", 1)
 
-          new_block = "        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}\n\n"
-          text = text[:start] + new_block + text[end:]
           app_path.write_text(text)
           workflow_path.unlink()
-
           print(f'AppNext bytes: {len(original.encode())} -> {len(text.encode())}')
           PY
-          nl -ba web/src/AppNext.tsx | sed -n '1605,1618p'
 
       - name: Build web
         working-directory: web
