@@ -5,5 +5,6 @@
       "*": false,
       "main": true
     }
-  }
+  },
+  "ignoreCommand": "BASE=${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}; git diff --quiet \"$BASE\" HEAD -- ':(top)web' ':(top)vercel.json'"
 }
