@@ -233,7 +233,7 @@ export async function listArchive(): Promise<ArchiveListResult> {
       await uploadLocalItem(item, auth.userId)
     } catch (error) {
       syncError = error instanceof Error ? error.message : '일부 기록 동기화에 실패했어.'
-      break
+      continue
     }
   }
   local = loadLocal()
