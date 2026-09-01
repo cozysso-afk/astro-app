@@ -39,6 +39,7 @@ import type {
 
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AiInterpretationPanel } from './AiInterpretationPanel'
+import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { estimateGeminiUsage } from './lib/aiUsage'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
@@ -151,24 +152,6 @@ const relationshipDayPresets = [7,31,90,180,365]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
 const relationshipTimeSensitivePoints = new Set(['Moon','ASC','DSC','MC','IC'])
 
-function hasPair(aspect: Aspect, a: string, b: string) {
-  return (aspect.a === a && aspect.b === b) || (aspect.a === b && aspect.b === a)
-}
-function relationshipAspectMeaning(aspect: Aspect) {
-  const tense = aspect.tone === 'challenging'
-  const supportive = aspect.tone === 'supportive'
-  if (hasPair(aspect,'Mercury','Mars')) return tense ? '말의 속도와 반응성이 빨라져 논쟁·반박이 쉽게 붙는 접점이야. 누가 맞는지보다 말의 강도를 조절하는 게 핵심이야.' : '생각을 행동으로 옮기는 속도가 잘 맞기 쉬워. 대화를 실제 움직임으로 연결하는 힘이 있어.'
-  if (hasPair(aspect,'Mercury','Uranus')) return tense ? '대화가 갑자기 튀거나 예상 밖의 말로 흐름이 끊길 수 있어. 신선함은 크지만 안정적인 소통 규칙이 필요해.' : '서로의 생각을 깨우는 자극이 강해. 새로운 관점과 아이디어가 잘 살아나는 접점이야.'
-  if (hasPair(aspect,'Mars','Pluto')) return '추진력과 힘겨루기가 동시에 커질 수 있는 강한 접점이야. 경계·통제·주도권을 어떻게 다루는지가 중요해.'
-  if ((aspect.a === 'Neptune' || aspect.b === 'Neptune') && ['ASC','DSC'].some((x)=>aspect.a===x||aspect.b===x)) return tense ? '상대를 보는 이미지와 실제 관계 방식 사이에 흐림이나 이상화가 생기기 쉬워. 추측보다 확인이 중요해.' : '분위기·공감은 잘 생길 수 있지만 현실 확인을 같이 해야 안정적으로 쓰여.'
-  if ((aspect.a === 'Sun' || aspect.b === 'Sun') && ['MC','IC'].some((x)=>aspect.a===x||aspect.b===x)) return supportive ? '한 사람의 핵심 방향성이 다른 사람의 진로·생활축과 자연스럽게 연결되는 접점이야.' : '개인의 방향성과 생활·진로축이 부딪힐 수 있어. 관계와 각자의 목표를 분리해 조율해야 해.'
-  if (hasPair(aspect,'Venus','Mars')) return supportive ? '호감 표현 방식과 추진력이 자연스럽게 맞물리는 전형적인 끌림 접점이야. 다만 이것만으로 관계 지속이나 재회를 뜻하진 않아.' : '끌림은 강할 수 있지만 원하는 속도나 표현 방식 차이로 마찰도 같이 생길 수 있어.'
-  if (aspect.a === 'Saturn' || aspect.b === 'Saturn') return tense ? '책임·거리·기준이 무겁게 느껴질 수 있어. 오래 가려면 의무감보다 합의된 규칙이 필요해.' : '관계에 구조와 지속성을 더해주는 접점이야. 꾸준함과 현실적인 약속으로 쓸 때 힘이 생겨.'
-  if (aspect.a === 'Jupiter' || aspect.b === 'Jupiter') return supportive ? '서로의 시야를 넓히고 격려하는 방향으로 쓰이기 쉬워.' : '기대나 낙관이 과해질 수 있어. 실제 상황보다 크게 해석하지 않는 게 중요해.'
-  if (aspect.a === 'True Node' || aspect.b === 'True Node') return '익숙함이나 의미 부여가 강해질 수 있지만 운명·재회 확정의 증거는 아니야. 반복 패턴을 살피는 근거로 보는 게 맞아.'
-  return supportive ? '이 기능은 비교적 자연스럽게 연결되는 조화 접점이야. 관계 전체가 좋다는 뜻은 아니야.' : tense ? '자극과 마찰이 반복되기 쉬운 긴장 접점이야. 나쁘다는 뜻보다 조율이 필요한 힘이 강하다는 의미야.' : '강한 결합이나 혼합 효과가 나타나는 접점이야. 상황에 따라 협력과 부담이 함께 나타날 수 있어.'
-}
-
 type OutcomeEvent = '' | 'none' | 'received' | 'sent' | 'both'
 type OutcomeTimeBucket = '' | 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night'
 type OutcomeChannel = '' | 'message' | 'dm' | 'call' | 'in_person' | 'other'
@@ -233,41 +216,6 @@ function relationshipLimitKo(text: string) {
   if (text.includes('Exact partner birth time')) return '상대의 정확한 출생시간이 없어 해당 정밀 진행 레이어는 계산하지 않았어.'
   return text
 }
-function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode }: { aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string; onAi: () => void; analysisMode: RelationshipAnalysisMode }) {
-  const interpretableAspects = partnerExact ? aspects : aspects.filter((a)=>!relationshipTimeSensitivePoints.has(a.a) && !relationshipTimeSensitivePoints.has(a.b))
-  const supportive = interpretableAspects.filter((a)=>a.tone==='supportive').length
-  const challenging = interpretableAspects.filter((a)=>a.tone==='challenging').length
-  const mixed = interpretableAspects.filter((a)=>a.tone==='mixed').length
-  const isReunion = analysisMode === 'reunion'
-  const isMarriage = analysisMode.startsWith('marriage_')
-  const tight = [...interpretableAspects].sort((a,b)=>a.orb-b.orb).slice(0,4)
-  const communication = interpretableAspects.filter((a)=>a.a==='Mercury'||a.b==='Mercury')
-  const chemistry = interpretableAspects.filter((a)=>['Venus','Mars','Pluto'].includes(a.a)||['Venus','Mars','Pluto'].includes(a.b))
-  const structure = interpretableAspects.filter((a)=>['Saturn','Jupiter','True Node'].includes(a.a)||['Saturn','Jupiter','True Node'].includes(a.b))
-  const topAspect = tight[0]
-  const headline = topAspect ? `${aspectText(topAspect)}이 가장 강하게 걸리는 관계` : '확정 가능한 핵심 접점이 적은 관계 구조'
-  const overview = tight.length ? tight.slice(0,3).map((aspect,index)=>`${index+1}순위 ${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°): ${relationshipAspectMeaning(aspect)}`).join(' ') : '현재 입력으로 확정 가능한 주요 접점이 적어서 관계 전체를 강하게 단정하기 어려워.'
-  const communicationTight = [...communication].sort((a,b)=>a.orb-b.orb).slice(0,2)
-  const chemistryTight = [...chemistry].sort((a,b)=>a.orb-b.orb).slice(0,2)
-  const structureTight = [...structure].sort((a,b)=>a.orb-b.orb).slice(0,2)
-  const communicationText = communicationTight.length ? communicationTight.map((aspect)=>`${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°) — ${relationshipAspectMeaning(aspect)}`).join(' ') : 'Mercury(수성) 관련 확정 접점이 상위권에 적어서 소통 패턴은 현재 차트만으로 강하게 말하지 않을게.'
-  const chemistryText = chemistryTight.length ? chemistryTight.map((aspect)=>`${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°) — ${relationshipAspectMeaning(aspect)}`).join(' ') : 'Venus(금성)·Mars(화성)·Pluto(명왕성) 관련 확정 접점이 상위권에 적어서 끌림 하나로 관계를 설명하진 않을게.'
-  const stabilityText = structureTight.length ? structureTight.map((aspect)=>`${aspectText(aspect)}(오브 ${aspect.orb.toFixed(2)}°) — ${relationshipAspectMeaning(aspect)}`).join(' ') : 'Saturn(토성)·Jupiter(목성)·교점 관련 확정 접점이 상위권에 적어서 장기 지속성은 현재 계산만으로 강하게 단정하기 어려워.'
-  const timing = partnerExact ? '두 사람의 정확한 출생시간과 위치가 있어 진행 궁합차트·Davison(데이비슨)·Marks(마크스) 시기층까지 계산할 수 있어.' : '상대 출생시간이 없어서 Moon(달)·ASC(상승점)·DSC(하강점)·MC(중천점)·IC(천저점)처럼 시간에 민감한 요소와 정밀 진행 시기층은 제외했어. 대신 출생시간 없이 확정 가능한 행성 간 접점만 해석해.'
-  const usage = estimateGeminiUsage(ai?.usage)
-  return <>
-    <section className="relationship-reading-card">
-      <span className="eyebrow">관계 구조 해설</span><h3>{headline}</h3>
-      <p className="relationship-overview">{overview}</p>
-      <div className="relationship-reading-grid"><article><strong>대화 · 소통</strong><p>{communicationText}</p></article><article><strong>끌림 · 자극</strong><p>{chemistryText}</p></article><article><strong>지속성 · 성장</strong><p>{stabilityText}</p></article><article><strong>타이밍 정밀도</strong><p>{timing}</p></article></div>
-      <div className="relationship-key-aspects"><strong>가장 강한 접점</strong>{tight.slice(0,3).map((aspect,index)=><div key={`${aspect.a}-${aspect.aspect}-${aspect.b}-${index}`}><b>{aspectText(aspect)} · 오브 {aspect.orb.toFixed(2)}°</b><p>{relationshipAspectMeaning(aspect)}</p></div>)}</div>
-    </section>
-    {!ai?.ok&&<div className="relationship-ai-toolbar"><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={17}/><span>{aiLoading?'Gemini(제미나이) 관계 해석 중…':'Gemini(제미나이) 관계 정밀해석'}</span></button><small>최초 1회 생성 후 자동 저장 · 같은 계산값은 저장본 즉시 조회</small></div>}
-    {aiError && <div className="status-banner error"><AlertTriangle size={16}/><span>{aiError}</span></div>}
-    {ai?.ok && ai.data && <section className="relationship-ai-card"><span className="eyebrow">Gemini(제미나이) 관계 해설</span><h3>{ai.data.headline}</h3>{usage?.total_tokens?<details className="ai-meta-details relationship-meta-details"><summary>해설 생성 정보</summary><div className="relationship-ai-usage"><span>입력 {(usage?.prompt_tokens??0).toLocaleString()} · 출력 {(usage?.candidate_tokens??0).toLocaleString()} · 사고 {(usage?.thought_tokens??0).toLocaleString()} token(토큰)</span><b>예상비용 ${Number(usage?.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw??0).toLocaleString()}원</b></div></details>:null}<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}{isReunion&&ai.data.reunion_reading?.bottom_line&&<div className="reunion-ai-deep"><strong>재회운 정밀 해석</strong><p className="reunion-ai-bottom">{ai.data.reunion_reading.bottom_line}</p><div className="reunion-ai-grid"><article><b>상대 → 나 · 수신</b><p>{ai.data.reunion_reading.incoming_contact}</p></article><article><b>나 → 상대 · 발신</b><p>{ai.data.reunion_reading.outgoing_contact}</p></article><article><b>재접점 강한 시기</b><p>{ai.data.reunion_reading.reconnection_windows}</p></article><article><b>약한 시기</b><p>{ai.data.reunion_reading.low_windows}</p></article><article><b>이 인연의 반복 패턴</b><p>{ai.data.reunion_reading.relationship_filter}</p></article><article><b>정밀도</b><p>{ai.data.reunion_reading.precision_note}</p></article></div></div>}{isMarriage&&ai.data.marriage_reading?.bottom_line&&<div className="marriage-ai-deep"><strong>{analysisMode==='marriage_unmarried'?'미혼 결혼운 · 정밀 해석':'기혼 결혼운 · 정밀 해석'}</strong><p className="marriage-ai-bottom">{ai.data.marriage_reading.bottom_line}</p><div className="marriage-ai-grid"><article><b>장기 결속력</b><p>{ai.data.marriage_reading.bond}</p></article><article><b>정서적 집</b><p>{ai.data.marriage_reading.emotional_home}</p></article><article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b><p>{ai.data.marriage_reading.conflict_repair}</p></article><article><b>{analysisMode==='marriage_unmarried'?'결혼 결정 흐름':'현재 결혼생활 주기'}</b><p>{ai.data.marriage_reading.commitment_or_current_cycle}</p></article><article><b>시기 흐름</b><p>{ai.data.marriage_reading.timing}</p></article><article><b>장기 주의점</b><p>{ai.data.marriage_reading.caution}</p></article><article><b>정밀도</b><p>{ai.data.marriage_reading.precision_note}</p></article></div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice"><strong>이 관계를 다룰 때</strong>{ai.data.practical_advice.map((x,i)=><p key={`${i}-${x}`}>{i+1}. {x}</p>)}</div>}{!!ai.data.top_aspects?.length&&<details open><summary>왜 이런 관계로 느껴지는지 · 핵심 접점</summary>{ai.data.top_aspects.map((x,i)=><div className="relationship-ai-aspect" key={`${i}-${x.label}`}><b>{x.label}</b><p>{x.meaning}</p></div>)}</details>}{ai.data.limits&&<p className="relationship-ai-limits">{ai.data.limits}</p>}</section>}
-  </>
-}
-
 function initialPeriodFromUrl(): PeriodKey {
   if (typeof window === 'undefined') return 'today'
   const kind = new URLSearchParams(window.location.search).get('kind')
@@ -1711,7 +1659,7 @@ export default function AppNext() {
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} />
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText} />
               {partnerTimeExact&&relationshipResult.result.house_overlays?.available&&<section className="result-card"><div className="result-card-title"><span>HOUSE OVERLAY</span><strong>홀사인 + 플라시두스 관계 하우스</strong></div><p className="result-note">한 체계로 덮어쓰지 않고 둘 다 보여줘. 숫자가 다르면 서로 다른 해석층이고, 같으면 중첩 근거로 봐.</p><div className="month-list">{[
                 {title:'내 행성 → 상대 하우스',rows:relationshipResult.result.house_overlays.user_in_counterpart?.relationship_houses??[]},
                 {title:'상대 행성 → 내 하우스',rows:relationshipResult.result.house_overlays.counterpart_in_user?.relationship_houses??[]},
