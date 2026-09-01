@@ -35,7 +35,6 @@ import type {
   AiInterpretationResponse
 } from './appTypes'
 
-import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AiInterpretationPanel } from './AiInterpretationPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
@@ -47,8 +46,9 @@ import { ProfileView } from './ProfileView'
 import { SettingsView } from './SettingsView'
 import { AppHeader, BottomNavigation } from './AppChrome'
 import { analysisTools as tools, fortunePeriods as periods, HomeControls } from './HomeControls'
-import { DailyOutcomeCard, type DailyOutcomeRecord } from './DailyOutcomeCard'
+import type { DailyOutcomeRecord } from './DailyOutcomeCard'
 import { PeriodFortunePanel } from './PeriodFortunePanel'
+import { PeriodFortuneResults } from './PeriodFortuneResults'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
 import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'
@@ -1505,45 +1505,28 @@ export default function AppNext() {
             buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 + AI 해설 생성`}
             onCalculate={runIntegrated}
           >
-            {integratedMatchesSelection && integratedResult && <>
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>{period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 계산 완료</strong><span>{integratedResult.engine} · {integratedResult.period.day_count}일 분석</span></div></div>
-              <PeriodAiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}/>
-
-              <section className="result-card">
-                <div className="result-card-title"><span>CORE FLOW</span><strong>핵심 흐름</strong></div>
-                <div className="integrated-topic-grid">
-                  {topIntegratedTopics.slice(0,3).map(({topic,stat})=><div className="integrated-topic" key={`period-top-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
-                </div>
-                {cautionIntegratedTopics.length>0 && <div className="best-window caution-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${topicDisplay(row.topic)} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
-              </section>
-
-              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card period-date-highlights">
-                <div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>
-                {bestIntegratedDays.map((point)=><div className="tight-row" key={`period-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {topicDisplay(point.topic)} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-                {cautionIntegratedDays.map((point)=><div className="tight-row" key={`period-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {topicDisplay(point.topic)} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-                <p className="result-note">기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p>
-              </section>}
-
-              {integratedResult.western.detail_days?.length ? <details className="result-card integrated-time-evidence period-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`period-day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`period-${day.date}-${topic}`}><strong className="time-topic-name">{topicDisplay(topic)}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`period-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
-
-              <section className="result-card">
-                <div className="result-card-title"><span>SYSTEMS</span><strong>체계별 보조 흐름</strong></div>
-                <div className="saju-summary">
-                  {integratedResult.saju.ok && integratedResult.saju.day_master && <span>사주 일간 <b>{integratedResult.saju.day_master}</b></span>}
-                  {activeDayun && <span>현재 대운 <b>{activeDayun.ganzhi}</b> · {activeDayun.start_year}~{activeDayun.end_year}</span>}
-                  <span>Thai(태국점성술) <b>{integratedResult.thai.thai_day}</b> · {integratedResult.thai.ruler}</span>
-                </div>
-              </section>
-
-
-              {period==='today' && <DailyOutcomeCard
-                draft={outcomeDraft}
-                saved={outcomeSaved}
-                calibration={outcomeCalibration}
-                onChange={setOutcomeDraft}
-                onSave={()=>void saveDailyOutcome()}
-              />}
-            </>}
+            {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
+              period={period}
+              periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}
+              result={integratedResult}
+              aiInterpretation={aiInterpretation}
+              aiLoading={aiLoading}
+              aiError={aiError}
+              aiCacheSource={aiCacheSource}
+              topTopics={topIntegratedTopics}
+              cautionTopics={cautionIntegratedTopics}
+              bestDays={bestIntegratedDays}
+              cautionDays={cautionIntegratedDays}
+              activeDayun={activeDayun}
+              outcomeDraft={outcomeDraft}
+              outcomeSaved={outcomeSaved}
+              outcomeCalibration={outcomeCalibration}
+              topicDisplay={topicDisplay}
+              humanizeEvidence={humanizeEvidence}
+              onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
+              onOutcomeChange={setOutcomeDraft}
+              onSaveOutcome={()=>void saveDailyOutcome()}
+            />}
           </PeriodFortunePanel>}
 
         </>}
