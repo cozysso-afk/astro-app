@@ -63,3 +63,111 @@
 
 /* calendar-year selector */
 .calendar-year-selector{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:12px 13px;border:1px solid rgba(130,112,150,.12);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(244,240,252,.78))}.calendar-year-selector>div{display:grid;gap:2px;min-width:0}.calendar-year-selector strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.82rem;color:#524759}.calendar-year-selector span{font-size:.75rem;color:#83788a}.calendar-year-selector select{appearance:auto;min-width:112px;height:38px;padding:0 10px;border:1px solid rgba(130,112,150,.16);border-radius:12px;background:rgba(255,255,255,.92);font-size:.76rem;font-weight:700;color:#5c5064}.relationship-calendar-year{margin-top:9px}.relationship-range-buttons button.is-active{box-shadow:0 6px 16px rgba(101,78,124,.1)}@media(max-width:430px){.calendar-year-selector{padding:11px}.calendar-year-selector select{min-width:105px;font-size:.75rem}}
+/* v12 · feedback-driven mobile correction */
+
+:root{--dock-h:68px}
+
+/* Stable iPhone dock: no floating capsule, no content occlusion. */
+.page-content{padding-bottom:calc(var(--dock-h) + env(safe-area-inset-bottom) + 24px)!important}
+.bottom-nav{
+  position:fixed!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:0!important;
+  width:min(100%,560px)!important;
+  min-height:var(--dock-h)!important;
+  padding:6px 10px calc(6px + env(safe-area-inset-bottom))!important;
+  border:0!important;
+  border-top:1px solid rgba(133,119,150,.15)!important;
+  border-radius:0!important;
+  background:rgba(252,250,253,.94)!important;
+  box-shadow:0 -8px 24px rgba(78,66,98,.08)!important;
+  transform:translate3d(-50%,0,0)!important;
+  -webkit-transform:translate3d(-50%,0,0)!important;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  contain:layout paint;
+  will-change:transform;
+}
+.nav-item{min-height:48px!important;border-radius:12px!important;font-size:.62rem}
+.nav-item svg{width:19px!important;height:19px!important}
+html[data-keyboard-open='true'] .bottom-nav{display:none!important}
+
+/* Date/time fields: give date more width and prevent iOS native controls from overflowing. */
+.field-grid{grid-template-columns:minmax(0,1.22fr) minmax(0,.78fr)}
+.field-wide{grid-column:1/-1!important}
+.birth-date-field{grid-column:1!important;min-width:0!important;overflow:hidden!important}
+.birth-time-field{grid-column:2!important;min-width:0!important;overflow:hidden!important}
+.birth-date-field input,.birth-time-field input{
+  display:block!important;
+  min-width:0!important;
+  max-width:100%!important;
+  width:100%!important;
+  padding-left:11px!important;
+  padding-right:9px!important;
+  font-size:.86rem;
+  -webkit-appearance:none!important;
+  appearance:none!important;
+}
+
+/* Relationship range is independent from integrated fortune period. */
+.relationship-range-block{padding:14px!important}
+.relationship-range-buttons{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:6px!important}
+.relationship-range-buttons button{padding:0 4px!important;font-size:.75rem!important}
+.relationship-custom-days{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(130,114,150,.1);font-size:.75rem;color:#6e6375}
+.relationship-custom-days span{font-weight:800}
+.relationship-custom-days label{display:flex;align-items:center;gap:6px}
+.relationship-custom-days input{width:76px;height:34px;border:1px solid rgba(129,113,150,.16);border-radius:11px;background:rgba(255,255,255,.82);text-align:center;font-weight:800;color:#504454}
+
+/* Core flow: less beige repetition, more luminous pastel differentiation. */
+.integrated-topic-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+.integrated-topic{min-height:92px;border:1px solid rgba(126,111,150,.11);box-shadow:0 8px 22px rgba(89,75,111,.045)}
+.integrated-topic:nth-child(6n+1){background:linear-gradient(145deg,rgba(255,244,230,.96),rgba(255,249,237,.9))}
+.integrated-topic:nth-child(6n+2){background:linear-gradient(145deg,rgba(241,235,255,.96),rgba(249,245,255,.9))}
+.integrated-topic:nth-child(6n+3){background:linear-gradient(145deg,rgba(231,248,244,.96),rgba(244,252,249,.9))}
+.integrated-topic:nth-child(6n+4){background:linear-gradient(145deg,rgba(234,244,255,.96),rgba(247,250,255,.9))}
+.integrated-topic:nth-child(6n+5){background:linear-gradient(145deg,rgba(255,236,244,.96),rgba(255,247,250,.9))}
+.integrated-topic:nth-child(6n){background:linear-gradient(145deg,rgba(251,246,221,.96),rgba(255,252,240,.9))}
+.integrated-topic>span{font-size:.78rem;line-height:1.3!important}
+.integrated-topic>strong{font-size:1.55rem}
+
+/* Long readings should be readable without giant developer/system blocks. */
+.ai-system-note,.system-summary-details{margin-top:12px!important;border:1px solid rgba(135,118,156,.1)!important;border-radius:18px!important;background:rgba(255,255,255,.58)!important;padding:13px 14px!important}
+.ai-system-note>summary,.system-summary-details>summary{cursor:pointer;font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.84rem;font-weight:700;color:#5c5063}
+.ai-system-note p,.system-summary-details p{font-size:.78rem!important;line-height:1.65!important}
+
+/* Reunion trigger cards */
+.reunion-transit-panel{background:radial-gradient(circle at 100% 0,rgba(226,239,255,.6),transparent 34%),linear-gradient(145deg,rgba(255,255,255,.84),rgba(247,240,255,.78))!important}
+.reunion-transit-list{display:grid;gap:9px;margin-top:12px}
+.reunion-transit-day{padding:13px;border-radius:17px;border:1px solid rgba(133,116,154,.1);background:rgba(255,255,255,.72)}
+.reunion-transit-day header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.reunion-transit-day header strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.94rem}
+.reunion-transit-day header b{font-size:1rem;color:#745a8b}
+.reunion-transit-day p{margin:7px 0 0;font-size:.78rem;line-height:1.62;color:#675e6d}
+
+/* Location/country ranking */
+.location-purpose-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.location-purpose-card{padding:14px;border-radius:18px;border:1px solid rgba(132,116,153,.11);background:rgba(255,255,255,.72)}
+.location-purpose-card>strong{font-family:"AppleMyungjo","Noto Serif KR",serif;font-size:.94rem}
+.location-rank-list{display:grid;gap:7px;margin-top:9px}
+.location-rank-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;background:linear-gradient(145deg,rgba(245,240,255,.8),rgba(240,250,248,.75))}
+.location-rank-row>span:first-child{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.8);font-weight:800;font-size:.75rem}
+.location-rank-row div{min-width:0;display:grid;gap:2px}.location-rank-row strong{font-size:.8rem}.location-rank-row small{font-size:.75rem;color:#827787}.location-rank-row b{font-size:.86rem;color:#6f5981}
+.location-evidence{font-size:.75rem!important;line-height:1.65!important;color:#756b7b!important}
+
+/* Save feedback is immediately visible, not buried below long results. */
+.save-action:disabled{opacity:.65!important}
+.save-feedback-toast{position:fixed;z-index:160;left:50%;bottom:calc(var(--dock-h) + env(safe-area-inset-bottom) + 10px);transform:translateX(-50%);width:min(calc(100% - 28px),520px);padding:11px 14px;border-radius:15px;background:rgba(59,49,67,.92);color:white;font-size:.76rem;font-weight:700;text-align:center;box-shadow:0 12px 30px rgba(46,38,54,.18);backdrop-filter:blur(14px)}
+
+@media(max-width:430px){
+  .tool-panel,.form-card{overflow:visible!important}
+  .field-grid{grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr)!important;gap:13px 8px!important}
+  .birth-date-field input,.birth-time-field input{height:52px;font-size:.83rem}
+  .relationship-range-buttons{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .location-purpose-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:355px){
+  .field-grid{grid-template-columns:1fr!important}
+  .birth-date-field,.birth-time-field{grid-column:1!important}
+  .relationship-range-buttons{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
