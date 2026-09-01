@@ -123,7 +123,7 @@ async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<Archi
     ? await supabase.from(table).update(payload).eq('id', cloudId).eq('user_id', userId).select('id, created_at').single()
     : await supabase.from(table).insert(payload).select('id, created_at').single()
   if (response.error) throw response.error
-  if (!response.data?.id) throw new Error('Supabase 저장 결과가 비어 있어.')
+  if (!response.data?.id) throw new Error('클라우드 저장 결과가 비어 있어.')
 
   const synced: ArchiveItem = {
     ...item,
@@ -153,7 +153,7 @@ export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 
     item = await uploadLocalItem(item, auth.userId)
     return { item, cloudSynced: true }
   } catch (error) {
-    return { item, cloudSynced: false, cloudError: error instanceof Error ? error.message : 'Supabase 동기화에 실패했어.' }
+    return { item, cloudSynced: false, cloudError: error instanceof Error ? error.message : '클라우드 동기화에 실패했어.' }
   }
 }
 

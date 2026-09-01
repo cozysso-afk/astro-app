@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Cloud, Copy, Gem, Heart, History, Home,
-  LoaderCircle, MapPin, Moon, Orbit, RefreshCw, Save, Search, Settings, Sparkles, Sun, Trash2, User,
+  AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
+  LoaderCircle, MapPin, Moon, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
@@ -45,6 +45,8 @@ import { LocationResults } from './LocationResults'
 import { ArchiveView } from './ArchiveView'
 import { ProfileView } from './ProfileView'
 import { SettingsView } from './SettingsView'
+import { AppHeader, BottomNavigation } from './AppChrome'
+import { analysisTools as tools, fortunePeriods as periods, HomeControls } from './HomeControls'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
 import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'
@@ -69,21 +71,6 @@ function fortuneCacheTtlDays(periodKey: PeriodKey, tool: ToolKey | null) {
   if (tool === 'integrated') return PERIOD_CACHE_TTL_DAYS.year
   return PERIOD_CACHE_TTL_DAYS[periodKey]
 }
-
-const periods = [
-  { key: 'today' as const, label: '오늘', icon: Sun },
-  { key: 'week' as const, label: '주간', icon: CalendarDays },
-  { key: 'month' as const, label: '월간', icon: Moon },
-  { key: 'year' as const, label: '연간', icon: Orbit },
-]
-
-const tools = [
-  { key: 'integrated' as const, label: '통합운세', desc: '서양·사주·태국 흐름을 분리 계산해 비교', icon: Sparkles, tone: 'gold' },
-  { key: 'compatibility' as const, label: '궁합운', desc: '두 사람의 관계 구조와 시기 흐름', icon: Heart, tone: 'rose' },
-  { key: 'marriage' as const, label: '결혼운', desc: '현재 관계의 장기 결속과 주기 흐름', icon: Gem, tone: 'champagne' },
-  { key: 'location' as const, label: '지역·국가운', desc: '나와 잘 맞는 국가·도시를 목적별로 비교', icon: MapPin, tone: 'sage' },
-  { key: 'precision' as const, label: '정밀분석', desc: '세부 계산과 고급 점성 레이어', icon: Search, tone: 'sage' },
-]
 
 const relationshipModes: Array<[RelationshipStatus, string]> = [
   ['dating', '연애중'], ['long_term', '장기커플'], ['cohabiting', '동거'], ['engaged', '약혼'], ['married', '기혼'],
@@ -337,7 +324,6 @@ export default function AppNext() {
   const [integratedCalendarYear, setIntegratedCalendarYear] = useState<number | null>(null)
   const [queryDate, setQueryDate] = useState(() => initialDateFromUrl())
   const [apiStatus, setApiStatus] = useState<ApiStatus>('warming')
-  const [apiVersion, setApiVersion] = useState('')
   const [pushState, setPushState] = useState<PushSnapshot | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
@@ -394,8 +380,10 @@ export default function AppNext() {
   useEffect(() => {
     let cancelled = false
     fetch(`${API_BASE}/health`)
-      .then((response) => { if (!response.ok) throw new Error('health check failed'); return response.json() })
-      .then((payload) => { if (!cancelled) { setApiStatus('online'); setApiVersion(String(payload.version ?? '')) } })
+      .then((response) => {
+        if (!response.ok) throw new Error('health check failed')
+        if (!cancelled) setApiStatus('online')
+      })
       .catch(() => { if (!cancelled) setApiStatus('offline') })
     return () => { cancelled = true }
   }, [])
@@ -538,6 +526,24 @@ export default function AppNext() {
     : []
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
+  const selectHomePeriod = (nextPeriod: PeriodKey, clearTool: boolean) => {
+    setPeriod(nextPeriod)
+    if (clearTool) setSelectedTool(null)
+    setIntegratedCalendarYear(null)
+    setIntegratedError('')
+    setIntegratedProgress(null)
+  }
+  const selectHomeTool = (tool: ToolKey) => {
+    setSelectedTool(tool)
+    if (tool === 'compatibility' || tool === 'marriage') {
+      setRelationshipDays(365)
+      setRelationshipCalendarYear(null)
+    }
+    if (tool === 'location') {
+      setLocationError('')
+      setLocationResult(null)
+    }
+  }
   const refreshPushState = async () => {
     const state = await getPushState()
     setPushState(state)
@@ -671,7 +677,7 @@ export default function AppNext() {
       setAiLoading(false)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
-      setAiError(message.includes('non-2xx') ? 'Supabase AI 해설 서버에서 오류가 발생했어. 설정의 Gemini 연결 상태를 확인해줘.' : message)
+      setAiError(message.includes('non-2xx') ? 'AI 해설 서버에서 오류가 발생했어. 설정의 AI 해설 연결 상태를 확인해줘.' : message)
     }
   }
 
@@ -1045,7 +1051,7 @@ export default function AppNext() {
       result: integratedResult as unknown as Record<string, unknown>,
       interpretation: aiInterpretation as unknown as Record<string,unknown> | undefined,
     })
-    setArchiveStatus(saved.cloudSynced ? '기록 저장 + Supabase 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
+    setArchiveStatus(saved.cloudSynced ? '기록 저장 + 클라우드 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
     setActionNotice('기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
     if (mainView === 'history') await refreshArchive()
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '기록 저장 실패') } finally { setArchiveSaving(false) }
@@ -1066,7 +1072,7 @@ export default function AppNext() {
       request: integratedRequestSnapshot,
       result: integratedResult as unknown as Record<string, unknown>,
     })
-    setArchiveStatus(saved.cloudSynced ? '정밀분석 기록 저장 + Supabase 동기화 완료' : `이 기기에 정밀분석 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
+    setArchiveStatus(saved.cloudSynced ? '정밀분석 기록 저장 + 클라우드 동기화 완료' : `이 기기에 정밀분석 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
     setActionNotice('정밀분석 기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '정밀분석 기록 저장 실패') } finally { setArchiveSaving(false) }
   }
@@ -1091,7 +1097,7 @@ export default function AppNext() {
       result: relationshipResult as unknown as Record<string, unknown>,
       interpretation: relationshipAi as unknown as Record<string,unknown> | undefined,
     })
-    setArchiveStatus(saved.cloudSynced ? '기록 저장 + Supabase 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
+    setArchiveStatus(saved.cloudSynced ? '기록 저장 + 클라우드 동기화 완료' : `이 기기에 기록 저장 완료 · 클라우드 동기화 대기${saved.cloudError ? ` (${saved.cloudError})` : ''}`)
     setActionNotice('관계 분석 기록 저장 완료'); window.setTimeout(()=>setActionNotice(''),2200)
     } catch (error) { setArchiveStatus(error instanceof Error ? error.message : '관계 분석 기록 저장 실패') } finally { setArchiveSaving(false) }
   }
@@ -1102,7 +1108,7 @@ export default function AppNext() {
     try {
       const data = await listArchive()
       setArchiveItems(data.items)
-      if (data.cloudAvailable) setArchiveStatus(data.cloudError ? `클라우드 연결됨 · 일부 동기화 주의: ${data.cloudError}` : `Supabase 클라우드 기록 연결됨 · ${data.items.length}개`)
+      if (data.cloudAvailable) setArchiveStatus(data.cloudError ? `클라우드 연결됨 · 일부 동기화 주의: ${data.cloudError}` : `클라우드 기록 연결됨 · ${data.items.length}개`)
       else setArchiveStatus(data.cloudError ? `이 기기 기록 사용 중 · 클라우드 대기: ${data.cloudError}` : `이 기기 기록 사용 중 · ${data.items.length}개`)
     } catch (error) {
       const message = error instanceof Error ? error.message : '기록을 불러오지 못했어.'
@@ -1263,25 +1269,22 @@ export default function AppNext() {
   return (
     <div className={`app-shell ${uiSettings.glow ? 'celestial-glow-on' : 'celestial-glow-off'} ${uiSettings.motion ? 'celestial-motion-on' : 'celestial-motion-off'}`}>
       <main className="page-content">
-        <section className="hero-card">
-          <div className="hero-orbit hero-orbit-a"/><div className="hero-orbit hero-orbit-b"/><div className="hero-star hero-star-a"/><div className="hero-star hero-star-b"/>
-          <div className="hero-kicker">CELESTIAL OBSERVATORY</div>
-          <div className="hero-row"><div className="hero-sigil"><Moon size={24} strokeWidth={1.7}/></div><div><h1>별빛의 운명</h1><p>시간의 흐름과 삶의 패턴을 읽는 개인 관측실</p></div></div>
-        </section>
+        <AppHeader/>
 
         {mainView === 'home' && <>
-          <button className="profile-card" type="button" onClick={() => switchMainView('profile')}>
-            <div className="profile-copy"><span className="eyebrow">MY BIRTH PROFILE</span><strong>{hasProfile ? `${birthProfile.name || '나'}의 출생 프로필` : '나의 출생 프로필'}</strong><span>{hasProfile ? `${birthProfile.birthDate} · ${birthProfile.birthTime} · 이 기기에 저장됨` : '정밀 계산에 사용할 출생정보를 먼저 저장해'}</span></div><ChevronDown size={20}/>
-          </button>
-          <section className="date-card"><label htmlFor="query-date">운세 기준 날짜</label><div className="date-control"><CalendarDays size={19}/><input id="query-date" type="date" value={queryDate} onChange={(e)=>setQueryDate(e.target.value)}/></div></section>
-          <section className="section-block period-fortune-section">
-            <div className="section-label">기간 운세</div>
-            <div className="period-grid" role="tablist" aria-label="기간 운세">
-              {periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${selectedTool===null&&period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setSelectedTool(null);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)}}><Icon size={17}/><span>{label}</span></button>)}
-            </div>
-          </section>
-          {selectedTool==='precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid">{periods.map(({key,label,icon:Icon})=><button key={key} className={`period-button ${period===key?'is-active':''}`} type="button" onClick={()=>{setPeriod(key);setIntegratedCalendarYear(null);setIntegratedError('');setIntegratedProgress(null)}}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
-          <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{tools.map(({key,label,desc,icon:Icon,tone})=><button key={key} className={`tool-card ${selectedTool===key?'is-selected':''}`} type="button" onClick={()=>{setSelectedTool(key); if(key==='compatibility'||key==='marriage'){setRelationshipDays(365);setRelationshipCalendarYear(null);} if(key==='location'){setLocationError('');setLocationResult(null)}}}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
+          <HomeControls
+            birthProfile={birthProfile}
+            hasProfile={hasProfile}
+            queryDate={queryDate}
+            period={period}
+            selectedTool={selectedTool}
+            apiStatus={apiStatus}
+            apiLabel={apiLabel}
+            onOpenProfile={()=>switchMainView('profile')}
+            onQueryDateChange={setQueryDate}
+            onPeriodSelect={selectHomePeriod}
+            onToolSelect={selectHomeTool}
+          />
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
@@ -1580,7 +1583,6 @@ export default function AppNext() {
           pushState={pushState}
           pushBusy={pushBusy}
           apiStatus={apiStatus}
-          apiVersion={apiVersion}
           archiveLoading={archiveLoading}
           archiveError={archiveError}
           archiveStatus={archiveStatus}
@@ -1594,12 +1596,7 @@ export default function AppNext() {
         />}
       </main>
       {actionNotice && actionNotice.includes('저장') && <div className="save-feedback-toast" role="status" aria-live="polite">{actionNotice}</div>}
-      <nav className="bottom-nav" aria-label="하단 탐색">
-        <button className={`nav-item ${mainView==='home'?'is-active':''}`} type="button" onClick={()=>switchMainView('home')}><Home size={20}/><span>홈</span></button>
-        <button className={`nav-item ${mainView==='profile'?'is-active':''}`} type="button" onClick={()=>switchMainView('profile')}><User size={20}/><span>내정보</span></button>
-        <button className={`nav-item ${mainView==='history'?'is-active':''}`} type="button" onClick={()=>switchMainView('history')}><History size={20}/><span>기록</span></button>
-        <button className={`nav-item ${mainView==='settings'?'is-active':''}`} type="button" onClick={()=>switchMainView('settings')}><Settings size={20}/><span>설정</span></button>
-      </nav>
+      <BottomNavigation activeView={mainView} onChange={switchMainView}/>
     </div>
   )
 }

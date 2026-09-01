@@ -53,11 +53,11 @@ function loadSdk() {
       const script = document.createElement('script')
       script.src = SDK_URL
       script.defer = true
-      script.onerror = () => reject(new Error('OneSignal SDK를 불러오지 못했어.'))
+      script.onerror = () => reject(new Error('알림 서비스를 불러오지 못했어.'))
       document.head.appendChild(script)
     }
 
-    const timer = window.setTimeout(() => reject(new Error('OneSignal 초기화 시간이 초과됐어.')), 12000)
+    const timer = window.setTimeout(() => reject(new Error('알림 서비스 연결 시간이 초과됐어.')), 12000)
     window.OneSignalDeferred!.push(async (OneSignal) => {
       try {
         await OneSignal.init({
