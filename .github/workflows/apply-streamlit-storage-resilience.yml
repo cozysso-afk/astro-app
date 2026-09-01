@@ -1,0 +1,73 @@
+name: Apply Streamlit storage resilience
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: astro-app-write-main
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    if: github.event_name != 'issues' || github.event.issue.title == '[automation] harden streamlit browser storage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Sync main before patch
+        run: git pull --rebase origin main
+
+      - name: Apply browser-storage resilience patch
+        run: python scripts/harden_streamlit_browser_storage.py
+
+      - name: Python syntax check
+        run: |
+          python -m py_compile app.py
+          python -m py_compile fortune_lab_v71.py
+          python -m py_compile scripts/harden_streamlit_browser_storage.py
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Scope guard
+        shell: bash
+        run: |
+          unexpected="$(git diff --name-only | grep -Ev '^(app\.py|fortune_lab_v71\.py)$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected changed files:"
+            echo "$unexpected"
+            exit 1
+          fi
+          if git diff --quiet -- app.py fortune_lab_v71.py; then
+            echo "No runtime changes needed; patch is already applied."
+          fi
+
+      - name: Safety marker check
+        shell: bash
+        run: |
+          grep -Fq "catch(e){return 'fail';}" app.py
+          grep -Fq "catch(e){{return '__EMPTY__';}}" fortune_lab_v71.py
+
+      - name: Commit and push patched runtime
+        shell: bash
+        run: |
+          if git diff --quiet -- app.py fortune_lab_v71.py; then
+            echo "No runtime changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py fortune_lab_v71.py
+          git commit -m "fix(streamlit): handle blocked browser storage safely"
+          git pull --rebase origin main
+          git push origin HEAD:main
