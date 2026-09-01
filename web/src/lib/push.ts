@@ -37,8 +37,14 @@ declare global {
 
 export function isStandalonePwa() {
   if (typeof window === 'undefined') return false
-  const navigatorWithStandalone = window.navigator as Navigator & { standalone?: boolean }
-  return navigatorWithStandalone.standalone === true || window.matchMedia('(display-mode: standalone)').matches
+  try {
+    const navigatorWithStandalone = window.navigator as Navigator & { standalone?: boolean }
+    if (navigatorWithStandalone.standalone === true) return true
+    if (typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(display-mode: standalone)').matches
+  } catch {
+    return false
+  }
 }
 
 function loadSdk() {
