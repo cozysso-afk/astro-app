@@ -1403,7 +1403,7 @@ export default function AppNext() {
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
               {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
               <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText} />
-              <RelationshipPrecisionDetails result={relationshipResult} partnerTimeExact={partnerTimeExact} formatLimit={relationshipLimitKo} />
+              <RelationshipPrecisionDetails result={relationshipResult} partnerTimeExact={partnerTimeExact} aspects={natalAspects} formatLimit={relationshipLimitKo} />
             </div>}
           </section>}
 
