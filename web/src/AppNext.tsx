@@ -3,11 +3,11 @@ import {
   AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Cloud, Copy, Gem, Heart, History, Home,
   LoaderCircle, MapPin, Moon, Orbit, RefreshCw, Save, Search, Settings, Sparkles, Sun, Trash2, User,
 } from 'lucide-react'
-import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem } from './lib/archive'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
 import type {
   PeriodKey,
@@ -18,7 +18,6 @@ import type {
   RelationshipPurpose,
   MarriageMode,
   RelationshipAnalysisMode,
-  Gender,
   BirthProfile,
   CounterpartProfile,
   Aspect,
@@ -44,6 +43,8 @@ import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
 import { LocationResults } from './LocationResults'
 import { ArchiveView } from './ArchiveView'
+import { ProfileView } from './ProfileView'
+import { SettingsView } from './SettingsView'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
 import { coreTopicOrder, marketTopicOrder, topicOrder } from './lib/fortuneTopics'
@@ -1563,69 +1564,34 @@ export default function AppNext() {
 
         </>}
 
-        {mainView === 'profile' && <section className="form-card profile-form-card">
-          <div className="form-card-heading"><div className="report-icon"><User size={21}/></div><div><span className="eyebrow">MY BIRTH PROFILE</span><h2>내 출생 프로필</h2><p>정밀 계산에만 사용하고 이 브라우저 기기에 로컬 저장해.</p></div></div>
-          <div className="privacy-note"><CheckCircle2 size={16}/><span>출생 프로필 자체는 이 브라우저에 저장해. 분석 기록에서 “기록 저장”을 누르면 계산 입력과 결과가 본인 전용 Supabase 기록에도 동기화될 수 있어.</span></div>
-          <div className="field-grid">
-            <label className="field field-wide"><span>이름 / 닉네임</span><input value={birthProfile.name} onChange={(e)=>setBirthProfile({...birthProfile,name:e.target.value})} placeholder="선택 입력"/></label>
-            <label className="field birth-date-field"><span>생년월일</span><input type="date" value={birthProfile.birthDate} onChange={(e)=>setBirthProfile({...birthProfile,birthDate:e.target.value})}/></label>
-            <label className="field birth-time-field"><span>출생시간</span><input type="time" value={birthProfile.birthTime} onChange={(e)=>setBirthProfile({...birthProfile,birthTime:e.target.value})}/></label>
-            <label className="field field-wide"><span>성별 · 사주 대운 계산 기준</span><select value={birthProfile.gender} onChange={(e)=>setBirthProfile({...birthProfile,gender:e.target.value as Gender})}><option value="female">여성</option><option value="male">남성</option></select></label>
-            <KoreaBirthplaceSelector value={birthProfile} onChange={(location)=>setBirthProfile({...birthProfile,...location})}/>
-            <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
-              <label className="field"><span>위도</span><input inputMode="decimal" value={birthProfile.latitude} onChange={(e)=>setBirthProfile({...birthProfile,latitude:e.target.value,placeKey:''})}/></label>
-              <label className="field"><span>경도</span><input inputMode="decimal" value={birthProfile.longitude} onChange={(e)=>setBirthProfile({...birthProfile,longitude:e.target.value,placeKey:''})}/></label>
-              <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={birthProfile.utcOffset} onChange={(e)=>setBirthProfile({...birthProfile,utcOffset:e.target.value})}/></label>
-            </div></details>
-          </div>
-          <div className="coordinate-note"><MapPin size={16}/><span>2026년 7월 1일 현행 전국 행정체계를 기준으로 선택해. 좌표는 자동 적용되고 직접 입력은 선택사항이야.</span></div>
-          <button className="primary-button" type="button" onClick={saveBirthProfile}><Save size={18}/><span>{profileSaved?'이 기기에 저장 완료':'이 기기에 프로필 저장'}</span></button>
-        </section>}
+        {mainView === 'profile' && <ProfileView
+          birthProfile={birthProfile}
+          profileSaved={profileSaved}
+          onChange={setBirthProfile}
+          onSave={saveBirthProfile}
+        />}
 
         {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}
 
-        {mainView === 'settings' && <section className="form-card settings-view">
-          <div className="form-card-heading"><div className="report-icon"><Settings size={21}/></div><div><span className="eyebrow">SETTINGS</span><h2>설정</h2><p>별빛 화면 효과와 앱 상태를 여기서 조절해.</p></div></div>
-
-          <div className="settings-list">
-            <label className="settings-toggle-row">
-              <span className="settings-row-icon lilac"><Sparkles size={19}/></span>
-              <span className="settings-row-copy"><strong>별빛 · 오로라 효과</strong><small>파스텔 빛 번짐, 글로우, 천체 장식의 강도를 켜고 꺼.</small></span>
-              <span className="toggle-switch"><input type="checkbox" checked={uiSettings.glow} onChange={(e)=>setUiSettings({...uiSettings, glow:e.target.checked})}/><span className="toggle-track"><span/></span></span>
-            </label>
-            <label className="settings-toggle-row">
-              <span className="settings-row-icon blue"><Orbit size={19}/></span>
-              <span className="settings-row-copy"><strong>잔잔한 애니메이션</strong><small>별 반짝임과 광택 이동 효과를 사용해.</small></span>
-              <span className="toggle-switch"><input type="checkbox" checked={uiSettings.motion} onChange={(e)=>setUiSettings({...uiSettings, motion:e.target.checked})}/><span className="toggle-track"><span/></span></span>
-            </label>
-          </div>
-
-          <div className="subsection-title">AI 해석</div>
-          <div className="ai-settings-card">
-            <label><span><strong>AI 해석 모델</strong><small>실계산 뒤에 붙는 자연어 해설 모델</small></span><select value={aiModel} onChange={(e)=>setAiModel(e.target.value)}><option value="gemini-3.7-flash">Gemini 3.7 Flash · 정밀 우선</option><option value="gemini-3.6-flash">Gemini 3.6 Flash · 빠른 해설</option></select></label>
-            <div className={`ai-api-state ${aiConfigured===true?'online':aiConfigured===false?'offline':'checking'}`}><Sparkles size={16}/><span><strong>Gemini API</strong><small>{aiConfigured===true?'Supabase Edge Function 연결됨 · Gemini 해설':aiConfigured===false?'미연결 · Supabase에 GEMINI_API_KEY 설정 필요':'연결 상태 확인 중'}</small></span></div>
-          </div>
-
-          <div className="subsection-title">알림</div>
-          <div className="push-settings-card">
-            <div className={`push-state-row ${pushState?.status || 'checking'}`}><span className="push-state-icon">🔔</span><span><strong>운세 푸시 알림</strong><small>{pushState?.message || 'OneSignal 알림 구독 상태 확인 중'}</small></span></div>
-            <button type="button" onClick={()=>void togglePush()} disabled={pushBusy || pushState?.status==='unsupported'}>{pushBusy?'처리 중…':pushState?.status==='ready'?'알림 끄기':'알림 켜기'}</button>
-            {pushState?.status==='needs_install' && <p>iPhone에서는 Safari에서 홈 화면에 추가한 뒤, 홈화면의 ‘별빛의 운명’을 열고 여기서 알림 켜기를 눌러야 해.</p>}
-            {pushState?.status==='error' && <p>OneSignal 사이트 주소가 현재 Vercel 도메인과 맞는지 대시보드에서 확인해줘.</p>}
-          </div>
-
-          <div className="subsection-title">앱 상태</div>
-          <div className="settings-status-grid">
-            <div><span>계산 서버</span><strong>{apiStatus==='online'?'연결됨':apiStatus==='warming'?'확인 중':'대기 중'}</strong><small>{apiVersion || 'API 상태 확인'}</small></div>
-            <div><span>AI 해설</span><strong>{aiConfigured===true?'연결됨':aiConfigured===false?'미연결':'확인 중'}</strong><small>{aiModel}</small></div>
-            <div><span>알림</span><strong>{pushState?.status==='ready'?'켜짐':pushState?.status==='needs_install'?'홈화면 설치 필요':pushState?.status==='unsupported'?'지원 안 됨':pushState?.status==='error'?'확인 오류':'꺼짐/확인 중'}</strong><small>{pushState?.message || '설정 탭에서 확인'}</small></div>
-            <div><span>클라우드 기록</span><strong>{archiveLoading?'확인 중':archiveError?'확인 오류':archiveItems.length+'개'}</strong><small>{archiveError || archiveStatus || '기록 상태 확인 전'}</small></div>
-            <div><span>출생 프로필</span><strong>{hasProfile?'저장됨':'미저장'}</strong><small>{hasProfile?'이 브라우저 기기 보관':'내정보에서 먼저 저장'}</small></div>
-          </div>
-
-          <div className="privacy-note settings-note"><Cloud size={16}/><span>클라우드 기록은 현재 익명 로그인 세션 기준이야. Safari와 홈화면 웹앱이 서로 다른 익명 세션을 만들면 기록이 따로 보일 수 있어. 장기적으로 기기 간 동일 기록이 필요하면 Apple/Google 로그인이 필요해.</span></div>
-          <div className="settings-actions"><button type="button" onClick={()=>switchMainView('history')}><History size={16}/>기록함 열기</button><button type="button" onClick={()=>switchMainView('profile')}><User size={16}/>출생 프로필 열기</button></div>
-        </section>}
+        {mainView === 'settings' && <SettingsView
+          uiSettings={uiSettings}
+          aiModel={aiModel}
+          aiConfigured={aiConfigured}
+          pushState={pushState}
+          pushBusy={pushBusy}
+          apiStatus={apiStatus}
+          apiVersion={apiVersion}
+          archiveLoading={archiveLoading}
+          archiveError={archiveError}
+          archiveStatus={archiveStatus}
+          archiveCount={archiveItems.length}
+          hasProfile={hasProfile}
+          onUiSettingsChange={setUiSettings}
+          onAiModelChange={setAiModel}
+          onTogglePush={()=>void togglePush()}
+          onOpenHistory={()=>switchMainView('history')}
+          onOpenProfile={()=>switchMainView('profile')}
+        />}
       </main>
       {actionNotice && actionNotice.includes('저장') && <div className="save-feedback-toast" role="status" aria-live="polite">{actionNotice}</div>}
       <nav className="bottom-nav" aria-label="하단 탐색">
