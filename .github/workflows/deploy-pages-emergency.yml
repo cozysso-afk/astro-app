@@ -1,3 +1,5 @@
+# Repository Settings → Pages → Source must remain "GitHub Actions".
+# Branch-based Pages races this workflow and overwrites the React build with Jekyll output.
 name: Emergency GitHub Pages Frontend
 
 on:
