@@ -77,7 +77,64 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+}
+
+.archive-actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.archive-undo-toast {
+  position: fixed;
+  z-index: 170;
+  left: 50%;
+  bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + 10px);
+  width: min(calc(100% - 28px), 520px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px 11px 14px;
+  transform: translateX(-50%);
+  border-radius: 15px;
+  color: #fff;
+  background: rgba(59, 49, 67, .95);
+  box-shadow: 0 12px 30px rgba(46, 38, 54, .2);
+  backdrop-filter: blur(14px);
+}
+
+.archive-undo-toast span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  overflow: hidden;
+  font-size: .72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-undo-toast strong {
+  font-size: .78rem;
+}
+
+.archive-undo-toast button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, .12);
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 850;
+  cursor: pointer;
 }
 
 .archive-tabs {
