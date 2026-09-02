@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Cloud, Copy, Download, History, Home, LoaderCircle, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { AlertTriangle, Cloud, Copy, Download, History, Home, LoaderCircle, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
 import type { ArchiveItem } from './lib/archive'
 
 type ArchiveViewProps = {
@@ -8,12 +8,14 @@ type ArchiveViewProps = {
   status: string
   error: string
   legacyOpen: ArchiveItem | null
+  deleteUndoPending: boolean
   onRefresh: () => void | Promise<void>
   onCloseLegacy: () => void
   onGoHome: () => void
   onRestore: (item: ArchiveItem) => void | Promise<void>
   onCopy: (item: ArchiveItem) => void | Promise<void>
   onExport: () => void | Promise<void>
+  onImport: (file: File) => void | Promise<void>
   onRemove: (item: ArchiveItem) => void | Promise<void>
 }
 
@@ -89,12 +91,14 @@ export function ArchiveView({
   status,
   error,
   legacyOpen,
+  deleteUndoPending,
   onRefresh,
   onCloseLegacy,
   onGoHome,
   onRestore,
   onCopy,
   onExport,
+  onImport,
   onRemove,
 }: ArchiveViewProps) {
   const [section, setSection] = useState<ArchiveSection>('fortune')
@@ -105,6 +109,8 @@ export function ArchiveView({
   const [dateTo, setDateTo] = useState('')
   const [pendingDelete, setPendingDelete] = useState<ArchiveItem | null>(null)
   const [removeBusy, setRemoveBusy] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!pendingDelete) return
@@ -162,13 +168,27 @@ export function ArchiveView({
     }
   }
 
+  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file || importBusy) return
+    setImportBusy(true)
+    try {
+      await onImport(file)
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   return <section className="form-card archive-view">
     <div className="form-card-heading"><div className="report-icon"><History size={21}/></div><div><span className="eyebrow">ARCHIVE</span><h2>기록함</h2><p>자동 저장되는 운세 기록과 직접 남긴 검증 기록을 분리해서 볼 수 있어.</p></div></div>
     <div className="archive-sync-row">
       <span><Cloud size={15}/>{loading ? '기록 연결 상태 확인 중' : status || '기록 연결 상태 확인 전'}</span>
       <div className="archive-toolbar-actions">
-        <button type="button" onClick={onExport} disabled={loading || items.length === 0}><Download size={15}/>전체 백업</button>
-        <button type="button" onClick={onRefresh} disabled={loading}><RefreshCw className={loading?'spin':''} size={15}/>새로고침</button>
+        <input ref={importInputRef} hidden type="file" accept="application/json,.json" aria-label="기록 백업 파일 선택" onChange={(event)=>void importBackup(event)}/>
+        <button type="button" onClick={()=>importInputRef.current?.click()} disabled={loading || importBusy || deleteUndoPending}>{importBusy ? <LoaderCircle className="spin" size={15}/> : <Upload size={15}/>}백업 가져오기</button>
+        <button type="button" onClick={onExport} disabled={loading || deleteUndoPending || items.length === 0}><Download size={15}/>전체 백업</button>
+        <button type="button" onClick={onRefresh} disabled={loading || deleteUndoPending}><RefreshCw className={loading?'spin':''} size={15}/>새로고침</button>
       </div>
     </div>
     <div className="archive-tabs" role="tablist" aria-label="기록 종류">
@@ -237,7 +257,7 @@ export function ArchiveView({
       <div className="archive-actions">
         <button type="button" onClick={()=>onRestore(item)}><Search size={14}/>다시 열기</button>
         <button type="button" onClick={()=>onCopy(item)}><Copy size={14}/>전체복사</button>
-        <button className="danger" type="button" onClick={()=>setPendingDelete(item)}><Trash2 size={14}/>삭제</button>
+        <button className="danger" type="button" disabled={deleteUndoPending} title={deleteUndoPending ? '진행 중인 삭제가 끝난 뒤 다시 시도해줘.' : undefined} onClick={()=>setPendingDelete(item)}><Trash2 size={14}/>삭제</button>
       </div>
     </article>)}</div>
     {pendingDelete && <div className="archive-confirm-backdrop" onMouseDown={(event)=>{
@@ -250,8 +270,8 @@ export function ArchiveView({
           <h3 id="archive-delete-title">이 기록을 삭제할까?</h3>
           <strong>{pendingDelete.title}</strong>
           <p id="archive-delete-description">{pendingDelete.cloudId
-            ? '이 기기와 클라우드에서 모두 삭제돼. 삭제 후에는 되돌릴 수 없어.'
-            : '아직 클라우드에 없는 기록이라 이 기기에서 지우면 복구할 수 없어. 필요하면 먼저 전체 백업을 받아줘.'}</p>
+            ? '삭제를 누른 뒤 8초 동안 되돌릴 수 있어. 시간이 지나면 이 기기와 클라우드에서 모두 삭제돼.'
+            : '삭제를 누른 뒤 8초 동안 되돌릴 수 있어. 시간이 지나면 이 기기에서 삭제돼.'}</p>
         </div>
         <div className="archive-confirm-actions">
           <button type="button" autoFocus onClick={()=>setPendingDelete(null)} disabled={removeBusy}>취소</button>
