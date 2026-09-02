@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
-  LoaderCircle, MapPin, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
+  LoaderCircle, MapPin, RefreshCw, RotateCcw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
-import { deleteArchive, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
-import { createArchiveBackup, downloadArchiveBackup } from './lib/archiveBackup'
+import { deleteArchive, importArchiveItems, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, parseArchiveBackupText } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
@@ -63,6 +63,7 @@ const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
 const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'
+const ARCHIVE_DELETE_UNDO_MS = 8000
 
 const PERIOD_CACHE_TTL_DAYS: Record<PeriodKey, number> = {
   today: 180,
@@ -375,6 +376,9 @@ export default function AppNext() {
   const [archiveStatus, setArchiveStatus] = useState('')
   const [archiveError, setArchiveError] = useState('')
   const [archiveSaving, setArchiveSaving] = useState(false)
+  const [archiveUndoItem, setArchiveUndoItem] = useState<ArchiveItem | null>(null)
+  const archiveUndoItemRef = useRef<ArchiveItem | null>(null)
+  const archiveDeleteTimerRef = useRef<number | null>(null)
   const [locationResult, setLocationResult] = useState<LocationFitResponse | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -461,6 +465,10 @@ export default function AppNext() {
   useEffect(() => {
     if (mainView === 'history' || mainView === 'settings') void refreshArchive()
   }, [mainView])
+
+  useEffect(() => () => {
+    if (archiveDeleteTimerRef.current !== null) window.clearTimeout(archiveDeleteTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (mainView === 'settings') void refreshPushState()
@@ -1124,7 +1132,8 @@ export default function AppNext() {
     setArchiveError('')
     try {
       const data = await listArchive()
-      setArchiveItems(data.items)
+      const pendingDeleteId = archiveUndoItemRef.current?.id
+      setArchiveItems(pendingDeleteId ? data.items.filter((item) => item.id !== pendingDeleteId) : data.items)
       if (data.cloudAvailable) setArchiveStatus(data.cloudError ? `클라우드 연결됨 · 일부 동기화 주의: ${data.cloudError}` : `클라우드 기록 연결됨 · ${data.items.length}개`)
       else setArchiveStatus(data.cloudError ? `이 기기 기록 사용 중 · 클라우드 대기: ${data.cloudError}` : `이 기기 기록 사용 중 · ${data.items.length}개`)
     } catch (error) {
@@ -1245,6 +1254,24 @@ export default function AppNext() {
     }
   }
 
+  async function importArchiveFile(file: File) {
+    setArchiveError('')
+    try {
+      if (file.size > ARCHIVE_BACKUP_MAX_BYTES) throw new Error('백업 파일은 25MB 이하만 가져올 수 있어.')
+      const parsed = parseArchiveBackupText(await file.text())
+      const restored = importArchiveItems(parsed.items, archiveItems)
+      setArchiveItems(restored.items)
+      const skipped = restored.skippedExisting + parsed.duplicateRecords + parsed.invalidRecords
+      if (restored.imported === 0) {
+        setArchiveStatus(`새로 복원된 기록이 없어 · 기존/중복/비정상 ${skipped}건 건너뜀`)
+        return
+      }
+      setArchiveStatus(`이 기기에 ${restored.imported}건 복원 완료${skipped ? ` · ${skipped}건 건너뜀` : ''} · 새로고침하면 현재 클라우드 계정에 동기화돼`)
+    } catch (error) {
+      setArchiveStatus(error instanceof Error ? error.message : '백업 파일을 가져오지 못했어.')
+    }
+  }
+
 
   const outcomeCalibration = useMemo(() => {
     void outcomeNonce
@@ -1292,15 +1319,48 @@ export default function AppNext() {
     window.setTimeout(()=>{ setOutcomeSaved(false); setActionNotice('') },2200)
   }
 
-  async function removeArchive(item: ArchiveItem): Promise<void> {
+  function restoreDeletedItem(item: ArchiveItem) {
+    setArchiveItems((current) => current.some((row) => row.id === item.id)
+      ? current
+      : [item, ...current].sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+  }
+
+  async function commitArchiveDelete(item: ArchiveItem) {
+    if (archiveUndoItemRef.current?.id !== item.id) return
+    archiveUndoItemRef.current = null
+    archiveDeleteTimerRef.current = null
+    setArchiveUndoItem(null)
     try {
       await deleteArchive(item)
-      if (legacyArchiveOpen?.id === item.id) setLegacyArchiveOpen(null)
       setArchiveStatus('기록 삭제 완료')
-      await refreshArchive()
     } catch (error) {
-      setArchiveStatus(error instanceof Error ? error.message : '기록 삭제 중 오류가 발생했어.')
+      restoreDeletedItem(item)
+      setArchiveStatus(error instanceof Error ? `삭제하지 못해 기록을 복원했어: ${error.message}` : '삭제하지 못해 기록을 다시 표시했어.')
     }
+  }
+
+  function removeArchive(item: ArchiveItem): void {
+    if (archiveUndoItemRef.current) {
+      setArchiveStatus('먼저 진행 중인 삭제를 되돌리거나 잠시 기다려줘.')
+      return
+    }
+    archiveUndoItemRef.current = item
+    setArchiveUndoItem(item)
+    setArchiveItems((current) => current.filter((row) => row.id !== item.id))
+    if (legacyArchiveOpen?.id === item.id) setLegacyArchiveOpen(null)
+    setArchiveStatus('기록을 숨겼어 · 8초 안에 되돌릴 수 있어')
+    archiveDeleteTimerRef.current = window.setTimeout(() => void commitArchiveDelete(item), ARCHIVE_DELETE_UNDO_MS)
+  }
+
+  function undoArchiveDelete() {
+    const item = archiveUndoItemRef.current
+    if (!item) return
+    if (archiveDeleteTimerRef.current !== null) window.clearTimeout(archiveDeleteTimerRef.current)
+    archiveDeleteTimerRef.current = null
+    archiveUndoItemRef.current = null
+    setArchiveUndoItem(null)
+    restoreDeletedItem(item)
+    setArchiveStatus('기록 삭제를 되돌렸어')
   }
 
   return (
@@ -1521,7 +1581,7 @@ export default function AppNext() {
           onSave={saveBirthProfile}
         />}
 
-        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onExport={exportArchive} onRemove={removeArchive} />}
+        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} deleteUndoPending={Boolean(archiveUndoItem)} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onExport={exportArchive} onImport={importArchiveFile} onRemove={removeArchive} />}
 
         {mainView === 'settings' && <SettingsView
           uiSettings={uiSettings}
@@ -1543,6 +1603,10 @@ export default function AppNext() {
         />}
       </main>
       {actionNotice && actionNotice.includes('저장') && <div className="save-feedback-toast" role="status" aria-live="polite">{actionNotice}</div>}
+      {archiveUndoItem && <div className="archive-undo-toast" role="status" aria-live="assertive">
+        <span><strong>삭제 대기 중</strong>{archiveUndoItem.title}</span>
+        <button type="button" onClick={undoArchiveDelete}><RotateCcw size={15}/>되돌리기</button>
+      </div>}
       <BottomNavigation activeView={mainView} onChange={switchMainView}/>
     </div>
   )
