@@ -33,6 +33,12 @@ export type ArchiveListResult = {
   cloudError?: string
 }
 
+export type ArchiveImportResult = {
+  items: ArchiveItem[]
+  imported: number
+  skippedExisting: number
+}
+
 const STORAGE_KEY = 'starlight-destiny.archive.v1'
 const CLOUD_PAGE_SIZE = 100
 
@@ -126,6 +132,28 @@ function upsertLocal(item: ArchiveItem): LocalPersistResult {
   const next = [item, ...items.filter((row) => row.id !== item.id)]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return persistLocal(next)
+}
+
+export function importArchiveItems(candidates: ArchiveItem[], knownItems: ArchiveItem[] = []): ArchiveImportResult {
+  const merged = new Map<string, ArchiveItem>()
+  loadLocal().forEach((item) => merged.set(item.id, item))
+  knownItems.forEach((item) => merged.set(item.id, item))
+
+  let imported = 0
+  let skippedExisting = 0
+  for (const candidate of candidates) {
+    if (merged.has(candidate.id)) {
+      skippedExisting += 1
+      continue
+    }
+    merged.set(candidate.id, { ...candidate, cloudId: undefined, syncState: 'local' })
+    imported += 1
+  }
+
+  const items = [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const persisted = persistLocal(items)
+  if (!persisted.ok) throw new Error(`기록을 복원하지 못했어: ${persisted.error}`)
+  return { items, imported, skippedExisting }
 }
 
 async function ensureArchiveUser() {
@@ -397,11 +425,13 @@ export async function listArchive(): Promise<ArchiveListResult> {
 }
 
 export async function deleteArchive(item: ArchiveItem) {
+  if (item.cloudId) {
+    const response = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
+      ? await supabase.from('readings').delete().eq('id', item.cloudId)
+      : await supabase.from('relationship_readings').delete().eq('id', item.cloudId)
+    if (response.error) throw new Error(supabaseErrorMessage(response.error, '클라우드 기록을 삭제하지 못했어.'))
+  }
+
   const localDelete = persistLocal(loadLocal().filter((row) => row.id !== item.id))
   if (!localDelete.ok) throw new Error(localDelete.error)
-  if (!item.cloudId) return
-  const response = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
-    ? await supabase.from('readings').delete().eq('id', item.cloudId)
-    : await supabase.from('relationship_readings').delete().eq('id', item.cloudId)
-  if (response.error) throw response.error
 }
