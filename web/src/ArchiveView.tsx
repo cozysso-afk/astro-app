@@ -1,5 +1,5 @@
-import { useMemo, useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Cloud, Copy, History, Home, LoaderCircle, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { AlertTriangle, Cloud, Copy, Download, History, Home, LoaderCircle, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import type { ArchiveItem } from './lib/archive'
 
 type ArchiveViewProps = {
@@ -13,6 +13,7 @@ type ArchiveViewProps = {
   onGoHome: () => void
   onRestore: (item: ArchiveItem) => void | Promise<void>
   onCopy: (item: ArchiveItem) => void | Promise<void>
+  onExport: () => void | Promise<void>
   onRemove: (item: ArchiveItem) => void | Promise<void>
 }
 
@@ -93,6 +94,7 @@ export function ArchiveView({
   onGoHome,
   onRestore,
   onCopy,
+  onExport,
   onRemove,
 }: ArchiveViewProps) {
   const [section, setSection] = useState<ArchiveSection>('fortune')
@@ -101,6 +103,17 @@ export function ArchiveView({
   const [dateField, setDateField] = useState<ArchiveDateField>('target')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<ArchiveItem | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
+
+  useEffect(() => {
+    if (!pendingDelete) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !removeBusy) setPendingDelete(null)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [pendingDelete, removeBusy])
 
   const normalizedQuery = normalizeSearchValue(query)
   const hasTextQuery = Boolean(normalizedQuery)
@@ -138,9 +151,26 @@ export function ArchiveView({
     setTypeFilter('all')
   }
 
+  const confirmRemove = async () => {
+    if (!pendingDelete || removeBusy) return
+    setRemoveBusy(true)
+    try {
+      await onRemove(pendingDelete)
+    } finally {
+      setRemoveBusy(false)
+      setPendingDelete(null)
+    }
+  }
+
   return <section className="form-card archive-view">
     <div className="form-card-heading"><div className="report-icon"><History size={21}/></div><div><span className="eyebrow">ARCHIVE</span><h2>기록함</h2><p>자동 저장되는 운세 기록과 직접 남긴 검증 기록을 분리해서 볼 수 있어.</p></div></div>
-    <div className="archive-sync-row"><span><Cloud size={15}/>{loading ? '기록 연결 상태 확인 중' : status || '기록 연결 상태 확인 전'}</span><button type="button" onClick={onRefresh} disabled={loading}><RefreshCw className={loading?'spin':''} size={15}/>새로고침</button></div>
+    <div className="archive-sync-row">
+      <span><Cloud size={15}/>{loading ? '기록 연결 상태 확인 중' : status || '기록 연결 상태 확인 전'}</span>
+      <div className="archive-toolbar-actions">
+        <button type="button" onClick={onExport} disabled={loading || items.length === 0}><Download size={15}/>전체 백업</button>
+        <button type="button" onClick={onRefresh} disabled={loading}><RefreshCw className={loading?'spin':''} size={15}/>새로고침</button>
+      </div>
+    </div>
     <div className="archive-tabs" role="tablist" aria-label="기록 종류">
       <button type="button" role="tab" aria-selected={section==='fortune'} className={`archive-tab fortune ${section==='fortune'?'active':''}`} onClick={()=>changeSection('fortune')}>
         <span>운세 기록</span><strong>{fortuneItems.length}</strong>
@@ -207,8 +237,29 @@ export function ArchiveView({
       <div className="archive-actions">
         <button type="button" onClick={()=>onRestore(item)}><Search size={14}/>다시 열기</button>
         <button type="button" onClick={()=>onCopy(item)}><Copy size={14}/>전체복사</button>
-        <button className="danger" type="button" onClick={()=>onRemove(item)}><Trash2 size={14}/>삭제</button>
+        <button className="danger" type="button" onClick={()=>setPendingDelete(item)}><Trash2 size={14}/>삭제</button>
       </div>
     </article>)}</div>
+    {pendingDelete && <div className="archive-confirm-backdrop" onMouseDown={(event)=>{
+      if (event.currentTarget === event.target && !removeBusy) setPendingDelete(null)
+    }}>
+      <div className="archive-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="archive-delete-title" aria-describedby="archive-delete-description">
+        <div className="archive-confirm-icon"><AlertTriangle size={22}/></div>
+        <div className="archive-confirm-copy">
+          <span className="eyebrow">DELETE RECORD</span>
+          <h3 id="archive-delete-title">이 기록을 삭제할까?</h3>
+          <strong>{pendingDelete.title}</strong>
+          <p id="archive-delete-description">{pendingDelete.cloudId
+            ? '이 기기와 클라우드에서 모두 삭제돼. 삭제 후에는 되돌릴 수 없어.'
+            : '아직 클라우드에 없는 기록이라 이 기기에서 지우면 복구할 수 없어. 필요하면 먼저 전체 백업을 받아줘.'}</p>
+        </div>
+        <div className="archive-confirm-actions">
+          <button type="button" autoFocus onClick={()=>setPendingDelete(null)} disabled={removeBusy}>취소</button>
+          <button className="danger" type="button" onClick={()=>void confirmRemove()} disabled={removeBusy}>
+            {removeBusy ? <><LoaderCircle className="spin" size={15}/>삭제 중…</> : <><Trash2 size={15}/>삭제하기</>}
+          </button>
+        </div>
+      </div>
+    </div>}
   </section>
 }

@@ -73,6 +73,13 @@
   cursor: not-allowed;
 }
 
+.archive-toolbar-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .archive-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -384,6 +391,100 @@
   background: #fff6f5;
 }
 
+.archive-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(42, 32, 38, .42);
+  backdrop-filter: blur(5px);
+}
+
+.archive-confirm-dialog {
+  width: min(100%, 390px);
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(151, 101, 101, .2);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fffdfb, #fff7f6);
+  box-shadow: 0 24px 70px rgba(43, 29, 37, .22);
+}
+
+.archive-confirm-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #a05f62;
+  background: #fbe8e7;
+}
+
+.archive-confirm-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.archive-confirm-copy h3,
+.archive-confirm-copy p {
+  margin: 0;
+}
+
+.archive-confirm-copy h3 {
+  color: #49383d;
+  font-size: 1rem;
+}
+
+.archive-confirm-copy strong {
+  overflow: hidden;
+  color: #665258;
+  font-size: .8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-confirm-copy p {
+  color: #806e73;
+  font-size: .76rem;
+  line-height: 1.65;
+}
+
+.archive-confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.archive-confirm-actions button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(103, 79, 86, .14);
+  border-radius: 12px;
+  color: #6e5d62;
+  background: #fff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.archive-confirm-actions button.danger {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(135deg, #9c5f62, #b87572);
+}
+
+.archive-confirm-actions button:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
+
 @media (max-width: 420px) {
   .result-actions button {
     font-size: 0.75rem;
@@ -408,6 +509,19 @@
 
   .archive-search-summary {
     align-items: flex-start;
+  }
+
+  .archive-sync-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .archive-toolbar-actions {
+    width: 100%;
+  }
+
+  .archive-toolbar-actions button {
+    flex: 1 1 0;
   }
 }
 

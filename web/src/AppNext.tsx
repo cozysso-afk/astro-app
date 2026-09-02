@@ -4,6 +4,7 @@ import {
   LoaderCircle, MapPin, RefreshCw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
 import { deleteArchive, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { createArchiveBackup, downloadArchiveBackup } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
@@ -1234,6 +1235,16 @@ export default function AppNext() {
     }
   }
 
+  function exportArchive() {
+    try {
+      const backup = createArchiveBackup(archiveItems)
+      downloadArchiveBackup(backup)
+      setArchiveStatus(`전체 기록 ${backup.summary.total}건 백업 완료 · 로컬 전용 ${backup.summary.localOnly}건 · 클라우드 연결 ${backup.summary.cloudBacked}건`)
+    } catch (error) {
+      setArchiveStatus(error instanceof Error ? error.message : '기록 백업 파일을 만들지 못했어.')
+    }
+  }
+
 
   const outcomeCalibration = useMemo(() => {
     void outcomeNonce
@@ -1281,7 +1292,7 @@ export default function AppNext() {
     window.setTimeout(()=>{ setOutcomeSaved(false); setActionNotice('') },2200)
   }
 
-  async function removeArchive(item: ArchiveItem) {
+  async function removeArchive(item: ArchiveItem): Promise<void> {
     try {
       await deleteArchive(item)
       if (legacyArchiveOpen?.id === item.id) setLegacyArchiveOpen(null)
@@ -1510,7 +1521,7 @@ export default function AppNext() {
           onSave={saveBirthProfile}
         />}
 
-        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onRemove={removeArchive} />}
+        {mainView === 'history' && <ArchiveView items={archiveItems} loading={archiveLoading} status={archiveStatus} error={archiveError} legacyOpen={legacyArchiveOpen} onRefresh={refreshArchive} onCloseLegacy={setLegacyArchiveOpen.bind(null, null)} onGoHome={switchMainView.bind(null, 'home')} onRestore={restoreArchive} onCopy={copyArchiveResult} onExport={exportArchive} onRemove={removeArchive} />}
 
         {mainView === 'settings' && <SettingsView
           uiSettings={uiSettings}
