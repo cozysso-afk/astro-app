@@ -1,0 +1,32 @@
+name: Vercel Production Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "web/**"
+      - ".github/workflows/vercel-production.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  advance-production-branch:
+    name: Advance Vercel production branch
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out main commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Advance deployment branch
+        run: git push origin HEAD:refs/heads/vercel-production
