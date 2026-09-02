@@ -40,6 +40,12 @@ type LocalPersistResult = { ok: true } | { ok: false; error: string }
 type UploadLocalItemResult = { item: ArchiveItem; local: LocalPersistResult }
 type CloudArchiveTable = 'readings' | 'relationship_readings'
 type CloudFetchResult = { items: ArchiveItem[]; warnings: string[] }
+type SupabaseErrorLike = {
+  code?: unknown
+  message?: unknown
+  details?: unknown
+  hint?: unknown
+}
 
 function newId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -68,6 +74,27 @@ function localStorageErrorMessage(error: unknown) {
   return isQuotaExceeded(error)
     ? '브라우저 저장 공간이 부족해.'
     : '브라우저 저장소를 사용할 수 없어.'
+}
+
+function supabaseErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message || fallback
+  if (!error || typeof error !== 'object') return String(error || fallback)
+
+  const cloudError = error as SupabaseErrorLike
+  const details = [cloudError.message, cloudError.details, cloudError.hint]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+  const code = typeof cloudError.code === 'string' && cloudError.code.trim()
+    ? `[${cloudError.code}]`
+    : ''
+  const message = [...new Set(details)].join(' · ')
+  return [code, message].filter(Boolean).join(' ') || fallback
+}
+
+function isRetryableCloudAuthError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const cloudError = error as SupabaseErrorLike
+  const code = typeof cloudError.code === 'string' ? cloudError.code.toUpperCase() : ''
+  return code === '42501' || code === 'PGRST301' || code === 'PGRST302' || code === 'PGRST303'
 }
 
 function persistLocal(items: ArchiveItem[]): LocalPersistResult {
@@ -267,12 +294,17 @@ async function fetchCloudTable(table: CloudArchiveTable, kindFallback: ArchiveKi
   let from = 0
 
   while (true) {
-    const page = await supabase
+    const fetchPage = () => supabase
       .from(table)
       .select(cloudColumns)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(from, from + CLOUD_PAGE_SIZE - 1)
+    let page = await fetchPage()
+    if (page.error && isRetryableCloudAuthError(page.error)) {
+      const session = await ensureSupabaseSession()
+      if (session.user.id === userId) page = await fetchPage()
+    }
     if (page.error) throw page.error
 
     const rows = page.data ?? []
@@ -288,7 +320,7 @@ async function fetchCloudTable(table: CloudArchiveTable, kindFallback: ArchiveKi
 }
 
 function cloudFetchError(label: string, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || '조회 실패')
+  const message = supabaseErrorMessage(error, '조회 실패')
   return `${label} 클라우드 조회 실패: ${message}`
 }
 
