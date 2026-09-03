@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FortuneDailyScore } from './appTypes'
 import { topicOrder } from './lib/fortuneTopics'
 
 const relationshipTopics = ['수신신호','발신적합','과거인연접점']
 const allTopics = [...topicOrder, ...relationshipTopics]
 const ALL_PAGE_SIZE = 60
+export const ANNUAL_SCORE_FOCUS_EVENT = 'starlight:annual-score-focus'
+
+type AnnualScoreFocusDetail = { date?: string; topic?: string }
 
 function band(score: number | null | undefined, topic: string) {
   if (score == null || !Number.isFinite(score)) return '—'
@@ -55,6 +58,20 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [allLimit, setAllLimit] = useState(ALL_PAGE_SIZE)
 
+  useEffect(() => {
+    const handleFocus = (event: Event) => {
+      const detail = (event as CustomEvent<AnnualScoreFocusDetail>).detail ?? {}
+      const date = String(detail.date ?? '')
+      const requestedTopic = String(detail.topic ?? '')
+      if (requestedTopic && availableTopics.includes(requestedTopic)) setSelectedTopic(requestedTopic)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) setSelectedMonth(date.slice(0,7))
+      setAllLimit(ALL_PAGE_SIZE)
+      window.requestAnimationFrame(() => document.getElementById('annual-daily-scores')?.scrollIntoView({ behavior:'smooth', block:'start' }))
+    }
+    window.addEventListener(ANNUAL_SCORE_FOCUS_EVENT, handleFocus)
+    return () => window.removeEventListener(ANNUAL_SCORE_FOCUS_EVENT, handleFocus)
+  }, [availableTopics])
+
   if (!rows.length) return null
   const topic = availableTopics.includes(selectedTopic) ? selectedTopic : (availableTopics[0] ?? '금전')
   const month = selectedMonth === 'all' || months.includes(selectedMonth) ? selectedMonth : 'all'
@@ -81,7 +98,7 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
   const listed = month === 'all' ? visible.slice(0,allLimit) : visible
   const hasMore = month === 'all' && listed.length < visible.length
 
-  return <section className="result-card annual-daily-scores">
+  return <section className="result-card annual-daily-scores" id="annual-daily-scores">
     <div className="result-card-title"><span>DATE SCORES</span><strong>{rows.length}일 날짜 점수</strong></div>
     <p className="daily-score-intro">핵심 날짜만 잘라낸 표가 아니라 계산 기간의 모든 날짜야. 먼저 연간 핵심일과 월별 흐름을 보고, 필요하면 아래에서 365일 원점수와 실제 계산 근거까지 확인하면 돼. 점수는 사건 확률이 아니고, <b>투자주의만 높을수록 경계가 큰 값</b>이야.</p>
 
