@@ -1,4 +1,4 @@
-name: Annual Full Daily Evidence Verification
+name: Remove Selective Key-Date Compatibility Layer
 
 on:
   push:
@@ -11,102 +11,51 @@ permissions:
   contents: write
 
 jobs:
-  annual:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/integrated-interpretation-v2
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: api/requirements.txt
-      - name: Link derived scores to their real source evidence
+      - name: Make Supabase interpreter use full-daily packet directly
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('integrated_fortune_v1.py')
+          p=Path('supabase/functions/fortune-interpret-v6-preview/index.ts')
           s=p.read_text(encoding='utf-8')
-          old='''    best: dict[tuple, dict] = {}\n\n    def ingest(rows: list[dict], topic_names):'''
-          new='''    best: dict[tuple, dict] = {}\n    relationship_links = {\n        "연락": ("수신신호", "발신적합", "과거인연접점"),\n        "소식": ("수신신호", "발신적합"),\n        "재회": ("수신신호", "발신적합", "과거인연접점"),\n        "연애": ("수신신호", "발신적합"),\n    }\n    investment_links = {\n        "금전": ("수익실현", "신규진입", "투자주의"),\n        "투자심리": ("수익실현", "신규진입", "투자주의"),\n    }\n\n    def ingest(rows: list[dict], topic_names, derived_links=None):\n        derived_links = derived_links or {}'''
-          if old not in s: raise SystemExit('derived evidence function anchor missing')
+          old='''import { KEY_DATE_LEDGER_VERSION, attachActualKeyDateEvidence } from "./keyDateEvidenceV2.ts";\n'''
+          if old not in s: raise SystemExit('key-date import missing')
+          s=s.replace(old,'',1)
+          old='''      :"연평균만 요약하지 말고 월별 변화→핵심 날짜→독립 체계 교차맥락 순으로 분석하라. western.key_date_details가 있으면 중요한 날짜 문단에 실제 트랜짓 근거 W:keydate:*를 우선 연결하라.";'''
+          new='''      :"연평균만 요약하지 말고 365일 일별 궤적→월별 변화→핵심 날짜→독립 체계 교차맥락 순으로 분석하라. 중요한 날짜 문단에는 계산엔진이 보존한 실제 일별 트랜짓·하우스 근거 W:daily:*를 우선 연결하라.";'''
+          if old not in s: raise SystemExit('prompt compatibility anchor missing')
           s=s.replace(old,new,1)
-          old='''                    current = best.get(identity)\n                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:\n                        current.setdefault("source_topics", [])\n                        if topic not in current["source_topics"]:\n                            current["source_topics"].append(topic)\n                        continue\n                    packed = {\n                        "kind": kind,\n                        "sample_time": sample_time,\n                        "source_topics": [topic],'''
-          new='''                    linked_topics = [topic, *derived_links.get(topic, ())]\n                    current = best.get(identity)\n                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:\n                        current.setdefault("source_topics", [])\n                        for linked_topic in linked_topics:\n                            if linked_topic not in current["source_topics"]:\n                                current["source_topics"].append(linked_topic)\n                        continue\n                    packed = {\n                        "kind": kind,\n                        "sample_time": sample_time,\n                        "source_topics": linked_topics,'''
-          if old not in s: raise SystemExit('derived evidence packing anchor missing')
+          old='''if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,key_date_ledger_version:KEY_DATE_LEDGER_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,evidence_ledger:true,monthly_trajectory:true,key_date_actual_transits:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});'''
+          new='''if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,evidence_ledger:true,full_daily_scores:true,daily_actual_evidence:true,monthly_trajectory:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});'''
+          if old not in s: raise SystemExit('meta compatibility anchor missing')
           s=s.replace(old,new,1)
-          old='''    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"))\n    ingest(market_rows, ("금전", "투자심리"))\n    out = list(best.values())'''
-          new='''    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"), relationship_links)\n    ingest(market_rows, ("금전", "투자심리"), investment_links)\n    out = list(best.values())'''
-          if old not in s: raise SystemExit('derived evidence ingest anchor missing')
+          old='''  const payload=attachActualKeyDateEvidence(compactCalculation(b.calculation),b.calculation);'''
+          new='''  const payload=compactCalculation(b.calculation);'''
+          if old not in s: raise SystemExit('payload compatibility anchor missing')
           s=s.replace(old,new,1)
-          # Prefer evidence rows that collectively explain the most displayed topics,
-          # then fill remaining slots by raw strength. This avoids a daily top-10 list
-          # being monopolized by one area while keeping the mobile payload bounded.
-          old='''    for item in out:\n        item["source_topics"] = sorted(set(item.get("source_topics") or []))\n    return out[:max(1, int(limit))]'''
-          new='''    for item in out:\n        item["source_topics"] = sorted(set(item.get("source_topics") or []))\n    max_rows = max(1, int(limit))\n    selected = []\n    remaining = list(out)\n    uncovered = {\n        "금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션",\n        "수신신호", "발신적합", "과거인연접점", "투자심리", "수익실현", "신규진입", "투자주의",\n    }\n    while remaining and uncovered and len(selected) < max_rows:\n        candidate = max(\n            remaining,\n            key=lambda item: (\n                len(set(item.get("source_topics") or []) & uncovered),\n                float(item.get("contribution") or 0.0),\n                -float(item.get("orb") or 99.0),\n            ),\n        )\n        coverage = set(candidate.get("source_topics") or []) & uncovered\n        if not coverage:\n            break\n        selected.append(candidate)\n        uncovered -= coverage\n        remaining.remove(candidate)\n    for item in out:\n        if len(selected) >= max_rows:\n            break\n        if item not in selected:\n            selected.append(item)\n    return selected'''
-          if old not in s: raise SystemExit('evidence selection anchor missing')
+          old='''    return res({ok:true,interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,key_date_ledger_version:KEY_DATE_LEDGER_VERSION,payload_bytes:new TextEncoder().encode(JSON.stringify(payload)).byteLength,payload_hash_prefix:hash.slice(0,16),evidence_ledger:payload?.evidence_ledger?.length??0,key_dates:payload?.key_dates?.length??0,cross_system_dates:payload?.cross_system_timeline?.length??0,western_months:payload?.western?.months?.length??0,western_key_date_details:payload?.western?.key_date_details?.length??0,actual_key_date_refs:(payload?.evidence_ledger??[]).filter((x:any)=>String(x?.id??"").startsWith("W:keydate:")).length,thai:{mahathaksa:Boolean(payload?.thai?.mahathaksa),taksajorn:Boolean(payload?.thai?.taksajorn),suriyayat:Boolean(payload?.thai?.suriyayat),suriyayat_lagna:Boolean(payload?.thai?.suriyayat?.lagna?.available)},saju:{annual_segments:payload?.saju?.annual?.length??0,monthly_segments:payload?.saju?.monthly?.length??0},detail_days:payload?.western?.detail_days?.length??0});'''
+          new='''    return res({ok:true,interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,payload_bytes:new TextEncoder().encode(JSON.stringify(payload)).byteLength,payload_hash_prefix:hash.slice(0,16),evidence_ledger:payload?.evidence_ledger?.length??0,key_dates:payload?.key_dates?.length??0,cross_system_dates:payload?.cross_system_timeline?.length??0,western_months:payload?.western?.months?.length??0,daily_score_rows:payload?.western?.daily_score_matrix?.rows?.length??0,actual_daily_refs:(payload?.evidence_ledger??[]).filter((x:any)=>String(x?.id??"").startsWith("W:daily:")).length,thai:{mahathaksa:Boolean(payload?.thai?.mahathaksa),taksajorn:Boolean(payload?.thai?.taksajorn),suriyayat:Boolean(payload?.thai?.suriyayat),suriyayat_lagna:Boolean(payload?.thai?.suriyayat?.lagna?.available)},saju:{annual_segments:payload?.saju?.annual?.length??0,monthly_segments:payload?.saju?.monthly?.length??0},detail_days:payload?.western?.detail_days?.length??0});'''
+          if old not in s: raise SystemExit('inspect compatibility anchor missing')
           s=s.replace(old,new,1)
           p.write_text(s,encoding='utf-8')
           PY
-      - name: Install calculation dependencies
-        run: pip install -r api/requirements.txt
-      - name: Run real 365-day calculation contract
+      - name: Guard direct full-daily path
         run: |
-          python - <<'PY'
-          import json
-          import time
-          from datetime import date, time as dt_time
-          from integrated_fortune_v1 import build_integrated_fortune
-
-          started=time.perf_counter()
-          result=build_integrated_fortune(
-              birth_date=date(1990,1,1),
-              birth_time=dt_time(12,0),
-              latitude=37.5665,
-              longitude=126.9780,
-              utc_offset_hours=9,
-              gender='female',
-              start_date=date(2026,1,1),
-              end_date=date(2026,12,31),
-          )
-          elapsed=time.perf_counter()-started
-          western=result['western']
-          daily=western.get('daily_scores') or []
-          assert result['period']['day_count']==365
-          assert len(daily)==365, len(daily)
-          investment={'투자심리','수익실현','신규진입','투자주의'}
-          closed=[row for row in daily if not row.get('market_open')]
-          assert closed
-          for row in closed[:30]:
-              assert all(row['scores'].get(topic) is None for topic in investment), row
-          evidence_days=sum(bool(row.get('evidence')) for row in daily)
-          assert evidence_days>=300, evidence_days
-          relationship_linked=sum(any('수신신호' in (ev.get('source_topics') or []) for ev in (row.get('evidence') or [])) for row in daily)
-          assert relationship_linked>=250, relationship_linked
-          market_rows=[row for row in daily if row.get('market_open')]
-          investment_linked=sum(any('투자주의' in (ev.get('source_topics') or []) for ev in (row.get('evidence') or [])) for row in market_rows)
-          assert investment_linked>=max(1,int(len(market_rows)*0.75)), (investment_linked,len(market_rows))
-          encoded=json.dumps(result,ensure_ascii=False,default=str).encode('utf-8')
-          assert len(encoded)<6_000_000, len(encoded)
-          print(json.dumps({
-              'annual_days':len(daily),
-              'elapsed_seconds':round(elapsed,2),
-              'response_bytes':len(encoded),
-              'evidence_days':evidence_days,
-              'relationship_linked_days':relationship_linked,
-              'market_days':len(market_rows),
-              'investment_linked_days':investment_linked,
-              'evidence_rows':sum(len(row.get('evidence') or []) for row in daily),
-          },ensure_ascii=False))
-          PY
-      - name: Commit evidence lineage improvement
+          ! grep -q 'keyDateEvidenceV2' supabase/functions/fortune-interpret-v6-preview/index.ts
+          ! grep -q 'W:keydate:' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'W:daily:' supabase/functions/fortune-interpret-v6-preview/index.ts
+          grep -q 'full_daily_scores:true' supabase/functions/fortune-interpret-v6-preview/index.ts
+      - name: Commit interpreter cleanup
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add integrated_fortune_v1.py
+          git add supabase/functions/fortune-interpret-v6-preview/index.ts
           git diff --cached --quiet && exit 0
-          git commit -m 'feat: link derived daily scores to source evidence'
+          git commit -m 'refactor: use full-daily evidence path directly'
           git push origin HEAD:work/integrated-interpretation-v2
