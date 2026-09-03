@@ -1092,6 +1092,25 @@ export default function AppNext() {
     }
   }
 
+  async function captureCanceledAiUsage(jobId: string) {
+    // The first network request may already have been sent when cancel is pressed.
+    // V21 stores its usage after that request returns; poll only for metadata, never start/retry Gemini here.
+    for (let attempt=0; attempt<14; attempt++) {
+      await new Promise((resolve)=>window.setTimeout(resolve, attempt<4 ? 1800 : 3000))
+      try {
+        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'status', job_id:jobId } })
+        if (error) continue
+        const total=Number(data?.usage?.total_tokens ?? 0)
+        if (total>0) {
+          setAiInterpretation({ ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage, error:data?.error || 'AI 해설 생성을 취소했어.' })
+          return
+        }
+      } catch {
+        // Best-effort observability only. Cancellation itself has already completed.
+      }
+    }
+  }
+
   async function cancelAiInterpretation(silent = false) {
     const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
     const saved = raw ? decodePendingFortuneAiJob(raw) : null
@@ -1112,6 +1131,7 @@ export default function AppNext() {
       aiPollRef.current = null
       setAiActiveJobId(null)
       setAiLoading(false)
+      void captureCanceledAiUsage(jobId)
       if (!silent) {
         setAiError('AI 해설 생성을 취소했어. 계산 결과는 그대로 사용할 수 있어.')
         setActionNotice('AI 해설 생성 취소 완료 · 이미 전송된 1회 호출은 되돌릴 수 없지만 추가 수선 호출은 중단해.')

@@ -73,4 +73,9 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   assert.doesNotMatch(src,/Promise\.all\(\[\s*generate/);
   assert.match(src,/buildThaiOutputFallback/);
   assert.match(src,/usage_json:usageJson/);
+  assert.match(src,/if\(!\(await jobActive\(id\)\)\)\{/);
+  assert.match(src,/update\(\{usage_json:usageJson,updated_at:/);
+  const usageBuild=src.indexOf('const usageJson=');
+  const inactiveCheck=src.indexOf('if(!(await jobActive(id)))');
+  assert.ok(usageBuild>=0 && inactiveCheck>usageBuild,'usage must be built before canceled-job early return');
 });
