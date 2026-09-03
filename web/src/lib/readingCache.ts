@@ -11,6 +11,7 @@ type CacheRecord<T = unknown> = {
 const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
+const FORTUNE_CALC_CACHE_CONTRACT = 'key-date-evidence-v2'
 const FORTUNE_AI_CACHE_CONTRACT = 'evidence-ledger-v2'
 
 function stableStringify(value: unknown): string {
@@ -109,7 +110,7 @@ export async function deleteReadingCache(id: string): Promise<void> {
 }
 
 export function fortuneCalculationCacheId(request: Record<string, unknown>): string {
-  return `fortune-calc:${hashText(stableStringify(request))}`
+  return `fortune-calc:${hashText(stableStringify({ contract: FORTUNE_CALC_CACHE_CONTRACT, request }))}`
 }
 
 export function fortuneAiCacheId(request: Record<string, unknown>, calculation: Record<string, unknown>, model: string): string {
