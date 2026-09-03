@@ -1,0 +1,92 @@
+name: Apply Grounded Split Prompting V17
+
+on:
+  push:
+    branches: [work/integrated-interpretation-v2]
+    paths: [.github/workflows/apply-grounded-split-v17.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Harden grounding and adaptive depth prompts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+          s=p.read_text(encoding='utf-8')
+          old='export const VERSION = "supabase-ai-v16-split-structured-output";'
+          new='export const VERSION = "supabase-ai-v17-grounded-split-output";'
+          if old not in s: raise SystemExit('version anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/index.ts')
+          s=p.read_text(encoding='utf-8')
+          old='''function splitPartInstruction(part:"core"|"topics"){\n  return part==="core"\n    ? "[OUTPUT PART: CORE] topic_analysis는 출력하지 말고, 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 이 스키마에 맞춰 작성해."\n    : "[OUTPUT PART: TOPICS] topic_analysis만 출력해. 15개 분야를 정확히 한 번씩 모두 넣고 topic 이름은 지정된 한국어 분야명을 그대로 사용해.";\n}\n'''
+          new='''function splitPartInstruction(part:"core"|"topics"){\n  if(part==="topics")return `[OUTPUT PART: TOPICS]\n- topic_analysis만 출력하고 15개 분야를 정확히 한 번씩 모두 넣어. topic 이름은 지정된 한국어 분야명을 그대로 써.\n- importance=핵심은 실제 근거가 충분한 최대 5개만 선택하고 reason을 구체적으로 써. 연간은 최소 85자, 그 외 기간은 최소 60자를 목표로 하며, 가능하면 평균/추세 근거와 실제 날짜·일별·세부 근거처럼 서로 다른 층위의 evidence_refs를 2개 이상 연결해.\n- importance=주목 reason은 연간 최소 55자, 그 외 기간 최소 40자를 목표로 하고, 단순 형용사가 아니라 변화 방향 + 시기 또는 구체 근거를 함께 설명해.\n- importance=참고는 짧게 유지해. 근거를 충분히 설명할 수 없는 분야를 핵심/주목으로 올리지 마.\n- evidence_refs는 evidence_ledger에 실제 존재하는 ID만 그대로 사용하고, reason/timing에 ledger에 없는 정확한 날짜를 만들지 마.`;\n  return `[OUTPUT PART: CORE]\n- topic_analysis는 출력하지 말고 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 작성해.\n- key_windows의 start/end에 정확한 날짜를 쓸 때는 그 날짜를 직접 포함하거나 덮는 evidence_refs가 반드시 있어야 해. 근거가 한 날짜뿐이면 임의로 앞뒤 날짜를 늘려 범위를 만들지 말고 start=end로 그 날짜만 써. 월초/중순/말 같은 말에서 임의의 1일·15일·말일을 생성하지 마.\n- 모든 정확한 날짜는 CALCULATED_DATA.evidence_ledger 또는 계산 패킷에 실제 존재하는 날짜만 사용해. 근거 없는 중간 날짜·범위 끝점을 추론하지 마.\n- key_window의 evidence_refs에 supportive와 caution이 함께 있으면 signal은 반드시 '혼합'으로 써. 한쪽 방향으로 단순화하지 마.\n- decisions의 각 항목은 반드시 적어도 하나의 evidence_ref를 실제로 출력한 key_window와 공유해야 해. timing도 그 key_window의 start/end 또는, 오늘 분석이면 실제 W:window 시간창과 직접 연결해. 계산된 핵심 시기와 무관한 '전면 보류', '무조건 관망' 같은 포괄 조언을 새로 만들지 마.\n- 오늘 분석에 W:window 근거가 있으면 최소 한 결정의 timing에 그 정확한 HH:MM~HH:MM 시간창을 쓰고 같은 분야의 W:detail 근거도 함께 연결해.\n- 관계·연애·연락·재회 근거가 두드러지면 relationship_reading의 flow/focus_timing/watch를 충분히 구체적으로 쓰되, focus_timing의 정확한 날짜는 relationship_reading.evidence_refs가 직접 뒷받침하는 날짜만 써.\n- annual이면 year_phases 4개 이상, cross_checks 3개 이상, key_windows 5개 이상을 유지하고 각 항목의 근거를 실제 evidence_refs로 연결해.`;\n}\n'''
+          if old not in s: raise SystemExit('split instruction anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityV2.ts')
+          s=p.read_text(encoding='utf-8')
+          old='''export function strictQualityRetryInstruction(report:any){\n  const failed=(report?.stages??[]).filter((s:any)=>!s?.passed).map((s:any)=>`[${s.stage}단계 ${s.name}] ${(s.issues??[]).slice(0,8).join(" / ")}`).join("\\n");\n  return `\\n\\nQUALITY_RETRY: 이전 응답이 5단계 품질검증을 통과하지 못했다. 아래 실패를 모두 고쳐라. 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고, 날짜를 새로 만들지 마라. 확률이 아니라는 한계 설명 자체는 유지해도 된다.\\n${failed}`;\n}\n'''
+          new='''export function strictQualityRetryInstruction(report:any){\n  const failed=(report?.stages??[]).filter((s:any)=>!s?.passed).map((s:any)=>`[${s.stage}단계 ${s.name}] ${(s.issues??[]).slice(0,10).join(" / ")}`).join("\\n");\n  return `\\n\\nQUALITY_RETRY: 이전 응답이 5단계 품질검증을 통과하지 못했다. 아래 실패만 정확히 고치고 이미 통과한 근거/방향은 망가뜨리지 마라.\n- 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고 날짜를 새로 만들지 마라. key_window의 start/end는 연결한 근거가 그 날짜를 직접 포함하거나 덮어야 한다. 한 날짜 근거로 임의 범위를 만들지 마라.\n- supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.\n- 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.\n- '핵심 근거 설명이 얕음'이면 해당 topic reason에 구체 추세/평균과 실제 시기·근거를 연결해 충분히 늘려라. '주목 근거 설명이 얕음'도 변화 방향과 시기 근거를 최소 두 문장 수준으로 보강해라. 참고 분야를 대신 장문화하지 마라.\n- 관계·재회 주목 시기 설명 부족이면 focus_timing을 실제 관계 evidence_refs가 직접 지지하는 날짜/구간과 현실 확인 방식까지 포함해 보강해라.\n- 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.\n- 확률이 아니라는 한계 설명 자체는 유지해도 된다.\\n${failed}`;\n}\n'''
+          if old not in s: raise SystemExit('quality retry anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/readingCache.ts')
+          s=p.read_text(encoding='utf-8').replace("const FORTUNE_AI_CACHE_CONTRACT = 'split-structured-output-contract-v16'","const FORTUNE_AI_CACHE_CONTRACT = 'grounded-split-output-contract-v17'",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.ts')
+          s=p.read_text(encoding='utf-8').replace("export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-split-structured-v16'","export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-grounded-split-v17'",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.test.mjs')
+          s=p.read_text(encoding='utf-8').replace('assert.match(FORTUNE_AI_JOB_CONTRACT, /v16$/)','assert.match(FORTUNE_AI_JOB_CONTRACT, /v17$/)',1)
+          p.write_text(s,encoding='utf-8')
+
+          test=Path('supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs')
+          test.write_text('''import assert from "node:assert/strict";\nimport test from "node:test";\nimport fs from "node:fs";\nimport { strictQualityRetryInstruction } from "./qualityV2.ts";\n\nconst source=fs.readFileSync(new URL("./index.ts",import.meta.url),"utf8");\n\ntest("split prompt forbids inferred dates and binds decisions to windows",()=>{\n  assert.match(source,/임의로 앞뒤 날짜를 늘려 범위를 만들지 말고 start=end/);\n  assert.match(source,/supportive와 caution이 함께 있으면 signal은 반드시 '혼합'/);\n  assert.match(source,/decisions의 각 항목은 반드시 적어도 하나의 evidence_ref를 실제로 출력한 key_window와 공유/);\n  assert.match(source,/W:window의 정확한 HH:MM~HH:MM/);\n});\n\ntest("topic split prompt states adaptive depth floors",()=>{\n  assert.match(source,/연간은 최소 85자/);\n  assert.match(source,/연간 최소 55자/);\n  assert.match(source,/근거를 충분히 설명할 수 없는 분야를 핵심\/주목으로 올리지 마/);\n});\n\ntest("quality retry gives targeted grounding repairs",()=>{\n  const text=strictQualityRetryInstruction({stages:[{stage:2,name:"근거 추적성",passed:false,issues:["계산근거에서 찾을 수 없는 날짜 언급: 2026-10-15"]}]});\n  assert.match(text,/한 날짜 근거로 임의 범위를 만들지 마라/);\n  assert.match(text,/signal='혼합'/);\n  assert.match(text,/key_window와 공유/);\n});\n''',encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit V17 grounding fix
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts \
+                  supabase/functions/fortune-interpret-v6-preview/index.ts \
+                  supabase/functions/fortune-interpret-v6-preview/qualityV2.ts \
+                  supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs \
+                  web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git commit -m "fix(ai): ground split interpretation dates and depth"
+          git push origin HEAD:work/integrated-interpretation-v2
