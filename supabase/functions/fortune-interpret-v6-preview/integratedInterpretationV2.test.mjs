@@ -106,10 +106,15 @@ function output(packet){
       {label:"Q3",start:"2026-07-01",end:"2026-09-30",theme:"7월의 실행 피크가 가장 눈에 띄는 구간이야.",change:"미리 준비한 행동을 실제 실행 쪽으로 옮겨.",evidence_refs:[julyWork]},
       {label:"Q4",start:"2026-10-01",end:"2026-12-31",theme:"관계 재접점과 연말 결산이 함께 들어와.",change:"실제 반응을 확인하면서 분야별로 결산해.",evidence_refs:[octReconnect]},
     ],
+    cross_checks:[
+      {label:"7월 실행창 교차검증",start:"2026-07-21",end:"2026-07-24",mode:"복수체계",western:"Western에서는 직장·발신 상위 날짜와 실제 일별 트랜짓 근거가 같은 주간에 모여 있어.",saju:"사주 월운은 같은 기간을 포함하는 절입 구간 맥락을 제공하지만 Western 점수와 합산하지 않아.",thai:"Thai는 이 교차검증에서 방향성 투표로 쓰지 않고 해당 기간층이 있다는 사실만 별도로 유지해.",synthesis:"Western의 실행 피크를 중심 근거로 삼고 사주는 같은 시기 배경을 독립적으로 겹쳐 보되, 두 체계가 같은 사건을 예언한다고 해석하지 않는 구간이야.",evidence_refs:[julyWork,julyDaily,ref("S:month:")]},
+      {label:"10월 재접점 교차검증",start:"2026-10-21",end:"2026-10-21",mode:"복수체계",western:"Western에서는 과거인연접점 상위 날짜와 실제 일별 근거가 동시에 잡혀 있어.",saju:"해당 날짜를 직접 지지하는 별도 사주 월운 근거가 없으므로 사주로 재회 방향을 보강하지 않아.",thai:"Taksajorn 기간층은 이 날짜를 포함하지만 사건 방향이나 재회 확률을 뜻하지 않는 독립 맥락이야.",synthesis:"재접점 해석의 방향은 Western 근거에 두고 Thai는 같은 기간에 존재하는 비예측 배경층으로만 나란히 표시해야 해.",evidence_refs:[octReconnect,octDaily,ref("T:taksajorn:")]},
+      {label:"5월 점검창 단독신호",start:"2026-05-14",end:"2026-05-15",mode:"Western단독",western:"Western에서 연애·발신 하위 날짜와 실제 일별 근거가 함께 잡혀 있어 점검 신호가 명확해.",saju:"같은 결론을 독립적으로 확인하는 직접 근거는 이 교차항목에 연결되지 않았어.",thai:"같은 결론을 독립적으로 확인하는 예측 근거로 사용하지 않아.",synthesis:"이 구간은 여러 체계가 같은 방향을 말한다고 포장하지 말고 Western 계산에서만 강하게 잡힌 주의 신호로 제한해서 읽어야 해.",evidence_refs:[mayLove,mayOutgoing,mayDaily]},
+    ],
     decisions:[
-      {action:"7월 실행창에는 준비된 업무 결정과 중요한 연락을 실제 행동으로 옮겨.",timing:"2026-07-21~2026-07-24",reason:"직장 상위 날짜와 발신적합 상위 날짜가 같은 구간에 있어.",evidence_refs:[julyWork,julyOutgoing]},
-      {action:"5월 점검창에는 관계 결론보다 메시지와 사실관계를 다시 확인해.",timing:"2026-05-14~2026-05-15",reason:"연애와 발신 관련 하위 날짜가 연속으로 잡혀 있어.",evidence_refs:[mayLove,mayOutgoing]},
-      {action:"10월 재접점 신호는 실제 상대 행동이 있을 때만 해석 범위를 넓혀.",timing:"2026-10-21",reason:"과거인연접점의 상위 날짜와 월간 근거가 함께 있어.",evidence_refs:[octReconnect,octMonth]},
+      {action:"7월 실행창에는 준비된 업무 결정과 중요한 연락을 실제 행동으로 옮겨.",timing:"2026-07-21~2026-07-24",reason:"직장 상위 날짜와 발신적합 상위 날짜가 같은 구간에 있어.",watch:"지원서·협상안·메시지 초안이 이미 준비됐는지와 상대의 실제 응답 가능 시간을 먼저 확인해.",avoid:"준비 없이 즉흥적으로 범위를 넓히거나 높은 점수를 성공 보장으로 해석하지 마.",evidence_refs:[julyWork,julyOutgoing]},
+      {action:"5월 점검창에는 관계 결론보다 메시지와 사실관계를 다시 확인해.",timing:"2026-05-14~2026-05-15",reason:"연애와 발신 관련 하위 날짜가 연속으로 잡혀 있어.",watch:"상대가 실제로 한 말과 행동, 일정 변경 같은 확인 가능한 사실을 감정 해석과 분리해 봐.",avoid:"답장 속도나 한 번의 반응만으로 관계 전체를 확정하거나 연속 메시지를 보내지 마.",evidence_refs:[mayLove,mayOutgoing]},
+      {action:"10월 재접점 신호는 실제 상대 행동이 있을 때만 해석 범위를 넓혀.",timing:"2026-10-21",reason:"과거인연접점의 상위 날짜와 월간 근거가 함께 있어.",watch:"실제 연락·만남 제안·우연한 재접촉처럼 관찰 가능한 사건이 생기는지 먼저 확인해.",avoid:"접점 지수만 보고 상대 속마음이나 재회 의사를 미리 확정하지 마.",evidence_refs:[octReconnect,octMonth]},
     ],
     clusters:{relationship:repeat("대인관계·연애·연락·재접점을 하나로 뭉개지 말고 각각의 월별 변화와 날짜 피크를 따로 읽어야 해.",2),work_study:repeat("일과 학업은 월별 강약이 다르므로 중요한 일정 배치를 같은 기준으로 처리하지 않는 게 좋아.",2),money_news:repeat("금전과 소식은 서로 다른 계산축이라 한쪽의 피크가 다른 쪽의 결과를 보장하지 않아.",2),investment:repeat("투자심리·수익실현·신규진입·투자주의는 서로 다른 지수고 특히 투자주의는 높을수록 경계가 커져.",2),condition:repeat("컨디션은 일정 강도와 휴식 배치를 조절하는 참고 흐름으로만 읽어.",2)},
     contact_flow:{incoming:"수신신호는 실제 연락의 보장이 아니라 상대→나 방향의 상대 활성도를 보여주는 참고축이야.",outgoing:"발신적합은 내가 행동할 때의 상대적 적합 흐름이지 상대 반응을 확정하는 값이 아니야.",reconnection:"과거인연접점은 과거 관계가 다시 활성화되는 맥락을 뜻할 뿐 실제 재회를 보장하지 않아."},
@@ -171,6 +176,15 @@ test("numeric probability claim fails semantic validation but a negated limitati
   raw.contact_flow.incoming="연락 확률은 80%야.";
   const report=inspectInterpretationQuality(validateOutput(raw),packet);
   assert.equal(report.stages[2].passed,false);
+});
+
+test("cross-system mode without an independent second system fails consistency",()=>{
+  const packet=compactCalculation(calculation());
+  const raw=output(packet);
+  raw.cross_checks[0].evidence_refs=raw.cross_checks[0].evidence_refs.filter((ref)=>ref.startsWith("W:"));
+  const report=inspectInterpretationQuality(validateOutput(raw),packet);
+  assert.equal(report.stages[3].passed,false);
+  assert.match(report.stages[3].issues.join(" "),/독립 체계 2개 미만/);
 });
 
 test("high confidence without enough evidence fails consistency",()=>{
