@@ -25,4 +25,6 @@ The user approved one paid V21.3 annual smoke job with a maximum of two Gemini c
 
 Human review still found a gap that the 100/100 validator did not catch: some model-written investment `key_windows`/`decisions` converted relative activity indices into cash-out, sell-delay, profit-taking, or investment-hold actions. V21.3.1 fixes this without another Gemini call by structurally sanitizing investment-linked actions, avoids, watches, priorities, clusters, and phase caveats after generation. The AI cache and pending-job contracts were bumped so the pre-fix V21.3 live result cannot be reused as a current cached interpretation.
 
-Final candidate verification is performed on the PR head by Interpretation Release CI and Web CI. The Supabase `fortune-interpret-v21-preview` deployment is intentionally a preview-only target; main and production remain unchanged until explicit release approval.
+V21.3.1 itself was intentionally not sent through another paid Gemini smoke because the approved paid allowance was already consumed by the single V21.3 job. Its post-smoke fix is covered by deterministic regression tests, Web CI, Interpretation Release CI, type checking, and production build validation.
+
+Final candidate verification is performed on the PR head. The Supabase `fortune-interpret-v21-preview` deployment is intentionally a preview-only target; main and production remain unchanged until explicit release approval.
