@@ -1,0 +1,133 @@
+name: Apply Intraday Window Evidence V12
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-intraday-window-evidence-v12.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Add exact intraday window evidence contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('export const VERSION = "supabase-ai-v11-period-aware-cross-system";','export const VERSION = "supabase-ai-v12-intraday-window-evidence";',1)
+          s=s.replace('export const PACKET_VERSION = "fortune-interpretation-packet-v3-full-daily";','export const PACKET_VERSION = "fortune-interpretation-packet-v4-intraday-window";',1)
+          s=s.replace('export const QUALITY_VERSION = "fortune-interpretation-quality-v2-cross-system";','export const QUALITY_VERSION = "fortune-interpretation-quality-v3-intraday-window";',1)
+          old='''  end?: string;\n  score?: number;\n'''
+          new='''  end?: string;\n  window?: string;\n  score?: number;\n'''
+          if old not in s: raise SystemExit('Evidence window field anchor missing')
+          s=s.replace(old,new,1)
+          old='''function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }\n'''
+          new='''function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }\nfunction clockToken(v:unknown){ const m=String(v??"").match(/(?:[01]\\d|2[0-3]):[0-5]\\d/); return m?m[0]:""; }\nfunction intradayWindow(value:any){\n  if(!value)return "";\n  if(value&&typeof value==="object"){const start=clockToken(value?.start),end=clockToken(value?.end);if(start&&end)return `${start}~${end}`;}\n  const matches=[...String(value).matchAll(/(?:[01]\\d|2[0-3]):[0-5]\\d/g)].map(m=>m[0]);\n  return matches.length>=2?`${matches[0]}~${matches[1]}`:"";\n}\n'''
+          if old not in s: raise SystemExit('intraday helper anchor missing')
+          s=s.replace(old,new,1)
+          old='''  const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];\n  const detail=detailRaw.slice(0,18).map((d:any)=>({date:d?.date,market_status:d?.market_open?"KRX(한국거래소) 거래일":"KRX(한국거래소) 휴장일",topics:Object.fromEntries(Object.entries(d?.topics??{}).map(([k,x]:any)=>[k,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:Array.isArray(x?.evidence)?x.evidence.slice(0,6):[]}]))}));\n  for(const d of detail){for(const [topic,x] of Object.entries(d.topics) as any[]){for(let i=0;i<(x.evidence??[]).length;i++){const id=`W:detail:${d.date}:${topic}:${i+1}`;addEvidence({id,system:"western",scope:"intraday_evidence",topic,direction:"context",date:d.date,text:String(x.evidence[i])});const kd=keyDates.find(k=>k.date===d.date);if(kd)kd.western_refs.push(id);}}}\n'''
+          new='''  const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];\n  const detail=detailRaw.slice(0,18).map((d:any)=>({date:d?.date,market_status:d?.market_open?"KRX(한국거래소) 거래일":"KRX(한국거래소) 휴장일",topics:Object.fromEntries(Object.entries(d?.topics??{}).map(([k,x]:any)=>[k,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:Array.isArray(x?.evidence)?x.evidence.slice(0,6):[]}]))}));\n  for(const d of detail){\n    for(const [topic,x] of Object.entries(d.topics) as any[]){\n      const kd=keyDates.find(k=>k.date===d.date);\n      const addWindow=(kind:"best"|"caution",value:any)=>{\n        const window=intradayWindow(value);if(!window)return;\n        const id=`W:window:${d.date}:${topic}:${kind}`;\n        const score=typeof value?.score==="number"&&Number.isFinite(value.score)?Number(value.score):undefined;\n        addEvidence({id,system:"western",scope:"intraday_window",topic,direction:evidenceDirection(topic,kind,score??0),date:d.date,window,score,text:`${d.date} ${topic} ${kind==="best"?"활용":"주의"} 시간창 ${window}${score===undefined?"":` · 상대지수 ${score.toFixed(1)}`}`});\n        if(kd)kd.western_refs.push(id);\n      };\n      addWindow("best",x?.best_window);\n      addWindow("caution",x?.caution_window);\n      for(let i=0;i<(x.evidence??[]).length;i++){const id=`W:detail:${d.date}:${topic}:${i+1}`;addEvidence({id,system:"western",scope:"intraday_evidence",topic,direction:"context",date:d.date,text:String(x.evidence[i])});if(kd)kd.western_refs.push(id);}\n    }\n  }\n'''
+          if old not in s: raise SystemExit('detail evidence block anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityV2.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('export const QUALITY_VERSION = "fortune-interpretation-quality-v2-cross-system-action";','export const QUALITY_VERSION = "fortune-interpretation-quality-v3-intraday-window";',1)
+          old='''function datesInText(s:string){return [...s.matchAll(/\\b(\\d{4}-\\d{2}-\\d{2})\\b/g)].map(m=>m[1]);}\n'''
+          new='''function datesInText(s:string){return [...s.matchAll(/\\b(\\d{4}-\\d{2}-\\d{2})\\b/g)].map(m=>m[1]);}\nfunction clockWindow(v:unknown){const matches=[...String(v??"").matchAll(/(?:[01]\\d|2[0-3]):[0-5]\\d/g)].map(m=>m[0]);return matches.length>=2?`${matches[0]}~${matches[1]}`:"";}\n'''
+          if old not in s: raise SystemExit('quality clock helper anchor missing')
+          s=s.replace(old,new,1)
+          old='''  if(kind==="day"){\n    const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];\n    const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));\n    if(hasIntradayWindow){\n      const timedDecisions=(data?.decisions??[]).filter((d:any)=>/(?:[01]\\d|2[0-3]):[0-5]\\d/.test(String(d?.timing??"")));\n      if(!timedDecisions.length)s5.push("오늘 시간대 행동 가이드 누락");\n      const detailEvidenceAvailable=Array.from(map.keys()).some((ref:any)=>String(ref).startsWith("W:detail:"));\n      if(detailEvidenceAvailable&&timedDecisions.length&&!timedDecisions.some((d:any)=>(d?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:detail:"))))s5.push("오늘 시간대 행동 가이드에 실제 W:detail:* 근거 미연결");\n    }\n  }\n'''
+          new='''  if(kind==="day"){\n    const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];\n    const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));\n    if(hasIntradayWindow){\n      const timedDecisions=(data?.decisions??[]).filter((d:any)=>Boolean(clockWindow(d?.timing)));\n      if(!timedDecisions.length)s5.push("오늘 시간대 행동 가이드 누락");\n      const windowEvidence=[...map.entries()].filter(([ref,row]:any)=>String(ref).startsWith("W:window:")||row?.scope==="intraday_window");\n      if(!windowEvidence.length)s5.push("오늘 시간창 전용 W:window:* 계산근거 누락");\n      if(windowEvidence.length&&timedDecisions.length){\n        const periodDate=isoDate(payload?.period?.start);\n        let exactLinked=false;\n        for(const d of timedDecisions){\n          const timingWindow=clockWindow(d?.timing);\n          const refs=(d?.evidence_refs??[]).map(String);\n          for(const ref of refs){\n            const row:any=map.get(ref);\n            if(!row||(row?.scope!=="intraday_window"&&!String(ref).startsWith("W:window:")))continue;\n            if(isoDate(row?.date)!==periodDate||clockWindow(row?.window??row?.text)!==timingWindow)continue;\n            const sameTopicDetailAvailable=[...map.values()].some((x:any)=>x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??""));\n            const sameTopicDetailLinked=refs.some((detailRef:string)=>{const x:any=map.get(detailRef);return x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??"");});\n            if(!sameTopicDetailAvailable||sameTopicDetailLinked){exactLinked=true;break;}\n          }\n          if(exactLinked)break;\n        }\n        if(!exactLinked)s5.push("오늘 시간대 행동 가이드에 동일 시간창 W:window:* 및 같은 분야 W:detail:* 근거 미연결");\n      }\n    }\n  }\n'''
+          if old not in s: raise SystemExit('day quality block anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/periodInstruction.ts')
+          s=p.read_text(encoding='utf-8')
+          old='''    "western.detail_days의 실제 시간대별 best_window·caution_window와 intraday evidence를 최우선으로 읽고, 같은 날짜의 daily_score_matrix와 key_dates/W:daily:* 근거로 교차 확인하라.",\n    "핵심 결론은 오늘 언제 움직이고 언제 피해야 하는지가 바로 보이게 쓰고, 시간대 근거가 있으면 decisions.timing과 key_windows에 날짜뿐 아니라 해당 시간대를 구체적으로 반영하라.",\n'''
+          new='''    "western.detail_days의 실제 시간대별 best_window·caution_window와 intraday evidence를 최우선으로 읽고, 같은 날짜의 daily_score_matrix와 key_dates/W:daily:* 근거로 교차 확인하라.",\n    "시간대를 쓰는 decisions.timing에는 반드시 동일한 HH:MM~HH:MM을 가진 W:window:* 전용 근거를 evidence_refs에 붙이고, 같은 분야의 W:detail:* 근거가 있으면 그 근거도 같은 decision에 함께 붙여라.",\n    "핵심 결론은 오늘 언제 움직이고 언제 피해야 하는지가 바로 보이게 쓰고, 시간대 근거가 있으면 decisions.timing과 key_windows에 날짜뿐 아니라 해당 시간대를 구체적으로 반영하라.",\n'''
+          if old not in s: raise SystemExit('day instruction anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          old='''  assert.match(text, /시간대/);\n  assert.doesNotMatch(text, /365일/);\n'''
+          new='''  assert.match(text, /시간대/);\n  assert.match(text, /W:window:\\*/);\n  assert.match(text, /W:detail:\\*/);\n  assert.doesNotMatch(text, /365일/);\n'''
+          if old not in s: raise SystemExit('period instruction test anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          start=s.index('test("day quality guard requires clock timing and W:detail evidence when intraday windows exist"')
+          end=s.index('\n\n\ntest("week and month require available W:daily evidence in key windows"',start)
+          new_test='''test("day quality guard requires exact W:window timing and same-topic detail evidence",()=>{\n  const {data,payload}=buildCase("day");\n  payload.western={detail_days:[{date:"2026-09-03",topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31}}}}]};\n  const windowRef="W:window:2026-09-03:직장:best";\n  const detailRef="W:detail:2026-09-03:직장:1";\n  payload.evidence_ledger.push(\n    {id:windowRef,system:"western",scope:"intraday_window",topic:"직장",direction:"supportive",date:"2026-09-03",window:"08:00~09:30",score:72,text:"2026-09-03 직장 활용 시간창 08:00~09:30"},\n    {id:detailRef,system:"western",scope:"intraday_evidence",topic:"직장",direction:"context",date:"2026-09-03",text:"08:00 실제 시간대 테스트 근거"},\n  );\n\n  const missing=inspectInterpretationQuality(data,payload);\n  assert.equal(missing.ok,false);\n  const missingIssues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);\n\n  data.decisions[0].timing="2026-09-03 08:00~09:30";\n  const unlinked=inspectInterpretationQuality(data,payload);\n  assert.equal(unlinked.ok,false);\n  const unlinkedIssues=unlinked.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(unlinkedIssues,/동일 시간창 W:window/);\n\n  data.decisions[0].evidence_refs.push(windowRef);\n  const windowOnly=inspectInterpretationQuality(data,payload);\n  assert.equal(windowOnly.ok,false);\n  const windowOnlyIssues=windowOnly.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(windowOnlyIssues,/같은 분야 W:detail/);\n\n  data.decisions[0].evidence_refs.push(detailRef);\n  const fixed=inspectInterpretationQuality(data,payload);\n  assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));\n  assert.equal(fixed.score,100);\n\n  data.decisions[0].timing="2026-09-03 10:00~11:00";\n  const mismatch=inspectInterpretationQuality(data,payload);\n  assert.equal(mismatch.ok,false);\n  const mismatchIssues=mismatch.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(mismatchIssues,/동일 시간창 W:window/);\n});'''
+          s=s[:start]+new_test+s[end:]
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          addition='''\n\ntest("packet emits exact W:window evidence for intraday best and caution windows",()=>{\n  const calc=calculation();\n  calc.western.detail_days=[{date:"2026-07-21",market_open:true,topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31},evidence:["Jupiter trine MC intraday test"]}}}];\n  const packet=compactCalculation(calc);\n  const best=packet.evidence_ledger.find(x=>x.id==="W:window:2026-07-21:직장:best");\n  const caution=packet.evidence_ledger.find(x=>x.id==="W:window:2026-07-21:직장:caution");\n  assert.ok(best);\n  assert.ok(caution);\n  assert.equal(best.scope,"intraday_window");\n  assert.equal(best.window,"08:00~09:30");\n  assert.equal(best.direction,"supportive");\n  assert.equal(caution.window,"16:00~17:00");\n  assert.equal(caution.direction,"caution");\n  assert.ok(packet.evidence_ledger.some(x=>x.id==="W:detail:2026-07-21:직장:1"));\n});\n'''
+          if 'packet emits exact W:window evidence for intraday best and caution windows' not in s:
+              s += addition
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/readingCache.ts')
+          s=p.read_text(encoding='utf-8')
+          if "period-aware-cross-system-contract-v11" not in s: raise SystemExit('reading cache v11 anchor missing')
+          s=s.replace("period-aware-cross-system-contract-v11","intraday-window-evidence-contract-v12",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.ts')
+          s=p.read_text(encoding='utf-8')
+          if "fortune-ai-job-period-aware-v11" not in s: raise SystemExit('pending job v11 anchor missing')
+          s=s.replace("fortune-ai-job-period-aware-v11","fortune-ai-job-intraday-window-v12",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          old="  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\\.v2$/)\n"
+          new="  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\\.v2$/)\n  assert.match(FORTUNE_AI_JOB_CONTRACT, /v12$/)\n"
+          if old not in s: raise SystemExit('pending contract test anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit V12 intraday evidence
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts supabase/functions/fortune-interpret-v6-preview/qualityV2.ts supabase/functions/fortune-interpret-v6-preview/periodInstruction.ts supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat(ai): link intraday timing to exact evidence windows'
+          git push origin HEAD:work/integrated-interpretation-v2
