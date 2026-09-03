@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v4-salience-relationship-flow";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -115,6 +115,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
     }
   }
   const relationshipSalient=["연애","연락","재회"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));
+  const investmentSalient=["투자심리","수익실현","신규진입","투자주의"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));
   if(relationshipSalient){
     const rr=data?.relationship_reading??{};
     const rows=(rr?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
@@ -135,9 +136,11 @@ export function inspectInterpretationQuality(data:any,payload:any){
 
   const s5:string[]=[];
   const minWindows=kind==="annual"?5:kind==="month"?3:kind==="week"?2:1;
+  const minDecisions=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
+  const minPriorities=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
   if((data?.key_windows?.length??0)<minWindows)s5.push(`핵심 시기 부족: ${data?.key_windows?.length??0}/${minWindows}`);
-  if((data?.decisions?.length??0)<3)s5.push("결정/행동 가이드 3개 미만");
-  if((data?.priorities?.length??0)<3)s5.push("우선순위 3개 미만");
+  if((data?.decisions?.length??0)<minDecisions)s5.push(`결정/행동 가이드 부족: ${data?.decisions?.length??0}/${minDecisions}`);
+  if((data?.priorities?.length??0)<minPriorities)s5.push(`우선순위 부족: ${data?.priorities?.length??0}/${minPriorities}`);
   if(kind==="annual"&&(data?.year_phases?.length??0)<4)s5.push("연간 4개 phase 미완성");
   if(kind==="annual"&&(data?.cross_checks?.length??0)<3)s5.push("연간 교차검증 3개 미만");
   if(kind==="annual"&&Array.from(map.values() as any).some((r:any)=>r?.system&&r.system!=="western")){
@@ -196,21 +199,40 @@ export function inspectInterpretationQuality(data:any,payload:any){
   for(const d of data?.decisions??[]){
     if(String(d?.watch??"").length<14)s5.push(`결정 가이드 확인조건이 너무 짧음: ${txt(d?.action,45)}`);
     if(String(d?.avoid??"").length<14)s5.push(`결정 가이드 회피조건이 너무 짧음: ${txt(d?.action,45)}`);
+    if(String(d?.reason??"").length>700)s5.push(`결정 가이드 근거가 지나치게 김: ${txt(d?.action,45)}`);
+    if(String(d?.watch??"").length>400)s5.push(`결정 가이드 확인조건이 지나치게 김: ${txt(d?.action,45)}`);
+    if(String(d?.avoid??"").length>400)s5.push(`결정 가이드 회피조건이 지나치게 김: ${txt(d?.action,45)}`);
   }
   for(const w of data?.key_windows??[]){
     if(String(w?.summary??"").length<45)s5.push(`핵심 시기 설명이 너무 짧음: ${w?.label}`);
+    if(String(w?.summary??"").length>750)s5.push(`핵심 시기 설명이 지나치게 김: ${w?.label}`);
     if(String(w?.action??"").length<18)s5.push(`핵심 시기 행동이 너무 짧음: ${w?.label}`);
     if((w?.evidence_refs?.length??0)<(kind==="annual"?2:1))s5.push(`핵심 시기 근거 수 부족: ${w?.label}`);
   }
   if(kind==="annual")for(const p of data?.year_phases??[])if(!(p?.evidence_refs?.length))s5.push(`연간 phase 근거 없음: ${p?.label}`);
   if(relationshipSalient){
-    const rr=data?.relationship_reading??{};
+    const rr=data?.relationship_reading??{},cf=data?.contact_flow??{};
     if(String(rr?.context??"").length<35)s5.push("관계·재회 관계 맥락 설명 부족");
     if(String(rr?.flow??"").length<55)s5.push("관계·재회 이어지는 흐름 설명 부족");
     if(String(rr?.focus_timing??"").length<20)s5.push("관계·재회 주목 시기 설명 부족");
     if(String(rr?.watch??"").length<20)s5.push("관계·재회 현실 확인 신호 부족");
     if(String(rr?.avoid??"").length<20)s5.push("관계·재회 과대해석 방지 설명 부족");
+    if(String(rr?.context??"").length>600||String(rr?.flow??"").length>850||String(rr?.focus_timing??"").length>550||String(rr?.watch??"").length>550||String(rr?.avoid??"").length>500)s5.push("관계·재회 핵심 흐름이 지나치게 장황함");
+    if(String(cf?.incoming??"").length<15)s5.push("관계·재회 상대→나 방향 설명 부족");
+    if(String(cf?.outgoing??"").length<15)s5.push("관계·재회 나→상대 방향 설명 부족");
+    if(String(cf?.reconnection??"").length<15)s5.push("관계·재회 과거인연 방향 설명 부족");
   }
+  if(investmentSalient){
+    const ir=data?.investment_reading??{};
+    const investmentFields:Record<string,string>={"투자심리":"psychology","수익실현":"realization","신규진입":"entry","투자주의":"risk"};
+    for(const [topic,field] of Object.entries(investmentFields)){
+      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&String(ir?.[field]??"").length<20)s5.push(`${topic} 중요 분야인데 투자 상세 설명 부족`);
+    }
+  }
+  const clusterMax=kind==="annual"?650:kind==="month"?500:420;
+  for(const [name,value] of Object.entries(data?.clusters??{}))if(String(value??"").length>clusterMax)s5.push(`분야별 종합 ${name}이 지나치게 김(${String(value??"").length}/${clusterMax})`);
+  const dominantMax=kind==="annual"?900:650;
+  if(String(data?.overall?.dominant_pattern??"").length>dominantMax)s5.push(`핵심 패턴이 지나치게 김(${String(data?.overall?.dominant_pattern??"").length}/${dominantMax})`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
     const importance=["핵심","주목","참고"].includes(String(x?.importance??""))?String(x.importance):"참고";
     const minReason=importance==="핵심"?(kind==="annual"?85:60):importance==="주목"?(kind==="annual"?55:40):(kind==="annual"?25:18);

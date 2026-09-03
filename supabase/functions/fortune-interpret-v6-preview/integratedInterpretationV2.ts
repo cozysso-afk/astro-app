@@ -1,8 +1,8 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
-export const VERSION = "supabase-ai-v13-salience-relationship-flow";
+export const VERSION = "supabase-ai-v14-adaptive-length";
 export const PACKET_VERSION = "fortune-interpretation-packet-v4-intraday-window";
-export const QUALITY_VERSION = "fortune-interpretation-quality-v4-salience-relationship-flow";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
   "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -266,7 +266,9 @@ export const SYSTEM=`너는 '별빛의 운명'의 증거기반 통합 운세 분
 - cross_checks는 체계를 억지로 합산하지 않고 같은 시기의 Western·사주·Thai 근거를 나란히 대조한다. mode=복수체계/상반맥락이면 Western 근거와 최소 1개의 비Western 근거를 함께 붙이고, mode=Western단독이면 다른 체계가 확인하지 않았다는 사실을 명확히 쓴다. Thai는 방향성 투표가 아니라 허용된 맥락만 기술한다.
 - decisions는 행동만 쓰지 말고 timing, reason, watch(실행 전에 확인할 현실 신호), avoid(피할 행동)를 모두 구체적으로 쓴다.
 - topic_analysis는 분야마다 verdict만 쓰지 말고 reason에 기간 평균과 월별 변화 또는 날짜 피크를 연결하되 importance=참고인 분야는 핵심 판단에 필요한 최소 설명만 쓴다.
-- relationship_reading은 관계 상태나 상대 속마음을 만들어내는 칸이 아니다. 계산된 관계 방향축을 종합해 어떤 흐름이 먼저/나중에 강해지는지와 어디를 현실에서 확인할지만 쓴다.
+- relationship_reading은 관계 상태나 상대 속마음을 만들어내는 칸이 아니다. 계산된 관계 방향축을 종합해 어떤 흐름이 먼저/나중에 강해지는지와 어디를 현실에서 확인할지만 쓴다. 연애·연락·재회가 모두 참고라면 relationship_reading과 contact_flow를 분량 채우기용으로 늘리지 않아도 된다.
+- 투자심리·수익실현·신규진입·투자주의가 모두 참고라면 investment_reading을 길게 만들지 않아도 된다. 해당 투자 분야가 핵심/주목일 때만 필요한 세부 항목을 설명한다.
+- clusters는 15개 상세해석을 다시 복제하는 장문 섹션이 아니다. 관계/일·학업/돈·소식/투자/컨디션의 핵심 차이만 2~4문장 이내로 요약한다.
 - confidence='높음'은 근거가 여러 개이고 적어도 하나의 Western 계산근거가 있을 때만 쓴다.`;
 
 const S={type:"STRING"};
@@ -277,11 +279,11 @@ const windowSchema={type:"OBJECT",properties:{label:S,start:S,end:S,signal:{type
 const phaseSchema={type:"OBJECT",properties:{label:S,start:S,end:S,theme:S,change:S,evidence_refs:refs},required:["label","start","end","theme","change","evidence_refs"]};
 const crossCheckSchema={type:"OBJECT",properties:{label:S,start:S,end:S,mode:{type:"STRING",enum:["복수체계","상반맥락","Western단독"]},western:S,saju:S,thai:S,synthesis:S,evidence_refs:refs},required:["label","start","end","mode","western","saju","thai","synthesis","evidence_refs"]};
 const decisionSchema={type:"OBJECT",properties:{action:S,timing:S,reason:S,watch:S,avoid:S,evidence_refs:refs},required:["action","timing","reason","watch","avoid","evidence_refs"]};
-export const SCHEMA:any={type:"OBJECT",properties:{headline:S,overall:{type:"OBJECT",properties:{summary:S,dominant_pattern:S,best_phase:S,caution_phase:S,evidence_refs:refs},required:["summary","dominant_pattern","best_phase","caution_phase","evidence_refs"]},key_windows:{type:"ARRAY",items:windowSchema},year_phases:{type:"ARRAY",items:phaseSchema},cross_checks:{type:"ARRAY",items:crossCheckSchema},decisions:{type:"ARRAY",items:decisionSchema},clusters:{type:"OBJECT",properties:{relationship:S,work_study:S,money_news:S,investment:S,condition:S},required:["relationship","work_study","money_news","investment","condition"]},relationship_reading:relationshipSchema,contact_flow:{type:"OBJECT",properties:{incoming:S,outgoing:S,reconnection:S},required:["incoming","outgoing","reconnection"]},investment_reading:{type:"OBJECT",properties:{psychology:S,realization:S,entry:S,risk:S},required:["psychology","realization","entry","risk"]},systems:{type:"OBJECT",properties:{western:S,saju:S,thai:S},required:["western","saju","thai"]},priorities:{type:"ARRAY",items:S},topic_analysis:{type:"OBJECT",properties:Object.fromEntries(TOPICS.map(k=>[k,topicSchema])),required:[...TOPICS]},limits:S},required:["headline","overall","key_windows","year_phases","cross_checks","decisions","clusters","contact_flow","investment_reading","systems","priorities","topic_analysis","limits"]};
+export const SCHEMA:any={type:"OBJECT",properties:{headline:S,overall:{type:"OBJECT",properties:{summary:S,dominant_pattern:S,best_phase:S,caution_phase:S,evidence_refs:refs},required:["summary","dominant_pattern","best_phase","caution_phase","evidence_refs"]},key_windows:{type:"ARRAY",items:windowSchema},year_phases:{type:"ARRAY",items:phaseSchema},cross_checks:{type:"ARRAY",items:crossCheckSchema},decisions:{type:"ARRAY",items:decisionSchema},clusters:{type:"OBJECT",properties:{relationship:S,work_study:S,money_news:S,investment:S,condition:S},required:["relationship","work_study","money_news","investment","condition"]},relationship_reading:relationshipSchema,contact_flow:{type:"OBJECT",properties:{incoming:S,outgoing:S,reconnection:S},required:["incoming","outgoing","reconnection"]},investment_reading:{type:"OBJECT",properties:{psychology:S,realization:S,entry:S,risk:S},required:["psychology","realization","entry","risk"]},systems:{type:"OBJECT",properties:{western:S,saju:S,thai:S},required:["western","saju","thai"]},priorities:{type:"ARRAY",items:S},topic_analysis:{type:"OBJECT",properties:Object.fromEntries(TOPICS.map(k=>[k,topicSchema])),required:[...TOPICS]},limits:S},required:["headline","overall","key_windows","year_phases","cross_checks","decisions","clusters","systems","priorities","topic_analysis","limits"]};
 
 function cleanRefs(v:any){return Array.isArray(v)?uniq(v.map((x:any)=>txt(x,180)).filter(Boolean)).slice(0,12):[];}
 export function validateOutput(o:any){
-  if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.contact_flow||!o.investment_reading||!o.systems||!o.topic_analysis)return null;
+  if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.systems||!o.topic_analysis)return null;
   const analyses:any={};
   for(const k of TOPICS){const x=o.topic_analysis[k];if(!x||typeof x!=="object")return null;const c=txt(x.confidence,20),importance=txt(x.importance,20);analyses[k]={importance:["핵심","주목","참고"].includes(importance)?importance:"참고",verdict:txt(x.verdict,900),reason:txt(x.reason,2200),timing:txt(x.timing,1200),action:txt(x.action,900),avoid:txt(x.avoid,900),confidence:["높음","보통","낮음"].includes(c)?c:"보통",confidence_reason:txt(x.confidence_reason,900),evidence_refs:cleanRefs(x.evidence_refs)};}
   const keyWindows=Array.isArray(o.key_windows)?o.key_windows.slice(0,10).map((x:any)=>({label:txt(x?.label,180),start:txt(x?.start,40),end:txt(x?.end,40),signal:["활용","혼합","주의","배경"].includes(txt(x?.signal,20))?txt(x?.signal,20):"혼합",topics:Array.isArray(x?.topics)?x.topics.slice(0,8).map((t:any)=>txt(t,80)).filter(Boolean):[],summary:txt(x?.summary,1600),action:txt(x?.action,900),avoid:txt(x?.avoid,900),evidence_refs:cleanRefs(x?.evidence_refs)})):[];

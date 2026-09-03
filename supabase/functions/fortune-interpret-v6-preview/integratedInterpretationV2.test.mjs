@@ -287,3 +287,17 @@ test("salient reunion reading requires directional evidence and grounded timing"
   assert.equal(fabricatedReport.ok,false);
   assert.match(fabricatedReport.stages[1].issues.join(" "),/직접 날짜 근거 미연결/);
 });
+
+
+test("non-salient relationship and investment detail blocks may be omitted",()=>{
+  const packet=compactCalculation(calculation());
+  const lean=output(packet);
+  for(const topic of ["연애","연락","재회","투자심리","수익실현","신규진입","투자주의"])lean.topic_analysis[topic].importance="참고";
+  delete lean.relationship_reading;
+  delete lean.contact_flow;
+  delete lean.investment_reading;
+  const validated=validateOutput(lean);
+  assert.ok(validated,"optional detail blocks should not invalidate the structured response");
+  const report=inspectInterpretationQuality(validated,packet);
+  assert.equal(report.ok,true,JSON.stringify(report,null,2));
+});

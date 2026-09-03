@@ -1,4 +1,4 @@
-export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-salience-relationship-v13'
+export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-adaptive-length-v14'
 export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v2'
 
 export type PendingFortuneAiJob = {

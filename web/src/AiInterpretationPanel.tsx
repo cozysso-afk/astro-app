@@ -42,6 +42,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
   const orderedTopics = [...topics].sort((a,b)=>importanceRank(data.topic_analysis?.[a]?.importance)-importanceRank(data.topic_analysis?.[b]?.importance))
   const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))
+  const showInvestmentFocus = ['투자심리','수익실현','신규진입','투자주의'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))
   const relationshipReading = data.relationship_reading
 
   return <section className="ai-interpret-card">
@@ -75,7 +76,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
     </div>
 
     {showRelationshipFocus && data.contact_flow && (data.contact_flow.incoming || data.contact_flow.outgoing || data.contact_flow.reconnection) && <div className="ai-direction-grid"><article><strong>수신 · 상대 → 나</strong><p>{data.contact_flow.incoming || '뚜렷한 수신 근거가 없어.'}</p></article><article><strong>발신 · 나 → 상대</strong><p>{data.contact_flow.outgoing || '뚜렷한 발신 적합 근거가 없어.'}</p></article><article><strong>과거 인연 · 재접점</strong><p>{data.contact_flow.reconnection || '재접점 근거가 약해.'}</p></article></div>}
-    {data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid"><article><strong>투자심리</strong><p>{data.investment_reading.psychology}</p></article><article><strong>수익실현</strong><p>{data.investment_reading.realization}</p></article><article><strong>신규진입</strong><p>{data.investment_reading.entry}</p></article><article className="is-risk"><strong>투자주의 · 높을수록 경계</strong><p>{data.investment_reading.risk}</p></article></div>}
+    {showInvestmentFocus && data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid"><article><strong>투자심리</strong><p>{data.investment_reading.psychology}</p></article><article><strong>수익실현</strong><p>{data.investment_reading.realization}</p></article><article><strong>신규진입</strong><p>{data.investment_reading.entry}</p></article><article className="is-risk"><strong>투자주의 · 높을수록 경계</strong><p>{data.investment_reading.risk}</p></article></div>}
 
     {!hasDecisions && !!data.priorities?.length && <div className="ai-priorities"><strong>이 기간 우선순위</strong>{data.priorities.map((item, index)=><p key={`${index}-${item}`}>{index+1}. {item}</p>)}</div>}
 

@@ -92,6 +92,17 @@ for(const kind of ["day","week","month"]){
 }
 
 
+test("short periods do not force filler decisions or priorities",()=>{
+  for(const [kind,decisionCount,priorityCount] of [["day",1,1],["week",2,2],["month",2,2]]){
+    const {data,payload}=buildCase(kind);
+    data.decisions=data.decisions.slice(0,decisionCount);
+    data.priorities=data.priorities.slice(0,priorityCount);
+    const report=inspectInterpretationQuality(data,payload);
+    assert.equal(report.ok,true,`${kind} should pass without filler: ${JSON.stringify(report,null,2)}`);
+  }
+});
+
+
 test("day quality guard requires exact W:window timing and same-topic detail evidence",()=>{
   const {data,payload}=buildCase("day");
   payload.western={detail_days:[{date:"2026-09-03",topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31}}}}]};
