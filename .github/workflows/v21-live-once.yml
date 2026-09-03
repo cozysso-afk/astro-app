@@ -1,0 +1,140 @@
+name: V21 Live Once
+
+on:
+  push:
+    branches:
+      - work/ai-cost-guard-v21
+    paths:
+      - '.github/workflows/v21-live-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RENDER_API: https://astro-app-api-f7fn.onrender.com
+      SUPABASE_URL: https://dbynfabwfcakxayyggzi.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r
+      FUNCTION_NAME: fortune-interpret-v21-preview
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create isolated anonymous test session
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS -X POST "$SUPABASE_URL/auth/v1/signup" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data '{"data":{"purpose":"v21-approved-live-smoke"}}' > auth.json
+          TOKEN=$(jq -r '.access_token // empty' auth.json)
+          USER_ID=$(jq -r '.user.id // empty' auth.json)
+          test -n "$TOKEN"
+          test -n "$USER_ID"
+          echo "ACCESS_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "$USER_ID" > test-user-id.txt
+          echo "anonymous test user created"
+
+      - name: Calculate one dummy 365-day annual fortune without Gemini
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > calc-request.json <<'JSON'
+          {
+            "profile": {
+              "name": "V21 DUMMY TEST",
+              "birth_date": "1990-06-15",
+              "birth_time": "12:00",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "utc_offset_hours": 9,
+              "gender": "female"
+            },
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31"
+          }
+          JSON
+          curl --fail-with-body -sS -X POST "$RENDER_API/v1/fortune/integrated/start" \
+            -H 'Content-Type: application/json' --data-binary @calc-request.json > calc-start.json
+          JOB_ID=$(jq -r '.job_id // empty' calc-start.json)
+          test -n "$JOB_ID"
+          for i in $(seq 1 240); do
+            sleep 2
+            HTTP=$(curl -sS -o calc-status.json -w '%{http_code}' "$RENDER_API/v1/fortune/integrated/jobs/$JOB_ID" || true)
+            if [ "$HTTP" = "200" ]; then
+              STATUS=$(jq -r '.status // empty' calc-status.json)
+              if [ "$STATUS" = "done" ]; then
+                jq '.result' calc-status.json > calculation.json
+                break
+              fi
+              if [ "$STATUS" = "failed" ]; then
+                cat calc-status.json
+                exit 1
+              fi
+            fi
+          done
+          test -s calculation.json
+          jq '{engine,period,western_engine:.western.engine,daily_rows:(.western.daily_scores|length),key_dates:(.western.key_dates|length)}' calculation.json
+
+      - name: Inspect V21 prompt budget without Gemini
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --slurpfile calc calculation.json '{action:"inspect",calculation:$calc[0]}' > inspect-request.json
+          curl --fail-with-body -sS -X POST "$SUPABASE_URL/functions/v1/$FUNCTION_NAME" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H 'Content-Type: application/json' --data-binary @inspect-request.json > inspect.json
+          jq '{interpreter_version,full_payload_bytes,prompt_payload_bytes,prompt_budget_bytes,prompt_budget_ok,estimated_input_tokens,max_gemini_calls_per_job,deterministic_topics,evidence_ledger,prompt_evidence_ledger}' inspect.json
+          test "$(jq -r '.prompt_budget_ok' inspect.json)" = "true"
+
+      - name: Start exactly one V21 Gemini job and poll to completion
+        id: live
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --slurpfile calc calculation.json '{action:"start",model:"gemini-3.7-flash",calculation:$calc[0]}' > ai-start-request.json
+          HTTP=$(curl -sS -o ai-start.json -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/$FUNCTION_NAME" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H 'Content-Type: application/json' --data-binary @ai-start-request.json)
+          echo "start_http=$HTTP"
+          cat ai-start.json | jq '{ok,job_id,status,interpreter_version,reused,inflight,prompt_budget,error}'
+          JOB_ID=$(jq -r '.job_id // empty' ai-start.json)
+          test -n "$JOB_ID"
+          echo "$JOB_ID" > ai-job-id.txt
+
+          for i in $(seq 1 70); do
+            sleep 3
+            jq -n --arg id "$JOB_ID" '{action:"status",job_id:$id}' > status-request.json
+            curl --fail-with-body -sS -X POST "$SUPABASE_URL/functions/v1/$FUNCTION_NAME" \
+              -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H 'Content-Type: application/json' --data-binary @status-request.json > ai-final.json
+            STATUS=$(jq -r '.status // empty' ai-final.json)
+            echo "poll $i status=$STATUS"
+            if [ "$STATUS" = "done" ] || [ "$STATUS" = "failed" ]; then break; fi
+          done
+
+          jq '{status,model,fallback_from,interpreter_version,error,usage,headline:.data.headline,overall:.data.overall,priorities:.data.priorities,key_windows_count:(.data.key_windows|length),decisions_count:(.data.decisions|length),year_phases_count:(.data.year_phases|length),cross_checks_count:(.data.cross_checks|length),relationship_reading:.data.relationship_reading,topic_core_count:([.data.topic_analysis[]? | select(.importance=="핵심")]|length)}' ai-final.json > live-summary.json
+          cat live-summary.json
+          STATUS=$(jq -r '.status // empty' ai-final.json)
+          if [ "$STATUS" != "done" ]; then
+            echo "V21 live smoke did not complete successfully"
+            exit 1
+          fi
+
+      - name: Upload sanitized live result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v21-live-once-result
+          path: |
+            inspect.json
+            ai-final.json
+            live-summary.json
+            test-user-id.txt
+          retention-days: 1
