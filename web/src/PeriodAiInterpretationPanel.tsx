@@ -1,4 +1,4 @@
-import { CheckCircle2, LoaderCircle, Sparkles } from 'lucide-react'
+import { CheckCircle2, CircleStop, Copy, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
 import { estimateGeminiUsage } from './lib/aiUsage'
 
@@ -15,20 +15,24 @@ function signalClass(signal: string) {
   return 'is-mixed'
 }
 
-export function PeriodAiInterpretationPanel({ result, loading, error, cacheSource, onRetry }: {
+export function PeriodAiInterpretationPanel({ result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel }: {
   result: AiInterpretationResponse | null
   loading: boolean
   error: string
   cacheSource: 'local' | 'server' | 'fresh' | ''
   onRetry: () => void
+  onCopyPrompt: () => void
+  onCancel: () => void
+  canCancel: boolean
 }) {
-  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>계산근거를 대조해 해설하는 중…</h3><p className="period-ai-summary">점수·핵심 시기·사주·Thai 맥락을 확인하고 5단계 검증까지 통과한 결과만 보여줄게.</p></div></section>
-  if (error && !result) {
+  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>압축 계산근거로 맞춤 해설 생성 중…</h3><p className="period-ai-summary">정상 경로 Gemini 1회, 필요한 품질 수선이 있을 때만 최대 2회야. 약 2분을 넘기지 않고 중단해.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+  const failedUsage = estimateGeminiUsage(result?.usage)
+  if (error && !result?.data) {
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
     const message = quotaLimited
       ? '운세 계산은 정상 완료됐어. 지금은 Gemini 해설 서버의 크레딧 또는 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 크레딧이나 한도가 복구된 뒤 다시 확인하면 계산 결과는 그대로 이어서 해설할 수 있어.'
       : error
-    return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button></section>
+    return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button></div></section>
   }
   if (!result?.ok || !result.data) return null
 
@@ -76,6 +80,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
     </div>}
 
     <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 검증 해설 조회 · 이번 Gemini API 재호출 0회' : '최초 검증 해설 자동 저장 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>
+    <div className="period-ai-v21-controls period-ai-v21-controls-success"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>같은 압축 프롬프트 복사</button></div>
 
     <details className="period-ai-details">
       <summary>분야별 · 체계별 상세 해설 보기</summary>
@@ -93,6 +98,6 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       </div>
     </details>
 
-    {usage?.total_tokens ? <details className="period-ai-meta"><summary>해설 생성 정보 · 비용</summary><div className="period-ai-cost"><span>입력 {(usage.prompt_tokens??0).toLocaleString()} · 출력 {(usage.candidate_tokens??0).toLocaleString()} · 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>{(usage.attempt_count??1)>1?`${usage.attempt_count}회 생성 시도 합산 · `:''}{usage.thai_safety_fallback?'Thai 안전 대체 결과 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장본 재조회 비용 0원</small></div></details> : null}
+    {usage?.total_tokens ? <details className="period-ai-meta"><summary>해설 생성 정보 · 비용</summary><div className="period-ai-cost"><span>입력 {(usage.prompt_tokens??0).toLocaleString()} · 출력 {(usage.candidate_tokens??0).toLocaleString()} · 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>{`실제 Gemini 호출 ${usage.attempt_count??1}회 · 최대 2회 · `}{usage.thai_safety_fallback?'Thai 안전 대체 결과 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장본 재조회 비용 0원</small></div></details> : null}
   </section>
 }

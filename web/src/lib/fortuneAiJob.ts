@@ -1,5 +1,5 @@
-export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-release-v20'
-export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v2'
+export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-release-v21-single-core-cost-guard'
+export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v3'
 
 export type PendingFortuneAiJob = {
   contract: string

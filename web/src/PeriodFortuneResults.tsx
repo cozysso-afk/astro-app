@@ -26,6 +26,9 @@ type PeriodFortuneResultsProps = {
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
   onRetryAi: () => void
+  onCopyAiPrompt: () => void
+  onCancelAi: () => void
+  aiCanCancel: boolean
   onOutcomeChange: (draft: DailyOutcomeRecord) => void
   onSaveOutcome: () => void
 }
@@ -49,12 +52,15 @@ export function PeriodFortuneResults({
   topicDisplay,
   humanizeEvidence,
   onRetryAi,
+  onCopyAiPrompt,
+  onCancelAi,
+  aiCanCancel,
   onOutcomeChange,
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
   return <>
     <div className="result-headline"><CheckCircle2 size={20}/><div><strong>{periodLabel}운세 계산 완료</strong><span>{result.engine} · {result.period.day_count}일 분석</span></div></div>
-    <PeriodAiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi}/>
+    <PeriodAiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel}/>
 
     <section className="result-card">
       <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>

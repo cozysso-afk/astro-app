@@ -327,6 +327,10 @@ export type AiInterpretationResponse = {
     thai_safety_retry?: boolean
     thai_safety_fallback?: boolean
     quality_validation?: AiQualityValidation | null
+    prompt_budget?: { bytes?: number; max_bytes?: number; estimated_input_tokens?: number } | null
+    call_trace?: Array<{ call:number; model:string; kind:string; prompt_bytes:number; elapsed_ms:number; http_status:number; usage?: { prompt_tokens?:number; candidate_tokens?:number; thought_tokens?:number; total_tokens?:number }; error?:string }>
+    cost_guard_version?: string
+    local_thai_scrub?: boolean
   }
   data?: {
     headline: string

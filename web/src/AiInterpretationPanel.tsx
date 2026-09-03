@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, LoaderCircle, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleStop, Copy, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
 import { ANNUAL_SCORE_FOCUS_EVENT } from './AnnualDailyScoresPanel'
 import { estimateGeminiUsage } from './lib/aiUsage'
@@ -21,20 +21,24 @@ function inspectAnnualScore(date: string, topic?: string) {
   window.dispatchEvent(new CustomEvent(ANNUAL_SCORE_FOCUS_EVENT, { detail: { date, topic } }))
 }
 
-export function AiInterpretationPanel({ result, loading, error, onRetry, topics }: {
+export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyPrompt, onCancel, canCancel, topics }: {
   result: AiInterpretationResponse | null
   loading: boolean
   error: string
   onRetry: () => void
+  onCopyPrompt: () => void
+  onCancel: () => void
+  canCancel: boolean
   topics: string[]
 }) {
-  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>Gemini가 서버에서 정밀해석 중…</strong><p>월별 변화와 핵심 날짜를 계산 근거에 다시 대조하고 있어. 앱을 닫아도 서버 작업은 계속돼.</p></div></section>
+  if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>압축 계산근거로 맞춤 해설 생성 중…</strong><p>정상 경로는 Gemini 1회야. 구조 오류·시간초과·핵심 품질 수선이 필요한 경우에만 최대 2회까지 허용하고 약 2분이 지나면 종료해.</p><div className="ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+  const failedUsage = estimateGeminiUsage(result?.usage)
   if (error) {
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
     const message = quotaLimited
       ? '운세 계산은 정상 완료됐어. 지금은 Gemini 해설 서버의 크레딧 또는 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 크레딧이나 한도가 복구된 뒤 다시 시도하면 돼.'
       : error
-    return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : 'AI 해설을 아직 붙이지 못했어'}</strong><p>{message}</p><button type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 시도' : 'AI 해설 다시 시도'}</button></div></section>
+    return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : 'AI 해설을 아직 붙이지 못했어'}</strong><p>{message}</p>{failedUsage?.total_tokens ? <p className="ai-v21-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · Gemini 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="ai-v21-controls"><button type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 시도' : 'AI 해설 다시 시도'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button></div></div></section>
   }
   if (!result?.ok || !result.data) return null
   const data = result.data
@@ -56,7 +60,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
 
     {validation?.stages?.length ? <div className={`ai-validation-badge ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={16}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100 · {validation.stages.filter((stage)=>stage.passed).length}/5 단계</span></div> : null}
 
-    {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>누적 예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>{(usage.attempt_count??1)>1?`${usage.attempt_count}회 생성 시도 합산 · `:''}{usage.thai_safety_fallback?'Thai 안전 대체 결과 적용 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
+    {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>누적 예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>{`실제 Gemini 호출 ${usage.attempt_count??1}회 · 최대 2회 · `}{usage.thai_safety_fallback?'Thai 안전 대체 결과 적용 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}
 
     <div className="ai-overall-block"><span className="ai-section-kicker">전체 결론</span><p className="ai-summary">{data.overall.summary}</p></div>
 
@@ -92,6 +96,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
       return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.importance} · {item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {item.reason}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}{item.evidence_refs?.length?<small className="ai-topic-evidence">검증 근거 {item.evidence_refs.length}개</small>:null}</article>
     })}</div></details>
 
+    <div className="ai-v21-controls ai-v21-controls-success"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>같은 압축 프롬프트 복사</button></div>
     <details className="ai-system-note"><summary>체계별 계산 근거</summary>{data.systems.western&&<p><b>Western(서양점성술)</b> {data.systems.western}</p>}{data.systems.saju&&<p><b>사주</b> {data.systems.saju}</p>}{data.systems.thai&&<p><b>Thai(태국점성술)</b> {data.systems.thai}</p>}</details>
     {data.limits && <p className="ai-limits">{data.limits}</p>}
   </section>

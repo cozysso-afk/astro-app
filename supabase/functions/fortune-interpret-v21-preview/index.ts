@@ -164,7 +164,7 @@ async function job(id:string,payload:any,model:string,key:string){
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
     if(!(await jobActive(id)))return;
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub)};
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:r.error,usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     await a.from("ai_interpret_jobs").update(r.ok?done:failed).eq("id",id);

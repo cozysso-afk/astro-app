@@ -61,6 +61,7 @@ import { aspectText, planetLabels, integratedPromptText, integratedResultText, r
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
+const FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
@@ -359,6 +360,7 @@ export default function AppNext() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const aiPollRef = useRef<string | null>(null)
+  const [aiActiveJobId, setAiActiveJobId] = useState<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
   const [aiCacheSource, setAiCacheSource] = useState<'local'|'server'|'fresh'|''>('')
@@ -405,7 +407,7 @@ export default function AppNext() {
   ;(async () => {
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', { body: { action: 'meta' } })
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action: 'meta' } })
       if (error) throw error
       if (!cancelled) setAiConfigured(Boolean(data?.configured))
     } catch {
@@ -543,6 +545,7 @@ export default function AppNext() {
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
   const selectHomePeriod = (nextPeriod: PeriodKey, clearTool: boolean) => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
     setPeriod(nextPeriod)
     if (clearTool) setSelectedTool(null)
     setIntegratedCalendarYear(null)
@@ -550,6 +553,7 @@ export default function AppNext() {
     setIntegratedProgress(null)
   }
   const selectHomeTool = (tool: ToolKey) => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
     setSelectedTool(tool)
     if (tool === 'compatibility' || tool === 'marriage') {
       setRelationshipDays(365)
@@ -589,12 +593,13 @@ export default function AppNext() {
   const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = PERIOD_CACHE_TTL_DAYS.today, requestForArchive?: Record<string, unknown>) => {
     if (!jobId || aiPollRef.current === jobId) return
     aiPollRef.current = jobId
+    setAiActiveJobId(jobId)
     setAiLoading(true); setAiError('')
     try {
       await ensureSupabaseSession()
       for (let attempt = 0; attempt < 180; attempt++) {
         if (document.visibilityState === 'hidden') return
-        const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', {
+        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
           body: { action: 'status', job_id: jobId },
         })
         if (error) throw error
@@ -624,13 +629,17 @@ export default function AppNext() {
             }
           }
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+          setAiActiveJobId(null)
           setAiConfigured(true)
           aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
-          throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
+          setAiActiveJobId(null)
+          const failedPayload: AiInterpretationResponse = { ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:data?.error || 'AI 해설 서버 작업이 실패했어.' }
+          setAiInterpretation(failedPayload)
+          throw new Error(failedPayload.error)
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
       }
@@ -653,8 +662,10 @@ export default function AppNext() {
     if (!saved) {
       removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      setAiActiveJobId(null)
       return
     }
+    setAiActiveJobId(saved.jobId)
     void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
@@ -673,6 +684,7 @@ export default function AppNext() {
         setAiInterpretation(annotated)
         setAiCacheSource('local')
         setAiLoading(false)
+        setAiActiveJobId(null)
         if (selectedTool === null) {
           const archiveRequest = {...requestForCache, archive_mode:'period_fortune_v16'}
           void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForCache)}`)
@@ -682,7 +694,7 @@ export default function AppNext() {
       setAiInterpretation(null)
       setAiCacheSource('')
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', {
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
         body: { action: 'start', calculation, model: aiModel },
       })
       if (error) throw error
@@ -691,6 +703,7 @@ export default function AppNext() {
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
+      setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
       void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
@@ -701,6 +714,7 @@ export default function AppNext() {
     } catch (error) {
       removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      setAiActiveJobId(null)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
       setAiError(message.includes('non-2xx') ? 'AI 해설 서버에서 오류가 발생했어. 설정의 AI 해설 연결 상태를 확인해줘.' : message)
@@ -735,6 +749,7 @@ export default function AppNext() {
   }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile.birthDate, birthProfile.birthTime, birthProfile.latitude, birthProfile.longitude, birthProfile.utcOffset, birthProfile.gender, birthProfile.placeKey, aiModel])
 
   const runIntegrated = async () => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) await cancelAiInterpretation(true)
     setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')
     if (!birthProfile.birthDate || !birthProfile.birthTime) {
       setIntegratedError('먼저 내정보에서 생년월일과 출생시간을 저장해줘.'); return
@@ -1059,6 +1074,57 @@ export default function AppNext() {
     window.setTimeout(() => setActionNotice(''), 2200)
   }
 
+
+  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult) {
+    if (!calculation) return
+    try {
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
+      if (error) throw error
+      if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
+      const ok = await copyToClipboard(String(data.prompt))
+      const estimated = Number(data.estimated_input_tokens ?? 0)
+      setActionNotice(ok ? `AI용 압축 프롬프트 복사 완료${estimated > 0 ? ` · 예상 입력 약 ${estimated.toLocaleString()} tokens` : ''}` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
+      window.setTimeout(() => setActionNotice(''), 3200)
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
+      window.setTimeout(() => setActionNotice(''), 3200)
+    }
+  }
+
+  async function cancelAiInterpretation(silent = false) {
+    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+    const saved = raw ? decodePendingFortuneAiJob(raw) : null
+    const jobId = aiActiveJobId || saved?.jobId || null
+    if (!jobId) {
+      if (!silent) {
+        setActionNotice('취소할 AI 해설 작업이 없어.')
+        window.setTimeout(() => setActionNotice(''), 2200)
+      }
+      return
+    }
+    try {
+      await ensureSupabaseSession()
+      const { error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'cancel', job_id:jobId } })
+      if (error) throw error
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+      aiRequestRef.current = ''
+      aiPollRef.current = null
+      setAiActiveJobId(null)
+      setAiLoading(false)
+      if (!silent) {
+        setAiError('AI 해설 생성을 취소했어. 계산 결과는 그대로 사용할 수 있어.')
+        setActionNotice('AI 해설 생성 취소 완료 · 이미 전송된 1회 호출은 되돌릴 수 없지만 추가 수선 호출은 중단해.')
+        window.setTimeout(() => setActionNotice(''), 3600)
+      }
+    } catch (error) {
+      if (!silent) {
+        setActionNotice(error instanceof Error ? `AI 해설 취소 확인 실패 · ${error.message}` : 'AI 해설 취소 확인에 실패했어.')
+        window.setTimeout(() => setActionNotice(''), 3200)
+      }
+    }
+  }
+
   async function saveIntegratedRecord() {
     if (!integratedResult || !integratedRequestSnapshot || archiveSaving) return
     setArchiveSaving(true); setArchiveStatus('기록 저장 중…')
@@ -1379,14 +1445,14 @@ export default function AppNext() {
             apiStatus={apiStatus}
             apiLabel={apiLabel}
             onOpenProfile={()=>switchMainView('profile')}
-            onQueryDateChange={setQueryDate}
+            onQueryDateChange={(value)=>{ if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true); setQueryDate(value) }}
             onPeriodSelect={selectHomePeriod}
             onToolSelect={selectHomeTool}
           />
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
-            <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>setIntegratedCalendarYear(Number(e.target.value))}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
+            <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>{ if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true); setIntegratedCalendarYear(Number(e.target.value)) }}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
             <div className="calculation-range annual-calculation-range"><CalendarDays size={17}/><span>연간 분석 {integratedStartDate} ~ {integratedSelectionEnd} · {annualFortuneYear}년 전체</span></div>
             <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀), 교차검증된 Suriyayat(수리야얏) 10행성 위치와 숫자 Lagna(라그나)를 계산해. 검증된 12개 하우스 연결은 맥락 설명에만 쓰고 사건·시기·확률·점수는 예측하지 않아.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
@@ -1394,8 +1460,13 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>연간 통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
-              {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
-              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()} topics={topicOrder}/>
+              <div className="relationship-ai-toolbar ai-cost-guard-toolbar">
+                {!aiInterpretation&&!aiLoading&&!aiError&&<button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button>}
+                <button type="button" onClick={()=>void copyAiInterpretationPrompt(integratedResult)}><Copy size={15}/><span>AI용 압축 프롬프트 복사</span></button>
+                {aiLoading&&aiActiveJobId&&<button type="button" onClick={()=>void cancelAiInterpretation(false)}><Trash2 size={15}/><span>AI 해설 생성 취소</span></button>}
+                <small>계산 자체 Gemini 0회 · 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회 · 약 2분 제한</small>
+              </div>
+              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()} onCopyPrompt={()=>void copyAiInterpretationPrompt(integratedResult)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} topics={topicOrder}/>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1568,6 +1639,9 @@ export default function AppNext() {
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
               onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
+              onCopyAiPrompt={()=>void copyAiInterpretationPrompt(integratedResult)}
+              onCancelAi={()=>void cancelAiInterpretation(false)}
+              aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}
               onOutcomeChange={setOutcomeDraft}
               onSaveOutcome={()=>void saveDailyOutcome()}
             />}
