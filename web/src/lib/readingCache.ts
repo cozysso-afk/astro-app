@@ -11,6 +11,8 @@ type CacheRecord<T = unknown> = {
 const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
+const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
+const FORTUNE_AI_CACHE_CONTRACT = 'release-contract-v20'
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
@@ -108,7 +110,7 @@ export async function deleteReadingCache(id: string): Promise<void> {
 }
 
 export function fortuneCalculationCacheId(request: Record<string, unknown>): string {
-  return `fortune-calc:${hashText(stableStringify(request))}`
+  return `fortune-calc:${hashText(stableStringify({ contract: FORTUNE_CALC_CACHE_CONTRACT, request }))}`
 }
 
 export function fortuneAiCacheId(request: Record<string, unknown>, calculation: Record<string, unknown>, model: string): string {
@@ -117,6 +119,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const saju = calculation.saju && typeof calculation.saju === 'object' ? calculation.saju as Record<string, unknown> : {}
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
   const signature = {
+    interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
     model,
     request,
     api_version: calculation.api_version,
@@ -125,10 +128,15 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
     western_engine: western.engine,
     overall: western.overall,
     relationship_signals: western.relationship_signals,
+    western_months: western.months,
+    western_detail_days: western.detail_days,
+    western_key_dates: western.key_dates,
+    western_daily_scores: western.daily_scores,
     saju_engine: saju.engine,
     saju_annual: saju.annual,
     saju_monthly: saju.monthly,
     thai_engine: thai.engine,
+    thai_mahathaksa: thai.mahathaksa,
     thai_taksajorn: thai.taksajorn,
     thai_suriyayat: thai.suriyayat,
   }

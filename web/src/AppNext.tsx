@@ -8,6 +8,7 @@ import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, p
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
@@ -38,6 +39,7 @@ import type {
 } from './appTypes'
 
 import { AiInterpretationPanel } from './AiInterpretationPanel'
+import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
@@ -62,7 +64,6 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
-const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'
 const ARCHIVE_DELETE_UNDO_MS = 8000
 
 const PERIOD_CACHE_TTL_DAYS: Record<PeriodKey, number> = {
@@ -602,7 +603,7 @@ export default function AppNext() {
             ok: true,
             model: data.model,
             fallback_from: data.fallback_from,
-            interpreter_version: data.interpreter_version || 'supabase-ai-v7-thai-lagna-output-guard',
+            interpreter_version: data.interpreter_version || 'unknown',
             usage: data.usage ?? undefined,
             data: data.data ?? undefined,
           }
@@ -622,13 +623,13 @@ export default function AppNext() {
               void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${periodStart}`,periodStart,periodEnd:periodEndValue,engine:calc.engine,request:archiveRequest,result:calc as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForArchive)}`)
             }
           }
-          removeLocalStorage(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiConfigured(true)
           aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
-          removeLocalStorage(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
@@ -640,21 +641,21 @@ export default function AppNext() {
       setAiError(message.includes('non-2xx') ? 'AI 해설 상태 확인이 잠시 끊겼어. 앱을 다시 열면 이어서 확인해.' : message)
     } finally {
       aiPollRef.current = null
-      setAiLoading(Boolean(readLocalStorage(AI_JOB_STORAGE_KEY)))
+      setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
     }
   }
 
   const resumeAiInterpretationJob = () => {
     if (document.visibilityState === 'hidden') return
-    const raw = readLocalStorage(AI_JOB_STORAGE_KEY)
+    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
     if (!raw) return
-    try {
-      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }
-      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
-    } catch {
-      removeLocalStorage(AI_JOB_STORAGE_KEY)
+    const saved = decodePendingFortuneAiJob(raw)
+    if (!saved) {
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      return
     }
+    void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
@@ -690,7 +691,7 @@ export default function AppNext() {
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
-      const jobPersisted = writeLocalStorage(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
+      const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
       void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
       if (!jobPersisted) {
@@ -698,7 +699,7 @@ export default function AppNext() {
         window.setTimeout(()=>setActionNotice(''),3200)
       }
     } catch (error) {
-      removeLocalStorage(AI_JOB_STORAGE_KEY)
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
@@ -1403,6 +1404,8 @@ export default function AppNext() {
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
 
+              <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
+
               <section className="result-card">
                 <div className="result-card-title"><span>WESTERN</span><strong>서양점성술 기간 흐름</strong></div>
                 <p className="result-note">{integratedResult.western.score_policy} · {integratedResult.western.ephemeris}</p>
@@ -1417,8 +1420,6 @@ export default function AppNext() {
               {orderedRelationshipSignals.length > 0 && <section className="result-card integrated-relationship-flow"><div className="result-card-title"><span>RELATIONSHIP</span><strong>연애 · 연락 · 재접점 흐름</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`integrated-signal-${topic}`}><span>{topic === '수신신호' ? '수신 · 상대 → 나' : topic === '발신적합' ? '발신 · 나 → 상대' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">수신·발신·재접점은 서로 섞지 않아. 점수는 사건 확률이 아니라 선택 기간의 상대적 활성도야.</p></section>}
 
               {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MONEY · MARKET</span><strong>금전 · 주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`integrated-market-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자주의는 높을수록 좋은 점수가 아니라 위험 경계가 강하다는 뜻이야.</p></section>}
-
-              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card integrated-date-highlights"><div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>{bestIntegratedDays.map((point)=><div className="tight-row" key={`integrated-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}{cautionIntegratedDays.map((point)=><div className="tight-row" key={`integrated-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}<p className="result-note">선택 기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p></section>}
 
               {integratedResult.western.detail_days?.length ? <details className="result-card integrated-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`integrated-day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`integrated-${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`integrated-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
 
@@ -1445,13 +1446,13 @@ export default function AppNext() {
                 <p className="result-note">Mahathaksa/Taksajorn은 태국 기간층, Suriyayat은 검증된 위치 사실층이야. Lagna와 12개 하우스 연결은 비예측형 맥락만 설명하며, 학파 예외·최종 길흉·사건·정확한 미래 시기·확률·점수는 만들지 않고 Western 점수에도 섞지 않아.</p>
               </section>
 
-              {integratedResult.western.months.length>1 && <section className="result-card">
-                <div className="result-card-title"><span>MONTHLY</span><strong>월별 흐름</strong></div>
-                <div className="month-list">{integratedResult.western.months.map((month)=>{
+              {integratedResult.western.months.length>1 && <details className="result-card integrated-month-source">
+                <summary><span>MONTHLY</span><strong>월별 분야 원자료 보기</strong><small>12개월의 분야별 상위 흐름을 펼쳐서 확인</small></summary>
+                <div className="integrated-month-source-body"><div className="month-list">{integratedResult.western.months.map((month)=>{
                   const ranked = topicOrder.map((topic)=>({topic,stat:month.topics[topic]})).filter((row): row is {topic:string;stat:FortuneStat}=>Boolean(row.stat)).sort((a,b)=>b.stat.average-a.stat.average).slice(0,3)
                   return <div className="month-card" key={month.calendar_month}><div className="month-title"><strong>{month.calendar_month}</strong><span>{month.start}~{month.end}</span></div>{ranked.map(({topic,stat})=><div className="tight-row" key={topic}><span>{topic} · {stat.band}</span><b>{stat.average.toFixed(1)}</b></div>)}</div>
-                })}</div>
-              </section>}
+                })}</div></div>
+              </details>}
             </div>}
           </section>}
 
