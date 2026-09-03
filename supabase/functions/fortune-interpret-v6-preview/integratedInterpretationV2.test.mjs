@@ -23,9 +23,31 @@ function calculation(){
     for(const topic of Object.keys(rel))mr[topic]=stat(45+(m%5)*4,`2026-${mm}-21`,75,`2026-${mm}-14`,36);
     months.push({calendar_month:`2026-${mm}`,start:`2026-${mm}-01`,end:`2026-${mm}-${String(lastDay(m)).padStart(2,"0")}`,topics:mt,relationship_signals:mr});
   }
+  const dailySeeds=[
+    ["2026-02-14",28,false],["2026-02-21",76,false],
+    ["2026-05-14",25,true],["2026-05-15",30,true],
+    ["2026-07-21",82,true],["2026-07-24",78,true],
+    ["2026-10-21",85,true],["2026-10-14",32,true],
+    ["2026-12-14",29,true],["2026-12-21",75,true],
+  ];
+  const investment=new Set(["투자심리","수익실현","신규진입","투자주의"]);
+  const daily_scores=dailySeeds.map(([date,base,market_open],rowIndex)=>{
+    const scores={};
+    for(const [index,topic] of TOPICS.entries()){
+      if(investment.has(topic)&&!market_open){scores[topic]=null;continue;}
+      const drift=(index%3)-1; scores[topic]=Math.max(5,Math.min(95,Number(base)+drift*2));
+    }
+    scores.수신신호=Math.max(5,Math.min(95,Number(base)+1));
+    scores.발신적합=Math.max(5,Math.min(95,Number(base)+2));
+    scores.과거인연접점=Math.max(5,Math.min(95,Number(base)+3));
+    return {
+      date,label:date,market_open:Boolean(market_open),scores,
+      evidence:[{kind:"aspect",sample_time:"12:00",source_topics:[...TOPICS,"수신신호","발신적합","과거인연접점"],contribution:1.2+rowIndex/100,text:`Jupiter→MC trine · orb 0.${20+rowIndex}°`,transit:"Jupiter",target:"MC",aspect:"trine",orb:(20+rowIndex)/100}],
+    };
+  });
   return {
     api_version:"test",engine:"test",period:{start:"2026-01-01",end:"2026-12-31",day_count:365},
-    western:{engine:"western",ephemeris:"DE440s",score_policy:"relative",overall:topics,relationship_signals:rel,months,detail_days:[],market:{}},
+    western:{engine:"western",ephemeris:"DE440s",score_policy:"relative",overall:topics,relationship_signals:rel,months,daily_scores,detail_days:[],market:{}},
     saju:{engine:"saju",pillars:{},annual:[{year:2026,ganzhi:"丙午",stem_ten_god:"정재",branch_links:[],segment_start:"2026-02-04T00:00:00+09:00",segment_end_exclusive:"2027-02-04T00:00:00+09:00"}],monthly:[{calendar_month:"2026-07",ganzhi:"乙未",stem_ten_god:"편재",branch_links:["일지와 六合"],segment_start:"2026-07-07T00:00:00+09:00",segment_end_exclusive:"2026-08-07T00:00:00+09:00",jie_name_ko:"소서"}],not_calculated:["용신"]},
     thai:{engine:"thai",taksajorn:{available:true,method:"test",segments:[{start:"2026-01-01T00:00:00+09:00",end:"2026-12-31T23:59:59+09:00",annual_boriwan:{key:"mars",label:"화성"},landed_center:false,wheel:[]}]},suriyayat:{},not_calculated:[]},
   };
@@ -57,6 +79,11 @@ function output(packet){
   const febStudy=ref("W:month:2026-02:학업");
   const decMoney=ref("W:month:2026-12:금전");
   const decLove=ref("W:month:2026-12:연애");
+  const julyDaily=ref("W:daily:2026-07-21:");
+  const mayDaily=ref("W:daily:2026-05-14:");
+  const octDaily=ref("W:daily:2026-10-21:");
+  const febDaily=ref("W:daily:2026-02-14:");
+  const decDaily=ref("W:daily:2026-12-14:");
   return {
     headline:"연평균보다 전환구간이 중요한 해",
     overall:{
@@ -67,11 +94,11 @@ function output(packet){
       evidence_refs:[julyWork,mayLove,ref("S:month:")],
     },
     key_windows:[
-      {label:"7월 실행창",start:"2026-07-21",end:"2026-07-24",signal:"활용",topics:["직장","이직","발신적합"],summary:repeat("준비해 둔 업무 결정과 연락 시도를 실제 행동으로 옮길 만한 상위 날짜가 같은 주간에 모여 있어.",2),action:"지원·협상·중요한 연락처럼 미리 준비한 행동을 이 구간에 집중해서 실행해.",avoid:"높은 상대지수를 결과 확정이나 성공 보장으로 바꾸지 마.",evidence_refs:[julyWork,julyOutgoing]},
-      {label:"5월 점검창",start:"2026-05-14",end:"2026-05-15",signal:"주의",topics:["연애","발신적합"],summary:repeat("관계와 발신 관련 하위 날짜가 연달아 잡혀서 즉흥적인 결론보다 사실 확인과 보완을 먼저 하는 편이 나아.",2),action:"중요한 관계 판단이나 메시지 전송 전에 문맥과 사실관계를 한 번 더 검토해.",avoid:"한 번의 반응만으로 관계 전체를 단정하거나 감정적으로 결론내리지 마.",evidence_refs:[mayLove,mayOutgoing]},
-      {label:"10월 재접점창",start:"2026-10-21",end:"2026-10-21",signal:"활용",topics:["과거인연접점"],summary:repeat("과거인연접점의 상위 날짜가 월간 흐름 안에서도 눈에 띄어서 과거 관계 이슈가 다시 의식될 수 있는 시기야.",2),action:"실제 연락이나 우연한 재접촉이 있다면 그때 상대의 현실 행동과 사실관계를 확인해.",avoid:"상위 지수를 실제 재회 가능성이나 상대 속마음으로 바꾸지 마.",evidence_refs:[octReconnect,octMonth]},
-      {label:"1분기 방향정리",start:"2026-02-14",end:"2026-02-21",signal:"혼합",topics:["금전","학업"],summary:repeat("금전과 학업의 월별 강약이 같지 않아서 한 분야의 흐름을 다른 분야까지 확대해석하면 판단이 흐려질 수 있어.",2),action:"금전 계획과 학업 일정을 따로 나눠 우선순위와 마감 일정을 다시 점검해.",avoid:"한 분야의 좋은 흐름을 전체 운세가 좋다는 뜻으로 일반화하지 마.",evidence_refs:[febMoney,febStudy]},
-      {label:"연말 분리결산",start:"2026-12-14",end:"2026-12-21",signal:"혼합",topics:["금전","연애"],summary:repeat("연말에도 금전과 연애가 같은 강도로 움직이지 않으니 성과 정리와 관계 판단을 같은 기준으로 묶지 않는 게 중요해.",2),action:"연말 결산은 금전 성과와 관계 상태를 분리해서 각각의 실제 결과와 다음 행동을 정리해.",avoid:"연말 분위기만으로 미뤄둔 결론을 한꺼번에 확정하지 마.",evidence_refs:[decMoney,decLove]},
+      {label:"7월 실행창",start:"2026-07-21",end:"2026-07-24",signal:"활용",topics:["직장","이직","발신적합"],summary:repeat("준비해 둔 업무 결정과 연락 시도를 실제 행동으로 옮길 만한 상위 날짜가 같은 주간에 모여 있어.",2),action:"지원·협상·중요한 연락처럼 미리 준비한 행동을 이 구간에 집중해서 실행해.",avoid:"높은 상대지수를 결과 확정이나 성공 보장으로 바꾸지 마.",evidence_refs:[julyWork,julyOutgoing,julyDaily]},
+      {label:"5월 점검창",start:"2026-05-14",end:"2026-05-15",signal:"주의",topics:["연애","발신적합"],summary:repeat("관계와 발신 관련 하위 날짜가 연달아 잡혀서 즉흥적인 결론보다 사실 확인과 보완을 먼저 하는 편이 나아.",2),action:"중요한 관계 판단이나 메시지 전송 전에 문맥과 사실관계를 한 번 더 검토해.",avoid:"한 번의 반응만으로 관계 전체를 단정하거나 감정적으로 결론내리지 마.",evidence_refs:[mayLove,mayOutgoing,mayDaily]},
+      {label:"10월 재접점창",start:"2026-10-21",end:"2026-10-21",signal:"활용",topics:["과거인연접점"],summary:repeat("과거인연접점의 상위 날짜가 월간 흐름 안에서도 눈에 띄어서 과거 관계 이슈가 다시 의식될 수 있는 시기야.",2),action:"실제 연락이나 우연한 재접촉이 있다면 그때 상대의 현실 행동과 사실관계를 확인해.",avoid:"상위 지수를 실제 재회 가능성이나 상대 속마음으로 바꾸지 마.",evidence_refs:[octReconnect,octMonth,octDaily]},
+      {label:"1분기 방향정리",start:"2026-02-14",end:"2026-02-21",signal:"혼합",topics:["금전","학업"],summary:repeat("금전과 학업의 월별 강약이 같지 않아서 한 분야의 흐름을 다른 분야까지 확대해석하면 판단이 흐려질 수 있어.",2),action:"금전 계획과 학업 일정을 따로 나눠 우선순위와 마감 일정을 다시 점검해.",avoid:"한 분야의 좋은 흐름을 전체 운세가 좋다는 뜻으로 일반화하지 마.",evidence_refs:[febMoney,febStudy,febDaily]},
+      {label:"연말 분리결산",start:"2026-12-14",end:"2026-12-21",signal:"혼합",topics:["금전","연애"],summary:repeat("연말에도 금전과 연애가 같은 강도로 움직이지 않으니 성과 정리와 관계 판단을 같은 기준으로 묶지 않는 게 중요해.",2),action:"연말 결산은 금전 성과와 관계 상태를 분리해서 각각의 실제 결과와 다음 행동을 정리해.",avoid:"연말 분위기만으로 미뤄둔 결론을 한꺼번에 확정하지 마.",evidence_refs:[decMoney,decLove,decDaily]},
     ],
     year_phases:[
       {label:"Q1",start:"2026-01-01",end:"2026-03-31",theme:"분야별 편차를 파악하는 초반부야.",change:"월별 강약을 확인하면서 우선순위를 정리해.",evidence_refs:[febMoney]},
@@ -103,6 +130,19 @@ test("packet v2 preserves 12-month trajectory and cross-system evidence",()=>{
   const july=packet.cross_system_timeline.find(x=>x.date==="2026-07-21");
   assert.ok(july?.saju_context_refs.length>0);
   assert.ok(july?.thai_context_refs.length>0);
+});
+
+test("full-daily packet preserves market nulls and promotes actual daily evidence",()=>{
+  const packet=compactCalculation(calculation());
+  const topics=packet.western.daily_score_matrix.topic_order;
+  const row=packet.western.daily_score_matrix.rows.find(x=>x[0]==="2026-02-14");
+  assert.ok(row);
+  const investIndex=topics.indexOf("투자심리");
+  assert.equal(row[investIndex+1],null);
+  assert.equal(packet.western.daily_pattern_digest.투자심리.days,8);
+  const july=packet.key_dates.find(x=>x.date==="2026-07-21");
+  assert.ok(july?.western_refs?.some(x=>x.startsWith("W:daily:2026-07-21:")));
+  assert.ok(packet.evidence_ledger.some(x=>x.id.startsWith("W:daily:2026-02-14:")));
 });
 
 test("five stages accept a deep evidence-backed annual interpretation",()=>{
