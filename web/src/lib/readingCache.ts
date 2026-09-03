@@ -11,8 +11,8 @@ type CacheRecord<T = unknown> = {
 const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
-const FORTUNE_CALC_CACHE_CONTRACT = 'key-date-evidence-v2'
-const FORTUNE_AI_CACHE_CONTRACT = 'evidence-ledger-v2'
+const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
+const FORTUNE_AI_CACHE_CONTRACT = 'daily-trajectory-evidence-ledger-v3'
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
@@ -131,6 +131,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
     western_months: western.months,
     western_detail_days: western.detail_days,
     western_key_dates: western.key_dates,
+    western_daily_scores: western.daily_scores,
     saju_engine: saju.engine,
     saju_annual: saju.annual,
     saju_monthly: saju.monthly,

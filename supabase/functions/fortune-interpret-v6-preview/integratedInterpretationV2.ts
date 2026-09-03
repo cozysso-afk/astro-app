@@ -1,7 +1,7 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
-export const VERSION = "supabase-ai-v8-evidence-ledger-five-stage-guard";
-export const PACKET_VERSION = "fortune-interpretation-packet-v2";
+export const VERSION = "supabase-ai-v9-full-daily-trajectory-five-stage-guard";
+export const PACKET_VERSION = "fortune-interpretation-packet-v3-full-daily";
 export const QUALITY_VERSION = "fortune-interpretation-quality-v1";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
@@ -78,6 +78,30 @@ function evidenceDirection(topic:string,kind:"best"|"caution"|"average",score:nu
   return "neutral" as const;
 }
 
+function trajectoryDigest(rows:any[],topic:string){
+  const values=rows.map((row:any)=>({date:String(row?.date??""),score:Number(row?.scores?.[topic])})).filter((x:any)=>x.date&&Number.isFinite(x.score));
+  if(!values.length)return null;
+  const mean=values.reduce((sum:number,x:any)=>sum+x.score,0)/values.length;
+  const variance=values.reduce((sum:number,x:any)=>sum+Math.pow(x.score-mean,2),0)/values.length;
+  const rolling=(size:number)=>{
+    if(values.length<size)return [] as any[];
+    const out:any[]=[];
+    for(let i=0;i<=values.length-size;i++){
+      const chunk=values.slice(i,i+size); const avg=chunk.reduce((sum:number,x:any)=>sum+x.score,0)/size;
+      out.push({start:chunk[0].date,end:chunk[chunk.length-1].date,average:Math.round(avg*10)/10});
+    }
+    return out;
+  };
+  const seven=rolling(Math.min(7,values.length));
+  const peak7=seven.length?[...seven].sort((a,b)=>b.average-a.average)[0]:null;
+  const low7=seven.length?[...seven].sort((a,b)=>a.average-b.average)[0]:null;
+  const changes:any[]=[];
+  for(let i=7;i<values.length;i++)changes.push({from:values[i-7].date,to:values[i].date,delta:Math.round((values[i].score-values[i-7].score)*10)/10});
+  const rise=changes.length?[...changes].sort((a,b)=>b.delta-a.delta)[0]:null;
+  const fall=changes.length?[...changes].sort((a,b)=>a.delta-b.delta)[0]:null;
+  return {days:values.length,mean:Math.round(mean*10)/10,min:[...values].sort((a,b)=>a.score-b.score)[0],max:[...values].sort((a,b)=>b.score-a.score)[0],volatility:Math.round(Math.sqrt(variance)*10)/10,peak_7d:peak7,low_7d:low7,largest_7d_rise:rise,largest_7d_fall:fall};
+}
+
 export function compactCalculation(calc:any){
   const w=calc?.western??{}, overall:Record<string,any>={}, rel:Record<string,any>={};
   for(const k of TOPICS){const s=compactStat(w?.overall?.[k],3);if(s)overall[k]=s;}
@@ -106,11 +130,31 @@ export function compactCalculation(calc:any){
     months.push({calendar_month:m?.calendar_month,start:m?.start,end:m?.end,topics:mt,relationship_signals:mr});
   }
 
+  const dailyRaw=Array.isArray(w?.daily_scores)?w.daily_scores.slice(0,400):[];
+  const dailyTopicOrder=[...TOPICS,...REL];
+  const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>Number.isFinite(Number(d?.scores?.[topic]))?Number(d.scores[topic]):null)])};
+  const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));
+  const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));
+
   const dateRank=new Map<string,{hits:number;weight:number;refs:string[];topics:Set<string>}>();
-  const addDate=(date:string,topic:string,score:number,id:string)=>{if(!date)return;const r=dateRank.get(date)??{hits:0,weight:0,refs:[],topics:new Set<string>()};r.hits+=1;r.weight+=Math.abs(score-50);r.refs.push(id);r.topics.add(topic);dateRank.set(date,r);};
+  const addDate=(date:string,topic:string,score:number,id:string)=>{if(!date)return;const r=dateRank.get(date)??{hits:0,weight:0,refs:[],topics:new Set<string>()};r.hits+=1;r.weight+=Math.abs(score-50);if(id)r.refs.push(id);r.topics.add(topic);dateRank.set(date,r);};
   for(const [topic,s] of Object.entries(overall) as any[])for(const p of [...(s.best_days??[]),...(s.caution_days??[])])addDate(p.date,topic,num(p.score),`W:date:${p.date}:${topic}:${(s.best_days??[]).some((x:any)=>x.date===p.date&&num(x.score)===num(p.score))?"best":"caution"}`);
   for(const [topic,s] of Object.entries(rel) as any[])for(const p of [...(s.best_days??[]),...(s.caution_days??[])])addDate(p.date,topic,num(p.score),`W:date:${p.date}:${topic}:${(s.best_days??[]).some((x:any)=>x.date===p.date&&num(x.score)===num(p.score))?"best":"caution"}`);
+  for(const d of dailyRaw){
+    const date=String(d?.date??"");
+    for(const topic of dailyTopicOrder){
+      const score=Number(d?.scores?.[topic]); if(!Number.isFinite(score))continue;
+      const base=(overall as any)?.[topic]??(rel as any)?.[topic]; const avg=Number(base?.average);
+      const deviation=Number.isFinite(avg)?Math.abs(score-avg):Math.abs(score-50);
+      if(deviation>=12||score>=72||score<=28)addDate(date,topic,score,"");
+    }
+  }
   const keyDates=[...dateRank.entries()].sort((a,b)=>b[1].hits-a[1].hits||b[1].weight-a[1].weight||a[0].localeCompare(b[0])).slice(0,16).map(([date,r])=>({date,hits:r.hits,salience:Math.round((r.weight+r.hits*10)*10)/10,topics:[...r.topics],western_refs:uniq(r.refs).filter(x=>evidenceIds.has(x))}));
+  for(const kd of keyDates){
+    const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
+    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",direction:"context",date:kd.date,text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
+    kd.western_refs=uniq(kd.western_refs);
+  }
 
   const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];
   const detail=detailRaw.slice(0,18).map((d:any)=>({date:d?.date,market_status:d?.market_open?"KRX(한국거래소) 거래일":"KRX(한국거래소) 휴장일",topics:Object.fromEntries(Object.entries(d?.topics??{}).map(([k,x]:any)=>[k,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:Array.isArray(x?.evidence)?x.evidence.slice(0,6):[]}]))}));
@@ -136,9 +180,9 @@ export function compactCalculation(calc:any){
     packet_version:PACKET_VERSION,
     api_version:calc?.api_version,engine:calc?.engine,period,
     period_kind:periodKind(num(period?.day_count)||1),
-    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:"key_dates는 Western 계산 피크/저점에서 선정하고 사주·Thai는 독립 맥락으로만 교차"},
+    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:"365일 실제 일별 점수·근거에서 다분야 변동과 피크/저점을 선정하고 사주·Thai는 독립 맥락으로만 교차"},
     ranking:{strongest:[...rank].sort((a,b)=>b.average-a.average).slice(0,6),weakest:[...rank].sort((a,b)=>a.average-b.average).slice(0,6)},
-    western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
+    western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
     key_dates:keyDates,
     cross_system_timeline:crossSystemTimeline,
     saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
@@ -159,7 +203,7 @@ export const SYSTEM=`너는 '별빛의 운명'의 증거기반 통합 운세 분
 핵심 원칙:
 - 너는 계산자가 아니라 분석가다. CALCULATED_DATA와 evidence_ledger에 없는 사실을 만들지 않는다.
 - 중요한 결론에는 반드시 evidence_refs를 붙인다. evidence_refs는 CALCULATED_DATA.evidence_ledger의 id를 그대로 사용한다.
-- 연간 분석은 연평균만 보지 않는다. western.months의 12개월 궤적 → key_dates의 피크/저점 → cross_system_timeline의 사주·Thai 독립 맥락 순으로 읽는다. 하루짜리 피크를 1년 전체 흐름처럼 과장하지 않는다.
+- 연간 분석은 연평균만 보지 않는다. western.daily_score_matrix의 최대 365일 원점수 → daily_pattern_digest의 7일 구간·변동성·상승/하락 전환 → western.months의 12개월 궤적 → key_dates의 실제 애스펙트/하우스 근거 → cross_system_timeline의 사주·Thai 독립 맥락 순으로 읽는다. 하루짜리 피크를 1년 전체 흐름처럼 과장하지 않는다.
 - Western 점수는 사건 확률이 아니다. 60점=60%처럼 말하지 않는다. 특히 수신신호·발신적합·과거인연접점은 연락/재회 확률이 아니다.
 - 투자주의는 높을수록 경계가 큰 지수다. 투자심리·수익실현·신규진입과 섞지 않는다. 가격방향·수익률·종목 성공을 예언하지 않는다.
 - 대인관계와 연애를 분리한다. 연락은 수신/발신/과거인연 재접점을 분리한다.

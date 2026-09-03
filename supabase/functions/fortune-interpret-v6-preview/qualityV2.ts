@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v1.1";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v1.2-daily-evidence";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -108,6 +108,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if((data?.priorities?.length??0)<3)s5.push("우선순위 3개 미만");
   if(kind==="annual"&&(data?.year_phases?.length??0)<4)s5.push("연간 4개 phase 미완성");
   if(kind==="annual"&&(data?.overall?.evidence_refs?.length??0)<3)s5.push("연간 총평 근거 3개 미만");
+  if(kind==="annual"&&Number(payload?.western?.daily_evidence_coverage?.days_with_evidence??0)>0){
+    const dailyBacked=(data?.key_windows??[]).filter((w:any)=>(w?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:daily:"))).length;
+    if(dailyBacked<Math.min(3,data?.key_windows?.length??0))s5.push(`실제 일별 애스펙트/하우스 근거가 연결된 핵심 시기 부족: ${dailyBacked}/3`);
+  }
   const minSummary=kind==="annual"?240:kind==="month"?170:110;
   if(String(data?.overall?.summary??"").length<minSummary)s5.push(`총평 깊이 부족(${String(data?.overall?.summary??"").length}/${minSummary})`);
   for(const w of data?.key_windows??[]){

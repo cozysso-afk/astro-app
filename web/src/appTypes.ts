@@ -155,6 +155,30 @@ export type ReunionTimingContext = {
   }>
 }
 
+export type FortuneDailyEvidence = {
+  kind: string
+  sample_time?: string
+  source_topics?: string[]
+  contribution?: number
+  text: string
+  transit?: string
+  target?: string
+  aspect?: string
+  orb?: number
+  motion?: string
+  direction?: string
+  whole_house?: number
+  placidus_house?: number | null
+  polarity?: number
+}
+export type FortuneDailyScore = {
+  date: string
+  label: string
+  market_open: boolean
+  scores: Record<string, number | null>
+  evidence?: FortuneDailyEvidence[]
+}
+
 export type IntegratedApiResponse = {
   ok: boolean
   api_version: string
@@ -170,6 +194,7 @@ export type IntegratedApiResponse = {
     relationship_signals: Record<string, FortuneStat | null>
     market?: { has_open_session: boolean; session_count: number; session_dates: string[]; calendar_mode?: string; calendar_exact_range?: string[] | null; calendar_warning?: string | null }
     detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>
+    daily_scores?: FortuneDailyScore[]
     key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>
     months: FortuneMonth[]
   }

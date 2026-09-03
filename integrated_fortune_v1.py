@@ -24,8 +24,8 @@ from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
 
-ENGINE_VERSION = "integrated-fortune-v2.10-thai-lagna-research"
-WESTERN_ENGINE_VERSION = "western-period-engine-v10-bounded-vector"
+ENGINE_VERSION = "integrated-fortune-v2.11-full-daily-evidence"
+WESTERN_ENGINE_VERSION = "western-period-engine-v11-full-daily-evidence"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-jie-exact"
 
 KST = pytz.timezone("Asia/Seoul")
@@ -831,6 +831,76 @@ def _rows_avg(rows: list[dict], key: str):
     return int(round(sum(vals) / len(vals))) if vals else None
 
 
+def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limit: int = 10):
+    """Keep the strongest real aspect/house contacts from an already-scanned day.
+
+    The annual engine already computes these rows to obtain the daily scores. We
+    preserve a compact evidence signature here instead of throwing the calculation
+    away and asking the AI to infer why a date was strong or weak.
+    """
+    best: dict[tuple, dict] = {}
+
+    def ingest(rows: list[dict], topic_names):
+        for sample in rows:
+            stamp = sample.get("dt")
+            sample_time = stamp.strftime("%H:%M") if stamp is not None else ""
+            topics = sample.get("topics") if isinstance(sample.get("topics"), dict) else {}
+            for topic in topic_names:
+                result = topics.get(topic)
+                if not isinstance(result, dict):
+                    continue
+                for evidence in result.get("evidence") or []:
+                    if not isinstance(evidence, dict):
+                        continue
+                    kind = str(evidence.get("kind") or "")
+                    if kind == "aspect":
+                        identity = (
+                            kind, evidence.get("transit"), evidence.get("target"),
+                            evidence.get("aspect"), evidence.get("motion"), evidence.get("direction"),
+                        )
+                    elif kind == "house":
+                        identity = (kind, evidence.get("transit"), evidence.get("whole_house"), evidence.get("placidus_house"))
+                    else:
+                        identity = (kind, str(evidence))
+                    try:
+                        contribution = float(evidence.get("score") or 0.0)
+                    except (TypeError, ValueError):
+                        contribution = 0.0
+                    current = best.get(identity)
+                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:
+                        current.setdefault("source_topics", [])
+                        if topic not in current["source_topics"]:
+                            current["source_topics"].append(topic)
+                        continue
+                    packed = {
+                        "kind": kind,
+                        "sample_time": sample_time,
+                        "source_topics": [topic],
+                        "contribution": round(contribution, 4),
+                        "text": _evidence_text(evidence),
+                    }
+                    for key in (
+                        "transit", "target", "aspect", "orb", "motion", "direction",
+                        "whole_house", "placidus_house", "polarity",
+                    ):
+                        if evidence.get(key) is not None:
+                            packed[key] = evidence.get(key)
+                    best[identity] = packed
+
+    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"))
+    ingest(market_rows, ("금전", "투자심리"))
+    out = list(best.values())
+    out.sort(key=lambda item: (
+        0 if item.get("kind") == "aspect" else 1,
+        -float(item.get("contribution") or 0.0),
+        float(item.get("orb") or 99.0),
+        str(item.get("text") or ""),
+    ))
+    for item in out:
+        item["source_topics"] = sorted(set(item.get("source_topics") or []))
+    return out[:max(1, int(limit))]
+
+
 @lru_cache(maxsize=5000)
 def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tuple, offset_hours: float):
     """Legacy Streamlit period aggregation, unchanged in sampling policy.
@@ -854,6 +924,7 @@ def _daily_aggregate_cached(day_iso: str, natal_packed: tuple, houses_packed: tu
     row["투자심리"] = _rows_avg(market, "투자심리") if market else None
     for key in ["수익실현", "신규진입", "투자주의"]:
         row[key] = _rows_avg(market, key) if market else None
+    row["_evidence"] = _compact_daily_evidence(life, market, 10)
     return row
 
 
@@ -946,6 +1017,7 @@ def _daily_detailed_cached(day_iso: str, natal_packed: tuple, houses_packed: tup
     row["투자심리"] = _rows_avg(market, "투자심리") if market else None
     for key in ["수익실현", "신규진입", "투자주의"]:
         row[key] = _rows_avg(market, key) if market else None
+    row["_evidence"] = _compact_daily_evidence(life, market, 10)
     return {"row": row, "detail": _legacy_detail(day_value, timing, market)}
 
 
@@ -1038,6 +1110,19 @@ def _western_payload(
     relationship_signals = {
         key: _period_stats(rows, key) for key in ["수신신호", "발신적합", "과거인연접점"]
     }
+    daily_score_keys = TOPIC_ORDER + ["수신신호", "발신적합", "과거인연접점"]
+    daily_scores = []
+    for row in rows:
+        daily_scores.append({
+            "date": row["date"],
+            "label": row["label"],
+            "market_open": bool(row.get("market_open")),
+            "scores": {
+                key: (float(row[key]) if isinstance(row.get(key), (int, float)) else None)
+                for key in daily_score_keys
+            },
+            "evidence": list(row.get("_evidence") or [])[:10],
+        })
     market_precision = _krx_calendar_precision(start_date, end_date)
     market_info = {
         "has_open_session": bool(market_rows),
@@ -1047,8 +1132,9 @@ def _western_payload(
         "calendar_exact_range": market_precision["exact_range"],
         "calendar_warning": market_precision["warning"],
     }
-    # Intraday evidence is returned for a single selected day. Multi-day reports
-    # keep best/caution dates but avoid multiplying expensive intraday scans.
+    # Multi-day reports now preserve every calculated daily score and a compact
+    # signature of the real aspect/house evidence already used to produce it.
+    # Full intraday best/caution windows remain a single-day precision feature.
 
     months = []
     for seg_start, seg_end in _month_segments(start_date, end_date):
@@ -1073,7 +1159,7 @@ def _western_payload(
         "ephemeris_fallback_reason": fallback_reason,
         "score_policy": "점수는 사건 발생 확률이 아니라 같은 분야 안의 상대 흐름",
         "method": ("이전 Streamlit 일일엔진과 동일: 생활점수 07:00~23:30/30분, 시간탐색 00:00~23:30/30분, KRX 09:00~15:30/15분" if day_count == 1 else "이전 Streamlit 기간엔진과 동일: 생활 08:00~22:00/120분, KRX 09:00~15:30/60분"),
-        "performance": {"vector_ephemeris_prewarm": bool(prewarmed_longitudes), "prewarmed_longitudes": prewarmed_longitudes},
+        "performance": {"vector_ephemeris_prewarm": bool(prewarmed_longitudes), "prewarmed_longitudes": prewarmed_longitudes, "daily_evidence_days": len(daily_scores), "daily_evidence_rows": sum(len(row.get("evidence") or []) for row in daily_scores)},
         "natal": {
             "asc": round(natal_houses["asc"], 6),
             "mc": round(natal_houses["mc"], 6),
@@ -1082,6 +1168,7 @@ def _western_payload(
         "relationship_signals": relationship_signals,
         "market": market_info,
         "detail_days": detail_days,
+        "daily_scores": daily_scores,
         "months": months,
     }
 

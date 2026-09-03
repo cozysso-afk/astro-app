@@ -38,6 +38,7 @@ import type {
 } from './appTypes'
 
 import { AiInterpretationPanel } from './AiInterpretationPanel'
+import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
@@ -1419,6 +1420,8 @@ export default function AppNext() {
               {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MONEY · MARKET</span><strong>금전 · 주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`integrated-market-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자주의는 높을수록 좋은 점수가 아니라 위험 경계가 강하다는 뜻이야.</p></section>}
 
               {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card integrated-date-highlights"><div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>{bestIntegratedDays.map((point)=><div className="tight-row" key={`integrated-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}{cautionIntegratedDays.map((point)=><div className="tight-row" key={`integrated-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}<p className="result-note">선택 기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p></section>}
+
+              <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
               {integratedResult.western.detail_days?.length ? <details className="result-card integrated-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`integrated-day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`integrated-${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`integrated-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
 
