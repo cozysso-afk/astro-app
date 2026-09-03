@@ -31,11 +31,12 @@ jobs:
           s=p.read_text(encoding='utf-8')
           import_anchor="import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'\n"
           import_line="import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'\n"
+          s=s.replace("const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'\n",'',1)
+          s=s.replace('AI_JOB_STORAGE_KEY','FORTUNE_AI_JOB_STORAGE_KEY')
+          s=s.replace('FORTUNE_FORTUNE_AI_JOB_STORAGE_KEY','FORTUNE_AI_JOB_STORAGE_KEY')
           if import_line not in s:
               if import_anchor not in s: raise SystemExit('AI job import anchor missing')
               s=s.replace(import_anchor,import_anchor+import_line,1)
-          s=s.replace("const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'\n",'',1)
-          s=s.replace('AI_JOB_STORAGE_KEY','FORTUNE_AI_JOB_STORAGE_KEY')
           s=s.replace("interpreter_version: data.interpreter_version || 'supabase-ai-v7-thai-lagna-output-guard',","interpreter_version: data.interpreter_version || 'unknown',",1)
           old='''  const resumeAiInterpretationJob = () => {\n    if (document.visibilityState === 'hidden') return\n    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)\n    if (!raw) return\n    try {\n      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }\n      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)\n    } catch {\n      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)\n      setAiLoading(false)\n    }\n  }\n'''
           new='''  const resumeAiInterpretationJob = () => {\n    if (document.visibilityState === 'hidden') return\n    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)\n    if (!raw) return\n    const saved = decodePendingFortuneAiJob(raw)\n    if (!saved) {\n      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)\n      setAiLoading(false)\n      return\n    }\n    void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)\n  }\n'''
