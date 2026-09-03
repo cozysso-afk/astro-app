@@ -2,7 +2,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { VERSION, PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SYSTEM, SCHEMA, validateOutput, txt } from "./integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "./qualityV2.ts";
-import { KEY_DATE_LEDGER_VERSION, attachActualKeyDateEvidence } from "./keyDateEvidenceV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, runWithThaiOutputSafety, strictThaiRetryInstruction, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "./thaiContract.ts";
 
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -24,7 +23,7 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
   try{
     const modeInstruction=compactMode
       ?"이전 생성이 검증을 끝까지 통과하지 못했다. 문장을 불필요하게 늘리지 말되 핵심 시기·근거 ID·행동을 빠뜨리지 말고 완전한 JSON으로 끝내라."
-      :"연평균만 요약하지 말고 월별 변화→핵심 날짜→독립 체계 교차맥락 순으로 분석하라. western.key_date_details가 있으면 중요한 날짜 문단에 실제 트랜짓 근거 W:keydate:*를 우선 연결하라.";
+      :"연평균만 요약하지 말고 365일 일별 궤적→월별 변화→핵심 날짜→독립 체계 교차맥락 순으로 분석하라. 중요한 날짜 문단에는 계산엔진이 보존한 실제 일별 트랜짓·하우스 근거 W:daily:*를 우선 연결하라.";
     const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\nCALCULATED_DATA=${JSON.stringify(payload)}`;
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
@@ -92,7 +91,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,key_date_ledger_version:KEY_DATE_LEDGER_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,evidence_ledger:true,monthly_trajectory:true,key_date_actual_transits:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,evidence_ledger:true,full_daily_scores:true,daily_actual_evidence:true,monthly_trajectory:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});
   if(!key)return res({ok:false,missing_key:true,error:"GEMINI_API_KEY가 설정되지 않았어."},503);
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
@@ -103,10 +102,10 @@ Deno.serve(async(req)=>{
   }
   if(!b?.calculation)return res({ok:false,error:"calculation이 필요해."},400);
   const preferred=MODELS[b.model]?b.model:DEFAULT_MODEL;
-  const payload=attachActualKeyDateEvidence(compactCalculation(b.calculation),b.calculation);
+  const payload=compactCalculation(b.calculation);
   if(b?.action==="inspect"){
     const hash=await payloadHash(payload);
-    return res({ok:true,interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,key_date_ledger_version:KEY_DATE_LEDGER_VERSION,payload_bytes:new TextEncoder().encode(JSON.stringify(payload)).byteLength,payload_hash_prefix:hash.slice(0,16),evidence_ledger:payload?.evidence_ledger?.length??0,key_dates:payload?.key_dates?.length??0,cross_system_dates:payload?.cross_system_timeline?.length??0,western_months:payload?.western?.months?.length??0,western_key_date_details:payload?.western?.key_date_details?.length??0,actual_key_date_refs:(payload?.evidence_ledger??[]).filter((x:any)=>String(x?.id??"").startsWith("W:keydate:")).length,thai:{mahathaksa:Boolean(payload?.thai?.mahathaksa),taksajorn:Boolean(payload?.thai?.taksajorn),suriyayat:Boolean(payload?.thai?.suriyayat),suriyayat_lagna:Boolean(payload?.thai?.suriyayat?.lagna?.available)},saju:{annual_segments:payload?.saju?.annual?.length??0,monthly_segments:payload?.saju?.monthly?.length??0},detail_days:payload?.western?.detail_days?.length??0});
+    return res({ok:true,interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,payload_bytes:new TextEncoder().encode(JSON.stringify(payload)).byteLength,payload_hash_prefix:hash.slice(0,16),evidence_ledger:payload?.evidence_ledger?.length??0,key_dates:payload?.key_dates?.length??0,cross_system_dates:payload?.cross_system_timeline?.length??0,western_months:payload?.western?.months?.length??0,daily_score_rows:payload?.western?.daily_score_matrix?.rows?.length??0,actual_daily_refs:(payload?.evidence_ledger??[]).filter((x:any)=>String(x?.id??"").startsWith("W:daily:")).length,thai:{mahathaksa:Boolean(payload?.thai?.mahathaksa),taksajorn:Boolean(payload?.thai?.taksajorn),suriyayat:Boolean(payload?.thai?.suriyayat),suriyayat_lagna:Boolean(payload?.thai?.suriyayat?.lagna?.available)},saju:{annual_segments:payload?.saju?.annual?.length??0,monthly_segments:payload?.saju?.monthly?.length??0},detail_days:payload?.western?.detail_days?.length??0});
   }
   if(b?.action==="start"){
     const hash=await payloadHash(payload);const kind=`${VERSION}:${hash.slice(0,32)}`;const a=admin();
