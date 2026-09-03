@@ -7,13 +7,15 @@ on:
       - '.github/workflows/measure-v21-prompt.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   measure:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -35,8 +37,6 @@ jobs:
           )
           with open('/tmp/v21-real-calc.json','w',encoding='utf-8') as f:
               json.dump(calc,f,ensure_ascii=False,separators=(',',':'))
-          print('CALC_BYTES', len(json.dumps(calc,ensure_ascii=False,separators=(',',':')).encode()))
-          print('DAILY_ROWS', len(calc['western'].get('daily_scores') or []))
           PY
       - name: Measure V20 packet vs V21 prompt packet
         run: |
@@ -51,22 +51,23 @@ jobs:
           const external=buildExternalPrompt(v20);
           const bytes=(x)=>Buffer.byteLength(JSON.stringify(x));
           const report={
-            raw_calculation_bytes:bytes(calc),
-            v20_packet_bytes:bytes(v20),
-            v21_prompt_packet_bytes:bytes(v21),
+            measured_at:'2026-09-03',fixture:'1990-01-01 12:00 Seoul / 2026-09-03~2027-09-02',
+            raw_calculation_bytes:bytes(calc),v20_packet_bytes:bytes(v20),v21_prompt_packet_bytes:bytes(v21),
             reduction_vs_v20_pct:Number(((1-bytes(v21)/bytes(v20))*100).toFixed(1)),
             reduction_vs_raw_pct:Number(((1-bytes(v21)/bytes(calc))*100).toFixed(1)),
-            estimated_v21_input_tokens:budget.estimated_input_tokens,
-            max_prompt_bytes:budget.max_bytes,
-            budget_ok:budget.ok,
-            v20_daily_rows:v20?.western?.daily_score_matrix?.rows?.length??0,
-            v21_has_daily_matrix:Boolean(v21?.western?.daily_score_matrix),
-            v20_evidence_rows:v20?.evidence_ledger?.length??0,
-            v21_evidence_rows:v21?.evidence_ledger?.length??0,
+            estimated_v21_input_tokens:budget.estimated_input_tokens,max_prompt_bytes:budget.max_bytes,budget_ok:budget.ok,
+            v20_daily_rows:v20?.western?.daily_score_matrix?.rows?.length??0,v21_has_daily_matrix:Boolean(v21?.western?.daily_score_matrix),
+            v20_evidence_rows:v20?.evidence_ledger?.length??0,v21_evidence_rows:v21?.evidence_ledger?.length??0,
             external_prompt_bytes:Buffer.byteLength(external.text),
           };
-          console.log('V21_MEASUREMENT',JSON.stringify(report));
-          if(!report.budget_ok)process.exit(2);
-          if(report.v21_has_daily_matrix)process.exit(3);
-          if(report.reduction_vs_v20_pct<55)process.exit(4);
+          fs.writeFileSync('.github/v21-measurement-result.json',JSON.stringify(report,null,2)+'\n');
+          if(!report.budget_ok||report.v21_has_daily_matrix||report.reduction_vs_v20_pct<55)process.exit(4);
           JS
+      - name: Persist one-time measurement result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/v21-measurement-result.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore(ai): record one-time V21 prompt measurement'
+          git push origin HEAD:${{ github.head_ref }}
