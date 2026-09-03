@@ -1,4 +1,4 @@
-name: Interpretation V3 CI
+name: Interpretation Release CI
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  interpretation-v3:
+  interpretation-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,11 +30,16 @@ jobs:
         run: |
           python -m py_compile integrated_fortune_v1.py api/main.py
           grep -q 'daily_scores' integrated_fortune_v1.py
-      - name: Evidence-ledger and five-stage guard tests
+      - name: Evidence-ledger and interpretation regression tests
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v18Reliability.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v19TargetedRepair.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/repairV19.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
       - name: Web typecheck and production build
