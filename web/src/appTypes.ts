@@ -279,10 +279,24 @@ export type AiYearPhase = {
   evidence_refs: string[]
 }
 
+export type AiCrossCheck = {
+  label: string
+  start: string
+  end: string
+  mode: '복수체계' | '상반맥락' | 'Western단독'
+  western: string
+  saju: string
+  thai: string
+  synthesis: string
+  evidence_refs: string[]
+}
+
 export type AiDecision = {
   action: string
   timing: string
   reason: string
+  watch: string
+  avoid: string
   evidence_refs: string[]
 }
 
@@ -318,6 +332,7 @@ export type AiInterpretationResponse = {
     overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string; evidence_refs?: string[] }
     key_windows?: AiKeyWindow[]
     year_phases?: AiYearPhase[]
+    cross_checks?: AiCrossCheck[]
     decisions?: AiDecision[]
     clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
