@@ -41,15 +41,21 @@ test("annual instruction keeps full 365-day to monthly to key-date hierarchy", (
   assert.match(text, /W:daily:\*/);
 });
 
-test("compact retry preserves the original period focus", () => {
+test("compact retry preserves the original period focus with quality safety margins", () => {
   const day = periodModeInstruction({ period_kind: "day" }, true);
   const month = periodModeInstruction({ period_kind: "month" }, true);
+  const annual = periodModeInstruction({ period_kind: "annual" }, true);
   assert.match(day, /이전 생성이 검증을 끝까지 통과하지 못했다/);
   assert.match(day, /하루 분석/);
   assert.match(day, /시간대/);
+  assert.match(day, /overall\.summary는 최소 130자/);
   assert.match(month, /이전 생성이 검증을 끝까지 통과하지 못했다/);
   assert.match(month, /월간 분석/);
+  assert.match(month, /overall\.summary는 최소 190자/);
+  assert.match(month, /참고도 최소 30자/);
   assert.doesNotMatch(month, /365일/);
+  assert.match(annual, /overall\.summary는 최소 270자/);
+  assert.match(annual, /참고도 최소 35자/);
 });
 
 test("unknown period kind fails safe to day focus instead of annual focus", () => {

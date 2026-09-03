@@ -35,8 +35,16 @@ const PERIOD_FOCUS: Record<InterpretationPeriodKind, string> = {
 
 export function periodModeInstruction(payload: any, compactMode = false): string {
   const kind = normalizeKind(payload?.period_kind);
+  const summaryTarget = kind === "annual" ? 270 : kind === "month" ? 190 : 130;
+  const coreReasonTarget = kind === "annual" ? 100 : 75;
+  const watchReasonTarget = kind === "annual" ? 70 : 55;
+  const referenceReasonTarget = kind === "annual" ? 35 : 30;
   const retry = compactMode
-    ? "이전 생성이 검증을 끝까지 통과하지 못했다. 문장을 불필요하게 늘리지 말되 핵심 시기·근거 ID·행동·확인조건·회피조건을 빠뜨리지 말고 완전한 JSON으로 끝내라. "
+    ? [
+      "이전 생성이 검증을 끝까지 통과하지 못했다. 문장을 불필요하게 늘리지 말되 핵심 시기·근거 ID·행동·확인조건·회피조건을 빠뜨리지 말고 완전한 JSON으로 끝내라.",
+      `길이 하한 바로 위에서 흔들리지 않도록 안전여유를 둬라. overall.summary는 최소 ${summaryTarget}자 정도로 작성하라.`,
+      `topic_analysis reason은 핵심 최소 ${coreReasonTarget}자, 주목 최소 ${watchReasonTarget}자, 참고도 최소 ${referenceReasonTarget}자를 목표로 하되 참고 분야를 장문화하지 마라.`,
+    ].join(" ")
     : "";
   return `${retry}${PERIOD_FOCUS[kind]}`;
 }
