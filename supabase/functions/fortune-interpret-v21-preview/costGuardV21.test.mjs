@@ -89,6 +89,7 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
   assert.equal((src.match(/:generateContent/g)||[]).length,1);
   assert.match(src,/MAX_GEMINI_CALLS=2/);
+  assert.match(src,/supabase-ai-v21\.3\.1-investment-output-guard/);
   assert.match(src,/MAX_USER_NEW_JOBS_10M=6/);
   assert.match(src,/MAX_USER_NEW_JOBS_24H=20/);
   assert.match(src,/MAX_GLOBAL_NEW_JOBS_10M=18/);

@@ -21,8 +21,8 @@ test('pending fortune AI job round-trips only with the current contract', () => 
   assert.equal(parsed?.contract, FORTUNE_AI_JOB_CONTRACT)
   assert.equal(parsed?.jobId, 'job-123')
   assert.equal(parsed?.request?.period, 'today')
-  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v4$/)
-  assert.match(FORTUNE_AI_JOB_CONTRACT, /v21\.3-balanced-evidence-budget$/)
+  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v5$/)
+  assert.match(FORTUNE_AI_JOB_CONTRACT, /v21\.3\.1-investment-output-guard$/)
 })
 
 test('legacy pending job without a contract is rejected', () => {
