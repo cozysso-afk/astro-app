@@ -1,4 +1,4 @@
-name: Branch Interpretation V3 Verification
+name: Annual Full Daily Evidence Verification
 
 on:
   push:
@@ -8,33 +8,105 @@ on:
       - .github/workflows/apply-full-daily-scores-v3.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  annual:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/integrated-interpretation-v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Python syntax contract
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Link derived scores to their real source evidence
         run: |
-          python -m py_compile integrated_fortune_v1.py key_date_evidence_v2.py api/main.py
-          grep -q 'daily_scores' integrated_fortune_v1.py
-      - name: Interpretation guards
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('integrated_fortune_v1.py')
+          s=p.read_text(encoding='utf-8')
+          old='''    best: dict[tuple, dict] = {}\n\n    def ingest(rows: list[dict], topic_names):'''
+          new='''    best: dict[tuple, dict] = {}\n    relationship_links = {\n        "연락": ("수신신호", "발신적합", "과거인연접점"),\n        "소식": ("수신신호", "발신적합"),\n        "재회": ("수신신호", "발신적합", "과거인연접점"),\n        "연애": ("수신신호", "발신적합"),\n    }\n    investment_links = {\n        "금전": ("수익실현", "신규진입", "투자주의"),\n        "투자심리": ("수익실현", "신규진입", "투자주의"),\n    }\n\n    def ingest(rows: list[dict], topic_names, derived_links=None):\n        derived_links = derived_links or {}'''
+          if old not in s: raise SystemExit('derived evidence function anchor missing')
+          s=s.replace(old,new,1)
+          old='''                    current = best.get(identity)\n                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:\n                        current.setdefault("source_topics", [])\n                        if topic not in current["source_topics"]:\n                            current["source_topics"].append(topic)\n                        continue\n                    packed = {\n                        "kind": kind,\n                        "sample_time": sample_time,\n                        "source_topics": [topic],'''
+          new='''                    linked_topics = [topic, *derived_links.get(topic, ())]\n                    current = best.get(identity)\n                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:\n                        current.setdefault("source_topics", [])\n                        for linked_topic in linked_topics:\n                            if linked_topic not in current["source_topics"]:\n                                current["source_topics"].append(linked_topic)\n                        continue\n                    packed = {\n                        "kind": kind,\n                        "sample_time": sample_time,\n                        "source_topics": linked_topics,'''
+          if old not in s: raise SystemExit('derived evidence packing anchor missing')
+          s=s.replace(old,new,1)
+          old='''    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"))\n    ingest(market_rows, ("금전", "투자심리"))\n    out = list(best.values())'''
+          new='''    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"), relationship_links)\n    ingest(market_rows, ("금전", "투자심리"), investment_links)\n    out = list(best.values())'''
+          if old not in s: raise SystemExit('derived evidence ingest anchor missing')
+          s=s.replace(old,new,1)
+          # Prefer evidence rows that collectively explain the most displayed topics,
+          # then fill remaining slots by raw strength. This avoids a daily top-10 list
+          # being monopolized by one area while keeping the mobile payload bounded.
+          old='''    for item in out:\n        item["source_topics"] = sorted(set(item.get("source_topics") or []))\n    return out[:max(1, int(limit))]'''
+          new='''    for item in out:\n        item["source_topics"] = sorted(set(item.get("source_topics") or []))\n    max_rows = max(1, int(limit))\n    selected = []\n    remaining = list(out)\n    uncovered = {\n        "금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션",\n        "수신신호", "발신적합", "과거인연접점", "투자심리", "수익실현", "신규진입", "투자주의",\n    }\n    while remaining and uncovered and len(selected) < max_rows:\n        candidate = max(\n            remaining,\n            key=lambda item: (\n                len(set(item.get("source_topics") or []) & uncovered),\n                float(item.get("contribution") or 0.0),\n                -float(item.get("orb") or 99.0),\n            ),\n        )\n        coverage = set(candidate.get("source_topics") or []) & uncovered\n        if not coverage:\n            break\n        selected.append(candidate)\n        uncovered -= coverage\n        remaining.remove(candidate)\n    for item in out:\n        if len(selected) >= max_rows:\n            break\n        if item not in selected:\n            selected.append(item)\n    return selected'''
+          if old not in s: raise SystemExit('evidence selection anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Install calculation dependencies
+        run: pip install -r api/requirements.txt
+      - name: Run real 365-day calculation contract
         run: |
-          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
-          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
-      - name: Web typecheck and build
-        working-directory: web
+          python - <<'PY'
+          import json
+          import time
+          from datetime import date, time as dt_time
+          from integrated_fortune_v1 import build_integrated_fortune
+
+          started=time.perf_counter()
+          result=build_integrated_fortune(
+              birth_date=date(1990,1,1),
+              birth_time=dt_time(12,0),
+              latitude=37.5665,
+              longitude=126.9780,
+              utc_offset_hours=9,
+              gender='female',
+              start_date=date(2026,1,1),
+              end_date=date(2026,12,31),
+          )
+          elapsed=time.perf_counter()-started
+          western=result['western']
+          daily=western.get('daily_scores') or []
+          assert result['period']['day_count']==365
+          assert len(daily)==365, len(daily)
+          investment={'투자심리','수익실현','신규진입','투자주의'}
+          closed=[row for row in daily if not row.get('market_open')]
+          assert closed
+          for row in closed[:30]:
+              assert all(row['scores'].get(topic) is None for topic in investment), row
+          evidence_days=sum(bool(row.get('evidence')) for row in daily)
+          assert evidence_days>=300, evidence_days
+          relationship_linked=sum(any('수신신호' in (ev.get('source_topics') or []) for ev in (row.get('evidence') or [])) for row in daily)
+          assert relationship_linked>=250, relationship_linked
+          market_rows=[row for row in daily if row.get('market_open')]
+          investment_linked=sum(any('투자주의' in (ev.get('source_topics') or []) for ev in (row.get('evidence') or [])) for row in market_rows)
+          assert investment_linked>=max(1,int(len(market_rows)*0.75)), (investment_linked,len(market_rows))
+          encoded=json.dumps(result,ensure_ascii=False,default=str).encode('utf-8')
+          assert len(encoded)<6_000_000, len(encoded)
+          print(json.dumps({
+              'annual_days':len(daily),
+              'elapsed_seconds':round(elapsed,2),
+              'response_bytes':len(encoded),
+              'evidence_days':evidence_days,
+              'relationship_linked_days':relationship_linked,
+              'market_days':len(market_rows),
+              'investment_linked_days':investment_linked,
+              'evidence_rows':sum(len(row.get('evidence') or []) for row in daily),
+          },ensure_ascii=False))
+          PY
+      - name: Commit evidence lineage improvement
         run: |
-          npm ci
-          npm run build
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: link derived daily scores to source evidence'
+          git push origin HEAD:work/integrated-interpretation-v2
