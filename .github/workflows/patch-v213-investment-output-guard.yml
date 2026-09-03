@@ -1,0 +1,121 @@
+name: Patch V21.3 investment output guard
+
+on:
+  push:
+    branches: [work/ai-cost-guard-v21]
+    paths:
+      - '.github/workflows/patch-v213-investment-output-guard.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply structural investment guidance sanitizer and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          src=Path('supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts')
+          s=src.read_text()
+          marker='function ensureMinText(value:any,min:number,fallback:string){const base=String(value??"").trim();if(base.length>=min)return base;return `${base}${base?" ":""}${fallback}`.trim();}\n\nexport function stabilizeCoreForQuality(core:any,payload:any){'
+          helper=r'''function ensureMinText(value:any,min:number,fallback:string){const base=String(value??"").trim();if(base.length>=min)return base;return `${base}${base?" ":""}${fallback}`.trim();}
+
+function sanitizeInvestmentGuidance(data:any,map:Map<string,any>){
+  const tradingPattern=/(매수|매도|매매|현금화|수익\s*정리|자산\s*실현|신규\s*(?:투자|진입)|투자\s*보류|보유\s*유지|레버리지)/;
+  const linkedTopics=(node:any)=>uniq([
+    ...(Array.isArray(node?.topics)?node.topics.map(String):[]),
+    ...refs(node?.evidence_refs).map(ref=>String(map.get(ref)?.topic??"")).filter(Boolean),
+  ]);
+  const investmentLinked=(node:any)=>linkedTopics(node).some(topic=>INVESTMENT_TOPICS.has(topic));
+  const safeAction="점성 상대지수는 매매 신호가 아니므로 실제 가격·거래량·밸류에이션·손익 기준과 본인 리스크 한도를 확인해.";
+  const safeAvoid="이 날짜나 상대지수만으로 매수·매도·보유·현금화 여부를 정하지 마.";
+  const safeWatch="실제 시장 데이터와 사전에 정한 손익·리스크 기준이 충족되는지 확인해.";
+  const addNoTradeTiming=(value:any)=>{const base=String(value??"").trim();if(!base||/매매 (?:신호|적기)|매매시점|시장 가격방향/.test(base))return base;return `${base} 이 상대지수는 시장 가격방향이나 매매 적기를 뜻하지 않아.`;};
+  const sanitizeNode=(node:any)=>{
+    if(!node||typeof node!=="object")return node;
+    const text=[node?.action,node?.avoid,node?.reason,node?.summary,node?.label].map(x=>String(x??"")).join(" ");
+    if(investmentLinked(node)){
+      node.action=safeAction;
+      node.avoid=safeAvoid;
+      if("watch" in node)node.watch=safeWatch;
+      if(typeof node.summary==="string")node.summary=addNoTradeTiming(node.summary);
+      if(typeof node.reason==="string")node.reason=addNoTradeTiming(node.reason);
+      return node;
+    }
+    if(tradingPattern.test(text)){
+      const topic=linkedTopics(node).find(t=>TOPICS.includes(t as any))??"금전";
+      const va=topicVerb(topic);
+      node.action=va.action;
+      node.avoid=va.avoid;
+      if("watch" in node)node.watch="실제 일정·문서·수치처럼 확인 가능한 조건을 우선 확인해.";
+    }
+    return node;
+  };
+  if(Array.isArray(data?.key_windows))data.key_windows=data.key_windows.map(sanitizeNode);
+  if(Array.isArray(data?.decisions))data.decisions=data.decisions.map(sanitizeNode);
+  if(data?.clusters&&typeof data.clusters==="object")data.clusters.investment="투자 관련 점수는 심리·행동의 상대활성도 참고값이야. 가격방향·수익률·매매시점을 뜻하지 않으므로 실제 시장 데이터와 손익·리스크 기준을 우선해.";
+  if(Array.isArray(data?.priorities))data.priorities=uniq(data.priorities.map((value:any)=>{
+    const text=String(value??"").trim();
+    return tradingPattern.test(text)?"투자·금전: 실제 시장 데이터·현금흐름·손익 기준·리스크 한도 점검":text;
+  }).filter(Boolean));
+  if(data?.overall&&typeof data.overall==="object")for(const key of ["best_phase","caution_phase"]){
+    const text=String(data.overall[key]??"").trim();
+    if(text&&/(수익실현|신규진입|투자|매수|매도|현금화|자산\s*실현)/.test(text)&&!/매매시점/.test(text))data.overall[key]=`${text} · 상대활성도 참고값이며 매매시점을 뜻하지 않음`;
+  }
+  return data;
+}
+
+export function stabilizeCoreForQuality(core:any,payload:any){'''
+          if marker not in s:
+              raise SystemExit('stabilizer insertion marker not found')
+          s=s.replace(marker,helper,1)
+          old='  return softenObject(data);\n}\n\nexport function buildPromptPacket(payload:any){'
+          new='  return softenObject(sanitizeInvestmentGuidance(data,map));\n}\n\nexport function buildPromptPacket(payload:any){'
+          if old not in s:
+              raise SystemExit('stabilizer return marker not found')
+          s=s.replace(old,new,1)
+          src.write_text(s)
+
+          testp=Path('supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs')
+          t=testp.read_text()
+          addition=r'''
+
+test('V21.3 structurally neutralizes model-generated trade timing actions without Gemini',()=>{
+  const p=packet();
+  const core={headline:'투자 후처리 테스트',overall:{summary:'상대활성도 요약을 충분한 길이로 설명하는 테스트 문장이다.',dominant_pattern:'패턴',best_phase:'2027-04 수익실현 지표 강세',caution_phase:'주의',evidence_refs:['W:overall:금전']},key_windows:[{label:'봄철 금전 및 실현 지수 피크 구간',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['금전','수익실현'],summary:'수익실현 관련 지수가 높아 실리적 결과를 점검하기 좋다.',action:'보유 자산을 현금화해.',avoid:'매도 시점을 늦추지 마.',evidence_refs:['W:date:2027-04-11:수익실현:best']}],year_phases:[],cross_checks:[],decisions:[{action:'자산 수익 정리 및 회수',timing:'2027-04-11',reason:'수익실현 상대지수가 높은 날짜다.',watch:'체결 가격',avoid:'고점 추가 상승을 기대한 과도한 보유 유지',evidence_refs:['W:date:2027-04-11:수익실현:best']}],clusters:{relationship:'',work_study:'',money_news:'',investment:'1~4월 투자에 우호적',condition:''},investment_reading:{psychology:'과열',realization:'수익에 유리',entry:'매수 적기',risk:'보수적'},systems:{western:'w',saju:'s',thai:'t'},priorities:['봄철 자산 실현 및 재정 정비'],limits:'점수는 확률이 아니다'};
+  const fixed=stabilizeCoreForQuality(core,p);
+  assert.match(fixed.key_windows[0].action,/점성 상대지수는 매매 신호가 아니므로/);
+  assert.doesNotMatch(fixed.key_windows[0].action,/현금화해|매도 시점/);
+  assert.match(fixed.key_windows[0].summary,/매매 적기를 뜻하지 않아/);
+  assert.match(fixed.decisions[0].action,/실제 가격·거래량·밸류에이션/);
+  assert.match(fixed.decisions[0].reason,/매매 적기를 뜻하지 않아/);
+  assert.match(fixed.decisions[0].watch,/실제 시장 데이터/);
+  assert.doesNotMatch(fixed.priorities.join(' '),/자산 실현|매수|매도|현금화/);
+  assert.match(fixed.clusters.investment,/매매시점을 뜻하지 않/);
+  assert.match(fixed.investment_reading.realization,/실제 수익 가능성이나 매도 적기를 뜻하지/);
+  assert.match(fixed.investment_reading.entry,/매수 신호가 아니며/);
+});
+'''
+          if "V21.3 structurally neutralizes model-generated trade timing actions" in t:
+              raise SystemExit('test already exists')
+          testp.write_text(t+addition)
+          PY
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          git diff --check
+      - name: Commit patch and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-v213-investment-output-guard.yml
+          git add supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          git commit -m 'fix(ai): neutralize investment timing guidance after generation'
+          git push origin HEAD:work/ai-cost-guard-v21
