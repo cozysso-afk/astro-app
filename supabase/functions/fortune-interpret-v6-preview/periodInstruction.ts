@@ -46,5 +46,6 @@ export function periodModeInstruction(payload: any, compactMode = false): string
       `topic_analysis reason은 핵심 최소 ${coreReasonTarget}자, 주목 최소 ${watchReasonTarget}자, 참고도 최소 ${referenceReasonTarget}자를 목표로 하되 참고 분야를 장문화하지 마라.`,
     ].join(" ")
     : "";
-  return `${retry}${PERIOD_FOCUS[kind]}`;
+  const outputSafety = "수치형 표현은 계산된 상대지수를 '78점'처럼 점수로만 쓰고 숫자 뒤에 % 기호를 절대 붙이지 마라. 상대지수를 사건 발생 확률이나 투자 수익률로 변환하지 마라. '무조건', '반드시', '확실히 일어난다' 같은 결정론적 미래 단정도 쓰지 마라.";
+  return `${retry}${outputSafety} ${PERIOD_FOCUS[kind]}`;
 }

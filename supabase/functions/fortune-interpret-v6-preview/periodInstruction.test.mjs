@@ -14,6 +14,16 @@ test("day instruction prioritizes intraday evidence and never asks for annual tr
   assert.doesNotMatch(text, /12개월/);
 });
 
+test("all period prompts forbid percent conversion and deterministic future claims", () => {
+  for (const period_kind of ["day", "week", "month", "annual"]) {
+    const text = periodModeInstruction({ period_kind });
+    assert.match(text, /숫자 뒤에 % 기호를 절대 붙이지 마라/);
+    assert.match(text, /사건 발생 확률이나 투자 수익률로 변환하지 마라/);
+    assert.match(text, /결정론적 미래 단정도 쓰지 마라/);
+    assert.match(text, /78점/);
+  }
+});
+
 test("week instruction follows daily sequence and key dates", () => {
   const text = periodModeInstruction({ period_kind: "week" });
   assert.match(text, /주간 분석/);
