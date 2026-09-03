@@ -262,7 +262,8 @@ export function strictQualityRetryInstruction(report:any){
 - supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.
 - 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.
 - '핵심 근거 설명이 얕음'이면 해당 topic reason에 구체 추세/평균과 실제 시기·근거를 연결해 충분히 늘려라. '주목 근거 설명이 얕음'도 변화 방향과 시기 근거를 최소 두 문장 수준으로 보강해라. 참고 분야를 대신 장문화하지 마라.
-- 관계·재회 주목 시기 설명 부족이면 focus_timing을 실제 관계 evidence_refs가 직접 지지하는 날짜/구간과 현실 확인 방식까지 포함해 보강해라.
+- 관계·재회 주목 시기 설명 부족이면 focus_timing을 최소 35자 정도로 실제 관계 evidence_refs가 직접 지지하는 날짜/구간 + 흐름 + 현실 확인 방식까지 포함해 보강해라.
+- 교차검증 종합이 너무 짧으면 해당 synthesis를 최소 60자 정도로 Western과 다른 체계의 공통점/차이를 구체적으로 풀어라.
 - 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
 - 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
 }

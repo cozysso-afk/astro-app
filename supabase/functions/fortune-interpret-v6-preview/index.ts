@@ -23,6 +23,17 @@ delete CORE_SCHEMA.properties.topic_analysis;
 CORE_SCHEMA.required=(CORE_SCHEMA.required??[]).filter((key:string)=>key!=="topic_analysis");
 const TOPIC_SCHEMA:any={type:"OBJECT",properties:{topic_analysis:SCHEMA.properties.topic_analysis},required:["topic_analysis"]};
 
+function normalizeDirectionalWindows(data:any,payload:any){
+  const ledger=new Map<string,any>((Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).map((row:any)=>[String(row?.id??""),row]));
+  for(const window of Array.isArray(data?.key_windows)?data.key_windows:[]){
+    const rows=(Array.isArray(window?.evidence_refs)?window.evidence_refs:[]).map((ref:any)=>ledger.get(String(ref))).filter(Boolean);
+    const supportive=rows.some((row:any)=>row?.direction==="supportive");
+    const caution=rows.some((row:any)=>row?.direction==="caution");
+    if(supportive&&caution)window.signal="혼합";
+  }
+  return data;
+}
+
 function splitPartInstruction(part:"core"|"topics"){
   if(part==="topics")return `[OUTPUT PART: TOPICS]
 - topic_analysis만 출력하고 15개 분야를 정확히 한 번씩 모두 넣어. topic 이름은 지정된 한국어 분야명을 그대로 써.
@@ -37,7 +48,8 @@ function splitPartInstruction(part:"core"|"topics"){
 - key_window의 evidence_refs에 supportive와 caution이 함께 있으면 signal은 반드시 '혼합'으로 써. 한쪽 방향으로 단순화하지 마.
 - decisions의 각 항목은 반드시 적어도 하나의 evidence_ref를 실제로 출력한 key_window와 공유해야 해. timing도 그 key_window의 start/end 또는, 오늘 분석이면 실제 W:window 시간창과 직접 연결해. 계산된 핵심 시기와 무관한 '전면 보류', '무조건 관망' 같은 포괄 조언을 새로 만들지 마.
 - 오늘 분석에 W:window 근거가 있으면 최소 한 결정의 timing에 그 정확한 HH:MM~HH:MM 시간창을 쓰고 같은 분야의 W:detail 근거도 함께 연결해.
-- 관계·연애·연락·재회 근거가 두드러지면 relationship_reading의 flow/focus_timing/watch를 충분히 구체적으로 쓰되, focus_timing의 정확한 날짜는 relationship_reading.evidence_refs가 직접 뒷받침하는 날짜만 써.
+- 관계·연애·연락·재회 근거가 두드러지면 relationship_reading의 flow/focus_timing/watch를 충분히 구체적으로 써. focus_timing은 최소 35자 정도로 시기 + 흐름 + 현실 확인 방식을 함께 설명하고, 정확한 날짜는 relationship_reading.evidence_refs가 직접 뒷받침하는 날짜만 써.
+- cross_checks의 synthesis는 최소 60자 정도로 Western과 다른 체계가 같은 시기를 어떻게 보완하거나 다르게 설명하는지 구체적으로 종합해. western 설명도 최소 35자 정도로 근거의 의미를 풀어 써.
 - annual이면 year_phases 4개 이상, cross_checks 3개 이상, key_windows 5개 이상을 유지하고 각 항목의 근거를 실제 evidence_refs로 연결해.`;
 }
 
@@ -47,7 +59,7 @@ async function generatePart(payload:any,model:string,key:string,part:"core"|"top
   try{
     const modeInstruction=periodModeInstruction(payload,compactMode);
     const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${splitPartInstruction(part)} ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\nCALCULATED_DATA=${JSON.stringify(payload)}`;
-    const maxOutputTokens=part==="core"?(compactMode?7600:11000):(compactMode?5600:8200);
+    const maxOutputTokens=part==="core"?(compactMode?10000:12000):(compactMode?6500:8200);
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
       body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,maxOutputTokens,temperature:.27,thinkingConfig:{thinkingLevel:compactMode?"low":"medium"}}}),
@@ -77,8 +89,9 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
   if(!core.ok||!topics.ok)return {ok:false,error:[core.ok?"":core.error,topics.ok?"":topics.error].filter(Boolean).join("; "),model,usage:combinedUsage,split_generation:true};
   try{
     const merged={...core.partial,...topics.partial};
-    const data=validateOutput(merged);
-    if(!data)return {ok:false,error:"1단계 구조 검증 실패",model,usage:combinedUsage,split_generation:true};
+    const validated=validateOutput(merged);
+    if(!validated)return {ok:false,error:"1단계 구조 검증 실패",model,usage:combinedUsage,split_generation:true};
+    const data=normalizeDirectionalWindows(validated,payload);
     const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
     if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:combinedUsage,output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data,split_generation:true};
     const quality=inspectInterpretationQuality(data,payload);
