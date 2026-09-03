@@ -1,0 +1,56 @@
+name: Apply Integrated Result UX V4
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-integrated-result-ux-v4.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - name: Reorder annual integrated result hierarchy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('web/src/AppNext.tsx')
+          s=p.read_text(encoding='utf-8')
+
+          anchor='''              {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}\n\n              <section className="result-card">'''
+          replacement='''              {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}\n\n              <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>\n\n              <section className="result-card">'''
+          if anchor not in s: raise SystemExit('date panel insertion anchor missing')
+          s=s.replace(anchor,replacement,1)
+
+          old='''              {(bestIntegratedDays.length>0 || cautionIntegratedDays.length>0) && <section className="result-card integrated-date-highlights"><div className="result-card-title"><span>TIMING</span><strong>좋은 날짜 · 주의 날짜</strong></div>{bestIntegratedDays.map((point)=><div className="tight-row" key={`integrated-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}{cautionIntegratedDays.map((point)=><div className="tight-row" key={`integrated-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {point.topic} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}<p className="result-note">선택 기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p></section>}\n\n              <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>\n\n'''
+          if old not in s: raise SystemExit('legacy timing block missing')
+          s=s.replace(old,'',1)
+
+          old='''              {integratedResult.western.months.length>1 && <section className="result-card">\n                <div className="result-card-title"><span>MONTHLY</span><strong>월별 흐름</strong></div>\n                <div className="month-list">{integratedResult.western.months.map((month)=>{\n                  const ranked = topicOrder.map((topic)=>({topic,stat:month.topics[topic]})).filter((row): row is {topic:string;stat:FortuneStat}=>Boolean(row.stat)).sort((a,b)=>b.stat.average-a.stat.average).slice(0,3)\n                  return <div className="month-card" key={month.calendar_month}><div className="month-title"><strong>{month.calendar_month}</strong><span>{month.start}~{month.end}</span></div>{ranked.map(({topic,stat})=><div className="tight-row" key={topic}><span>{topic} · {stat.band}</span><b>{stat.average.toFixed(1)}</b></div>)}</div>\n                })}</div>\n              </section>}'''
+          new='''              {integratedResult.western.months.length>1 && <details className="result-card integrated-month-source">\n                <summary><span>MONTHLY</span><strong>월별 분야 원자료 보기</strong><small>12개월의 분야별 상위 흐름을 펼쳐서 확인</small></summary>\n                <div className="integrated-month-source-body"><div className="month-list">{integratedResult.western.months.map((month)=>{\n                  const ranked = topicOrder.map((topic)=>({topic,stat:month.topics[topic]})).filter((row): row is {topic:string;stat:FortuneStat}=>Boolean(row.stat)).sort((a,b)=>b.stat.average-a.stat.average).slice(0,3)\n                  return <div className="month-card" key={month.calendar_month}><div className="month-title"><strong>{month.calendar_month}</strong><span>{month.start}~{month.end}</span></div>{ranked.map(({topic,stat})=><div className="tight-row" key={topic}><span>{topic} · {stat.band}</span><b>{stat.average.toFixed(1)}</b></div>)}</div>\n                })}</div></div>\n              </details>}'''
+          if old not in s: raise SystemExit('monthly source block missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify hierarchy cleanup
+        run: |
+          ! grep -q 'integrated-date-highlights' web/src/AppNext.tsx
+          test "$(grep -c 'AnnualDailyScoresPanel rows=' web/src/AppNext.tsx)" -eq 1
+          grep -q 'integrated-month-source' web/src/AppNext.tsx
+      - name: Commit hierarchy cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AppNext.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'refactor(web): clarify annual result hierarchy'
+          git push origin HEAD:work/integrated-interpretation-v2
