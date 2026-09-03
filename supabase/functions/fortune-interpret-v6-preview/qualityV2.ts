@@ -145,10 +145,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
       if(!windowEvidence.length)s5.push("오늘 시간창 전용 W:window:* 계산근거 누락");
       if(windowEvidence.length&&timedDecisions.length){
         const periodDate=isoDate(payload?.period?.start);
-        let exactLinked=false;
         for(const d of timedDecisions){
           const timingWindow=clockWindow(d?.timing);
           const refs=(d?.evidence_refs??[]).map(String);
+          let exactLinked=false;
           for(const ref of refs){
             const row:any=map.get(ref);
             if(!row||(row?.scope!=="intraday_window"&&!String(ref).startsWith("W:window:")))continue;
@@ -157,9 +157,8 @@ export function inspectInterpretationQuality(data:any,payload:any){
             const sameTopicDetailLinked=refs.some((detailRef:string)=>{const x:any=map.get(detailRef);return x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??"");});
             if(!sameTopicDetailAvailable||sameTopicDetailLinked){exactLinked=true;break;}
           }
-          if(exactLinked)break;
+          if(!exactLinked)s5.push(`오늘 시간대 행동 가이드 근거 불일치: ${txt(d?.timing,45)} · 동일 시간창 W:window:* 및 같은 분야 W:detail:* 필요`);
         }
-        if(!exactLinked)s5.push("오늘 시간대 행동 가이드에 동일 시간창 W:window:* 및 같은 분야 W:detail:* 근거 미연결");
       }
     }
   }

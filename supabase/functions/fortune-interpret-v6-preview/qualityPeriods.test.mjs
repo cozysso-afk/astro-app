@@ -109,24 +109,32 @@ test("day quality guard requires exact W:window timing and same-topic detail evi
   const unlinked=inspectInterpretationQuality(data,payload);
   assert.equal(unlinked.ok,false);
   const unlinkedIssues=unlinked.stages.flatMap(stage=>stage.issues??[]).join(" / ");
-  assert.match(unlinkedIssues,/동일 시간창 W:window/);
+  assert.match(unlinkedIssues,/시간대 행동 가이드 근거 불일치/);
 
   data.decisions[0].evidence_refs.push(windowRef);
   const windowOnly=inspectInterpretationQuality(data,payload);
   assert.equal(windowOnly.ok,false);
   const windowOnlyIssues=windowOnly.stages.flatMap(stage=>stage.issues??[]).join(" / ");
-  assert.match(windowOnlyIssues,/같은 분야 W:detail/);
+  assert.match(windowOnlyIssues,/시간대 행동 가이드 근거 불일치/);
 
   data.decisions[0].evidence_refs.push(detailRef);
   const fixed=inspectInterpretationQuality(data,payload);
   assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));
   assert.equal(fixed.score,100);
 
+  data.decisions[1].timing="2026-09-03 10:00~11:00";
+  const partiallyValid=inspectInterpretationQuality(data,payload);
+  assert.equal(partiallyValid.ok,false,"one valid timed decision must not hide another unsupported time");
+  const partialIssues=partiallyValid.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+  assert.match(partialIssues,/10:00~11:00/);
+  assert.match(partialIssues,/시간대 행동 가이드 근거 불일치/);
+  data.decisions[1].timing="중간 점검";
+
   data.decisions[0].timing="2026-09-03 10:00~11:00";
   const mismatch=inspectInterpretationQuality(data,payload);
   assert.equal(mismatch.ok,false);
   const mismatchIssues=mismatch.stages.flatMap(stage=>stage.issues??[]).join(" / ");
-  assert.match(mismatchIssues,/동일 시간창 W:window/);
+  assert.match(mismatchIssues,/시간대 행동 가이드 근거 불일치/);
 });
 
 
