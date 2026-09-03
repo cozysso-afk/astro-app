@@ -1,0 +1,64 @@
+name: Apply Day Intraday Quality Guard
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-day-intraday-quality.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Require real intraday evidence for day readings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityV2.ts')
+          s=p.read_text(encoding='utf-8')
+          anchor='''  const minSummary=kind==="annual"?240:kind==="month"?170:110;\n'''
+          insert='''  if(kind==="day"){\n    const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];\n    const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));\n    if(hasIntradayWindow){\n      const timedDecision=(data?.decisions??[]).some((d:any)=>/(?:[01]\\d|2[0-3]):[0-5]\\d/.test(String(d?.timing??"")));\n      if(!timedDecision)s5.push("오늘 시간대 행동 가이드 누락");\n      const detailEvidenceAvailable=Array.from(map.keys()).some((ref:any)=>String(ref).startsWith("W:detail:"));\n      if(detailEvidenceAvailable&&!refsUsed.some((ref:string)=>ref.startsWith("W:detail:")))s5.push("오늘 실제 시간대 계산근거 W:detail:* 미사용");\n    }\n  }\n'''+anchor
+          if '오늘 시간대 행동 가이드 누락' not in s:
+              if anchor not in s: raise SystemExit('day quality anchor missing')
+              s=s.replace(anchor,insert,1)
+              p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          marker='day quality guard requires clock timing and W:detail evidence when intraday windows exist'
+          if marker not in s:
+              s += '''\n\ntest("day quality guard requires clock timing and W:detail evidence when intraday windows exist",()=>{\n  const {data,payload}=buildCase("day");\n  payload.western={detail_days:[{date:"2026-09-03",topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31}}}}]};\n  const detailRef="W:detail:2026-09-03:직장:1";\n  payload.evidence_ledger.push({id:detailRef,system:"western",scope:"intraday_evidence",topic:"직장",direction:"context",date:"2026-09-03",text:"08:00 실제 시간대 테스트 근거"});\n\n  const missing=inspectInterpretationQuality(data,payload);\n  assert.equal(missing.ok,false);\n  const missingIssues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);\n  assert.match(missingIssues,/W:detail/);\n\n  data.decisions[0].timing="2026-09-03 08:00~09:30";\n  data.decisions[0].evidence_refs.push(detailRef);\n  const fixed=inspectInterpretationQuality(data,payload);\n  assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));\n  assert.equal(fixed.score,100);\n});\n'''
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit intraday quality guard
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v6-preview/qualityV2.ts supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat(ai): enforce intraday evidence in day readings'
+          git push origin HEAD:work/integrated-interpretation-v2
