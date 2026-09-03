@@ -1,8 +1,8 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
-export const VERSION = "supabase-ai-v11-period-aware-cross-system";
-export const PACKET_VERSION = "fortune-interpretation-packet-v3-full-daily";
-export const QUALITY_VERSION = "fortune-interpretation-quality-v2-cross-system";
+export const VERSION = "supabase-ai-v12-intraday-window-evidence";
+export const PACKET_VERSION = "fortune-interpretation-packet-v4-intraday-window";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v3-intraday-window";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
   "gemini-3.6-flash": "Gemini 3.6 Flash · 빠른 해설",
@@ -22,6 +22,7 @@ type Evidence = {
   date?: string;
   start?: string;
   end?: string;
+  window?: string;
   score?: number;
   band?: string;
   text: string;
@@ -79,6 +80,13 @@ function evidenceDirection(topic:string,kind:"best"|"caution"|"average",score:nu
 }
 
 function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
+function clockToken(v:unknown){ const m=String(v??"").match(/(?:[01]\d|2[0-3]):[0-5]\d/); return m?m[0]:""; }
+function intradayWindow(value:any){
+  if(!value)return "";
+  if(value&&typeof value==="object"){const start=clockToken(value?.start),end=clockToken(value?.end);if(start&&end)return `${start}~${end}`;}
+  const matches=[...String(value).matchAll(/(?:[01]\d|2[0-3]):[0-5]\d/g)].map(m=>m[0]);
+  return matches.length>=2?`${matches[0]}~${matches[1]}`:"";
+}
 function trajectoryDigest(rows:any[],topic:string){
   const values=rows.map((row:any)=>({date:String(row?.date??""),score:finiteDailyScore(row?.scores?.[topic])})).filter((x:any):x is {date:string;score:number}=>Boolean(x.date)&&x.score!==null);
   if(!values.length)return null;
@@ -159,7 +167,21 @@ export function compactCalculation(calc:any){
 
   const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];
   const detail=detailRaw.slice(0,18).map((d:any)=>({date:d?.date,market_status:d?.market_open?"KRX(한국거래소) 거래일":"KRX(한국거래소) 휴장일",topics:Object.fromEntries(Object.entries(d?.topics??{}).map(([k,x]:any)=>[k,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:Array.isArray(x?.evidence)?x.evidence.slice(0,6):[]}]))}));
-  for(const d of detail){for(const [topic,x] of Object.entries(d.topics) as any[]){for(let i=0;i<(x.evidence??[]).length;i++){const id=`W:detail:${d.date}:${topic}:${i+1}`;addEvidence({id,system:"western",scope:"intraday_evidence",topic,direction:"context",date:d.date,text:String(x.evidence[i])});const kd=keyDates.find(k=>k.date===d.date);if(kd)kd.western_refs.push(id);}}}
+  for(const d of detail){
+    for(const [topic,x] of Object.entries(d.topics) as any[]){
+      const kd=keyDates.find(k=>k.date===d.date);
+      const addWindow=(kind:"best"|"caution",value:any)=>{
+        const window=intradayWindow(value);if(!window)return;
+        const id=`W:window:${d.date}:${topic}:${kind}`;
+        const score=typeof value?.score==="number"&&Number.isFinite(value.score)?Number(value.score):undefined;
+        addEvidence({id,system:"western",scope:"intraday_window",topic,direction:evidenceDirection(topic,kind,score??0),date:d.date,window,score,text:`${d.date} ${topic} ${kind==="best"?"활용":"주의"} 시간창 ${window}${score===undefined?"":` · 상대지수 ${score.toFixed(1)}`}`});
+        if(kd)kd.western_refs.push(id);
+      };
+      addWindow("best",x?.best_window);
+      addWindow("caution",x?.caution_window);
+      for(let i=0;i<(x.evidence??[]).length;i++){const id=`W:detail:${d.date}:${topic}:${i+1}`;addEvidence({id,system:"western",scope:"intraday_evidence",topic,direction:"context",date:d.date,text:String(x.evidence[i])});if(kd)kd.western_refs.push(id);}
+    }
+  }
 
   const s=calc?.saju??{};
   const sajuAnnual=(Array.isArray(s?.annual)?s.annual.slice(0,8):[]).map((x:any,index:number)=>{const id=`S:annual:${index+1}:${isoDate(x?.segment_start)||x?.year||""}`;addEvidence({id,system:"saju",scope:"annual_segment",direction:"context",start:x?.segment_start,end:x?.segment_end_exclusive,text:`세운 ${x?.ganzhi??""} · 십성 ${x?.stem_ten_god??""}${Array.isArray(x?.branch_links)&&x.branch_links.length?` · 지지관계 ${x.branch_links.join(", ")}`:""}`});return {...x,evidence_id:id};});

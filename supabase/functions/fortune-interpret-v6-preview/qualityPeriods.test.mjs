@@ -90,11 +90,15 @@ for(const kind of ["day","week","month"]){
 }
 
 
-test("day quality guard requires clock timing and W:detail evidence when intraday windows exist",()=>{
+test("day quality guard requires exact W:window timing and same-topic detail evidence",()=>{
   const {data,payload}=buildCase("day");
   payload.western={detail_days:[{date:"2026-09-03",topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31}}}}]};
+  const windowRef="W:window:2026-09-03:직장:best";
   const detailRef="W:detail:2026-09-03:직장:1";
-  payload.evidence_ledger.push({id:detailRef,system:"western",scope:"intraday_evidence",topic:"직장",direction:"context",date:"2026-09-03",text:"08:00 실제 시간대 테스트 근거"});
+  payload.evidence_ledger.push(
+    {id:windowRef,system:"western",scope:"intraday_window",topic:"직장",direction:"supportive",date:"2026-09-03",window:"08:00~09:30",score:72,text:"2026-09-03 직장 활용 시간창 08:00~09:30"},
+    {id:detailRef,system:"western",scope:"intraday_evidence",topic:"직장",direction:"context",date:"2026-09-03",text:"08:00 실제 시간대 테스트 근거"},
+  );
 
   const missing=inspectInterpretationQuality(data,payload);
   assert.equal(missing.ok,false);
@@ -105,12 +109,24 @@ test("day quality guard requires clock timing and W:detail evidence when intrada
   const unlinked=inspectInterpretationQuality(data,payload);
   assert.equal(unlinked.ok,false);
   const unlinkedIssues=unlinked.stages.flatMap(stage=>stage.issues??[]).join(" / ");
-  assert.match(unlinkedIssues,/시간대 행동 가이드에 실제 W:detail/);
+  assert.match(unlinkedIssues,/동일 시간창 W:window/);
+
+  data.decisions[0].evidence_refs.push(windowRef);
+  const windowOnly=inspectInterpretationQuality(data,payload);
+  assert.equal(windowOnly.ok,false);
+  const windowOnlyIssues=windowOnly.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+  assert.match(windowOnlyIssues,/같은 분야 W:detail/);
 
   data.decisions[0].evidence_refs.push(detailRef);
   const fixed=inspectInterpretationQuality(data,payload);
   assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));
   assert.equal(fixed.score,100);
+
+  data.decisions[0].timing="2026-09-03 10:00~11:00";
+  const mismatch=inspectInterpretationQuality(data,payload);
+  assert.equal(mismatch.ok,false);
+  const mismatchIssues=mismatch.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+  assert.match(mismatchIssues,/동일 시간창 W:window/);
 });
 
 

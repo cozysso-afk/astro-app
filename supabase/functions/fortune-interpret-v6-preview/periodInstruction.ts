@@ -10,6 +10,7 @@ const PERIOD_FOCUS: Record<InterpretationPeriodKind, string> = {
   day: [
     "하루 분석이다. 연간·월간 흐름처럼 일반화하지 마라.",
     "western.detail_days의 실제 시간대별 best_window·caution_window와 intraday evidence를 최우선으로 읽고, 같은 날짜의 daily_score_matrix와 key_dates/W:daily:* 근거로 교차 확인하라.",
+    "시간대를 쓰는 decisions.timing에는 반드시 동일한 HH:MM~HH:MM을 가진 W:window:* 전용 근거를 evidence_refs에 붙이고, 같은 분야의 W:detail:* 근거가 있으면 그 근거도 같은 decision에 함께 붙여라.",
     "핵심 결론은 오늘 언제 움직이고 언제 피해야 하는지가 바로 보이게 쓰고, 시간대 근거가 있으면 decisions.timing과 key_windows에 날짜뿐 아니라 해당 시간대를 구체적으로 반영하라.",
     "사주·Thai는 하루 사건의 확률을 높이는 투표로 쓰지 말고 그 날짜가 속한 독립 기간 맥락만 설명하라.",
   ].join(" "),

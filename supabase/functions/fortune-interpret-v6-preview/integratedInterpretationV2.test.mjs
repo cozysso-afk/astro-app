@@ -204,3 +204,20 @@ test("shallow annual output fails depth and utility",()=>{
   const report=inspectInterpretationQuality(validateOutput(raw),packet);
   assert.equal(report.stages[4].passed,false);
 });
+
+
+test("packet emits exact W:window evidence for intraday best and caution windows",()=>{
+  const calc=calculation();
+  calc.western.detail_days=[{date:"2026-07-21",market_open:true,topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31},evidence:["Jupiter trine MC intraday test"]}}}];
+  const packet=compactCalculation(calc);
+  const best=packet.evidence_ledger.find(x=>x.id==="W:window:2026-07-21:직장:best");
+  const caution=packet.evidence_ledger.find(x=>x.id==="W:window:2026-07-21:직장:caution");
+  assert.ok(best);
+  assert.ok(caution);
+  assert.equal(best.scope,"intraday_window");
+  assert.equal(best.window,"08:00~09:30");
+  assert.equal(best.direction,"supportive");
+  assert.equal(caution.window,"16:00~17:00");
+  assert.equal(caution.direction,"caution");
+  assert.ok(packet.evidence_ledger.some(x=>x.id==="W:detail:2026-07-21:직장:1"));
+});

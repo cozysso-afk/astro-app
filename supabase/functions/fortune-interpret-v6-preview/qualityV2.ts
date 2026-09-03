@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v2-cross-system-action";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v3-intraday-window";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -9,6 +9,7 @@ function ledgerMap(payload:any){return new Map((Array.isArray(payload?.evidence_
 function allRefs(data:any){const out:string[]=[];const walk=(v:any)=>{if(Array.isArray(v))for(const x of v)walk(x);else if(v&&typeof v==="object"){if(Array.isArray(v.evidence_refs))out.push(...v.evidence_refs.map(String));for(const [k,x] of Object.entries(v))if(k!=="evidence_refs")walk(x);}};walk(data);return uniq(out);}
 function withinPeriod(date:string,payload:any){const start=isoDate(payload?.period?.start),end=isoDate(payload?.period?.end);return Boolean(date&&start&&end&&start<=date&&date<=end);}
 function datesInText(s:string){return [...s.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)].map(m=>m[1]);}
+function clockWindow(v:unknown){const matches=[...String(v??"").matchAll(/(?:[01]\d|2[0-3]):[0-5]\d/g)].map(m=>m[0]);return matches.length>=2?`${matches[0]}~${matches[1]}`:"";}
 function rowCoversDate(row:any,date:string){
   if(!date)return false;
   if(isoDate(row?.date)===date)return true;
@@ -138,10 +139,28 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];
     const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));
     if(hasIntradayWindow){
-      const timedDecisions=(data?.decisions??[]).filter((d:any)=>/(?:[01]\d|2[0-3]):[0-5]\d/.test(String(d?.timing??"")));
+      const timedDecisions=(data?.decisions??[]).filter((d:any)=>Boolean(clockWindow(d?.timing)));
       if(!timedDecisions.length)s5.push("오늘 시간대 행동 가이드 누락");
-      const detailEvidenceAvailable=Array.from(map.keys()).some((ref:any)=>String(ref).startsWith("W:detail:"));
-      if(detailEvidenceAvailable&&timedDecisions.length&&!timedDecisions.some((d:any)=>(d?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:detail:"))))s5.push("오늘 시간대 행동 가이드에 실제 W:detail:* 근거 미연결");
+      const windowEvidence=[...map.entries()].filter(([ref,row]:any)=>String(ref).startsWith("W:window:")||row?.scope==="intraday_window");
+      if(!windowEvidence.length)s5.push("오늘 시간창 전용 W:window:* 계산근거 누락");
+      if(windowEvidence.length&&timedDecisions.length){
+        const periodDate=isoDate(payload?.period?.start);
+        let exactLinked=false;
+        for(const d of timedDecisions){
+          const timingWindow=clockWindow(d?.timing);
+          const refs=(d?.evidence_refs??[]).map(String);
+          for(const ref of refs){
+            const row:any=map.get(ref);
+            if(!row||(row?.scope!=="intraday_window"&&!String(ref).startsWith("W:window:")))continue;
+            if(isoDate(row?.date)!==periodDate||clockWindow(row?.window??row?.text)!==timingWindow)continue;
+            const sameTopicDetailAvailable=[...map.values()].some((x:any)=>x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??""));
+            const sameTopicDetailLinked=refs.some((detailRef:string)=>{const x:any=map.get(detailRef);return x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??"");});
+            if(!sameTopicDetailAvailable||sameTopicDetailLinked){exactLinked=true;break;}
+          }
+          if(exactLinked)break;
+        }
+        if(!exactLinked)s5.push("오늘 시간대 행동 가이드에 동일 시간창 W:window:* 및 같은 분야 W:detail:* 근거 미연결");
+      }
     }
   }
   const minSummary=kind==="annual"?240:kind==="month"?170:110;

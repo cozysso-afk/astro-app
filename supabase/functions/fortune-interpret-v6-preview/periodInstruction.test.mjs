@@ -8,6 +8,8 @@ test("day instruction prioritizes intraday evidence and never asks for annual tr
   assert.match(text, /하루 분석/);
   assert.match(text, /detail_days/);
   assert.match(text, /시간대/);
+  assert.match(text, /W:window:\*/);
+  assert.match(text, /W:detail:\*/);
   assert.doesNotMatch(text, /365일/);
   assert.doesNotMatch(text, /12개월/);
 });

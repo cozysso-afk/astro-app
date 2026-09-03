@@ -1,4 +1,4 @@
-export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-period-aware-v11'
+export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-intraday-window-v12'
 export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v2'
 
 export type PendingFortuneAiJob = {
