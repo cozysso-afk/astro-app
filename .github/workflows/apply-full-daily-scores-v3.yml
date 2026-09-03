@@ -1,4 +1,4 @@
-name: Fix Daily Null Semantics V3
+name: Branch Interpretation V3 Verification
 
 on:
   push:
@@ -8,52 +8,33 @@ on:
       - .github/workflows/apply-full-daily-scores-v3.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/integrated-interpretation-v2
-          fetch-depth: 0
-      - name: Preserve null daily scores
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax contract
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
-          s = p.read_text(encoding='utf-8')
-          replacements = [
-            (
-              '''function trajectoryDigest(rows:any[],topic:string){\n  const values=rows.map((row:any)=>({date:String(row?.date??""),score:Number(row?.scores?.[topic])})).filter((x:any)=>x.date&&Number.isFinite(x.score));''',
-              '''function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }\nfunction trajectoryDigest(rows:any[],topic:string){\n  const values=rows.map((row:any)=>({date:String(row?.date??""),score:finiteDailyScore(row?.scores?.[topic])})).filter((x:any):x is {date:string;score:number}=>Boolean(x.date)&&x.score!==null);'''
-            ),
-            (
-              '''  const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>Number.isFinite(Number(d?.scores?.[topic]))?Number(d.scores[topic]):null)])};''',
-              '''  const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>finiteDailyScore(d?.scores?.[topic]))])};'''
-            ),
-            (
-              '''      const score=Number(d?.scores?.[topic]); if(!Number.isFinite(score))continue;''',
-              '''      const score=finiteDailyScore(d?.scores?.[topic]); if(score===null)continue;'''
-            ),
-          ]
-          for old,new in replacements:
-              if old not in s:
-                  raise SystemExit(f'null semantics anchor missing: {old[:80]}')
-              s = s.replace(old,new,1)
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Guard null semantics
+          python -m py_compile integrated_fortune_v1.py key_date_evidence_v2.py api/main.py
+          grep -q 'daily_scores' integrated_fortune_v1.py
+      - name: Interpretation guards
         run: |
-          grep -q 'function finiteDailyScore' supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts
-          ! grep -q 'score:Number(row?.scores' supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts
-          ! grep -q 'Number.isFinite(Number(d?.scores' supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts
-      - name: Commit fix
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+      - name: Web typecheck and build
+        working-directory: web
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix: preserve nulls in daily trajectory analysis'
-          git push origin HEAD:work/integrated-interpretation-v2
+          npm ci
+          npm run build
