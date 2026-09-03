@@ -108,3 +108,27 @@ test("day quality guard requires clock timing and W:detail evidence when intrada
   assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));
   assert.equal(fixed.score,100);
 });
+
+
+test("week and month require available W:daily evidence in key windows",()=>{
+  for(const kind of ["week","month"]){
+    const {data,payload}=buildCase(kind);
+    const needed=kind==="month"?2:1;
+    const dailyRefs=[];
+    for(let i=0;i<needed;i++){
+      const date=data.key_windows[i].start;
+      const ref=`W:daily:${date}:${i+1}`;
+      dailyRefs.push(ref);
+      payload.evidence_ledger.push({id:ref,system:"western",scope:"daily_actual_aspect_house",direction:"context",date,text:`${date} 실제 일별 트랜짓 테스트 근거`});
+    }
+    const missing=inspectInterpretationQuality(data,payload);
+    assert.equal(missing.ok,false);
+    const issues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+    assert.match(issues,kind==="month"?/월간 실제 일별 계산근거/:/주간 실제 일별 계산근거/);
+
+    for(let i=0;i<needed;i++)data.key_windows[i].evidence_refs.push(dailyRefs[i]);
+    const fixed=inspectInterpretationQuality(data,payload);
+    assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));
+    assert.equal(fixed.score,100);
+  }
+});

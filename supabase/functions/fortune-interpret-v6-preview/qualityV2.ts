@@ -126,6 +126,14 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const dailyBacked=(data?.key_windows??[]).filter((w:any)=>(w?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:daily:"))).length;
     if(dailyBacked<Math.min(3,data?.key_windows?.length??0))s5.push(`실제 일별 애스펙트/하우스 근거가 연결된 핵심 시기 부족: ${dailyBacked}/3`);
   }
+  if(kind==="week"||kind==="month"){
+    const dailyRefsAvailable=Array.from(map.keys()).filter((ref:any)=>String(ref).startsWith("W:daily:"));
+    if(dailyRefsAvailable.length){
+      const required=kind==="month"?Math.min(2,data?.key_windows?.length??0):Math.min(1,data?.key_windows?.length??0);
+      const dailyBacked=(data?.key_windows??[]).filter((w:any)=>(w?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:daily:"))).length;
+      if(dailyBacked<required)s5.push(`${kind==="month"?"월간":"주간"} 실제 일별 계산근거가 연결된 핵심 시기 부족: ${dailyBacked}/${required}`);
+    }
+  }
   if(kind==="day"){
     const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];
     const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));
