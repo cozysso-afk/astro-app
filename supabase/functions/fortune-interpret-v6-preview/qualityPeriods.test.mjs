@@ -88,3 +88,23 @@ for(const kind of ["day","week","month"]){
     assert.equal(data.cross_checks.length,0);
   });
 }
+
+
+test("day quality guard requires clock timing and W:detail evidence when intraday windows exist",()=>{
+  const {data,payload}=buildCase("day");
+  payload.western={detail_days:[{date:"2026-09-03",topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31}}}}]};
+  const detailRef="W:detail:2026-09-03:직장:1";
+  payload.evidence_ledger.push({id:detailRef,system:"western",scope:"intraday_evidence",topic:"직장",direction:"context",date:"2026-09-03",text:"08:00 실제 시간대 테스트 근거"});
+
+  const missing=inspectInterpretationQuality(data,payload);
+  assert.equal(missing.ok,false);
+  const missingIssues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);
+  assert.match(missingIssues,/W:detail/);
+
+  data.decisions[0].timing="2026-09-03 08:00~09:30";
+  data.decisions[0].evidence_refs.push(detailRef);
+  const fixed=inspectInterpretationQuality(data,payload);
+  assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));
+  assert.equal(fixed.score,100);
+});
