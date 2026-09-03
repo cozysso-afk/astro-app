@@ -22,22 +22,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Adapt patcher to current type contract
+      - name: Normalize current type anchor
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path('scripts/patch_full_daily_scores_v3.py')
+          p = Path('web/src/appTypes.ts')
           s = p.read_text(encoding='utf-8')
-          old = '''    detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>\n    months: FortuneMonth[]\n'''
-          new = '''    detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>\n    key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>\n    months: FortuneMonth[]\n'''
-          fixed = '''    detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>\n    daily_scores?: FortuneDailyScore[]\n    key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>\n    months: FortuneMonth[]\n'''
-          if old not in s:
-              raise SystemExit('patcher appTypes old anchor missing')
-          s = s.replace(old, new, 1).replace(new, fixed, 1)
-          p.write_text(s, encoding='utf-8')
+          line = '    key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>\n'
+          if line not in s:
+              raise SystemExit('existing key_dates type line missing')
+          p.write_text(s.replace(line, '', 1), encoding='utf-8')
           PY
       - name: Apply patch
         run: python scripts/patch_full_daily_scores_v3.py
+      - name: Restore key_dates type
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/appTypes.ts')
+          s = p.read_text(encoding='utf-8')
+          anchor = '    daily_scores?: FortuneDailyScore[]\n'
+          line = '    key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>\n'
+          if anchor not in s:
+              raise SystemExit('daily_scores type anchor missing after patch')
+          if line not in s:
+              s = s.replace(anchor, anchor + line, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Basic syntax guards
         run: |
           python -m py_compile integrated_fortune_v1.py
