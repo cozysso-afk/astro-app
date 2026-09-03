@@ -186,6 +186,51 @@ function rowCovers(row:any,date:string){if(!date)return false;const d=iso(row?.d
 function kdTopics(kd:any){if(Array.isArray(kd?.topics))return kd.topics.map(String);if(kd?.topics&&typeof kd.topics==="object")return Object.keys(kd.topics);return [];}
 function ensureMinText(value:any,min:number,fallback:string){const base=String(value??"").trim();if(base.length>=min)return base;return `${base}${base?" ":""}${fallback}`.trim();}
 
+function sanitizeInvestmentGuidance(data:any,map:Map<string,any>){
+  const tradingPattern=/(매수|매도|매매|현금화|수익\s*정리|자산\s*실현|신규\s*(?:투자|진입)|투자\s*보류|보유\s*유지|레버리지)/;
+  const linkedTopics=(node:any)=>uniq([
+    ...(Array.isArray(node?.topics)?node.topics.map(String):[]),
+    ...refs(node?.evidence_refs).map(ref=>String(map.get(ref)?.topic??"")).filter(Boolean),
+  ]);
+  const investmentLinked=(node:any)=>linkedTopics(node).some(topic=>INVESTMENT_TOPICS.has(topic));
+  const safeAction="점성 상대지수는 매매 신호가 아니므로 실제 가격·거래량·밸류에이션·손익 기준과 본인 리스크 한도를 확인해.";
+  const safeAvoid="이 날짜나 상대지수만으로 매수·매도·보유·현금화 여부를 정하지 마.";
+  const safeWatch="실제 시장 데이터와 사전에 정한 손익·리스크 기준이 충족되는지 확인해.";
+  const addNoTradeTiming=(value:any)=>{const base=String(value??"").trim();if(!base||/매매 (?:신호|적기)|매매시점|시장 가격방향/.test(base))return base;return `${base} 이 상대지수는 시장 가격방향이나 매매 적기를 뜻하지 않아.`;};
+  const sanitizeNode=(node:any)=>{
+    if(!node||typeof node!=="object")return node;
+    const text=[node?.action,node?.avoid,node?.reason,node?.summary,node?.label].map(x=>String(x??"")).join(" ");
+    if(investmentLinked(node)){
+      node.action=safeAction;
+      node.avoid=safeAvoid;
+      if("watch" in node)node.watch=safeWatch;
+      if(typeof node.summary==="string")node.summary=addNoTradeTiming(node.summary);
+      if(typeof node.reason==="string")node.reason=addNoTradeTiming(node.reason);
+      return node;
+    }
+    if(tradingPattern.test(text)){
+      const topic=linkedTopics(node).find(t=>TOPICS.includes(t as any))??"금전";
+      const va=topicVerb(topic);
+      node.action=va.action;
+      node.avoid=va.avoid;
+      if("watch" in node)node.watch="실제 일정·문서·수치처럼 확인 가능한 조건을 우선 확인해.";
+    }
+    return node;
+  };
+  if(Array.isArray(data?.key_windows))data.key_windows=data.key_windows.map(sanitizeNode);
+  if(Array.isArray(data?.decisions))data.decisions=data.decisions.map(sanitizeNode);
+  if(data?.clusters&&typeof data.clusters==="object")data.clusters.investment="투자 관련 점수는 심리·행동의 상대활성도 참고값이야. 가격방향·수익률·매매시점을 뜻하지 않으므로 실제 시장 데이터와 손익·리스크 기준을 우선해.";
+  if(Array.isArray(data?.priorities))data.priorities=uniq(data.priorities.map((value:any)=>{
+    const text=String(value??"").trim();
+    return tradingPattern.test(text)?"투자·금전: 실제 시장 데이터·현금흐름·손익 기준·리스크 한도 점검":text;
+  }).filter(Boolean));
+  if(data?.overall&&typeof data.overall==="object")for(const key of ["best_phase","caution_phase"]){
+    const text=String(data.overall[key]??"").trim();
+    if(text&&/(수익실현|신규진입|투자|매수|매도|현금화|자산\s*실현)/.test(text)&&!/매매시점/.test(text))data.overall[key]=`${text} · 상대활성도 참고값이며 매매시점을 뜻하지 않음`;
+  }
+  return data;
+}
+
 export function stabilizeCoreForQuality(core:any,payload:any){
   const data=structuredClone(core??{});
   const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[];
@@ -247,7 +292,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     ir.entry=`신규진입 상대활성도 평균 ${scoreText(overall?.신규진입?.average)}점이야. 매수 신호가 아니며 실제 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.`;
     ir.risk=`투자주의 상대활성도 평균 ${scoreText(overall?.투자주의?.average)}점이야. 높을수록 판단 오류와 변동성 대응을 더 보수적으로 점검하되 실제 투자 결정은 시장 데이터가 우선이야.`;
   }
-  return softenObject(data);
+  return softenObject(sanitizeInvestmentGuidance(data,map));
 }
 
 export function buildPromptPacket(payload:any){

@@ -158,3 +158,20 @@ test('V21 local stabilizer repairs evidence links and minimum prose without Gemi
   assert.ok(fixed.priorities.length>=3);
   assert.equal(fixed.year_phases.length,4);
 });
+
+
+test('V21.3 structurally neutralizes model-generated trade timing actions without Gemini',()=>{
+  const p=packet();
+  const core={headline:'투자 후처리 테스트',overall:{summary:'상대활성도 요약을 충분한 길이로 설명하는 테스트 문장이다.',dominant_pattern:'패턴',best_phase:'2027-04 수익실현 지표 강세',caution_phase:'주의',evidence_refs:['W:overall:금전']},key_windows:[{label:'봄철 금전 및 실현 지수 피크 구간',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['금전','수익실현'],summary:'수익실현 관련 지수가 높아 실리적 결과를 점검하기 좋다.',action:'보유 자산을 현금화해.',avoid:'매도 시점을 늦추지 마.',evidence_refs:['W:date:2027-04-11:수익실현:best']}],year_phases:[],cross_checks:[],decisions:[{action:'자산 수익 정리 및 회수',timing:'2027-04-11',reason:'수익실현 상대지수가 높은 날짜다.',watch:'체결 가격',avoid:'고점 추가 상승을 기대한 과도한 보유 유지',evidence_refs:['W:date:2027-04-11:수익실현:best']}],clusters:{relationship:'',work_study:'',money_news:'',investment:'1~4월 투자에 우호적',condition:''},investment_reading:{psychology:'과열',realization:'수익에 유리',entry:'매수 적기',risk:'보수적'},systems:{western:'w',saju:'s',thai:'t'},priorities:['봄철 자산 실현 및 재정 정비'],limits:'점수는 확률이 아니다'};
+  const fixed=stabilizeCoreForQuality(core,p);
+  assert.match(fixed.key_windows[0].action,/점성 상대지수는 매매 신호가 아니므로/);
+  assert.doesNotMatch(fixed.key_windows[0].action,/현금화해|매도 시점/);
+  assert.match(fixed.key_windows[0].summary,/매매 적기를 뜻하지 않아/);
+  assert.match(fixed.decisions[0].action,/실제 가격·거래량·밸류에이션/);
+  assert.match(fixed.decisions[0].reason,/매매 적기를 뜻하지 않아/);
+  assert.match(fixed.decisions[0].watch,/실제 시장 데이터/);
+  assert.doesNotMatch(fixed.priorities.join(' '),/자산 실현|매수|매도|현금화/);
+  assert.match(fixed.clusters.investment,/매매시점을 뜻하지 않/);
+  assert.match(fixed.investment_reading.realization,/실제 수익 가능성이나 매도 적기를 뜻하지/);
+  assert.match(fixed.investment_reading.entry,/매수 신호가 아니며/);
+});
