@@ -5,6 +5,7 @@ on:
     paths:
       - 'integrated_fortune_v1.py'
       - 'supabase/functions/fortune-interpret-v6-preview/**'
+      - 'supabase/functions/fortune-interpret-v21-preview/**'
       - 'web/src/**'
       - 'web/package.json'
       - 'web/package-lock.json'
@@ -41,6 +42,7 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v19TargetedRepair.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/repairV19.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
       - name: Web typecheck and production build
         working-directory: web
