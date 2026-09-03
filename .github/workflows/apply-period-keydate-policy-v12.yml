@@ -1,0 +1,73 @@
+name: Apply Period Keydate Policy V12
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-period-keydate-policy-v12.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Harden period key dates and policy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+          s=p.read_text(encoding='utf-8')
+          old='''  const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));\n  const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));\n\n  const dateRank=new Map<string,{hits:number;weight:number;refs:string[];topics:Set<string>}>();\n'''
+          new='''  const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));\n  const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));\n  const calculationPeriod=calc?.period??{};\n  const calculationPeriodKind=periodKind(num(calculationPeriod?.day_count)||1);\n\n  const dateRank=new Map<string,{hits:number;weight:number;refs:string[];topics:Set<string>}>();\n'''
+          if old not in s: raise SystemExit('period metadata anchor missing')
+          s=s.replace(old,new,1)
+          old='''  const keyDates=[...dateRank.entries()].sort((a,b)=>b[1].hits-a[1].hits||b[1].weight-a[1].weight||a[0].localeCompare(b[0])).slice(0,16).map(([date,r])=>({date,hits:r.hits,salience:Math.round((r.weight+r.hits*10)*10)/10,topics:[...r.topics],western_refs:uniq(r.refs).filter(x=>evidenceIds.has(x))}));\n'''
+          new='''  const keyDateRow=([date,r]:[string,{hits:number;weight:number;refs:string[];topics:Set<string>}])=>({date,hits:r.hits,salience:Math.round((r.weight+r.hits*10)*10)/10,topics:[...r.topics],western_refs:uniq(r.refs).filter(x=>evidenceIds.has(x))});\n  let keyDates=[...dateRank.entries()].sort((a,b)=>b[1].hits-a[1].hits||b[1].weight-a[1].weight||a[0].localeCompare(b[0])).slice(0,16).map(keyDateRow);\n  if(calculationPeriodKind==="day"){\n    const dayDate=isoDate(calculationPeriod?.start);\n    if(dayDate&&!keyDates.some(k=>k.date===dayDate)){\n      const daily:any=dailyByDate.get(dayDate);\n      const fallback={hits:0,weight:0,refs:[] as string[],topics:new Set<string>(dailyTopicOrder.filter(topic=>finiteDailyScore(daily?.scores?.[topic])!==null))};\n      keyDates=[keyDateRow([dayDate,dateRank.get(dayDate)??fallback]),...keyDates].slice(0,16);\n    }\n  }\n'''
+          if old not in s: raise SystemExit('keyDates anchor missing')
+          s=s.replace(old,new,1)
+          old='''  const rank=Object.entries(overall).map(([topic,st]:any)=>({topic,average:num(st.average),band:st.band}));\n  const period=calc?.period??{};\n  const packet:any={\n    packet_version:PACKET_VERSION,\n    api_version:calc?.api_version,engine:calc?.engine,period,\n    period_kind:periodKind(num(period?.day_count)||1),\n    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:"365일 실제 일별 점수·근거에서 다분야 변동과 피크/저점을 선정하고 사주·Thai는 독립 맥락으로만 교차"},\n'''
+          new='''  const rank=Object.entries(overall).map(([topic,st]:any)=>({topic,average:num(st.average),band:st.band}));\n  const period=calculationPeriod;\n  const importantDateRule=calculationPeriodKind==="day"\n    ?"오늘 실제 일별 점수와 detail_days의 시간창·세부 근거를 우선하고 사주·Thai는 해당 날짜가 속한 독립 맥락으로만 교차"\n    :calculationPeriodKind==="week"\n      ?"주간 실제 일별 점수·근거에서 초반·중반·후반 전환과 핵심 날짜를 선정하고 사주·Thai는 독립 맥락으로만 교차"\n      :calculationPeriodKind==="month"\n        ?"월간 실제 일별 점수·근거와 변동 궤적에서 초·중·후반 전환과 핵심 날짜를 선정하고 사주·Thai는 독립 맥락으로만 교차"\n        :"365일 실제 일별 점수·근거에서 다분야 변동과 피크/저점을 선정하고 사주·Thai는 독립 맥락으로만 교차";\n  const packet:any={\n    packet_version:PACKET_VERSION,\n    api_version:calc?.api_version,engine:calc?.engine,period,\n    period_kind:calculationPeriodKind,\n    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:importantDateRule},\n'''
+          if old not in s: raise SystemExit('integration policy anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          addition='''\n\ntest("day packet always keeps the selected date in key_dates and uses a day-specific policy",()=>{\n  const calc=calculation();\n  calc.period={start:"2026-09-03",end:"2026-09-03",day_count:1};\n  calc.western.daily_scores=[{\n    date:"2026-09-03",label:"2026-09-03",market_open:true,\n    scores:Object.fromEntries([...TOPICS,"수신신호","발신적합","과거인연접점"].map(topic=>[topic,50])),\n    evidence:[],\n  }];\n  calc.western.detail_days=[{date:"2026-09-03",market_open:true,topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31},evidence:["Jupiter trine MC intraday test"]}}}];\n  const packet=compactCalculation(calc);\n  const today=packet.key_dates.find(x=>x.date==="2026-09-03");\n  assert.ok(today,"selected day must survive key-date ranking even without a salience hit");\n  assert.ok(today.western_refs.includes("W:window:2026-09-03:직장:best"));\n  assert.ok(today.western_refs.includes("W:detail:2026-09-03:직장:1"));\n  assert.equal(packet.period_kind,"day");\n  assert.match(packet.integration_policy.important_date_rule,/오늘/);\n  assert.match(packet.integration_policy.important_date_rule,/시간창/);\n  assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);\n});\n\ntest("week and month packet policies do not inherit annual 365-day wording",()=>{\n  for(const [days,expected] of [[7,/주간/],[30,/월간/]]){\n    const calc=calculation();\n    calc.period={start:"2026-09-01",end:days===7?"2026-09-07":"2026-09-30",day_count:days};\n    const packet=compactCalculation(calc);\n    assert.match(packet.integration_policy.important_date_rule,expected);\n    assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);\n  }\n});\n'''
+          if 'day packet always keeps the selected date in key_dates' not in s:
+              s += addition
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit period key-date hardening
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(ai): keep day evidence in period key dates'
+          git push origin HEAD:work/integrated-interpretation-v2
