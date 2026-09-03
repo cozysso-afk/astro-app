@@ -58,6 +58,7 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [allLimit, setAllLimit] = useState(ALL_PAGE_SIZE)
   const [focusedDate, setFocusedDate] = useState('')
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const scrollToDate = (date: string) => {
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
@@ -75,6 +76,7 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         setSelectedMonth(date.slice(0,7))
         setFocusedDate(date)
+        setDetailOpen(true)
         scrollToDate(date)
       }
       setAllLimit(ALL_PAGE_SIZE)
@@ -112,17 +114,18 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
   const focusLocalDate = (date: string) => {
     setSelectedMonth(date.slice(0,7))
     setFocusedDate(date)
+    setDetailOpen(true)
     setAllLimit(ALL_PAGE_SIZE)
     scrollToDate(date)
   }
 
   return <section className="result-card annual-daily-scores" id="annual-daily-scores">
-    <div className="result-card-title"><span>DATE SCORES</span><strong>{rows.length}일 날짜 점수</strong></div>
+    <div className="result-card-title"><span>DATE SCORES</span><strong>중요 날짜 · {rows.length}일 원점수</strong></div>
     <p className="daily-score-intro">핵심 날짜만 잘라낸 표가 아니라 계산 기간의 모든 날짜야. 먼저 연간 핵심일과 월별 흐름을 보고, 필요하면 아래에서 365일 원점수와 실제 계산 근거까지 확인하면 돼. 점수는 사건 확률이 아니고, <b>투자주의만 높을수록 경계가 큰 값</b>이야.</p>
 
     <div className="daily-score-controls">
       <label><span>분야</span><select value={topic} onChange={(event)=>{setSelectedTopic(event.target.value);setFocusedDate('');setAllLimit(ALL_PAGE_SIZE)}}>{availableTopics.map((item)=><option value={item} key={item}>{item}</option>)}</select></label>
-      <label><span>상세 목록 범위</span><select value={month} onChange={(event)=>{setSelectedMonth(event.target.value);setFocusedDate('');setAllLimit(ALL_PAGE_SIZE)}}><option value="all">전체 기간</option>{months.map((item)=><option value={item} key={item}>{monthLabel(item)}</option>)}</select></label>
+      <label><span>상세 목록 범위</span><select value={month} onChange={(event)=>{setSelectedMonth(event.target.value);setFocusedDate('');setDetailOpen(event.target.value !== 'all');setAllLimit(ALL_PAGE_SIZE)}}><option value="all">전체 기간</option>{months.map((item)=><option value={item} key={item}>{monthLabel(item)}</option>)}</select></label>
     </div>
 
     {(annualBest.length || annualCaution.length) > 0 && <div className="daily-score-section">
@@ -142,34 +145,37 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
     <div className="daily-score-section">
       <div className="daily-score-section-head"><strong>월별 흐름</strong><span>월 평균 · 눌러서 상세 보기</span></div>
       <div className="daily-score-months">
-        {monthly.map((item) => <button type="button" className={month === item.month ? 'is-selected' : ''} key={item.month} onClick={()=>{setSelectedMonth(item.month);setFocusedDate('');setAllLimit(ALL_PAGE_SIZE)}}>
+        {monthly.map((item) => <button type="button" className={month === item.month ? 'is-selected' : ''} key={item.month} onClick={()=>{setSelectedMonth(item.month);setFocusedDate('');setDetailOpen(true);setAllLimit(ALL_PAGE_SIZE)}}>
           <span><strong>{monthLabel(item.month)}</strong><small>{item.count ? `${item.count}일` : '값 없음'}</small></span>
           <b>{item.average == null ? '—' : item.average.toFixed(1)}</b>
           <i aria-hidden="true"><em style={{width:`${item.average == null ? 0 : Math.max(0,Math.min(100,item.average))}%`}} /></i>
         </button>)}
       </div>
-      {month !== 'all' && <button type="button" className="daily-score-all-button" onClick={()=>{setSelectedMonth('all');setFocusedDate('');setAllLimit(ALL_PAGE_SIZE)}}>전체 기간으로 돌아가기</button>}
+      {month !== 'all' && <button type="button" className="daily-score-all-button" onClick={()=>{setSelectedMonth('all');setFocusedDate('');setDetailOpen(false);setAllLimit(ALL_PAGE_SIZE)}}>전체 기간으로 돌아가기</button>}
     </div>
 
-    <div className="daily-score-section">
-      <div className="daily-score-section-head"><strong>{month === 'all' ? '365일 상세 점수' : `${monthLabel(month)} 상세 점수`}</strong><span>{listed.length}/{visible.length}일 표시</span></div>
-      {(best || caution) && <div className="daily-score-extremes">
-        {best && <div><span>{topic === '투자주의' ? '이 범위 경계 최저' : '이 범위 최고점'}</span><strong>{best.row.date}</strong><b>{best.score.toFixed(1)}</b></div>}
-        {caution && <div><span>{topic === '투자주의' ? '이 범위 경계 최고' : '이 범위 최저점'}</span><strong>{caution.row.date}</strong><b>{caution.score.toFixed(1)}</b></div>}
-      </div>}
-      <div className="daily-score-list">{listed.map((row) => {
-        const score = scoreValue(row, topic)
-        const evidence = (row.evidence ?? []).filter((item) => !item.source_topics?.length || item.source_topics.includes(topic))
-        const isFocused = focusedDate === row.date
-        return <details id={`annual-daily-score-${row.date}`} className={`daily-score-row ${scoreClass(score, topic)} ${isFocused ? 'is-focused' : ''}`} key={`${row.date}-${topic}`} open={isFocused || undefined} onToggle={(event)=>{if(isFocused&&!event.currentTarget.open)setFocusedDate('')}}>
-          <summary><span><strong>{row.date}</strong><small>{row.label}{row.market_open ? ' · KRX 거래일' : ''}</small></span><span className="daily-score-value"><b>{score == null ? '—' : score.toFixed(1)}</b><small>{band(score, topic)}</small></span></summary>
-          {evidence.length ? <div className="daily-score-evidence"><strong>{topic}에 직접 연결된 계산 근거</strong>{evidence.slice(0,6).map((item,index)=><p key={`${row.date}-ev-${index}`}>{item.sample_time ? `${item.sample_time} · ` : ''}{evidenceText(item.text)}</p>)}</div> : <p className="daily-score-no-evidence">이 날짜의 {topic} 점수는 계산됐지만, 저장된 상위 근거 중 이 분야에 직접 연결된 항목은 없어. 다른 분야 근거로 대신 설명하지 않을게.</p>}
-        </details>
-      })}</div>
-      {hasMore && <div className="daily-score-more">
-        <button type="button" onClick={()=>setAllLimit((value)=>Math.min(value+ALL_PAGE_SIZE,visible.length))}>다음 {Math.min(ALL_PAGE_SIZE,visible.length-listed.length)}일 더 보기</button>
-        <button type="button" onClick={()=>setAllLimit(visible.length)}>365일 전부 펼치기</button>
-      </div>}
-    </div>
+    <details className="daily-score-section daily-score-detail-disclosure" open={detailOpen} onToggle={(event)=>setDetailOpen(event.currentTarget.open)}>
+      <summary><span><strong>{month === 'all' ? '365일 상세 원점수' : `${monthLabel(month)} 상세 원점수`}</strong><small>날짜별 점수와 직접 연결된 계산 근거</small></span><b>{detailOpen ? '접기' : '펼치기'}</b></summary>
+      <div className="daily-score-detail-body">
+        <div className="daily-score-section-head"><strong>{topic} · {month === 'all' ? '전체 기간' : monthLabel(month)}</strong><span>{listed.length}/{visible.length}일 표시</span></div>
+        {(best || caution) && <div className="daily-score-extremes">
+          {best && <div><span>{topic === '투자주의' ? '이 범위 경계 최저' : '이 범위 최고점'}</span><strong>{best.row.date}</strong><b>{best.score.toFixed(1)}</b></div>}
+          {caution && <div><span>{topic === '투자주의' ? '이 범위 경계 최고' : '이 범위 최저점'}</span><strong>{caution.row.date}</strong><b>{caution.score.toFixed(1)}</b></div>}
+        </div>}
+        <div className="daily-score-list">{listed.map((row) => {
+          const score = scoreValue(row, topic)
+          const evidence = (row.evidence ?? []).filter((item) => !item.source_topics?.length || item.source_topics.includes(topic))
+          const isFocused = focusedDate === row.date
+          return <details id={`annual-daily-score-${row.date}`} className={`daily-score-row ${scoreClass(score, topic)} ${isFocused ? 'is-focused' : ''}`} key={`${row.date}-${topic}`} open={isFocused || undefined} onToggle={(event)=>{if(isFocused&&!event.currentTarget.open)setFocusedDate('')}}>
+            <summary><span><strong>{row.date}</strong><small>{row.label}{row.market_open ? ' · KRX 거래일' : ''}</small></span><span className="daily-score-value"><b>{score == null ? '—' : score.toFixed(1)}</b><small>{band(score, topic)}</small></span></summary>
+            {evidence.length ? <div className="daily-score-evidence"><strong>{topic}에 직접 연결된 계산 근거</strong>{evidence.slice(0,6).map((item,index)=><p key={`${row.date}-ev-${index}`}>{item.sample_time ? `${item.sample_time} · ` : ''}{evidenceText(item.text)}</p>)}</div> : <p className="daily-score-no-evidence">이 날짜의 {topic} 점수는 계산됐지만, 저장된 상위 근거 중 이 분야에 직접 연결된 항목은 없어. 다른 분야 근거로 대신 설명하지 않을게.</p>}
+          </details>
+        })}</div>
+        {hasMore && <div className="daily-score-more">
+          <button type="button" onClick={()=>setAllLimit((value)=>Math.min(value+ALL_PAGE_SIZE,visible.length))}>다음 {Math.min(ALL_PAGE_SIZE,visible.length-listed.length)}일 더 보기</button>
+          <button type="button" onClick={()=>setAllLimit(visible.length)}>365일 전부 펼치기</button>
+        </div>}
+      </div>
+    </details>
   </section>
 }
