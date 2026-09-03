@@ -12,7 +12,7 @@ const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
-const FORTUNE_AI_CACHE_CONTRACT = 'adaptive-length-contract-v14'
+const FORTUNE_AI_CACHE_CONTRACT = 'compact-schema-contract-v15'
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)

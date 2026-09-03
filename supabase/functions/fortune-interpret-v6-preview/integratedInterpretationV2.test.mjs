@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PACKET_VERSION, TOPICS, compactCalculation, validateOutput } from "./integratedInterpretationV2.ts";
+import { PACKET_VERSION, SCHEMA, TOPICS, compactCalculation, validateOutput } from "./integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality } from "./qualityV2.ts";
 
 function stat(avg,bestDate,bestScore,cautionDate,cautionScore){
@@ -300,4 +300,18 @@ test("non-salient relationship and investment detail blocks may be omitted",()=>
   assert.ok(validated,"optional detail blocks should not invalidate the structured response");
   const report=inspectInterpretationQuality(validated,packet);
   assert.equal(report.ok,true,JSON.stringify(report,null,2));
+});
+
+
+test("Gemini compact topic array schema normalizes back to the stable topic map",()=>{
+  const packet=compactCalculation(calculation());
+  const objectForm=output(packet);
+  const arrayForm={...objectForm,topic_analysis:Object.entries(objectForm.topic_analysis).map(([topic,row])=>({topic,...row}))};
+  const validated=validateOutput(arrayForm);
+  assert.ok(validated);
+  assert.deepEqual(Object.keys(validated.topic_analysis),TOPICS);
+  assert.equal(SCHEMA.properties.topic_analysis.type,"ARRAY");
+  assert.equal(SCHEMA.properties.topic_analysis.minItems,TOPICS.length);
+  const duplicate={...arrayForm,topic_analysis:[...arrayForm.topic_analysis.slice(0,-1),arrayForm.topic_analysis[0]]};
+  assert.equal(validateOutput(duplicate),null);
 });
