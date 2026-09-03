@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { VERSION, PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SYSTEM, SCHEMA, validateOutput, txt } from "./integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "./qualityV2.ts";
+import { periodModeInstruction } from "./periodInstruction.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, runWithThaiOutputSafety, strictThaiRetryInstruction, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "./thaiContract.ts";
 
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -21,9 +22,7 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),compactMode?65000:78000);
   try{
-    const modeInstruction=compactMode
-      ?"이전 생성이 검증을 끝까지 통과하지 못했다. 문장을 불필요하게 늘리지 말되 핵심 시기·근거 ID·행동을 빠뜨리지 말고 완전한 JSON으로 끝내라."
-      :"연평균만 요약하지 말고 365일 일별 궤적→월별 변화→핵심 날짜→독립 체계 교차맥락 순으로 분석하라. 중요한 날짜 문단에는 계산엔진이 보존한 실제 일별 트랜짓·하우스 근거 W:daily:*를 우선 연결하라.";
+    const modeInstruction=periodModeInstruction(payload,compactMode);
     const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\nCALCULATED_DATA=${JSON.stringify(payload)}`;
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
