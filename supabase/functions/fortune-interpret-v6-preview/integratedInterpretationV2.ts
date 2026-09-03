@@ -144,6 +144,8 @@ export function compactCalculation(calc:any){
   const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>finiteDailyScore(d?.scores?.[topic]))])};
   const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));
   const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));
+  const calculationPeriod=calc?.period??{};
+  const calculationPeriodKind=periodKind(num(calculationPeriod?.day_count)||1);
 
   const dateRank=new Map<string,{hits:number;weight:number;refs:string[];topics:Set<string>}>();
   const addDate=(date:string,topic:string,score:number,id:string)=>{if(!date)return;const r=dateRank.get(date)??{hits:0,weight:0,refs:[],topics:new Set<string>()};r.hits+=1;r.weight+=Math.abs(score-50);if(id)r.refs.push(id);r.topics.add(topic);dateRank.set(date,r);};
@@ -158,7 +160,16 @@ export function compactCalculation(calc:any){
       if(deviation>=12||score>=72||score<=28)addDate(date,topic,score,"");
     }
   }
-  const keyDates=[...dateRank.entries()].sort((a,b)=>b[1].hits-a[1].hits||b[1].weight-a[1].weight||a[0].localeCompare(b[0])).slice(0,16).map(([date,r])=>({date,hits:r.hits,salience:Math.round((r.weight+r.hits*10)*10)/10,topics:[...r.topics],western_refs:uniq(r.refs).filter(x=>evidenceIds.has(x))}));
+  const keyDateRow=([date,r]:[string,{hits:number;weight:number;refs:string[];topics:Set<string>}])=>({date,hits:r.hits,salience:Math.round((r.weight+r.hits*10)*10)/10,topics:[...r.topics],western_refs:uniq(r.refs).filter(x=>evidenceIds.has(x))});
+  let keyDates=[...dateRank.entries()].sort((a,b)=>b[1].hits-a[1].hits||b[1].weight-a[1].weight||a[0].localeCompare(b[0])).slice(0,16).map(keyDateRow);
+  if(calculationPeriodKind==="day"){
+    const dayDate=isoDate(calculationPeriod?.start);
+    if(dayDate&&!keyDates.some(k=>k.date===dayDate)){
+      const daily:any=dailyByDate.get(dayDate);
+      const fallback={hits:0,weight:0,refs:[] as string[],topics:new Set<string>(dailyTopicOrder.filter(topic=>finiteDailyScore(daily?.scores?.[topic])!==null))};
+      keyDates=[keyDateRow([dayDate,dateRank.get(dayDate)??fallback]),...keyDates].slice(0,16);
+    }
+  }
   for(const kd of keyDates){
     const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
     rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",direction:"context",date:kd.date,text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
@@ -198,12 +209,19 @@ export function compactCalculation(calc:any){
   });
 
   const rank=Object.entries(overall).map(([topic,st]:any)=>({topic,average:num(st.average),band:st.band}));
-  const period=calc?.period??{};
+  const period=calculationPeriod;
+  const importantDateRule=calculationPeriodKind==="day"
+    ?"오늘 실제 일별 점수와 detail_days의 시간창·세부 근거를 우선하고 사주·Thai는 해당 날짜가 속한 독립 맥락으로만 교차"
+    :calculationPeriodKind==="week"
+      ?"주간 실제 일별 점수·근거에서 초반·중반·후반 전환과 핵심 날짜를 선정하고 사주·Thai는 독립 맥락으로만 교차"
+      :calculationPeriodKind==="month"
+        ?"월간 실제 일별 점수·근거와 변동 궤적에서 초·중·후반 전환과 핵심 날짜를 선정하고 사주·Thai는 독립 맥락으로만 교차"
+        :"365일 실제 일별 점수·근거에서 다분야 변동과 피크/저점을 선정하고 사주·Thai는 독립 맥락으로만 교차";
   const packet:any={
     packet_version:PACKET_VERSION,
     api_version:calc?.api_version,engine:calc?.engine,period,
-    period_kind:periodKind(num(period?.day_count)||1),
-    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:"365일 실제 일별 점수·근거에서 다분야 변동과 피크/저점을 선정하고 사주·Thai는 독립 맥락으로만 교차"},
+    period_kind:calculationPeriodKind,
+    integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:importantDateRule},
     ranking:{strongest:[...rank].sort((a,b)=>b.average-a.average).slice(0,6),weakest:[...rank].sort((a,b)=>a.average-b.average).slice(0,6)},
     western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
     key_dates:keyDates,

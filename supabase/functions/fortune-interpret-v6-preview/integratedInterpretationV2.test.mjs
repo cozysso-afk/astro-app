@@ -221,3 +221,34 @@ test("packet emits exact W:window evidence for intraday best and caution windows
   assert.equal(caution.direction,"caution");
   assert.ok(packet.evidence_ledger.some(x=>x.id==="W:detail:2026-07-21:직장:1"));
 });
+
+
+test("day packet always keeps the selected date in key_dates and uses a day-specific policy",()=>{
+  const calc=calculation();
+  calc.period={start:"2026-09-03",end:"2026-09-03",day_count:1};
+  calc.western.daily_scores=[{
+    date:"2026-09-03",label:"2026-09-03",market_open:true,
+    scores:Object.fromEntries([...TOPICS,"수신신호","발신적합","과거인연접점"].map(topic=>[topic,50])),
+    evidence:[],
+  }];
+  calc.western.detail_days=[{date:"2026-09-03",market_open:true,topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31},evidence:["Jupiter trine MC intraday test"]}}}];
+  const packet=compactCalculation(calc);
+  const today=packet.key_dates.find(x=>x.date==="2026-09-03");
+  assert.ok(today,"selected day must survive key-date ranking even without a salience hit");
+  assert.ok(today.western_refs.includes("W:window:2026-09-03:직장:best"));
+  assert.ok(today.western_refs.includes("W:detail:2026-09-03:직장:1"));
+  assert.equal(packet.period_kind,"day");
+  assert.match(packet.integration_policy.important_date_rule,/오늘/);
+  assert.match(packet.integration_policy.important_date_rule,/시간창/);
+  assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);
+});
+
+test("week and month packet policies do not inherit annual 365-day wording",()=>{
+  for(const [days,expected] of [[7,/주간/],[30,/월간/]]){
+    const calc=calculation();
+    calc.period={start:"2026-09-01",end:days===7?"2026-09-07":"2026-09-30",day_count:days};
+    const packet=compactCalculation(calc);
+    assert.match(packet.integration_policy.important_date_rule,expected);
+    assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);
+  }
+});
