@@ -1,0 +1,43 @@
+name: Apply V21.2 Post-Live Refinement
+
+on:
+  push:
+    branches:
+      - work/ai-cost-guard-v21
+    paths:
+      - '.github/workflows/apply-v21-refine-after-live.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ai-cost-guard-v21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V21.2 refinements
+        run: python .github/v21_refine_after_live.py
+      - name: V21 fixture tests
+        run: node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+      - name: Pending job regression
+        run: node --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts supabase/functions/fortune-interpret-v21-preview/index.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(ai): refine V21.2 grounded wording after live smoke'
+          git push origin HEAD:work/ai-cost-guard-v21
