@@ -114,3 +114,13 @@
 /* V21.3.1 UI audit · important dates visible before long thematic blocks */
 .ai-quick-dates{display:grid;gap:9px}.ai-quick-date-list{display:grid;gap:7px}.ai-quick-date{width:100%;display:grid;grid-template-columns:minmax(92px,auto) minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px 11px;border:1px solid rgba(159,153,177,.2);border-radius:14px;background:rgba(255,255,255,.76);text-align:left;font:inherit;cursor:pointer}.ai-quick-date.is-use{background:linear-gradient(135deg,rgba(239,250,244,.94),rgba(255,255,255,.84));border-color:rgba(116,158,137,.23)}.ai-quick-date.is-caution{background:linear-gradient(135deg,rgba(255,242,244,.94),rgba(255,255,255,.84));border-color:rgba(181,121,129,.22)}.ai-quick-date>b{color:#664f75;font-size:.86rem;font-weight:950;font-variant-numeric:tabular-nums}.ai-quick-date>span{min-width:0;display:grid;gap:2px}.ai-quick-date>span>strong{color:#44394d;font-size:.84rem;line-height:1.35}.ai-quick-date>span>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8a7e90;font-size:.68rem}.ai-quick-date>em{font-style:normal;padding:4px 7px;border-radius:999px;background:rgba(116,93,131,.08);color:#705c7a;font-size:.64rem;font-weight:900}
 @media(max-width:520px){.ai-quick-date{grid-template-columns:88px minmax(0,1fr) auto;padding:10px}.ai-quick-date>b{font-size:.82rem}.ai-quick-date>span>strong{font-size:.81rem}}
+
+
+/* V21.3.1 UI audit · semantic order for annual reading */
+.ai-interpret-card>.ai-interpret-head{order:-100}
+.ai-interpret-card>.ai-overall-block{order:-90}
+.ai-interpret-card>.ai-quick-dates{order:-80}
+.ai-interpret-card>.ai-decision-section{order:-70}
+.ai-interpret-card>.ai-key-window-section{order:-60}
+.ai-interpret-card>.ai-relationship-highlight{order:-50}
+.ai-interpret-card>.ai-relationship-direction{order:-49}
