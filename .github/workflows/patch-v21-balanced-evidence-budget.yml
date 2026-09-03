@@ -1,0 +1,51 @@
+name: Patch V21 balanced evidence budget
+
+on:
+  push:
+    branches: [work/ai-cost-guard-v21]
+    paths:
+      - "scripts/patch_v21_balanced_evidence_budget.py"
+      - ".github/workflows/patch-v21-balanced-evidence-budget.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply balanced evidence and rolling budget patch
+        run: python scripts/patch_v21_balanced_evidence_budget.py
+
+      - name: Run V21 cost guard tests
+        run: node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+
+      - name: Run pending job contract tests
+        run: node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+
+      - name: Diff sanity check
+        run: git diff --check
+
+      - name: Guard sanity
+        shell: bash
+        run: |
+          grep -q 'supabase-ai-v21.3-balanced-evidence-budget' supabase/functions/fortune-interpret-v21-preview/index.ts
+          grep -q 'MAX_USER_NEW_JOBS_24H=20' supabase/functions/fortune-interpret-v21-preview/index.ts
+          grep -q 'MAX_GLOBAL_NEW_JOBS_24H=60' supabase/functions/fortune-interpret-v21-preview/index.ts
+          grep -q 'const reserve=Math.min(context.length' supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts
+          grep -q 'starlight-destiny.ai-job.v4' web/src/lib/fortuneAiJob.ts
+
+      - name: Commit patch and remove one-shot files
+        shell: bash
+        run: |
+          git rm scripts/patch_v21_balanced_evidence_budget.py .github/workflows/patch-v21-balanced-evidence-budget.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/fortune-interpret-v21-preview/index.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs supabase/functions/fortune-interpret-v21-preview/README.md web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git commit -m "fix(ai): reserve cross-system evidence and bound rolling jobs"
+          git push origin HEAD:work/ai-cost-guard-v21
