@@ -8,6 +8,7 @@ import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, p
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
@@ -63,7 +64,6 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
-const AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v1'
 const ARCHIVE_DELETE_UNDO_MS = 8000
 
 const PERIOD_CACHE_TTL_DAYS: Record<PeriodKey, number> = {
@@ -603,7 +603,7 @@ export default function AppNext() {
             ok: true,
             model: data.model,
             fallback_from: data.fallback_from,
-            interpreter_version: data.interpreter_version || 'supabase-ai-v7-thai-lagna-output-guard',
+            interpreter_version: data.interpreter_version || 'unknown',
             usage: data.usage ?? undefined,
             data: data.data ?? undefined,
           }
@@ -623,13 +623,13 @@ export default function AppNext() {
               void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${periodStart}`,periodStart,periodEnd:periodEndValue,engine:calc.engine,request:archiveRequest,result:calc as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForArchive)}`)
             }
           }
-          removeLocalStorage(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiConfigured(true)
           aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
-          removeLocalStorage(AI_JOB_STORAGE_KEY)
+          removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
@@ -641,21 +641,21 @@ export default function AppNext() {
       setAiError(message.includes('non-2xx') ? 'AI 해설 상태 확인이 잠시 끊겼어. 앱을 다시 열면 이어서 확인해.' : message)
     } finally {
       aiPollRef.current = null
-      setAiLoading(Boolean(readLocalStorage(AI_JOB_STORAGE_KEY)))
+      setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
     }
   }
 
   const resumeAiInterpretationJob = () => {
     if (document.visibilityState === 'hidden') return
-    const raw = readLocalStorage(AI_JOB_STORAGE_KEY)
+    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
     if (!raw) return
-    try {
-      const saved = JSON.parse(raw) as { jobId?: string; periodStart?: string; periodEnd?: string; cacheId?: string; ttlDays?: number; request?: Record<string,unknown> }
-      if (saved.jobId) void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
-    } catch {
-      removeLocalStorage(AI_JOB_STORAGE_KEY)
+    const saved = decodePendingFortuneAiJob(raw)
+    if (!saved) {
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      return
     }
+    void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
@@ -691,7 +691,7 @@ export default function AppNext() {
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
-      const jobPersisted = writeLocalStorage(AI_JOB_STORAGE_KEY, JSON.stringify(pending))
+      const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
       void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
       if (!jobPersisted) {
@@ -699,7 +699,7 @@ export default function AppNext() {
         window.setTimeout(()=>setActionNotice(''),3200)
       }
     } catch (error) {
-      removeLocalStorage(AI_JOB_STORAGE_KEY)
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
