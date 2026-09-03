@@ -1,0 +1,126 @@
+name: Apply Adaptive Length V14
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-adaptive-length-v14.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Make interpretation length period and salience aware
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('export const VERSION = "supabase-ai-v13-salience-relationship-flow";','export const VERSION = "supabase-ai-v14-adaptive-length";',1)
+          s=s.replace('export const QUALITY_VERSION = "fortune-interpretation-quality-v4-salience-relationship-flow";','export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";',1)
+          anchor='''- relationship_reading은 관계 상태나 상대 속마음을 만들어내는 칸이 아니다. 계산된 관계 방향축을 종합해 어떤 흐름이 먼저/나중에 강해지는지와 어디를 현실에서 확인할지만 쓴다.\n- confidence='높음'은 근거가 여러 개이고 적어도 하나의 Western 계산근거가 있을 때만 쓴다.`;\n'''
+          replacement='''- relationship_reading은 관계 상태나 상대 속마음을 만들어내는 칸이 아니다. 계산된 관계 방향축을 종합해 어떤 흐름이 먼저/나중에 강해지는지와 어디를 현실에서 확인할지만 쓴다. 연애·연락·재회가 모두 참고라면 relationship_reading과 contact_flow를 분량 채우기용으로 늘리지 않아도 된다.\n- 투자심리·수익실현·신규진입·투자주의가 모두 참고라면 investment_reading을 길게 만들지 않아도 된다. 해당 투자 분야가 핵심/주목일 때만 필요한 세부 항목을 설명한다.\n- clusters는 15개 상세해석을 다시 복제하는 장문 섹션이 아니다. 관계/일·학업/돈·소식/투자/컨디션의 핵심 차이만 2~4문장 이내로 요약한다.\n- confidence='높음'은 근거가 여러 개이고 적어도 하나의 Western 계산근거가 있을 때만 쓴다.`;\n'''
+          if anchor not in s: raise SystemExit('adaptive system anchor missing')
+          s=s.replace(anchor,replacement,1)
+          old='''},required:["headline","overall","key_windows","year_phases","cross_checks","decisions","clusters","contact_flow","investment_reading","systems","priorities","topic_analysis","limits"]};'''
+          new='''},required:["headline","overall","key_windows","year_phases","cross_checks","decisions","clusters","systems","priorities","topic_analysis","limits"]};'''
+          if old not in s: raise SystemExit('schema optional blocks anchor missing')
+          s=s.replace(old,new,1)
+          old='''if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.contact_flow||!o.investment_reading||!o.systems||!o.topic_analysis)return null;'''
+          new='''if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.systems||!o.topic_analysis)return null;'''
+          if old not in s: raise SystemExit('validate optional blocks anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityV2.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('export const QUALITY_VERSION = "fortune-interpretation-quality-v4-salience-relationship-flow";','export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";',1)
+          old='''  const relationshipSalient=["연애","연락","재회"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));\n  if(relationshipSalient){\n'''
+          new='''  const relationshipSalient=["연애","연락","재회"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));\n  const investmentSalient=["투자심리","수익실현","신규진입","투자주의"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));\n  if(relationshipSalient){\n'''
+          if old not in s: raise SystemExit('investment salience anchor missing')
+          s=s.replace(old,new,1)
+          old='''  const minWindows=kind==="annual"?5:kind==="month"?3:kind==="week"?2:1;\n  if((data?.key_windows?.length??0)<minWindows)s5.push(`핵심 시기 부족: ${data?.key_windows?.length??0}/${minWindows}`);\n  if((data?.decisions?.length??0)<3)s5.push("결정/행동 가이드 3개 미만");\n  if((data?.priorities?.length??0)<3)s5.push("우선순위 3개 미만");\n'''
+          new='''  const minWindows=kind==="annual"?5:kind==="month"?3:kind==="week"?2:1;\n  const minDecisions=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;\n  const minPriorities=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;\n  if((data?.key_windows?.length??0)<minWindows)s5.push(`핵심 시기 부족: ${data?.key_windows?.length??0}/${minWindows}`);\n  if((data?.decisions?.length??0)<minDecisions)s5.push(`결정/행동 가이드 부족: ${data?.decisions?.length??0}/${minDecisions}`);\n  if((data?.priorities?.length??0)<minPriorities)s5.push(`우선순위 부족: ${data?.priorities?.length??0}/${minPriorities}`);\n'''
+          if old not in s: raise SystemExit('period-aware count anchor missing')
+          s=s.replace(old,new,1)
+          old='''  for(const d of data?.decisions??[]){\n    if(String(d?.watch??"").length<14)s5.push(`결정 가이드 확인조건이 너무 짧음: ${txt(d?.action,45)}`);\n    if(String(d?.avoid??"").length<14)s5.push(`결정 가이드 회피조건이 너무 짧음: ${txt(d?.action,45)}`);\n  }\n  for(const w of data?.key_windows??[]){\n    if(String(w?.summary??"").length<45)s5.push(`핵심 시기 설명이 너무 짧음: ${w?.label}`);\n    if(String(w?.action??"").length<18)s5.push(`핵심 시기 행동이 너무 짧음: ${w?.label}`);\n'''
+          new='''  for(const d of data?.decisions??[]){\n    if(String(d?.watch??"").length<14)s5.push(`결정 가이드 확인조건이 너무 짧음: ${txt(d?.action,45)}`);\n    if(String(d?.avoid??"").length<14)s5.push(`결정 가이드 회피조건이 너무 짧음: ${txt(d?.action,45)}`);\n    if(String(d?.reason??"").length>700)s5.push(`결정 가이드 근거가 지나치게 김: ${txt(d?.action,45)}`);\n    if(String(d?.watch??"").length>400)s5.push(`결정 가이드 확인조건이 지나치게 김: ${txt(d?.action,45)}`);\n    if(String(d?.avoid??"").length>400)s5.push(`결정 가이드 회피조건이 지나치게 김: ${txt(d?.action,45)}`);\n  }\n  for(const w of data?.key_windows??[]){\n    if(String(w?.summary??"").length<45)s5.push(`핵심 시기 설명이 너무 짧음: ${w?.label}`);\n    if(String(w?.summary??"").length>750)s5.push(`핵심 시기 설명이 지나치게 김: ${w?.label}`);\n    if(String(w?.action??"").length<18)s5.push(`핵심 시기 행동이 너무 짧음: ${w?.label}`);\n'''
+          if old not in s: raise SystemExit('visible prose max anchor missing')
+          s=s.replace(old,new,1)
+          old='''  if(relationshipSalient){\n    const rr=data?.relationship_reading??{};\n    if(String(rr?.context??"").length<35)s5.push("관계·재회 관계 맥락 설명 부족");\n    if(String(rr?.flow??"").length<55)s5.push("관계·재회 이어지는 흐름 설명 부족");\n    if(String(rr?.focus_timing??"").length<20)s5.push("관계·재회 주목 시기 설명 부족");\n    if(String(rr?.watch??"").length<20)s5.push("관계·재회 현실 확인 신호 부족");\n    if(String(rr?.avoid??"").length<20)s5.push("관계·재회 과대해석 방지 설명 부족");\n  }\n  for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){\n'''
+          new='''  if(relationshipSalient){\n    const rr=data?.relationship_reading??{},cf=data?.contact_flow??{};\n    if(String(rr?.context??"").length<35)s5.push("관계·재회 관계 맥락 설명 부족");\n    if(String(rr?.flow??"").length<55)s5.push("관계·재회 이어지는 흐름 설명 부족");\n    if(String(rr?.focus_timing??"").length<20)s5.push("관계·재회 주목 시기 설명 부족");\n    if(String(rr?.watch??"").length<20)s5.push("관계·재회 현실 확인 신호 부족");\n    if(String(rr?.avoid??"").length<20)s5.push("관계·재회 과대해석 방지 설명 부족");\n    if(String(rr?.context??"").length>600||String(rr?.flow??"").length>850||String(rr?.focus_timing??"").length>550||String(rr?.watch??"").length>550||String(rr?.avoid??"").length>500)s5.push("관계·재회 핵심 흐름이 지나치게 장황함");\n    if(String(cf?.incoming??"").length<15)s5.push("관계·재회 상대→나 방향 설명 부족");\n    if(String(cf?.outgoing??"").length<15)s5.push("관계·재회 나→상대 방향 설명 부족");\n    if(String(cf?.reconnection??"").length<15)s5.push("관계·재회 과거인연 방향 설명 부족");\n  }\n  if(investmentSalient){\n    const ir=data?.investment_reading??{};\n    const investmentFields:Record<string,string>={"투자심리":"psychology","수익실현":"realization","신규진입":"entry","투자주의":"risk"};\n    for(const [topic,field] of Object.entries(investmentFields)){\n      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&String(ir?.[field]??"").length<20)s5.push(`${topic} 중요 분야인데 투자 상세 설명 부족`);\n    }\n  }\n  const clusterMax=kind==="annual"?650:kind==="month"?500:420;\n  for(const [name,value] of Object.entries(data?.clusters??{}))if(String(value??"").length>clusterMax)s5.push(`분야별 종합 ${name}이 지나치게 김(${String(value??"").length}/${clusterMax})`);\n  const dominantMax=kind==="annual"?900:650;\n  if(String(data?.overall?.dominant_pattern??"").length>dominantMax)s5.push(`핵심 패턴이 지나치게 김(${String(data?.overall?.dominant_pattern??"").length}/${dominantMax})`);\n  for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){\n'''
+          if old not in s: raise SystemExit('adaptive optional block quality anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/AiInterpretationPanel.tsx')
+          s=p.read_text(encoding='utf-8')
+          old='''  const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))\n  const relationshipReading = data.relationship_reading\n'''
+          new='''  const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))\n  const showInvestmentFocus = ['투자심리','수익실현','신규진입','투자주의'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))\n  const relationshipReading = data.relationship_reading\n'''
+          if old not in s: raise SystemExit('annual investment salience var anchor missing')
+          s=s.replace(old,new,1)
+          old='''    {data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid">'''
+          new='''    {showInvestmentFocus && data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid">'''
+          if old not in s: raise SystemExit('annual investment visibility anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/readingCache.ts')
+          s=p.read_text(encoding='utf-8').replace("const FORTUNE_AI_CACHE_CONTRACT = 'salience-relationship-flow-contract-v13'","const FORTUNE_AI_CACHE_CONTRACT = 'adaptive-length-contract-v14'",1)
+          p.write_text(s,encoding='utf-8')
+          p=Path('web/src/lib/fortuneAiJob.ts')
+          s=p.read_text(encoding='utf-8').replace("export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-salience-relationship-v13'","export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-adaptive-length-v14'",1)
+          p.write_text(s,encoding='utf-8')
+          p=Path('web/src/lib/fortuneAiJob.test.mjs')
+          s=p.read_text(encoding='utf-8').replace('assert.match(FORTUNE_AI_JOB_CONTRACT, /v13$/)','assert.match(FORTUNE_AI_JOB_CONTRACT, /v14$/)',1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          anchor='''for(const kind of ["day","week","month"]){\n  test(`${kind} quality guard accepts period-sized output without annual-only sections`,()=>{\n    const {data,payload}=buildCase(kind);\n    const report=inspectInterpretationQuality(data,payload);\n    assert.equal(report.ok,true,JSON.stringify(report,null,2));\n    assert.equal(report.score,100);\n    assert.equal(data.year_phases.length,0);\n    assert.equal(data.cross_checks.length,0);\n  });\n}\n'''
+          addition=anchor+'''\n\ntest("short periods do not force filler decisions or priorities",()=>{\n  for(const [kind,decisionCount,priorityCount] of [["day",1,1],["week",2,2],["month",2,2]]){\n    const {data,payload}=buildCase(kind);\n    data.decisions=data.decisions.slice(0,decisionCount);\n    data.priorities=data.priorities.slice(0,priorityCount);\n    const report=inspectInterpretationQuality(data,payload);\n    assert.equal(report.ok,true,`${kind} should pass without filler: ${JSON.stringify(report,null,2)}`);\n  }\n});\n'''
+          if anchor not in s: raise SystemExit('period lean output test anchor missing')
+          s=s.replace(anchor,addition,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          addition='''\n\ntest("non-salient relationship and investment detail blocks may be omitted",()=>{\n  const packet=compactCalculation(calculation());\n  const lean=output(packet);\n  for(const topic of ["연애","연락","재회","투자심리","수익실현","신규진입","투자주의"])lean.topic_analysis[topic].importance="참고";\n  delete lean.relationship_reading;\n  delete lean.contact_flow;\n  delete lean.investment_reading;\n  const validated=validateOutput(lean);\n  assert.ok(validated,"optional detail blocks should not invalidate the structured response");\n  const report=inspectInterpretationQuality(validated,packet);\n  assert.equal(report.ok,true,JSON.stringify(report,null,2));\n});\n'''
+          if 'non-salient relationship and investment detail blocks may be omitted' not in s:
+              s += addition
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit V14 adaptive length contract
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts supabase/functions/fortune-interpret-v6-preview/qualityV2.ts supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs web/src/AiInterpretationPanel.tsx web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat(ai): make interpretation length adaptive to salience'
+          git push origin HEAD:work/integrated-interpretation-v2
