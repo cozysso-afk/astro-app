@@ -1,9 +1,10 @@
 name: Apply Iterative Quality Repair V20
 
 on:
-  push:
+  pull_request:
     branches:
-      - work/integrated-interpretation-v2
+      - main
+    types: [synchronize]
     paths:
       - .github/workflows/apply-v20-repair-chain.yml
 
