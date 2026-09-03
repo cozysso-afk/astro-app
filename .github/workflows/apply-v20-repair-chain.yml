@@ -1,0 +1,158 @@
+name: Apply Iterative Quality Repair V20
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - .github/workflows/apply-v20-repair-chain.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply iterative quality repair chain
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          base=Path('supabase/functions/fortune-interpret-v6-preview')
+
+          p=base/'repairV19.ts'
+          s=p.read_text(encoding='utf-8')
+          old='''if(TOPICS.some(topic=>issue.startsWith(`${topic} 확신도 `)||issue.startsWith(`${topic} 핵심인데 `)||issue.startsWith(`${topic} 핵심 근거 설명이 얕음`)||issue.startsWith(`${topic} 주목 근거 설명이 얕음`)||issue.startsWith(`${topic} 참고 설명이 과도하게 김`)))return true;'''
+          new='''if(TOPICS.some(topic=>issue.startsWith(`${topic} 확신도 `)||issue.startsWith(`${topic} 핵심인데 `)||issue.startsWith(`${topic} 핵심 근거 설명이 얕음`)||issue.startsWith(`${topic} 주목 근거 설명이 얕음`)||issue.startsWith(`${topic} 참고 근거 설명이 얕음`)||issue.startsWith(`${topic} 참고 설명이 과도하게 김`)))return true;'''
+          if old not in s: raise SystemExit('repair classifier anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=base/'integratedInterpretationV2.ts'
+          s=p.read_text(encoding='utf-8')
+          old='export const VERSION = "supabase-ai-v19-targeted-quality-repair";'
+          new='export const VERSION = "supabase-ai-v20-iterative-targeted-repair";'
+          if old not in s: raise SystemExit('version anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=base/'index.ts'
+          s=p.read_text(encoding='utf-8')
+          old='''async function calculate(payload:any,preferred:string,key:string){
+  const first:any=await generateWithThaiSafety(payload,preferred,key,false,"");
+  if(first.ok)return first;
+  const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
+  const canTarget=first?.quality_guard_failed===true&&first?.candidate_data&&first?.quality_report;
+  const second:any=canTarget
+    ?await repairCandidateWithThaiSafety(payload,first.candidate_data,first.quality_report,secondModel,key)
+    :await generateWithThaiSafety(payload,secondModel,key,true,"");
+  const combinedUsageBase=addGeminiUsage(first.usage,second.usage);
+  const combinedUsage=second?.validation?{...combinedUsageBase,quality_validation:qualitySummary(second.validation)}:combinedUsageBase;
+  const attemptCount=Number(first.attempt_count??1)+Number(second.attempt_count??1);
+  if(second.ok)return preferred===secondModel?{...second,usage:combinedUsage,attempt_count:attemptCount}:{...second,usage:combinedUsage,attempt_count:attemptCount,fallback_from:preferred};
+  const qualityDetail=second?.quality_guard_failed?` · 최종 품질점수 ${second?.quality_report?.score??0}/100`:"";
+  const repairLabel=canTarget?"타깃 재생성":"전체 재생성";
+  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차(${repairLabel})=${second.error}${qualityDetail}`,model:preferred,usage:combinedUsage,attempt_count:attemptCount,quality_report:second?.quality_report??first?.quality_report};
+}
+'''
+          new='''async function calculate(payload:any,preferred:string,key:string){
+  const first:any=await generateWithThaiSafety(payload,preferred,key,false,"");
+  if(first.ok)return first;
+  const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
+  const canTarget=first?.quality_guard_failed===true&&first?.candidate_data&&first?.quality_report;
+  const second:any=canTarget
+    ?await repairCandidateWithThaiSafety(payload,first.candidate_data,first.quality_report,secondModel,key)
+    :await generateWithThaiSafety(payload,secondModel,key,true,"");
+  const combinedUsageBase=addGeminiUsage(first.usage,second.usage);
+  const combinedUsage=second?.validation?{...combinedUsageBase,quality_validation:qualitySummary(second.validation)}:combinedUsageBase;
+  const attemptCount=Number(first.attempt_count??1)+Number(second.attempt_count??1);
+  if(second.ok)return preferred===secondModel?{...second,usage:combinedUsage,attempt_count:attemptCount,repair_chain_count:canTarget?1:0}:{...second,usage:combinedUsage,attempt_count:attemptCount,repair_chain_count:canTarget?1:0,fallback_from:preferred};
+
+  const canRepairAgain=second?.quality_guard_failed===true&&second?.candidate_data&&second?.quality_report;
+  if(canRepairAgain){
+    const third:any=await repairCandidateWithThaiSafety(payload,second.candidate_data,second.quality_report,secondModel,key);
+    const combinedUsageAllBase=addGeminiUsage(combinedUsageBase,third.usage);
+    const combinedUsageAll=third?.validation?{...combinedUsageAllBase,quality_validation:qualitySummary(third.validation)}:combinedUsageAllBase;
+    const attemptCountAll=attemptCount+Number(third.attempt_count??1);
+    if(third.ok)return preferred===secondModel?{...third,usage:combinedUsageAll,attempt_count:attemptCountAll,repair_chain_count:2}:{...third,usage:combinedUsageAll,attempt_count:attemptCountAll,repair_chain_count:2,fallback_from:preferred};
+    const qualityDetail=third?.quality_guard_failed?` · 최종 품질점수 ${third?.quality_report?.score??0}/100`:"";
+    const repairLabel=canTarget?"타깃 재생성":"전체 재생성";
+    return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차(${repairLabel})=${second.error}; 3차(후속 타깃 재생성)=${third.error}${qualityDetail}`,model:preferred,usage:combinedUsageAll,attempt_count:attemptCountAll,repair_chain_count:2,quality_report:third?.quality_report??second?.quality_report??first?.quality_report};
+  }
+
+  const qualityDetail=second?.quality_guard_failed?` · 최종 품질점수 ${second?.quality_report?.score??0}/100`:"";
+  const repairLabel=canTarget?"타깃 재생성":"전체 재생성";
+  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차(${repairLabel})=${second.error}${qualityDetail}`,model:preferred,usage:combinedUsage,attempt_count:attemptCount,repair_chain_count:canTarget?1:0,quality_report:second?.quality_report??first?.quality_report};
+}
+'''
+          if old not in s: raise SystemExit('calculate anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('web/src/lib/readingCache.ts')
+          s=p.read_text(encoding='utf-8')
+          old="const FORTUNE_AI_CACHE_CONTRACT = 'targeted-quality-repair-contract-v19'"
+          new="const FORTUNE_AI_CACHE_CONTRACT = 'iterative-targeted-repair-contract-v20'"
+          if old not in s: raise SystemExit('cache contract anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.ts')
+          s=p.read_text(encoding='utf-8')
+          old="export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-targeted-repair-v19'"
+          new="export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-iterative-repair-v20'"
+          if old not in s: raise SystemExit('job contract anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          if 'assert.match(FORTUNE_AI_JOB_CONTRACT, /v19$/)' not in s: raise SystemExit('job test anchor missing')
+          p.write_text(s.replace('assert.match(FORTUNE_AI_JOB_CONTRACT, /v19$/)','assert.match(FORTUNE_AI_JOB_CONTRACT, /v20$/)',1),encoding='utf-8')
+
+          p=base/'repairV19.test.mjs'
+          s=p.read_text(encoding='utf-8')
+          anchor='''  assert.deepEqual(classifyQualityRepair(report("직장 핵심 근거 설명이 얕음"),candidate),{core:false,topics:true});\n'''
+          add='''  assert.deepEqual(classifyQualityRepair(report("컨디션 참고 근거 설명이 얕음"),candidate),{core:false,topics:true});\n'''
+          if anchor not in s: raise SystemExit('repair test anchor missing')
+          p.write_text(s.replace(anchor,anchor+add,1),encoding='utf-8')
+
+          p=base/'v20RepairChain.test.mjs'
+          p.write_text('''import assert from "node:assert/strict";\nimport test from "node:test";\nimport fs from "node:fs";\nconst source=fs.readFileSync(new URL("./index.ts",import.meta.url),"utf8");\n\ntest("a second targeted repair can fix residual quality issues without full regeneration",()=>{\n  assert.match(source,/const canRepairAgain=second\\?\\.quality_guard_failed===true&&second\\?\\.candidate_data&&second\\?\\.quality_report/);\n  assert.match(source,/repairCandidateWithThaiSafety\\(payload,second\\.candidate_data,second\\.quality_report,secondModel,key\\)/);\n  assert.match(source,/repair_chain_count:2/);\n  assert.doesNotMatch(source,/third:any=await generateWithThaiSafety/);\n});\n''',encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v18Reliability.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/repairV19.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v19TargetedRepair.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v20RepairChain.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit V20 iterative repair
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts \
+                  supabase/functions/fortune-interpret-v6-preview/index.ts \
+                  supabase/functions/fortune-interpret-v6-preview/repairV19.ts \
+                  supabase/functions/fortune-interpret-v6-preview/repairV19.test.mjs \
+                  supabase/functions/fortune-interpret-v6-preview/v20RepairChain.test.mjs \
+                  web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git commit -m "fix(ai): iteratively repair residual quality failures"
+          git push origin HEAD:work/integrated-interpretation-v2
