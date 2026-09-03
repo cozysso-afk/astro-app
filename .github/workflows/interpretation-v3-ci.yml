@@ -33,6 +33,7 @@ jobs:
       - name: Evidence-ledger and five-stage guard tests
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
       - name: Web typecheck and production build
