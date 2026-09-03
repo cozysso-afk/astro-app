@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply V21.2 refinements
-        run: python .github/v21_refine_after_live.py
+      - name: Apply V21.2 refinements with current anchors
+        run: python .github/v21_refine_wrapper.py
       - name: V21 fixture tests
         run: node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
       - name: Pending job regression
