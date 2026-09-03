@@ -18,34 +18,61 @@ function qualityFailure(result:any,quality:any){
   return {...result,ok:false,error:`5단계 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};
 }
 
-async function generate(payload:any,model:string,key:string,compactMode=false,strictThai=false,qualityRetry=""){
+const CORE_SCHEMA:any=structuredClone(SCHEMA);
+delete CORE_SCHEMA.properties.topic_analysis;
+CORE_SCHEMA.required=(CORE_SCHEMA.required??[]).filter((key:string)=>key!=="topic_analysis");
+const TOPIC_SCHEMA:any={type:"OBJECT",properties:{topic_analysis:SCHEMA.properties.topic_analysis},required:["topic_analysis"]};
+
+function splitPartInstruction(part:"core"|"topics"){
+  return part==="core"
+    ? "[OUTPUT PART: CORE] topic_analysis는 출력하지 말고, 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 이 스키마에 맞춰 작성해."
+    : "[OUTPUT PART: TOPICS] topic_analysis만 출력해. 15개 분야를 정확히 한 번씩 모두 넣고 topic 이름은 지정된 한국어 분야명을 그대로 사용해.";
+}
+
+async function generatePart(payload:any,model:string,key:string,part:"core"|"topics",schema:any,compactMode=false,strictThai=false,qualityRetry=""){
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),compactMode?65000:78000);
+  const timer=setTimeout(()=>controller.abort(),compactMode?56000:66000);
   try{
     const modeInstruction=periodModeInstruction(payload,compactMode);
-    const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\nCALCULATED_DATA=${JSON.stringify(payload)}`;
+    const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${splitPartInstruction(part)} ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\nCALCULATED_DATA=${JSON.stringify(payload)}`;
+    const maxOutputTokens=part==="core"?(compactMode?7600:11000):(compactMode?5600:8200);
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:SCHEMA,maxOutputTokens:compactMode?10500:15000,temperature:.27,thinkingConfig:{thinkingLevel:"medium"}}}),
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,maxOutputTokens,temperature:.27,thinkingConfig:{thinkingLevel:compactMode?"low":"medium"}}}),
     });
     const rawText=await r.text();
-    if(!r.ok)return {ok:false,error:`Gemini HTTP ${r.status}`,model,http_status:r.status};
+    if(!r.ok)return {ok:false,error:`${part} Gemini HTTP ${r.status}`,model,http_status:r.status};
     const raw=JSON.parse(rawText);
     const parts=raw?.candidates?.[0]?.content?.parts??[];
     let out=parts.filter((p:any)=>!p?.thought).map((p:any)=>p?.text??"").join("").trim();
     if(!out)out=parts.map((p:any)=>p?.text??"").join("").trim();
     out=out.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"");
     try{
-      const data=validateOutput(JSON.parse(out));
-      if(!data)return {ok:false,error:"1단계 구조 검증 실패",model,usage:usage(raw)};
-      const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
-      if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:usage(raw),output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data};
-      const quality=inspectInterpretationQuality(data,payload);
-      if(!quality.ok)return qualityFailure({model,usage:usage(raw),data},quality);
-      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,usage:{...usage(raw),quality_validation:qualitySummary(quality)}};
-    }catch{return {ok:false,error:"구조화 응답이 완전하지 않았어",model,usage:usage(raw)};}
-  }catch(e){return {ok:false,error:e instanceof DOMException&&e.name==="AbortError"?"AI 해설 시간이 초과됐어.":`AI 해설 호출 실패: ${e instanceof Error?e.message:String(e)}`,model};}
+      const partial=JSON.parse(out);
+      if(!partial||typeof partial!=="object"||Array.isArray(partial))return {ok:false,error:`${part} 구조화 응답이 객체가 아니야`,model,usage:usage(raw)};
+      return {ok:true,partial,model,usage:usage(raw)};
+    }catch{return {ok:false,error:`${part} 구조화 응답이 완전하지 않았어`,model,usage:usage(raw)};}
+  }catch(e){return {ok:false,error:e instanceof DOMException&&e.name==="AbortError"?`${part} AI 해설 시간이 초과됐어.`:`${part} AI 해설 호출 실패: ${e instanceof Error?e.message:String(e)}`,model};}
   finally{clearTimeout(timer);}
+}
+
+async function generate(payload:any,model:string,key:string,compactMode=false,strictThai=false,qualityRetry=""){
+  const [core,topics]=await Promise.all([
+    generatePart(payload,model,key,"core",CORE_SCHEMA,compactMode,strictThai,qualityRetry),
+    generatePart(payload,model,key,"topics",TOPIC_SCHEMA,compactMode,strictThai,qualityRetry),
+  ]);
+  const combinedUsage=addGeminiUsage(core.usage,topics.usage);
+  if(!core.ok||!topics.ok)return {ok:false,error:[core.ok?"":core.error,topics.ok?"":topics.error].filter(Boolean).join("; "),model,usage:combinedUsage,split_generation:true};
+  try{
+    const merged={...core.partial,...topics.partial};
+    const data=validateOutput(merged);
+    if(!data)return {ok:false,error:"1단계 구조 검증 실패",model,usage:combinedUsage,split_generation:true};
+    const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
+    if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:combinedUsage,output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data,split_generation:true};
+    const quality=inspectInterpretationQuality(data,payload);
+    if(!quality.ok)return qualityFailure({model,usage:combinedUsage,data,split_generation:true},quality);
+    return {ok:true,data,model,interpreter_version:VERSION,validation:quality,split_generation:true,usage:{...combinedUsage,quality_validation:qualitySummary(quality)}};
+  }catch{return {ok:false,error:"분할 구조화 응답 병합에 실패했어",model,usage:combinedUsage,split_generation:true};}
 }
 
 async function generateWithThaiSafety(payload:any,model:string,key:string,compactMode=false,qualityRetry=""){
@@ -90,7 +117,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,evidence_ledger:true,full_daily_scores:true,daily_actual_evidence:true,monthly_trajectory:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,split_structured_output:true,evidence_ledger:true,full_daily_scores:true,daily_actual_evidence:true,monthly_trajectory:true,cross_system_timeline:true,thai_contract:THAI_CONTRACT_VERSION,thai_layers:["Mahathaksa","Taksajorn","Suriyayat 10-planet position facts","validated numeric Lagna","12 descriptive non-predictive house routes"],suriyayat_lagna:true,thai_output_guard:true,thai_strict_retry:true,thai_safe_fallback:true});
   if(!key)return res({ok:false,missing_key:true,error:"GEMINI_API_KEY가 설정되지 않았어."},503);
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
