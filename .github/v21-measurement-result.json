@@ -1,0 +1,17 @@
+{
+  "measured_at": "2026-09-03",
+  "fixture": "1990-01-01 12:00 Seoul / 2026-09-03~2027-09-02",
+  "raw_calculation_bytes": 1858047,
+  "v20_packet_bytes": 280179,
+  "v21_prompt_packet_bytes": 69324,
+  "reduction_vs_v20_pct": 75.3,
+  "reduction_vs_raw_pct": 96.3,
+  "estimated_v21_input_tokens": 26664,
+  "max_prompt_bytes": 95000,
+  "budget_ok": true,
+  "v20_daily_rows": 365,
+  "v21_has_daily_matrix": false,
+  "v20_evidence_rows": 538,
+  "v21_evidence_rows": 110,
+  "external_prompt_bytes": 70080
+}
