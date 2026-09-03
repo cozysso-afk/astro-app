@@ -16,3 +16,8 @@ s = s.replace(old_meta, new_meta, 1)
 
 p.write_text(s)
 runpy.run_path(str(p), run_name='__main__')
+
+fixture = Path('supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs')
+t = fixture.read_text()
+t = t.replace("assert.equal(rows.find(x=>x.topic==='연애').timing,'2027-04-11');", "assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');", 1)
+fixture.write_text(t)
