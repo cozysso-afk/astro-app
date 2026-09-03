@@ -11,8 +11,7 @@ the dates shown to the user, not a second AI calculation.
 
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import date, time as dt_time
+from datetime import date, time as dt_time, timezone
 from typing import Any
 
 from integrated_fortune_v1 import (
@@ -226,8 +225,9 @@ def enrich_integrated_key_dates(
 
     try:
         birth_local = _aware_local(birth_date, birth_time, utc_offset_hours)
-        natal_houses = _compute_houses(birth_local.astimezone(__import__("datetime").timezone.utc), latitude, longitude)
-        natal_lons = {body: _planet_lon(body, birth_local.astimezone(__import__("datetime").timezone.utc)) for body in PLANET_KEYS}
+        birth_utc = birth_local.astimezone(timezone.utc)
+        natal_houses = _compute_houses(birth_utc, latitude, longitude)
+        natal_lons = {body: _planet_lon(body, birth_utc) for body in PLANET_KEYS}
         enriched = []
         for ranked_row in ranked:
             day_value = date.fromisoformat(str(ranked_row["date"]))
