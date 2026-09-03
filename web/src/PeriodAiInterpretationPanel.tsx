@@ -23,7 +23,13 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   onRetry: () => void
 }) {
   if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>계산근거를 대조해 해설하는 중…</h3><p className="period-ai-summary">점수·핵심 시기·사주·Thai 맥락을 확인하고 5단계 검증까지 통과한 결과만 보여줄게.</p></div></section>
-  if (error && !result) return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>자연어 해설을 아직 불러오지 못했어</h3><p className="period-ai-summary">{error}</p><button className="period-ai-retry" type="button" onClick={onRetry}>해설 다시 확인</button></section>
+  if (error && !result) {
+    const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
+    const message = quotaLimited
+      ? '운세 계산은 정상 완료됐어. 지금은 Gemini 해설 서버의 크레딧 또는 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 크레딧이나 한도가 복구된 뒤 다시 확인하면 계산 결과는 그대로 이어서 해설할 수 있어.'
+      : error
+    return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button></section>
+  }
   if (!result?.ok || !result.data) return null
 
   const data = result.data
