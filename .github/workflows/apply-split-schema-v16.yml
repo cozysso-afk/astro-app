@@ -1,0 +1,89 @@
+name: Apply Split Structured Output V16
+
+on:
+  push:
+    branches: [work/integrated-interpretation-v2]
+    paths: [.github/workflows/apply-split-schema-v16.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply V16 split structured output
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('export const VERSION = "supabase-ai-v15-compact-schema";','export const VERSION = "supabase-ai-v16-split-structured-output";',1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('supabase/functions/fortune-interpret-v6-preview/index.ts')
+          s=p.read_text(encoding='utf-8')
+          anchor='''function qualityFailure(result:any,quality:any){\n  const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");\n  return {...result,ok:false,error:`5단계 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};\n}\n'''
+          addition='''\nconst CORE_SCHEMA:any=structuredClone(SCHEMA);\ndelete CORE_SCHEMA.properties.topic_analysis;\nCORE_SCHEMA.required=(CORE_SCHEMA.required??[]).filter((key:string)=>key!=="topic_analysis");\nconst TOPIC_SCHEMA:any={type:"OBJECT",properties:{topic_analysis:SCHEMA.properties.topic_analysis},required:["topic_analysis"]};\n\nfunction splitPartInstruction(part:"core"|"topics"){\n  return part==="core"\n    ? "[OUTPUT PART: CORE] topic_analysis는 출력하지 말고, 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 이 스키마에 맞춰 작성해."\n    : "[OUTPUT PART: TOPICS] topic_analysis만 출력해. 15개 분야를 정확히 한 번씩 모두 넣고 topic 이름은 지정된 한국어 분야명을 그대로 사용해.";\n}\n'''
+          if 'const CORE_SCHEMA:any=structuredClone(SCHEMA);' not in s:
+              if anchor not in s: raise SystemExit('qualityFailure anchor missing')
+              s=s.replace(anchor,anchor+addition,1)
+
+          pattern=r'async function generate\(payload:any,model:string,key:string,compactMode=false,strictThai=false,qualityRetry=""\)\{.*?\n\}\n\nasync function generateWithThaiSafety'
+          replacement='''async function generatePart(payload:any,model:string,key:string,part:"core"|"topics",schema:any,compactMode=false,strictThai=false,qualityRetry=""){\n  const controller=new AbortController();\n  const timer=setTimeout(()=>controller.abort(),compactMode?56000:66000);\n  try{\n    const modeInstruction=periodModeInstruction(payload,compactMode);\n    const prompt=`분석기간=${payload?.period?.start??""}~${payload?.period?.end??""}. ${splitPartInstruction(part)} ${modeInstruction}${strictThai?strictThaiRetryInstruction():""}${qualityRetry}\\nCALCULATED_DATA=${JSON.stringify(payload)}`;\n    const maxOutputTokens=part==="core"?(compactMode?7600:11000):(compactMode?5600:8200);\n    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{\n      method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},\n      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,maxOutputTokens,temperature:.27,thinkingConfig:{thinkingLevel:compactMode?"low":"medium"}}}),\n    });\n    const rawText=await r.text();\n    if(!r.ok)return {ok:false,error:`${part} Gemini HTTP ${r.status}`,model,http_status:r.status};\n    const raw=JSON.parse(rawText);\n    const parts=raw?.candidates?.[0]?.content?.parts??[];\n    let out=parts.filter((p:any)=>!p?.thought).map((p:any)=>p?.text??"").join("").trim();\n    if(!out)out=parts.map((p:any)=>p?.text??"").join("").trim();\n    out=out.replace(/^```(?:json)?\\s*/i,"").replace(/\\s*```$/i,"");\n    try{\n      const partial=JSON.parse(out);\n      if(!partial||typeof partial!=="object"||Array.isArray(partial))return {ok:false,error:`${part} 구조화 응답이 객체가 아니야`,model,usage:usage(raw)};\n      return {ok:true,partial,model,usage:usage(raw)};\n    }catch{return {ok:false,error:`${part} 구조화 응답이 완전하지 않았어`,model,usage:usage(raw)};}\n  }catch(e){return {ok:false,error:e instanceof DOMException&&e.name==="AbortError"?`${part} AI 해설 시간이 초과됐어.`:`${part} AI 해설 호출 실패: ${e instanceof Error?e.message:String(e)}`,model};}\n  finally{clearTimeout(timer);}\n}\n\nasync function generate(payload:any,model:string,key:string,compactMode=false,strictThai=false,qualityRetry=""){\n  const [core,topics]=await Promise.all([\n    generatePart(payload,model,key,"core",CORE_SCHEMA,compactMode,strictThai,qualityRetry),\n    generatePart(payload,model,key,"topics",TOPIC_SCHEMA,compactMode,strictThai,qualityRetry),\n  ]);\n  const combinedUsage=addGeminiUsage(core.usage,topics.usage);\n  if(!core.ok||!topics.ok)return {ok:false,error:[core.ok?"":core.error,topics.ok?"":topics.error].filter(Boolean).join("; "),model,usage:combinedUsage,split_generation:true};\n  try{\n    const merged={...core.partial,...topics.partial};\n    const data=validateOutput(merged);\n    if(!data)return {ok:false,error:"1단계 구조 검증 실패",model,usage:combinedUsage,split_generation:true};\n    const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));\n    if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:combinedUsage,output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data,split_generation:true};\n    const quality=inspectInterpretationQuality(data,payload);\n    if(!quality.ok)return qualityFailure({model,usage:combinedUsage,data,split_generation:true},quality);\n    return {ok:true,data,model,interpreter_version:VERSION,validation:quality,split_generation:true,usage:{...combinedUsage,quality_validation:qualitySummary(quality)}};\n  }catch{return {ok:false,error:"분할 구조화 응답 병합에 실패했어",model,usage:combinedUsage,split_generation:true};}\n}\n\nasync function generateWithThaiSafety'''
+          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit(f'generate replacement failed: {n}')
+          s=s2
+          s=s.replace('five_stage_validation:true,evidence_ledger:true,','five_stage_validation:true,split_structured_output:true,evidence_ledger:true,',1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/readingCache.ts')
+          s=p.read_text(encoding='utf-8').replace("const FORTUNE_AI_CACHE_CONTRACT = 'compact-schema-contract-v15'","const FORTUNE_AI_CACHE_CONTRACT = 'split-structured-output-contract-v16'",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.ts')
+          s=p.read_text(encoding='utf-8').replace("export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-compact-schema-v15'","export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-split-structured-v16'",1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('web/src/lib/fortuneAiJob.test.mjs')
+          s=p.read_text(encoding='utf-8').replace('assert.match(FORTUNE_AI_JOB_CONTRACT, /v15$/)','assert.match(FORTUNE_AI_JOB_CONTRACT, /v16$/)',1)
+          p.write_text(s,encoding='utf-8')
+
+          test=Path('supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs')
+          test.write_text('''import assert from "node:assert/strict";\nimport test from "node:test";\nimport fs from "node:fs";\n\nconst source=fs.readFileSync(new URL("./index.ts",import.meta.url),"utf8");\n\ntest("Gemini generation uses two smaller structured schemas in parallel",()=>{\n  assert.match(source,/const CORE_SCHEMA:any=structuredClone\\(SCHEMA\\)/);\n  assert.match(source,/delete CORE_SCHEMA\\.properties\\.topic_analysis/);\n  assert.match(source,/const TOPIC_SCHEMA:any=/);\n  assert.match(source,/Promise\\.all\\(\\[/);\n  assert.match(source,/generatePart\\(payload,model,key,"core",CORE_SCHEMA/);\n  assert.match(source,/generatePart\\(payload,model,key,"topics",TOPIC_SCHEMA/);\n  assert.doesNotMatch(source,/responseSchema:SCHEMA/);\n  assert.match(source,/const merged=\\{\\.\\.\\.core\\.partial,\\.\\.\\.topics\\.partial\\}/);\n  assert.match(source,/validateOutput\\(merged\\)/);\n});\n''',encoding='utf-8')
+          PY
+      - name: Full interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit V16 split structured output
+        run: |
+          git config user.name "cozysso-afk"
+          git config user.email "cozysso@gmail.com"
+          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts \
+                  supabase/functions/fortune-interpret-v6-preview/index.ts \
+                  supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs \
+                  web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git commit -m "fix(ai): split Gemini structured output for schema compatibility"
+          git push origin HEAD:work/integrated-interpretation-v2
