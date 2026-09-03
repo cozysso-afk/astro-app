@@ -1,0 +1,33 @@
+name: Interpretation V2 CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/fortune-interpret-v6-preview/**'
+      - 'web/src/**'
+      - 'web/package.json'
+      - 'web/package-lock.json'
+      - '.github/workflows/interpretation-v2-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  interpretation-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Evidence-ledger and guard tests
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+      - name: Web typecheck and production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
