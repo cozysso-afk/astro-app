@@ -1,4 +1,4 @@
-name: Patch Interpretation V3 Test Fixture
+name: Branch Interpretation V3 Verification
 
 on:
   push:
@@ -8,59 +8,33 @@ on:
       - .github/workflows/apply-full-daily-scores-v3.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/integrated-interpretation-v2
-          fetch-depth: 0
-      - name: Add grounded full-daily fixture
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax contract
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs')
-          s=p.read_text(encoding='utf-8')
-          anchor='''    months.push({calendar_month:`2026-${mm}`,start:`2026-${mm}-01`,end:`2026-${mm}-${String(lastDay(m)).padStart(2,"0")}`,topics:mt,relationship_signals:mr});\n  }\n  return {'''
-          insert='''    months.push({calendar_month:`2026-${mm}`,start:`2026-${mm}-01`,end:`2026-${mm}-${String(lastDay(m)).padStart(2,"0")}`,topics:mt,relationship_signals:mr});\n  }\n  const dailySeeds=[\n    ["2026-02-14",28,false],["2026-02-21",76,false],\n    ["2026-05-14",25,true],["2026-05-15",30,true],\n    ["2026-07-21",82,true],["2026-07-24",78,true],\n    ["2026-10-21",85,true],["2026-10-14",32,true],\n    ["2026-12-14",29,true],["2026-12-21",75,true],\n  ];\n  const investment=new Set(["투자심리","수익실현","신규진입","투자주의"]);\n  const daily_scores=dailySeeds.map(([date,base,market_open],rowIndex)=>{\n    const scores={};\n    for(const [index,topic] of TOPICS.entries()){\n      if(investment.has(topic)&&!market_open){scores[topic]=null;continue;}\n      const drift=(index%3)-1; scores[topic]=Math.max(5,Math.min(95,Number(base)+drift*2));\n    }\n    scores.수신신호=Math.max(5,Math.min(95,Number(base)+1));\n    scores.발신적합=Math.max(5,Math.min(95,Number(base)+2));\n    scores.과거인연접점=Math.max(5,Math.min(95,Number(base)+3));\n    return {\n      date,label:date,market_open:Boolean(market_open),scores,\n      evidence:[{kind:"aspect",sample_time:"12:00",source_topics:[...TOPICS,"수신신호","발신적합","과거인연접점"],contribution:1.2+rowIndex/100,text:`Jupiter→MC trine · orb 0.${20+rowIndex}°`,transit:"Jupiter",target:"MC",aspect:"trine",orb:(20+rowIndex)/100}],\n    };\n  });\n  return {'''
-          if anchor not in s: raise SystemExit('daily fixture insertion anchor missing')
-          s=s.replace(anchor,insert,1)
-          old='''    western:{engine:"western",ephemeris:"DE440s",score_policy:"relative",overall:topics,relationship_signals:rel,months,detail_days:[],market:{}},'''
-          new='''    western:{engine:"western",ephemeris:"DE440s",score_policy:"relative",overall:topics,relationship_signals:rel,months,daily_scores,detail_days:[],market:{}},'''
-          if old not in s: raise SystemExit('western fixture anchor missing')
-          s=s.replace(old,new,1)
-          old='''  const decMoney=ref("W:month:2026-12:금전");\n  const decLove=ref("W:month:2026-12:연애");'''
-          new='''  const decMoney=ref("W:month:2026-12:금전");\n  const decLove=ref("W:month:2026-12:연애");\n  const julyDaily=ref("W:daily:2026-07-21:");\n  const mayDaily=ref("W:daily:2026-05-14:");\n  const octDaily=ref("W:daily:2026-10-21:");\n  const febDaily=ref("W:daily:2026-02-14:");\n  const decDaily=ref("W:daily:2026-12-14:");'''
-          if old not in s: raise SystemExit('daily ref anchor missing')
-          s=s.replace(old,new,1)
-          replacements={
-            'evidence_refs:[julyWork,julyOutgoing]}':'evidence_refs:[julyWork,julyOutgoing,julyDaily]}',
-            'evidence_refs:[mayLove,mayOutgoing]}':'evidence_refs:[mayLove,mayOutgoing,mayDaily]}',
-            'evidence_refs:[octReconnect,octMonth]}':'evidence_refs:[octReconnect,octMonth,octDaily]}',
-            'evidence_refs:[febMoney,febStudy]}':'evidence_refs:[febMoney,febStudy,febDaily]}',
-            'evidence_refs:[decMoney,decLove]}':'evidence_refs:[decMoney,decLove,decDaily]}',
-          }
-          for old,new in replacements.items():
-            if old not in s: raise SystemExit(f'key-window ref anchor missing: {old}')
-            s=s.replace(old,new,1)
-          # Add explicit null/evidence contract test before the deep-output acceptance test.
-          marker='''test("five stages accept a deep evidence-backed annual interpretation",()=>{'''
-          extra='''test("full-daily packet preserves market nulls and promotes actual daily evidence",()=>{\n  const packet=compactCalculation(calculation());\n  const topics=packet.western.daily_score_matrix.topic_order;\n  const row=packet.western.daily_score_matrix.rows.find(x=>x[0]==="2026-02-14");\n  assert.ok(row);\n  const investIndex=topics.indexOf("투자심리");\n  assert.equal(row[investIndex+1],null);\n  assert.equal(packet.western.daily_pattern_digest.투자심리.days,8);\n  const july=packet.key_dates.find(x=>x.date==="2026-07-21");\n  assert.ok(july?.western_refs?.some(x=>x.startsWith("W:daily:2026-07-21:")));\n  assert.ok(packet.evidence_ledger.some(x=>x.id.startsWith("W:daily:2026-02-14:")));\n});\n\n'''+marker
-          if marker not in s: raise SystemExit('test insertion marker missing')
-          s=s.replace(marker,extra,1)
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Run focused interpretation tests
+          python -m py_compile integrated_fortune_v1.py key_date_evidence_v2.py api/main.py
+          grep -q 'daily_scores' integrated_fortune_v1.py
+      - name: Interpretation guards
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
-      - name: Commit fixture
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
+      - name: Web typecheck and build
+        working-directory: web
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
-          git diff --cached --quiet && exit 0
-          git commit -m 'test: ground annual interpretation in full daily evidence'
-          git push origin HEAD:work/integrated-interpretation-v2
+          npm ci
+          npm run build
