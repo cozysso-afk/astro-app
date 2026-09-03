@@ -29,7 +29,13 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
   topics: string[]
 }) {
   if (loading) return <section className="ai-interpret-card is-loading"><LoaderCircle className="spin" size={22}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>Gemini가 서버에서 정밀해석 중…</strong><p>월별 변화와 핵심 날짜를 계산 근거에 다시 대조하고 있어. 앱을 닫아도 서버 작업은 계속돼.</p></div></section>
-  if (error) return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>AI 해설을 아직 붙이지 못했어</strong><p>{error}</p><button type="button" onClick={onRetry}>AI 해설 다시 시도</button></div></section>
+  if (error) {
+    const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
+    const message = quotaLimited
+      ? '운세 계산은 정상 완료됐어. 지금은 Gemini 해설 서버의 크레딧 또는 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 크레딧이나 한도가 복구된 뒤 다시 시도하면 돼.'
+      : error
+    return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : 'AI 해설을 아직 붙이지 못했어'}</strong><p>{message}</p><button type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 시도' : 'AI 해설 다시 시도'}</button></div></section>
+  }
   if (!result?.ok || !result.data) return null
   const data = result.data
   const usage = estimateGeminiUsage(result.usage)
