@@ -1,0 +1,78 @@
+name: Gemini 429 Live Smoke
+
+on:
+  push:
+    branches:
+      - hotfix/gemini-429-backoff
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Run real production interpretation smoke
+        working-directory: web
+        run: |
+          node --input-type=module - <<'JS'
+          import { createClient } from '@supabase/supabase-js'
+
+          const SUPABASE_URL='https://dbynfabwfcakxayyggzi.supabase.co'
+          const SUPABASE_KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+          const FUNCTION_URL=`${SUPABASE_URL}/functions/v1/fortune-interpret-v6-preview`
+          const today='2026-09-03'
+
+          const calculationResponse=await fetch('https://astro-app-api-f7fn.onrender.com/v1/fortune/integrated',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              profile:{name:'gemini-429-live-smoke',birth_date:'1990-01-01',birth_time:'12:00:00',latitude:37.5665,longitude:126.9780,utc_offset_hours:9,gender:'female'},
+              start_date:today,
+              end_date:today,
+            }),
+          })
+          if(!calculationResponse.ok)throw new Error(`Render calculation HTTP ${calculationResponse.status}`)
+          const calculation=await calculationResponse.json()
+          if(!calculation?.ok)throw new Error('Render calculation not ok')
+
+          const supabase=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false}})
+          const {data:auth,error:authError}=await supabase.auth.signInAnonymously()
+          if(authError||!auth.session?.access_token)throw new Error(`anonymous auth failed: ${authError?.message??'no token'}`)
+          const token=auth.session.access_token
+
+          async function call(body){
+            const r=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${token}`},body:JSON.stringify(body)})
+            const data=await r.json()
+            if(!r.ok)throw new Error(`function HTTP ${r.status}: ${JSON.stringify(data)}`)
+            return data
+          }
+
+          const start=await call({action:'start',model:'gemini-3.7-flash',calculation})
+          if(!start?.job_id)throw new Error(`missing job id: ${JSON.stringify(start)}`)
+          console.log('started',start.job_id,start.interpreter_version)
+
+          let final=null
+          for(let i=0;i<60;i++){
+            await new Promise(r=>setTimeout(r,3000))
+            const status=await call({action:'status',job_id:start.job_id})
+            if(status.status==='done'||status.status==='failed'){final=status;break}
+          }
+          if(!final)throw new Error('interpretation smoke timed out')
+          console.log('final-status',final.status,'model',final.model,'fallback_from',final.fallback_from,'version',final.interpreter_version)
+          console.log('quality',JSON.stringify(final.usage?.quality_validation??null))
+          if(final.status!=='done')throw new Error(`interpretation failed: ${final.error}`)
+          if(final.interpreter_version!=='supabase-ai-v20-release-cache-break')throw new Error(`unexpected interpreter version: ${final.interpreter_version}`)
+          if(Number(final.usage?.quality_validation?.score??0)!==100)throw new Error(`quality not 100: ${JSON.stringify(final.usage?.quality_validation)}`)
+          if(!final.data?.overall?.summary)throw new Error('missing interpretation summary')
+          console.log('gemini-429-live-smoke-ok')
+          JS
