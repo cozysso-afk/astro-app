@@ -41,11 +41,11 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
   const availableTopics = useMemo(() => allTopics.filter((topic) => rows.some((row) => typeof row.scores?.[topic] === 'number')), [rows])
   const months = useMemo(() => [...new Set(rows.map((row) => row.date.slice(0,7)))].sort(), [rows])
   const [selectedTopic, setSelectedTopic] = useState('대인관계')
-  const [selectedMonth, setSelectedMonth] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('all')
 
   if (!rows.length) return null
   const topic = availableTopics.includes(selectedTopic) ? selectedTopic : (availableTopics[0] ?? '금전')
-  const month = selectedMonth === 'all' || months.includes(selectedMonth) ? selectedMonth : (months[0] ?? 'all')
+  const month = selectedMonth === 'all' || months.includes(selectedMonth) ? selectedMonth : 'all'
   const visible = rows.filter((row) => month === 'all' || row.date.startsWith(month))
   const scored = visible
     .map((row) => ({ row, score: typeof row.scores?.[topic] === 'number' ? row.scores[topic] as number : null }))
