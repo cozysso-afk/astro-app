@@ -1,0 +1,272 @@
+/* v18 · period fortune mobile readability pass
+   Goals: stronger Korean body text, clearer hierarchy, easier scanning,
+   and less low-contrast secondary copy without changing calculation output. */
+
+.period-ai-card {
+  gap: 14px !important;
+  padding: 19px 18px !important;
+}
+
+.period-ai-kicker {
+  font-size: .78rem !important;
+  line-height: 1.35 !important;
+  letter-spacing: .13em !important;
+  color: #76647f !important;
+}
+
+.period-ai-card h3 {
+  margin-top: 0 !important;
+  font-size: 1.16rem !important;
+  line-height: 1.42 !important;
+  font-weight: 850 !important;
+  color: #403647 !important;
+  word-break: keep-all;
+}
+
+.period-ai-summary {
+  font-size: .94rem !important;
+  line-height: 1.82 !important;
+  font-weight: 520 !important;
+  color: #4f4754 !important;
+  letter-spacing: -.012em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.period-ai-chips {
+  gap: 8px !important;
+}
+
+.period-ai-chip {
+  padding: 9px 12px !important;
+  font-size: .83rem !important;
+  line-height: 1.5 !important;
+  color: #594b63 !important;
+  background: rgba(255,255,255,.82) !important;
+  border-color: rgba(137,111,158,.18) !important;
+  word-break: keep-all;
+}
+
+.period-ai-cache-note {
+  align-items: flex-start !important;
+  gap: 7px !important;
+  font-size: .8rem !important;
+  line-height: 1.55 !important;
+  color: #5c7069 !important;
+}
+
+.period-ai-cache-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.period-ai-cost {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 5px !important;
+  align-items: start !important;
+  padding: 11px 0 2px !important;
+  border-top: 1px solid rgba(132,110,146,.10);
+  font-size: .78rem !important;
+  line-height: 1.5 !important;
+  color: #716575 !important;
+}
+
+.period-ai-cost b {
+  font-size: 1rem !important;
+  line-height: 1.35 !important;
+  color: #4f4058 !important;
+}
+
+.period-ai-cost small {
+  font-size: .75rem !important;
+  line-height: 1.55 !important;
+  color: #817684 !important;
+}
+
+.period-ai-details {
+  padding-top: 8px !important;
+}
+
+.period-ai-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 2px !important;
+  font-size: .94rem !important;
+  line-height: 1.4 !important;
+  color: #493b52 !important;
+}
+
+.period-ai-detail-body {
+  gap: 13px !important;
+  padding-top: 11px !important;
+}
+
+.period-ai-section {
+  padding: 15px 14px !important;
+  border-radius: 17px !important;
+  background: rgba(255,255,255,.76) !important;
+  border-color: rgba(145,123,164,.14) !important;
+}
+
+.period-ai-section > strong {
+  margin-bottom: 8px !important;
+  font-size: .94rem !important;
+  line-height: 1.42 !important;
+  color: #413648 !important;
+}
+
+.period-ai-section p {
+  font-size: .9rem !important;
+  line-height: 1.82 !important;
+  color: #504853 !important;
+  letter-spacing: -.012em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.period-ai-topic-list {
+  gap: 11px !important;
+}
+
+.period-ai-topic {
+  padding: 14px 14px 15px !important;
+  border-radius: 16px !important;
+  border-left-width: 4px !important;
+  background: rgba(255,255,255,.74) !important;
+}
+
+.period-ai-topic strong {
+  font-size: .98rem !important;
+  line-height: 1.38 !important;
+  color: #403548 !important;
+}
+
+.period-ai-topic b {
+  margin: 5px 0 8px !important;
+  font-size: .91rem !important;
+  line-height: 1.45 !important;
+  color: #604b6d !important;
+}
+
+.period-ai-topic p {
+  margin: 6px 0 !important;
+  font-size: .88rem !important;
+  line-height: 1.76 !important;
+  color: #514954 !important;
+  letter-spacing: -.012em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Timing evidence shown immediately below the period reading. */
+.period-time-evidence > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-size: .96rem !important;
+  line-height: 1.4 !important;
+  color: #493c52 !important;
+}
+
+.period-time-evidence .time-detail-list {
+  gap: 13px !important;
+}
+
+.period-time-evidence .time-detail-list details {
+  padding: 16px 15px 17px !important;
+}
+
+.period-time-evidence .time-detail-list summary {
+  font-size: 1.08rem !important;
+  line-height: 1.42 !important;
+  color: #403548 !important;
+}
+
+.period-time-evidence .time-topic {
+  gap: 11px !important;
+  padding: 15px 14px !important;
+}
+
+.period-time-evidence .time-topic-name {
+  font-size: 1.05rem !important;
+  color: #44384c !important;
+}
+
+.period-time-evidence .time-window b {
+  font-size: .87rem !important;
+}
+
+.period-time-evidence .time-window span {
+  font-size: .99rem !important;
+  color: #473f50 !important;
+}
+
+.period-time-evidence .time-window em {
+  font-size: .92rem !important;
+}
+
+.period-time-evidence .time-evidence-label {
+  font-size: .87rem !important;
+  color: #62566a !important;
+}
+
+.period-time-evidence .time-evidence em {
+  font-size: .91rem !important;
+  line-height: 1.65 !important;
+  color: #5d5462 !important;
+}
+
+.period-fortune-report .result-note {
+  color: #6d626e !important;
+}
+
+@media (max-width: 430px) {
+  .period-ai-card {
+    gap: 13px !important;
+    padding: 18px 16px !important;
+    border-radius: 22px !important;
+  }
+
+  .period-ai-card h3 {
+    font-size: 1.12rem !important;
+  }
+
+  .period-ai-summary {
+    font-size: .93rem !important;
+    line-height: 1.8 !important;
+  }
+
+  .period-ai-chips {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .period-ai-chip {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 16px !important;
+  }
+
+  .period-ai-section {
+    padding: 15px 13px !important;
+  }
+
+  .period-ai-section p {
+    font-size: .91rem !important;
+  }
+
+  .period-ai-topic {
+    padding: 14px 13px 15px !important;
+  }
+
+  .period-ai-topic p {
+    font-size: .89rem !important;
+  }
+
+  .period-time-evidence .time-window {
+    grid-template-columns: auto minmax(0,1fr) auto !important;
+    gap: 8px !important;
+  }
+}
