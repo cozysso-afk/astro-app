@@ -25,14 +25,14 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   onCancel: () => void
   canCancel: boolean
 }) {
-  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>압축 계산근거로 맞춤 해설 생성 중…</h3><p className="period-ai-summary">정상 경로 Gemini 1회, 필요한 품질 수선이 있을 때만 최대 2회야. 약 2분을 넘기지 않고 중단해.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>압축 계산근거로 맞춤 해설 생성 중…</h3><p className="period-ai-summary">정상 경로 Gemini 1회, 필요한 품질 수선이 있을 때만 최대 2회야. 약 2분을 넘기지 않고 중단해.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
   const failedUsage = estimateGeminiUsage(result?.usage)
   if (error && !result?.data) {
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
     const message = quotaLimited
       ? '운세 계산은 정상 완료됐어. 지금은 Gemini 해설 서버의 크레딧 또는 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 크레딧이나 한도가 복구된 뒤 다시 확인하면 계산 결과는 그대로 이어서 해설할 수 있어.'
       : error
-    return <section className="period-ai-card"><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button></div></section>
+    return <section className="period-ai-card"><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button></div></section>
   }
   if (!result?.ok || !result.data) return null
 
@@ -50,12 +50,17 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const relationshipReading = data.relationship_reading
 
   return <section className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{data.headline || '기간 흐름 요약'}</h3></div></div>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>{data.headline || '기간 흐름 요약'}</h3></div></div>
     <p className="period-ai-summary">{data.overall.summary}</p>
+
+    {!!keyWindows.length && <section className="period-ai-quick-dates">
+      <div className="period-ai-section-title"><span>가장 먼저 볼 날짜</span><strong>핵심 시기 TOP 3</strong></div>
+      <div className="period-ai-quick-date-list">{keyWindows.slice(0,3).map((item,index)=><article className={`period-ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`}><b>{periodLabel(item.start,item.end)}</b><div><strong>{item.label}</strong>{!!item.topics?.length&&<small>{item.topics.slice(0,3).join(' · ')}</small>}</div><span>{item.signal}</span></article>)}</div>
+    </section>}
 
     {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
 
-    {showRelationshipFocus && relationshipReading ? <section className="period-ai-window-section"><div className="period-ai-section-title"><span>관계 · 연락 · 재회</span><strong>관계 흐름을 먼저 보면</strong></div><article className="period-ai-window is-mixed"><p>{relationshipReading.context}</p><div className="period-ai-window-line"><b>이어지는 흐름</b><span>{relationshipReading.flow}</span></div><div className="period-ai-window-line"><b>주목 시기</b><span>{relationshipReading.focus_timing}</span></div><div className="period-ai-window-line"><b>현실에서 확인</b><span>{relationshipReading.watch}</span></div><div className="period-ai-window-line is-avoid"><b>과대해석 주의</b><span>{relationshipReading.avoid}</span></div>{data.contact_flow ? <><div className="period-ai-window-line"><b>상대 → 나</b><span>{data.contact_flow.incoming}</span></div><div className="period-ai-window-line"><b>나 → 상대</b><span>{data.contact_flow.outgoing}</span></div><div className="period-ai-window-line"><b>과거 인연</b><span>{data.contact_flow.reconnection}</span></div></> : null}</article></section> : null}
+    {showRelationshipFocus && relationshipReading ? <section className="period-ai-window-section period-ai-relationship-section"><div className="period-ai-section-title"><span>관계 · 연락 · 재회</span><strong>관계 흐름을 먼저 보면</strong></div><article className="period-ai-window is-mixed"><p>{relationshipReading.context}</p><div className="period-ai-window-line"><b>이어지는 흐름</b><span>{relationshipReading.flow}</span></div><div className="period-ai-window-line"><b>주목 시기</b><span>{relationshipReading.focus_timing}</span></div><div className="period-ai-window-line"><b>현실에서 확인</b><span>{relationshipReading.watch}</span></div><div className="period-ai-window-line is-avoid"><b>과대해석 주의</b><span>{relationshipReading.avoid}</span></div>{data.contact_flow ? <><div className="period-ai-window-line"><b>상대 → 나</b><span>{data.contact_flow.incoming}</span></div><div className="period-ai-window-line"><b>나 → 상대</b><span>{data.contact_flow.outgoing}</span></div><div className="period-ai-window-line"><b>과거 인연</b><span>{data.contact_flow.reconnection}</span></div></> : null}</article></section> : null}
 
     {!!decisions.length && <section className="period-ai-action-section">
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
@@ -65,8 +70,8 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       </article>)}</div>
     </section>}
 
-    {!!keyWindows.length ? <section className="period-ai-window-section">
-      <div className="period-ai-section-title"><span>중요 시기</span><strong>눈여겨볼 날짜 · 구간</strong></div>
+    {!!keyWindows.length ? <section className="period-ai-window-section period-ai-key-window-section">
+      <div className="period-ai-section-title"><span>중요 시기 상세</span><strong>눈여겨볼 날짜 · 구간</strong></div>
       <div className="period-ai-windows">{keyWindows.slice(0,6).map((item,index)=><article className={`period-ai-window ${signalClass(item.signal)}`} key={`${item.start}-${item.end}-${index}`}>
         <div className="period-ai-window-head"><div><b>{periodLabel(item.start,item.end)}</b><strong>{item.label}</strong></div><span>{item.signal}</span></div>
         {!!item.topics?.length && <div className="period-ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>}

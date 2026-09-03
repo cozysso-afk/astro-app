@@ -18,3 +18,19 @@
 
 /* V21 single-call controls */
 .period-ai-v21-controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.period-ai-v21-controls button{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(120,105,150,.2);border-radius:999px;padding:8px 11px;background:rgba(255,255,255,.7);font:inherit;cursor:pointer}.period-ai-v21-controls button.is-cancel{border-color:rgba(170,86,102,.28)}.period-ai-v21-controls-success{margin-top:10px}.period-ai-failed-usage{font-size:.82rem;opacity:.82}.ai-cost-guard-toolbar{flex-wrap:wrap}
+
+
+/* V21.3.1 UI audit · dates/actions before secondary interpretation detail */
+.period-ai-v18>.period-ai-head{order:1}
+.period-ai-v18>.period-ai-summary{order:2}
+.period-ai-v18>.period-ai-quick-dates{order:3}
+.period-ai-v18>.period-ai-action-section{order:4}
+.period-ai-v18>.period-ai-key-window-section,.period-ai-v18>.period-ai-chips{order:5}
+.period-ai-v18>.period-ai-relationship-section{order:6}
+.period-ai-v18>.period-ai-cache-note{order:7}
+.period-ai-v18>.period-ai-v21-controls-success{order:8}
+.period-ai-v18>.period-ai-details{order:9}
+.period-ai-v18>.period-ai-meta{order:10}
+.period-ai-v18>.period-ai-validation{order:11}
+.period-ai-quick-dates{display:grid;gap:8px}.period-ai-quick-date-list{display:grid;gap:6px}.period-ai-quick-date{display:grid;grid-template-columns:minmax(88px,auto) minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;border:1px solid rgba(157,151,177,.18);background:rgba(255,255,255,.72)}.period-ai-quick-date.is-use{background:linear-gradient(135deg,rgba(237,249,243,.92),rgba(255,255,255,.8));border-color:rgba(112,157,135,.22)}.period-ai-quick-date.is-caution{background:linear-gradient(135deg,rgba(255,241,243,.92),rgba(255,255,255,.8));border-color:rgba(181,119,128,.2)}.period-ai-quick-date>b{color:#654e74;font-size:.82rem;font-weight:950;font-variant-numeric:tabular-nums}.period-ai-quick-date>div{min-width:0;display:grid;gap:2px}.period-ai-quick-date>div>strong{color:#493d52;font-size:.8rem;line-height:1.35}.period-ai-quick-date>div>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#897c8e;font-size:.66rem}.period-ai-quick-date>span{padding:4px 7px;border-radius:999px;background:rgba(115,92,130,.08);color:#705b7b;font-size:.63rem;font-weight:900}.period-ai-window-head>div>b{font-size:.86rem}.period-ai-window>p{font-size:.81rem}.period-ai-window-line{font-size:.79rem}.period-ai-actions article>div>strong{font-size:.87rem}.period-ai-actions article>div>p{font-size:.8rem}
+@media(max-width:430px){.period-ai-quick-date{grid-template-columns:84px minmax(0,1fr) auto;padding:9px}.period-ai-quick-date>b{font-size:.79rem}.period-ai-quick-date>div>strong{font-size:.78rem}}
