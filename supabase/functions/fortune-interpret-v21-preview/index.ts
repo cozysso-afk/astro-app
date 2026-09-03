@@ -6,7 +6,7 @@ import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiO
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21.2-single-core-safe-wording";
+const VERSION="supabase-ai-v21.2.1-explicit-action-guard";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -199,6 +199,7 @@ Deno.serve(async(req)=>{
   const preferred=MODELS[b.model]?b.model:DEFAULT_MODEL;const payload=compactCalculation(b.calculation);const pb=promptBudget(payload);
   if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0});
   if(b?.action==="prompt"){const p=buildExternalPrompt(payload);return res({ok:true,interpreter_version:VERSION,prompt:p.text,prompt_bytes:p.bytes,estimated_input_tokens:p.estimated_input_tokens,prompt_budget_bytes:p.max_bytes});}
+  if(b?.action!=="start")return res({ok:false,error:"지원하지 않는 action이야. 유료 AI 호출은 action=start에서만 시작할 수 있어."},400);
   if(!key)return res({ok:false,missing_key:true,error:"GEMINI_API_KEY가 설정되지 않았어."},503);
   if(b?.action==="start"){
     if(!pb.ok)return res({ok:false,cost_guard_blocked:true,error:`AI 입력 근거가 비용 상한을 넘었어(${pb.bytes}/${pb.max_bytes} bytes). 계산 결과와 프롬프트 복사는 그대로 사용할 수 있어.`},413);
@@ -211,5 +212,5 @@ Deno.serve(async(req)=>{
     if(error||!data?.id)return res({ok:false,error:`해설 작업 생성 실패: ${error?.message??"unknown"}`},500);
     const task=job(data.id,payload,preferred,key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);return res({ok:true,job_id:data.id,status:"queued",interpreter_version:VERSION,reused:false,inflight:false,prompt_budget:{bytes:pb.bytes,estimated_input_tokens:pb.estimated_input_tokens,max_bytes:pb.max_bytes}},202);
   }
-  const r:any=await calculate(payload,preferred,key,async()=>true);return res(r,r.ok?200:r?.cost_guard_blocked?413:502);
+  return res({ok:false,error:"지원하지 않는 action이야."},400);
 });

@@ -77,6 +77,8 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   assert.match(src,/stabilizeCoreForQuality/);
   assert.match(src,/quality_report:r\.quality_report\?\?null/);
   assert.match(src,/if\(!\(await jobActive\(id\)\)\)\{/);
+  assert.match(src,/if\(b\?\.action!==\"start\"\)return res/);
+  assert.doesNotMatch(src,/calculate\(payload,preferred,key,async\(\)=>true\)/);
   assert.match(src,/update\(\{usage_json:usageJson,updated_at:/);
   const usageBuild=src.indexOf('const usageJson=');
   const inactiveCheck=src.indexOf('if(!(await jobActive(id)))');
