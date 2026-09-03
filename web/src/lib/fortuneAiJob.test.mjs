@@ -21,8 +21,8 @@ test('pending fortune AI job round-trips only with the current contract', () => 
   assert.equal(parsed?.contract, FORTUNE_AI_JOB_CONTRACT)
   assert.equal(parsed?.jobId, 'job-123')
   assert.equal(parsed?.request?.period, 'today')
-  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v2$/)
-  assert.match(FORTUNE_AI_JOB_CONTRACT, /v20$/)
+  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v3$/)
+  assert.match(FORTUNE_AI_JOB_CONTRACT, /v21-single-core-cost-guard$/)
 })
 
 test('legacy pending job without a contract is rejected', () => {
@@ -31,7 +31,7 @@ test('legacy pending job without a contract is rejected', () => {
 })
 
 test('pending job from a different interpretation contract is rejected', () => {
-  const stale = JSON.stringify({ contract: 'fortune-ai-job-old', jobId: 'old-job' })
+  const stale = JSON.stringify({ contract: 'fortune-ai-job-release-v20', jobId: 'old-job' })
   assert.equal(decodePendingFortuneAiJob(stale), null)
 })
 
