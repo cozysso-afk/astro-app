@@ -2,6 +2,7 @@
 
 This preview generation keeps deterministic calculation depth while limiting paid Gemini work.
 
+- Current runtime guard: `supabase-ai-v21.2.1-explicit-action-guard`.
 - Normal generation path: one Gemini core call.
 - Paid Gemini generation is fail-closed: only an explicit authenticated `action: start` can enter a paid generation path; missing or unknown actions return HTTP 400.
 - Hard network-call ceiling: two Gemini calls per job, including repair/fallback.
