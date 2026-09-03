@@ -170,6 +170,7 @@ export type IntegratedApiResponse = {
     relationship_signals: Record<string, FortuneStat | null>
     market?: { has_open_session: boolean; session_count: number; session_dates: string[]; calendar_mode?: string; calendar_exact_range?: string[] | null; calendar_warning?: string | null }
     detail_days?: Array<{ date: string; market_open: boolean; topics: Record<string, { best_window?: { start: string; end: string; score: number }; caution_window?: { start: string; end: string; score: number }; evidence?: string[] }> }>
+    key_dates?: Array<{ date:string; salience?:number; topics?:Record<string,unknown>|string[]; evidence?:string[]; samples?:unknown[] }>
     months: FortuneMonth[]
   }
   saju: {
@@ -206,8 +207,6 @@ export type IntegratedApiResponse = {
   }
 }
 
-
-
 export type LocationFitResponse = {
   ok: boolean
   api_version: string
@@ -231,6 +230,41 @@ export type AiTopicInterpretation = {
   avoid: string
   confidence: '높음' | '보통' | '낮음'
   confidence_reason: string
+  evidence_refs?: string[]
+}
+
+export type AiKeyWindow = {
+  label: string
+  start: string
+  end: string
+  signal: '활용' | '혼합' | '주의' | '배경'
+  topics: string[]
+  summary: string
+  action: string
+  avoid: string
+  evidence_refs: string[]
+}
+
+export type AiYearPhase = {
+  label: string
+  start: string
+  end: string
+  theme: string
+  change: string
+  evidence_refs: string[]
+}
+
+export type AiDecision = {
+  action: string
+  timing: string
+  reason: string
+  evidence_refs: string[]
+}
+
+export type AiQualityValidation = {
+  version?: string
+  score?: number
+  stages?: Array<{ stage:number; name:string; passed:boolean }>
 }
 
 export type AiInterpretationResponse = {
@@ -240,10 +274,26 @@ export type AiInterpretationResponse = {
   model?: string
   fallback_from?: string
   interpreter_version?: string
-  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; billable_output_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number; price_phase?: string; attempt_count?: number; thai_safety_retry?: boolean; thai_safety_fallback?: boolean }
+  usage?: {
+    prompt_tokens?: number
+    candidate_tokens?: number
+    thought_tokens?: number
+    billable_output_tokens?: number
+    total_tokens?: number
+    estimated_usd?: number
+    estimated_krw?: number
+    price_phase?: string
+    attempt_count?: number
+    thai_safety_retry?: boolean
+    thai_safety_fallback?: boolean
+    quality_validation?: AiQualityValidation | null
+  }
   data?: {
     headline: string
-    overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string }
+    overall: { summary: string; dominant_pattern: string; best_phase: string; caution_phase: string; evidence_refs?: string[] }
+    key_windows?: AiKeyWindow[]
+    year_phases?: AiYearPhase[]
+    decisions?: AiDecision[]
     clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
     investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }
