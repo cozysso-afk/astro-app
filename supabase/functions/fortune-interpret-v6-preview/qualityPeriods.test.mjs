@@ -100,9 +100,13 @@ test("day quality guard requires clock timing and W:detail evidence when intrada
   assert.equal(missing.ok,false);
   const missingIssues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");
   assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);
-  assert.match(missingIssues,/W:detail/);
 
   data.decisions[0].timing="2026-09-03 08:00~09:30";
+  const unlinked=inspectInterpretationQuality(data,payload);
+  assert.equal(unlinked.ok,false);
+  const unlinkedIssues=unlinked.stages.flatMap(stage=>stage.issues??[]).join(" / ");
+  assert.match(unlinkedIssues,/시간대 행동 가이드에 실제 W:detail/);
+
   data.decisions[0].evidence_refs.push(detailRef);
   const fixed=inspectInterpretationQuality(data,payload);
   assert.equal(fixed.ok,true,JSON.stringify(fixed,null,2));

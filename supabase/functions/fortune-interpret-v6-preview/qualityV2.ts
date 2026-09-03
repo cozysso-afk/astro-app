@@ -138,10 +138,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const detailDays=Array.isArray(payload?.western?.detail_days)?payload.western.detail_days:[];
     const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));
     if(hasIntradayWindow){
-      const timedDecision=(data?.decisions??[]).some((d:any)=>/(?:[01]\d|2[0-3]):[0-5]\d/.test(String(d?.timing??"")));
-      if(!timedDecision)s5.push("오늘 시간대 행동 가이드 누락");
+      const timedDecisions=(data?.decisions??[]).filter((d:any)=>/(?:[01]\d|2[0-3]):[0-5]\d/.test(String(d?.timing??"")));
+      if(!timedDecisions.length)s5.push("오늘 시간대 행동 가이드 누락");
       const detailEvidenceAvailable=Array.from(map.keys()).some((ref:any)=>String(ref).startsWith("W:detail:"));
-      if(detailEvidenceAvailable&&!refsUsed.some((ref:string)=>ref.startsWith("W:detail:")))s5.push("오늘 실제 시간대 계산근거 W:detail:* 미사용");
+      if(detailEvidenceAvailable&&timedDecisions.length&&!timedDecisions.some((d:any)=>(d?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:detail:"))))s5.push("오늘 시간대 행동 가이드에 실제 W:detail:* 근거 미연결");
     }
   }
   const minSummary=kind==="annual"?240:kind==="month"?170:110;
