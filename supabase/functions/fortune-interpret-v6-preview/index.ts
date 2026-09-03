@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
-import { VERSION, PACKET_VERSION, QUALITY_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SYSTEM, SCHEMA, validateOutput, inspectInterpretationQuality, strictQualityRetryInstruction, txt } from "./integratedInterpretationV2.ts";
+import { VERSION, PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SYSTEM, SCHEMA, validateOutput, txt } from "./integratedInterpretationV2.ts";
+import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "./qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, runWithThaiOutputSafety, strictThaiRetryInstruction, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "./thaiContract.ts";
 
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
