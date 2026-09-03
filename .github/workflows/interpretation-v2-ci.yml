@@ -1,8 +1,9 @@
-name: Interpretation V2 CI
+name: Interpretation V3 CI
 
 on:
   pull_request:
     paths:
+      - 'integrated_fortune_v1.py'
       - 'supabase/functions/fortune-interpret-v6-preview/**'
       - 'web/src/**'
       - 'web/package.json'
@@ -13,16 +14,23 @@ permissions:
   contents: read
 
 jobs:
-  interpretation-v2:
+  interpretation-v3:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Evidence-ledger and guard tests
+      - name: Calculation syntax contract
+        run: |
+          python -m py_compile integrated_fortune_v1.py api/main.py
+          grep -q 'daily_scores' integrated_fortune_v1.py
+      - name: Evidence-ledger and five-stage guard tests
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
