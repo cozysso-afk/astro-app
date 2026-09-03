@@ -1,0 +1,40 @@
+name: Patch V21.3.1 contracts
+
+on:
+  push:
+    branches:
+      - work/ai-cost-guard-v21
+    paths:
+      - '.github/workflows/patch-v2131-contracts.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply contract bump
+        run: python scripts/patch_v2131_contracts.py
+      - name: Run interpretation regressions
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+      - name: Web build
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit V21.3.1 and cleanup one-shot files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-v2131-contracts.yml scripts/patch_v2131_contracts.py .github/workflows/v213-live-once-approved.yml
+          git add supabase/functions/fortune-interpret-v21-preview/index.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs supabase/functions/fortune-interpret-v21-preview/README.md web/src/lib/readingCache.ts web/src/lib/fortuneAiJob.ts web/src/lib/fortuneAiJob.test.mjs
+          git commit -m 'fix(ai): bump V21.3.1 after investment output guard'
+          git push origin HEAD:work/ai-cost-guard-v21
