@@ -60,7 +60,9 @@
 .ai-window-avoid strong { color:#90686c; }
 .ai-window-action span,
 .ai-window-avoid span { color:#68606e; }
-.ai-key-window > small { color:#9a909d; font-size:.68rem; }
+.ai-window-footer { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-top:2px; }
+.ai-window-footer small { color:#9a909d; font-size:.68rem; }
+.ai-window-footer button { flex:0 0 auto; border:1px solid rgba(121,99,137,.24); border-radius:999px; background:rgba(255,255,255,.72); padding:6px 9px; color:#6d5879; font-size:.68rem; font-weight:850; cursor:pointer; }
 
 .ai-year-phase-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .ai-year-phase-list article {
@@ -98,4 +100,5 @@
   .ai-window-date { font-size:1.05rem; }
   .ai-key-window { padding:15px 14px; }
   .ai-decision-list article { padding:13px; }
+  .ai-window-footer { align-items:flex-start; flex-direction:column; }
 }
