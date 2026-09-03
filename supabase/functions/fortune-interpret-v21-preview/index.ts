@@ -4,9 +4,9 @@ import { PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculati
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
-import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget } from "./costGuardV21.ts";
+import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21-single-core-cost-guard";
+const VERSION="supabase-ai-v21.1-single-core-local-stabilizer";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -100,7 +100,7 @@ function normalizeDirectionalWindows(data:any,payload:any){
 }
 
 function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
-  const merged={...core,topic_analysis:buildDeterministicTopicAnalysis(payload)};
+  const merged=stabilizeCoreForQuality({...core,topic_analysis:buildDeterministicTopicAnalysis(payload)},payload);
   let validated=validateOutput(merged);
   if(!validated)return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,...meta};
   let data=normalizeDirectionalWindows(validated,payload);
@@ -163,7 +163,7 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub)};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),quality_report:r.quality_report??null};
     if(!(await jobActive(id))){
       // A cancel request can mark the row failed while the already-sent first network call is still in flight.
       // Never resurrect that job, but attach the real usage/trace once the call returns so spent tokens are observable.
@@ -181,7 +181,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,thai_contract:THAI_CONTRACT_VERSION});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();

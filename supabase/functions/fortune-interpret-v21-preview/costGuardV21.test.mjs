@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget } from './costGuardV21.ts';
+import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from './costGuardV21.ts';
 import { TOPICS, REL } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts';
 
 function packet(){
@@ -19,6 +19,7 @@ function packet(){
   for(const topic of TOPICS){
     evidence_ledger.push({id:`W:overall:${topic}`,system:'western',scope:'period_average',topic,direction:'neutral',score:overall[topic].average,text:`${topic} 기간 평균 ${overall[topic].average}`});
     evidence_ledger.push({id:`W:date:2027-04-11:${topic}:best`,system:'western',scope:'best_day',topic,direction:'supportive',date:'2027-04-11',score:72,text:`${topic} 직접 날짜 근거 ${'x'.repeat(100)}`});
+    evidence_ledger.push({id:`W:daily:2027-04-11:${topic}:1`,system:'western',scope:'daily_actual',topic,direction:'supportive',date:'2027-04-11',score:69,text:`${topic} 실제 일별 애스펙트 근거`});
     evidence_ledger.push({id:`W:month:2027-04:${topic}`,system:'western',scope:'month_average',topic,direction:'supportive',start:'2027-04-01',end:'2027-05-01',score:61,text:`${topic} 월 근거 ${'y'.repeat(100)}`});
   }
   for(const topic of REL){
@@ -73,6 +74,8 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   assert.doesNotMatch(src,/Promise\.all\(\[\s*generate/);
   assert.match(src,/buildThaiOutputFallback/);
   assert.match(src,/usage_json:usageJson/);
+  assert.match(src,/stabilizeCoreForQuality/);
+  assert.match(src,/quality_report:r\.quality_report\?\?null/);
   assert.match(src,/if\(!\(await jobActive\(id\)\)\)\{/);
   assert.match(src,/update\(\{usage_json:usageJson,updated_at:/);
   const usageBuild=src.indexOf('const usageJson=');
@@ -89,4 +92,22 @@ test('fortune UI is wired only to the V21 cost-guarded function and exposes prom
   assert.match(app,/captureCanceledAiUsage/);
   assert.match(app,/AI용 압축 프롬프트 복사/);
   assert.match(app,/정상 경로 1회/);
+});
+
+
+test('V21 local stabilizer repairs evidence links and minimum prose without Gemini',()=>{
+  const p=packet();
+  const core={headline:'테스트',overall:{summary:'짧은 총평',dominant_pattern:'패턴',best_phase:'활용',caution_phase:'주의',evidence_refs:['W:overall:직장']},key_windows:[{label:'직장 날짜',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['직장'],summary:'짧음',action:'확인',avoid:'주의',evidence_refs:['W:date:2027-04-11:직장:best']}],year_phases:[],cross_checks:[{label:'교차',start:'2027-04-11',end:'2027-04-11',mode:'복수체계',western:'짧음',saju:'',thai:'',synthesis:'짧음',evidence_refs:['W:date:2027-04-11:직장:best']}],decisions:[{action:'직장 확인',timing:'2027-04-11',reason:'짧음',watch:'짧음',avoid:'짧음',evidence_refs:['W:overall:직장']}],clusters:{relationship:'',work_study:'',money_news:'',investment:'',condition:''},relationship_reading:{context:'',flow:'',focus_timing:'',watch:'',avoid:'',evidence_refs:[]},contact_flow:{incoming:'',outgoing:'',reconnection:''},investment_reading:{psychology:'',realization:'',entry:'',risk:''},systems:{western:'w',saju:'s',thai:'t'},priorities:[],limits:'점수는 확률이 아니다'};
+  const fixed=stabilizeCoreForQuality(core,p);
+  assert.ok(fixed.overall.summary.length>=240);
+  assert.ok(fixed.overall.evidence_refs.length>=3);
+  assert.ok(fixed.key_windows[0].evidence_refs.some(ref=>ref.startsWith('W:daily:2027-04-11:직장')));
+  assert.ok(fixed.key_windows[0].summary.length>=45);
+  assert.ok(fixed.decisions[0].evidence_refs.some(ref=>fixed.key_windows[0].evidence_refs.includes(ref)));
+  assert.ok(fixed.decisions[0].watch.length>=14);
+  assert.ok(fixed.cross_checks[0].evidence_refs.includes('S:annual:1:2027-01-01'));
+  assert.ok(fixed.cross_checks[0].evidence_refs.includes('T:taksajorn:1:2027-01-01'));
+  assert.ok(fixed.cross_checks[0].synthesis.length>=45);
+  assert.ok(fixed.priorities.length>=3);
+  assert.equal(fixed.year_phases.length,4);
 });
