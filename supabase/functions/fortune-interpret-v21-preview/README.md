@@ -11,6 +11,7 @@ This preview generation keeps deterministic calculation depth while limiting pai
 - Prompt-size budget is checked before a paid request is sent.
 - Cross-system prompt evidence reserves slots for Saju and Thai context so a Western-heavy annual packet cannot crowd them out.
 - Rolling emergency breaker: per user 6 new jobs/10 minutes and 20/24 hours; service-wide 18/10 minutes and 60/24 hours. Cached/pending reuse is checked before these limits, so free reuse does not consume the breaker.
+- The rolling breaker counts newly inserted V21 jobs regardless of final status. This is intentionally conservative so cancel/error loops cannot silently keep spending.
 - Thai safety cleanup and eligible quality/evidence repairs are local and do not trigger an extra model call.
 - Successful, failed, and canceled in-flight calls preserve token/call traces when available.
 - The compressed AI prompt can be copied without calling Gemini.
