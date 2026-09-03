@@ -1,6 +1,6 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
-export const VERSION = "supabase-ai-v18-grounded-split-reliability";
+export const VERSION = "supabase-ai-v19-targeted-quality-repair";
 export const PACKET_VERSION = "fortune-interpretation-packet-v4-intraday-window";
 export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";
 export const MODELS: Record<string,string> = {

@@ -4,6 +4,7 @@ import { VERSION, PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compact
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "./qualityV2.ts";
 import { periodModeInstruction } from "./periodInstruction.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, runWithThaiOutputSafety, strictThaiRetryInstruction, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "./thaiContract.ts";
+import { classifyQualityRepair } from "./repairV19.ts";
 
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -100,6 +101,36 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
   }catch{return {ok:false,error:"분할 구조화 응답 병합에 실패했어",model,usage:combinedUsage,split_generation:true};}
 }
 
+async function repairCandidate(payload:any,candidate:any,report:any,model:string,key:string,compactMode=true,strictThai=false){
+  const repair=classifyQualityRepair(report,candidate);
+  const qualityRetry=strictQualityRetryInstruction(report);
+  const [core,topics]=await Promise.all([
+    repair.core?generatePart(payload,model,key,"core",CORE_SCHEMA,compactMode,strictThai,qualityRetry):Promise.resolve({ok:true,partial:null,usage:null}),
+    repair.topics?generatePart(payload,model,key,"topics",TOPIC_SCHEMA,compactMode,strictThai,qualityRetry):Promise.resolve({ok:true,partial:null,usage:null}),
+  ]);
+  const combinedUsage=addGeminiUsage(core.usage,topics.usage);
+  if(!core.ok||!topics.ok)return {ok:false,error:[core.ok?"":core.error,topics.ok?"":topics.error].filter(Boolean).join("; "),model,usage:combinedUsage,targeted_repair:repair};
+  try{
+    const merged={...candidate,...(core.partial??{}),...(topics.partial??{})};
+    const validated=validateOutput(merged);
+    if(!validated)return {ok:false,error:"타깃 재생성 후 구조 검증 실패",model,usage:combinedUsage,targeted_repair:repair};
+    const data=normalizeDirectionalWindows(validated,payload);
+    const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
+    if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:combinedUsage,output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data,targeted_repair:repair};
+    const quality=inspectInterpretationQuality(data,payload);
+    if(!quality.ok)return qualityFailure({model,usage:combinedUsage,data,targeted_repair:repair},quality);
+    return {ok:true,data,model,interpreter_version:VERSION,validation:quality,targeted_repair:repair,usage:{...combinedUsage,quality_validation:qualitySummary(quality)}};
+  }catch{return {ok:false,error:"타깃 재생성 병합에 실패했어",model,usage:combinedUsage,targeted_repair:repair};}
+}
+
+async function repairCandidateWithThaiSafety(payload:any,candidate:any,report:any,model:string,key:string){
+  const result=await runWithThaiOutputSafety(payload,(strictThai)=>repairCandidate(payload,candidate,report,model,key,true,strictThai),validateOutput);
+  if(!result.ok)return result;
+  const quality=result.validation?.ok===true?result.validation:inspectInterpretationQuality(result.data,payload);
+  if(!quality.ok)return qualityFailure(result,quality);
+  return {...result,model:result.model??model,interpreter_version:VERSION,validation:quality,usage:{...(result.usage??{}),quality_validation:qualitySummary(quality)}};
+}
+
 async function generateWithThaiSafety(payload:any,model:string,key:string,compactMode=false,qualityRetry=""){
   const result=await runWithThaiOutputSafety(payload,(strictThai)=>generate(payload,model,key,compactMode,strictThai,qualityRetry),validateOutput);
   if(!result.ok)return result;
@@ -112,14 +143,17 @@ async function calculate(payload:any,preferred:string,key:string){
   const first:any=await generateWithThaiSafety(payload,preferred,key,false,"");
   if(first.ok)return first;
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
-  const qualityRetry=first?.quality_guard_failed?strictQualityRetryInstruction(first.quality_report):"";
-  const second:any=await generateWithThaiSafety(payload,secondModel,key,true,qualityRetry);
+  const canTarget=first?.quality_guard_failed===true&&first?.candidate_data&&first?.quality_report;
+  const second:any=canTarget
+    ?await repairCandidateWithThaiSafety(payload,first.candidate_data,first.quality_report,secondModel,key)
+    :await generateWithThaiSafety(payload,secondModel,key,true,"");
   const combinedUsageBase=addGeminiUsage(first.usage,second.usage);
   const combinedUsage=second?.validation?{...combinedUsageBase,quality_validation:qualitySummary(second.validation)}:combinedUsageBase;
   const attemptCount=Number(first.attempt_count??1)+Number(second.attempt_count??1);
   if(second.ok)return preferred===secondModel?{...second,usage:combinedUsage,attempt_count:attemptCount}:{...second,usage:combinedUsage,attempt_count:attemptCount,fallback_from:preferred};
   const qualityDetail=second?.quality_guard_failed?` · 최종 품질점수 ${second?.quality_report?.score??0}/100`:"";
-  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second.error}${qualityDetail}`,model:preferred,usage:combinedUsage,attempt_count:attemptCount,quality_report:second?.quality_report??first?.quality_report};
+  const repairLabel=canTarget?"타깃 재생성":"전체 재생성";
+  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차(${repairLabel})=${second.error}${qualityDetail}`,model:preferred,usage:combinedUsage,attempt_count:attemptCount,quality_report:second?.quality_report??first?.quality_report};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
