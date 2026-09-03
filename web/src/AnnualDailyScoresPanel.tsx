@@ -66,11 +66,10 @@ export function AnnualDailyScoresPanel({ rows }: { rows: FortuneDailyScore[] }) 
     </div>}
     <div className="daily-score-list">{visible.map((row) => {
       const score = typeof row.scores?.[topic] === 'number' ? row.scores[topic] as number : null
-      const relevant = (row.evidence ?? []).filter((item) => !item.source_topics?.length || item.source_topics.includes(topic))
-      const evidence = relevant.length ? relevant : (row.evidence ?? [])
+      const evidence = (row.evidence ?? []).filter((item) => !item.source_topics?.length || item.source_topics.includes(topic))
       return <details className={`daily-score-row ${scoreClass(score, topic)}`} key={`${row.date}-${topic}`}>
         <summary><span><strong>{row.date}</strong><small>{row.label}{row.market_open ? ' · KRX 거래일' : ''}</small></span><span className="daily-score-value"><b>{score == null ? '—' : score.toFixed(1)}</b><small>{band(score, topic)}</small></span></summary>
-        {evidence.length ? <div className="daily-score-evidence"><strong>그날 실제 계산 근거</strong>{evidence.slice(0,6).map((item,index)=><p key={`${row.date}-ev-${index}`}>{item.sample_time ? `${item.sample_time} · ` : ''}{evidenceText(item.text)}</p>)}</div> : <p className="daily-score-no-evidence">이 날짜는 점수는 계산됐지만 표시용 상위 근거가 남지 않았어.</p>}
+        {evidence.length ? <div className="daily-score-evidence"><strong>{topic}에 직접 연결된 계산 근거</strong>{evidence.slice(0,6).map((item,index)=><p key={`${row.date}-ev-${index}`}>{item.sample_time ? `${item.sample_time} · ` : ''}{evidenceText(item.text)}</p>)}</div> : <p className="daily-score-no-evidence">이 날짜의 {topic} 점수는 계산됐지만, 저장된 상위 근거 중 이 분야에 직접 연결된 항목은 없어. 다른 분야 근거로 대신 설명하지 않을게.</p>}
       </details>
     })}</div>
   </section>
