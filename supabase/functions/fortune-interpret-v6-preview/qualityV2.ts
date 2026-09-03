@@ -256,6 +256,13 @@ export function inspectInterpretationQuality(data:any,payload:any){
 }
 
 export function strictQualityRetryInstruction(report:any){
-  const failed=(report?.stages??[]).filter((s:any)=>!s?.passed).map((s:any)=>`[${s.stage}단계 ${s.name}] ${(s.issues??[]).slice(0,8).join(" / ")}`).join("\n");
-  return `\n\nQUALITY_RETRY: 이전 응답이 5단계 품질검증을 통과하지 못했다. 아래 실패를 모두 고쳐라. 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고, 날짜를 새로 만들지 마라. 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
+  const failed=(report?.stages??[]).filter((s:any)=>!s?.passed).map((s:any)=>`[${s.stage}단계 ${s.name}] ${(s.issues??[]).slice(0,10).join(" / ")}`).join("\n");
+  return `\n\nQUALITY_RETRY: 이전 응답이 5단계 품질검증을 통과하지 못했다. 아래 실패만 정확히 고치고 이미 통과한 근거/방향은 망가뜨리지 마라.
+- 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고 날짜를 새로 만들지 마라. key_window의 start/end는 연결한 근거가 그 날짜를 직접 포함하거나 덮어야 한다. 한 날짜 근거로 임의 범위를 만들지 마라.
+- supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.
+- 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.
+- '핵심 근거 설명이 얕음'이면 해당 topic reason에 구체 추세/평균과 실제 시기·근거를 연결해 충분히 늘려라. '주목 근거 설명이 얕음'도 변화 방향과 시기 근거를 최소 두 문장 수준으로 보강해라. 참고 분야를 대신 장문화하지 마라.
+- 관계·재회 주목 시기 설명 부족이면 focus_timing을 실제 관계 evidence_refs가 직접 지지하는 날짜/구간과 현실 확인 방식까지 포함해 보강해라.
+- 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
+- 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
 }

@@ -1,4 +1,4 @@
-export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-split-structured-v16'
+export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-grounded-split-v17'
 export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v2'
 
 export type PendingFortuneAiJob = {

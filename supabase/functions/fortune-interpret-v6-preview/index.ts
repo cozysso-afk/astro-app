@@ -24,9 +24,21 @@ CORE_SCHEMA.required=(CORE_SCHEMA.required??[]).filter((key:string)=>key!=="topi
 const TOPIC_SCHEMA:any={type:"OBJECT",properties:{topic_analysis:SCHEMA.properties.topic_analysis},required:["topic_analysis"]};
 
 function splitPartInstruction(part:"core"|"topics"){
-  return part==="core"
-    ? "[OUTPUT PART: CORE] topic_analysis는 출력하지 말고, 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 이 스키마에 맞춰 작성해."
-    : "[OUTPUT PART: TOPICS] topic_analysis만 출력해. 15개 분야를 정확히 한 번씩 모두 넣고 topic 이름은 지정된 한국어 분야명을 그대로 사용해.";
+  if(part==="topics")return `[OUTPUT PART: TOPICS]
+- topic_analysis만 출력하고 15개 분야를 정확히 한 번씩 모두 넣어. topic 이름은 지정된 한국어 분야명을 그대로 써.
+- importance=핵심은 실제 근거가 충분한 최대 5개만 선택하고 reason을 구체적으로 써. 연간은 최소 85자, 그 외 기간은 최소 60자를 목표로 하며, 가능하면 평균/추세 근거와 실제 날짜·일별·세부 근거처럼 서로 다른 층위의 evidence_refs를 2개 이상 연결해.
+- importance=주목 reason은 연간 최소 55자, 그 외 기간 최소 40자를 목표로 하고, 단순 형용사가 아니라 변화 방향 + 시기 또는 구체 근거를 함께 설명해.
+- importance=참고는 짧게 유지해. 근거를 충분히 설명할 수 없는 분야를 핵심/주목으로 올리지 마.
+- evidence_refs는 evidence_ledger에 실제 존재하는 ID만 그대로 사용하고, reason/timing에 ledger에 없는 정확한 날짜를 만들지 마.`;
+  return `[OUTPUT PART: CORE]
+- topic_analysis는 출력하지 말고 총평·핵심시기·연간구간·교차검증·행동·관계/연락/재회·투자·체계별 해설·한계만 작성해.
+- key_windows의 start/end에 정확한 날짜를 쓸 때는 그 날짜를 직접 포함하거나 덮는 evidence_refs가 반드시 있어야 해. 근거가 한 날짜뿐이면 임의로 앞뒤 날짜를 늘려 범위를 만들지 말고 start=end로 그 날짜만 써. 월초/중순/말 같은 말에서 임의의 1일·15일·말일을 생성하지 마.
+- 모든 정확한 날짜는 CALCULATED_DATA.evidence_ledger 또는 계산 패킷에 실제 존재하는 날짜만 사용해. 근거 없는 중간 날짜·범위 끝점을 추론하지 마.
+- key_window의 evidence_refs에 supportive와 caution이 함께 있으면 signal은 반드시 '혼합'으로 써. 한쪽 방향으로 단순화하지 마.
+- decisions의 각 항목은 반드시 적어도 하나의 evidence_ref를 실제로 출력한 key_window와 공유해야 해. timing도 그 key_window의 start/end 또는, 오늘 분석이면 실제 W:window 시간창과 직접 연결해. 계산된 핵심 시기와 무관한 '전면 보류', '무조건 관망' 같은 포괄 조언을 새로 만들지 마.
+- 오늘 분석에 W:window 근거가 있으면 최소 한 결정의 timing에 그 정확한 HH:MM~HH:MM 시간창을 쓰고 같은 분야의 W:detail 근거도 함께 연결해.
+- 관계·연애·연락·재회 근거가 두드러지면 relationship_reading의 flow/focus_timing/watch를 충분히 구체적으로 쓰되, focus_timing의 정확한 날짜는 relationship_reading.evidence_refs가 직접 뒷받침하는 날짜만 써.
+- annual이면 year_phases 4개 이상, cross_checks 3개 이상, key_windows 5개 이상을 유지하고 각 항목의 근거를 실제 evidence_refs로 연결해.`;
 }
 
 async function generatePart(payload:any,model:string,key:string,part:"core"|"topics",schema:any,compactMode=false,strictThai=false,qualityRetry=""){
