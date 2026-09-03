@@ -41,6 +41,8 @@ The candidate UI now uses the following reading hierarchy for annual, month, wee
 
 The period component also replaces the English `GEMINI PERIOD READING` kicker with `AI(인공지능) 기간 해설`, increases the smallest actionable date/body typography, and moves the 5-stage validation badge below user-facing interpretation content. The annual quick-date rows remain clickable so a date can jump back to the annual score inspection UI.
 
+The first-pass audit is complete. The remaining readability issue is content-level rather than layout-level: the top overall summary still repeats too many averages/spreads and should be condensed into a short conclusion while preserving the detailed statistics below. That belongs to the next interpretation UX pass rather than this hierarchy patch.
+
 This UI audit used no additional Gemini call and created no Vercel deployment. It changes presentation only; the V21.3.1 runtime/cache contracts do not need another version bump.
 
 Final candidate verification is performed on the PR head. The Supabase `fortune-interpret-v21-preview` deployment is intentionally a preview-only target; main and production remain unchanged until explicit release approval.
