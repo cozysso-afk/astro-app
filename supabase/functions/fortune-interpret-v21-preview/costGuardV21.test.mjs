@@ -79,3 +79,14 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const inactiveCheck=src.indexOf('if(!(await jobActive(id)))');
   assert.ok(usageBuild>=0 && inactiveCheck>usageBuild,'usage must be built before canceled-job early return');
 });
+
+test('fortune UI is wired only to the V21 cost-guarded function and exposes prompt/cancel controls',()=>{
+  const app=fs.readFileSync(new URL('../../../web/src/AppNext.tsx',import.meta.url),'utf8');
+  assert.match(app,/FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'/);
+  assert.doesNotMatch(app,/supabase\.functions\.invoke\('fortune-interpret-v6-preview'/);
+  assert.match(app,/action:'prompt'/);
+  assert.match(app,/action:'cancel'/);
+  assert.match(app,/captureCanceledAiUsage/);
+  assert.match(app,/AI용 압축 프롬프트 복사/);
+  assert.match(app,/정상 경로 1회/);
+});
