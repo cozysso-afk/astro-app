@@ -11,6 +11,11 @@ const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
 
 function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status,headers:CORS});}
 function usage(raw:any){const u=raw?.usageMetadata??{};return {prompt_tokens:Number(u.promptTokenCount??0),candidate_tokens:Number(u.candidatesTokenCount??0),thought_tokens:Number(u.thoughtsTokenCount??0),total_tokens:Number(u.totalTokenCount??0)};}
+function qualitySummary(quality:any){return quality?{version:quality.version,score:quality.score,stages:(quality.stages??[]).map((s:any)=>({stage:s.stage,name:s.name,passed:s.passed}))}:null;}
+function qualityFailure(result:any,quality:any){
+  const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");
+  return {...result,ok:false,error:`5단계 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};
+}
 
 async function generate(payload:any,model:string,key:string,compactMode=false,strictThai=false,qualityRetry=""){
   const controller=new AbortController();
@@ -37,11 +42,8 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
       const thaiGuard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
       if(!thaiGuard.safe)return {ok:false,error:"Thai 출력 안전검증에서 금지된 예측 표현을 감지했어.",model,usage:usage(raw),output_guard_failed:true,guard_violations:thaiGuard.violations,guard_engine:thaiGuard.guard_engine,unsafe_data:data};
       const quality=inspectInterpretationQuality(data,payload);
-      if(!quality.ok){
-        const failed=(quality.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");
-        return {ok:false,error:`5단계 해설 검증 미통과(${failed})`,model,usage:usage(raw),quality_guard_failed:true,quality_report:quality,candidate_data:data};
-      }
-      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,usage:usage(raw)};
+      if(!quality.ok)return qualityFailure({model,usage:usage(raw),data},quality);
+      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,usage:{...usage(raw),quality_validation:qualitySummary(quality)}};
     }catch{return {ok:false,error:"구조화 응답이 완전하지 않았어",model,usage:usage(raw)};}
   }catch(e){return {ok:false,error:e instanceof DOMException&&e.name==="AbortError"?"AI 해설 시간이 초과됐어.":`AI 해설 호출 실패: ${e instanceof Error?e.message:String(e)}`,model};}
   finally{clearTimeout(timer);}
@@ -49,7 +51,12 @@ async function generate(payload:any,model:string,key:string,compactMode=false,st
 
 async function generateWithThaiSafety(payload:any,model:string,key:string,compactMode=false,qualityRetry=""){
   const result=await runWithThaiOutputSafety(payload,(strictThai)=>generate(payload,model,key,compactMode,strictThai,qualityRetry),validateOutput);
-  return result.ok?{...result,model:result.model??model,interpreter_version:VERSION}:result;
+  if(!result.ok)return result;
+  // runWithThaiOutputSafety can construct a local Thai-safe fallback. Every
+  // success path, including that fallback, must pass the exact same 5 stages.
+  const quality=result.validation?.ok===true?result.validation:inspectInterpretationQuality(result.data,payload);
+  if(!quality.ok)return qualityFailure(result,quality);
+  return {...result,model:result.model??model,interpreter_version:VERSION,validation:quality,usage:{...(result.usage??{}),quality_validation:qualitySummary(quality)}};
 }
 
 async function calculate(payload:any,preferred:string,key:string){
@@ -58,7 +65,8 @@ async function calculate(payload:any,preferred:string,key:string){
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
   const qualityRetry=first?.quality_guard_failed?strictQualityRetryInstruction(first.quality_report):"";
   const second:any=await generateWithThaiSafety(payload,secondModel,key,true,qualityRetry);
-  const combinedUsage=addGeminiUsage(first.usage,second.usage);
+  const combinedUsageBase=addGeminiUsage(first.usage,second.usage);
+  const combinedUsage=second?.validation?{...combinedUsageBase,quality_validation:qualitySummary(second.validation)}:combinedUsageBase;
   const attemptCount=Number(first.attempt_count??1)+Number(second.attempt_count??1);
   if(second.ok)return preferred===secondModel?{...second,usage:combinedUsage,attempt_count:attemptCount}:{...second,usage:combinedUsage,attempt_count:attemptCount,fallback_from:preferred};
   const qualityDetail=second?.quality_guard_failed?` · 최종 품질점수 ${second?.quality_report?.score??0}/100`:"";
@@ -73,8 +81,7 @@ async function job(id:string,payload:any,model:string,key:string){
   await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key);
-    const qualityValidation=r.validation?{version:r.validation.version,score:r.validation.score,stages:(r.validation.stages??[]).map((s:any)=>({stage:s.stage,name:s.name,passed:s.passed}))}:null;
-    const usageJson=r.usage?{...r.usage,attempt_count:r.attempt_count??1,thai_safety_retry:Boolean(r.thai_safety_retry),thai_safety_fallback:Boolean(r.thai_safety_fallback),quality_validation:qualityValidation}:null;
+    const usageJson=r.usage?{...r.usage,attempt_count:r.attempt_count??1,thai_safety_retry:Boolean(r.thai_safety_retry),thai_safety_fallback:Boolean(r.thai_safety_fallback),quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null}:null;
     await a.from("ai_interpret_jobs").update(r.ok?{status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}:{status:"failed",model,error:r.error,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}).eq("id",id);
   }catch(e){
     await a.from("ai_interpret_jobs").update({status:"failed",error:e instanceof Error?e.message:String(e),updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}).eq("id",id);
