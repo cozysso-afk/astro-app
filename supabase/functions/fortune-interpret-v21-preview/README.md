@@ -18,3 +18,9 @@ This preview generation keeps deterministic calculation depth while limiting pai
 - Investment activity indices must not be presented as price, yield, buy, or sell predictions. Post-generation structural sanitization also replaces model-written buy/sell/hold/cash-out timing actions with market-data and risk-limit checks.
 - Western, Saju, and Thai evidence remain independent contexts; timing overlap is not a combined score, causal confirmation, or guaranteed outcome.
 - Live Gemini smoke tests are opt-in only and require explicit cost approval before execution.
+
+## Approved live smoke record
+
+The user approved one paid V21.3 annual smoke job with a maximum of two Gemini calls and an approximate KRW 150 ceiling. The job finished on the first `gemini-3.7-flash` call: prompt 29,292 tokens, candidate 6,241, thinking 930, total 36,463, with 5-stage quality validation 100/100. The compressed prompt contained 110 evidence rows: Western 100, Saju 8, Thai 2.
+
+Human review still found a gap that the 100/100 validator did not catch: some model-written investment `key_windows`/`decisions` converted relative activity indices into cash-out, sell-delay, profit-taking, or investment-hold actions. V21.3.1 fixes this without another Gemini call by structurally sanitizing investment-linked actions, avoids, watches, priorities, clusters, and phase caveats after generation. The AI cache and pending-job contracts were bumped so the pre-fix V21.3 live result cannot be reused as a current cached interpretation.
