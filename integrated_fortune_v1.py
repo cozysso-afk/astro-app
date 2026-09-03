@@ -839,8 +839,19 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
     away and asking the AI to infer why a date was strong or weak.
     """
     best: dict[tuple, dict] = {}
+    relationship_links = {
+        "연락": ("수신신호", "발신적합", "과거인연접점"),
+        "소식": ("수신신호", "발신적합"),
+        "재회": ("수신신호", "발신적합", "과거인연접점"),
+        "연애": ("수신신호", "발신적합"),
+    }
+    investment_links = {
+        "금전": ("수익실현", "신규진입", "투자주의"),
+        "투자심리": ("수익실현", "신규진입", "투자주의"),
+    }
 
-    def ingest(rows: list[dict], topic_names):
+    def ingest(rows: list[dict], topic_names, derived_links=None):
+        derived_links = derived_links or {}
         for sample in rows:
             stamp = sample.get("dt")
             sample_time = stamp.strftime("%H:%M") if stamp is not None else ""
@@ -866,16 +877,18 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
                         contribution = float(evidence.get("score") or 0.0)
                     except (TypeError, ValueError):
                         contribution = 0.0
+                    linked_topics = [topic, *derived_links.get(topic, ())]
                     current = best.get(identity)
                     if current is not None and float(current.get("contribution") or 0.0) >= contribution:
                         current.setdefault("source_topics", [])
-                        if topic not in current["source_topics"]:
-                            current["source_topics"].append(topic)
+                        for linked_topic in linked_topics:
+                            if linked_topic not in current["source_topics"]:
+                                current["source_topics"].append(linked_topic)
                         continue
                     packed = {
                         "kind": kind,
                         "sample_time": sample_time,
-                        "source_topics": [topic],
+                        "source_topics": linked_topics,
                         "contribution": round(contribution, 4),
                         "text": _evidence_text(evidence),
                     }
@@ -887,8 +900,8 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
                             packed[key] = evidence.get(key)
                     best[identity] = packed
 
-    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"))
-    ingest(market_rows, ("금전", "투자심리"))
+    ingest(life_rows, ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션"), relationship_links)
+    ingest(market_rows, ("금전", "투자심리"), investment_links)
     out = list(best.values())
     out.sort(key=lambda item: (
         0 if item.get("kind") == "aspect" else 1,
@@ -898,7 +911,34 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
     ))
     for item in out:
         item["source_topics"] = sorted(set(item.get("source_topics") or []))
-    return out[:max(1, int(limit))]
+    max_rows = max(1, int(limit))
+    selected = []
+    remaining = list(out)
+    uncovered = {
+        "금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션",
+        "수신신호", "발신적합", "과거인연접점", "투자심리", "수익실현", "신규진입", "투자주의",
+    }
+    while remaining and uncovered and len(selected) < max_rows:
+        candidate = max(
+            remaining,
+            key=lambda item: (
+                len(set(item.get("source_topics") or []) & uncovered),
+                float(item.get("contribution") or 0.0),
+                -float(item.get("orb") or 99.0),
+            ),
+        )
+        coverage = set(candidate.get("source_topics") or []) & uncovered
+        if not coverage:
+            break
+        selected.append(candidate)
+        uncovered -= coverage
+        remaining.remove(candidate)
+    for item in out:
+        if len(selected) >= max_rows:
+            break
+        if item not in selected:
+            selected.append(item)
+    return selected
 
 
 @lru_cache(maxsize=5000)
