@@ -75,7 +75,6 @@ jobs:
             -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' \
             --data-binary @inspect-request.json > inspect.json
           jq '{interpreter_version,prompt_payload_bytes,prompt_budget_ok,estimated_input_tokens,max_gemini_calls_per_job,prompt_evidence_ledger}' inspect.json
-          test "$(jq -r '.prompt_budget_ok')" != ""
           test "$(jq -r '.prompt_budget_ok' inspect.json)" = "true"
 
       - name: Run one V21.1 AI job
