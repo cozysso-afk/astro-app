@@ -36,6 +36,7 @@ jobs:
 
           p=Path('supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs')
           s=p.read_text(encoding='utf-8')
+          s=s.replace('''  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);\n  assert.match(missingIssues,/W:detail/);\n''','''  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);\n''',1)
           old='''  data.decisions[0].timing="2026-09-03 08:00~09:30";\n  data.decisions[0].evidence_refs.push(detailRef);\n  const fixed=inspectInterpretationQuality(data,payload);\n'''
           new='''  data.decisions[0].timing="2026-09-03 08:00~09:30";\n  const unlinked=inspectInterpretationQuality(data,payload);\n  assert.equal(unlinked.ok,false);\n  const unlinkedIssues=unlinked.stages.flatMap(stage=>stage.issues??[]).join(" / ");\n  assert.match(unlinkedIssues,/시간대 행동 가이드에 실제 W:detail/);\n\n  data.decisions[0].evidence_refs.push(detailRef);\n  const fixed=inspectInterpretationQuality(data,payload);\n'''
           if old not in s: raise SystemExit('linked detail test anchor missing')
