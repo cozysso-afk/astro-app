@@ -16,6 +16,7 @@ import './visual-overhaul-v5.css'
 import './visual-overhaul-v6.css'
 import './mobile-spacing-v11.css'
 import './fortune-ux-v14.css'
+import './period-readability-v18.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
