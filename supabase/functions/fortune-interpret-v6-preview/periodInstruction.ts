@@ -1,3 +1,5 @@
+import "./geminiRateLimitGuard.ts";
+
 export type InterpretationPeriodKind = "day" | "week" | "month" | "annual";
 
 function normalizeKind(value: unknown): InterpretationPeriodKind {
