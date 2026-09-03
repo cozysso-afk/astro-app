@@ -1,0 +1,46 @@
+name: Apply Full Daily Scores V3
+
+on:
+  push:
+    branches:
+      - work/integrated-interpretation-v2
+    paths:
+      - scripts/patch_full_daily_scores_v3.py
+      - .github/workflows/apply-full-daily-scores-v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/integrated-interpretation-v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply patch
+        run: python scripts/patch_full_daily_scores_v3.py
+      - name: Basic syntax guards
+        run: |
+          python -m py_compile integrated_fortune_v1.py
+          grep -q 'daily_scores' integrated_fortune_v1.py
+          grep -q 'daily_score_matrix' supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts
+          grep -q 'AnnualDailyScoresPanel' web/src/AppNext.tsx
+      - name: Commit generated changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py \
+            supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts \
+            supabase/functions/fortune-interpret-v6-preview/qualityV2.ts \
+            web/src/appTypes.ts web/src/AppNext.tsx web/src/main.tsx web/src/lib/readingCache.ts
+          if git diff --cached --quiet; then
+            echo 'No generated changes'
+            exit 0
+          fi
+          git commit -m 'feat: preserve full daily scores and evidence'
+          git push origin HEAD:work/integrated-interpretation-v2
