@@ -1,6 +1,6 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
-export const VERSION = "supabase-ai-v10-cross-system-action-contract";
+export const VERSION = "supabase-ai-v11-period-aware-cross-system";
 export const PACKET_VERSION = "fortune-interpretation-packet-v3-full-daily";
 export const QUALITY_VERSION = "fortune-interpretation-quality-v2-cross-system";
 export const MODELS: Record<string,string> = {
