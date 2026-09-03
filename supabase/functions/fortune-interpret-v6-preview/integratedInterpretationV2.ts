@@ -78,8 +78,9 @@ function evidenceDirection(topic:string,kind:"best"|"caution"|"average",score:nu
   return "neutral" as const;
 }
 
+function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
 function trajectoryDigest(rows:any[],topic:string){
-  const values=rows.map((row:any)=>({date:String(row?.date??""),score:Number(row?.scores?.[topic])})).filter((x:any)=>x.date&&Number.isFinite(x.score));
+  const values=rows.map((row:any)=>({date:String(row?.date??""),score:finiteDailyScore(row?.scores?.[topic])})).filter((x:any):x is {date:string;score:number}=>Boolean(x.date)&&x.score!==null);
   if(!values.length)return null;
   const mean=values.reduce((sum:number,x:any)=>sum+x.score,0)/values.length;
   const variance=values.reduce((sum:number,x:any)=>sum+Math.pow(x.score-mean,2),0)/values.length;
@@ -132,7 +133,7 @@ export function compactCalculation(calc:any){
 
   const dailyRaw=Array.isArray(w?.daily_scores)?w.daily_scores.slice(0,400):[];
   const dailyTopicOrder=[...TOPICS,...REL];
-  const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>Number.isFinite(Number(d?.scores?.[topic]))?Number(d.scores[topic]):null)])};
+  const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>finiteDailyScore(d?.scores?.[topic]))])};
   const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));
   const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));
 
@@ -143,7 +144,7 @@ export function compactCalculation(calc:any){
   for(const d of dailyRaw){
     const date=String(d?.date??"");
     for(const topic of dailyTopicOrder){
-      const score=Number(d?.scores?.[topic]); if(!Number.isFinite(score))continue;
+      const score=finiteDailyScore(d?.scores?.[topic]); if(score===null)continue;
       const base=(overall as any)?.[topic]??(rel as any)?.[topic]; const avg=Number(base?.average);
       const deviation=Number.isFinite(avg)?Math.abs(score-avg):Math.abs(score-50);
       if(deviation>=12||score>=72||score<=28)addDate(date,topic,score,"");
