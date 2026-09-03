@@ -161,7 +161,11 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
     const p=(row:any)=>String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
     return p(a)-p(b);
   });
-  return ordered.slice(0,payload?.period_kind==="annual"?110:80);
+  const limit=payload?.period_kind==="annual"?110:80;
+  const context=ordered.filter((row:any)=>String(row?.system??"")!=="western");
+  const western=ordered.filter((row:any)=>String(row?.system??"")==="western");
+  const reserve=Math.min(context.length,payload?.period_kind==="annual"?16:12,limit);
+  return [...western.slice(0,limit-reserve),...context.slice(0,reserve)];
 }
 
 function compactThai(thai:any){

@@ -6,13 +6,17 @@ import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiO
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21.2.1-explicit-action-guard";
+const VERSION="supabase-ai-v21.3-balanced-evidence-budget";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
 const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
 const MAX_GEMINI_CALLS=2;
 const MAX_JOB_MS=115000;
+const MAX_USER_NEW_JOBS_10M=6;
+const MAX_USER_NEW_JOBS_24H=20;
+const MAX_GLOBAL_NEW_JOBS_10M=18;
+const MAX_GLOBAL_NEW_JOBS_24H=60;
 const enc=new TextEncoder();
 
 function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status,headers:CORS});}
@@ -158,6 +162,25 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
+async function recentV21JobCount(a:any,since:string,userId?:string){
+  let q=a.from("ai_interpret_jobs").select("id",{count:"exact",head:true}).like("kind","supabase-ai-v21%").gte("created_at",since);
+  if(userId)q=q.eq("user_id",userId);
+  const {count,error}=await q;if(error)throw new Error(error.message);return Number(count??0);
+}
+async function checkRollingJobBudget(a:any,userId:string){
+  const now=Date.now(),since10=new Date(now-10*60*1000).toISOString(),since24=new Date(now-24*60*60*1000).toISOString();
+  try{
+    const user10=await recentV21JobCount(a,since10,userId);
+    if(user10>=MAX_USER_NEW_JOBS_10M)return {ok:false,error:`10분 내 새 AI 해설 작업이 ${MAX_USER_NEW_JOBS_10M}건에 도달해서 비용 보호가 작동했어. 잠시 뒤 다시 시도해.`,retry_after_seconds:600};
+    const user24=await recentV21JobCount(a,since24,userId);
+    if(user24>=MAX_USER_NEW_JOBS_24H)return {ok:false,error:`24시간 내 새 AI 해설 작업이 ${MAX_USER_NEW_JOBS_24H}건에 도달해서 오늘의 비용 보호가 작동했어. 저장된 해설과 프롬프트 복사는 계속 사용할 수 있어.`,retry_after_seconds:3600};
+    const global10=await recentV21JobCount(a,since10);
+    if(global10>=MAX_GLOBAL_NEW_JOBS_10M)return {ok:false,error:"서비스 전체의 단시간 AI 비용 보호 상한에 도달했어. 잠시 뒤 다시 시도해.",retry_after_seconds:600};
+    const global24=await recentV21JobCount(a,since24);
+    if(global24>=MAX_GLOBAL_NEW_JOBS_24H)return {ok:false,error:"서비스 전체의 24시간 AI 비용 보호 상한에 도달했어. 저장된 해설과 프롬프트 복사는 계속 사용할 수 있어.",retry_after_seconds:3600};
+    return {ok:true,user10,user24,global10,global24};
+  }catch(e){return {ok:false,error:`AI 비용 보호 카운터를 확인하지 못해서 새 Gemini 호출을 안전하게 차단했어: ${e instanceof Error?e.message:String(e)}`,retry_after_seconds:60};}
+}
 async function user(req:Request){const auth=req.headers.get("Authorization")??"";if(!auth)return null;const c=createClient(SUPABASE_URL,ANON,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false}});const {data,error}=await c.auth.getUser();return error?null:data.user??null;}
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
 
@@ -183,7 +206,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,safe_wording:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,max_user_new_jobs_10m:MAX_USER_NEW_JOBS_10M,max_user_new_jobs_24h:MAX_USER_NEW_JOBS_24H,max_global_new_jobs_10m:MAX_GLOBAL_NEW_JOBS_10M,max_global_new_jobs_24h:MAX_GLOBAL_NEW_JOBS_24H,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,safe_wording:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();
@@ -208,6 +231,7 @@ Deno.serve(async(req)=>{
     if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
     const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(!pendingError&&pending?.id)return res({ok:true,job_id:pending.id,status:pending.status,interpreter_version:VERSION,reused:true,inflight:true},202);
+    const rolling=await checkRollingJobBudget(a,u.id);if(!rolling.ok)return res({ok:false,cost_guard_blocked:true,rolling_job_guard:true,error:rolling.error,retry_after_seconds:rolling.retry_after_seconds},200);
     const {data,error}=await a.from("ai_interpret_jobs").insert({user_id:u.id,kind,status:"queued",model:preferred,period_start:payload?.period?.start||null,period_end:payload?.period?.end||null}).select("id").single();
     if(error||!data?.id)return res({ok:false,error:`해설 작업 생성 실패: ${error?.message??"unknown"}`},500);
     const task=job(data.id,payload,preferred,key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);return res({ok:true,job_id:data.id,status:"queued",interpreter_version:VERSION,reused:false,inflight:false,prompt_budget:{bytes:pb.bytes,estimated_input_tokens:pb.estimated_input_tokens,max_bytes:pb.max_bytes}},202);

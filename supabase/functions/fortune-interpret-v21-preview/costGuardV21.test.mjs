@@ -50,6 +50,25 @@ test('V21 prompt packet removes 365-row matrix and keeps evidence-backed summary
   assert.ok(compactBytes < fullBytes*0.55,`expected >45% reduction, full=${fullBytes}, compact=${compactBytes}`);
 });
 
+test('V21 prompt reserves Saju and Thai evidence even when Western candidates exceed the annual cap',()=>{
+  const p=packet();
+  const stressTopics=[...TOPICS,...REL];
+  for(const topic of stressTopics){
+    for(let i=0;i<8;i++)p.evidence_ledger.push({id:`W:daily:stress:${topic}:${i}`,system:'western',scope:'daily_actual',topic,direction:'supportive',date:`2027-01-${String(i+1).padStart(2,'0')}`,score:60+i,text:`${topic} stress western ${i}`});
+  }
+  p.key_dates=Array.from({length:8},(_,i)=>{
+    const date=`2027-01-${String(i+1).padStart(2,'0')}`;
+    const ref=`W:date:stress:${date}`;
+    p.evidence_ledger.push({id:ref,system:'western',scope:'best_day',direction:'supportive',date,score:70,text:`stress key date ${date}`});
+    return {date,topics:['직장'],western_refs:[ref]};
+  });
+  p.cross_system_timeline=p.key_dates.map(row=>({date:row.date,western_refs:row.western_refs,saju_context_refs:['S:annual:1:2027-01-01'],thai_context_refs:['T:taksajorn:1:2027-01-01']}));
+  const compact=buildPromptPacket(p);
+  assert.ok(compact.evidence_ledger.length<=110);
+  assert.ok(compact.evidence_ledger.some(x=>x.system==='saju'),'Saju context must survive the cap');
+  assert.ok(compact.evidence_ledger.some(x=>x.system==='thai'),'Thai context must survive the cap');
+});
+
 test('V21 deterministic topics cover all 15 without a second Gemini call',()=>{
   const rows=buildDeterministicTopicAnalysis(packet());
   assert.equal(rows.length,TOPICS.length);
@@ -70,6 +89,12 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
   assert.equal((src.match(/:generateContent/g)||[]).length,1);
   assert.match(src,/MAX_GEMINI_CALLS=2/);
+  assert.match(src,/MAX_USER_NEW_JOBS_10M=6/);
+  assert.match(src,/MAX_USER_NEW_JOBS_24H=20/);
+  assert.match(src,/MAX_GLOBAL_NEW_JOBS_10M=18/);
+  assert.match(src,/MAX_GLOBAL_NEW_JOBS_24H=60/);
+  assert.match(src,/checkRollingJobBudget/);
+  assert.match(src,/rolling_job_guard:true/);
   assert.doesNotMatch(src,/generatePart\(.*topics/);
   assert.doesNotMatch(src,/Promise\.all\(\[\s*generate/);
   assert.match(src,/buildThaiOutputFallback/);
