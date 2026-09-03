@@ -248,6 +248,7 @@ export type LocationFitResponse = {
 }
 
 export type AiTopicInterpretation = {
+  importance: '핵심' | '주목' | '참고'
   verdict: string
   reason: string
   timing: string
@@ -335,6 +336,7 @@ export type AiInterpretationResponse = {
     cross_checks?: AiCrossCheck[]
     decisions?: AiDecision[]
     clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
+    relationship_reading?: { context: string; flow: string; focus_timing: string; watch: string; avoid: string; evidence_refs?: string[] }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
     investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }
     systems: { western: string; saju: string; thai: string }

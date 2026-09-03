@@ -58,9 +58,11 @@ function output(packet){
   const ref=(prefix)=>ids.find(x=>x.startsWith(prefix)) ?? ids[0];
   const analyses={};
   for(const topic of TOPICS){
+    const importance=["직장","이직"].includes(topic)?"핵심":["연애","연락","재회"].includes(topic)?"주목":"참고";
     analyses[topic]={
+      importance,
       verdict:`${topic}은 연평균 하나보다 월별 변화와 날짜 피크를 같이 봐야 해.`,
-      reason:repeat(`${topic}은 기간 평균과 7월 월평균, 상·하위 날짜가 서로 다른 층의 근거라서 한 날짜만으로 전체 흐름을 과장하면 안 돼.`,3),
+      reason:repeat(`${topic}은 기간 평균과 7월 월평균, 상·하위 날짜가 서로 다른 층의 근거라서 한 날짜만으로 전체 흐름을 과장하면 안 돼.`,importance==="핵심"?3:importance==="주목"?2:1),
       timing:"2026-07-21과 2026-05-14의 대비를 중심으로 봐.",
       action:"강한 구간에는 미리 준비한 일정과 결정을 배치하고 약한 구간에는 검토를 우선해.",
       avoid:"단일 피크를 실제 사건의 보장으로 바꾸지 마.",
@@ -117,6 +119,7 @@ function output(packet){
       {action:"10월 재접점 신호는 실제 상대 행동이 있을 때만 해석 범위를 넓혀.",timing:"2026-10-21",reason:"과거인연접점의 상위 날짜와 월간 근거가 함께 있어.",watch:"실제 연락·만남 제안·우연한 재접촉처럼 관찰 가능한 사건이 생기는지 먼저 확인해.",avoid:"접점 지수만 보고 상대 속마음이나 재회 의사를 미리 확정하지 마.",evidence_refs:[octReconnect,octMonth]},
     ],
     clusters:{relationship:repeat("대인관계·연애·연락·재접점을 하나로 뭉개지 말고 각각의 월별 변화와 날짜 피크를 따로 읽어야 해.",2),work_study:repeat("일과 학업은 월별 강약이 다르므로 중요한 일정 배치를 같은 기준으로 처리하지 않는 게 좋아.",2),money_news:repeat("금전과 소식은 서로 다른 계산축이라 한쪽의 피크가 다른 쪽의 결과를 보장하지 않아.",2),investment:repeat("투자심리·수익실현·신규진입·투자주의는 서로 다른 지수고 특히 투자주의는 높을수록 경계가 커져.",2),condition:repeat("컨디션은 일정 강도와 휴식 배치를 조절하는 참고 흐름으로만 읽어.",2)},
+    relationship_reading:{context:"연락과 재회 축은 관계 자체를 확정하는 값이 아니라 수신·발신·과거인연 재접점이 언제 따로 또는 함께 활성화되는지를 보는 구조야.",flow:"7월에는 발신 쪽 실행성이 먼저 살아나고 10월에는 과거인연 재접점이 따로 강해져서, 먼저 내가 움직이기 좋은 흐름과 이후 과거 관계 이슈가 다시 떠오르는 흐름을 구분해서 봐야 해.",focus_timing:"2026-07-24의 발신 적합과 2026-10-21의 과거인연 재접점 구간을 서로 다른 의미로 주목해.",watch:"실제 메시지 수신 여부, 상대의 지속적인 행동, 만남 제안처럼 현실에서 확인되는 반응이 이어지는지 확인해.",avoid:"상대 활성도나 재접점 지수를 상대 속마음, 연락 확정, 재회 확률로 바꾸지 마.",evidence_refs:[ref("W:overall:수신신호"),julyOutgoing,octReconnect]},
     contact_flow:{incoming:"수신신호는 실제 연락의 보장이 아니라 상대→나 방향의 상대 활성도를 보여주는 참고축이야.",outgoing:"발신적합은 내가 행동할 때의 상대적 적합 흐름이지 상대 반응을 확정하는 값이 아니야.",reconnection:"과거인연접점은 과거 관계가 다시 활성화되는 맥락을 뜻할 뿐 실제 재회를 보장하지 않아."},
     investment_reading:{psychology:"투자심리는 심리적 판단 환경을 보는 지수고 가격 방향을 예측하지 않아.",realization:"수익실현은 이미 형성된 흐름을 정리하기 좋은 상대적 조건이지 실제 수익을 보장하지 않아.",entry:"신규진입은 진입 판단 환경을 보는 지수이지 매수 성공률을 뜻하지 않아.",risk:"투자주의는 높을수록 경계가 커지는 위험 지수라 다른 투자지수와 방향을 뒤집어 읽으면 안 돼."},
     systems:{western:repeat("서양점성술은 연평균과 12개월 궤적, 상·하위 날짜를 계층적으로 읽어야 해.",2),saju:repeat("사주는 입춘과 절입 정확 구간을 유지하고 계산되지 않은 용신 같은 항목을 추정하지 않아.",2),thai:repeat("Thai는 허용된 비예측 맥락만 사용하고 Western 점수에 합산하거나 사건 날짜 투표처럼 쓰지 않아.",2)},
@@ -251,4 +254,36 @@ test("week and month packet policies do not inherit annual 365-day wording",()=>
     assert.match(packet.integration_policy.important_date_rule,expected);
     assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);
   }
+});
+
+
+test("salience contract prevents equal-length filler and caps core topics",()=>{
+  const packet=compactCalculation(calculation());
+  const bloated=output(packet);
+  bloated.topic_analysis.금전.importance="참고";
+  bloated.topic_analysis.금전.reason=repeat("참고 분야인데도 같은 설명을 길게 반복해서 분량만 늘리는 문장이야.",20);
+  const bloatedReport=inspectInterpretationQuality(validateOutput(bloated),packet);
+  assert.equal(bloatedReport.ok,false);
+  assert.match(bloatedReport.stages[4].issues.join(" "),/참고 분야 과설명/);
+
+  const crowded=output(packet);
+  for(const topic of TOPICS.slice(0,6))crowded.topic_analysis[topic].importance="핵심";
+  const crowdedReport=inspectInterpretationQuality(validateOutput(crowded),packet);
+  assert.equal(crowdedReport.ok,false);
+  assert.match(crowdedReport.stages[3].issues.join(" "),/핵심 분야가 너무 많음/);
+});
+
+test("salient reunion reading requires directional evidence and grounded timing",()=>{
+  const packet=compactCalculation(calculation());
+  const wrongRefs=output(packet);
+  wrongRefs.relationship_reading.evidence_refs=[wrongRefs.topic_analysis.직장.evidence_refs[0],wrongRefs.topic_analysis.직장.evidence_refs[1]];
+  const wrongRefReport=inspectInterpretationQuality(validateOutput(wrongRefs),packet);
+  assert.equal(wrongRefReport.ok,false);
+  assert.match(wrongRefReport.stages[3].issues.join(" "),/관계 방향축 근거 없음/);
+
+  const fabricated=output(packet);
+  fabricated.relationship_reading.focus_timing += " 2026-11-30도 같은 강도로 주목해.";
+  const fabricatedReport=inspectInterpretationQuality(validateOutput(fabricated),packet);
+  assert.equal(fabricatedReport.ok,false);
+  assert.match(fabricatedReport.stages[1].issues.join(" "),/직접 날짜 근거 미연결/);
 });

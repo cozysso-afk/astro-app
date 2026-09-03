@@ -34,12 +34,18 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const decisions = data.decisions ?? []
   const keyWindows = data.key_windows ?? []
   const crossChecks = data.cross_checks ?? []
+  const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
+  const topicEntries = Object.entries(data.topic_analysis ?? {}).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
+  const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))
+  const relationshipReading = data.relationship_reading
 
   return <section className="period-ai-card period-ai-v18">
     <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">GEMINI PERIOD READING</span><h3>{data.headline || '기간 흐름 요약'}</h3></div></div>
     <p className="period-ai-summary">{data.overall.summary}</p>
 
     {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
+
+    {showRelationshipFocus && relationshipReading ? <section className="period-ai-window-section"><div className="period-ai-section-title"><span>관계 · 연락 · 재회</span><strong>관계 흐름을 먼저 보면</strong></div><article className="period-ai-window is-mixed"><p>{relationshipReading.context}</p><div className="period-ai-window-line"><b>이어지는 흐름</b><span>{relationshipReading.flow}</span></div><div className="period-ai-window-line"><b>주목 시기</b><span>{relationshipReading.focus_timing}</span></div><div className="period-ai-window-line"><b>현실에서 확인</b><span>{relationshipReading.watch}</span></div><div className="period-ai-window-line is-avoid"><b>과대해석 주의</b><span>{relationshipReading.avoid}</span></div>{data.contact_flow ? <><div className="period-ai-window-line"><b>상대 → 나</b><span>{data.contact_flow.incoming}</span></div><div className="period-ai-window-line"><b>나 → 상대</b><span>{data.contact_flow.outgoing}</span></div><div className="period-ai-window-line"><b>과거 인연</b><span>{data.contact_flow.reconnection}</span></div></> : null}</article></section> : null}
 
     {!!decisions.length && <section className="period-ai-action-section">
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
@@ -74,7 +80,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
 
         {!!crossChecks.length && <div className="period-ai-section period-ai-cross-section"><strong>체계 교차검증</strong><p className="period-ai-cross-note">세 체계를 합산하거나 다수결하지 않고 같은 시기의 독립 근거를 비교해.</p><div className="period-ai-cross-list">{crossChecks.map((item,index)=><article key={`${item.start}-${item.label}-${index}`}><div><b>{periodLabel(item.start,item.end)}</b><span>{item.mode}</span></div><strong>{item.label}</strong><p><b>Western</b> {item.western}</p><p><b>사주</b> {item.saju}</p><p><b>Thai</b> {item.thai}</p><p className="period-ai-cross-synthesis"><b>그래서</b> {item.synthesis}</p></article>)}</div></div>}
 
-        <details className="period-ai-topic-disclosure"><summary>15개 분야별 해석 펼치기</summary><div className="period-ai-topic-list">{Object.entries(data.topic_analysis ?? {}).map(([topic,item])=><article className="period-ai-topic" key={topic}><strong>{topic}</strong><b>{item.verdict}</b>{item.reason&&<p>근거 · {item.reason}</p>}{item.timing&&<p>시기 · {item.timing}</p>}{item.action&&<p>활용 · {item.action}</p>}{item.avoid&&<p>피할 것 · {item.avoid}</p>}<p>확신도 · {item.confidence}{item.confidence_reason?` · ${item.confidence_reason}`:''}</p></article>)}</div></details>
+        <details className="period-ai-topic-disclosure"><summary>15개 분야별 해석 펼치기 · 중요도순</summary><div className="period-ai-topic-list">{topicEntries.map(([topic,item])=><article className="period-ai-topic" key={topic}><strong>{topic} · {item.importance}</strong><b>{item.verdict}</b>{item.reason&&<p>근거 · {item.reason}</p>}{item.timing&&<p>시기 · {item.timing}</p>}{item.action&&<p>활용 · {item.action}</p>}{item.avoid&&<p>피할 것 · {item.avoid}</p>}<p>확신도 · {item.confidence}{item.confidence_reason?` · ${item.confidence_reason}`:''}</p></article>)}</div></details>
 
         <div className="period-ai-section"><strong>체계별 계산 해설</strong><p>{[data.systems?.western&&`서양점성술 · ${data.systems.western}`,data.systems?.saju&&`사주 · ${data.systems.saju}`,data.systems?.thai&&`태국점성술 · ${data.systems.thai}`].filter(Boolean).join('\n\n')}</p></div>
         {data.limits && <div className="period-ai-section"><strong>해설 한계</strong><p>{data.limits}</p></div>}

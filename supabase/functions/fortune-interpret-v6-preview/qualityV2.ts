@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v3-intraday-window";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v4-salience-relationship-flow";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -26,6 +26,7 @@ function claimStrings(data:any){
   for(const x of data?.cross_checks??[]){add(x?.label);add(x?.western);add(x?.saju);add(x?.thai);add(x?.synthesis);}
   for(const d of data?.decisions??[]){add(d?.action);add(d?.timing);add(d?.reason);add(d?.watch);add(d?.avoid);}
   for(const v of Object.values(data?.clusters??{}))add(v);
+  for(const v of Object.values(data?.relationship_reading??{}))add(v);
   for(const v of Object.values(data?.contact_flow??{}))add(v);
   for(const v of Object.values(data?.investment_reading??{}))add(v);
   for(const v of Object.values(data?.systems??{}))add(v);
@@ -56,7 +57,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if(!Array.isArray(data?.key_windows))s1.push("key_windows 누락");
   if(!Array.isArray(data?.cross_checks))s1.push("cross_checks 누락");
   if(!Array.isArray(data?.decisions))s1.push("decisions 누락");
-  for(const k of TOPICS)if(!data?.topic_analysis?.[k])s1.push(`topic_analysis.${k} 누락`);
+  for(const k of TOPICS){
+    if(!data?.topic_analysis?.[k])s1.push(`topic_analysis.${k} 누락`);
+    else if(!["핵심","주목","참고"].includes(String(data.topic_analysis[k]?.importance??"")))s1.push(`topic_analysis.${k}.importance 오류`);
+  }
   stages.push(qualityStage(1,"구조 완전성",s1));
 
   const s2:string[]=[];
@@ -74,6 +78,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
     if(!refs.length)s2.push(`근거 없는 key_window: ${w?.label||w?.start||""}`);
   }
   for(const d of uniq(claimStrings(data).flatMap(datesInText)))if(!knownExactDates.has(d))s2.push(`계산근거에서 찾을 수 없는 날짜 언급: ${d}`);
+  const relationshipTimingRefs=(data?.relationship_reading?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
+  for(const d of uniq(datesInText(String(data?.relationship_reading?.focus_timing??"")))){
+    if(!relationshipTimingRefs.some(row=>isoDate(row?.date)===d))s2.push(`관계·재회 주목 날짜에 직접 날짜 근거 미연결: ${d}`);
+  }
   stages.push(qualityStage(2,"근거 추적성",uniq(s2).slice(0,35)));
 
   const s3:string[]=[];
@@ -93,12 +101,26 @@ export function inspectInterpretationQuality(data:any,payload:any){
   const s4:string[]=[];
   const seen=new Map<string,string>();
   for(const w of data?.key_windows??[]){const key=`${w?.start}|${w?.end}`;const prev=seen.get(key);if(prev&&prev!==w?.signal&&prev!=="혼합"&&w?.signal!=="혼합")s4.push(`같은 기간에 상충 신호: ${key}`);seen.set(key,w?.signal);}
+  const coreTopics=Object.entries(data?.topic_analysis??{}).filter(([,x]:any)=>x?.importance==="핵심");
+  if(coreTopics.length>5)s4.push(`핵심 분야가 너무 많음: ${coreTopics.length}/5`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
+    const rows=(x?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
     if(x?.confidence==="높음"){
-      const rows=(x?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
       if(rows.length<2)s4.push(`${topic} 확신도 높음인데 근거 2개 미만`);
       if(!rows.some(r=>r.system==="western"))s4.push(`${topic} 확신도 높음인데 Western 근거 없음`);
     }
+    if(x?.importance==="핵심"){
+      if(rows.length<2)s4.push(`${topic} 핵심인데 근거 2개 미만`);
+      if(!rows.some(r=>r.system==="western"))s4.push(`${topic} 핵심인데 Western 근거 없음`);
+    }
+  }
+  const relationshipSalient=["연애","연락","재회"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));
+  if(relationshipSalient){
+    const rr=data?.relationship_reading??{};
+    const rows=(rr?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
+    const directional=new Set(["수신신호","발신적합","과거인연접점","연애","연락","재회"]);
+    if(rows.length<2)s4.push("관계·재회 핵심 흐름 근거 2개 미만");
+    if(!rows.some(r=>directional.has(String(r?.topic??""))))s4.push("관계·재회 핵심 흐름에 관계 방향축 근거 없음");
   }
   for(const x of data?.cross_checks??[]){
     const rows=(x?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
@@ -163,7 +185,10 @@ export function inspectInterpretationQuality(data:any,payload:any){
     }
   }
   const minSummary=kind==="annual"?240:kind==="month"?170:110;
-  if(String(data?.overall?.summary??"").length<minSummary)s5.push(`총평 깊이 부족(${String(data?.overall?.summary??"").length}/${minSummary})`);
+  const maxSummary=kind==="annual"?1100:kind==="month"?800:650;
+  const summaryLength=String(data?.overall?.summary??"").length;
+  if(summaryLength<minSummary)s5.push(`총평 깊이 부족(${summaryLength}/${minSummary})`);
+  if(summaryLength>maxSummary)s5.push(`총평이 핵심보다 지나치게 김(${summaryLength}/${maxSummary})`);
   for(const x of data?.cross_checks??[]){
     if(String(x?.synthesis??"").length<45)s5.push(`교차검증 종합이 너무 짧음: ${x?.label}`);
     if(String(x?.western??"").length<25)s5.push(`교차검증 Western 설명이 너무 짧음: ${x?.label}`);
@@ -178,10 +203,27 @@ export function inspectInterpretationQuality(data:any,payload:any){
     if((w?.evidence_refs?.length??0)<(kind==="annual"?2:1))s5.push(`핵심 시기 근거 수 부족: ${w?.label}`);
   }
   if(kind==="annual")for(const p of data?.year_phases??[])if(!(p?.evidence_refs?.length))s5.push(`연간 phase 근거 없음: ${p?.label}`);
+  if(relationshipSalient){
+    const rr=data?.relationship_reading??{};
+    if(String(rr?.context??"").length<35)s5.push("관계·재회 관계 맥락 설명 부족");
+    if(String(rr?.flow??"").length<55)s5.push("관계·재회 이어지는 흐름 설명 부족");
+    if(String(rr?.focus_timing??"").length<20)s5.push("관계·재회 주목 시기 설명 부족");
+    if(String(rr?.watch??"").length<20)s5.push("관계·재회 현실 확인 신호 부족");
+    if(String(rr?.avoid??"").length<20)s5.push("관계·재회 과대해석 방지 설명 부족");
+  }
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
-    const minReason=kind==="annual"?70:45;
-    if(String(x?.reason??"").length<minReason)s5.push(`${topic} 근거 설명이 얕음`);
-    if((x?.evidence_refs?.length??0)<(kind==="annual"?2:1))s5.push(`${topic} 근거 ID 부족`);
+    const importance=["핵심","주목","참고"].includes(String(x?.importance??""))?String(x.importance):"참고";
+    const minReason=importance==="핵심"?(kind==="annual"?85:60):importance==="주목"?(kind==="annual"?55:40):(kind==="annual"?25:18);
+    const maxReason=importance==="핵심"?1200:importance==="주목"?700:320;
+    const reasonLength=String(x?.reason??"").length;
+    if(reasonLength<minReason)s5.push(`${topic} ${importance} 근거 설명이 얕음`);
+    if(reasonLength>maxReason)s5.push(`${topic} ${importance} 분야 과설명(${reasonLength}/${maxReason})`);
+    const minRefs=importance==="핵심"?2:1;
+    if((x?.evidence_refs?.length??0)<minRefs)s5.push(`${topic} ${importance} 근거 ID 부족`);
+    if(importance==="참고"){
+      const detailLength=String(x?.timing??"").length+String(x?.action??"").length+String(x?.avoid??"").length+String(x?.confidence_reason??"").length;
+      if(detailLength>650)s5.push(`${topic} 참고 분야 부가설명이 지나치게 김(${detailLength}/650)`);
+    }
   }
   const generic=/좋은\s*기운|긍정적으로|마음을\s*열|천천히\s*해보|자신을\s*믿|잘\s*해낼/g;
   if((prose.match(generic)??[]).length>=3)s5.push("일반론 조언 반복이 많음");

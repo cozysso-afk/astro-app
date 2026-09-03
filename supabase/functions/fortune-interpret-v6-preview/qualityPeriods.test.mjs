@@ -44,6 +44,7 @@ function buildCase(kind){
     evidence_refs:[refs[Math.min(index,refs.length-1)]],
   }));
   const topic_analysis=Object.fromEntries(TOPICS.map((topic,index)=>[topic,{
+    importance:topic==="직장"?"주목":"참고",
     verdict:`${topic}은 현재 기간의 상대적 활성도를 현실 판단과 분리해서 읽어야 해.`,
     reason:long(`${topic} 해석은 계산된 기간 근거와 핵심 시기의 변화만 사용하고 단일 점수를 실제 사건 발생이나 성공 확률로 바꾸지 않는 방식으로 읽어야 해.`,2),
     timing:"계산된 기간 안에서 핵심 구간을 중심으로 확인해.",
@@ -67,6 +68,7 @@ function buildCase(kind){
     cross_checks:[],
     decisions,
     clusters:{relationship:"관계는 실제 반응과 계산 근거를 분리해 읽어.",work_study:"일과 학업은 준비 상태와 일정 확인을 우선해.",money_news:"금전과 소식은 확정 정보가 있는지 먼저 확인해.",investment:"투자는 가격 방향 예측이 아니라 심리와 위험 신호를 분리해.",condition:"컨디션은 무리한 일정 집중을 피하고 실제 상태를 확인해."},
+    relationship_reading:{context:"관계 분야가 핵심이 아니면 방향축을 짧은 참고 맥락으로만 유지해.",flow:"현재 테스트에서는 관계 흐름보다 직장 관련 핵심 시기와 현실 확인 조건이 우선이야.",focus_timing:"별도 관계 핵심 시기 없음",watch:"실제 반응이 있을 때만 추가로 확인해.",avoid:"관계 지수를 사건 확률로 바꾸지 마.",evidence_refs:[]},
     contact_flow:{incoming:"수신 지수는 연락 확률이 아니라 상대 방향 활성도야.",outgoing:"발신 적합은 연락 성공 보장이 아니라 행동 적합도야.",reconnection:"재접점 지수는 재회 확률이 아니라 과거 인연 관련 활성도야."},
     investment_reading:{psychology:"투자심리 흐름만 설명해.",realization:"수익실현 적합도만 설명해.",entry:"신규진입 적합도만 설명해.",risk:"투자주의는 높을수록 경계가 필요한 지수야."},
     systems:{western:"Western 계산 근거를 중심으로 읽어.",saju:"사주는 독립 배경 맥락으로만 유지해.",thai:"Thai는 방향성 투표가 아니라 허용된 배경 맥락으로만 유지해."},
