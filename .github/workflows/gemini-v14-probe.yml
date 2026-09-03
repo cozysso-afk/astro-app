@@ -1,0 +1,28 @@
+name: Gemini V14 Request Probe
+
+on:
+  push:
+    branches: [work/integrated-interpretation-v2]
+    paths: [.github/workflows/gemini-v14-probe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe authenticated Gemini request
+        env:
+          SUPABASE_URL: https://dbynfabwfcakxayyggzi.supabase.co
+          SUPABASE_KEY: sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r
+          PROBE_URL: https://dbynfabwfcakxayyggzi.supabase.co/functions/v1/fortune-gemini-v14-probe
+        run: |
+          node <<'NODE'
+          const signup=await fetch(`${process.env.SUPABASE_URL}/auth/v1/signup`,{method:'POST',headers:{apikey:process.env.SUPABASE_KEY,'content-type':'application/json'},body:JSON.stringify({data:{purpose:'gemini-v14-probe'}})})
+          const sj=await signup.json();if(!signup.ok||!sj.access_token)throw new Error(`anonymous auth failed ${signup.status}: ${JSON.stringify(sj)}`)
+          for(const model of ['gemini-3.7-flash','gemini-3.6-flash']){
+            const r=await fetch(process.env.PROBE_URL,{method:'POST',headers:{apikey:process.env.SUPABASE_KEY,authorization:`Bearer ${sj.access_token}`,'content-type':'application/json'},body:JSON.stringify({model})})
+            console.log(model, r.status, await r.text())
+          }
+          NODE
