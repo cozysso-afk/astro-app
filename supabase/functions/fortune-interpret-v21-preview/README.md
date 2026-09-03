@@ -27,4 +27,20 @@ Human review still found a gap that the 100/100 validator did not catch: some mo
 
 V21.3.1 itself was intentionally not sent through another paid Gemini smoke because the approved paid allowance was already consumed by the single V21.3 job. Its post-smoke fix is covered by deterministic regression tests, Web CI, Interpretation Release CI, type checking, and production build validation.
 
+## Mobile interpretation hierarchy audit
+
+The first no-cost UI audit reproduced the approved annual smoke content at an iPhone-width layout and reviewed the separate annual and period interpretation components. The main discoverability defect was structural: important dates were pushed below long relationship/detail sections, so the user could reach the mobile fold before seeing an actual key-date card.
+
+The candidate UI now uses the following reading hierarchy for annual, month, week, and day interpretations:
+1. headline and overall conclusion
+2. compact `가장 먼저 볼 날짜 / 핵심 시기 TOP 3` rows
+3. `이 기간에 실제로 할 일`
+4. full key-date/window detail
+5. relationship/contact detail when relevant
+6. secondary validation, generation-cost, cross-system, topic, and evidence detail
+
+The period component also replaces the English `GEMINI PERIOD READING` kicker with `AI(인공지능) 기간 해설`, increases the smallest actionable date/body typography, and moves the 5-stage validation badge below user-facing interpretation content. The annual quick-date rows remain clickable so a date can jump back to the annual score inspection UI.
+
+This UI audit used no additional Gemini call and created no Vercel deployment. It changes presentation only; the V21.3.1 runtime/cache contracts do not need another version bump.
+
 Final candidate verification is performed on the PR head. The Supabase `fortune-interpret-v21-preview` deployment is intentionally a preview-only target; main and production remain unchanged until explicit release approval.
