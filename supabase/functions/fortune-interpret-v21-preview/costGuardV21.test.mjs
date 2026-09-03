@@ -95,6 +95,26 @@ test('fortune UI is wired only to the V21 cost-guarded function and exposes prom
 });
 
 
+
+
+test('V21.2 deterministic wording uses correct Korean particles and topic-specific extreme dates',()=>{
+  const rows=buildDeterministicTopicAnalysis(packet());
+  assert.match(rows.find(x=>x.topic==='연애').verdict,/^연애는 /);
+  assert.match(rows.find(x=>x.topic==='직장').verdict,/^직장은 /);
+  assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');
+});
+
+test('V21.2 local stabilizer softens overclaim and investment prediction language without Gemini',()=>{
+  const p=packet();
+  const core={headline:'2027년 완벽 해설',overall:{summary:'짧은 총평',dominant_pattern:'패턴',best_phase:'활용',caution_phase:'주의',evidence_refs:['W:overall:직장']},key_windows:[{label:'재회 최적기',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['연애'],summary:'대길의 시기이자 가장 완벽한 시기',action:'확인',avoid:'절대 금물이다',evidence_refs:['W:date:2027-04-11:연애:best']}],year_phases:[],cross_checks:[{label:'교차',start:'2027-04-11',end:'2027-04-11',mode:'복수체계',western:'Western 직접 근거가 존재한다.',saju:'사주 독립 맥락이 존재한다.',thai:'Thai 독립 맥락이 존재한다.',synthesis:'삼박자로 맞아떨어져 매우 긍정적인 시너지를 발휘하는 완벽한 합일',evidence_refs:['W:date:2027-04-11:직장:best','S:annual:1:2027-01-01','T:taksajorn:1:2027-01-01']}],decisions:[],clusters:{relationship:'',work_study:'',money_news:'',investment:'',condition:''},relationship_reading:{context:'관계 맥락을 충분히 설명하는 테스트 문장이다.',flow:'관계 흐름을 충분히 설명하고 실제 행동 신호를 확인하는 테스트 문장이다.',focus_timing:'2027-04-11 직접 관계 근거를 본다.',watch:'실제 연락과 약속 제안을 확인한다.',avoid:'속마음이나 관계 결과를 미리 확정하지 않는다.',evidence_refs:['W:date:2027-04-11:연애:best']},contact_flow:{incoming:'상대 반응을 확인한다.',outgoing:'내 행동을 확인한다.',reconnection:'이뤄질 가능성이 높다.'},investment_reading:{psychology:'과열',realization:'수익에 유리',entry:'매수 적기',risk:'절대 보수적 태도를 유지해야 한다'},systems:{western:'w',saju:'s',thai:'t'},priorities:[],limits:'점수는 확률이 아니다'};
+  const fixed=stabilizeCoreForQuality(core,p);
+  const prose=JSON.stringify(fixed);
+  assert.doesNotMatch(prose,/완벽|대길|시너지|삼박자|절대 금물|이뤄질 가능성이 높다/);
+  assert.match(fixed.cross_checks[0].synthesis,/합산하지/);
+  assert.match(fixed.investment_reading.realization,/실제 수익 가능성이나 매도 적기를 뜻하지/);
+  assert.match(fixed.investment_reading.entry,/매수 신호가 아니며/);
+});
+
 test('V21 local stabilizer repairs evidence links and minimum prose without Gemini',()=>{
   const p=packet();
   const core={headline:'테스트',overall:{summary:'짧은 총평',dominant_pattern:'패턴',best_phase:'활용',caution_phase:'주의',evidence_refs:['W:overall:직장']},key_windows:[{label:'직장 날짜',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['직장'],summary:'짧음',action:'확인',avoid:'주의',evidence_refs:['W:date:2027-04-11:직장:best']}],year_phases:[],cross_checks:[{label:'교차',start:'2027-04-11',end:'2027-04-11',mode:'복수체계',western:'짧음',saju:'',thai:'',synthesis:'짧음',evidence_refs:['W:date:2027-04-11:직장:best']}],decisions:[{action:'직장 확인',timing:'2027-04-11',reason:'짧음',watch:'짧음',avoid:'짧음',evidence_refs:['W:overall:직장']}],clusters:{relationship:'',work_study:'',money_news:'',investment:'',condition:''},relationship_reading:{context:'',flow:'',focus_timing:'',watch:'',avoid:'',evidence_refs:[]},contact_flow:{incoming:'',outgoing:'',reconnection:''},investment_reading:{psychology:'',realization:'',entry:'',risk:''},systems:{western:'w',saju:'s',thai:'t'},priorities:[],limits:'점수는 확률이 아니다'};

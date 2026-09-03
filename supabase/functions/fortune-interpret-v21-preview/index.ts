@@ -6,7 +6,7 @@ import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiO
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21.1-single-core-local-stabilizer";
+const VERSION="supabase-ai-v21.2-single-core-safe-wording";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -30,7 +30,9 @@ const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이
 - 점수는 상대활성도이지 확률이 아니다. 숫자%로 바꾸지 않는다.
 - 중요한 결론·날짜·행동은 실제 evidence_refs와 연결한다.
 - supportive와 caution이 같이 있으면 '혼합'으로 표현한다.
-- 사주와 Thai는 Western 점수에 합산하지 않고 독립 맥락으로만 비교한다.
+- 사주와 Thai는 Western 점수에 합산하지 않고 독립 맥락으로만 비교한다. 겹친다고 시너지·합일·확정으로 표현하지 않는다.
+- 대길·완벽·무조건 같은 과장 표현을 쓰지 않는다.
+- 투자 관련 상대지수는 시장 가격방향·수익률·매수매도 적기 예측으로 바꾸지 않는다.
 - 관계가 중요할 때만 상대→나·나→상대·과거인연 재접점의 순서와 현실 확인 신호를 종합한다.
 - 중요하지 않은 분야를 분량 채우기 위해 반복하지 않는다. 15개 분야 상세는 서버가 별도로 만들므로 topic_analysis는 출력하지 않는다.
 - 결론→핵심 흐름→주목 시기→현실 확인→피할 행동 순서. 한국어 반말. JSON만 반환한다.`;
@@ -151,8 +153,8 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답")){second=await generate(payload,secondModel,key,budget,"fallback",true,"");}
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
-  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,...(preferred===secondModel?{}:{fallback_from:preferred})};
-  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,quality_report:second?.quality_report??first?.quality_report};
+  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -163,7 +165,7 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),quality_report:r.quality_report??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
     if(!(await jobActive(id))){
       // A cancel request can mark the row failed while the already-sent first network call is still in flight.
       // Never resurrect that job, but attach the real usage/trace once the call returns so spent tokens are observable.
@@ -181,7 +183,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
   let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,safe_wording:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
   const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();

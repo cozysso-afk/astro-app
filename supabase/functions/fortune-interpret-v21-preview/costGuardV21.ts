@@ -11,6 +11,39 @@ function scoreText(v:unknown){ return Number.isFinite(Number(v)) ? Number(v).toF
 function jsonBytes(v:any){ return enc.encode(JSON.stringify(v)).byteLength; }
 function periodLimit(kind:string){ return kind==="annual"?8:kind==="month"?6:kind==="week"?5:2; }
 
+function topicSubject(topic:string){
+  const last=topic.charCodeAt(Math.max(0,topic.length-1));
+  const hasBatchim=last>=0xAC00&&last<=0xD7A3&&((last-0xAC00)%28)!==0;
+  return `${topic}${hasBatchim?"은":"는"}`;
+}
+
+function softenClaimText(value:string){
+  return value
+    .replace(/연중 가장 완벽한 합일/g,"연중에서도 독립 근거가 비교적 뚜렷하게 겹치는 구간")
+    .replace(/가장 완벽한 시기/g,"특히 주목할 시기")
+    .replace(/완벽 해설/g,"핵심 해설")
+    .replace(/완벽한 합일/g,"독립 근거의 시기적 겹침")
+    .replace(/완벽한 시기/g,"주목할 시기")
+    .replace(/대길의 시기/g,"상대활성도가 높은 시기")
+    .replace(/대길/g,"강한 상대활성도")
+    .replace(/매우 긍정적인 시너지를 발휘하는 시기/g,"우호적 맥락이 같은 시기에 나타나는 구간")
+    .replace(/삼박자로 맞아떨어져/g,"각 체계의 맥락이 같은 시기에 겹쳐")
+    .replace(/시너지/g,"시기적 겹침")
+    .replace(/절대 보수적 태도를 유지해야 한다/g,"보수적으로 접근하고 실제 시장 데이터를 우선해야 해")
+    .replace(/절대 금물이다/g,"피하는 편이 안전해")
+    .replace(/절대 금물/g,"피하는 편이 안전해")
+    .replace(/관계 확정/g,"관계 재정립 여부 확인")
+    .replace(/재회 최적기/g,"재회 주목기")
+    .replace(/이뤄질 가능성이 높다/g,"재접점 신호가 상대적으로 강하게 나타난다");
+}
+
+function softenObject<T>(value:T):T{
+  if(typeof value==="string")return softenClaimText(value) as T;
+  if(Array.isArray(value))return value.map(v=>softenObject(v)) as T;
+  if(value&&typeof value==="object"){for(const [k,v] of Object.entries(value as any))(value as any)[k]=softenObject(v);}
+  return value;
+}
+
 function topicEvidence(payload:any, topic:string){
   const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[];
   const direct=rows.filter((row:any)=>String(row?.topic??"")===topic);
@@ -46,11 +79,12 @@ function topicImportance(payload:any){
 }
 
 function bestTopicDate(payload:any,topic:string){
-  const stat=payload?.western?.overall?.[topic]??{};
-  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date);
+  const stat=payload?.western?.overall?.[topic]??{},avg=num(stat?.average);
+  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&Number.isFinite(Number(x?.score)));
+  candidates.sort((a:any,b:any)=>Math.abs(num(b?.score)-avg)-Math.abs(num(a?.score)-avg));
+  if(candidates[0]?.date)return String(candidates[0].date);
   const key=(payload?.key_dates??[]).find((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic));
-  if(key?.date)return String(key.date);
-  return candidates[0]?.date?String(candidates[0].date):String(payload?.period?.start??"");
+  return key?.date?String(key.date):String(payload?.period?.start??"");
 }
 
 function topicVerb(topic:string){
@@ -80,7 +114,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const va=topicVerb(topic);
     return {
       topic,importance,
-      verdict:`${topic}은 이번 기간에서 ${direction}으로 읽혀.`,
+      verdict:`${topicSubject(topic)} 이번 기간에서 ${direction}으로 읽혀.`,
       reason:reasonParts.join(" "),
       timing,
       action:va.action,
@@ -194,15 +228,22 @@ export function stabilizeCoreForQuality(core:any,payload:any){
   data.priorities=Array.isArray(data?.priorities)?data.priorities.map(String).filter(Boolean):[];for(const row of [...coreTopics,...important]){if(data.priorities.length>=minimumPriorities)break;const text=`${row.topic}: ${row.action}`;if(!data.priorities.includes(text))data.priorities.push(text);}
   data.overall=data?.overall&&typeof data.overall==="object"?data.overall:{};let overallEvidence=valid(data.overall.evidence_refs);overallEvidence=uniq([...overallEvidence,...data.key_windows.flatMap((w:any)=>refs(w?.evidence_refs)),...coreTopics.flatMap((x:any)=>refs(x?.evidence_refs))]).filter(ref=>map.has(ref));data.overall.evidence_refs=overallEvidence.slice(0,8);const minSummary=kind==="annual"?240:kind==="month"?170:110;const groundedAppend=coreTopics.slice(0,3).map((x:any)=>String(x.reason??x.verdict??"")).filter(Boolean).join(" ");data.overall.summary=ensureMinText(data.overall.summary,minSummary,`${groundedAppend} 이 점수들은 사건 확률이 아니라 기간 내 상대활성도이므로 실제 일정·반응·수치와 대조해서 판단해.`);
   const timeline=Array.isArray(payload?.cross_system_timeline)?payload.cross_system_timeline:[];const timelineFor=(start:string,end:string)=>timeline.find((x:any)=>{const d=iso(x?.date);return d&&start&&end&&start<=d&&d<=end;});
-  const enrichCross=(x:any)=>{const out={...x};const start=iso(out?.start),end=iso(out?.end)||start,t=timelineFor(start,end);let linked=valid(out?.evidence_refs);if(t)linked=uniq([...linked,...valid(t?.western_refs),...valid(t?.saju_context_refs),...valid(t?.thai_context_refs)]);const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean),systems=new Set(linkedRows.map((r:any)=>String(r?.system??"")));out.evidence_refs=linked.slice(0,8);out.mode=systems.has("western")&&systems.size>=2?(out?.mode==="상반맥락"?"상반맥락":"복수체계"):"Western단독";const western=linkedRows.filter((r:any)=>r?.system==="western").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),saju=linkedRows.filter((r:any)=>r?.system==="saju").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),thai=linkedRows.filter((r:any)=>r?.system==="thai").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" ");out.western=ensureMinText(out?.western,25,western||"Western 계산은 해당 시기의 상대활성도 변화를 직접 추적해.");out.saju=String(out?.saju??"").trim()||(saju?`${saju} 사주는 Western 점수에 합산하지 않고 독립 맥락으로만 참고해.`:"");out.thai=String(out?.thai??"").trim()||(thai?`${thai} Thai는 위치·기간 맥락만 독립적으로 참고해.`:"");const others=[out.saju,out.thai].filter(Boolean).join(" ");out.synthesis=ensureMinText(out?.synthesis,45,others?`Western의 직접 시기 근거와 비Western의 독립 맥락을 나란히 비교해. ${others} 서로 점수를 합산하지 말고 실제 변화가 겹치는지만 확인해.`:"다른 체계의 독립 근거가 충분하지 않아 Western 직접 계산을 중심으로 보고, 실제 변화가 나타나는지 확인해.");return out;};
+  const enrichCross=(x:any)=>{const out={...x};const start=iso(out?.start),end=iso(out?.end)||start,t=timelineFor(start,end);let linked=valid(out?.evidence_refs);if(t)linked=uniq([...linked,...valid(t?.western_refs),...valid(t?.saju_context_refs),...valid(t?.thai_context_refs)]);const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean),systems=new Set(linkedRows.map((r:any)=>String(r?.system??"")));out.evidence_refs=linked.slice(0,8);out.mode=systems.has("western")&&systems.size>=2?(out?.mode==="상반맥락"?"상반맥락":"복수체계"):"Western단독";const western=linkedRows.filter((r:any)=>r?.system==="western").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),saju=linkedRows.filter((r:any)=>r?.system==="saju").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),thai=linkedRows.filter((r:any)=>r?.system==="thai").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" ");out.western=ensureMinText(out?.western,25,western||"Western 계산은 해당 시기의 상대활성도 변화를 직접 추적해.");out.saju=String(out?.saju??"").trim()||(saju?`${saju} 사주는 Western 점수에 합산하지 않고 독립 맥락으로만 참고해.`:"");out.thai=String(out?.thai??"").trim()||(thai?`${thai} Thai는 위치·기간 맥락만 독립적으로 참고해.`:"");const others=[out.saju,out.thai].filter(Boolean).join(" ");const otherNames=[out.saju?"사주":"",out.thai?"Thai":""].filter(Boolean).join("·");out.synthesis=out.mode==="Western단독"?"다른 체계의 독립 근거가 충분하지 않아 Western 직접 계산을 중심으로 보고, 실제 변화가 나타나는지 확인해.":out.mode==="상반맥락"?`Western 직접 시기 근거와 ${otherNames||"비Western"}의 독립 맥락이 같은 기간에 서로 다르게 나타나는지 비교해. 서로 점수나 인과를 합산하지 말고 실제 관찰에서 어느 맥락이 더 두드러지는지만 확인해.`:`Western 직접 시기 근거와 ${otherNames||"비Western"}의 독립 맥락이 같은 기간에 함께 나타나는지 비교해. 서로 점수나 인과를 합산하지 말고 실제 변화가 각 체계의 맥락과 동시에 관찰되는지만 확인해.`;return out;};
   data.cross_checks=(Array.isArray(data?.cross_checks)?data.cross_checks:[]).map(enrichCross);
   if(kind==="annual"){const usedCrossDates=new Set(data.cross_checks.map((x:any)=>iso(x?.start)).filter(Boolean));const candidates=[...timeline,...(Array.isArray(payload?.key_dates)?payload.key_dates:[])];for(const t of candidates){if(data.cross_checks.length>=3)break;const date=iso(t?.date);if(!date||usedCrossDates.has(date))continue;let linked=uniq([...valid(t?.western_refs),...valid(t?.saju_context_refs),...valid(t?.thai_context_refs)]);if(!linked.length)linked=refsForDate(date,kdTopics(t)).slice(0,4);if(!linked.length)continue;const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean),systems=new Set(linkedRows.map((r:any)=>String(r?.system??"")));data.cross_checks.push(enrichCross({label:`${date} 체계 교차확인`,start:date,end:date,mode:systems.has("western")&&systems.size>=2?"복수체계":"Western단독",western:"",saju:"",thai:"",synthesis:"",evidence_refs:linked}));usedCrossDates.add(date);}}
   if(kind==="annual"){data.year_phases=Array.isArray(data?.year_phases)?data.year_phases:[];const months=Array.isArray(payload?.western?.months)?payload.western.months:[];for(let q=data.year_phases.length;q<4&&months.length;q++){const startIndex=Math.min(months.length-1,Math.floor(q*months.length/4)),endIndex=Math.min(months.length-1,Math.floor((q+1)*months.length/4)-1),first=months[startIndex],last=months[Math.max(startIndex,endIndex)],start=iso(first?.start)||`${String(first?.calendar_month??"")}-01`.slice(0,10),end=iso(last?.end)||start,topic=String(coreTopics[q%Math.max(1,coreTopics.length)]?.topic??TOPICS[q%TOPICS.length]);let linked=rows.filter((row:any)=>String(row?.id??"").startsWith("W:month:")&&rowCovers(row,start)&&String(row?.topic??"")===topic).map((row:any)=>String(row.id));if(!linked.length)linked=refsForDate(start,[topic]);data.year_phases.push({label:`연간 흐름 ${q+1}`,start,end,theme:`${topic} 흐름을 중심으로 보는 구간`,change:String(coreTopics[q%Math.max(1,coreTopics.length)]?.reason??`${topic} 기간 변화가 두드러지는 구간이야.`),evidence_refs:linked.slice(0,4)});}data.year_phases=data.year_phases.map((p:any)=>{const out={...p};let linked=valid(out?.evidence_refs);if(!linked.length)linked=refsForDate(iso(out?.start),[]);out.evidence_refs=linked.slice(0,5);return out;});}
   const relationshipSalient=important.some((x:any)=>["연애","연락","재회"].includes(String(x.topic)));
   if(relationshipSalient){const relTopicSet=new Set(["수신신호","발신적합","과거인연접점","연애","연락","재회"]),relRows=rows.filter((row:any)=>relTopicSet.has(String(row?.topic??"")));data.relationship_reading=data?.relationship_reading&&typeof data.relationship_reading==="object"?data.relationship_reading:{};const rr=data.relationship_reading,focusDates=[...String(rr?.focus_timing??"").matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].map((m:any)=>m[0]);let linked=valid(rr?.evidence_refs);for(const date of focusDates)linked=uniq([...linked,...relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))]);linked=uniq([...linked,...relRows.sort((a:any,b:any)=>rowPriority(a)-rowPriority(b)).map((row:any)=>String(row.id))]).slice(0,8);rr.evidence_refs=linked;const sig=payload?.western?.relationship_signals??{},incoming=scoreText(sig?.수신신호?.average),outgoing=scoreText(sig?.발신적합?.average),reconnect=scoreText(sig?.과거인연접점?.average),exact=relRows.find((row:any)=>iso(row?.date)&&String(row?.id??"").startsWith("W:date:")),exactDate=iso(exact?.date);rr.context=ensureMinText(rr?.context,35,`관계 계산에서 수신 ${incoming}점, 발신 ${outgoing}점, 과거인연 재접점 ${reconnect}점이 서로 다른 축으로 움직여.`);rr.flow=ensureMinText(rr?.flow,55,"상대→나 신호와 나→상대 행동 적합도를 분리해서 보고, 과거 인연 재접점은 별도 축으로 확인해야 해. 한 축의 상승만으로 관계 결과를 확정하지 마.");rr.focus_timing=ensureMinText(rr?.focus_timing,20,exactDate?`${exactDate}의 직접 관계 근거를 우선 확인하고, 실제 답변·약속·만남 제안이 뒤따르는지 봐.`:"직접 관계 날짜 근거가 있는 구간에서 실제 답변·약속·만남 제안이 뒤따르는지 확인해.");if(exactDate&&![...String(rr.focus_timing).matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].length)rr.focus_timing=`${exactDate} · ${rr.focus_timing}`;if(exactDate)rr.evidence_refs=uniq([...rr.evidence_refs,...relRows.filter((row:any)=>iso(row?.date)===exactDate).map((row:any)=>String(row.id))]).slice(0,8);rr.watch=ensureMinText(rr?.watch,20,"실제 연락 빈도, 답변의 구체성, 약속 제안처럼 관찰 가능한 신호가 함께 움직이는지 확인해.");rr.avoid=ensureMinText(rr?.avoid,20,"상대활성도 점수만으로 상대의 속마음이나 재회·연애 결과를 미리 확정하지 마.");data.contact_flow=data?.contact_flow&&typeof data.contact_flow==="object"?data.contact_flow:{};data.contact_flow.incoming=ensureMinText(data.contact_flow.incoming,15,`수신신호 평균 ${incoming}점의 상대활성도를 실제 상대의 반응과 대조해.`);data.contact_flow.outgoing=ensureMinText(data.contact_flow.outgoing,15,`발신적합 평균 ${outgoing}점의 흐름을 내 행동 타이밍과 대조해.`);data.contact_flow.reconnection=ensureMinText(data.contact_flow.reconnection,15,`과거인연접점 평균 ${reconnect}점은 재회 보장이 아니라 재접점 활성도야.`);}
   const investmentSalient=important.some((x:any)=>INVESTMENT_TOPICS.has(String(x.topic)));
-  if(investmentSalient){data.investment_reading=data?.investment_reading&&typeof data.investment_reading==="object"?data.investment_reading:{};const ir=data.investment_reading,overall=payload?.western?.overall??{};const fill=(field:string,topic:string)=>{ir[field]=ensureMinText(ir?.[field],20,`${topic} 상대활성도 평균 ${scoreText(overall?.[topic]?.average)}점이야. 실제 시장 데이터와 본인 위험 한도를 함께 확인해.`);};fill("psychology","투자심리");fill("realization","수익실현");fill("entry","신규진입");fill("risk","투자주의");}
-  return data;
+  if(investmentSalient){
+    data.investment_reading=data?.investment_reading&&typeof data.investment_reading==="object"?data.investment_reading:{};
+    const ir=data.investment_reading,overall=payload?.western?.overall??{};
+    ir.psychology=`투자심리 상대활성도 평균 ${scoreText(overall?.투자심리?.average)}점이야. 심리적 과열·위축을 점검하는 보조지표이며 시장 가격 방향 예측은 아니야.`;
+    ir.realization=`수익실현 상대활성도 평균 ${scoreText(overall?.수익실현?.average)}점이야. 실제 수익 가능성이나 매도 적기를 뜻하지 않으므로 보유 종목의 시장 데이터와 손익 기준을 우선해.`;
+    ir.entry=`신규진입 상대활성도 평균 ${scoreText(overall?.신규진입?.average)}점이야. 매수 신호가 아니며 실제 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.`;
+    ir.risk=`투자주의 상대활성도 평균 ${scoreText(overall?.투자주의?.average)}점이야. 높을수록 판단 오류와 변동성 대응을 더 보수적으로 점검하되 실제 투자 결정은 시장 데이터가 우선이야.`;
+  }
+  return softenObject(data);
 }
 
 export function buildPromptPacket(payload:any){
@@ -245,6 +286,6 @@ export function promptBudget(payload:any){
 
 export function buildExternalPrompt(payload:any){
   const {packet,bytes,max_bytes,estimated_input_tokens}=promptBudget(payload);
-  const text=`아래는 '별빛의 운명' 계산엔진이 만든 압축 근거 패킷이야. 이 자료 밖의 사실·상대 속마음·사건 확률을 만들지 말고, 중요한 것부터 한국어로 이해하기 쉽게 해석해줘.\n\n요구사항:\n- 결론 → 핵심 흐름 → 주목 날짜/시간 → 현실에서 확인할 신호 → 피할 행동 순서로 써.\n- 점수는 사건 확률이 아니라 상대활성도야. 숫자%로 바꾸지 마.\n- 연애·연락·재회가 중요하면 상대→나, 나→상대, 과거인연 재접점을 분리하고 실제 행동으로 확인하게 해.\n- 사주·Thai는 Western 점수에 합산하지 말고 독립 맥락으로 비교해.\n- 중요하지 않은 분야를 억지로 길게 쓰지 마.\n\nCALCULATED_DATA=${JSON.stringify(packet)}`;
+  const text=`아래는 '별빛의 운명' 계산엔진이 만든 압축 근거 패킷이야. 이 자료 밖의 사실·상대 속마음·사건 확률을 만들지 말고, 중요한 것부터 한국어로 이해하기 쉽게 해석해줘.\n\n요구사항:\n- 결론 → 핵심 흐름 → 주목 날짜/시간 → 현실에서 확인할 신호 → 피할 행동 순서로 써.\n- 점수는 사건 확률이 아니라 상대활성도야. 숫자%로 바꾸지 마.\n- 연애·연락·재회가 중요하면 상대→나, 나→상대, 과거인연 재접점을 분리하고 실제 행동으로 확인하게 해.\n- 사주·Thai는 Western 점수에 합산하지 말고 독립 맥락으로 비교해. 체계가 겹쳐도 시너지·합일·확정 표현을 쓰지 마.\n- 대길·완벽·무조건 같은 과장 표현을 쓰지 마.\n- 투자 관련 지수는 가격방향·수익률·매수매도 적기 예측으로 바꾸지 마.\n- 중요하지 않은 분야를 억지로 길게 쓰지 마.\n\nCALCULATED_DATA=${JSON.stringify(packet)}`;
   return {text,bytes,max_bytes,estimated_input_tokens};
 }
