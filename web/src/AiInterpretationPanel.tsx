@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
+import { ANNUAL_SCORE_FOCUS_EVENT } from './AnnualDailyScoresPanel'
 import { estimateGeminiUsage } from './lib/aiUsage'
 
 function periodLabel(start: string, end: string) {
@@ -13,6 +14,11 @@ function signalClass(signal: string) {
   if (signal === '주의') return 'is-caution'
   if (signal === '배경') return 'is-background'
   return 'is-mixed'
+}
+
+function inspectAnnualScore(date: string, topic?: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(ANNUAL_SCORE_FOCUS_EVENT, { detail: { date, topic } }))
 }
 
 export function AiInterpretationPanel({ result, loading, error, onRetry, topics }: {
@@ -44,7 +50,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, topics 
 
     {hasDecisions && <section className="ai-decision-section"><div className="ai-section-heading"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div><div className="ai-decision-list">{data.decisions!.map((item,index)=><article key={`${index}-${item.action}`}><span className="ai-decision-index">{index+1}</span><div><strong>{item.action}</strong>{item.timing&&<b>{item.timing}</b>}<p>{item.reason}</p><small>계산 근거 {item.evidence_refs?.length ?? 0}개 연결</small></div></article>)}</div></section>}
 
-    {hasKeyWindows && <section className="ai-key-window-section"><div className="ai-section-heading"><span>중요 날짜 · 시기</span><strong>눈여겨볼 핵심 구간</strong></div><div className="ai-key-window-list">{data.key_windows!.map((item,index)=><article className={`ai-key-window ${signalClass(item.signal)}`} key={`${item.start}-${item.end}-${index}`}><div className="ai-key-window-top"><div><span className="ai-window-date">{periodLabel(item.start,item.end)}</span><strong>{item.label}</strong></div><b>{item.signal}</b></div>{item.topics?.length?<div className="ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>:null}<p>{item.summary}</p><div className="ai-window-action"><strong>이때</strong><span>{item.action}</span></div>{item.avoid&&<div className="ai-window-avoid"><strong>피할 것</strong><span>{item.avoid}</span></div>}<small>계산 근거 {item.evidence_refs?.length ?? 0}개 검증</small></article>)}</div></section>}
+    {hasKeyWindows && <section className="ai-key-window-section"><div className="ai-section-heading"><span>중요 날짜 · 시기</span><strong>눈여겨볼 핵심 구간</strong></div><div className="ai-key-window-list">{data.key_windows!.map((item,index)=><article className={`ai-key-window ${signalClass(item.signal)}`} key={`${item.start}-${item.end}-${index}`}><div className="ai-key-window-top"><div><span className="ai-window-date">{periodLabel(item.start,item.end)}</span><strong>{item.label}</strong></div><b>{item.signal}</b></div>{item.topics?.length?<div className="ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>:null}<p>{item.summary}</p><div className="ai-window-action"><strong>이때</strong><span>{item.action}</span></div>{item.avoid&&<div className="ai-window-avoid"><strong>피할 것</strong><span>{item.avoid}</span></div>}<div className="ai-window-footer"><small>계산 근거 {item.evidence_refs?.length ?? 0}개 검증</small><button type="button" onClick={()=>inspectAnnualScore(item.start,item.topics?.[0])}>날짜 점수에서 확인</button></div></article>)}</div></section>}
 
     {hasYearPhases && <section className="ai-year-phase-section"><div className="ai-section-heading"><span>연간 흐름 지도</span><strong>한 해를 4구간으로 보면</strong></div><div className="ai-year-phase-list">{data.year_phases!.map((phase,index)=><article key={`${phase.label}-${index}`}><div><b>{phase.label}</b><span>{periodLabel(phase.start,phase.end)}</span></div><strong>{phase.theme}</strong><p>{phase.change}</p></article>)}</div></section>}
 
