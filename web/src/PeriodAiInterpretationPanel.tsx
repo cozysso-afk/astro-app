@@ -68,7 +68,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
       <div className="period-ai-actions">{decisions.slice(0,4).map((item,index)=><article key={`${index}-${item.action}`}>
         <span className="period-ai-action-index">{index+1}</span>
-        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}<p>{item.reason}</p>{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</div>
+        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
       </article>)}</div>
     </section>}
 
@@ -78,7 +78,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
         <div className="period-ai-window-head"><div><b>{periodLabel(item.start,item.end)}</b><strong>{item.label}</strong></div><span>{item.signal}</span></div>
         {!!item.topics?.length && <div className="period-ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>}
         <p>{item.summary}</p>
-        {item.action&&<div className="period-ai-window-line"><b>이때</b><span>{item.action}</span></div>}
+        {!decisions.length&&item.action&&<div className="period-ai-window-line"><b>이때</b><span>{item.action}</span></div>}
         {item.avoid&&<div className="period-ai-window-line is-avoid"><b>피할 것</b><span>{item.avoid}</span></div>}
       </article>)}</div>
     </section> : <div className="period-ai-chips">

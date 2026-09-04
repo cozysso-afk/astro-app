@@ -38,3 +38,7 @@
 
 /* V21.3.1 UX pass 2 · concise period conclusion */
 .period-ai-overall-brief{display:grid;gap:7px;padding:11px 12px;border:1px solid rgba(157,151,177,.17);border-radius:14px;background:linear-gradient(135deg,rgba(251,247,255,.9),rgba(242,250,248,.86))}.period-ai-overall-brief>span{color:#8d7a95;font-size:.68rem;font-weight:900;letter-spacing:.04em}.period-ai-overall-brief>p{display:grid;grid-template-columns:86px minmax(0,1fr);gap:7px;margin:0;line-height:1.55}.period-ai-overall-brief>p>b{color:#715d7c;font-size:.72rem}.period-ai-overall-brief>p>strong{color:#534958;font-size:.81rem;font-weight:650}@media(max-width:430px){.period-ai-overall-brief>p{grid-template-columns:1fr;gap:2px}.period-ai-overall-brief>p>strong{font-size:.8rem}}
+
+
+/* V21.3.1 UX pass 3 · compact action cards */
+.period-ai-action-more{margin-top:3px}.period-ai-action-more>summary{cursor:pointer;list-style:none;color:#897a91;font-size:.7rem;font-weight:850}.period-ai-action-more>summary::-webkit-details-marker{display:none}.period-ai-action-more>summary::before{content:'＋';margin-right:5px}.period-ai-action-more[open]>summary::before{content:'－'}.period-ai-action-more>p:not(.period-ai-condition){margin:7px 0 0;color:#746a78;font-size:.77rem;line-height:1.6}.period-ai-action-more>.period-ai-condition{margin-top:7px}
