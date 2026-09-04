@@ -53,13 +53,13 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Commit verified v11 source and permanent regressions only
+      - name: Commit verified source and permanent tests
         run: |
+          # A GitHub Actions app token cannot modify workflow files. The permanent CI
+          # change and one-shot workflow cleanup are applied separately through the
+          # authenticated GitHub connector after this verified source commit lands.
+          git checkout -- .github/workflows/interpretation-v3-ci.yml
           rm -f \
-            .github/workflows/run-relationship-v11-final-free-audit.yml \
-            .github/workflows/run-full-relationship-audit-v11.yml \
-            .github/workflows/run-marriage-scope-ui-patch.yml \
-            .github/workflows/run-personal-marriage-backend-patch.yml \
             scripts/adjust_v11_test_contract.py \
             scripts/finalize_relationship_v11_fun.py \
             scripts/patch_marriage_scope_ui.py \
@@ -72,6 +72,10 @@ jobs:
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add api/main.py personal_marriage_v1.py tests/test_personal_marriage_v1.py \
+            supabase/functions/relationship-interpret-v9-preview/index.ts \
+            web/src/AppNext.tsx web/src/PersonalMarriagePanel.tsx web/src/RelationshipInterpretationPanel.tsx \
+            web/src/appTypes.ts web/src/lib/readingCache.ts web/src/lib/relationshipModeContract.test.mjs \
+            scripts
           git commit -m 'feat(relationship): finalize marriage modes and v11 cost guard'
           git push origin HEAD:work/ai-cost-guard-v21
