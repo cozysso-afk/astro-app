@@ -1,0 +1,337 @@
+/* V27 · mobile design reset
+ * One authoritative late visual layer for iPhone-first readability.
+ * Replaces the stacked V23–V26 presentation layers.
+ */
+
+:root{
+  --v27-bg:#f5f3f8;
+  --v27-surface:rgba(255,255,255,.88);
+  --v27-surface-strong:rgba(255,255,255,.96);
+  --v27-surface-soft:rgba(249,247,251,.84);
+  --v27-ink:#302b35;
+  --v27-text:#514a56;
+  --v27-muted:#817987;
+  --v27-line:rgba(104,91,119,.13);
+  --v27-line-strong:rgba(104,91,119,.20);
+  --v27-violet:#7d6a94;
+  --v27-violet-soft:#eee9f3;
+  --v27-mint:#789b8f;
+  --v27-mint-soft:#edf5f1;
+  --v27-blue:#7e96ae;
+  --v27-blue-soft:#edf3f8;
+  --v27-rose:#a67886;
+  --v27-rose-soft:#f8eff2;
+  --v27-shadow:0 10px 28px rgba(70,58,82,.065);
+  --v27-shadow-strong:0 16px 38px rgba(70,58,82,.09);
+  --v27-r-lg:22px;
+  --v27-r-md:17px;
+  --v27-r-sm:12px;
+}
+
+html,body,#root{background:var(--v27-bg)!important}
+body{
+  color:var(--v27-text)!important;
+  font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  letter-spacing:-.018em!important;
+}
+.app-shell{
+  background:
+    radial-gradient(circle at 14% 0%,rgba(231,223,240,.52),transparent 27%),
+    radial-gradient(circle at 88% 10%,rgba(223,233,240,.42),transparent 25%),
+    linear-gradient(180deg,#f7f5f9 0%,#f4f2f6 100%)!important;
+}
+.app-shell::before,.app-shell::after{display:none!important}
+
+/* Typography: one predictable scale. */
+h1,h2,h3,h4,
+.tool-panel-heading h2,
+.period-report-heading h2,
+.ai-interpret-head h3,
+.period-ai-head h3,
+.result-card-title strong,
+.ai-section-heading strong,
+.period-ai-section-title strong{
+  font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",sans-serif!important;
+  color:var(--v27-ink)!important;
+  letter-spacing:-.035em!important;
+  text-shadow:none!important;
+}
+.eyebrow,.section-label,.result-card-title>span,.period-ai-kicker,.ai-section-kicker{
+  font-family:inherit!important;
+  font-size:.73rem!important;
+  line-height:1.25!important;
+  letter-spacing:.045em!important;
+  text-transform:none!important;
+  color:#897f8f!important;
+  font-weight:800!important;
+}
+.tool-panel-heading h2,.period-report-heading h2{font-size:1.58rem!important;line-height:1.18!important;font-weight:800!important}
+.ai-interpret-head h3,.period-ai-head h3{font-size:1.18rem!important;line-height:1.38!important;font-weight:800!important}
+.result-card-title strong,.ai-section-heading strong,.period-ai-section-title strong{font-size:1rem!important;line-height:1.4!important;font-weight:800!important}
+.tool-panel-heading p,.coordinate-note span,.result-note,.ai-summary,.period-ai-summary{font-size:.9rem!important;line-height:1.62!important;color:var(--v27-muted)!important}
+
+/* Shared surfaces: less glass, fewer gradients, smaller radii. */
+.profile-card,.date-card,.tool-panel,.result-card,.period-ai-card,.ai-interpret-card,
+.relationship-reading-card,.relationship-ai-card,.precision-card{
+  border:1px solid var(--v27-line)!important;
+  background:var(--v27-surface)!important;
+  box-shadow:var(--v27-shadow)!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+}
+.tool-panel,.result-card,.period-ai-card,.ai-interpret-card,.relationship-reading-card,.relationship-ai-card{border-radius:var(--v27-r-lg)!important}
+.profile-card,.date-card{border-radius:var(--v27-r-md)!important}
+.result-card::before,.relationship-reading-card::before,.relationship-ai-card::before,.period-ai-card::before,.ai-interpret-card::before{display:none!important}
+
+/* Home / controls. */
+.profile-card,.date-card{padding:14px 15px!important}
+.profile-copy strong{font-size:.98rem!important;color:var(--v27-ink)!important}
+.profile-copy>span:last-child{font-size:.8rem!important;color:var(--v27-muted)!important}
+.period-grid{gap:8px!important}
+.period-button{
+  min-height:45px!important;
+  border:1px solid var(--v27-line)!important;
+  border-radius:14px!important;
+  background:rgba(255,255,255,.72)!important;
+  color:#736a79!important;
+  box-shadow:none!important;
+  font-size:.86rem!important;
+  font-weight:760!important;
+}
+.period-button.is-active{
+  color:#61536d!important;
+  border-color:rgba(125,106,148,.30)!important;
+  background:#f0ebf4!important;
+  box-shadow:0 6px 18px rgba(79,65,95,.08)!important;
+  transform:translateY(-1px);
+}
+.tool-grid{gap:10px!important}
+.tool-card,.tool-grid>.tool-card:first-child,.tool-grid>.tool-card:not(:first-child){
+  min-height:112px!important;
+  padding:15px!important;
+  border:1px solid var(--v27-line)!important;
+  border-radius:18px!important;
+  background:rgba(255,255,255,.78)!important;
+  box-shadow:none!important;
+}
+.tool-grid>.tool-card:first-child{grid-column:1/-1!important;min-height:104px!important}
+.tool-card strong,.tool-grid>.tool-card:first-child strong,.tool-grid>.tool-card:not(:first-child) strong{font-size:.97rem!important;color:var(--v27-ink)!important}
+.tool-card>span:last-child,.tool-grid>.tool-card:first-child>span:last-child,.tool-grid>.tool-card:not(:first-child)>span:last-child{font-size:.79rem!important;line-height:1.48!important;color:var(--v27-muted)!important}
+.tool-card.is-selected{border-color:rgba(125,106,148,.30)!important;background:#f4f0f7!important;outline:none!important;box-shadow:0 8px 22px rgba(79,65,95,.08)!important}
+.tool-icon,.period-report-icon,.ai-orb{box-shadow:none!important}
+
+/* Period header: compact app header, not a giant decorative poster. */
+.period-fortune-report .period-report-heading{
+  display:flex!important;
+  gap:12px!important;
+  align-items:flex-start!important;
+  margin:0 0 14px!important;
+  padding:16px!important;
+  border:1px solid var(--v27-line)!important;
+  border-radius:20px!important;
+  background:var(--v27-surface-strong)!important;
+  box-shadow:var(--v27-shadow)!important;
+  overflow:hidden!important;
+}
+.period-report-heading::before,.period-report-heading::after{display:none!important}
+.period-report-icon{
+  width:42px!important;height:42px!important;flex:0 0 42px!important;
+  border-radius:13px!important;
+  background:#f1ecf5!important;
+  color:#78668e!important;
+  border:1px solid rgba(125,106,148,.15)!important;
+}
+.period-report-icon::before{display:none!important}
+.period-report-kicker-row{margin:0 0 4px!important}
+.period-report-kicker-row .eyebrow{font-size:.72rem!important;color:#817587!important;letter-spacing:.035em!important}
+.period-report-badge{
+  min-width:auto!important;min-height:22px!important;padding:3px 8px!important;
+  border-radius:999px!important;border:1px solid var(--v27-line)!important;
+  background:#f6f3f7!important;color:#756a7b!important;font-size:.7rem!important;font-weight:800!important;box-shadow:none!important;
+}
+.period-report-heading h2{margin:0!important;font-size:1.5rem!important;line-height:1.2!important}
+.period-report-range{
+  display:inline-flex!important;margin-top:8px!important;padding:6px 9px!important;
+  border-radius:10px!important;border:1px solid var(--v27-line)!important;background:#f8f7f9!important;box-shadow:none!important;
+  color:#756d79!important;font-size:.76rem!important;
+}
+.period-report-range strong{font-size:.76rem!important;color:#665e69!important}
+.period-report-copy>p{margin:7px 0 0!important;font-size:.82rem!important;line-height:1.5!important;color:#8a818e!important}
+
+/* Completion / status. */
+.result-headline{
+  min-height:72px!important;padding:13px 14px!important;border-radius:17px!important;
+  border:1px solid rgba(120,153,138,.17)!important;background:var(--v27-mint-soft)!important;
+  box-shadow:none!important;
+}
+.result-headline::after{display:none!important}
+.result-headline strong{font-size:.98rem!important;color:#566e63!important}
+.result-headline span{font-size:.8rem!important;line-height:1.45!important;color:#7a887f!important}
+.status-banner,.coordinate-note{border-radius:14px!important;box-shadow:none!important}
+
+/* AI interpretation: one hero surface, calm typography. */
+.period-ai-card,.ai-interpret-card{
+  padding:17px 16px!important;
+  gap:14px!important;
+  background:var(--v27-surface-strong)!important;
+  border-color:rgba(125,106,148,.18)!important;
+  box-shadow:var(--v27-shadow-strong)!important;
+}
+.period-ai-head,.ai-interpret-head{gap:10px!important;align-items:flex-start!important}
+.period-ai-orb,.ai-orb{
+  width:40px!important;height:40px!important;flex:0 0 40px!important;border-radius:12px!important;
+  background:#f0ebf5!important;color:#756089!important;border:1px solid rgba(125,106,148,.14)!important;
+}
+.period-ai-head h3,.ai-interpret-head h3{margin-top:2px!important;font-size:1.13rem!important;line-height:1.4!important}
+.ai-interpret-head small{font-size:.76rem!important;line-height:1.45!important;color:#8a818e!important}
+.period-ai-overall-brief,.ai-overall-brief{
+  padding:12px 13px!important;border:1px solid var(--v27-line)!important;border-radius:15px!important;
+  background:#f8f6f9!important;box-shadow:none!important;
+}
+.period-ai-overall-brief>p,.ai-overall-brief>p{margin:0!important}
+.period-ai-overall-brief>p>strong,.ai-overall-brief span,.ai-overall-brief p{font-size:.9rem!important;line-height:1.55!important}
+
+/* Loading: visibly alive without a neon arcade look. */
+.ai-interpret-card.is-loading,.period-ai-card.is-loading{position:relative!important;isolation:isolate;overflow:hidden!important}
+.ai-interpret-card.is-loading>* , .period-ai-card.is-loading>*{position:relative;z-index:2}
+.ai-interpret-card.is-loading::before,.period-ai-card.is-loading::before{
+  content:""!important;display:block!important;position:absolute!important;z-index:1!important;
+  width:42%;height:220%;left:-50%;top:-60%;transform:rotate(13deg);
+  background:linear-gradient(90deg,transparent,rgba(217,202,233,.08),rgba(185,211,228,.28),rgba(255,255,255,.70),rgba(213,196,232,.17),transparent)!important;
+  filter:blur(3px);pointer-events:none;
+}
+.ai-interpret-card.is-loading strong{font-size:1rem!important;line-height:1.4!important;margin-top:2px!important}
+.ai-interpret-card.is-loading p{font-size:.84rem!important;line-height:1.58!important;color:#7f7684!important}
+.period-ai-card.is-loading h3{font-size:1rem!important;line-height:1.4!important}
+.period-ai-card.is-loading .period-ai-summary{font-size:.84rem!important;line-height:1.58!important}
+.ai-interpret-card.is-loading>svg,.period-ai-card.is-loading>svg{color:#7d6a94!important;filter:drop-shadow(0 0 8px rgba(125,106,148,.30))}
+
+/* Actions / dates: no giant nested cards. */
+.period-ai-quick-date,.ai-quick-date,
+.period-ai-actions>article,.ai-decision-list>article,
+.period-ai-window,.ai-key-window{
+  border:1px solid var(--v27-line)!important;
+  border-left:3px solid #b4a1c3!important;
+  border-radius:15px!important;
+  background:rgba(255,255,255,.82)!important;
+  box-shadow:none!important;
+}
+.period-ai-quick-date.is-use,.ai-quick-date.is-use,.period-ai-actions>article:nth-child(1),.ai-decision-list>article:nth-child(1){border-left-color:#8fb9aa!important}
+.period-ai-quick-date.is-caution,.ai-quick-date.is-caution{border-left-color:#c999a8!important}
+.period-ai-actions>article:nth-child(2),.ai-decision-list>article:nth-child(2){border-left-color:#9db5cc!important}
+.period-ai-actions>article{padding:12px 12px!important;gap:8px!important}
+.period-ai-actions article>div>strong,.ai-decision-list article>div>strong{font-size:.96rem!important;line-height:1.4!important;color:#403946!important}
+.period-ai-actions article>div>p,.period-ai-window>p,.period-ai-window-line,.ai-key-window p{font-size:.86rem!important;line-height:1.6!important;color:#69616d!important}
+.period-ai-action-time{font-size:.76rem!important;padding:5px 8px!important;background:#f3eff6!important;border-color:var(--v27-line)!important;box-shadow:none!important}
+.period-ai-condition,.ai-decision-condition{border-radius:11px!important;background:var(--v27-mint-soft)!important}
+.period-ai-section-title,.ai-section-heading{margin-bottom:8px!important}
+.period-ai-section-title>span,.ai-section-heading>span{font-size:.74rem!important;color:#8a7b91!important}
+.period-ai-section-title>strong,.ai-section-heading>strong{font-size:1.02rem!important;color:var(--v27-ink)!important}
+.period-ai-key-window-section,.ai-key-window-section{border-top:1px solid var(--v27-line)!important;padding-top:16px!important}
+
+/* Score/evidence cards become secondary. */
+.result-card{padding:16px!important;background:rgba(255,255,255,.78)!important;box-shadow:var(--v27-shadow)!important}
+.result-card-title{gap:3px!important;margin-bottom:12px!important}
+.result-card-title>strong{font-size:1rem!important}
+.integrated-topic-grid{gap:8px!important}
+.integrated-topic{
+  min-height:102px!important;padding:13px 10px!important;border:1px solid var(--v27-line)!important;border-radius:15px!important;
+  background:#faf9fb!important;box-shadow:none!important;
+}
+.integrated-topic>span{font-size:.82rem!important;color:#645c68!important}
+.integrated-topic>strong{font-size:1.65rem!important;line-height:1!important;color:#604f6c!important}
+.integrated-topic>small{font-size:.76rem!important;color:#8b828f!important}
+.period-date-source,.period-time-evidence,.integrated-time-evidence{background:#f9f8fa!important;box-shadow:none!important;border-color:var(--v27-line)!important}
+.period-date-source>summary{padding:13px 14px!important}
+.period-date-source>summary>span{font-size:.67rem!important;color:#8a7e8f!important}
+.period-date-source>summary>strong{font-size:.9rem!important;color:#554d59!important}
+.period-date-source>summary>small{font-size:.75rem!important;color:#918994!important}
+
+/* Integrated AI toolbar / copy controls. */
+.relationship-ai-toolbar.ai-cost-guard-toolbar{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;align-items:stretch!important;
+  margin:2px 0 4px!important;
+}
+.relationship-ai-toolbar.ai-cost-guard-toolbar button{
+  min-height:42px!important;padding:8px 10px!important;border:1px solid var(--v27-line-strong)!important;border-radius:13px!important;
+  background:#f6f2f8!important;color:#5d5364!important;box-shadow:none!important;font-size:.8rem!important;line-height:1.3!important;font-weight:800!important;
+}
+.relationship-ai-toolbar.ai-cost-guard-toolbar button:only-of-type{grid-column:1/-1}
+.relationship-ai-toolbar.ai-cost-guard-toolbar small{grid-column:1/-1;font-size:.72rem!important;line-height:1.45!important;text-align:center;color:#8a818d!important}
+.result-actions{gap:8px!important}
+.result-actions button{min-height:40px!important;padding:8px 10px!important;border-radius:12px!important;font-size:.78rem!important;box-shadow:none!important}
+.result-actions .save-action{background:#726176!important;color:white!important;border-color:#726176!important}
+
+/* Relationship / detail typography. */
+.relationship-reading-card h3,.relationship-ai-card h3{font-size:1.14rem!important;line-height:1.4!important}
+.relationship-overview,.relationship-ai-overview,.relationship-reading-grid p,.relationship-ai-grid p{font-size:.88rem!important;line-height:1.6!important}
+.relationship-reading-grid article,.relationship-ai-grid article{border-radius:14px!important;box-shadow:none!important;background:#faf9fb!important}
+
+/* Bottom navigation: quieter, clearer, less toy-like. */
+.bottom-nav{
+  padding-top:5px!important;
+  border-top:1px solid rgba(105,94,116,.13)!important;
+  background:rgba(250,249,251,.94)!important;
+  box-shadow:0 -8px 24px rgba(63,54,72,.06)!important;
+  backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;
+}
+.bottom-nav::before{display:none!important}
+.nav-item{min-height:56px!important;gap:2px!important;color:#918a95!important;transform:none!important;filter:none!important}
+.nav-icon-shell{width:34px!important;height:30px!important;border:0!important;border-radius:10px!important;background:transparent!important;box-shadow:none!important;transform:none!important}
+.nav-icon-shell::after{display:none!important}
+.nav-label{font-size:.68rem!important;font-weight:720!important;color:#918a95!important}
+.nav-item.is-active{color:#6e5e79!important;background:none!important}
+.nav-item.is-active .nav-icon-shell{color:#6d5a79!important;background:#eee8f2!important;box-shadow:none!important;transform:translateY(-1px)!important;border:0!important}
+.nav-item.is-active .nav-label{color:#64566e!important;font-weight:850!important}
+.nav-item.is-active::after{content:""!important;display:block!important;position:absolute!important;left:50%!important;bottom:2px!important;width:5px!important;height:5px!important;border-radius:50%!important;transform:translateX(-50%)!important;background:#8b7697!important;box-shadow:none!important}
+
+/* Motion: noticeable on entrance, restrained after that. */
+@keyframes v27Enter{0%{opacity:0;transform:translateY(18px);filter:blur(3px)}100%{opacity:1;transform:none;filter:none}}
+@keyframes v27Sweep{0%{left:-54%;opacity:0}14%{opacity:1}62%{opacity:.92}100%{left:118%;opacity:0}}
+@keyframes v27LoaderPulse{0%,100%{transform:rotate(0deg) scale(1);filter:drop-shadow(0 0 5px rgba(125,106,148,.20))}50%{transform:rotate(180deg) scale(1.12);filter:drop-shadow(0 0 13px rgba(125,106,148,.42))}}
+.celestial-motion-on .period-fortune-report>.period-report-heading,
+.celestial-motion-on .period-fortune-report>.result-headline,
+.celestial-motion-on .period-fortune-report>.period-ai-card,
+.celestial-motion-on .integrated-results>.result-headline,
+.celestial-motion-on .integrated-results>.ai-interpret-card,
+.celestial-motion-on .integrated-results>.result-card{
+  animation:v27Enter .52s cubic-bezier(.16,.82,.28,1) both!important;
+}
+.celestial-motion-on .period-fortune-report>.result-headline,.celestial-motion-on .integrated-results>.result-headline{animation-delay:.06s!important}
+.celestial-motion-on .period-fortune-report>.period-ai-card,.celestial-motion-on .integrated-results>.ai-interpret-card{animation-delay:.12s!important}
+.celestial-motion-on .integrated-results>.result-card:nth-of-type(1){animation-delay:.18s!important}
+.celestial-motion-on .ai-interpret-card.is-loading::before,.celestial-motion-on .period-ai-card.is-loading::before{animation:v27Sweep 2.2s cubic-bezier(.22,.7,.24,1) infinite!important}
+.celestial-motion-on .ai-interpret-card.is-loading>svg,.celestial-motion-on .period-ai-card.is-loading>svg{animation:v27LoaderPulse 1.4s ease-in-out infinite!important}
+.celestial-motion-on .period-button,.celestial-motion-on .tool-card,.celestial-motion-on button{transition:transform .16s ease,background-color .2s ease,border-color .2s ease,box-shadow .2s ease!important}
+.celestial-motion-on .period-button:active,.celestial-motion-on .tool-card:active,.celestial-motion-on button:active{transform:scale(.975)}
+
+@media(max-width:430px){
+  .page-content{padding-left:14px!important;padding-right:14px!important}
+  .period-fortune-report .period-report-heading{padding:14px!important;gap:10px!important}
+  .period-report-icon{width:38px!important;height:38px!important;flex-basis:38px!important}
+  .period-report-heading h2{font-size:1.38rem!important}
+  .period-report-range{font-size:.72rem!important}.period-report-range strong{font-size:.72rem!important}
+  .period-report-copy>p{font-size:.8rem!important}
+  .result-headline{min-height:66px!important;padding:12px 13px!important}
+  .period-ai-card,.ai-interpret-card{padding:15px 14px!important;border-radius:19px!important}
+  .period-ai-head h3,.ai-interpret-head h3{font-size:1.08rem!important}
+  .period-ai-overall-brief,.ai-overall-brief{padding:11px 12px!important}
+  .period-ai-actions>article{padding:11px!important}
+  .integrated-topic{min-height:96px!important}
+  .integrated-topic>strong{font-size:1.55rem!important}
+  .relationship-ai-toolbar.ai-cost-guard-toolbar button{font-size:.77rem!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .celestial-motion-on .period-fortune-report>.period-report-heading,
+  .celestial-motion-on .period-fortune-report>.result-headline,
+  .celestial-motion-on .period-fortune-report>.period-ai-card,
+  .celestial-motion-on .integrated-results>.result-headline,
+  .celestial-motion-on .integrated-results>.ai-interpret-card,
+  .celestial-motion-on .integrated-results>.result-card,
+  .celestial-motion-on .ai-interpret-card.is-loading::before,
+  .celestial-motion-on .period-ai-card.is-loading::before,
+  .celestial-motion-on .ai-interpret-card.is-loading>svg,
+  .celestial-motion-on .period-ai-card.is-loading>svg{animation:none!important}
+  .celestial-motion-on .period-button,.celestial-motion-on .tool-card,.celestial-motion-on button{transition:none!important}
+}
