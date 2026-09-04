@@ -1,0 +1,88 @@
+name: Patch interpretation repetition cleanup
+
+on:
+  push:
+    branches: [work/ai-cost-guard-v21]
+    paths:
+      - '.github/workflows/patch-v2131-deduplicate-reading.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Separate summary, action, and detail roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          annual = Path('web/src/AiInterpretationPanel.tsx')
+          s = annual.read_text()
+          old = """{hasDecisions && <section className=\"ai-decision-section\"><div className=\"ai-section-heading\"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div><div className=\"ai-decision-list\">{data.decisions!.map((item,index)=><article key={`${index}-${item.action}`}><span className=\"ai-decision-index\">{index+1}</span><div><strong>{item.action}</strong>{item.timing&&<b>{item.timing}</b>}<p>{item.reason}</p>{item.watch&&<div className=\"ai-decision-condition\"><b>확인</b><span>{item.watch}</span></div>}{item.avoid&&<div className=\"ai-decision-condition is-avoid\"><b>피할 것</b><span>{item.avoid}</span></div>}<small>계산 근거 {item.evidence_refs?.length ?? 0}개 연결</small></div></article>)}</div></section>}"""
+          new = """{hasDecisions && <section className=\"ai-decision-section\"><div className=\"ai-section-heading\"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div><div className=\"ai-decision-list\">{data.decisions!.map((item,index)=><article key={`${index}-${item.action}`}><span className=\"ai-decision-index\">{index+1}</span><div><strong>{item.action}</strong>{item.timing&&<b>{item.timing}</b>}{item.watch&&<div className=\"ai-decision-condition\"><b>확인</b><span>{item.watch}</span></div>}<details className=\"ai-decision-more\"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<div className=\"ai-decision-condition is-avoid\"><b>피할 것</b><span>{item.avoid}</span></div>}<small>계산 근거 {item.evidence_refs?.length ?? 0}개 연결</small></details></div></article>)}</div></section>}"""
+          if old not in s:
+              raise SystemExit('annual decision block not found')
+          s = s.replace(old, new, 1)
+          old_action = '<div className="ai-window-action"><strong>이때</strong><span>{item.action}</span></div>'
+          new_action = '{!hasDecisions&&item.action&&<div className="ai-window-action"><strong>이때</strong><span>{item.action}</span></div>}'
+          if old_action not in s:
+              raise SystemExit('annual window action not found')
+          s = s.replace(old_action, new_action, 1)
+          annual.write_text(s)
+
+          period = Path('web/src/PeriodAiInterpretationPanel.tsx')
+          s = period.read_text()
+          old = """        <div><strong>{item.action}</strong>{item.timing&&<b className=\"period-ai-action-time\">{item.timing}</b>}<p>{item.reason}</p>{item.watch&&<p className=\"period-ai-condition\"><b>확인</b><span>{item.watch}</span></p>}{item.avoid&&<p className=\"period-ai-condition is-avoid\"><b>피할 것</b><span>{item.avoid}</span></p>}</div>"""
+          new = """        <div><strong>{item.action}</strong>{item.timing&&<b className=\"period-ai-action-time\">{item.timing}</b>}{item.watch&&<p className=\"period-ai-condition\"><b>확인</b><span>{item.watch}</span></p>}<details className=\"period-ai-action-more\"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<p className=\"period-ai-condition is-avoid\"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>"""
+          if old not in s:
+              raise SystemExit('period decision block not found')
+          s = s.replace(old, new, 1)
+          old_action = '{item.action&&<div className="period-ai-window-line"><b>이때</b><span>{item.action}</span></div>}'
+          new_action = '{!decisions.length&&item.action&&<div className="period-ai-window-line"><b>이때</b><span>{item.action}</span></div>}'
+          if old_action not in s:
+              raise SystemExit('period window action not found')
+          s = s.replace(old_action, new_action, 1)
+          period.write_text(s)
+
+          css = Path('web/src/ai-interpret-v2.css')
+          s = css.read_text()
+          marker = '/* V21.3.1 UX pass 3 · role-separated action details */'
+          if marker not in s:
+              s += """\n\n/* V21.3.1 UX pass 3 · role-separated action details */\n.ai-decision-more{margin-top:2px}.ai-decision-more>summary{cursor:pointer;list-style:none;color:#88788f;font-size:.72rem;font-weight:850}.ai-decision-more>summary::-webkit-details-marker{display:none}.ai-decision-more>summary::before{content:'＋';margin-right:5px}.ai-decision-more[open]>summary::before{content:'－'}.ai-decision-more>p{margin:7px 0 0}.ai-decision-more>.ai-decision-condition{margin-top:7px}.ai-decision-more>small{display:block;margin-top:7px}\n"""
+          css.write_text(s)
+
+          css = Path('web/src/period-ai-v18.css')
+          s = css.read_text()
+          marker = '/* V21.3.1 UX pass 3 · compact action cards */'
+          if marker not in s:
+              s += """\n\n/* V21.3.1 UX pass 3 · compact action cards */\n.period-ai-action-more{margin-top:3px}.period-ai-action-more>summary{cursor:pointer;list-style:none;color:#897a91;font-size:.7rem;font-weight:850}.period-ai-action-more>summary::-webkit-details-marker{display:none}.period-ai-action-more>summary::before{content:'＋';margin-right:5px}.period-ai-action-more[open]>summary::before{content:'－'}.period-ai-action-more>p:not(.period-ai-condition){margin:7px 0 0;color:#746a78;font-size:.77rem;line-height:1.6}.period-ai-action-more>.period-ai-condition{margin-top:7px}\n"""
+          css.write_text(s)
+          PY
+      - name: Verify build and role contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'className="ai-decision-more"' web/src/AiInterpretationPanel.tsx
+          grep -q '!hasDecisions&&item.action' web/src/AiInterpretationPanel.tsx
+          grep -q 'className="period-ai-action-more"' web/src/PeriodAiInterpretationPanel.tsx
+          grep -q '!decisions.length&&item.action' web/src/PeriodAiInterpretationPanel.tsx
+          git diff --check
+          cd web
+          npm ci
+          npm run build
+      - name: Commit UI changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/AiInterpretationPanel.tsx web/src/PeriodAiInterpretationPanel.tsx web/src/ai-interpret-v2.css web/src/period-ai-v18.css
+          git commit -m 'fix(ui): separate actions from timing detail'
+          git push origin HEAD:work/ai-cost-guard-v21
