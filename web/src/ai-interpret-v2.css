@@ -124,3 +124,8 @@
 .ai-interpret-card>.ai-key-window-section{order:-60}
 .ai-interpret-card>.ai-relationship-highlight{order:-50}
 .ai-interpret-card>.ai-relationship-direction{order:-49}
+
+
+/* V21.3.1 UX pass 2 · concise top conclusion, raw numeric summary below */
+.ai-overall-brief{display:grid;gap:7px;padding:12px 13px;border:1px solid rgba(159,153,177,.18);border-radius:15px;background:linear-gradient(135deg,rgba(251,247,255,.9),rgba(242,250,248,.88))}.ai-overall-brief>p{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;margin:0;font-size:.84rem;line-height:1.58}.ai-overall-brief>p>b{color:#715c7d;font-size:.76rem}.ai-overall-brief>p>span{color:#554c5d}.ai-overall-raw-details{border:1px solid rgba(158,144,170,.16);border-radius:13px;overflow:hidden}.ai-overall-raw-details>summary{cursor:pointer;list-style:none;padding:10px 11px;color:#675772;font-size:.75rem;font-weight:900;background:rgba(250,248,252,.72)}.ai-overall-raw-details>summary::-webkit-details-marker{display:none}.ai-overall-raw-details>summary::before{content:'＋';margin-right:6px;color:#887294}.ai-overall-raw-details[open]>summary::before{content:'－'}.ai-overall-raw-details>p{margin:0;padding:11px 12px;color:#716776;font-size:.79rem;line-height:1.68;background:rgba(255,255,255,.58)}
+@media(max-width:520px){.ai-overall-brief>p{grid-template-columns:1fr;gap:2px}.ai-overall-brief>p>b{font-size:.72rem}.ai-overall-brief>p>span{font-size:.83rem}}

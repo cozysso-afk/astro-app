@@ -22,7 +22,7 @@
 
 /* V21.3.1 UI audit · dates/actions before secondary interpretation detail */
 .period-ai-v18>.period-ai-head{order:1}
-.period-ai-v18>.period-ai-summary{order:2}
+.period-ai-v18>.period-ai-overall-brief{order:2}
 .period-ai-v18>.period-ai-quick-dates{order:3}
 .period-ai-v18>.period-ai-action-section{order:4}
 .period-ai-v18>.period-ai-key-window-section,.period-ai-v18>.period-ai-chips{order:5}
@@ -34,3 +34,7 @@
 .period-ai-v18>.period-ai-validation{order:11}
 .period-ai-quick-dates{display:grid;gap:8px}.period-ai-quick-date-list{display:grid;gap:6px}.period-ai-quick-date{display:grid;grid-template-columns:minmax(88px,auto) minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;border:1px solid rgba(157,151,177,.18);background:rgba(255,255,255,.72)}.period-ai-quick-date.is-use{background:linear-gradient(135deg,rgba(237,249,243,.92),rgba(255,255,255,.8));border-color:rgba(112,157,135,.22)}.period-ai-quick-date.is-caution{background:linear-gradient(135deg,rgba(255,241,243,.92),rgba(255,255,255,.8));border-color:rgba(181,119,128,.2)}.period-ai-quick-date>b{color:#654e74;font-size:.82rem;font-weight:950;font-variant-numeric:tabular-nums}.period-ai-quick-date>div{min-width:0;display:grid;gap:2px}.period-ai-quick-date>div>strong{color:#493d52;font-size:.8rem;line-height:1.35}.period-ai-quick-date>div>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#897c8e;font-size:.66rem}.period-ai-quick-date>span{padding:4px 7px;border-radius:999px;background:rgba(115,92,130,.08);color:#705b7b;font-size:.63rem;font-weight:900}.period-ai-window-head>div>b{font-size:.86rem}.period-ai-window>p{font-size:.81rem}.period-ai-window-line{font-size:.79rem}.period-ai-actions article>div>strong{font-size:.87rem}.period-ai-actions article>div>p{font-size:.8rem}
 @media(max-width:430px){.period-ai-quick-date{grid-template-columns:84px minmax(0,1fr) auto;padding:9px}.period-ai-quick-date>b{font-size:.79rem}.period-ai-quick-date>div>strong{font-size:.78rem}}
+
+
+/* V21.3.1 UX pass 2 · concise period conclusion */
+.period-ai-overall-brief{display:grid;gap:7px;padding:11px 12px;border:1px solid rgba(157,151,177,.17);border-radius:14px;background:linear-gradient(135deg,rgba(251,247,255,.9),rgba(242,250,248,.86))}.period-ai-overall-brief>span{color:#8d7a95;font-size:.68rem;font-weight:900;letter-spacing:.04em}.period-ai-overall-brief>p{display:grid;grid-template-columns:86px minmax(0,1fr);gap:7px;margin:0;line-height:1.55}.period-ai-overall-brief>p>b{color:#715d7c;font-size:.72rem}.period-ai-overall-brief>p>strong{color:#534958;font-size:.81rem;font-weight:650}@media(max-width:430px){.period-ai-overall-brief>p{grid-template-columns:1fr;gap:2px}.period-ai-overall-brief>p>strong{font-size:.8rem}}

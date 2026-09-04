@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleStop, Copy, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
 import { estimateGeminiUsage } from './lib/aiUsage'
+import { buildInterpretationBrief } from './lib/interpretationSummary'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -48,10 +49,11 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const topicEntries = Object.entries(data.topic_analysis ?? {}).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))
   const relationshipReading = data.relationship_reading
+  const brief = buildInterpretationBrief(data)
 
   return <section className="period-ai-card period-ai-v18">
     <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>{data.headline || '기간 흐름 요약'}</h3></div></div>
-    <p className="period-ai-summary">{data.overall.summary}</p>
+    <section className="period-ai-overall-brief"><span>한눈에 결론</span><p><b>핵심 흐름</b><strong>{brief.flow}</strong></p>{brief.remember&&<p><b>먼저 기억할 것</b><strong>{brief.remember}</strong></p>}</section>
 
     {!!keyWindows.length && <section className="period-ai-quick-dates">
       <div className="period-ai-section-title"><span>가장 먼저 볼 날짜</span><strong>핵심 시기 TOP 3</strong></div>
@@ -90,7 +92,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
     <details className="period-ai-details">
       <summary>분야별 · 체계별 상세 해설 보기</summary>
       <div className="period-ai-detail-body">
-        {data.overall.dominant_pattern && <div className="period-ai-section"><strong>기간을 관통하는 패턴</strong><p>{data.overall.dominant_pattern}</p></div>}
+        <div className="period-ai-section"><strong>수치 포함 전체 계산 요약</strong><p>{data.overall.summary}</p></div>
         <div className="period-ai-section"><strong>분야별 종합</strong><p>{[data.clusters.relationship&&`관계 · ${data.clusters.relationship}`,data.clusters.work_study&&`일·학업 · ${data.clusters.work_study}`,data.clusters.money_news&&`돈·소식 · ${data.clusters.money_news}`,data.clusters.investment&&`투자 · ${data.clusters.investment}`,data.clusters.condition&&`컨디션 · ${data.clusters.condition}`].filter(Boolean).join('\n\n')}</p></div>
         {!!data.priorities?.length && <div className="period-ai-section"><strong>우선순위</strong><p>{data.priorities.map((item,index)=>`${index+1}. ${item}`).join('\n')}</p></div>}
 
