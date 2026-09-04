@@ -1,0 +1,48 @@
+name: V28 mobile readability patch
+on:
+  push:
+    branches:
+      - fix/mobile-readability-language-v28-20260904
+    paths:
+      - scripts/patch_mobile_readability_v28.py
+      - .github/workflows/mobile-readability-v28.yml
+permissions:
+  contents: write
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-readability-language-v28-20260904
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply screenshot-driven readability patch
+        run: python scripts/patch_mobile_readability_v28.py
+      - name: Run permanent UI regressions
+        working-directory: web
+        run: node --test src/lib/mobileReadabilityLanguage.test.mjs src/lib/interpretationUiContract.test.mjs
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Typecheck and production build
+        working-directory: web
+        run: npm run build
+      - name: Commit verified source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/mobile-design-v27.css web/src/AiInterpretationPanel.tsx web/src/PeriodAiInterpretationPanel.tsx web/src/lib/mobileReadabilityLanguage.test.mjs
+          if git diff --cached --quiet; then
+            echo "No verified source changes to commit"
+          else
+            git commit -m "fix(web): tighten Korean readability and fortune language"
+            git push origin HEAD:fix/mobile-readability-language-v28-20260904
+          fi
