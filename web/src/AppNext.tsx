@@ -41,6 +41,7 @@ import type {
 import { AiInterpretationPanel } from './AiInterpretationPanel'
 import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
+import { PersonalMarriagePanel, type PersonalMarriageResponse } from './PersonalMarriagePanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
@@ -341,6 +342,10 @@ export default function AppNext() {
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
   const [marriageMode, setMarriageMode] = useState<MarriageMode>('unmarried')
+  const [marriageScope, setMarriageScope] = useState<'personal'|'partner'>('personal')
+  const [personalMarriage, setPersonalMarriage] = useState<PersonalMarriageResponse | null>(null)
+  const [personalMarriageLoading, setPersonalMarriageLoading] = useState(false)
+  const [personalMarriageError, setPersonalMarriageError] = useState('')
   const [relationshipDays, setRelationshipDays] = useState(365)
   const [relationshipCalendarYear, setRelationshipCalendarYear] = useState<number | null>(null)
   const [reunionTiming, setReunionTiming] = useState<ReunionTimingContext | null>(null)
@@ -523,6 +528,8 @@ export default function AppNext() {
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
   const relationshipDayCount = Math.round((new Date(`${relationshipEndDate}T12:00:00Z`).getTime()-new Date(`${relationshipStartDate}T12:00:00Z`).getTime())/86400000)+1
   const relationshipPeriodKey: PeriodKey = relationshipCalendarYear || clampedRelationshipDays >= 365 ? 'year' : clampedRelationshipDays >= 28 ? 'month' : 'week'
+  const isPersonalMarriage = selectedTool === 'marriage' && marriageMode === 'unmarried' && marriageScope === 'personal'
+  const needsCounterpart = selectedTool === 'compatibility' || (selectedTool === 'marriage' && !isPersonalMarriage)
   const integratedMatchesSelection = Boolean(
     integratedResult &&
     integratedResult.period.start === integratedStartDate &&
@@ -950,6 +957,31 @@ export default function AppNext() {
     }
   }
 
+  const runPersonalMarriage = async () => {
+    setPersonalMarriageError(''); setPersonalMarriage(null); setRelationshipResult(null); setRelationshipAi(null); setReunionTiming(null)
+    if (!birthProfile.birthDate || !birthProfile.birthTime) { setPersonalMarriageError('먼저 내정보에서 본인 생년월일과 출생시간을 저장해줘.'); return }
+    const latitude = parseOptionalNumber(birthProfile.latitude)
+    const longitude = parseOptionalNumber(birthProfile.longitude)
+    if (latitude === null || longitude === null) { setPersonalMarriageError('먼저 내정보에서 본인 출생지역까지 저장해줘. 개인 결혼운의 4·5·7·8하우스 계산에는 위치 좌표가 필요해.'); return }
+    const body = {
+      profile: {
+        name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime,
+        latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey,
+      },
+      start_date: relationshipStartDate, end_date: relationshipEndDate,
+    }
+    setPersonalMarriageLoading(true)
+    try {
+      const response = await fetch(`${API_BASE}/v1/marriage/personal`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+      const payload = await response.json().catch(()=>({}))
+      if (!response.ok || !payload?.ok) throw new Error(payload?.detail || payload?.error || '개인 결혼운 계산 요청에 실패했어.')
+      setPersonalMarriage(payload as PersonalMarriageResponse)
+    } catch (error) {
+      setPersonalMarriageError(error instanceof Error ? error.message : '개인 결혼운 계산 중 오류가 발생했어.')
+    } finally { setPersonalMarriageLoading(false) }
+  }
+
+
   const runRelationship = async () => {
     const revision = relationshipRevisionRef.current + 1
     relationshipRevisionRef.current = revision
@@ -958,6 +990,7 @@ export default function AppNext() {
     const userLatitude = parseOptionalNumber(birthProfile.latitude)
     const userLongitude = parseOptionalNumber(birthProfile.longitude)
     if (userLatitude === null || userLongitude === null) { setRelationshipError('먼저 내정보에서 본인 출생지역까지 저장해줘. 정밀 관계 계산에는 위치 좌표가 필요해.'); return }
+    if (!needsCounterpart) { setRelationshipError('상대가 없는 미혼 결혼운은 개인 결혼운 계산 경로를 사용해.'); return }
     if (!counterpart.birthDate) { setRelationshipError('상대 생년월일은 반드시 필요해.'); return }
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
     const counterpartLatitude = parseOptionalNumber(counterpart.latitude)
@@ -1562,10 +1595,12 @@ export default function AppNext() {
                 <small className="relationship-range-note">{relationshipPurpose==='reunion'?'재회는 기본 365일. 수신·발신·재접점과 두 사람 차트를 건드리는 실제 트랜짓 날짜를 이 범위 안에서 비교해.':'기본 궁합 구조는 고정이고, 여기 지정한 7~365일은 관계 시기 흐름에만 적용돼.'}</small>
               </div>
             </>}
-            {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null)}}><strong>미혼</strong><span>결혼 전 · 장기 결속과 결혼생활 적합 구조</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setRelationshipAi(null)}}><strong>기혼</strong><span>결혼 후 · 현재 결속과 갈등·회복 주기</span></button></div>}
-            {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='unmarried'?'결혼 여부 예언이 아니라, 이 관계가 결혼생활로 이어질 때의 생활궁합·책임·갈등·지속성을 깊게 봐.':'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·갈등과 회복 흐름을 봐.'}</span></div>}
+            {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>미혼</strong><span>상대 유무에 따라 개인 결혼운 또는 특정 상대 결혼궁합</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setMarriageScope('partner');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>기혼</strong><span>배우자와 현재 결속·생활·갈등·회복 주기</span></button></div>}
+            {selectedTool==='marriage'&&marriageMode==='unmarried'&&<div className="relationship-purpose-row marriage-scope-row"><button type="button" className={marriageScope==='personal'?'is-active':''} onClick={()=>{setMarriageScope('personal');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setRelationshipError('')}}><strong>상대 없음 · 개인 결혼운</strong><span>결혼 가능성 · 시기 · 미래 배우자상</span></button><button type="button" className={marriageScope==='partner'?'is-active':''} onClick={()=>{setMarriageScope('partner');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setPersonalMarriageError('')}}><strong>특정 상대 있음 · 결혼궁합</strong><span>이 사람과의 생활궁합 · 결속 · 갈등 · 친밀감</span></button></div>}
+            {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='married'?'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·공유자원·갈등과 회복 흐름을 봐.':marriageScope==='personal'?'상대가 없어도 내 차트로 결혼 가능성 지수·강한 시기·배우자 외모/성향/직업군·만남 경로를 적극적으로 봐. 0~100은 점성 엔터테인먼트 지수이고 실제 이름·주소·회사처럼 특정 신원만 만들어내지 않아.':'이 특정 상대와 결혼생활로 들어갈 때의 결속·생활·친밀감·돈/공유자원·갈등·지속성과 결혼 흐름을 깊게 봐.'}</span></div>}
             {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
+            {needsCounterpart&&<>
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
               <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
@@ -1580,11 +1615,14 @@ export default function AppNext() {
               </div></details>
             </div>
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>관계 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
-            {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
-            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
+            </>}
+            <div className="calculation-range"><CalendarDays size={17}/><span>{isPersonalMarriage?'개인 결혼운':'관계'} 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
+            {(isPersonalMarriage?personalMarriageError:relationshipError) && <div className="status-banner error"><AlertTriangle size={17}/><span>{isPersonalMarriage?personalMarriageError:relationshipError}</span></div>}
+            <button className="primary-button" type="button" onClick={isPersonalMarriage?runPersonalMarriage:runRelationship} disabled={personalMarriageLoading||relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(personalMarriageLoading||relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{personalMarriageLoading?'개인 결혼운 계산 중…':(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):isPersonalMarriage?'상대 없이 개인 결혼운 계산':selectedTool==='marriage'?(marriageMode==='unmarried'?'특정 상대와 결혼궁합 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산'}</span></button>
 
-            {relationshipResult && <div className="results-wrap">
+            {isPersonalMarriage&&personalMarriage&&<div className="results-wrap"><div className="result-headline"><CheckCircle2 size={20}/><div><strong>개인 결혼운 계산 완료</strong><span>{personalMarriage.period.start} ~ {personalMarriage.period.end} · {personalMarriage.period.day_count}일</span></div></div><PersonalMarriagePanel data={personalMarriage}/></div>}
+
+            {!isPersonalMarriage&&relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
               <div className="result-actions">
                 <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
