@@ -80,11 +80,22 @@ function topicImportance(payload:any){
 
 function bestTopicDate(payload:any,topic:string){
   const stat=payload?.western?.overall?.[topic]??{},avg=num(stat?.average);
-  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&Number.isFinite(Number(x?.score)));
+  const evidence=topicEvidence(payload,topic);
+  const backedDates=new Set<string>();
+  for(const row of evidence){
+    for(const value of [row?.date,row?.start,row?.end]){
+      const date=String(value??"").slice(0,10);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(date))backedDates.add(date);
+    }
+  }
+  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&Number.isFinite(Number(x?.score))&&backedDates.has(String(x.date).slice(0,10)));
   candidates.sort((a:any,b:any)=>Math.abs(num(b?.score)-avg)-Math.abs(num(a?.score)-avg));
-  if(candidates[0]?.date)return String(candidates[0].date);
-  const key=(payload?.key_dates??[]).find((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic));
-  return key?.date?String(key.date):String(payload?.period?.start??"");
+  if(candidates[0]?.date)return String(candidates[0].date).slice(0,10);
+  const key=(payload?.key_dates??[]).find((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic)&&backedDates.has(String(row?.date??"").slice(0,10)));
+  if(key?.date)return String(key.date).slice(0,10);
+  const direct=evidence.find((row:any)=>row?.date&&backedDates.has(String(row.date).slice(0,10)));
+  if(direct?.date)return String(direct.date).slice(0,10);
+  return String(payload?.period?.start??"").slice(0,10);
 }
 
 function topicVerb(topic:string){
@@ -110,8 +121,10 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const risk=topic===INVESTMENT_RISK;
     const direction=risk?(avg>=60?"경계 압력이 상대적으로 높은 편":avg<40?"경계 압력이 상대적으로 낮은 편":"경계 압력이 중간권"):(avg>=60?"상대적으로 강한 편":avg<40?"상대적으로 약한 편":"중간권");
     const min=digest?.min, max=digest?.max;
+    const backedDateSet=new Set(topicEvidence(payload,topic).flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
     const reasonParts=[`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`];
-    if(min?.date&&max?.date)reasonParts.push(`실제 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
+    if(min?.date&&max?.date&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`직접 근거가 연결된 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
+    else reasonParts.push(`일별 변동성은 ${scoreText(digest?.volatility)}점이며, 날짜를 특정할 때는 evidence ledger에 직접 연결된 날짜만 사용해.`);
     const timing=bestTopicDate(payload,topic);
     if(timing)reasonParts.push(`판단할 때는 ${timing} 전후의 직접 계산근거와 기간 평균을 함께 보는 게 좋아.`);
     const va=topicVerb(topic);
@@ -296,12 +309,16 @@ export function stabilizeCoreForQuality(core:any,payload:any){
 
     const sig=payload?.western?.relationship_signals??{};
     const tone=(v:number)=>v>=60?"강한 편":v<40?"약한 편":"중간권";
-    const bestDate=(stat:any)=>Array.isArray(stat?.best_days)&&stat.best_days[0]?.date?String(stat.best_days[0].date):"";
-    const cautionDate=(stat:any)=>Array.isArray(stat?.caution_days)&&stat.caution_days[0]?.date?String(stat.caution_days[0].date):"";
+    const relEvidenceDates=(key:string)=>new Set(relRows.filter((row:any)=>String(row?.topic??"")===key).flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
+    const backedStatDate=(key:string,stat:any,field:"best_days"|"caution_days")=>{
+      const allowed=relEvidenceDates(key);
+      const row=(Array.isArray(stat?.[field])?stat[field]:[]).find((item:any)=>allowed.has(String(item?.date??"").slice(0,10)));
+      return row?.date?String(row.date).slice(0,10):"";
+    };
     const axes=[
-      {key:"수신신호",label:"상대 → 나",avg:num(sig?.수신신호?.average),best:bestDate(sig?.수신신호),caution:cautionDate(sig?.수신신호)},
-      {key:"발신적합",label:"나 → 상대",avg:num(sig?.발신적합?.average),best:bestDate(sig?.발신적합),caution:cautionDate(sig?.발신적합)},
-      {key:"과거인연접점",label:"과거 인연 재접점",avg:num(sig?.과거인연접점?.average),best:bestDate(sig?.과거인연접점),caution:cautionDate(sig?.과거인연접점)},
+      {key:"수신신호",label:"상대 → 나",avg:num(sig?.수신신호?.average),best:backedStatDate("수신신호",sig?.수신신호,"best_days"),caution:backedStatDate("수신신호",sig?.수신신호,"caution_days")},
+      {key:"발신적합",label:"나 → 상대",avg:num(sig?.발신적합?.average),best:backedStatDate("발신적합",sig?.발신적합,"best_days"),caution:backedStatDate("발신적합",sig?.발신적합,"caution_days")},
+      {key:"과거인연접점",label:"과거 인연 재접점",avg:num(sig?.과거인연접점?.average),best:backedStatDate("과거인연접점",sig?.과거인연접점,"best_days"),caution:backedStatDate("과거인연접점",sig?.과거인연접점,"caution_days")},
     ];
     const ranked=[...axes].sort((a,b)=>b.avg-a.avg);
     const gap=Math.abs((ranked[0]?.avg??0)-(ranked[ranked.length-1]?.avg??0));
@@ -342,6 +359,75 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     ir.risk=`투자주의 상대활성도 평균 ${scoreText(overall?.투자주의?.average)}점이야. 높을수록 판단 오류와 변동성 대응을 더 보수적으로 점검하되 실제 투자 결정은 시장 데이터가 우선이야.`;
   }
   return softenObject(sanitizeInvestmentGuidance(data,map));
+}
+
+export function buildLocalQualityFallbackCore(payload:any){
+  const topics=buildDeterministicTopicAnalysis(payload);
+  const important=topics.filter((x:any)=>x.importance!=="참고");
+  const core=topics.filter((x:any)=>x.importance==="핵심");
+  const names=(core.length?core:important).slice(0,3).map((x:any)=>String(x.topic));
+  const periodStart=String(payload?.period?.start??"");
+  const periodEnd=String(payload?.period?.end??"");
+  const periodLabel=periodStart&&periodEnd&&periodStart!==periodEnd?`${periodStart}~${periodEnd}`:periodStart||"선택 기간";
+  const focus=names.length?names.join(" · "):"핵심 분야";
+  const topicLine=(wanted:string[])=>{
+    const rows=topics.filter((x:any)=>wanted.includes(String(x.topic))).filter((x:any)=>x.importance!=="참고").slice(0,3);
+    return rows.length?rows.map((x:any)=>`${x.topic}: ${x.verdict}`).join(" "):"이번 기간에 해당 분야가 최우선으로 두드러진다는 직접 근거는 강하지 않아.";
+  };
+  const sajuText=payload?.saju?.day_master
+    ? `사주는 일간 ${String(payload.saju.day_master)}과 실제 계산된 세운·월운 구간만 Western과 합산하지 않고 독립 맥락으로 참고해.`
+    : "사주는 실제 계산된 구간이 있을 때만 Western과 합산하지 않고 독립 맥락으로 참고해.";
+  const thaiText=payload?.thai?.thai_day
+    ? `Thai는 ${String(payload.thai.thai_day)} 출생요일과 실제 계산된 Mahathaksa·Taksajorn·Suriyayat 범위만 독립 맥락으로 참고해.`
+    : "Thai는 실제 계산된 범위만 독립 맥락으로 참고해.";
+  return {
+    headline:`${periodLabel}은 ${focus} 흐름을 계산근거 중심으로 확인하는 기간이야.`,
+    overall:{
+      summary:"",
+      dominant_pattern:`${focus}의 상대활성도 변화가 이번 기간의 우선 확인 대상이야. 한 날짜나 점수 하나를 사건 결과로 바꾸지 않고 기간 평균·직접 날짜 근거·실제 반응을 함께 봐.`,
+      best_phase:"직접 계산근거가 연결된 상위 날짜·구간에서 실제 일정과 반응이 함께 좋아지는지 확인해.",
+      caution_phase:"하위 날짜·구간에서는 체감만으로 결론을 확대하지 말고 실제 일정·반응·수치를 다시 확인해.",
+      evidence_refs:[],
+    },
+    key_windows:[],
+    year_phases:[],
+    cross_checks:[],
+    decisions:[],
+    clusters:{
+      relationship:topicLine(["대인관계","연애","연락","재회"]),
+      work_study:topicLine(["학업","시험","직장","이직"]),
+      money_news:topicLine(["금전","소식"]),
+      investment:"투자 관련 상대지수는 심리·행동의 참고값이야. 가격방향·수익률·매수·매도 시점을 뜻하지 않으며 실제 시장 데이터와 손익·리스크 기준을 우선해.",
+      condition:topicLine(["컨디션"]),
+    },
+    relationship_reading:{
+      context:"관계가 중요 분야일 때 상대 → 나, 나 → 상대, 과거 인연 재접점을 서로 다른 축으로 분리해 확인해.",
+      flow:"한 방향의 상대활성도가 올라가도 다른 방향의 결과까지 자동으로 뜻하지 않아. 실제 연락·답변·약속·만남 제안이 뒤따르는지 확인해.",
+      focus_timing:"직접 관계 날짜 근거가 연결된 구간만 주목하고, 실제 반응이 함께 나타나는지 확인해.",
+      watch:"실제 연락 빈도, 답변의 구체성, 약속 이행, 만남 제안처럼 관찰 가능한 신호를 확인해.",
+      avoid:"상대활성도만으로 상대의 속마음이나 연애·재회 결과를 미리 확정하지 마.",
+      evidence_refs:[],
+    },
+    contact_flow:{
+      incoming:"상대 → 나는 실제로 먼저 온 연락·답변·구체적 제안이 나타나는지 확인하는 방향축이야.",
+      outgoing:"나 → 상대는 내가 먼저 연락하거나 제안할 때의 상대적 적합도이지 상대의 수락을 뜻하지 않아.",
+      reconnection:"과거 인연 재접점은 과거 인연이 다시 접촉할 상대적 활성도이지 재회 확정이 아니야.",
+    },
+    investment_reading:{
+      psychology:"투자심리 상대활성도는 과열·위축을 점검하는 보조지표이며 시장 가격 방향 예측이 아니야.",
+      realization:"수익실현 상대활성도는 실제 수익 가능성이나 매도 적기를 뜻하지 않아. 시장 데이터와 사전 손익 기준을 우선해.",
+      entry:"신규진입 상대활성도는 매수 신호가 아니야. 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.",
+      risk:"투자주의 상대활성도는 판단 오류와 변동성 대응을 더 보수적으로 점검하는 참고값이야.",
+    },
+    systems:{
+      western:"Western 계산은 기간 평균·일별 궤적·직접 날짜 근거의 상대활성도 변화를 중심으로 읽어. 점수는 사건 확률이 아니야.",
+      saju:sajuText,
+      thai:thaiText,
+    },
+    priorities:[],
+    topic_analysis:topics,
+    limits:"Gemini 유료 호출이 끝난 뒤에도 5단계 품질검증을 완전히 통과하지 못한 경우 계산근거만으로 만든 안전 보정본이야. 구조·근거 추적·의미 방향·내부 일관성은 통과해야 표시하고, 깊이·실용성 일부 항목만 부족하면 결과를 숨기지 않고 보정본으로 보여줘. 사건 결과·상대 속마음·가격방향을 미리 확정하지 않아.",
+  };
 }
 
 export function buildPromptPacket(payload:any){

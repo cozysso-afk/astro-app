@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from './costGuardV21.ts';
-import { TOPICS, REL } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts';
+import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildLocalQualityFallbackCore, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from './costGuardV21.ts';
+import { TOPICS, REL, validateOutput } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts';
+import { inspectInterpretationQuality } from '../fortune-interpret-v6-preview/qualityV2.ts';
 
 function packet(){
   const overall={},digest={};
@@ -89,7 +90,7 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
   assert.equal((src.match(/:generateContent/g)||[]).length,1);
   assert.match(src,/MAX_GEMINI_CALLS=2/);
-  assert.match(src,/supabase-ai-v21\.3\.2-relationship-direction-depth/);
+  assert.match(src,/supabase-ai-v21\.3\.3-no-zero-paid-fallback/);
   assert.match(src,/MAX_USER_NEW_JOBS_10M=6/);
   assert.match(src,/MAX_USER_NEW_JOBS_24H=20/);
   assert.match(src,/MAX_GLOBAL_NEW_JOBS_10M=18/);
@@ -129,7 +130,7 @@ test('V21.2 deterministic wording uses correct Korean particles and topic-specif
   const rows=buildDeterministicTopicAnalysis(packet());
   assert.match(rows.find(x=>x.topic==='연애').verdict,/^연애는 /);
   assert.match(rows.find(x=>x.topic==='직장').verdict,/^직장은 /);
-  assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');
+  assert.equal(rows.find(x=>x.topic==='연애').timing,'2027-04-11');
 });
 
 test('V21.2 local stabilizer softens overclaim and investment prediction language without Gemini',()=>{
@@ -202,4 +203,32 @@ test('V21.3.2 relationship directions are distinct and grounded without Gemini',
   const topics=buildDeterministicTopicAnalysis(p);
   assert.notEqual(topics.find(x=>x.topic==='연애').action,topics.find(x=>x.topic==='연락').action);
   assert.notEqual(topics.find(x=>x.topic==='연락').action,topics.find(x=>x.topic==='재회').action);
+});
+
+test('V21.3.3 local fallback keeps paid jobs from becoming zero-content when critical validation can pass',()=>{
+  const p=packet();
+  const core=buildLocalQualityFallbackCore(p);
+  const stabilized=stabilizeCoreForQuality(core,p);
+  const validated=validateOutput(stabilized);
+  assert.ok(validated,'local fallback must satisfy output schema');
+  const report=inspectInterpretationQuality(validated,p);
+  for(const stage of [1,2,3,4]){
+    const row=report.stages.find(x=>x.stage===stage);
+    assert.equal(row?.passed,true,`critical quality stage ${stage} must pass: ${(row?.issues??[]).join(' / ')}`);
+  }
+  assert.ok(Array.isArray(validated.key_windows));
+  assert.ok(Array.isArray(validated.decisions));
+  const depth=report.stages.find(x=>x.stage===5);
+  assert.ok(depth,'stage 5 must remain observable even when degraded fallback is shown');
+  assert.match(validated.limits,/안전 보정본/);
+});
+
+test('V21.3.3 runtime preserves paid usage and exposes local fallback instead of zero content',()=>{
+  const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+  assert.match(src,/supabase-ai-v21\.3\.3-no-zero-paid-fallback/);
+  assert.match(src,/buildLocalQualityFallbackCore/);
+  assert.match(src,/allow_degraded_quality:true/);
+  assert.match(src,/local_quality_fallback:true/);
+  assert.match(src,/criticalQualityPassed/);
+  assert.match(src,/usage:\{\.\.\.combined,quality_validation:/);
 });

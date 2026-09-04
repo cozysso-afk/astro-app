@@ -37,8 +37,8 @@ export function BottomNavigation({ activeView, onChange }: BottomNavigationProps
       aria-current={activeView === view ? 'page' : undefined}
       onClick={() => onChange(view)}
     >
-      <Icon size={20}/>
-      <span>{label}</span>
+      <span className="nav-icon-shell"><Icon size={20}/></span>
+      <span className="nav-label">{label}</span>
     </button>)}
   </nav>
 }

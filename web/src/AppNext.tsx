@@ -224,17 +224,33 @@ function toDateInputValue(date: Date) {
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate()+days); return toDateInputValue(date)
 }
-function periodEnd(start: string, period: PeriodKey) {
+function startOfWeekMonday(value: string) {
+  const date = new Date(`${value}T12:00:00`)
+  const mondayOffset = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - mondayOffset)
+  return toDateInputValue(date)
+}
+function periodStart(value: string, period: PeriodKey) {
+  if (period === 'week') return startOfWeekMonday(value)
+  if (period === 'month') return `${value.slice(0,7)}-01`
+  if (period === 'year') return `${value.slice(0,4)}-01-01`
+  return value
+}
+function periodEnd(value: string, period: PeriodKey) {
+  const start = periodStart(value, period)
   if (period === 'today') return start
   if (period === 'week') return addDays(start, 6)
-  if (period === 'month') return addDays(start, 30)
-  return addDays(start, 364)
+  if (period === 'month') {
+    const [year, month] = start.split('-').map(Number)
+    return toDateInputValue(new Date(year, month, 0, 12, 0, 0))
+  }
+  return `${start.slice(0,4)}-12-31`
 }
 function periodRangeLabel(period: PeriodKey) {
   if (period === 'today') return '1일'
-  if (period === 'week') return '7일'
-  if (period === 'month') return '31일'
-  return '1년 · 365일'
+  if (period === 'week') return '월~일 · 7일'
+  if (period === 'month') return '달력 월'
+  return '달력 연도'
 }
 function parseOptionalNumber(value: string) {
   const n = Number(value.trim()); return value.trim() && Number.isFinite(n) ? n : null
@@ -521,7 +537,8 @@ export default function AppNext() {
   const queryYear = Number(queryDate.slice(0,4)) || new Date().getFullYear()
   const calendarYearOptions = Array.from({length:6},(_,index)=>queryYear - 1 + index)
   const annualFortuneYear = integratedCalendarYear ?? queryYear
-  const integratedStartDate = selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : queryDate
+  const periodSelectionStart = periodStart(queryDate, period)
+  const integratedStartDate = selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : periodSelectionStart
   const integratedSelectionEnd = selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)
   const clampedRelationshipDays = Math.max(7, Math.min(365, Number(relationshipDays) || 365))
   const relationshipStartDate = relationshipCalendarYear ? `${relationshipCalendarYear}-01-01` : queryDate
@@ -1587,6 +1604,7 @@ export default function AppNext() {
                 <button type="button" className={relationshipPurpose==='reunion'?'is-active':''} onClick={()=>{setRelationshipPurpose('reunion');setRelationshipMode('single');setRelationshipDays(365);setRelationshipCalendarYear(null);setReunionTiming(null);setRelationshipAi(null)}}>재회</button>
                 {relationshipModes.map(([value,label])=><button key={value} type="button" className={relationshipPurpose==='compatibility'&&relationshipMode===value?'is-active':''} onClick={()=>{setRelationshipPurpose('compatibility');setRelationshipMode(value);setReunionTiming(null);setRelationshipAi(null)}}>{label}</button>)}
               </div>
+              {relationshipPurpose==='compatibility'&&relationshipMode==='married'&&<div className="status-banner compatibility-married-note"><Heart size={16}/><span><b>기혼 · 일반 궁합</b>은 부부라는 현재 상태를 반영해 두 사람의 기본 궁합과 선택 기간의 흐름을 보는 모드야. <b>결혼운 → 기혼</b>은 결속·생활 역할·공유재정/친밀감·반복 갈등·회복 주기를 결혼생활 중심으로 더 깊게 보는 별도 분석이야.</span></div>}
               <div className="relationship-range-block">
                 <div><strong>{relationshipPurpose==='reunion'?'재회운 분석기간':'궁합 시기 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div>
                 <div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div>
@@ -1648,7 +1666,7 @@ export default function AppNext() {
 
           {selectedTool === 'precision' && <section className="tool-panel precision-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-sage"><Search size={22}/></span><div><span className="eyebrow">정밀 계산</span><h2>정밀분석</h2><p>새 점수를 만들지 않고 선택한 기간 운세 실계산의 원자료를 더 깊게 펼쳐봐. Western(서양점성술) 세부 지표, 사주 원자료, Thai(태국점성술) 상태와 원본 JSON(제이슨·데이터 형식)까지 확인할 수 있어.</p></div></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {queryDate} ~ {periodEnd(queryDate,period)} · {periodRangeLabel(period)}</span></div>
+            <div className="calculation-range"><CalendarDays size={17}/><span>분석기간 {periodSelectionStart} ~ {integratedSelectionEnd} · {periodRangeLabel(period)}</span></div>
             <div className="coordinate-note"><Search size={16}/><span>기간 운세와 같은 실계산 엔진을 사용해. 같은 날짜·기간 계산이 이미 있으면 다시 호출하지 않고 동일 결과를 정밀 화면에서 펼쳐 보여줘.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             {!integratedMatchesSelection && <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Search size={18}/>}<span>{integratedLoading?'정밀 계산 중…':'정밀분석 실제 계산'}</span></button>}
@@ -1669,7 +1687,7 @@ export default function AppNext() {
 
           {selectedTool===null && <PeriodFortunePanel
             title={period==='today'?'오늘의 운세':`${periods.find((item)=>item.key===period)?.label}운세`}
-            startDate={queryDate}
+            startDate={periodSelectionStart}
             endDate={integratedSelectionEnd}
             ready={integratedMatchesSelection}
             loading={integratedLoading}

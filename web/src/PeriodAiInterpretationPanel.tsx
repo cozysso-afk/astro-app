@@ -9,6 +9,15 @@ function periodLabel(start: string, end: string) {
   return `${start} → ${end}`
 }
 
+function visibleAiText(value: string | undefined) {
+  return String(value ?? '')
+    .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
+    .replace(/\(\s*계산 근거\s*\)/g, '')
+    .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function signalClass(signal: string) {
   if (signal === '활용') return 'is-use'
   if (signal === '주의') return 'is-caution'
@@ -26,6 +35,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   onCancel: () => void
   canCancel: boolean
 }) {
+  if (!loading && !error && (!result || !result.data)) return <section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 자동 해설이 시작되지 않았거나 저장본이 없으면 여기서 직접 생성할 수 있고, Gemini를 쓰지 않고 프롬프트만 복사할 수도 있어.</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>
   if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>압축 계산근거로 맞춤 해설 생성 중…</h3><p className="period-ai-summary">정상 경로 Gemini 1회, 필요한 품질 수선이 있을 때만 최대 2회야. 약 2분을 넘기지 않고 중단해.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
   const failedUsage = estimateGeminiUsage(result?.usage)
   if (error && !result?.data) {
@@ -42,6 +52,8 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
   const validationPassed = validation?.score === 100 || (!!validation?.stages?.length && validation.stages.every((stage)=>stage.passed))
+  const localQualityFallback = Boolean(result.usage?.local_quality_fallback)
+  const degradedQuality = Boolean(result.usage?.degraded_quality)
   const decisions = data.decisions ?? []
   const keyWindows = data.key_windows ?? []
   const crossChecks = data.cross_checks ?? []
@@ -60,13 +72,14 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       <div className="period-ai-quick-date-list">{keyWindows.slice(0,3).map((item,index)=><article className={`period-ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`}><b>{periodLabel(item.start,item.end)}</b><div><strong>{item.label}</strong>{!!item.topics?.length&&<small>{item.topics.slice(0,3).join(' · ')}</small>}</div><span>{item.signal}</span></article>)}</div>
     </section>}
 
+    {(localQualityFallback || degradedQuality) ? <div className="period-ai-quality-fallback"><CheckCircle2 size={15}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 핵심 근거를 기준으로 표시했어.')}</span></div></div> : null}
     {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
 
     {!!decisions.length && <section className="period-ai-action-section">
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
       <div className="period-ai-actions">{decisions.slice(0,4).map((item,index)=><article key={`${index}-${item.action}`}>
         <span className="period-ai-action-index">{index+1}</span>
-        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
+        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
       </article>)}</div>
     </section>}
 
