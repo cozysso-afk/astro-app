@@ -44,6 +44,7 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
+          node --test web/src/lib/interpretationUiContract.test.mjs
       - name: Web typecheck and production build
         working-directory: web
         run: |
