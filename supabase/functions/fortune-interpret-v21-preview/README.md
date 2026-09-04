@@ -45,4 +45,12 @@ The first-pass audit is complete. The remaining readability issue is content-lev
 
 This UI audit used no additional Gemini call and created no Vercel deployment. It changes presentation only; the V21.3.1 runtime/cache contracts do not need another version bump.
 
+## Interpretation readability pass 2
+
+The second no-cost UX pass removes the metric-heavy `overall.summary` from the primary conclusion position without deleting any generated information. A deterministic UI helper now selects the first narrative sentence that is not dominated by averages, spreads, extrema, or repeated numeric values. The top card presents that as `핵심 흐름`, then uses the first non-metric priority, decision action, or key-window label as `먼저 기억할 것` when available.
+
+The original `overall.summary` remains intact below as `수치 포함 전체 계산 요약`, so detailed averages and variation statistics are still available when the user wants them. The change applies to annual, month, week, and day interpretation panels, and removes the redundant standalone dominant-pattern block where the same material was being repeated.
+
+This pass is presentation-only and requires no Gemini regeneration, no Supabase runtime redeployment, and no cache-contract bump. A regression fixture explicitly checks that a summary beginning with values such as `평균 46.3점` and `변동폭 42점` does not leak that metric-heavy sentence into the new top-level narrative brief.
+
 Final candidate verification is performed on the PR head. The Supabase `fortune-interpret-v21-preview` deployment is intentionally a preview-only target; main and production remain unchanged until explicit release approval.
