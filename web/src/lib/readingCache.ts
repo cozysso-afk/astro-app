@@ -13,6 +13,7 @@ const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
 const FORTUNE_AI_CACHE_CONTRACT = 'release-contract-v21.3.2-relationship-direction-depth'
+const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11-mode-split-cost-guard'
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
@@ -144,5 +145,5 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
 }
 
 export function relationshipAiCacheId(calculation: Record<string, unknown>, purpose: string, model: string, context?: unknown): string {
-  return `relationship-ai:${hashText(stableStringify({ model, purpose, calculation, context: context ?? null }))}`
+  return `relationship-ai:${hashText(stableStringify({ contract: RELATIONSHIP_AI_CACHE_CONTRACT, model, purpose, calculation, context: context ?? null }))}`
 }

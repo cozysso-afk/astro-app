@@ -113,6 +113,7 @@ export type RelationshipAiResponse = {
       bond: string
       emotional_home: string
       daily_life: string
+      intimacy_resources: string
       conflict_repair: string
       commitment_or_current_cycle: string
       timing: string
