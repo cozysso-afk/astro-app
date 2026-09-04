@@ -44,4 +44,4 @@ jobs:
           git add supabase/functions/fortune-interpret-v21-preview/index.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs web/src/appTypes.ts web/src/PeriodAiInterpretationPanel.tsx web/src/AiInterpretationPanel.tsx web/src/period-ai-v18.css web/src/ai-interpret-v2.css
           git commit -m "fix(ai): show safe fallback after paid validation failure"
           git push origin HEAD:work/period-selector-ui-v1
-      # final regression: critical stages 1-4 must remain strict
+      # aligned contract: stages 1-4 strict, stage 5 observable/degradable
