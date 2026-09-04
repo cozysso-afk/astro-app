@@ -72,6 +72,9 @@ rep(cost, r'''    const sig=payload?.western?.relationship_signals??{};
     ];
 ''', 'relationship evidence-backed dates')
 
+rep(cost, '한 날짜나 점수 하나를 사건 확률로 바꾸지 않고 기간 평균·직접 날짜 근거·실제 반응을 함께 봐.', '한 날짜나 점수 하나를 사건 결과로 바꾸지 않고 기간 평균·직접 날짜 근거·실제 반응을 함께 봐.', 'fallback probability wording 1')
+rep(cost, '사건 확률·상대 속마음·가격방향은 단정하지 않아.', '사건 결과·상대 속마음·가격방향을 미리 확정하지 않아.', 'fallback probability wording 2')
+
 test='supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs'
 rep(test, "assert.match(src,/supabase-ai-v21\\.3\\.2-relationship-direction-depth/);", "assert.match(src,/supabase-ai-v21\\.3\\.3-no-zero-paid-fallback/);", 'runtime version assertion')
 rep(test, "assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');", "assert.equal(rows.find(x=>x.topic==='연애').timing,'2027-04-11');", 'evidence-backed timing assertion')
