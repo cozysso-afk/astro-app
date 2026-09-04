@@ -1,0 +1,204 @@
+/* v24 · visual hierarchy pass
+ * Makes the screen read as HERO -> interpretation -> actionable timing -> evidence.
+ * Visual-only. No calculation/API/cache behavior changes.
+ */
+
+:root{
+  --vh-ink:#43394a;
+  --vh-muted:#82768a;
+  --vh-lilac:#b8a2d7;
+  --vh-blue:#a7c9ea;
+  --vh-mint:#a9d9cc;
+  --vh-rose:#e2b5c9;
+  --vh-pearl:rgba(255,255,255,.90);
+  --vh-line:rgba(151,142,172,.20);
+  --vh-deep-shadow:0 22px 52px rgba(91,78,122,.15),0 1px 0 rgba(255,255,255,.96) inset;
+  --vh-mid-shadow:0 13px 31px rgba(91,82,112,.095),0 1px 0 rgba(255,255,255,.92) inset;
+  --vh-soft-shadow:0 7px 20px rgba(91,82,112,.055),0 1px 0 rgba(255,255,255,.88) inset;
+}
+
+/* HOME: one clear hero, one featured tool, supporting controls. */
+.hero-card{
+  min-height:178px;
+  padding:28px 23px 25px!important;
+  border-color:rgba(178,165,208,.42)!important;
+  background:
+    radial-gradient(circle at 84% 10%,rgba(210,231,255,.68),transparent 27%),
+    radial-gradient(circle at 13% 95%,rgba(234,215,250,.68),transparent 36%),
+    radial-gradient(circle at 62% 72%,rgba(216,245,236,.40),transparent 31%),
+    linear-gradient(140deg,rgba(255,255,255,.98),rgba(244,241,253,.96) 53%,rgba(240,248,251,.94))!important;
+  box-shadow:0 26px 60px rgba(91,76,126,.16),0 0 38px rgba(192,178,231,.18),0 1px 0 rgba(255,255,255,.98) inset!important;
+}
+.hero-card::before{opacity:1!important;filter:saturate(1.15)}
+.hero-row h1{font-size:clamp(2.18rem,8.5vw,2.65rem)!important;letter-spacing:-.06em!important;color:#372d42!important}
+.hero-row p{max-width:310px;font-size:.84rem!important;line-height:1.55!important;color:#756a7b!important}
+.hero-kicker{font-size:.7rem!important;letter-spacing:.17em!important;color:#9578a8!important}
+.hero-sigil{width:55px!important;height:55px!important;flex-basis:55px!important;border-radius:18px!important;color:#7d6aa0!important;background:linear-gradient(145deg,#fff,#ebe2fb 55%,#dcecff)!important;border-color:rgba(169,151,205,.38)!important}
+
+.profile-card,.date-card{box-shadow:var(--vh-soft-shadow)!important;border-color:rgba(174,167,190,.24)!important;background:rgba(255,255,255,.76)!important}
+.section-block{position:relative}
+.section-label{font-size:.7rem!important;letter-spacing:.14em!important;color:#8b7894!important}
+
+/* Featured entry: Integrated fortune becomes the visual anchor in the tool grid. */
+.tool-grid{align-items:stretch}
+.tool-grid>.tool-card:first-child{
+  grid-column:1/-1;
+  min-height:116px!important;
+  display:grid!important;
+  grid-template-columns:58px minmax(0,1fr);
+  grid-template-rows:auto auto;
+  column-gap:15px;
+  align-content:center;
+  padding:18px 19px!important;
+  border-radius:24px!important;
+  border-color:rgba(174,158,205,.42)!important;
+  background:
+    radial-gradient(circle at 86% 12%,rgba(204,228,255,.58),transparent 29%),
+    radial-gradient(circle at 10% 95%,rgba(226,209,248,.64),transparent 36%),
+    linear-gradient(135deg,rgba(255,255,255,.97),rgba(239,237,252,.94))!important;
+  box-shadow:0 18px 42px rgba(94,79,127,.13),0 0 30px rgba(205,192,238,.14),0 1px 0 rgba(255,255,255,.96) inset!important;
+}
+.tool-grid>.tool-card:first-child .tool-icon{grid-row:1/3;width:52px;height:52px;margin:0!important;border-radius:17px}
+.tool-grid>.tool-card:first-child strong{font-size:1.08rem!important;align-self:end;color:#44364f!important}
+.tool-grid>.tool-card:first-child>span:last-child{font-size:.84rem!important;line-height:1.5!important;align-self:start;margin-top:3px!important;color:#756a7c!important}
+.tool-grid>.tool-card:not(:first-child){min-height:132px!important;border-radius:20px!important;box-shadow:var(--vh-mid-shadow)!important}
+.tool-grid>.tool-card:not(:first-child) strong{font-size:.97rem!important}
+.tool-grid>.tool-card:not(:first-child)>span:last-child{font-size:.8rem!important;line-height:1.5!important}
+.tool-card.is-selected{outline:2px solid rgba(188,168,222,.27);outline-offset:2px}
+
+/* PERIOD RESULTS: headline/AI is primary, scores are secondary, raw evidence recedes. */
+.result-headline{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(145,178,157,.22)!important;
+  border-radius:18px!important;
+  padding:14px 15px!important;
+  background:linear-gradient(135deg,rgba(239,250,244,.95),rgba(245,244,255,.91))!important;
+  box-shadow:var(--vh-soft-shadow)!important;
+}
+.result-headline::after{content:'';position:absolute;right:-34px;top:-43px;width:105px;height:105px;border-radius:50%;background:radial-gradient(circle,rgba(202,231,219,.34),transparent 69%);pointer-events:none}
+.result-headline strong{font-size:1.02rem!important;color:#506b5c!important}
+.result-headline span{font-size:.79rem!important;color:#7a887f!important}
+
+.period-ai-card,.ai-interpret-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(166,151,196,.34)!important;
+  border-radius:24px!important;
+  background:
+    radial-gradient(circle at 88% 5%,rgba(213,233,255,.40),transparent 28%),
+    radial-gradient(circle at 8% 97%,rgba(231,213,249,.44),transparent 34%),
+    linear-gradient(145deg,rgba(255,255,255,.97),rgba(247,243,253,.94))!important;
+  box-shadow:var(--vh-deep-shadow)!important;
+}
+.period-ai-card::before,.ai-interpret-card::before{
+  content:'';position:absolute;left:10%;right:10%;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.98),rgba(198,181,231,.66),rgba(210,232,246,.72),transparent);
+  pointer-events:none;
+}
+.period-ai-head h3,.ai-interpret-head h3{font-size:1.16rem!important;line-height:1.42!important;color:#43364c!important}
+.period-ai-kicker,.ai-interpret-head .eyebrow{color:#826b91!important;font-weight:900!important}
+.period-ai-overall-brief,.ai-overall-brief{
+  border-color:rgba(160,146,187,.19)!important;
+  background:linear-gradient(135deg,rgba(248,242,255,.94),rgba(238,249,247,.91))!important;
+  box-shadow:0 9px 23px rgba(99,82,122,.07),inset 0 1px 0 rgba(255,255,255,.92)!important;
+}
+.period-ai-overall-brief>span,.ai-section-kicker{color:#806a8d!important}
+
+/* Actionable content gets color-coded rails, not identical white boxes. */
+.period-ai-quick-date,.ai-quick-date{position:relative;overflow:hidden;border-left:4px solid rgba(166,146,198,.42)!important;box-shadow:var(--vh-soft-shadow)!important}
+.period-ai-quick-date.is-use,.ai-quick-date.is-use{border-left-color:#8ccab8!important}
+.period-ai-quick-date.is-caution,.ai-quick-date.is-caution{border-left-color:#dba4b6!important}
+.period-ai-quick-date.is-mixed,.ai-quick-date.is-mixed{border-left-color:#b8a0d9!important}
+.period-ai-actions>article,.ai-decision-list>article{border-left:4px solid rgba(171,149,202,.34)!important;background:rgba(255,255,255,.82)!important;box-shadow:var(--vh-soft-shadow)!important}
+.period-ai-actions>article:nth-child(1),.ai-decision-list>article:nth-child(1){border-left-color:#9fcdbf!important}
+.period-ai-actions>article:nth-child(2),.ai-decision-list>article:nth-child(2){border-left-color:#aec8e6!important}
+.period-ai-actions>article:nth-child(3),.ai-decision-list>article:nth-child(3){border-left-color:#c6addd!important}
+.period-ai-actions>article:nth-child(4),.ai-decision-list>article:nth-child(4){border-left-color:#e1b6c9!important}
+.period-ai-action-index,.ai-decision-index{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 5px 12px rgba(110,91,134,.08)}
+.period-ai-section-title,.ai-section-heading{padding-top:3px}
+.period-ai-section-title>strong,.ai-section-heading>strong{font-size:1.02rem!important;color:#463a4e!important}
+.period-ai-section-title>span,.ai-section-heading>span{font-size:.76rem!important;color:#8e7998!important}
+
+/* Key windows are important but visually below decisions. */
+.period-ai-key-window-section,.ai-key-window-section{padding-top:4px;border-top:1px dashed rgba(149,136,169,.17)}
+.period-ai-window,.ai-key-window{box-shadow:var(--vh-soft-shadow)!important;border-color:rgba(163,154,181,.17)!important}
+.period-ai-window.is-use,.ai-key-window.is-use{background:linear-gradient(145deg,rgba(239,250,245,.93),rgba(255,255,255,.83))!important}
+.period-ai-window.is-caution,.ai-key-window.is-caution{background:linear-gradient(145deg,rgba(255,242,245,.92),rgba(255,255,255,.84))!important}
+.period-ai-window.is-mixed,.ai-key-window.is-mixed{background:linear-gradient(145deg,rgba(247,241,255,.93),rgba(241,249,253,.86))!important}
+
+/* Score overview: secondary dashboard. Raw data/evidence: tertiary. */
+.result-card:has(.integrated-topic-grid){
+  border-color:rgba(173,163,192,.24)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(248,246,252,.82))!important;
+  box-shadow:var(--vh-mid-shadow)!important;
+}
+.result-card:has(.integrated-topic-grid) .result-card-title>strong{font-size:1.08rem!important}
+.integrated-topic{border:1px solid rgba(171,163,188,.16);border-radius:16px;background:rgba(255,255,255,.67);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.integrated-topic>strong{font-size:2rem!important;letter-spacing:-.04em;color:#654d78!important}
+.integrated-topic>span{font-size:.86rem!important}
+.period-date-source,.period-time-evidence,.result-card:has(.saju-summary){
+  background:rgba(250,249,252,.67)!important;
+  border-color:rgba(169,163,179,.14)!important;
+  box-shadow:0 4px 14px rgba(86,78,99,.035)!important;
+}
+.period-date-source>summary,.period-time-evidence>summary{opacity:.88}
+.result-card:has(.saju-summary) .result-card-title>strong{font-size:.98rem!important;color:#665b6b!important}
+
+/* RELATIONSHIP: one strong thesis card, subordinate evidence blocks. */
+.relationship-reading-card{
+  position:relative;overflow:hidden;
+  border:1px solid rgba(172,154,199,.34)!important;
+  border-radius:24px!important;
+  padding:20px 18px!important;
+  background:
+    radial-gradient(circle at 88% 7%,rgba(244,210,229,.42),transparent 29%),
+    radial-gradient(circle at 8% 96%,rgba(218,230,255,.38),transparent 33%),
+    linear-gradient(145deg,rgba(255,255,255,.96),rgba(248,244,252,.93))!important;
+  box-shadow:var(--vh-deep-shadow)!important;
+}
+.relationship-reading-card>h3{font-size:1.28rem!important;line-height:1.45!important;color:#44354c!important}
+.relationship-overview{font-size:.95rem!important;line-height:1.72!important;color:#655b69!important}
+.relationship-reading-grid>article{border:1px solid rgba(166,155,181,.16);border-radius:16px;padding:12px 13px;background:rgba(255,255,255,.67);box-shadow:var(--vh-soft-shadow)}
+.relationship-key-aspects{margin-top:15px!important;padding-top:14px!important;border-top:1px dashed rgba(155,141,174,.20)}
+.relationship-key-aspects>div{padding:11px 0!important}
+.relationship-ai-toolbar button{min-height:54px!important;border-radius:18px!important;background:linear-gradient(118deg,rgba(239,222,250,.96),rgba(221,231,255,.95) 52%,rgba(218,245,237,.94))!important;box-shadow:0 13px 30px rgba(102,86,135,.13),0 0 24px rgba(196,184,231,.16)!important}
+.relationship-ai-card{border-radius:24px!important;box-shadow:var(--vh-deep-shadow)!important}
+
+/* Details should look intentionally secondary, not like another primary card. */
+details.period-ai-details,details.ai-meta-details,.period-ai-topic-disclosure,.ai-meta-details{border-color:rgba(155,146,170,.14)!important;background:rgba(250,249,252,.54)!important}
+details.period-ai-details>summary,.period-ai-topic-disclosure>summary,.ai-meta-details>summary{color:#756b7b!important}
+
+/* Stronger section breathing room on phone. */
+.period-ai-card>*+*,.ai-interpret-card>*+*{margin-top:15px}
+.period-ai-action-section,.period-ai-window-section,.ai-decision-section,.ai-key-window-section,.ai-relationship-section{margin-top:19px!important}
+
+/* Motion-on gets a subtle depth response; motion-off remains completely static. */
+.celestial-motion-on .tool-card:not(:first-child):active,
+.celestial-motion-on .integrated-topic:active,
+.celestial-motion-on .period-ai-quick-date:active,
+.celestial-motion-on .ai-quick-date:active{
+  transform:translateY(1px) scale(.975)!important;
+}
+.celestial-motion-on .tool-grid>.tool-card:first-child::before{
+  content:'';position:absolute;inset:auto -12% -80% 32%;width:220px;height:220px;border-radius:50%;
+  background:radial-gradient(circle,rgba(218,205,249,.36),transparent 68%);pointer-events:none;
+  animation:astroHaloBreath 6.4s ease-in-out infinite;
+}
+
+@media(max-width:430px){
+  .hero-card{min-height:164px;padding:24px 19px 22px!important}
+  .hero-row h1{font-size:2.2rem!important}.hero-row p{font-size:.82rem!important}
+  .tool-grid>.tool-card:first-child{grid-template-columns:50px minmax(0,1fr);column-gap:12px;padding:16px!important;min-height:108px!important}
+  .tool-grid>.tool-card:first-child .tool-icon{width:47px;height:47px}
+  .tool-grid>.tool-card:first-child strong{font-size:1.02rem!important}
+  .tool-grid>.tool-card:first-child>span:last-child{font-size:.8rem!important}
+  .tool-grid>.tool-card:not(:first-child){min-height:126px!important;padding:14px!important}
+  .period-ai-card,.ai-interpret-card,.relationship-reading-card{border-radius:22px!important}
+  .integrated-topic>strong{font-size:1.88rem!important}
+  .relationship-reading-card>h3{font-size:1.18rem!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .celestial-motion-on .tool-grid>.tool-card:first-child::before{animation:none!important}
+}
