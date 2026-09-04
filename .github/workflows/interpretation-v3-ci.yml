@@ -4,8 +4,12 @@ on:
   pull_request:
     paths:
       - 'integrated_fortune_v1.py'
+      - 'personal_marriage_v1.py'
+      - 'tests/test_personal_marriage_v1.py'
+      - 'api/main.py'
       - 'supabase/functions/fortune-interpret-v6-preview/**'
       - 'supabase/functions/fortune-interpret-v21-preview/**'
+      - 'supabase/functions/relationship-interpret-v9-preview/**'
       - 'web/src/**'
       - 'web/package.json'
       - 'web/package-lock.json'
@@ -29,8 +33,12 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Calculation syntax contract
         run: |
-          python -m py_compile integrated_fortune_v1.py api/main.py
+          python -m py_compile integrated_fortune_v1.py personal_marriage_v1.py api/main.py
           grep -q 'daily_scores' integrated_fortune_v1.py
+      - name: Personal marriage calculation regression
+        run: |
+          python -m pip install -q -r api/requirements.txt pytest
+          python -m pytest -q tests/test_personal_marriage_v1.py
       - name: Evidence-ledger and interpretation regression tests
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
@@ -45,6 +53,8 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
           node --test web/src/lib/interpretationUiContract.test.mjs
+          node --test web/src/lib/relationshipModeContract.test.mjs
+          node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
       - name: Web typecheck and production build
         working-directory: web
         run: |
