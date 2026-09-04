@@ -26,6 +26,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   onCancel: () => void
   canCancel: boolean
 }) {
+  if (!loading && !error && (!result || !result.data)) return <section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 자동 해설이 시작되지 않았거나 저장본이 없으면 여기서 직접 생성할 수 있고, Gemini를 쓰지 않고 프롬프트만 복사할 수도 있어.</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>
   if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>압축 계산근거로 맞춤 해설 생성 중…</h3><p className="period-ai-summary">정상 경로 Gemini 1회, 필요한 품질 수선이 있을 때만 최대 2회야. 약 2분을 넘기지 않고 중단해.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
   const failedUsage = estimateGeminiUsage(result?.usage)
   if (error && !result?.data) {

@@ -33,7 +33,7 @@ export function PeriodFortunePanel({
     </div>
 
     {!ready ? <>
-      <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 버튼을 누르면 계산 후 Gemini 자연어 해설도 자동 생성해. 최초 생성은 API 사용량이 발생할 수 있고, 같은 계산의 저장본 재조회는 다시 호출하지 않아.</span></div>
+      <div className="coordinate-note"><Sparkles size={16}/><span>현재 선택한 기간의 계산 결과가 아직 없어. 버튼을 누르면 기간 계산을 시작해. 자연어 해설은 자동 생성 경로를 먼저 시도하고, 해설 카드에서 직접 생성하거나 Gemini 호출 없이 프롬프트만 복사할 수도 있어. 같은 계산의 저장본 재조회는 다시 호출하지 않아.</span></div>
       {error ? <div className="status-banner error"><AlertTriangle size={17}/><span>{error}</span></div> : null}
       <button className="primary-button" type="button" onClick={onCalculate} disabled={loading || offline}>
         {loading ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>}<span>{loading ? '기간 운세 계산 중…' : buttonLabel}</span>
