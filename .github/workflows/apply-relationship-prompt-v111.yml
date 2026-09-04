@@ -1,0 +1,66 @@
+name: Apply relationship prompt V11.1
+
+on:
+  push:
+    branches:
+      - fix/compact-cards-usage-v29-20260905
+    paths:
+      - scripts/patch_relationship_prompt_v111.py
+      - .github/workflows/apply-relationship-prompt-v111.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/compact-cards-usage-v29-20260905
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply adaptive relationship packet patch
+        run: python scripts/patch_relationship_prompt_v111.py
+      - name: Verify source contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('supabase/functions/relationship-interpret-v9-preview/index.ts').read_text()
+          assert 'relationship-v11.1-adaptive-prompt-pack' in s
+          assert 'selectPromptPacket(b.calculation,b.reunion_context,purpose)' in s
+          assert 'for(let level=0;level<=2;level++)' in s
+          assert 'housePacket(r?.house_overlays,L.house)' in s
+          assert 'sajuPacket(r?.saju_relationship,L.cross)' in s
+          assert 'transitDay(d,L.hits)' in s
+          assert 'prompt_compression_level' in s
+          assert 'original_prompt_bytes' in s
+          assert 'MAX_PROMPT_BYTES=110000' in s
+          print('relationship prompt V11.1 source contract OK')
+          PY
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: TypeScript syntax bundle for relationship edge function
+        working-directory: web
+        run: npx esbuild ../supabase/functions/relationship-interpret-v9-preview/index.ts --bundle --platform=neutral '--external:jsr:*' '--external:npm:*' --outfile=/tmp/relationship-v111.js
+      - name: Web production build
+        working-directory: web
+        run: npm run build
+      - name: Commit patched source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview/index.ts
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git commit -m 'fix(ai): adaptively compact relationship prompt evidence'
+          git push origin HEAD:fix/compact-cards-usage-v29-20260905
