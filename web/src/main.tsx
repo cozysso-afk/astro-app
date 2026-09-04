@@ -22,6 +22,7 @@ import './period-ai-v18.css'
 import './ux-readability-v22.css'
 import './mobile-design-v27.css'
 import './mobile-type-v28.css'
+import './mobile-density-v29.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

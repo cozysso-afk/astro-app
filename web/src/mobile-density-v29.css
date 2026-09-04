@@ -1,0 +1,342 @@
+/* V29 · compact mobile density + always-visible Gemini usage/cost
+ * Keep V28 type scale; reduce nested-card bulk and restore cost visibility.
+ */
+
+/* Main result surfaces: trim empty space, not readable type. */
+.period-ai-card,.ai-interpret-card{
+  padding:14px 13px!important;
+  gap:10px!important;
+}
+.period-ai-head,.ai-interpret-head{gap:8px!important}
+.period-ai-orb,.ai-orb{
+  width:36px!important;height:36px!important;flex:0 0 36px!important;
+  border-radius:11px!important;
+}
+.ai-interpret-head h3,.period-ai-head h3{
+  font-size:17px!important;
+  line-height:1.42!important;
+  margin-top:1px!important;
+}
+.ai-interpret-head small{margin-top:2px!important}
+
+/* Overview: less box-within-box height. */
+.ai-overall-block,.period-ai-overall-brief{margin:0!important}
+.ai-overall-brief,.period-ai-overall-brief{
+  padding:10px 11px!important;
+  border-radius:13px!important;
+}
+.ai-overall-brief>p+p,.period-ai-overall-brief>p+p{margin-top:7px!important}
+.ai-overall-brief>p>b,.period-ai-overall-brief>p>b{margin-bottom:2px!important}
+
+/* Section rhythm: preserve hierarchy without giant vertical gaps. */
+.ai-quick-dates,.period-ai-quick-dates,
+.ai-decision-section,.period-ai-action-section,
+.ai-key-window-section,.period-ai-window-section,
+.ai-relationship-section,.period-ai-relationship-section,
+.ai-year-phase-section,.ai-cross-check-section{
+  margin-top:4px!important;
+}
+.ai-section-heading,.period-ai-section-title{
+  margin-bottom:6px!important;
+  gap:1px!important;
+}
+.ai-quick-date-list,.period-ai-quick-date-list,
+.ai-decision-list,.period-ai-actions,
+.ai-key-window-list,.period-ai-windows{
+  gap:8px!important;
+}
+
+/* Quick dates: shorter rows, same readable labels. */
+.ai-quick-date,.period-ai-quick-date{
+  grid-template-columns:86px minmax(0,1fr) auto!important;
+  gap:7px!important;
+  min-height:0!important;
+  padding:9px 10px!important;
+  border-radius:12px!important;
+}
+.ai-quick-date>span>strong,.period-ai-quick-date>div>strong{font-size:14.5px!important;line-height:1.4!important}
+.ai-quick-date>b,.period-ai-quick-date>b{font-size:13.5px!important}
+
+/* Action cards: reduce nested padding and oversized number blocks. */
+.ai-decision-list article,.period-ai-actions>article{
+  padding:10px!important;
+  gap:8px!important;
+  border-radius:13px!important;
+}
+.ai-decision-index,.period-ai-action-index{
+  width:34px!important;height:34px!important;min-width:34px!important;
+  border-radius:10px!important;
+  font-size:13px!important;
+}
+.ai-decision-list article strong,.period-ai-actions article>div>strong{
+  font-size:15.5px!important;
+  line-height:1.45!important;
+}
+.ai-decision-condition,.period-ai-condition{
+  margin-top:6px!important;
+  padding:8px 9px!important;
+  border-radius:10px!important;
+}
+.ai-decision-more,.period-ai-action-more{margin-top:5px!important}
+.ai-decision-more>summary,.period-ai-action-more>summary{padding-block:3px!important}
+
+/* Detailed windows: keep prose size, shrink shell. */
+.ai-key-window,.period-ai-window{
+  padding:10px 11px!important;
+  border-radius:13px!important;
+}
+.ai-key-window-top,.period-ai-window-head{margin-bottom:6px!important}
+.ai-window-topics,.period-ai-window-topics{gap:5px!important;margin:5px 0!important}
+.ai-key-window>p,.period-ai-window>p{margin:7px 0!important;line-height:1.64!important}
+.ai-window-action,.ai-window-avoid,.period-ai-window-line{margin-top:6px!important;padding:8px 9px!important}
+.ai-window-footer{margin-top:7px!important;padding-top:7px!important}
+
+/* Relationship blocks: compact summaries; long explanations remain opt-in. */
+.ai-direction-grid,.period-ai-relationship-directions{gap:6px!important}
+.ai-direction-item>summary,.period-ai-direction-item>summary{padding:9px 10px!important}
+.ai-direction-item>p,.period-ai-direction-item>p{padding:0 10px 10px!important;line-height:1.64!important}
+.ai-relationship-highlight,.period-ai-relationship-summary>p{padding:9px 10px!important;margin-bottom:6px!important}
+.ai-relationship-timing,.period-ai-window-line{padding-block:8px!important}
+
+/* Supporting result cards should not tower over the interpretation. */
+.result-card{padding:14px!important}
+.result-card-title{margin-bottom:9px!important}
+.result-headline{min-height:64px!important;padding:11px 12px!important}
+.integrated-topic{min-height:88px!important;padding:11px 9px!important}
+.period-date-source>summary{padding:11px 12px!important}
+
+/* Period header: compact without shrinking the readable title. */
+.period-fortune-report .period-report-heading{
+  padding:12px 13px!important;
+  gap:10px!important;
+  margin-bottom:11px!important;
+  border-radius:17px!important;
+}
+.period-report-icon{
+  width:38px!important;height:38px!important;flex-basis:38px!important;
+  border-radius:11px!important;
+}
+.period-report-range{margin-top:6px!important;padding:5px 8px!important}
+.period-report-copy>p{margin-top:5px!important}
+
+/* Restore Gemini usage and estimated cost as an always-visible compact strip.
+ * The data never disappeared; it was hidden in collapsed <details> elements.
+ */
+details.ai-meta-details,details.period-ai-meta{
+  display:block!important;
+  margin:4px 0 0!important;
+  padding:9px 10px!important;
+  border:1px solid rgba(104,91,119,.13)!important;
+  border-radius:12px!important;
+  background:#f8f7fa!important;
+  box-shadow:none!important;
+}
+/* Put cost where it is actually seen, directly after the concise conclusion. */
+.ai-interpret-card>.ai-meta-details{order:-85!important}
+.period-ai-v18>.period-ai-meta{order:2!important}
+details.ai-meta-details>summary,details.period-ai-meta>summary{display:none!important}
+details.ai-meta-details::before,details.period-ai-meta::before{
+  content:"Gemini API 사용량 · 예상 비용";
+  display:block;
+  margin-bottom:4px;
+  font-size:11.5px;
+  line-height:1.35;
+  font-weight:750;
+  color:#7b7081;
+  letter-spacing:0;
+}
+details.ai-meta-details:not([open])>.ai-usage-card,
+details.period-ai-meta:not([open])>.period-ai-cost{
+  display:grid!important;
+}
+.ai-usage-card,.period-ai-cost{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:baseline!important;
+  gap:2px 9px!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.ai-usage-card>strong{display:none!important}
+.ai-usage-card>span,.period-ai-cost>span{
+  font-size:12px!important;
+  line-height:1.45!important;
+  color:#716977!important;
+  letter-spacing:0!important;
+}
+.ai-usage-card>b,.period-ai-cost>b{
+  font-size:12.5px!important;
+  line-height:1.4!important;
+  color:#5f5367!important;
+  white-space:nowrap;
+}
+.ai-usage-card>small,.period-ai-cost>small{
+  grid-column:1/-1;
+  margin-top:1px!important;
+  font-size:11.5px!important;
+  line-height:1.45!important;
+  color:#8a828e!important;
+  letter-spacing:0!important;
+}
+
+/* Validation/cache notices: short status rows, not extra cards. */
+.ai-validation-badge,.period-ai-validation,
+.ai-quality-fallback,.period-ai-quality-fallback,
+.period-ai-cache-note{
+  padding:7px 9px!important;
+  border-radius:10px!important;
+  min-height:0!important;
+  gap:6px!important;
+}
+
+/* Relationship precision is reference material: collapsed, quiet and compact by default. */
+.relationship-precision-card{
+  padding:0!important;
+  overflow:hidden!important;
+  border-radius:16px!important;
+  background:#fbfafc!important;
+  box-shadow:none!important;
+}
+.relationship-precision-summary{
+  list-style:none;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:5px 9px;
+  padding:11px 12px;
+  cursor:pointer;
+}
+.relationship-precision-summary::-webkit-details-marker{display:none}
+.relationship-precision-summary>span{
+  grid-column:1/-1;
+  font-size:11.5px!important;
+  line-height:1.3!important;
+  font-weight:700!important;
+  color:#918692!important;
+  letter-spacing:0!important;
+}
+.relationship-precision-summary>strong{
+  font-size:15px!important;
+  line-height:1.42!important;
+  font-weight:720!important;
+  color:#554d59!important;
+  letter-spacing:0!important;
+}
+.relationship-precision-summary>small{
+  font-size:11.5px!important;
+  line-height:1.35!important;
+  color:#958b98!important;
+  white-space:nowrap;
+  letter-spacing:0!important;
+}
+.relationship-precision-summary::after{
+  content:'＋';
+  font-size:16px;
+  color:#8b7f90;
+}
+.relationship-precision-card[open]>.relationship-precision-summary::after{content:'－'}
+.relationship-precision-body{
+  padding:0 11px 11px;
+  border-top:1px solid rgba(104,91,119,.10);
+}
+.relationship-precision-body>.result-note{
+  margin:10px 1px!important;
+  font-size:13px!important;
+  line-height:1.58!important;
+}
+.relationship-precision-month-list,.relationship-precision-body .month-list{gap:8px!important}
+.relationship-precision-month{
+  padding:10px!important;
+  border-radius:12px!important;
+  background:#faf8f5!important;
+  border-color:rgba(127,105,84,.10)!important;
+  box-shadow:none!important;
+}
+.relationship-precision-month .month-title{margin-bottom:7px!important}
+.relationship-precision-month .month-title strong{font-size:14px!important;line-height:1.4!important;letter-spacing:0!important}
+.relationship-precision-month .month-title span{font-size:11.5px!important;letter-spacing:0!important}
+.relationship-precision-month .month-metrics{gap:5px!important;margin-bottom:6px!important}
+.relationship-precision-month .month-metrics span{
+  padding:4px 7px!important;
+  border-radius:999px!important;
+  font-size:11.5px!important;
+  background:#f2eee8!important;
+  color:#75685d!important;
+  letter-spacing:0!important;
+}
+.relationship-precision-month .month-metrics b{font-size:12.5px!important}
+.relationship-precision-month .tight-row{padding:7px 1px!important;gap:8px!important}
+.relationship-precision-month .tight-row span{font-size:13.5px!important;line-height:1.45!important;letter-spacing:0!important}
+.relationship-precision-month .tight-row b{
+  font-size:12.5px!important;
+  line-height:1.4!important;
+  padding:3px 6px!important;
+  border-radius:8px!important;
+  background:#f5f1ec!important;
+  color:#74675c!important;
+  letter-spacing:0!important;
+}
+
+/* Relationship reading should visually lead; controls and error state should not shout over it. */
+.relationship-reading-card,.relationship-ai-card{
+  padding:14px 13px!important;
+  border-radius:18px!important;
+  box-shadow:0 8px 24px rgba(70,58,82,.055)!important;
+}
+.relationship-reading-card>h3,.relationship-ai-card>h3{
+  font-size:17px!important;
+  line-height:1.45!important;
+  letter-spacing:-.005em!important;
+}
+.relationship-overview,.relationship-ai-overview{
+  font-size:14.5px!important;
+  line-height:1.68!important;
+  letter-spacing:0!important;
+}
+.relationship-reading-grid{gap:7px!important}
+.relationship-reading-grid>article{
+  padding:10px!important;
+  border-radius:12px!important;
+  box-shadow:none!important;
+}
+.relationship-reading-grid>article>strong{font-size:13px!important;letter-spacing:0!important}
+.relationship-reading-grid>article>p{font-size:14px!important;line-height:1.62!important;letter-spacing:0!important}
+.relationship-key-aspects{margin-top:10px!important;padding-top:10px!important}
+.relationship-key-aspects>strong{font-size:13px!important;letter-spacing:0!important}
+.relationship-key-aspects b{font-size:13.5px!important;line-height:1.45!important;letter-spacing:0!important}
+.relationship-key-aspects p{font-size:13.5px!important;line-height:1.58!important;letter-spacing:0!important}
+.relationship-ai-toolbar:not(.ai-cost-guard-toolbar){gap:6px!important;margin-top:10px!important}
+.relationship-ai-toolbar:not(.ai-cost-guard-toolbar)>button{
+  min-height:46px!important;
+  padding:10px 13px!important;
+  border-radius:14px!important;
+  background:#f2eef5!important;
+  box-shadow:none!important;
+  font-size:14px!important;
+}
+.relationship-ai-toolbar:not(.ai-cost-guard-toolbar)>small{
+  font-size:11.5px!important;
+  line-height:1.45!important;
+  color:#918894!important;
+  letter-spacing:0!important;
+}
+.relationship-ai-toolbar~.status-banner.error{
+  padding:10px 11px!important;
+  border-radius:13px!important;
+  font-size:13.5px!important;
+  line-height:1.55!important;
+}
+
+@media(max-width:430px){
+  .ai-quick-date,.period-ai-quick-date{grid-template-columns:82px minmax(0,1fr) auto!important}
+  .period-ai-card,.ai-interpret-card{padding:13px 12px!important}
+  .ai-usage-card,.period-ai-cost{grid-template-columns:1fr!important;gap:1px!important}
+  .ai-usage-card>b,.period-ai-cost>b{white-space:normal;font-size:13px!important}
+  .ai-usage-card>small,.period-ai-cost>small{grid-column:auto}
+  .relationship-precision-summary{grid-template-columns:minmax(0,1fr) auto}
+  .relationship-precision-summary>span{grid-column:1/-1}
+  .relationship-precision-summary>small{grid-column:1/2;white-space:normal}
+  .relationship-precision-summary::after{grid-column:2;grid-row:2}
+}

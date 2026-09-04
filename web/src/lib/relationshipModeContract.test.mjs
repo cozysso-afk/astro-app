@@ -7,6 +7,7 @@ const panel = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', imp
 const personalPanel = readFileSync(new URL('../PersonalMarriagePanel.tsx', import.meta.url), 'utf8')
 const cache = readFileSync(new URL('./readingCache.ts', import.meta.url), 'utf8')
 const relationshipFn = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
+const formatters = readFileSync(new URL('./resultFormatters.ts', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../api/main.py', import.meta.url), 'utf8')
 const personalEngine = readFileSync(new URL('../../../personal_marriage_v1.py', import.meta.url), 'utf8')
 
@@ -75,6 +76,18 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11-mode-split-cost-guard'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.1-adaptive-prompt-pack'/)
   assert.match(cache, /contract: RELATIONSHIP_AI_CACHE_CONTRACT/)
+})
+
+
+test('external relationship prompt is compact bounded and clearly separated from raw full copy', () => {
+  assert.match(formatters, /EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS = 28000/)
+  assert.match(formatters, /compactRelationshipExternalPacket/)
+  assert.match(formatters, /for \(let level=0; level<=2; level\+\+\)/)
+  assert.match(formatters, /prompt\.slice\(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS - 180\)/)
+  assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
+  assert.match(app, /외부 AI용 압축 프롬프트/)
+  assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
+  assert.match(relationshipFn, /relationship-v11\.1-adaptive-prompt-pack/)
 })

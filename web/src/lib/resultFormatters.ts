@@ -84,49 +84,167 @@ export function integratedResultText(result: IntegratedApiResponse) {
   return lines.join('\n')
 }
 
+const EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS = 28000
+
+function compactAspectForExternal(aspect: unknown) {
+  if (!aspect || typeof aspect !== 'object') return null
+  const row = aspect as Record<string, unknown>
+  const orb = Number(row.orb)
+  if (!Number.isFinite(orb)) return null
+  return {
+    a: String(row.a ?? ''), aspect: String(row.aspect ?? ''), b: String(row.b ?? ''),
+    orb: Number(orb.toFixed(2)), tone: String(row.tone ?? 'mixed'), layer: row.layer ?? undefined,
+  }
+}
+
+function compactStatForExternal(stat: unknown, bestLimit: number, cautionLimit: number) {
+  if (!stat || typeof stat !== 'object') return null
+  const row = stat as Record<string, unknown>
+  const point = (value: unknown) => {
+    if (!value || typeof value !== 'object') return null
+    const p = value as Record<string, unknown>
+    const score = Number(p.score)
+    return { date: String(p.date ?? ''), score: Number.isFinite(score) ? Number(score.toFixed(1)) : 0 }
+  }
+  return {
+    average: Number(Number(row.average ?? 0).toFixed(1)),
+    band: String(row.band ?? ''),
+    spread: Number(Number(row.spread ?? 0).toFixed(1)),
+    best_days: (Array.isArray(row.best_days) ? row.best_days : []).slice(0,bestLimit).map(point).filter(Boolean),
+    caution_days: (Array.isArray(row.caution_days) ? row.caution_days : []).slice(0,cautionLimit).map(point).filter(Boolean),
+  }
+}
+
+function compactHouseRowsForExternal(value: unknown, limit: number) {
+  return (Array.isArray(value) ? value : []).slice(0,limit).map((item) => {
+    const row = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    return { planet: String(row.planet ?? ''), whole_house: row.whole_house ?? null, placidus_house: row.placidus_house ?? row.house ?? null }
+  })
+}
+
+function compactSajuForExternal(value: unknown, limit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const person = (p: unknown) => {
+    if (!p || typeof p !== 'object') return null
+    const x = p as Record<string, unknown>
+    return { year:x.year ?? null, month:x.month ?? null, day:x.day ?? null, hour:x.hour ?? null, day_stem:x.day_stem ?? null, day_branch:x.day_branch ?? null, precision:x.precision ?? null, time_known:Boolean(x.time_known) }
+  }
+  if (row.available === false) return { available:false, error:row.error ?? null }
+  return {
+    available: row.available ?? true,
+    policy: row.policy ?? null,
+    user: person(row.user), counterpart: person(row.counterpart),
+    day_master_relation: row.day_master_relation ?? null,
+    spouse_palace: row.spouse_palace ?? null,
+    cross_branch_links: (Array.isArray(row.cross_branch_links) ? row.cross_branch_links : []).slice(0,limit),
+    limitations: (Array.isArray(row.limitations) ? row.limitations : []).slice(0,4),
+  }
+}
+
+function compactRelationshipExternalPacket(calculation: RelationshipApiResponse | null | undefined, reunionContext: ReunionTimingContext | null | undefined, level: number) {
+  if (!calculation) return null
+  const rawResult = calculation.result as RelationshipApiResponse['result'] & Record<string, unknown>
+  const natal = rawResult.natal_synastry
+  const caps = level === 0
+    ? { aspects:24, house:8, focus:3, months:12, tight:2, transitDays:8, transitHits:2, transitMonths:8, directionalMonths:8, statBest:4, statCaution:3, saju:8 }
+    : level === 1
+      ? { aspects:16, house:6, focus:2, months:8, tight:2, transitDays:6, transitHits:2, transitMonths:6, directionalMonths:6, statBest:3, statCaution:2, saju:6 }
+      : { aspects:12, house:4, focus:1, months:6, tight:1, transitDays:4, transitHits:1, transitMonths:4, directionalMonths:4, statBest:2, statCaution:1, saju:4 }
+  const aspects = [...(natal?.aspects ?? [])].sort((a,b)=>a.orb-b.orb).slice(0,caps.aspects).map(compactAspectForExternal).filter(Boolean)
+  const house = rawResult.house_overlays
+  const focusSource = ((rawResult.relationship_focus as Record<string, unknown> | undefined)?.groups ?? {}) as Record<string, unknown>
+  const focus = Object.fromEntries(Object.entries(focusSource).map(([key,value]) => [key, (Array.isArray(value) ? value : []).slice().sort((a,b)=>Number((a as Record<string, unknown>)?.orb ?? 99)-Number((b as Record<string, unknown>)?.orb ?? 99)).slice(0,caps.focus).map(compactAspectForExternal).filter(Boolean)]))
+  const months = (rawResult.months ?? []).slice(0,caps.months).map((month) => ({
+    calendar_month: month.calendar_month,
+    representative_date: month.representative_date,
+    signal_summary: {
+      exact_contacts: month.signal_summary.exact_contacts,
+      supportive_contacts: month.signal_summary.supportive_contacts,
+      challenging_contacts: month.signal_summary.challenging_contacts,
+      tightest: month.signal_summary.tightest.slice(0,caps.tight).map(compactAspectForExternal).filter(Boolean),
+    },
+  }))
+  const transits = rawResult.reunion_transits?.available ? {
+    available: true,
+    period: rawResult.reunion_transits.period,
+    policy: rawResult.reunion_transits.policy,
+    top_days: rawResult.reunion_transits.top_days.slice(0,caps.transitDays).map((day)=>({
+      date:day.date,
+      score:Number(day.score.toFixed(1)), user_score:Number(day.user_score.toFixed(1)), counterpart_score:Number(day.counterpart_score.toFixed(1)),
+      shared_activation:day.shared_activation,
+      hits:day.hits.slice(0,caps.transitHits).map((hit)=>({ person:hit.person, transit:hit.transit, aspect:hit.aspect, target:hit.target, orb:Number(hit.orb.toFixed(2)), tone:hit.tone, score:Number(hit.score.toFixed(1)) })),
+    })),
+    top_months: rawResult.reunion_transits.top_months.slice(0,caps.transitMonths).map((month)=>({ calendar_month:month.calendar_month, score:Number(month.score.toFixed(1)), top_dates:month.top_dates.slice(0,3) })),
+  } : null
+  const directionalMonths = (reunionContext?.months ?? []).map((month)=>({
+    calendar_month:month.calendar_month, start:month.start, end:month.end,
+    incoming:compactStatForExternal(month.incoming,1,1), outgoing:compactStatForExternal(month.outgoing,1,1), reconnection:compactStatForExternal(month.reconnection,1,1),
+    rank:Number(((month.reconnection?.average ?? 0)*.5 + (month.incoming?.average ?? 0)*.35 + (month.outgoing?.average ?? 0)*.15).toFixed(2)),
+  })).sort((a,b)=>b.rank-a.rank).slice(0,caps.directionalMonths)
+  return {
+    engine: calculation.engine,
+    api_version: calculation.api_version,
+    relationship_status: calculation.relationship_status,
+    period: calculation.period,
+    precision: { partner_time_exact:Boolean(natal?.partner_time_exact), note:natal?.note ?? null },
+    natal_synastry: { aspects },
+    relationship_focus: focus,
+    house_overlays: house ? {
+      available:house.available,
+      precision_note:house.precision_note ?? null,
+      user_in_counterpart:compactHouseRowsForExternal(house.user_in_counterpart?.relationship_houses,caps.house),
+      counterpart_in_user:compactHouseRowsForExternal(house.counterpart_in_user?.relationship_houses,caps.house),
+    } : null,
+    saju_relationship: compactSajuForExternal(rawResult.saju_relationship,caps.saju),
+    advanced: { davison:rawResult.davison ?? null, marks:rawResult.marks ?? null, months },
+    reunion_transits: transits,
+    reunion_directional_context: reunionContext ? {
+      period:reunionContext.period,
+      incoming:compactStatForExternal(reunionContext.incoming,caps.statBest,caps.statCaution),
+      outgoing:compactStatForExternal(reunionContext.outgoing,caps.statBest,caps.statCaution),
+      reconnection:compactStatForExternal(reunionContext.reconnection,caps.statBest,caps.statCaution),
+      strongest_months:directionalMonths,
+    } : null,
+    limitations:(rawResult.limitations ?? []).slice(0,6),
+  }
+}
+
 export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null) {
   const user = (request.user ?? {}) as Record<string, unknown>
   const cp = (request.counterpart ?? {}) as Record<string, unknown>
   const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
-  const calculatedData = kind === 'reunion'
-    ? { relationship: calculation ?? null, reunion_directional_context: reunionContext ?? null }
-    : calculation ?? null
   const modeRule = kind === 'marriage'
     ? '- 결혼 여부를 예언하지 않고 장기 결속·협력·긴장 활성도를 본다.'
     : kind === 'reunion'
       ? '- 재회는 ① 연락/재접촉 활성화 ② 감정 재활성화 ③ 실제 관계 재구축 가능성을 서로 다른 층으로 분리한다. 수신(상대→나)·발신(나→상대)·과거인연 재접점도 섞지 않는다.'
       : '- 궁합의 정적 구조와 선택 기간의 시기 활성도를 구분한다.'
-  return [
-    `[별빛의 운명 · ${label} 분석 요청]`,
-    `관계 상태: ${String(request.relationship_status ?? '')}`,
-    `분석 모드: ${String(request.analysis_mode ?? kind)}`,
-    `분석 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
+  const intro = [
+    `[별빛의 운명 · ${label} 외부 AI용 초압축 해석 요청]`,
+    `관계 상태: ${String(request.relationship_status ?? '')} / 분석 모드: ${String(request.analysis_mode ?? kind)} / 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
+    `본인: ${String(user.name ?? '나')} · ${String(user.birth_date ?? '')} ${String(user.birth_time ?? '')}`,
+    `상대: ${String(cp.name ?? '상대')} · ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
+    '※ 좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다. 아래 계산값을 다시 천문/사주 계산하지 마라.',
     '',
-    `본인: ${String(user.name ?? '나')} / ${String(user.birth_date ?? '')} ${String(user.birth_time ?? '')}`,
-    `본인 좌표: ${String(user.latitude ?? '')}, ${String(user.longitude ?? '')} / UTC ${String(user.utc_offset_hours ?? '')}`,
-    `상대: ${String(cp.name ?? '상대')} / ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
-    `상대 출생지역 좌표: ${cp.latitude != null && cp.longitude != null ? `${String(cp.latitude)}, ${String(cp.longitude)} / UTC ${String(cp.utc_offset_hours ?? '')}` : '미입력'}${cp.time_known ? '' : ' · 생시 모름: 각도·하우스 등 시간민감 레이어에서는 사용하지 않음'}`,
-    '',
-    '해석 원칙:',
-    '- 정적 synastry(시너스트리·궁합차트)와 기간별 transit(트랜짓·현재 행성 이동)/진행 접점을 분리한다.',
-    '- 접점 수·점수·오브를 연락·재회·결혼의 통계 확률처럼 말하지 않는다.',
-    '- 상대의 사적인 속마음을 계산값만으로 단정하지 않는다.',
+    '[해석 규칙]',
+    '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
+    '- 좁은 오브의 실제 접점과 서로 독립된 레이어에서 반복되는 근거를 우선한다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
+    '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
+    '- 사주는 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고 없는 천간합·신강/신약·용신·배우자성은 만들지 않는다.',
     modeRule,
-    '',
-    '[원본 API 요청 JSON]',
-    JSON.stringify(request, null, 2),
-    '',
-    '[외부 AI 해석 지시]',
-    '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 관계 계산값이다. 다른 천문력/사주 계산으로 덮어쓰지 말고 이 데이터를 해석의 단일 근거로 사용한다.',
-    '- 오브가 좁은 실제 접점을 우선하고, 접점 수나 점수를 재회·결혼·연락 확률로 바꾸지 않는다.',
-    '- 생시 미상으로 빠진 Moon(달)·ASC(상승점)·DSC(하강점)·MC(중천점)·IC(천저점)·하우스·진행 레이어는 추정하지 않는다.',
-    '- 사주는 CALCULATED_DATA에 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고, 없는 천간합·신강/신약·용신·배우자성 등을 만들지 않는다.',
-    kind === 'reunion' ? '- reunion_directional_context가 있으면 수신·발신·재접점을 각각 읽고, relationship.reunion_transits의 실제 트랜짓 날짜와 교차 검증한다. 한쪽 데이터가 없으면 없다고 명시한다.' : '',
-    '- 결론→가장 강한 계산 근거→관계에서 실제 체감되는 패턴→강한 시기/약한 시기→한계 순서로 구체적으로 설명한다.',
-    '',
-    '[CALCULATED_DATA · 원본 관계 계산 JSON]',
-    JSON.stringify(calculatedData, null, 2),
-  ].filter(Boolean).join('\n')
+    kind === 'reunion' ? '- 수신(상대→나)·발신(나→상대)·재접점을 따로 읽고, directional 날짜와 reunion_transits의 실제 날짜가 겹치는지 교차검증한다.' : '',
+    '- 답변 순서: 한줄 결론 → 가장 강한 계산근거 5~8개 → 관계에서 체감되는 패턴 → 강한 시기/약한 시기 → 내가 취할 현실적 행동 → 한계.',
+  ].filter(Boolean)
+  let prompt = ''
+  for (let level=0; level<=2; level++) {
+    const packet = compactRelationshipExternalPacket(calculation,reunionContext,level)
+    const candidate = [...intro, '', `[COMPACT_CALCULATED_DATA · 압축단계 ${level}]`, packet ? JSON.stringify(packet) : '계산 결과 없음'].join('\n')
+    prompt = candidate
+    if (candidate.length <= EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS) break
+  }
+  return prompt.length <= EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS
+    ? prompt
+    : `${prompt.slice(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS - 180)}\n[길이 안전 절단] 뒤쪽 저우선순위 근거는 외부 AI 입력 한도를 위해 생략됨. 앞의 계산근거만 사용해 해석해.`
 }
 
 export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marriage', response: RelationshipApiResponse, reunionContext?: ReunionTimingContext | null) {

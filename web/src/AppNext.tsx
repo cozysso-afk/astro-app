@@ -1643,7 +1643,7 @@ export default function AppNext() {
             {!isPersonalMarriage&&relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
               <div className="result-actions">
-                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('외부 AI용 압축 프롬프트 복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>외부 AI용 압축 프롬프트</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveRelationshipRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
