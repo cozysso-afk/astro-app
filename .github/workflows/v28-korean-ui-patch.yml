@@ -6,15 +6,12 @@ on:
       - fix/korean-type-language-v28-20260904
     paths:
       - '.github/workflows/v28-korean-ui-patch.yml'
-      - 'web/src/**'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   patch-and-verify:
-    if: ${{ !startsWith(github.event.head_commit.message || '', 'style(web): apply V28') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,19 +47,15 @@ jobs:
               ".replace(/이직\\s*및\\s*진로\\s*타깃\\s*시간/g, '이직·진로 집중 시간')\n    .replace(/타깃/g, '집중')\n    .replace(/\\s{2,}/g, ' ')\n    .trim()",
               'period visible text sanitizer')
           s = s.replace('핵심 시기 TOP 3', '먼저 볼 시기')
-          s = s.replace('<strong>{data.headline || \'기간 흐름 요약\'}</strong>', '<strong>{visibleAiText(data.headline) || \'기간 흐름 요약\'}</strong>')
-          s = s.replace('<h3>{data.headline || \'기간 흐름 요약\'}</h3>', '<h3>{visibleAiText(data.headline) || \'기간 흐름 요약\'}</h3>')
+          s = s.replace("<h3>{data.headline || '기간 흐름 요약'}</h3>", "<h3>{visibleAiText(data.headline) || '기간 흐름 요약'}</h3>")
           s = s.replace('<strong>{item.label}</strong>', '<strong>{visibleAiText(item.label)}</strong>')
           s = s.replace('<strong>{item.action}</strong>', '<strong>{visibleAiText(item.action)}</strong>')
           s = s.replace('<p>{item.summary}</p>', '<p>{visibleAiText(item.summary)}</p>')
           old = '<div className="period-ai-relationship-directions"><div className="period-ai-window-line"><b>상대 → 나</b><span>{data.contact_flow.incoming}</span></div><div className="period-ai-window-line"><b>나 → 상대</b><span>{data.contact_flow.outgoing}</span></div><div className="period-ai-window-line"><b>과거 인연 재접점</b><span>{data.contact_flow.reconnection}</span></div></div>'
           new = '<div className="period-ai-relationship-directions"><details className="period-ai-direction-item"><summary><strong>상대 → 나</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.incoming)}</p></details><details className="period-ai-direction-item"><summary><strong>나 → 상대</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.outgoing)}</p></details><details className="period-ai-direction-item"><summary><strong>과거 인연 재접점</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.reconnection)}</p></details></div>'
           s = replace_once(s, old, new, 'period relationship directions')
-          s = s.replace('{relationshipReading.flow}', '{visibleAiText(relationshipReading.flow)}')
-          s = s.replace('{relationshipReading.focus_timing}', '{visibleAiText(relationshipReading.focus_timing)}')
-          s = s.replace('{relationshipReading.context}', '{visibleAiText(relationshipReading.context)}')
-          s = s.replace('{relationshipReading.watch}', '{visibleAiText(relationshipReading.watch)}')
-          s = s.replace('{relationshipReading.avoid}', '{visibleAiText(relationshipReading.avoid)}')
+          for field in ['flow','focus_timing','context','watch','avoid']:
+              s = s.replace('{relationshipReading.'+field+'}', '{visibleAiText(relationshipReading.'+field+')}')
           p.write_text(s)
 
           p = root / 'AiInterpretationPanel.tsx'
@@ -79,11 +72,8 @@ jobs:
           old = '<div className="ai-direction-grid ai-relationship-direction"><article><strong>상대 → 나</strong><p>{data.contact_flow.incoming || \'뚜렷한 수신 근거가 없어.\'}</p></article><article><strong>나 → 상대</strong><p>{data.contact_flow.outgoing || \'뚜렷한 발신 적합 근거가 없어.\'}</p></article><article><strong>과거 인연 재접점</strong><p>{data.contact_flow.reconnection || \'재접점 근거가 약해.\'}</p></article></div>'
           new = '<div className="ai-direction-grid ai-relationship-direction"><details className="ai-direction-item"><summary><strong>상대 → 나</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.incoming || \'뚜렷한 수신 근거가 없어.\')}</p></details><details className="ai-direction-item"><summary><strong>나 → 상대</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.outgoing || \'뚜렷한 발신 적합 근거가 없어.\')}</p></details><details className="ai-direction-item"><summary><strong>과거 인연 재접점</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.reconnection || \'재접점 근거가 약해.\')}</p></details></div>'
           s = replace_once(s, old, new, 'annual relationship directions')
-          s = s.replace('{relationshipReading.flow}', '{visibleAiText(relationshipReading.flow)}')
-          s = s.replace('{relationshipReading.focus_timing}', '{visibleAiText(relationshipReading.focus_timing)}')
-          s = s.replace('{relationshipReading.context}', '{visibleAiText(relationshipReading.context)}')
-          s = s.replace('{relationshipReading.watch}', '{visibleAiText(relationshipReading.watch)}')
-          s = s.replace('{relationshipReading.avoid}', '{visibleAiText(relationshipReading.avoid)}')
+          for field in ['flow','focus_timing','context','watch','avoid']:
+              s = s.replace('{relationshipReading.'+field+'}', '{visibleAiText(relationshipReading.'+field+')}')
           p.write_text(s)
           PY
       - name: Install and verify
@@ -97,6 +87,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add web/src/main.tsx web/src/PeriodAiInterpretationPanel.tsx web/src/AiInterpretationPanel.tsx web/src/mobile-type-v28.css
-          if git diff --cached --quiet; then exit 0; fi
           git commit -m 'style(web): apply V28 Korean readability and language polish'
           git push origin HEAD:fix/korean-type-language-v28-20260904
