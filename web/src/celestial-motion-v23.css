@@ -1,0 +1,372 @@
+/* v23 · LUNEA-inspired luminous motion layer
+ * Visual-only. No calculation, AI, cache, or API behavior changes.
+ * Motion is enabled only when the existing celestial-motion-on setting is active.
+ */
+
+@keyframes astroAuroraDrift {
+  0%,100% { transform: translate3d(-2%, -1%, 0) scale(1); opacity:.44; }
+  38% { transform: translate3d(5%, 2%, 0) scale(1.06); opacity:.62; }
+  72% { transform: translate3d(-1%, 5%, 0) scale(1.03); opacity:.52; }
+}
+@keyframes astroOrbitA {
+  0%,100% { transform: rotate(-18deg) scale(1); opacity:.64; }
+  50% { transform: rotate(342deg) scale(1.035); opacity:1; }
+}
+@keyframes astroOrbitB {
+  0%,100% { transform: rotate(0deg) scale(.98); opacity:.58; }
+  50% { transform: rotate(-180deg) scale(1.06); opacity:.9; }
+}
+@keyframes astroHaloBreath {
+  0%,100% { transform: scale(.96); opacity:.38; }
+  50% { transform: scale(1.08); opacity:.78; }
+}
+@keyframes astroSigilFloat {
+  0%,100% { transform: translateY(0) rotate(-2deg); box-shadow:0 11px 24px rgba(105,85,135,.13),0 0 18px rgba(207,195,241,.16); }
+  48% { transform: translateY(-5px) rotate(2deg); box-shadow:0 17px 30px rgba(105,85,135,.17),0 0 28px rgba(207,195,241,.30); }
+}
+@keyframes astroStarPulse {
+  0%,100% { transform:scale(.68); opacity:.42; filter:brightness(.94); }
+  46% { transform:scale(1.55); opacity:1; filter:brightness(1.22); }
+}
+@keyframes astroSectionRise {
+  0% { opacity:0; transform:translateY(18px) scale(.982); filter:blur(2px); }
+  68% { opacity:1; transform:translateY(-2px) scale(1.004); filter:blur(0); }
+  100% { opacity:1; transform:none; filter:blur(0); }
+}
+@keyframes astroCardStagger {
+  0% { opacity:0; transform:translateY(15px) scale(.975); }
+  72% { opacity:1; transform:translateY(-2px) scale(1.008); }
+  100% { opacity:1; transform:none; }
+}
+@keyframes astroSelectedBreath {
+  0%,100% { transform:translateY(0) scale(1); filter:saturate(1); }
+  50% { transform:translateY(-2px) scale(1.018); filter:saturate(1.12) brightness(1.025); }
+}
+@keyframes astroIconFloat {
+  0%,100% { transform:translateY(0) rotate(0deg); }
+  50% { transform:translateY(-3px) rotate(3deg); }
+}
+@keyframes astroGleam {
+  0%,22% { transform:translateX(-180%) skewX(-18deg); opacity:0; }
+  35% { opacity:.68; }
+  58% { transform:translateX(330%) skewX(-18deg); opacity:0; }
+  100% { transform:translateX(330%) skewX(-18deg); opacity:0; }
+}
+@keyframes astroResultReveal {
+  0% { opacity:0; transform:translateY(22px) scale(.985); }
+  62% { opacity:1; transform:translateY(-3px) scale(1.004); }
+  100% { opacity:1; transform:none; }
+}
+@keyframes astroDateReveal {
+  0% { opacity:0; transform:translateX(-15px) scale(.985); }
+  70% { opacity:1; transform:translateX(2px) scale(1.006); }
+  100% { opacity:1; transform:none; }
+}
+@keyframes astroActionReveal {
+  0% { opacity:0; transform:translateX(16px) scale(.985); }
+  70% { opacity:1; transform:translateX(-2px) scale(1.004); }
+  100% { opacity:1; transform:none; }
+}
+@keyframes astroLoadingScan {
+  0% { transform:translateX(-150%); opacity:0; }
+  18% { opacity:.15; }
+  48% { opacity:.72; }
+  76% { opacity:.12; }
+  100% { transform:translateX(240%); opacity:0; }
+}
+@keyframes astroOrbTurn {
+  0% { transform:rotate(0deg) scale(.96); box-shadow:0 0 0 rgba(187,162,229,0); }
+  50% { transform:rotate(180deg) scale(1.08); box-shadow:0 0 24px rgba(187,162,229,.34); }
+  100% { transform:rotate(360deg) scale(.96); box-shadow:0 0 0 rgba(187,162,229,0); }
+}
+@keyframes astroNavLift {
+  0%,100% { transform:translateY(0) scale(1); }
+  45% { transform:translateY(-3px) scale(1.08); }
+}
+@keyframes astroBadgePulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(160,213,192,0); }
+  50% { box-shadow:0 0 0 5px rgba(160,213,192,.10),0 0 18px rgba(180,220,208,.18); }
+}
+
+/* Background atmosphere. The old star layer was intentionally disabled in v22;
+   bring back a softer animated aurora only when motion is enabled. */
+.app-shell.celestial-motion-on::before {
+  display:block!important;
+  z-index:0!important;
+  inset:-18vh -24vw!important;
+  opacity:.5!important;
+  background:
+    radial-gradient(ellipse at 24% 15%,rgba(226,207,251,.42),transparent 30%),
+    radial-gradient(ellipse at 80% 22%,rgba(198,228,252,.36),transparent 28%),
+    radial-gradient(ellipse at 18% 69%,rgba(203,241,229,.29),transparent 31%),
+    radial-gradient(ellipse at 82% 78%,rgba(249,209,231,.25),transparent 28%)!important;
+  filter:blur(18px);
+  animation:astroAuroraDrift 14s ease-in-out infinite;
+  will-change:transform,opacity;
+}
+.app-shell.celestial-motion-on::after {
+  z-index:0!important;
+  animation:astroHaloBreath 7.2s ease-in-out infinite;
+  transform-origin:center;
+}
+.celestial-motion-on .page-content,
+.celestial-motion-on .bottom-nav { position:relative; z-index:1; }
+
+/* Hero now visibly moves instead of behaving like a static illustration. */
+.celestial-motion-on .hero-card {
+  animation:astroSectionRise .62s cubic-bezier(.16,1,.3,1) both;
+}
+.celestial-motion-on .hero-card::after {
+  animation:astroHaloBreath 5.6s ease-in-out infinite;
+  transform-origin:center;
+}
+.celestial-motion-on .hero-orbit-a {
+  animation:astroOrbitA 16s linear infinite;
+  transform-origin:center;
+  will-change:transform;
+}
+.celestial-motion-on .hero-orbit-b {
+  animation:astroOrbitB 19s linear infinite;
+  transform-origin:center;
+  will-change:transform;
+}
+.celestial-motion-on .hero-star {
+  animation:astroStarPulse 2.8s ease-in-out infinite!important;
+}
+.celestial-motion-on .hero-star-b { animation-delay:1.05s!important; }
+.celestial-motion-on .hero-sigil {
+  animation:astroSigilFloat 4.4s ease-in-out infinite;
+  will-change:transform;
+}
+
+/* Home screen entrance rhythm. */
+.celestial-motion-on .profile-card { animation:astroSectionRise .48s .07s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .date-card { animation:astroSectionRise .48s .13s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .period-fortune-section { animation:astroSectionRise .48s .19s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tools-section { animation:astroSectionRise .52s .25s cubic-bezier(.16,1,.3,1) both; }
+
+.celestial-motion-on .tool-card { overflow:hidden; }
+.celestial-motion-on .tool-card:nth-child(1) { animation:astroCardStagger .5s .28s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tool-card:nth-child(2) { animation:astroCardStagger .5s .34s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tool-card:nth-child(3) { animation:astroCardStagger .5s .40s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tool-card:nth-child(4) { animation:astroCardStagger .5s .46s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tool-card:nth-child(5) { animation:astroCardStagger .5s .52s cubic-bezier(.16,1,.3,1) both; }
+.celestial-motion-on .tool-card .tool-icon { animation:astroIconFloat 3.8s ease-in-out infinite; }
+.celestial-motion-on .tool-card:nth-child(2) .tool-icon { animation-delay:.35s; }
+.celestial-motion-on .tool-card:nth-child(3) .tool-icon { animation-delay:.7s; }
+.celestial-motion-on .tool-card:nth-child(4) .tool-icon { animation-delay:1.05s; }
+.celestial-motion-on .tool-card:nth-child(5) .tool-icon { animation-delay:1.4s; }
+
+/* Full-card moonlight streak. Runs once on entry, then periodically only on selected cards. */
+.celestial-motion-on .tool-card::after {
+  left:-62%!important;
+  right:auto!important;
+  top:-16%!important;
+  width:34%!important;
+  height:132%!important;
+  z-index:3!important;
+  border-radius:50%!important;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),rgba(224,218,249,.48),transparent)!important;
+  filter:blur(3px);
+  opacity:0;
+  transform:translateX(-180%) skewX(-18deg);
+  pointer-events:none;
+  animation:astroGleam 1.45s .72s ease-out 1;
+}
+.celestial-motion-on .tool-card.is-selected {
+  animation:astroSelectedBreath 2.7s ease-in-out infinite;
+  border-color:rgba(171,157,205,.58)!important;
+  box-shadow:0 17px 36px rgba(107,92,137,.15),0 0 28px rgba(202,190,239,.22),inset 0 1px 0 rgba(255,255,255,.95)!important;
+}
+.celestial-motion-on .tool-card.is-selected::after {
+  animation:astroGleam 4.5s .25s ease-in-out infinite;
+}
+
+/* Period selection feels like a state change, not a color swap. */
+.celestial-motion-on .period-button.is-active {
+  animation:astroSelectedBreath 2.5s ease-in-out infinite!important;
+}
+.celestial-motion-on .period-button.is-active svg {
+  animation:astroIconFloat 2.6s ease-in-out infinite;
+}
+.celestial-motion-on .period-step-button:active,
+.celestial-motion-on .period-button:active,
+.celestial-motion-on .tool-card:active,
+.celestial-motion-on .profile-card:active,
+.celestial-motion-on .primary-button:active {
+  transform:scale(.955)!important;
+  transition-duration:.08s!important;
+}
+
+/* Result surfaces: visible staged reveal similar to LUNEA card reveals. */
+.celestial-motion-on .period-ai-card,
+.celestial-motion-on .ai-interpret-card,
+.celestial-motion-on .relationship-reading-card,
+.celestial-motion-on .relationship-ai-card,
+.celestial-motion-on .results-wrap>.result-card,
+.celestial-motion-on .tool-panel {
+  animation:astroResultReveal .58s cubic-bezier(.16,1,.3,1) both!important;
+}
+
+.celestial-motion-on .period-ai-orb,
+.celestial-motion-on .ai-orb {
+  animation:astroOrbTurn 5.4s ease-in-out infinite;
+  will-change:transform;
+}
+.celestial-motion-on .period-ai-head,
+.celestial-motion-on .ai-interpret-head,
+.celestial-motion-on .ai-overall-block,
+.celestial-motion-on .period-ai-overall-brief {
+  animation:astroSectionRise .48s .05s cubic-bezier(.16,1,.3,1) both;
+}
+
+.celestial-motion-on .period-ai-quick-date,
+.celestial-motion-on .ai-quick-date {
+  animation:astroDateReveal .46s cubic-bezier(.16,1,.3,1) both;
+}
+.celestial-motion-on .period-ai-quick-date:nth-child(1),
+.celestial-motion-on .ai-quick-date:nth-child(1) { animation-delay:.12s; }
+.celestial-motion-on .period-ai-quick-date:nth-child(2),
+.celestial-motion-on .ai-quick-date:nth-child(2) { animation-delay:.20s; }
+.celestial-motion-on .period-ai-quick-date:nth-child(3),
+.celestial-motion-on .ai-quick-date:nth-child(3) { animation-delay:.28s; }
+
+.celestial-motion-on .period-ai-actions>article,
+.celestial-motion-on .ai-decision-list>article {
+  animation:astroActionReveal .46s cubic-bezier(.16,1,.3,1) both;
+}
+.celestial-motion-on .period-ai-actions>article:nth-child(1),
+.celestial-motion-on .ai-decision-list>article:nth-child(1) { animation-delay:.18s; }
+.celestial-motion-on .period-ai-actions>article:nth-child(2),
+.celestial-motion-on .ai-decision-list>article:nth-child(2) { animation-delay:.25s; }
+.celestial-motion-on .period-ai-actions>article:nth-child(3),
+.celestial-motion-on .ai-decision-list>article:nth-child(3) { animation-delay:.32s; }
+.celestial-motion-on .period-ai-actions>article:nth-child(4),
+.celestial-motion-on .ai-decision-list>article:nth-child(4) { animation-delay:.39s; }
+
+.celestial-motion-on .period-ai-window,
+.celestial-motion-on .ai-key-window,
+.celestial-motion-on .ai-year-phase-list>article,
+.celestial-motion-on .ai-cross-check-list>article {
+  animation:astroCardStagger .5s cubic-bezier(.16,1,.3,1) both;
+}
+.celestial-motion-on .period-ai-window:nth-child(1),
+.celestial-motion-on .ai-key-window:nth-child(1) { animation-delay:.16s; }
+.celestial-motion-on .period-ai-window:nth-child(2),
+.celestial-motion-on .ai-key-window:nth-child(2) { animation-delay:.22s; }
+.celestial-motion-on .period-ai-window:nth-child(3),
+.celestial-motion-on .ai-key-window:nth-child(3) { animation-delay:.28s; }
+.celestial-motion-on .period-ai-window:nth-child(4),
+.celestial-motion-on .ai-key-window:nth-child(4) { animation-delay:.34s; }
+.celestial-motion-on .period-ai-window:nth-child(5),
+.celestial-motion-on .ai-key-window:nth-child(5) { animation-delay:.40s; }
+.celestial-motion-on .period-ai-window:nth-child(6),
+.celestial-motion-on .ai-key-window:nth-child(6) { animation-delay:.46s; }
+
+/* Loading has a moving light band so the screen visibly feels alive. */
+.celestial-motion-on .period-ai-card.is-loading,
+.celestial-motion-on .ai-interpret-card.is-loading {
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+}
+.celestial-motion-on .period-ai-card.is-loading::after,
+.celestial-motion-on .ai-interpret-card.is-loading::after {
+  content:'';
+  position:absolute;
+  z-index:-1;
+  top:-20%;
+  left:-38%;
+  width:34%;
+  height:140%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),rgba(220,211,250,.32),transparent);
+  filter:blur(5px);
+  transform:translateX(-150%);
+  animation:astroLoadingScan 2.25s ease-in-out infinite;
+  pointer-events:none;
+}
+.celestial-motion-on .period-ai-card.is-loading .spin,
+.celestial-motion-on .ai-interpret-card.is-loading .spin {
+  filter:drop-shadow(0 0 8px rgba(159,133,199,.30));
+}
+
+/* Successful validation/fallback badges gently breathe once content arrives. */
+.celestial-motion-on .period-ai-validation.is-passed,
+.celestial-motion-on .ai-validation-badge.is-passed,
+.celestial-motion-on .period-ai-quality-fallback,
+.celestial-motion-on .ai-quality-fallback {
+  animation:astroBadgePulse 3.6s ease-in-out infinite;
+}
+
+/* Details open with a more noticeable sheet-like reveal. */
+.celestial-motion-on details[open]>*:not(summary) {
+  animation:astroSectionRise .34s cubic-bezier(.16,1,.3,1) both!important;
+  transform-origin:top center;
+}
+
+/* Bottom navigation: active icon floats, matching LUNEA's tactile controls. */
+.celestial-motion-on .nav-item.is-active svg {
+  animation:astroNavLift 2.5s ease-in-out infinite;
+  filter:drop-shadow(0 0 6px rgba(177,157,216,.28));
+}
+.celestial-motion-on .nav-item {
+  transition:transform .16s ease,color .2s ease,background .2s ease,filter .2s ease!important;
+}
+.celestial-motion-on .nav-item:active { transform:scale(.92)!important; }
+
+@media (max-width:430px) {
+  .app-shell.celestial-motion-on::before { filter:blur(15px); opacity:.46!important; }
+  .celestial-motion-on .hero-sigil { animation-duration:4.8s; }
+  .celestial-motion-on .tool-card.is-selected { animation-duration:3s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.celestial-motion-on::before,
+  .app-shell.celestial-motion-on::after,
+  .celestial-motion-on .hero-card,
+  .celestial-motion-on .hero-card::after,
+  .celestial-motion-on .hero-orbit-a,
+  .celestial-motion-on .hero-orbit-b,
+  .celestial-motion-on .hero-star,
+  .celestial-motion-on .hero-sigil,
+  .celestial-motion-on .profile-card,
+  .celestial-motion-on .date-card,
+  .celestial-motion-on .period-fortune-section,
+  .celestial-motion-on .tools-section,
+  .celestial-motion-on .tool-card,
+  .celestial-motion-on .tool-card::after,
+  .celestial-motion-on .tool-card .tool-icon,
+  .celestial-motion-on .period-button.is-active,
+  .celestial-motion-on .period-button.is-active svg,
+  .celestial-motion-on .period-ai-card,
+  .celestial-motion-on .ai-interpret-card,
+  .celestial-motion-on .relationship-reading-card,
+  .celestial-motion-on .relationship-ai-card,
+  .celestial-motion-on .results-wrap>.result-card,
+  .celestial-motion-on .tool-panel,
+  .celestial-motion-on .period-ai-orb,
+  .celestial-motion-on .ai-orb,
+  .celestial-motion-on .period-ai-head,
+  .celestial-motion-on .ai-interpret-head,
+  .celestial-motion-on .ai-overall-block,
+  .celestial-motion-on .period-ai-overall-brief,
+  .celestial-motion-on .period-ai-quick-date,
+  .celestial-motion-on .ai-quick-date,
+  .celestial-motion-on .period-ai-actions>article,
+  .celestial-motion-on .ai-decision-list>article,
+  .celestial-motion-on .period-ai-window,
+  .celestial-motion-on .ai-key-window,
+  .celestial-motion-on .ai-year-phase-list>article,
+  .celestial-motion-on .ai-cross-check-list>article,
+  .celestial-motion-on .period-ai-card.is-loading::after,
+  .celestial-motion-on .ai-interpret-card.is-loading::after,
+  .celestial-motion-on .period-ai-validation.is-passed,
+  .celestial-motion-on .ai-validation-badge.is-passed,
+  .celestial-motion-on .period-ai-quality-fallback,
+  .celestial-motion-on .ai-quality-fallback,
+  .celestial-motion-on details[open]>*:not(summary),
+  .celestial-motion-on .nav-item.is-active svg {
+    animation:none!important;
+  }
+  .celestial-motion-on * { scroll-behavior:auto!important; }
+}
