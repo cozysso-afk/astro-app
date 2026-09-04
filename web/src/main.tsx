@@ -22,6 +22,7 @@ import './period-ai-v18.css'
 import './ux-readability-v22.css'
 import './celestial-motion-v23.css'
 import './visual-hierarchy-v24.css'
+import './app-chrome-v25.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
