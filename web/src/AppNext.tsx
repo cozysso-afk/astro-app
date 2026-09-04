@@ -41,6 +41,7 @@ import type {
 import { AiInterpretationPanel } from './AiInterpretationPanel'
 import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
+import { PersonalMarriagePanel, type PersonalMarriageResponse } from './PersonalMarriagePanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
@@ -61,6 +62,7 @@ import { aspectText, planetLabels, integratedPromptText, integratedResultText, r
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
+const FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
@@ -340,6 +342,10 @@ export default function AppNext() {
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
   const [marriageMode, setMarriageMode] = useState<MarriageMode>('unmarried')
+  const [marriageScope, setMarriageScope] = useState<'personal'|'partner'>('personal')
+  const [personalMarriage, setPersonalMarriage] = useState<PersonalMarriageResponse | null>(null)
+  const [personalMarriageLoading, setPersonalMarriageLoading] = useState(false)
+  const [personalMarriageError, setPersonalMarriageError] = useState('')
   const [relationshipDays, setRelationshipDays] = useState(365)
   const [relationshipCalendarYear, setRelationshipCalendarYear] = useState<number | null>(null)
   const [reunionTiming, setReunionTiming] = useState<ReunionTimingContext | null>(null)
@@ -359,6 +365,7 @@ export default function AppNext() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const aiPollRef = useRef<string | null>(null)
+  const [aiActiveJobId, setAiActiveJobId] = useState<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
   const [aiCacheSource, setAiCacheSource] = useState<'local'|'server'|'fresh'|''>('')
@@ -405,7 +412,7 @@ export default function AppNext() {
   ;(async () => {
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', { body: { action: 'meta' } })
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action: 'meta' } })
       if (error) throw error
       if (!cancelled) setAiConfigured(Boolean(data?.configured))
     } catch {
@@ -521,6 +528,8 @@ export default function AppNext() {
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
   const relationshipDayCount = Math.round((new Date(`${relationshipEndDate}T12:00:00Z`).getTime()-new Date(`${relationshipStartDate}T12:00:00Z`).getTime())/86400000)+1
   const relationshipPeriodKey: PeriodKey = relationshipCalendarYear || clampedRelationshipDays >= 365 ? 'year' : clampedRelationshipDays >= 28 ? 'month' : 'week'
+  const isPersonalMarriage = selectedTool === 'marriage' && marriageMode === 'unmarried' && marriageScope === 'personal'
+  const needsCounterpart = selectedTool === 'compatibility' || (selectedTool === 'marriage' && !isPersonalMarriage)
   const integratedMatchesSelection = Boolean(
     integratedResult &&
     integratedResult.period.start === integratedStartDate &&
@@ -543,6 +552,7 @@ export default function AppNext() {
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
   const selectHomePeriod = (nextPeriod: PeriodKey, clearTool: boolean) => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
     setPeriod(nextPeriod)
     if (clearTool) setSelectedTool(null)
     setIntegratedCalendarYear(null)
@@ -550,6 +560,7 @@ export default function AppNext() {
     setIntegratedProgress(null)
   }
   const selectHomeTool = (tool: ToolKey) => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
     setSelectedTool(tool)
     if (tool === 'compatibility' || tool === 'marriage') {
       setRelationshipDays(365)
@@ -589,12 +600,13 @@ export default function AppNext() {
   const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = PERIOD_CACHE_TTL_DAYS.today, requestForArchive?: Record<string, unknown>) => {
     if (!jobId || aiPollRef.current === jobId) return
     aiPollRef.current = jobId
+    setAiActiveJobId(jobId)
     setAiLoading(true); setAiError('')
     try {
       await ensureSupabaseSession()
       for (let attempt = 0; attempt < 180; attempt++) {
         if (document.visibilityState === 'hidden') return
-        const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', {
+        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
           body: { action: 'status', job_id: jobId },
         })
         if (error) throw error
@@ -624,13 +636,17 @@ export default function AppNext() {
             }
           }
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+          setAiActiveJobId(null)
           setAiConfigured(true)
           aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
-          throw new Error(data?.error || 'AI 해설 서버 작업이 실패했어.')
+          setAiActiveJobId(null)
+          const failedPayload: AiInterpretationResponse = { ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:data?.error || 'AI 해설 서버 작업이 실패했어.' }
+          setAiInterpretation(failedPayload)
+          throw new Error(failedPayload.error)
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
       }
@@ -653,8 +669,10 @@ export default function AppNext() {
     if (!saved) {
       removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      setAiActiveJobId(null)
       return
     }
+    setAiActiveJobId(saved.jobId)
     void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
@@ -673,6 +691,7 @@ export default function AppNext() {
         setAiInterpretation(annotated)
         setAiCacheSource('local')
         setAiLoading(false)
+        setAiActiveJobId(null)
         if (selectedTool === null) {
           const archiveRequest = {...requestForCache, archive_mode:'period_fortune_v16'}
           void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForCache)}`)
@@ -682,7 +701,7 @@ export default function AppNext() {
       setAiInterpretation(null)
       setAiCacheSource('')
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('fortune-interpret-v6-preview', {
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
         body: { action: 'start', calculation, model: aiModel },
       })
       if (error) throw error
@@ -691,6 +710,7 @@ export default function AppNext() {
         throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
+      setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
       void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
@@ -701,6 +721,7 @@ export default function AppNext() {
     } catch (error) {
       removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       setAiLoading(false)
+      setAiActiveJobId(null)
       aiRequestRef.current = ''
       const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
       setAiError(message.includes('non-2xx') ? 'AI 해설 서버에서 오류가 발생했어. 설정의 AI 해설 연결 상태를 확인해줘.' : message)
@@ -735,6 +756,7 @@ export default function AppNext() {
   }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile.birthDate, birthProfile.birthTime, birthProfile.latitude, birthProfile.longitude, birthProfile.utcOffset, birthProfile.gender, birthProfile.placeKey, aiModel])
 
   const runIntegrated = async () => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) await cancelAiInterpretation(true)
     setIntegratedError(''); setIntegratedResult(null); setIntegratedRequestSnapshot(null); setAiInterpretation(null); setAiError('')
     if (!birthProfile.birthDate || !birthProfile.birthTime) {
       setIntegratedError('먼저 내정보에서 생년월일과 출생시간을 저장해줘.'); return
@@ -935,6 +957,31 @@ export default function AppNext() {
     }
   }
 
+  const runPersonalMarriage = async () => {
+    setPersonalMarriageError(''); setPersonalMarriage(null); setRelationshipResult(null); setRelationshipAi(null); setReunionTiming(null)
+    if (!birthProfile.birthDate || !birthProfile.birthTime) { setPersonalMarriageError('먼저 내정보에서 본인 생년월일과 출생시간을 저장해줘.'); return }
+    const latitude = parseOptionalNumber(birthProfile.latitude)
+    const longitude = parseOptionalNumber(birthProfile.longitude)
+    if (latitude === null || longitude === null) { setPersonalMarriageError('먼저 내정보에서 본인 출생지역까지 저장해줘. 개인 결혼운의 4·5·7·8하우스 계산에는 위치 좌표가 필요해.'); return }
+    const body = {
+      profile: {
+        name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime,
+        latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey,
+      },
+      start_date: relationshipStartDate, end_date: relationshipEndDate,
+    }
+    setPersonalMarriageLoading(true)
+    try {
+      const response = await fetch(`${API_BASE}/v1/marriage/personal`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+      const payload = await response.json().catch(()=>({}))
+      if (!response.ok || !payload?.ok) throw new Error(payload?.detail || payload?.error || '개인 결혼운 계산 요청에 실패했어.')
+      setPersonalMarriage(payload as PersonalMarriageResponse)
+    } catch (error) {
+      setPersonalMarriageError(error instanceof Error ? error.message : '개인 결혼운 계산 중 오류가 발생했어.')
+    } finally { setPersonalMarriageLoading(false) }
+  }
+
+
   const runRelationship = async () => {
     const revision = relationshipRevisionRef.current + 1
     relationshipRevisionRef.current = revision
@@ -943,6 +990,7 @@ export default function AppNext() {
     const userLatitude = parseOptionalNumber(birthProfile.latitude)
     const userLongitude = parseOptionalNumber(birthProfile.longitude)
     if (userLatitude === null || userLongitude === null) { setRelationshipError('먼저 내정보에서 본인 출생지역까지 저장해줘. 정밀 관계 계산에는 위치 좌표가 필요해.'); return }
+    if (!needsCounterpart) { setRelationshipError('상대가 없는 미혼 결혼운은 개인 결혼운 계산 경로를 사용해.'); return }
     if (!counterpart.birthDate) { setRelationshipError('상대 생년월일은 반드시 필요해.'); return }
     if (counterpart.timeKnown && !counterpart.birthTime) { setRelationshipError('상대 출생시간을 모르면 “출생시간 모름”을 체크해줘.'); return }
     const counterpartLatitude = parseOptionalNumber(counterpart.latitude)
@@ -1057,6 +1105,77 @@ export default function AppNext() {
     const ok = await copyToClipboard(text)
     setActionNotice(ok ? `${label} 완료` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
     window.setTimeout(() => setActionNotice(''), 2200)
+  }
+
+
+  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult) {
+    if (!calculation) return
+    try {
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
+      if (error) throw error
+      if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
+      const ok = await copyToClipboard(String(data.prompt))
+      const estimated = Number(data.estimated_input_tokens ?? 0)
+      setActionNotice(ok ? `AI용 압축 프롬프트 복사 완료${estimated > 0 ? ` · 예상 입력 약 ${estimated.toLocaleString()} tokens` : ''}` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
+      window.setTimeout(() => setActionNotice(''), 3200)
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
+      window.setTimeout(() => setActionNotice(''), 3200)
+    }
+  }
+
+  async function captureCanceledAiUsage(jobId: string) {
+    // The first network request may already have been sent when cancel is pressed.
+    // V21 stores its usage after that request returns; poll only for metadata, never start/retry Gemini here.
+    for (let attempt=0; attempt<14; attempt++) {
+      await new Promise((resolve)=>window.setTimeout(resolve, attempt<4 ? 1800 : 3000))
+      try {
+        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'status', job_id:jobId } })
+        if (error) continue
+        const total=Number(data?.usage?.total_tokens ?? 0)
+        if (total>0) {
+          setAiInterpretation({ ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage, error:data?.error || 'AI 해설 생성을 취소했어.' })
+          return
+        }
+      } catch {
+        // Best-effort observability only. Cancellation itself has already completed.
+      }
+    }
+  }
+
+  async function cancelAiInterpretation(silent = false) {
+    const raw = readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+    const saved = raw ? decodePendingFortuneAiJob(raw) : null
+    const jobId = aiActiveJobId || saved?.jobId || null
+    if (!jobId) {
+      if (!silent) {
+        setActionNotice('취소할 AI 해설 작업이 없어.')
+        window.setTimeout(() => setActionNotice(''), 2200)
+      }
+      return
+    }
+    try {
+      await ensureSupabaseSession()
+      const { error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'cancel', job_id:jobId } })
+      if (error) throw error
+      removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+      aiRequestRef.current = ''
+      aiPollRef.current = null
+      setAiActiveJobId(null)
+      setAiLoading(false)
+      void captureCanceledAiUsage(jobId)
+      if (!silent) {
+        setAiError('AI 해설 생성을 취소했어. 계산 결과는 그대로 사용할 수 있어.')
+        setActionNotice('AI 해설 생성 취소 완료 · 이미 전송된 1회 호출은 되돌릴 수 없지만 추가 수선 호출은 중단해.')
+        window.setTimeout(() => setActionNotice(''), 3600)
+      }
+    } catch (error) {
+      if (!silent) {
+        setActionNotice(error instanceof Error ? `AI 해설 취소 확인 실패 · ${error.message}` : 'AI 해설 취소 확인에 실패했어.')
+        window.setTimeout(() => setActionNotice(''), 3200)
+      }
+    }
   }
 
   async function saveIntegratedRecord() {
@@ -1379,14 +1498,14 @@ export default function AppNext() {
             apiStatus={apiStatus}
             apiLabel={apiLabel}
             onOpenProfile={()=>switchMainView('profile')}
-            onQueryDateChange={setQueryDate}
+            onQueryDateChange={(value)=>{ if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true); setQueryDate(value) }}
             onPeriodSelect={selectHomePeriod}
             onToolSelect={selectHomeTool}
           />
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
-            <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>setIntegratedCalendarYear(Number(e.target.value))}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
+            <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>{ if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true); setIntegratedCalendarYear(Number(e.target.value)) }}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
             <div className="calculation-range annual-calculation-range"><CalendarDays size={17}/><span>연간 분석 {integratedStartDate} ~ {integratedSelectionEnd} · {annualFortuneYear}년 전체</span></div>
             <div className="coordinate-note"><MapPin size={16}/><span>사주는 출생지 경도로 진태양시를 보정하고, 서양점성술은 출생지 좌표로 상승점·하우스를 계산해. Thai(태국점성술)는 출생요일·Mahathaksa(마하탁사)·Taksajorn(탁사쫀), 교차검증된 Suriyayat(수리야얏) 10행성 위치와 숫자 Lagna(라그나)를 계산해. 검증된 12개 하우스 연결은 맥락 설명에만 쓰고 사건·시기·확률·점수는 예측하지 않아.</span></div>
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
@@ -1394,8 +1513,13 @@ export default function AppNext() {
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>연간 통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
-              {!aiInterpretation&&!aiLoading&&!aiError&&<div className="relationship-ai-toolbar"><button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button><small>원할 때만 AI 호출 · 계산 자체는 Gemini 크레딧 0원 · 완료 후 토큰/예상비용 표시</small></div>}
-              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()} topics={topicOrder}/>
+              <div className="relationship-ai-toolbar ai-cost-guard-toolbar">
+                {!aiInterpretation&&!aiLoading&&!aiError&&<button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button>}
+                <button type="button" onClick={()=>void copyAiInterpretationPrompt(integratedResult)}><Copy size={15}/><span>AI용 압축 프롬프트 복사</span></button>
+                {aiLoading&&aiActiveJobId&&<button type="button" onClick={()=>void cancelAiInterpretation(false)}><Trash2 size={15}/><span>AI 해설 생성 취소</span></button>}
+                <small>계산 자체 Gemini 0회 · 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회 · 약 2분 제한</small>
+              </div>
+              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()} onCopyPrompt={()=>void copyAiInterpretationPrompt(integratedResult)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} topics={topicOrder}/>
               <div className="result-actions">
                 <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1471,10 +1595,12 @@ export default function AppNext() {
                 <small className="relationship-range-note">{relationshipPurpose==='reunion'?'재회는 기본 365일. 수신·발신·재접점과 두 사람 차트를 건드리는 실제 트랜짓 날짜를 이 범위 안에서 비교해.':'기본 궁합 구조는 고정이고, 여기 지정한 7~365일은 관계 시기 흐름에만 적용돼.'}</small>
               </div>
             </>}
-            {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null)}}><strong>미혼</strong><span>결혼 전 · 장기 결속과 결혼생활 적합 구조</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setRelationshipAi(null)}}><strong>기혼</strong><span>결혼 후 · 현재 결속과 갈등·회복 주기</span></button></div>}
-            {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='unmarried'?'결혼 여부 예언이 아니라, 이 관계가 결혼생활로 이어질 때의 생활궁합·책임·갈등·지속성을 깊게 봐.':'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·갈등과 회복 흐름을 봐.'}</span></div>}
+            {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>미혼</strong><span>상대 유무에 따라 개인 결혼운 또는 특정 상대 결혼궁합</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setMarriageScope('partner');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>기혼</strong><span>배우자와 현재 결속·생활·갈등·회복 주기</span></button></div>}
+            {selectedTool==='marriage'&&marriageMode==='unmarried'&&<div className="relationship-purpose-row marriage-scope-row"><button type="button" className={marriageScope==='personal'?'is-active':''} onClick={()=>{setMarriageScope('personal');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setRelationshipError('')}}><strong>상대 없음 · 개인 결혼운</strong><span>결혼 가능성 · 시기 · 미래 배우자상</span></button><button type="button" className={marriageScope==='partner'?'is-active':''} onClick={()=>{setMarriageScope('partner');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setPersonalMarriageError('')}}><strong>특정 상대 있음 · 결혼궁합</strong><span>이 사람과의 생활궁합 · 결속 · 갈등 · 친밀감</span></button></div>}
+            {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='married'?'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·공유자원·갈등과 회복 흐름을 봐.':marriageScope==='personal'?'상대가 없어도 내 차트로 결혼 가능성 지수·강한 시기·배우자 외모/성향/직업군·만남 경로를 적극적으로 봐. 0~100은 점성 엔터테인먼트 지수이고 실제 이름·주소·회사처럼 특정 신원만 만들어내지 않아.':'이 특정 상대와 결혼생활로 들어갈 때의 결속·생활·친밀감·돈/공유자원·갈등·지속성과 결혼 흐름을 깊게 봐.'}</span></div>}
             {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
+            {needsCounterpart&&<>
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
               <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
@@ -1489,11 +1615,14 @@ export default function AppNext() {
               </div></details>
             </div>
             <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
-            <div className="calculation-range"><CalendarDays size={17}/><span>관계 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
-            {relationshipError && <div className="status-banner error"><AlertTriangle size={17}/><span>{relationshipError}</span></div>}
-            <button className="primary-button" type="button" onClick={runRelationship} disabled={relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):(selectedTool==='marriage'?(marriageMode==='unmarried'?'미혼 결혼운 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산')}</span></button>
+            </>}
+            <div className="calculation-range"><CalendarDays size={17}/><span>{isPersonalMarriage?'개인 결혼운':'관계'} 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
+            {(isPersonalMarriage?personalMarriageError:relationshipError) && <div className="status-banner error"><AlertTriangle size={17}/><span>{isPersonalMarriage?personalMarriageError:relationshipError}</span></div>}
+            <button className="primary-button" type="button" onClick={isPersonalMarriage?runPersonalMarriage:runRelationship} disabled={personalMarriageLoading||relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(personalMarriageLoading||relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{personalMarriageLoading?'개인 결혼운 계산 중…':(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):isPersonalMarriage?'상대 없이 개인 결혼운 계산':selectedTool==='marriage'?(marriageMode==='unmarried'?'특정 상대와 결혼궁합 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산'}</span></button>
 
-            {relationshipResult && <div className="results-wrap">
+            {isPersonalMarriage&&personalMarriage&&<div className="results-wrap"><div className="result-headline"><CheckCircle2 size={20}/><div><strong>개인 결혼운 계산 완료</strong><span>{personalMarriage.period.start} ~ {personalMarriage.period.end} · {personalMarriage.period.day_count}일</span></div></div><PersonalMarriagePanel data={personalMarriage}/></div>}
+
+            {!isPersonalMarriage&&relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
               <div className="result-actions">
                 <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('요청/프롬프트 전체복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
@@ -1568,6 +1697,9 @@ export default function AppNext() {
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
               onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
+              onCopyAiPrompt={()=>void copyAiInterpretationPrompt(integratedResult)}
+              onCancelAi={()=>void cancelAiInterpretation(false)}
+              aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}
               onOutcomeChange={setOutcomeDraft}
               onSaveOutcome={()=>void saveDailyOutcome()}
             />}

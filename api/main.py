@@ -20,8 +20,9 @@ from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
+from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 
-APP_VERSION = "api-fortune-v5.2-purpose-scoped-relationship"
+APP_VERSION = "api-fortune-v5.4-personal-marriage-forecast"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -101,6 +102,12 @@ class FortuneProfile(BaseModel):
 
 
 class IntegratedFortuneRequest(BaseModel):
+    profile: FortuneProfile
+    start_date: date
+    end_date: date
+
+
+class PersonalMarriageRequest(BaseModel):
     profile: FortuneProfile
     start_date: date
     end_date: date
@@ -213,6 +220,7 @@ def meta() -> dict:
         "relationship_engine": REL_ENGINE_VERSION,
         "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "location_engine": LOCATION_ENGINE_VERSION,
+        "personal_marriage_engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
         "calculation_engine_connected": True,
         "ai_interpretation": ai_status(),
         "routes": [
@@ -220,6 +228,7 @@ def meta() -> dict:
             "fortune/integrated",
             "fortune/interpret",
             "location/fit",
+            "marriage/personal",
         ],
     }
 
@@ -281,6 +290,39 @@ def location_fit(request: LocationFitRequest) -> dict:
         "engine": LOCATION_ENGINE_VERSION,
         **result,
     }
+
+@app.post("/v1/marriage/personal")
+def personal_marriage(request: PersonalMarriageRequest) -> dict:
+    profile = request.profile
+    try:
+        result = build_personal_marriage(
+            birth_date=profile.birth_date,
+            birth_time=profile.birth_time,
+            latitude=profile.latitude,
+            longitude=profile.longitude,
+            utc_offset_hours=profile.utc_offset_hours,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"personal marriage calculation failed: {exc}") from exc
+    return {
+        "ok": True,
+        "api_version": APP_VERSION,
+        "engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
+        "period": result["period"],
+        "result": result,
+        "interpretation_policy": {
+            "counterpart_required": False,
+            "probability_style_forecast": True,
+            "spouse_archetype": True,
+            "specific_identity_claims": False,
+            "mode": "상대가 없는 미혼 개인 결혼운 · 결혼 가능성 지수/시기/배우자상/직업군/만남 경로를 점성 엔터테인먼트 해석으로 제공",
+        },
+    }
+
 
 @app.post("/v1/relationship/western")
 def relationship_western(request: RelationshipRequest) -> dict:
