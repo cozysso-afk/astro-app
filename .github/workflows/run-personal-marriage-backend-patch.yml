@@ -23,7 +23,9 @@ jobs:
       - name: Apply API patch
         run: python scripts/patch_personal_marriage_backend.py
       - name: Install calculation dependencies
-        run: python -m pip install -r api/requirements.txt
+        run: |
+          python -m pip install -r api/requirements.txt
+          python -m pip install pytest
       - name: Verify personal marriage calculation and API syntax
         run: |
           python -m py_compile personal_marriage_v1.py api/main.py
