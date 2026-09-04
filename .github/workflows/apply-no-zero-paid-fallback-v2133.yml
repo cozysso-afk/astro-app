@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Apply no-zero fallback patch
-        run: python scripts/apply_no_zero_paid_fallback_v2133.py
+        run: |
+          python scripts/apply_no_zero_paid_fallback_v2133.py
+          python scripts/fix_no_zero_paid_fallback_v2133.py
       - name: Run interpretation regression
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
