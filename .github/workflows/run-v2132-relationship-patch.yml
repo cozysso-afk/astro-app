@@ -19,6 +19,21 @@ jobs:
           fetch-depth: 0
       - name: Apply patch
         run: python scripts/patch_v2132_relationship.py
+      - name: Correct UI source assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/lib/interpretationUiContract.test.mjs')
+          s=p.read_text()
+          old="  assert.equal((annual.match(/data\\.contact_flow\\.incoming/g) || []).length, 1)"
+          new="  assert.equal((annual.match(/className=\"ai-relationship-section\"/g) || []).length, 1)\n  assert.equal((annual.match(/className=\"ai-direction-grid ai-relationship-direction\"/g) || []).length, 1)"
+          if old not in s: raise SystemExit('annual relationship assertion not found')
+          s=s.replace(old,new,1)
+          old="  assert.equal((period.match(/data\\.contact_flow\\.incoming/g) || []).length, 1)"
+          new="  assert.equal((period.match(/period-ai-relationship-section/g) || []).length, 1)\n  assert.equal((period.match(/period-ai-relationship-directions/g) || []).length, 1)"
+          if old not in s: raise SystemExit('period relationship assertion not found')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Verify
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
