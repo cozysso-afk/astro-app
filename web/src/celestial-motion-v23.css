@@ -109,8 +109,8 @@
   animation:astroHaloBreath 7.2s ease-in-out infinite;
   transform-origin:center;
 }
-.celestial-motion-on .page-content,
-.celestial-motion-on .bottom-nav { position:relative; z-index:1; }
+.celestial-motion-on .page-content { position:relative; z-index:1; }
+.celestial-motion-on .bottom-nav { z-index:50; }
 
 /* Hero now visibly moves instead of behaving like a static illustration. */
 .celestial-motion-on .hero-card {
