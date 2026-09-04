@@ -1,0 +1,192 @@
+/* v26 · screenshot-driven mobile polish
+   Fixes the annual AI loading state that remained oversized and makes motion perceptible.
+   Loaded last so it can safely override legacy readability layers without rewriting them. */
+
+/* Annual cost-guard controls: two compact actions instead of two oversized full-width bars. */
+.ai-cost-guard-toolbar {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin: 12px 0 10px !important;
+}
+.ai-cost-guard-toolbar > button {
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+  font-size: .82rem !important;
+  line-height: 1.25 !important;
+  font-weight: 820 !important;
+}
+.ai-cost-guard-toolbar > button svg { width: 16px !important; height: 16px !important; }
+
+/* The screenshot showed legacy v4 overrides forcing 1.2rem/1rem in this exact state. */
+.ai-interpret-card.is-loading,
+.period-ai-card.is-loading {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  align-items: flex-start !important;
+  gap: 11px !important;
+  padding: 18px 16px !important;
+  border-radius: 22px !important;
+}
+.ai-interpret-card.is-loading > *,
+.period-ai-card.is-loading > * {
+  position: relative;
+  z-index: 2;
+}
+.ai-interpret-card.is-loading > svg,
+.period-ai-card.is-loading > svg {
+  width: 27px !important;
+  height: 27px !important;
+  margin-top: 3px !important;
+  color: #8065a0 !important;
+  filter: drop-shadow(0 0 7px rgba(151, 119, 194, .28));
+}
+.ai-interpret-card.is-loading .eyebrow,
+.period-ai-card.is-loading .period-ai-kicker {
+  display: block !important;
+  margin: 0 0 5px !important;
+  font-size: .72rem !important;
+  line-height: 1.25 !important;
+  letter-spacing: .055em !important;
+  color: #8b6c79 !important;
+}
+.ai-interpret-card.is-loading strong,
+.period-ai-card.is-loading h3 {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 1.02rem !important;
+  line-height: 1.42 !important;
+  letter-spacing: -.025em !important;
+  color: #44384d !important;
+}
+.ai-interpret-card.is-loading p,
+.period-ai-card.is-loading .period-ai-summary {
+  margin: 8px 0 0 !important;
+  font-size: .84rem !important;
+  line-height: 1.62 !important;
+  color: #756c79 !important;
+}
+.ai-interpret-card.is-loading .ai-v21-controls,
+.period-ai-card.is-loading .period-ai-v21-controls {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+  margin-top: 11px !important;
+}
+.ai-interpret-card.is-loading .ai-v21-controls button,
+.period-ai-card.is-loading .period-ai-v21-controls button {
+  min-height: 38px !important;
+  padding: 7px 10px !important;
+  border-radius: 12px !important;
+  font-size: .78rem !important;
+  line-height: 1.2 !important;
+}
+
+/* Existing v23 scan sat at z-index:-1, behind an opaque card background. Put it visibly over the card. */
+.celestial-motion-on .ai-interpret-card.is-loading::after,
+.celestial-motion-on .period-ai-card.is-loading::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 1 !important;
+  top: -28% !important;
+  bottom: -28% !important;
+  left: -46% !important;
+  width: 34% !important;
+  height: auto !important;
+  border-radius: 42% !important;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,.08) 18%,
+    rgba(255,255,255,.72) 47%,
+    rgba(213,226,255,.34) 62%,
+    rgba(224,207,247,.28) 74%,
+    transparent 100%
+  ) !important;
+  filter: blur(5px) !important;
+  opacity: .82 !important;
+  pointer-events: none !important;
+  animation: v26LoadingSweep 2.35s cubic-bezier(.4,0,.2,1) infinite !important;
+}
+.celestial-motion-on .ai-interpret-card.is-loading,
+.celestial-motion-on .period-ai-card.is-loading {
+  box-shadow:
+    0 20px 48px rgba(89,72,118,.15),
+    0 0 0 1px rgba(255,255,255,.82) inset,
+    0 0 26px rgba(196,177,232,.18) !important;
+  animation: v26LoadingBreath 2.7s ease-in-out infinite !important;
+}
+.celestial-motion-on .ai-interpret-card.is-loading > svg,
+.celestial-motion-on .period-ai-card.is-loading > svg {
+  animation: v26LoaderSpin 1.05s linear infinite !important;
+}
+
+/* Make active navigation unmistakable while keeping the fixed dock stable. */
+.celestial-motion-on .nav-item.is-active .nav-icon-shell {
+  animation: v26NavPulse 2.15s ease-in-out infinite !important;
+}
+.celestial-motion-on .nav-item.is-active::after {
+  animation: v26NavDot 1.8s ease-in-out infinite !important;
+}
+
+@keyframes v26LoadingSweep {
+  0% { transform: translate3d(-30%,0,0) skewX(-16deg); opacity: 0; }
+  14% { opacity: .58; }
+  58% { opacity: .9; }
+  100% { transform: translate3d(520%,0,0) skewX(-16deg); opacity: 0; }
+}
+@keyframes v26LoadingBreath {
+  0%,100% { border-color: rgba(166,151,196,.30); filter: saturate(1); }
+  50% { border-color: rgba(151,128,193,.52); filter: saturate(1.08); }
+}
+@keyframes v26LoaderSpin {
+  0% { transform: rotate(0deg) scale(.94); filter: drop-shadow(0 0 4px rgba(151,119,194,.18)); }
+  50% { transform: rotate(180deg) scale(1.08); filter: drop-shadow(0 0 11px rgba(151,119,194,.48)); }
+  100% { transform: rotate(360deg) scale(.94); filter: drop-shadow(0 0 4px rgba(151,119,194,.18)); }
+}
+@keyframes v26NavPulse {
+  0%,100% { transform: translateY(-2px) scale(1.04); box-shadow: inset 0 1px rgba(255,255,255,.95), 0 7px 18px rgba(101,88,133,.16), 0 0 15px rgba(199,184,235,.24); }
+  50% { transform: translateY(-5px) scale(1.11); box-shadow: inset 0 1px rgba(255,255,255,.98), 0 11px 24px rgba(101,88,133,.24), 0 0 27px rgba(199,184,235,.52); }
+}
+@keyframes v26NavDot {
+  0%,100% { width: 13px; opacity: .55; }
+  50% { width: 24px; opacity: 1; }
+}
+
+@media (max-width: 430px) {
+  .ai-interpret-card.is-loading,
+  .period-ai-card.is-loading {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    gap: 10px !important;
+    padding: 16px 14px !important;
+  }
+  .ai-interpret-card.is-loading > svg,
+  .period-ai-card.is-loading > svg { width: 25px !important; height: 25px !important; }
+  .ai-interpret-card.is-loading strong,
+  .period-ai-card.is-loading h3 { font-size: .98rem !important; line-height: 1.4 !important; }
+  .ai-interpret-card.is-loading p,
+  .period-ai-card.is-loading .period-ai-summary { font-size: .82rem !important; line-height: 1.58 !important; }
+  .ai-cost-guard-toolbar > button { min-height: 42px !important; font-size: .79rem !important; }
+}
+
+@media (max-width: 355px) {
+  .ai-cost-guard-toolbar { grid-template-columns: 1fr !important; }
+}
+
+/* Accessibility contract: system Reduce Motion still wins. */
+@media (prefers-reduced-motion: reduce) {
+  .celestial-motion-on .ai-interpret-card.is-loading,
+  .celestial-motion-on .period-ai-card.is-loading,
+  .celestial-motion-on .ai-interpret-card.is-loading::after,
+  .celestial-motion-on .period-ai-card.is-loading::after,
+  .celestial-motion-on .ai-interpret-card.is-loading > svg,
+  .celestial-motion-on .period-ai-card.is-loading > svg,
+  .celestial-motion-on .nav-item.is-active .nav-icon-shell,
+  .celestial-motion-on .nav-item.is-active::after {
+    animation: none !important;
+  }
+}
