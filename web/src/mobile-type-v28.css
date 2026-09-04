@@ -1,0 +1,211 @@
+/* V28 · Korean typography + reading density
+ * Screenshot-driven correction for Korean spacing, hierarchy and long AI blocks.
+ */
+
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body,.app-shell,.page-content{letter-spacing:0!important}
+
+/* Korean headings: stop squeezing syllables. */
+h1,h2,h3,h4,
+.tool-panel-heading h2,.period-report-heading h2,
+.ai-interpret-head h3,.period-ai-head h3,
+.result-card-title>strong,.ai-section-heading>strong,.period-ai-section-title>strong{
+  letter-spacing:-.01em!important;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.eyebrow,.section-label,.result-card-title>span,.period-ai-kicker,.ai-section-kicker,
+.period-ai-section-title>span,.ai-section-heading>span{
+  letter-spacing:0!important;
+  font-size:12px!important;
+  line-height:1.35!important;
+  font-weight:700!important;
+}
+
+/* App / period header. */
+.tool-panel-heading h2,.period-report-heading h2{
+  font-size:24px!important;
+  line-height:1.28!important;
+  font-weight:750!important;
+}
+.period-report-kicker-row{gap:7px!important;margin-bottom:5px!important}
+.period-report-badge{font-size:12px!important;font-weight:700!important;padding:3px 8px!important}
+.period-report-range,.period-report-range strong{font-size:13px!important;line-height:1.45!important;letter-spacing:0!important}
+.period-report-copy>p,.tool-panel-heading p,.coordinate-note span,.result-note{
+  font-size:14px!important;
+  line-height:1.65!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+}
+
+/* AI hero: no billboard-size Korean. */
+.ai-interpret-head h3,.period-ai-head h3{
+  font-size:18px!important;
+  line-height:1.48!important;
+  font-weight:750!important;
+}
+.ai-interpret-head small{font-size:12.5px!important;line-height:1.5!important;letter-spacing:0!important}
+.ai-section-heading>strong,.period-ai-section-title>strong{
+  font-size:18px!important;
+  line-height:1.42!important;
+  font-weight:750!important;
+}
+
+.ai-overall-brief,.period-ai-overall-brief{padding:12px!important;border-radius:14px!important}
+.ai-overall-brief>p,.period-ai-overall-brief>p{
+  font-size:15px!important;
+  line-height:1.65!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+}
+.ai-overall-brief>p>b,.period-ai-overall-brief>p>b{
+  font-size:12.5px!important;
+  line-height:1.4!important;
+  letter-spacing:0!important;
+}
+.ai-overall-brief>p>span,.period-ai-overall-brief>p>strong{
+  font-size:15px!important;
+  line-height:1.65!important;
+  font-weight:650!important;
+  letter-spacing:0!important;
+}
+
+/* Quick dates. */
+.ai-quick-date,.period-ai-quick-date{
+  grid-template-columns:100px minmax(0,1fr) auto!important;
+  gap:9px!important;
+  padding:11px 12px!important;
+  border-left-width:1px!important;
+  border-radius:14px!important;
+}
+.ai-quick-date>b,.period-ai-quick-date>b{
+  font-size:14px!important;
+  letter-spacing:0!important;
+}
+.ai-quick-date>span>strong,.period-ai-quick-date>div>strong{
+  font-size:15px!important;
+  line-height:1.45!important;
+  letter-spacing:-.005em!important;
+  word-break:keep-all;
+}
+.ai-quick-date>span>small,.period-ai-quick-date>div>small{
+  font-size:12px!important;
+  line-height:1.4!important;
+  letter-spacing:0!important;
+}
+.ai-quick-date>em,.period-ai-quick-date>span{font-size:11.5px!important;letter-spacing:0!important}
+
+/* Action cards. */
+.ai-decision-list article,.period-ai-actions>article{
+  padding:12px!important;
+  border-left-width:1px!important;
+  border-radius:15px!important;
+}
+.ai-decision-list article strong,.period-ai-actions article>div>strong{
+  font-size:16px!important;
+  line-height:1.48!important;
+  letter-spacing:-.005em!important;
+  word-break:keep-all;
+}
+.ai-decision-list article p,.period-ai-actions article>div>p,
+.ai-decision-condition,.period-ai-condition,
+.ai-decision-more,.period-ai-action-more{
+  font-size:14.5px!important;
+  line-height:1.68!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+}
+.period-ai-action-time,.ai-decision-list article>div>b{
+  font-size:13px!important;
+  line-height:1.35!important;
+  letter-spacing:0!important;
+}
+
+/* Detailed windows. */
+.ai-key-window,.period-ai-window{
+  padding:13px!important;
+  border-left-width:1px!important;
+  border-radius:15px!important;
+}
+.ai-window-date,.period-ai-window-head>div>b{font-size:14px!important;letter-spacing:0!important}
+.ai-key-window-top>div>strong,.period-ai-window-head>div>strong{
+  font-size:16px!important;
+  line-height:1.48!important;
+  letter-spacing:-.005em!important;
+  word-break:keep-all;
+}
+.ai-key-window>p,.period-ai-window>p,.period-ai-window-line,
+.ai-window-action,.ai-window-avoid{
+  font-size:15px!important;
+  line-height:1.72!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+}
+.ai-window-topics span,.period-ai-window-topics>span{font-size:12px!important;letter-spacing:0!important}
+
+/* Relationship: summaries first, long explanation only on demand. */
+.ai-direction-grid,.period-ai-relationship-directions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+.ai-direction-item,.period-ai-direction-item{
+  border:1px solid rgba(104,91,119,.12);
+  border-radius:13px;
+  background:#fbfafc;
+  overflow:hidden;
+}
+.ai-direction-item>summary,.period-ai-direction-item>summary{
+  list-style:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+  cursor:pointer;
+}
+.ai-direction-item>summary::-webkit-details-marker,.period-ai-direction-item>summary::-webkit-details-marker{display:none}
+.ai-direction-item>summary strong,.period-ai-direction-item>summary strong{
+  font-size:14px!important;
+  line-height:1.4!important;
+  letter-spacing:0!important;
+  color:#536b61!important;
+}
+.ai-direction-item>summary span,.period-ai-direction-item>summary span{
+  font-size:12.5px!important;
+  line-height:1.4!important;
+  color:#817987!important;
+  text-align:right;
+}
+.ai-direction-item>p,.period-ai-direction-item>p{
+  margin:0!important;
+  padding:0 12px 12px!important;
+  font-size:14.5px!important;
+  line-height:1.72!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+  color:#655f69!important;
+}
+.ai-highlight,.period-ai-relationship-summary>p,.ai-relationship-timing,.period-ai-relationship-more>p{
+  font-size:14.5px!important;
+  line-height:1.7!important;
+  letter-spacing:0!important;
+  word-break:keep-all;
+}
+
+/* Secondary content must actually look secondary. */
+.result-card-title>strong{font-size:16px!important;line-height:1.45!important;letter-spacing:-.005em!important}
+.integrated-topic>span{font-size:13px!important;letter-spacing:0!important}
+.integrated-topic>strong{font-size:25px!important;letter-spacing:-.01em!important}
+.integrated-topic>small{font-size:12px!important;letter-spacing:0!important}
+.period-date-source>summary>strong{font-size:15px!important;letter-spacing:0!important}
+.period-date-source>summary>small,.period-date-source>summary>span{font-size:12px!important;letter-spacing:0!important}
+
+/* Bottom navigation. */
+.nav-label{font-size:12px!important;letter-spacing:0!important;font-weight:650!important}
+.nav-item.is-active .nav-label{font-weight:750!important}
+
+/* Mobile: keep overview labels above text instead of squeezing into columns. */
+@media(max-width:430px){
+  .ai-overall-brief>p,.period-ai-overall-brief>p{display:block!important}
+  .ai-overall-brief>p>b,.period-ai-overall-brief>p>b{display:block;margin-bottom:4px}
+  .ai-quick-date,.period-ai-quick-date{grid-template-columns:94px minmax(0,1fr) auto!important}
+  .period-fortune-report .period-report-heading{padding:14px!important}
+}
