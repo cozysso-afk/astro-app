@@ -37,6 +37,7 @@ jobs:
           from scripts.finalize_relationship_v11_fun import finalize_runtime_and_contract
           finalize_runtime_and_contract()
           PY
+          python scripts/adjust_v11_test_contract.py
       - name: Verify personal marriage deterministic forecast
         run: |
           python -m pip install -q -r api/requirements.txt pytest
@@ -59,6 +60,7 @@ jobs:
             .github/workflows/run-full-relationship-audit-v11.yml \
             .github/workflows/run-marriage-scope-ui-patch.yml \
             .github/workflows/run-personal-marriage-backend-patch.yml \
+            scripts/adjust_v11_test_contract.py \
             scripts/finalize_relationship_v11_fun.py \
             scripts/patch_marriage_scope_ui.py \
             scripts/patch_personal_marriage_backend.py \
