@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AlertTriangle, LoaderCircle, Moon, Sparkles } from 'lucide-react'
+import { AlertTriangle, CalendarDays, LoaderCircle, Moon, Sparkles } from 'lucide-react'
 
 type PeriodFortunePanelProps = {
   title: string
@@ -14,6 +14,14 @@ type PeriodFortunePanelProps = {
   children: ReactNode
 }
 
+function periodBadge(title: string) {
+  if (title.includes('오늘')) return '오늘'
+  if (title.includes('주간')) return '주간'
+  if (title.includes('월간')) return '월간'
+  if (title.includes('연간')) return '연간'
+  return '기간'
+}
+
 export function PeriodFortunePanel({
   title,
   startDate,
@@ -26,10 +34,16 @@ export function PeriodFortunePanel({
   onCalculate,
   children,
 }: PeriodFortunePanelProps) {
-  return <section className="tool-panel period-fortune-report">
-    <div className="tool-panel-heading">
-      <span className="tool-icon tone-gold"><Moon size={22}/></span>
-      <div><span className="eyebrow">PERIOD FORTUNE</span><h2>{title}</h2><p>{startDate} → {endDate} · 선택한 기간만 따로 보는 기간 운세야.</p></div>
+  const badge = periodBadge(title)
+  return <section className={`tool-panel period-fortune-report period-fortune-${badge}`}>
+    <div className="tool-panel-heading period-report-heading">
+      <span className="tool-icon tone-gold period-report-icon"><Moon size={22}/></span>
+      <div className="period-report-copy">
+        <div className="period-report-kicker-row"><span className="eyebrow">CELESTIAL PERIOD READING</span><span className="period-report-badge">{badge}</span></div>
+        <h2>{title}</h2>
+        <div className="period-report-range"><CalendarDays size={15}/><strong>{startDate}</strong><span>→</span><strong>{endDate}</strong></div>
+        <p>선택한 기간의 흐름과 중요한 시기를 따로 읽어.</p>
+      </div>
     </div>
 
     {!ready ? <>
