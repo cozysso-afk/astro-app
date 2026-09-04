@@ -90,7 +90,10 @@ function bestTopicDate(payload:any,topic:string){
 function topicVerb(topic:string){
   if(["직장","이직"].includes(topic))return {action:"조건·일정·문서를 실제 기준과 대조해 우선순위를 정리해.",avoid:"한 번의 고점이나 저점만 보고 커리어 결론을 즉시 확정하지 마."};
   if(["학업","시험"].includes(topic))return {action:"집중력이 상대적으로 나은 구간에 핵심 과제와 점검을 먼저 배치해.",avoid:"낮은 구간의 체감만으로 전체 학습 성과를 단정하지 마."};
-  if(["대인관계","연애","연락","재회"].includes(topic))return {action:"실제 답변·약속·만남 제안처럼 관찰 가능한 반응을 확인하며 속도를 조절해.",avoid:"상대지수만 보고 상대의 속마음이나 관계 결과를 미리 확정하지 마."};
+  if(topic==="대인관계")return {action:"상대별 실제 반응과 약속 이행 여부를 구분해 관계의 우선순위를 조절해.",avoid:"한 사람과의 긴장이나 호의를 전체 인간관계 흐름으로 확대하지 마."};
+  if(topic==="연애")return {action:"호감 표현·만남의 지속성·관계 정의처럼 실제로 확인되는 연애 행동을 기준으로 속도를 조절해.",avoid:"연애 상대활성도만 보고 상대의 감정이나 관계 성립을 미리 확정하지 마."};
+  if(topic==="연락")return {action:"상대가 먼저 보낸 연락과 내가 먼저 보내기 좋은 흐름을 구분하고, 답변의 구체성과 지속성을 확인해.",avoid:"발신 적합도가 높다는 이유로 상대의 수신 의향까지 높다고 해석하지 마."};
+  if(topic==="재회")return {action:"과거 인연의 실제 재접촉·대화 재개·만남 제안이 생기는지 확인한 뒤 관계 재정립 여부를 판단해.",avoid:"재접점 활성도를 재회 확정이나 상대의 복귀 의사로 바꾸어 읽지 마."};
   if(["금전","소식"].includes(topic))return {action:"계약·입금·안내처럼 확인 가능한 정보부터 다시 점검해.",avoid:"확인되지 않은 기대만으로 지출이나 결정을 확대하지 마."};
   if(INVESTMENT_TOPICS.has(topic))return {action:"실제 시장 데이터와 본인 리스크 한도를 함께 확인해 규모를 조절해.",avoid:"상대지수를 가격방향·수익률 예측으로 바꾸거나 레버리지를 확대하지 마."};
   return {action:"체감보다 수면·일정·회복 같은 확인 가능한 상태를 기준으로 강도를 조절해.",avoid:"하루의 컨디션 변화를 장기 상태로 단정하지 마."};
@@ -282,7 +285,53 @@ export function stabilizeCoreForQuality(core:any,payload:any){
   if(kind==="annual"){const usedCrossDates=new Set(data.cross_checks.map((x:any)=>iso(x?.start)).filter(Boolean));const candidates=[...timeline,...(Array.isArray(payload?.key_dates)?payload.key_dates:[])];for(const t of candidates){if(data.cross_checks.length>=3)break;const date=iso(t?.date);if(!date||usedCrossDates.has(date))continue;let linked=uniq([...valid(t?.western_refs),...valid(t?.saju_context_refs),...valid(t?.thai_context_refs)]);if(!linked.length)linked=refsForDate(date,kdTopics(t)).slice(0,4);if(!linked.length)continue;const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean),systems=new Set(linkedRows.map((r:any)=>String(r?.system??"")));data.cross_checks.push(enrichCross({label:`${date} 체계 교차확인`,start:date,end:date,mode:systems.has("western")&&systems.size>=2?"복수체계":"Western단독",western:"",saju:"",thai:"",synthesis:"",evidence_refs:linked}));usedCrossDates.add(date);}}
   if(kind==="annual"){data.year_phases=Array.isArray(data?.year_phases)?data.year_phases:[];const months=Array.isArray(payload?.western?.months)?payload.western.months:[];for(let q=data.year_phases.length;q<4&&months.length;q++){const startIndex=Math.min(months.length-1,Math.floor(q*months.length/4)),endIndex=Math.min(months.length-1,Math.floor((q+1)*months.length/4)-1),first=months[startIndex],last=months[Math.max(startIndex,endIndex)],start=iso(first?.start)||`${String(first?.calendar_month??"")}-01`.slice(0,10),end=iso(last?.end)||start,topic=String(coreTopics[q%Math.max(1,coreTopics.length)]?.topic??TOPICS[q%TOPICS.length]);let linked=rows.filter((row:any)=>String(row?.id??"").startsWith("W:month:")&&rowCovers(row,start)&&String(row?.topic??"")===topic).map((row:any)=>String(row.id));if(!linked.length)linked=refsForDate(start,[topic]);data.year_phases.push({label:`연간 흐름 ${q+1}`,start,end,theme:`${topic} 흐름을 중심으로 보는 구간`,change:String(coreTopics[q%Math.max(1,coreTopics.length)]?.reason??`${topic} 기간 변화가 두드러지는 구간이야.`),evidence_refs:linked.slice(0,4)});}data.year_phases=data.year_phases.map((p:any)=>{const out={...p};let linked=valid(out?.evidence_refs);if(!linked.length)linked=refsForDate(iso(out?.start),[]);out.evidence_refs=linked.slice(0,5);return out;});}
   const relationshipSalient=important.some((x:any)=>["연애","연락","재회"].includes(String(x.topic)));
-  if(relationshipSalient){const relTopicSet=new Set(["수신신호","발신적합","과거인연접점","연애","연락","재회"]),relRows=rows.filter((row:any)=>relTopicSet.has(String(row?.topic??"")));data.relationship_reading=data?.relationship_reading&&typeof data.relationship_reading==="object"?data.relationship_reading:{};const rr=data.relationship_reading,focusDates=[...String(rr?.focus_timing??"").matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].map((m:any)=>m[0]);let linked=valid(rr?.evidence_refs);for(const date of focusDates)linked=uniq([...linked,...relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))]);linked=uniq([...linked,...relRows.sort((a:any,b:any)=>rowPriority(a)-rowPriority(b)).map((row:any)=>String(row.id))]).slice(0,8);rr.evidence_refs=linked;const sig=payload?.western?.relationship_signals??{},incoming=scoreText(sig?.수신신호?.average),outgoing=scoreText(sig?.발신적합?.average),reconnect=scoreText(sig?.과거인연접점?.average),exact=relRows.find((row:any)=>iso(row?.date)&&String(row?.id??"").startsWith("W:date:")),exactDate=iso(exact?.date);rr.context=ensureMinText(rr?.context,35,`관계 계산에서 수신 ${incoming}점, 발신 ${outgoing}점, 과거인연 재접점 ${reconnect}점이 서로 다른 축으로 움직여.`);rr.flow=ensureMinText(rr?.flow,55,"상대→나 신호와 나→상대 행동 적합도를 분리해서 보고, 과거 인연 재접점은 별도 축으로 확인해야 해. 한 축의 상승만으로 관계 결과를 확정하지 마.");rr.focus_timing=ensureMinText(rr?.focus_timing,20,exactDate?`${exactDate}의 직접 관계 근거를 우선 확인하고, 실제 답변·약속·만남 제안이 뒤따르는지 봐.`:"직접 관계 날짜 근거가 있는 구간에서 실제 답변·약속·만남 제안이 뒤따르는지 확인해.");if(exactDate&&![...String(rr.focus_timing).matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].length)rr.focus_timing=`${exactDate} · ${rr.focus_timing}`;if(exactDate)rr.evidence_refs=uniq([...rr.evidence_refs,...relRows.filter((row:any)=>iso(row?.date)===exactDate).map((row:any)=>String(row.id))]).slice(0,8);rr.watch=ensureMinText(rr?.watch,20,"실제 연락 빈도, 답변의 구체성, 약속 제안처럼 관찰 가능한 신호가 함께 움직이는지 확인해.");rr.avoid=ensureMinText(rr?.avoid,20,"상대활성도 점수만으로 상대의 속마음이나 재회·연애 결과를 미리 확정하지 마.");data.contact_flow=data?.contact_flow&&typeof data.contact_flow==="object"?data.contact_flow:{};data.contact_flow.incoming=ensureMinText(data.contact_flow.incoming,15,`수신신호 평균 ${incoming}점의 상대활성도를 실제 상대의 반응과 대조해.`);data.contact_flow.outgoing=ensureMinText(data.contact_flow.outgoing,15,`발신적합 평균 ${outgoing}점의 흐름을 내 행동 타이밍과 대조해.`);data.contact_flow.reconnection=ensureMinText(data.contact_flow.reconnection,15,`과거인연접점 평균 ${reconnect}점은 재회 보장이 아니라 재접점 활성도야.`);}
+  if(relationshipSalient){
+    const relTopicSet=new Set(["수신신호","발신적합","과거인연접점","연애","연락","재회"]);
+    const relRows=rows.filter((row:any)=>relTopicSet.has(String(row?.topic??"")));
+    data.relationship_reading=data?.relationship_reading&&typeof data.relationship_reading==="object"?data.relationship_reading:{};
+    const rr=data.relationship_reading;
+    let linked=valid(rr?.evidence_refs);
+    linked=uniq([...linked,...relRows.sort((a:any,b:any)=>rowPriority(a)-rowPriority(b)).map((row:any)=>String(row.id))]).slice(0,10);
+    rr.evidence_refs=linked;
+
+    const sig=payload?.western?.relationship_signals??{};
+    const tone=(v:number)=>v>=60?"강한 편":v<40?"약한 편":"중간권";
+    const bestDate=(stat:any)=>Array.isArray(stat?.best_days)&&stat.best_days[0]?.date?String(stat.best_days[0].date):"";
+    const cautionDate=(stat:any)=>Array.isArray(stat?.caution_days)&&stat.caution_days[0]?.date?String(stat.caution_days[0].date):"";
+    const axes=[
+      {key:"수신신호",label:"상대 → 나",avg:num(sig?.수신신호?.average),best:bestDate(sig?.수신신호),caution:cautionDate(sig?.수신신호)},
+      {key:"발신적합",label:"나 → 상대",avg:num(sig?.발신적합?.average),best:bestDate(sig?.발신적합),caution:cautionDate(sig?.발신적합)},
+      {key:"과거인연접점",label:"과거 인연 재접점",avg:num(sig?.과거인연접점?.average),best:bestDate(sig?.과거인연접점),caution:cautionDate(sig?.과거인연접점)},
+    ];
+    const ranked=[...axes].sort((a,b)=>b.avg-a.avg);
+    const gap=Math.abs((ranked[0]?.avg??0)-(ranked[ranked.length-1]?.avg??0));
+    const compare=gap<4
+      ? `세 방향의 평균 차이가 ${scoreText(gap)}점으로 크지 않아 한 방향만 앞세우기보다 실제 반응을 함께 확인하는 편이 좋아.`
+      : `${ranked[0]?.label??"관계"} 축이 ${ranked[ranked.length-1]?.label??"다른 관계"} 축보다 ${scoreText(gap)}점 높아, 이번 기간에는 세 방향의 활성도가 같은 강도로 움직이지 않아.`;
+    rr.context=`관계 계산은 상대 → 나 ${scoreText(axes[0].avg)}점, 나 → 상대 ${scoreText(axes[1].avg)}점, 과거 인연 재접점 ${scoreText(axes[2].avg)}점을 서로 다른 축으로 분리해 읽어.`;
+    rr.flow=`${compare} 상대 → 나, 나 → 상대, 재접점은 의미가 서로 다르므로 한 축의 상승을 다른 축의 결과로 옮겨 읽지 마.`;
+    const timingParts=axes.filter((a:any)=>a.best).map((a:any)=>`${a.label} ${a.best}`);
+    rr.focus_timing=timingParts.length?`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`:"직접 관계 날짜 근거가 있는 구간에서 실제 답변·약속·만남 제안이 뒤따르는지 확인해.";
+    for(const axis of axes){
+      for(const date of [axis.best,axis.caution].filter(Boolean)){
+        linked=uniq([...linked,...relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))]);
+      }
+    }
+    rr.evidence_refs=linked.slice(0,10);
+    rr.watch=ensureMinText(rr?.watch,20,"실제 연락 빈도, 답변의 구체성, 약속 제안, 대화 지속처럼 관찰 가능한 신호가 각 방향의 계산과 함께 움직이는지 확인해.");
+    rr.avoid=ensureMinText(rr?.avoid,20,"상대활성도 점수만으로 상대의 속마음이나 연애·재회 결과를 미리 확정하지 마.");
+
+    const axisText=(axis:any,meaning:string)=>{
+      const peak=axis.best?`${axis.best} 전후가 이 방향의 직접 계산상 두드러지는 시기야.`:"직접 최고일 근거가 충분하지 않아.";
+      const low=axis.caution&&axis.caution!==axis.best?` ${axis.caution} 전후는 상대적으로 낮은 구간이야.`:"";
+      return `${axis.label} 축은 기간 평균 ${scoreText(axis.avg)}점(${tone(axis.avg)})이야. ${peak}${low} ${meaning}`;
+    };
+    data.contact_flow={
+      incoming:axisText(axes[0],"이 축은 상대가 실제로 보이는 반응을 확인하는 용도라서 답변·먼저 온 연락·구체적 만남 제안과 함께 봐."),
+      outgoing:axisText(axes[1],"이 축은 내가 먼저 연락하거나 제안할 때의 상대적 적합도를 보는 값이지, 상대가 받아준다는 뜻은 아니야."),
+      reconnection:axisText(axes[2],"이 축은 과거 인연의 재접점 활성도를 보는 값이지, 재회나 관계 재성립을 확정하지 않아."),
+    };
+  }
   const investmentSalient=important.some((x:any)=>INVESTMENT_TOPICS.has(String(x.topic)));
   if(investmentSalient){
     data.investment_reading=data?.investment_reading&&typeof data.investment_reading==="object"?data.investment_reading:{};

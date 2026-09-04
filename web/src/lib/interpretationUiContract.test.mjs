@@ -56,3 +56,22 @@ test('period reading uses the same non-repeating information roles', () => {
   assert.match(windows, /item\.summary/)
   assert.match(windows, /item\.avoid/)
 })
+
+
+test('relationship focus appears once and follows timing detail', () => {
+  const annualKey = annual.indexOf('className="ai-key-window-section"')
+  const annualRel = annual.indexOf('className="ai-relationship-section"')
+  assert.ok(annualKey >= 0 && annualRel > annualKey, 'annual relationship focus should follow date detail')
+  assert.equal((annual.match(/className="ai-relationship-section"/g) || []).length, 1)
+  assert.equal((annual.match(/className="ai-direction-grid ai-relationship-direction"/g) || []).length, 1)
+  assert.match(annual, /!showRelationshipFocus && data\.clusters\.relationship/)
+  assert.match(annual, /className="ai-relationship-more"/)
+
+  const periodKey = period.indexOf('period-ai-key-window-section')
+  const periodRel = period.indexOf('period-ai-relationship-section')
+  assert.ok(periodKey >= 0 && periodRel > periodKey, 'period relationship focus should follow date detail')
+  assert.equal((period.match(/period-ai-relationship-section/g) || []).length, 1)
+  assert.equal((period.match(/period-ai-relationship-directions/g) || []).length, 1)
+  assert.match(period, /!showRelationshipFocus&&data\.clusters\.relationship/)
+  assert.match(period, /className="period-ai-relationship-more"/)
+})

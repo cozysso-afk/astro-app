@@ -89,7 +89,7 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
   assert.equal((src.match(/:generateContent/g)||[]).length,1);
   assert.match(src,/MAX_GEMINI_CALLS=2/);
-  assert.match(src,/supabase-ai-v21\.3\.1-investment-output-guard/);
+  assert.match(src,/supabase-ai-v21\.3\.2-relationship-direction-depth/);
   assert.match(src,/MAX_USER_NEW_JOBS_10M=6/);
   assert.match(src,/MAX_USER_NEW_JOBS_24H=20/);
   assert.match(src,/MAX_GLOBAL_NEW_JOBS_10M=18/);
@@ -175,4 +175,31 @@ test('V21.3 structurally neutralizes model-generated trade timing actions withou
   assert.match(fixed.clusters.investment,/매매시점을 뜻하지 않/);
   assert.match(fixed.investment_reading.realization,/실제 수익 가능성이나 매도 적기를 뜻하지/);
   assert.match(fixed.investment_reading.entry,/매수 신호가 아니며/);
+});
+
+
+test('V21.3.2 relationship directions are distinct and grounded without Gemini',()=>{
+  const p=packet();
+  for(const topic of ['연애','연락','재회']){ p.western.overall[topic].average=88; p.western.overall[topic].spread=52; p.western.daily_pattern_digest[topic].volatility=28; }
+  p.western.relationship_signals.수신신호={average:72,band:'강함',spread:30,best_days:[{date:'2027-03-12',score:84}],caution_days:[{date:'2027-01-19',score:31}]};
+  p.western.relationship_signals.발신적합={average:48,band:'보통',spread:18,best_days:[{date:'2027-04-07',score:68}],caution_days:[{date:'2027-02-02',score:36}]};
+  p.western.relationship_signals.과거인연접점={average:61,band:'강함',spread:25,best_days:[{date:'2027-05-18',score:79}],caution_days:[{date:'2027-03-03',score:34}]};
+  for(const [topic,date] of [['수신신호','2027-03-12'],['발신적합','2027-04-07'],['과거인연접점','2027-05-18']]) p.evidence_ledger.push({id:`W:date:${date}:${topic}:depth`,system:'western',scope:'relationship_best_day',topic,direction:'supportive',date,score:78,text:`${topic} 방향별 직접 날짜 근거`});
+  const core={headline:'관계 방향 테스트',overall:{summary:'관계 흐름을 충분한 길이로 설명하는 테스트 요약이다.',dominant_pattern:'관계 방향을 서로 구분해 본다.',best_phase:'활용',caution_phase:'주의',evidence_refs:['W:overall:연애']},key_windows:[],year_phases:[],cross_checks:[],decisions:[],clusters:{relationship:'관계 종합',work_study:'',money_news:'',investment:'',condition:''},relationship_reading:{context:'기존 관계 문장',flow:'기존 흐름',focus_timing:'기존 시기',watch:'실제 반응을 확인한다.',avoid:'속마음을 확정하지 않는다.',evidence_refs:[]},contact_flow:{incoming:'같은 문장',outgoing:'같은 문장',reconnection:'같은 문장'},systems:{western:'w',saju:'s',thai:'t'},priorities:[],limits:'점수는 확률이 아니다'};
+  const fixed=stabilizeCoreForQuality(core,p);
+  assert.match(fixed.relationship_reading.flow,/상대 → 나|나 → 상대|과거 인연 재접점/);
+  assert.match(fixed.relationship_reading.focus_timing,/상대 → 나 2027-03-12/);
+  assert.match(fixed.relationship_reading.focus_timing,/나 → 상대 2027-04-07/);
+  assert.match(fixed.relationship_reading.focus_timing,/과거 인연 재접점 2027-05-18/);
+  assert.match(fixed.contact_flow.incoming,/2027-03-12/);
+  assert.match(fixed.contact_flow.incoming,/답변·먼저 온 연락/);
+  assert.match(fixed.contact_flow.outgoing,/2027-04-07/);
+  assert.match(fixed.contact_flow.outgoing,/상대가 받아준다는 뜻은 아니야/);
+  assert.match(fixed.contact_flow.reconnection,/2027-05-18/);
+  assert.match(fixed.contact_flow.reconnection,/재회나 관계 재성립을 확정하지 않아/);
+  assert.notEqual(fixed.contact_flow.incoming,fixed.contact_flow.outgoing);
+  assert.notEqual(fixed.contact_flow.outgoing,fixed.contact_flow.reconnection);
+  const topics=buildDeterministicTopicAnalysis(p);
+  assert.notEqual(topics.find(x=>x.topic==='연애').action,topics.find(x=>x.topic==='연락').action);
+  assert.notEqual(topics.find(x=>x.topic==='연락').action,topics.find(x=>x.topic==='재회').action);
 });

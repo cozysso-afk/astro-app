@@ -133,3 +133,7 @@
 
 /* V21.3.1 UX pass 3 · role-separated action details */
 .ai-decision-more{margin-top:2px}.ai-decision-more>summary{cursor:pointer;list-style:none;color:#88788f;font-size:.72rem;font-weight:850}.ai-decision-more>summary::-webkit-details-marker{display:none}.ai-decision-more>summary::before{content:'＋';margin-right:5px}.ai-decision-more[open]>summary::before{content:'－'}.ai-decision-more>p{margin:7px 0 0}.ai-decision-more>.ai-decision-condition{margin-top:7px}.ai-decision-more>small{display:block;margin-top:7px}
+
+
+/* V21.3.2 relationship direction depth */
+.ai-relationship-section{display:grid;gap:10px}.ai-relationship-timing{display:grid;gap:4px;padding:10px 12px;border:1px solid rgba(117,89,132,.14);border-radius:12px;background:rgba(250,247,252,.82)}.ai-relationship-timing>b{font-size:.74rem;color:#735d7c}.ai-relationship-timing>span{font-size:.82rem;line-height:1.6;color:#554d59}.ai-relationship-more>summary{cursor:pointer;list-style:none;color:#806d88;font-size:.74rem;font-weight:850}.ai-relationship-more>summary::-webkit-details-marker{display:none}.ai-relationship-more>summary::before{content:'＋';margin-right:5px}.ai-relationship-more[open]>summary::before{content:'－'}.ai-relationship-more>p{margin:8px 0 0;font-size:.79rem;line-height:1.6;color:#62596a}.ai-relationship-more>p>b{color:#755f7d}

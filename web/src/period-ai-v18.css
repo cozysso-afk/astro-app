@@ -42,3 +42,7 @@
 
 /* V21.3.1 UX pass 3 · compact action cards */
 .period-ai-action-more{margin-top:3px}.period-ai-action-more>summary{cursor:pointer;list-style:none;color:#897a91;font-size:.7rem;font-weight:850}.period-ai-action-more>summary::-webkit-details-marker{display:none}.period-ai-action-more>summary::before{content:'＋';margin-right:5px}.period-ai-action-more[open]>summary::before{content:'－'}.period-ai-action-more>p:not(.period-ai-condition){margin:7px 0 0;color:#746a78;font-size:.77rem;line-height:1.6}.period-ai-action-more>.period-ai-condition{margin-top:7px}
+
+
+/* V21.3.2 relationship direction depth */
+.period-ai-relationship-summary{display:grid;gap:9px}.period-ai-relationship-directions{display:grid;gap:7px}.period-ai-relationship-more{margin-top:2px}.period-ai-relationship-more>summary{cursor:pointer;list-style:none;color:#846f8d;font-size:.72rem;font-weight:850}.period-ai-relationship-more>summary::-webkit-details-marker{display:none}.period-ai-relationship-more>summary::before{content:'＋';margin-right:5px}.period-ai-relationship-more[open]>summary::before{content:'－'}.period-ai-relationship-more>p{margin:7px 0 0;color:#655b69;font-size:.77rem;line-height:1.6}.period-ai-relationship-more>p.is-avoid{color:#855e68}

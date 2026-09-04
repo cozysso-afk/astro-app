@@ -6,7 +6,7 @@ import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiO
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21.3.1-investment-output-guard";
+const VERSION="supabase-ai-v21.3.2-relationship-direction-depth";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
