@@ -332,6 +332,9 @@ export type AiInterpretationResponse = {
     call_trace?: Array<{ call:number; model:string; kind:string; prompt_bytes:number; elapsed_ms:number; http_status:number; usage?: { prompt_tokens?:number; candidate_tokens?:number; thought_tokens?:number; total_tokens?:number }; error?:string }>
     cost_guard_version?: string
     local_thai_scrub?: boolean
+    degraded_quality?: boolean
+    local_quality_fallback?: boolean
+    quality_warning?: string | null
   }
   data?: {
     headline: string

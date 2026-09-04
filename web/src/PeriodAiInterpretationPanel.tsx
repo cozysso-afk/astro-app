@@ -52,6 +52,8 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
   const validationPassed = validation?.score === 100 || (!!validation?.stages?.length && validation.stages.every((stage)=>stage.passed))
+  const localQualityFallback = Boolean(result.usage?.local_quality_fallback)
+  const degradedQuality = Boolean(result.usage?.degraded_quality)
   const decisions = data.decisions ?? []
   const keyWindows = data.key_windows ?? []
   const crossChecks = data.cross_checks ?? []
@@ -70,6 +72,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       <div className="period-ai-quick-date-list">{keyWindows.slice(0,3).map((item,index)=><article className={`period-ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`}><b>{periodLabel(item.start,item.end)}</b><div><strong>{item.label}</strong>{!!item.topics?.length&&<small>{item.topics.slice(0,3).join(' · ')}</small>}</div><span>{item.signal}</span></article>)}</div>
     </section>}
 
+    {(localQualityFallback || degradedQuality) ? <div className="period-ai-quality-fallback"><CheckCircle2 size={15}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 핵심 근거를 기준으로 표시했어.')}</span></div></div> : null}
     {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
 
     {!!decisions.length && <section className="period-ai-action-section">

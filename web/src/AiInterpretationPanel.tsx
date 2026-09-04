@@ -55,6 +55,8 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
   const usage = estimateGeminiUsage(result.usage)
   const validation = result.usage?.quality_validation
   const validationPassed = validation?.score === 100 || (!!validation?.stages?.length && validation.stages.every((stage)=>stage.passed))
+  const localQualityFallback = Boolean(result.usage?.local_quality_fallback)
+  const degradedQuality = Boolean(result.usage?.degraded_quality)
   const hasDecisions = !!data.decisions?.length
   const hasKeyWindows = !!data.key_windows?.length
   const hasYearPhases = !!data.year_phases?.length
@@ -69,6 +71,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
   return <section className="ai-interpret-card">
     <div className="ai-interpret-head"><span className="ai-orb"><Sparkles size={19}/></span><div><span className="eyebrow">Gemini(제미나이) 통합 해설</span><h3>{data.headline || '통합 계산 해설'}</h3><small>실계산 결과 · 월별 변화 · 핵심 날짜를 함께 읽는 해설</small></div></div>
 
+    {(localQualityFallback || degradedQuality) ? <div className="ai-quality-fallback"><CheckCircle2 size={16}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 핵심 근거를 기준으로 표시했어.')}</span></div></div> : null}
     {validation?.stages?.length ? <div className={`ai-validation-badge ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={16}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100 · {validation.stages.filter((stage)=>stage.passed).length}/5 단계</span></div> : null}
 
     {usage?.total_tokens ? <details className="ai-meta-details"><summary>해설 생성 정보</summary><div className="ai-usage-card"><strong>API(응용 프로그램 인터페이스) 사용량</strong><span>입력 {(usage?.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage?.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage?.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>누적 예상비용 ${Number(usage?.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage?.estimated_krw ?? 0).toLocaleString()}원</b><small>{`실제 Gemini 호출 ${usage.attempt_count??1}회 · 최대 2회 · `}{usage.thai_safety_fallback?'Thai 안전 대체 결과 적용 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장 기록 재열람은 재호출이 없으면 0원</small></div></details> : null}

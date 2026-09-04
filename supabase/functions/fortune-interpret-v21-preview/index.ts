@@ -4,9 +4,9 @@ import { PACKET_VERSION, MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculati
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
-import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
+import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildLocalQualityFallbackCore, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
 
-const VERSION="supabase-ai-v21.3.2-relationship-direction-depth";
+const VERSION="supabase-ai-v21.3.3-no-zero-paid-fallback";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -23,6 +23,10 @@ function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status
 function usage(raw:any){const u=raw?.usageMetadata??{};return {prompt_tokens:Number(u.promptTokenCount??0),candidate_tokens:Number(u.candidatesTokenCount??0),thought_tokens:Number(u.thoughtsTokenCount??0),total_tokens:Number(u.totalTokenCount??0)};}
 function qualitySummary(quality:any){return quality?{version:quality.version,score:quality.score,stages:(quality.stages??[]).map((s:any)=>({stage:s.stage,name:s.name,passed:s.passed}))}:null;}
 function qualityFailure(result:any,quality:any){const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");return {...result,ok:false,error:`5단계 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};}
+function criticalQualityPassed(quality:any){
+  const stages=Array.isArray(quality?.stages)?quality.stages:[];
+  return [1,2,3,4].every((stage)=>stages.some((row:any)=>Number(row?.stage)===stage&&row?.passed===true));
+}
 
 const CORE_SCHEMA:any=structuredClone(SCHEMA);
 delete CORE_SCHEMA.properties.topic_analysis;
@@ -120,8 +124,13 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
     data=normalizeDirectionalWindows(validated,payload);localThaiScrub=true;
   }
   const quality=inspectInterpretationQuality(data,payload);
-  if(!quality.ok)return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,...meta},quality);
-  return {ok:true,data,model,interpreter_version:VERSION,validation:quality,local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+  if(!quality.ok){
+    if(meta?.allow_degraded_quality===true&&criticalQualityPassed(quality)){
+      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(meta?.local_quality_fallback),quality_warning:String(meta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해."),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+    }
+    return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,...meta},quality);
+  }
+  return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:Boolean(meta?.local_quality_fallback),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
 }
 
 async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"="initial",compact=false,qualityRetry=""){
@@ -158,7 +167,12 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
   if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
-  return {ok:false,error:`AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report};
+  if(second?.quality_guard_failed===true&&second?.candidate_data&&criticalQualityPassed(second?.quality_report)){
+    return {ok:true,data:second.candidate_data,model:second?.model??secondModel,interpreter_version:VERSION,validation:second.quality_report,degraded_quality:true,local_quality_fallback:false,quality_warning:"구조·근거·의미 방향·일관성은 통과했고 깊이·실용성 일부 항목만 미통과라 결과를 숨기지 않고 표시해.",usage:{...combined,quality_validation:qualitySummary(second.quality_report)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  }
+  const local=finalizeCandidate(buildLocalQualityFallbackCore(payload),payload,secondModel,{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0},{allow_degraded_quality:true,local_quality_fallback:true,quality_warning:"Gemini 유료 호출은 끝났고, 검증 미통과 부분은 계산근거만으로 안전 보정해 표시했어. 추가 Gemini 호출은 0회야."});
+  if(local?.ok)return {...local,usage:{...combined,quality_validation:qualitySummary(local.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  return {ok:false,error:`AI 해설이 검증을 완료하지 못했고 안전 보정본도 만들지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}; 로컬=${local?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -188,7 +202,7 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),degraded_quality:Boolean(r.degraded_quality),local_quality_fallback:Boolean(r.local_quality_fallback),quality_warning:r.quality_warning??null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
     if(!(await jobActive(id))){
       // A cancel request can mark the row failed while the already-sent first network call is still in flight.
       // Never resurrect that job, but attach the real usage/trace once the call returns so spent tokens are observable.
