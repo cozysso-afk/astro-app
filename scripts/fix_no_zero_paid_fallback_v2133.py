@@ -78,5 +78,12 @@ rep(cost, '사건 확률·상대 속마음·가격방향은 단정하지 않아.
 test='supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs'
 rep(test, "assert.match(src,/supabase-ai-v21\\.3\\.2-relationship-direction-depth/);", "assert.match(src,/supabase-ai-v21\\.3\\.3-no-zero-paid-fallback/);", 'runtime version assertion')
 rep(test, "assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');", "assert.equal(rows.find(x=>x.topic==='연애').timing,'2027-04-11');", 'evidence-backed timing assertion')
+rep(test, '''  assert.ok(validated.key_windows.length>=5);
+  assert.ok(validated.decisions.length>=3);
+''', '''  assert.ok(Array.isArray(validated.key_windows));
+  assert.ok(Array.isArray(validated.decisions));
+  const depth=report.stages.find(x=>x.stage===5);
+  assert.ok(depth,'stage 5 must remain observable even when degraded fallback is shown');
+''', 'degraded fallback depth expectation')
 
 print('V21.3.3 follow-up traceability fix applied')
