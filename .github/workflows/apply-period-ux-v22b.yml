@@ -19,8 +19,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Apply patch
-        run: python scripts/apply_period_ux_v22.py
+      - name: Apply follow-up
+        run: python scripts/apply_period_ux_v22_followup.py
       - name: Run UX contracts
         run: node --test web/src/lib/periodSelectionContract.test.mjs web/src/lib/interpretationUiContract.test.mjs web/src/lib/relationshipModeContract.test.mjs
       - name: Install web dependencies
@@ -29,10 +29,10 @@ jobs:
       - name: Production build
         working-directory: web
         run: npm run build
-      - name: Commit verified source
+      - name: Commit verified follow-up
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add web/src/AppNext.tsx web/src/HomeControls.tsx web/src/PeriodAiInterpretationPanel.tsx web/src/PeriodFortunePanel.tsx web/src/main.tsx web/src/ux-readability-v22.css web/src/lib/periodSelectionContract.test.mjs
-          git commit -m "feat(ux): calendar period selectors and readable mobile hierarchy"
+          git add web/src/AppNext.tsx web/src/PeriodAiInterpretationPanel.tsx web/src/AiInterpretationPanel.tsx web/src/lib/periodSelectionContract.test.mjs
+          git commit -m "fix(ux): calendar labels and hide internal evidence ids"
           git push origin HEAD:work/period-selector-ui-v1
