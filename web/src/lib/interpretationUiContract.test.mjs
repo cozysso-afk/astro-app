@@ -8,9 +8,9 @@ const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import
 function sectionFrom(source, marker) {
   const start = source.indexOf(marker)
   assert.notEqual(start, -1, `missing UI marker: ${marker}`)
-  const end = source.indexOf('</section>}', start)
+  const end = source.indexOf('</section>', start)
   assert.notEqual(end, -1, `missing section end after: ${marker}`)
-  return source.slice(start, end)
+  return source.slice(start, end + '</section>'.length)
 }
 
 function assertQuickDatesStayCompact(source, marker) {
