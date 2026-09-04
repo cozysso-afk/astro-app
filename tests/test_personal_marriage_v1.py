@@ -16,8 +16,9 @@ def test_personal_marriage_is_single_person_and_deterministic():
     assert result["ok"] is True
     assert result["mode"] == "personal_unmarried"
     assert result["policy"]["counterpart_required"] is False
-    assert result["policy"]["marriage_probability"] is False
-    assert result["policy"]["spouse_identity_prediction"] is False
+    assert result["policy"]["marriage_probability"] is True
+    assert result["policy"]["spouse_archetype_prediction"] is True
+    assert result["policy"]["specific_identity_claims"] is False
     assert set(result["relationship_houses"]) == {"4", "5", "7", "8"}
     assert result["relationship_houses"]["7"]["whole_ruler"]
     assert result["relationship_houses"]["7"]["placidus_ruler"]
@@ -25,9 +26,18 @@ def test_personal_marriage_is_single_person_and_deterministic():
     assert result["period"]["day_count"] == 27
     assert result["timing"]["top_days"]
     assert all("date" in row and "activation" in row for row in result["timing"]["top_days"])
-    text = str(result)
-    assert "marriage_probability': True" not in text
-    assert "spouse_identity_prediction': True" not in text
+    forecast = result["forecast"]
+    assert 0 <= forecast["marriage_probability_percent"] <= 100
+    assert forecast["label"] in {"매우 강함", "강함", "중간 이상", "보통", "낮음"}
+    assert forecast["strong_windows"]
+    assert "통계적" in forecast["probability_note"]
+    spouse = result["spouse_archetype"]
+    assert spouse["appearance_hints"]
+    assert spouse["personality_hints"]
+    assert spouse["career_clusters"]
+    assert spouse["meeting_route"]
+    assert spouse["identity_clues"]
+    assert "실제 이름" in spouse["precision_note"]
 
 
 def test_personal_marriage_never_accepts_more_than_one_year():

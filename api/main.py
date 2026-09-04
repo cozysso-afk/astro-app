@@ -22,7 +22,7 @@ from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, buil
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 
-APP_VERSION = "api-fortune-v5.3-personal-marriage-scope"
+APP_VERSION = "api-fortune-v5.4-personal-marriage-forecast"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -316,9 +316,10 @@ def personal_marriage(request: PersonalMarriageRequest) -> dict:
         "result": result,
         "interpretation_policy": {
             "counterpart_required": False,
-            "probability": False,
-            "spouse_identity_claims": False,
-            "mode": "상대가 없는 미혼 개인 결혼운 · 결혼 확률이 아니라 본인 차트의 결혼생활 구조와 활성 구간을 계산",
+            "probability_style_forecast": True,
+            "spouse_archetype": True,
+            "specific_identity_claims": False,
+            "mode": "상대가 없는 미혼 개인 결혼운 · 결혼 가능성 지수/시기/배우자상/직업군/만남 경로를 점성 엔터테인먼트 해석으로 제공",
         },
     }
 
