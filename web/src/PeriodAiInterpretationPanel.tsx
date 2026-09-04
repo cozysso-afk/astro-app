@@ -9,6 +9,15 @@ function periodLabel(start: string, end: string) {
   return `${start} → ${end}`
 }
 
+function visibleAiText(value: string | undefined) {
+  return String(value ?? '')
+    .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
+    .replace(/\(\s*계산 근거\s*\)/g, '')
+    .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function signalClass(signal: string) {
   if (signal === '활용') return 'is-use'
   if (signal === '주의') return 'is-caution'
@@ -67,7 +76,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
       <div className="period-ai-actions">{decisions.slice(0,4).map((item,index)=><article key={`${index}-${item.action}`}>
         <span className="period-ai-action-index">{index+1}</span>
-        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
+        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
       </article>)}</div>
     </section>}
 

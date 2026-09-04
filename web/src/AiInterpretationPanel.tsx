@@ -10,6 +10,15 @@ function periodLabel(start: string, end: string) {
   return `${start} → ${end}`
 }
 
+function visibleAiText(value: string | undefined) {
+  return String(value ?? '')
+    .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
+    .replace(/\(\s*계산 근거\s*\)/g, '')
+    .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function signalClass(signal: string) {
   if (signal === '활용') return 'is-use'
   if (signal === '주의') return 'is-caution'
@@ -68,7 +77,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
 
     {hasKeyWindows && <section className="ai-quick-dates"><div className="ai-section-heading"><span>가장 먼저 볼 날짜</span><strong>핵심 시기 TOP 3</strong></div><div className="ai-quick-date-list">{data.key_windows!.slice(0,3).map((item,index)=><button type="button" className={`ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`} onClick={()=>inspectAnnualScore(item.start,item.topics?.[0])}><b>{periodLabel(item.start,item.end)}</b><span><strong>{item.label}</strong>{item.topics?.length?<small>{item.topics.slice(0,3).join(' · ')}</small>:null}</span><em>{item.signal}</em></button>)}</div></section>}
 
-    {hasDecisions && <section className="ai-decision-section"><div className="ai-section-heading"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div><div className="ai-decision-list">{data.decisions!.map((item,index)=><article key={`${index}-${item.action}`}><span className="ai-decision-index">{index+1}</span><div><strong>{item.action}</strong>{item.timing&&<b>{item.timing}</b>}{item.watch&&<div className="ai-decision-condition"><b>확인</b><span>{item.watch}</span></div>}<details className="ai-decision-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{item.reason}</p>}{item.avoid&&<div className="ai-decision-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></div>}<small>계산 근거 {item.evidence_refs?.length ?? 0}개 연결</small></details></div></article>)}</div></section>}
+    {hasDecisions && <section className="ai-decision-section"><div className="ai-section-heading"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div><div className="ai-decision-list">{data.decisions!.map((item,index)=><article key={`${index}-${item.action}`}><span className="ai-decision-index">{index+1}</span><div><strong>{item.action}</strong>{item.timing&&<b>{item.timing}</b>}{item.watch&&<div className="ai-decision-condition"><b>확인</b><span>{item.watch}</span></div>}<details className="ai-decision-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.avoid&&<div className="ai-decision-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></div>}<small>계산 근거 {item.evidence_refs?.length ?? 0}개 연결</small></details></div></article>)}</div></section>}
 
     {hasKeyWindows && <section className="ai-key-window-section"><div className="ai-section-heading"><span>중요 날짜 · 시기</span><strong>눈여겨볼 핵심 구간</strong></div><div className="ai-key-window-list">{data.key_windows!.map((item,index)=><article className={`ai-key-window ${signalClass(item.signal)}`} key={`${item.start}-${item.end}-${index}`}><div className="ai-key-window-top"><div><span className="ai-window-date">{periodLabel(item.start,item.end)}</span><strong>{item.label}</strong></div><b>{item.signal}</b></div>{item.topics?.length?<div className="ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>:null}<p>{item.summary}</p>{!hasDecisions&&item.action&&<div className="ai-window-action"><strong>이때</strong><span>{item.action}</span></div>}{item.avoid&&<div className="ai-window-avoid"><strong>피할 것</strong><span>{item.avoid}</span></div>}<div className="ai-window-footer"><small>계산 근거 {item.evidence_refs?.length ?? 0}개 검증</small><button type="button" onClick={()=>inspectAnnualScore(item.start,item.topics?.[0])}>날짜 점수에서 확인</button></div></article>)}</div></section>}
 
@@ -97,7 +106,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
     <details className="ai-details"><summary>15개 분야별 정밀 해석 보기 · 중요도순</summary><div className="ai-topic-list">{orderedTopics.map((topic)=>{
       const item=data.topic_analysis?.[topic]
       if(!item) return null
-      return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.importance} · {item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {item.reason}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}{item.evidence_refs?.length?<small className="ai-topic-evidence">검증 근거 {item.evidence_refs.length}개</small>:null}</article>
+      return <article key={topic}><div className="ai-topic-title"><strong>{topic}</strong><span>{item.importance} · {item.confidence}</span></div><p className="ai-verdict">{item.verdict}</p>{item.reason&&<p><b>근거</b> {visibleAiText(item.reason)}</p>}{item.timing&&<p><b>시기</b> {item.timing}</p>}{item.action&&<p><b>행동</b> {item.action}</p>}{item.avoid&&<p><b>주의</b> {item.avoid}</p>}{item.evidence_refs?.length?<small className="ai-topic-evidence">검증 근거 {item.evidence_refs.length}개</small>:null}</article>
     })}</div></details>
 
     <div className="ai-v21-controls ai-v21-controls-success"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>같은 압축 프롬프트 복사</button></div>

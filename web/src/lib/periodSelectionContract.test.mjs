@@ -10,3 +10,6 @@ test('week month year have direct pickers',()=>{assert.match(home,/월요일~일
 test('period AI always exposes generation and prompt copy in idle state',()=>{assert.match(ai,/자연어 해설 준비됨/);assert.match(ai,/>해설 생성</);assert.match(ai,/>프롬프트 복사</)})
 test('fixed star dots are removed and typography is normalized',()=>{assert.match(css,/\.app-shell::before\{display:none!important\}/);assert.match(css,/period-ai-v21-controls button/);assert.match(css,/uxCardRise/)})
 test('married compatibility is explicitly distinct from married marriage fortune',()=>{assert.match(app,/기혼 · 일반 궁합/);assert.match(app,/결혼운 → 기혼/)})
+
+test('calendar range labels never hardcode 31 or 365 days',()=>{assert.match(app,/return '달력 월'/);assert.match(app,/return '달력 연도'/);assert.doesNotMatch(app,/if \(period === 'month'\) return '31일'/)})
+test('internal evidence ids are stripped from visible AI reasons',()=>{assert.match(ai,/function visibleAiText/);assert.match(ai,/visibleAiText\(item.reason\)/);assert.match(readFileSync(new URL('../AiInterpretationPanel.tsx',import.meta.url),'utf8'),/visibleAiText\(item.reason\)/)})

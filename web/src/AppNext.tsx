@@ -248,9 +248,9 @@ function periodEnd(value: string, period: PeriodKey) {
 }
 function periodRangeLabel(period: PeriodKey) {
   if (period === 'today') return '1일'
-  if (period === 'week') return '7일'
-  if (period === 'month') return '31일'
-  return '1년 · 365일'
+  if (period === 'week') return '월~일 · 7일'
+  if (period === 'month') return '달력 월'
+  return '달력 연도'
 }
 function parseOptionalNumber(value: string) {
   const n = Number(value.trim()); return value.trim() && Number.isFinite(n) ? n : null
