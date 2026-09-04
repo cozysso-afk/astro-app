@@ -14,6 +14,8 @@ function visibleAiText(value: string | undefined) {
     .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
     .replace(/\(\s*계산 근거\s*\)/g, '')
     .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
+    .replace(/이직\s*및\s*진로\s*타깃\s*시간/g, '이직·진로 집중 시간')
+    .replace(/타깃/g, '집중')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
@@ -64,12 +66,12 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const brief = buildInterpretationBrief(data)
 
   return <section className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>{data.headline || '기간 흐름 요약'}</h3></div></div>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">AI(인공지능) 기간 해설</span><h3>{visibleAiText(data.headline) || '기간 흐름 요약'}</h3></div></div>
     <section className="period-ai-overall-brief"><span>한눈에 결론</span><p><b>핵심 흐름</b><strong>{brief.flow}</strong></p>{brief.remember&&<p><b>먼저 기억할 것</b><strong>{brief.remember}</strong></p>}</section>
 
     {!!keyWindows.length && <section className="period-ai-quick-dates">
-      <div className="period-ai-section-title"><span>가장 먼저 볼 날짜</span><strong>핵심 시기 TOP 3</strong></div>
-      <div className="period-ai-quick-date-list">{keyWindows.slice(0,3).map((item,index)=><article className={`period-ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`}><b>{periodLabel(item.start,item.end)}</b><div><strong>{item.label}</strong>{!!item.topics?.length&&<small>{item.topics.slice(0,3).join(' · ')}</small>}</div><span>{item.signal}</span></article>)}</div>
+      <div className="period-ai-section-title"><span>가장 먼저 볼 날짜</span><strong>먼저 볼 시기</strong></div>
+      <div className="period-ai-quick-date-list">{keyWindows.slice(0,3).map((item,index)=><article className={`period-ai-quick-date ${signalClass(item.signal)}`} key={`quick-${item.start}-${index}`}><b>{periodLabel(item.start,item.end)}</b><div><strong>{visibleAiText(item.label)}</strong>{!!item.topics?.length&&<small>{item.topics.slice(0,3).join(' · ')}</small>}</div><span>{item.signal}</span></article>)}</div>
     </section>}
 
     {(localQualityFallback || degradedQuality) ? <div className="period-ai-quality-fallback"><CheckCircle2 size={15}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 핵심 근거를 기준으로 표시했어.')}</span></div></div> : null}
@@ -79,16 +81,16 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       <div className="period-ai-section-title"><span>먼저 이것부터</span><strong>이 기간에 실제로 할 일</strong></div>
       <div className="period-ai-actions">{decisions.slice(0,4).map((item,index)=><article key={`${index}-${item.action}`}>
         <span className="period-ai-action-index">{index+1}</span>
-        <div><strong>{item.action}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
+        <div><strong>{visibleAiText(item.action)}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.watch&&<p className="period-ai-condition"><b>확인</b><span>{item.watch}</span></p>}<details className="period-ai-action-more"><summary>근거 · 주의 보기</summary>{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></p>}</details></div>
       </article>)}</div>
     </section>}
 
     {!!keyWindows.length ? <section className="period-ai-window-section period-ai-key-window-section">
       <div className="period-ai-section-title"><span>중요 시기 상세</span><strong>눈여겨볼 날짜 · 구간</strong></div>
       <div className="period-ai-windows">{keyWindows.slice(0,6).map((item,index)=><article className={`period-ai-window ${signalClass(item.signal)}`} key={`${item.start}-${item.end}-${index}`}>
-        <div className="period-ai-window-head"><div><b>{periodLabel(item.start,item.end)}</b><strong>{item.label}</strong></div><span>{item.signal}</span></div>
+        <div className="period-ai-window-head"><div><b>{periodLabel(item.start,item.end)}</b><strong>{visibleAiText(item.label)}</strong></div><span>{item.signal}</span></div>
         {!!item.topics?.length && <div className="period-ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>}
-        <p>{item.summary}</p>
+        <p>{visibleAiText(item.summary)}</p>
         {!decisions.length&&item.action&&<div className="period-ai-window-line"><b>이때</b><span>{item.action}</span></div>}
         {item.avoid&&<div className="period-ai-window-line is-avoid"><b>피할 것</b><span>{item.avoid}</span></div>}
       </article>)}</div>
@@ -97,7 +99,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
       {data.overall.caution_phase && <span className="period-ai-chip">주의 흐름 · {data.overall.caution_phase}</span>}
     </div>}
 
-    {showRelationshipFocus && relationshipReading ? <section className="period-ai-window-section period-ai-relationship-section"><div className="period-ai-section-title"><span>관계 · 연락 · 재회</span><strong>세 방향을 따로 보면</strong></div><article className="period-ai-window is-mixed period-ai-relationship-summary"><p>{relationshipReading.flow}</p>{data.contact_flow ? <div className="period-ai-relationship-directions"><div className="period-ai-window-line"><b>상대 → 나</b><span>{data.contact_flow.incoming}</span></div><div className="period-ai-window-line"><b>나 → 상대</b><span>{data.contact_flow.outgoing}</span></div><div className="period-ai-window-line"><b>과거 인연 재접점</b><span>{data.contact_flow.reconnection}</span></div></div> : null}<div className="period-ai-window-line"><b>주목 시기</b><span>{relationshipReading.focus_timing}</span></div><details className="period-ai-relationship-more"><summary>판단 기준 · 주의 보기</summary><p><b>세 축 기준</b> {relationshipReading.context}</p><p><b>현실에서 확인</b> {relationshipReading.watch}</p><p className="is-avoid"><b>과대해석 주의</b> {relationshipReading.avoid}</p></details></article></section> : null}
+    {showRelationshipFocus && relationshipReading ? <section className="period-ai-window-section period-ai-relationship-section"><div className="period-ai-section-title"><span>관계 · 연락 · 재회</span><strong>세 방향을 따로 보면</strong></div><article className="period-ai-window is-mixed period-ai-relationship-summary"><p>{visibleAiText(relationshipReading.flow)}</p>{data.contact_flow ? <div className="period-ai-relationship-directions"><details className="period-ai-direction-item"><summary><strong>상대 → 나</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.incoming)}</p></details><details className="period-ai-direction-item"><summary><strong>나 → 상대</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.outgoing)}</p></details><details className="period-ai-direction-item"><summary><strong>과거 인연 재접점</strong><span>설명 보기</span></summary><p>{visibleAiText(data.contact_flow.reconnection)}</p></details></div> : null}<div className="period-ai-window-line"><b>주목 시기</b><span>{visibleAiText(relationshipReading.focus_timing)}</span></div><details className="period-ai-relationship-more"><summary>판단 기준 · 주의 보기</summary><p><b>세 축 기준</b> {visibleAiText(relationshipReading.context)}</p><p><b>현실에서 확인</b> {visibleAiText(relationshipReading.watch)}</p><p className="is-avoid"><b>과대해석 주의</b> {visibleAiText(relationshipReading.avoid)}</p></details></article></section> : null}
 
     <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 검증 해설 조회 · 이번 Gemini API 재호출 0회' : '최초 검증 해설 자동 저장 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>
     <div className="period-ai-v21-controls period-ai-v21-controls-success"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>같은 압축 프롬프트 복사</button></div>
@@ -109,7 +111,7 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
         <div className="period-ai-section"><strong>분야별 종합</strong><p>{[!showRelationshipFocus&&data.clusters.relationship&&`관계 · ${data.clusters.relationship}`,data.clusters.work_study&&`일·학업 · ${data.clusters.work_study}`,data.clusters.money_news&&`돈·소식 · ${data.clusters.money_news}`,data.clusters.investment&&`투자 · ${data.clusters.investment}`,data.clusters.condition&&`컨디션 · ${data.clusters.condition}`].filter(Boolean).join('\n\n')}</p></div>
         {!!data.priorities?.length && <div className="period-ai-section"><strong>우선순위</strong><p>{data.priorities.map((item,index)=>`${index+1}. ${item}`).join('\n')}</p></div>}
 
-        {!!crossChecks.length && <div className="period-ai-section period-ai-cross-section"><strong>체계 교차검증</strong><p className="period-ai-cross-note">세 체계를 합산하거나 다수결하지 않고 같은 시기의 독립 근거를 비교해.</p><div className="period-ai-cross-list">{crossChecks.map((item,index)=><article key={`${item.start}-${item.label}-${index}`}><div><b>{periodLabel(item.start,item.end)}</b><span>{item.mode}</span></div><strong>{item.label}</strong><p><b>Western</b> {item.western}</p><p><b>사주</b> {item.saju}</p><p><b>Thai</b> {item.thai}</p><p className="period-ai-cross-synthesis"><b>그래서</b> {item.synthesis}</p></article>)}</div></div>}
+        {!!crossChecks.length && <div className="period-ai-section period-ai-cross-section"><strong>체계 교차검증</strong><p className="period-ai-cross-note">세 체계를 합산하거나 다수결하지 않고 같은 시기의 독립 근거를 비교해.</p><div className="period-ai-cross-list">{crossChecks.map((item,index)=><article key={`${item.start}-${item.label}-${index}`}><div><b>{periodLabel(item.start,item.end)}</b><span>{item.mode}</span></div><strong>{visibleAiText(item.label)}</strong><p><b>Western</b> {item.western}</p><p><b>사주</b> {item.saju}</p><p><b>Thai</b> {item.thai}</p><p className="period-ai-cross-synthesis"><b>그래서</b> {item.synthesis}</p></article>)}</div></div>}
 
         <details className="period-ai-topic-disclosure"><summary>15개 분야별 해석 펼치기 · 중요도순</summary><div className="period-ai-topic-list">{topicEntries.map(([topic,item])=><article className="period-ai-topic" key={topic}><strong>{topic} · {item.importance}</strong><b>{item.verdict}</b>{item.reason&&<p>근거 · {item.reason}</p>}{item.timing&&<p>시기 · {item.timing}</p>}{item.action&&<p>활용 · {item.action}</p>}{item.avoid&&<p>피할 것 · {item.avoid}</p>}<p>확신도 · {item.confidence}{item.confidence_reason?` · ${item.confidence_reason}`:''}</p></article>)}</div></details>
 
