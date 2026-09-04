@@ -51,7 +51,7 @@ test('period reading uses the same non-repeating information roles', () => {
   assert.ok(actions.indexOf('item.reason') > disclosure, 'period decision reason should be preserved inside disclosure')
   assert.ok(actions.indexOf('item.avoid') > disclosure, 'period decision avoid should be preserved inside disclosure')
 
-  const windows = sectionFrom(period, 'className="period-ai-key-window-section"')
+  const windows = sectionFrom(period, 'period-ai-key-window-section')
   assert.match(windows, /!decisions\.length&&item\.action/, 'period date detail should repeat action only when no action cards exist')
   assert.match(windows, /item\.summary/)
   assert.match(windows, /item\.avoid/)
