@@ -21,6 +21,7 @@ import './fortune-ux-v14.css'
 import './period-ai-v18.css'
 import './ux-readability-v22.css'
 import './celestial-motion-v23.css'
+import './visual-hierarchy-v24.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
