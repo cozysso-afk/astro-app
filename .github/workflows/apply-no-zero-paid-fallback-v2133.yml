@@ -1,0 +1,44 @@
+name: Apply no-zero paid fallback v21.3.3
+
+on:
+  push:
+    branches:
+      - work/period-selector-ui-v1
+    paths:
+      - '.github/workflows/apply-no-zero-paid-fallback-v2133.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/period-selector-ui-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply no-zero fallback patch
+        run: python scripts/apply_no_zero_paid_fallback_v2133.py
+      - name: Run interpretation regression
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          node --test web/src/lib/interpretationUiContract.test.mjs
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Production build
+        working-directory: web
+        run: npm run build
+      - name: Commit verified source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/fortune-interpret-v21-preview/index.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs web/src/appTypes.ts web/src/PeriodAiInterpretationPanel.tsx web/src/AiInterpretationPanel.tsx web/src/period-ai-v18.css web/src/ai-interpret-v2.css
+          git commit -m "fix(ai): show safe fallback after paid validation failure"
+          git push origin HEAD:work/period-selector-ui-v1
