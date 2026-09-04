@@ -36,8 +36,44 @@ rep(cost, r'''function bestTopicDate(payload:any,topic:string){
 }
 ''', 'evidence-backed topic timing')
 
+rep(cost, r'''    const min=digest?.min, max=digest?.max;
+    const reasonParts=[`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`];
+    if(min?.date&&max?.date)reasonParts.push(`실제 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
+    const timing=bestTopicDate(payload,topic);
+''', r'''    const min=digest?.min, max=digest?.max;
+    const backedDateSet=new Set(topicEvidence(payload,topic).flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
+    const reasonParts=[`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`];
+    if(min?.date&&max?.date&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`직접 근거가 연결된 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
+    else reasonParts.push(`일별 변동성은 ${scoreText(digest?.volatility)}점이며, 날짜를 특정할 때는 evidence ledger에 직접 연결된 날짜만 사용해.`);
+    const timing=bestTopicDate(payload,topic);
+''', 'topic reason date traceability')
+
+rep(cost, r'''    const sig=payload?.western?.relationship_signals??{};
+    const tone=(v:number)=>v>=60?"강한 편":v<40?"약한 편":"중간권";
+    const bestDate=(stat:any)=>Array.isArray(stat?.best_days)&&stat.best_days[0]?.date?String(stat.best_days[0].date):"";
+    const cautionDate=(stat:any)=>Array.isArray(stat?.caution_days)&&stat.caution_days[0]?.date?String(stat.caution_days[0].date):"";
+    const axes=[
+      {key:"수신신호",label:"상대 → 나",avg:num(sig?.수신신호?.average),best:bestDate(sig?.수신신호),caution:cautionDate(sig?.수신신호)},
+      {key:"발신적합",label:"나 → 상대",avg:num(sig?.발신적합?.average),best:bestDate(sig?.발신적합),caution:cautionDate(sig?.발신적합)},
+      {key:"과거인연접점",label:"과거 인연 재접점",avg:num(sig?.과거인연접점?.average),best:bestDate(sig?.과거인연접점),caution:cautionDate(sig?.과거인연접점)},
+    ];
+''', r'''    const sig=payload?.western?.relationship_signals??{};
+    const tone=(v:number)=>v>=60?"강한 편":v<40?"약한 편":"중간권";
+    const relEvidenceDates=(key:string)=>new Set(relRows.filter((row:any)=>String(row?.topic??"")===key).flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
+    const backedStatDate=(key:string,stat:any,field:"best_days"|"caution_days")=>{
+      const allowed=relEvidenceDates(key);
+      const row=(Array.isArray(stat?.[field])?stat[field]:[]).find((item:any)=>allowed.has(String(item?.date??"").slice(0,10)));
+      return row?.date?String(row.date).slice(0,10):"";
+    };
+    const axes=[
+      {key:"수신신호",label:"상대 → 나",avg:num(sig?.수신신호?.average),best:backedStatDate("수신신호",sig?.수신신호,"best_days"),caution:backedStatDate("수신신호",sig?.수신신호,"caution_days")},
+      {key:"발신적합",label:"나 → 상대",avg:num(sig?.발신적합?.average),best:backedStatDate("발신적합",sig?.발신적합,"best_days"),caution:backedStatDate("발신적합",sig?.발신적합,"caution_days")},
+      {key:"과거인연접점",label:"과거 인연 재접점",avg:num(sig?.과거인연접점?.average),best:backedStatDate("과거인연접점",sig?.과거인연접점,"best_days"),caution:backedStatDate("과거인연접점",sig?.과거인연접점,"caution_days")},
+    ];
+''', 'relationship evidence-backed dates')
+
 test='supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs'
 rep(test, "assert.match(src,/supabase-ai-v21\\.3\\.2-relationship-direction-depth/);", "assert.match(src,/supabase-ai-v21\\.3\\.3-no-zero-paid-fallback/);", 'runtime version assertion')
 rep(test, "assert.equal(rows.find(x=>x.topic==='연애').timing,'2026-11-19');", "assert.equal(rows.find(x=>x.topic==='연애').timing,'2027-04-11');", 'evidence-backed timing assertion')
 
-print('V21.3.3 follow-up timing fix applied')
+print('V21.3.3 follow-up traceability fix applied')
