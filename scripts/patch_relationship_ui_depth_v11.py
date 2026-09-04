@@ -1,0 +1,21 @@
+from pathlib import Path
+
+p=Path('web/src/RelationshipInterpretationPanel.tsx')
+s=p.read_text()
+
+old='<p className="relationship-ai-overview">{ai.data.overview}</p><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}{isReunion&&ai.data.reunion_reading?.bottom_line&&'
+new='<p className="relationship-ai-overview">{ai.data.overview}</p>{!isMarriage?<><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}{!ai.data.long_term&&ai.data.stability&&<article><strong>장기 지속성</strong><p>{ai.data.stability}</p></article>}<article><strong>시기 · 정밀도</strong><p>{ai.data.timing}</p></article>{isReunion&&ai.data.reunion_context&&<article><strong>재회 맥락</strong><p>{ai.data.reunion_context}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>실제로는 이렇게 체감되기 쉬워</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}</>:null}{isReunion&&ai.data.reunion_reading?.bottom_line&&'
+if old not in s: raise SystemExit('generic AI grid anchor missing')
+s=s.replace(old,new,1)
+
+old='<article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>갈등과 회복</b>'
+new='<article><b>생활 · 돈 · 역할</b><p>{ai.data.marriage_reading.daily_life}</p></article><article><b>친밀감 · 공유자원</b><p>{ai.data.marriage_reading.intimacy_resources}</p></article><article><b>갈등과 회복</b>'
+if old not in s: raise SystemExit('marriage grid anchor missing')
+s=s.replace(old,new,1)
+
+old='</div></div>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice">'
+new='</div></div>}{isMarriage&&<details className="marriage-base-evidence"><summary>기본 궁합 근거 보기</summary><div className="relationship-ai-grid"><article><strong>끌림 · 호감</strong><p>{ai.data.chemistry}</p></article>{ai.data.emotional_dynamic&&<article><strong>정서적 친화 · 거리감</strong><p>{ai.data.emotional_dynamic}</p></article>}<article><strong>대화 · 오해</strong><p>{ai.data.communication}</p></article>{ai.data.conflict_pattern&&<article><strong>갈등이 붙는 지점</strong><p>{ai.data.conflict_pattern}</p></article>}{ai.data.power_boundaries&&<article><strong>힘의 균형 · 경계</strong><p>{ai.data.power_boundaries}</p></article>}{ai.data.long_term&&<article><strong>장기 지속성</strong><p>{ai.data.long_term}</p></article>}</div>{!!ai.data.felt_scenarios?.length&&<div className="relationship-ai-scenarios"><strong>현실에서 체감되는 기본 관계 패턴</strong>{ai.data.felt_scenarios.map((x,i)=><p key={`${i}-${x}`}><span>{i+1}</span>{x}</p>)}</div>}</details>}{!!ai.data.practical_advice?.length&&<div className="relationship-ai-advice">'
+if old not in s: raise SystemExit('marriage details insertion anchor missing')
+s=s.replace(old,new,1)
+
+p.write_text(s)
