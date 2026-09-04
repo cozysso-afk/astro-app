@@ -57,7 +57,7 @@ test('period reading uses the same non-repeating information roles', () => {
   assert.match(windows, /item\.avoid/)
 })
 
-
+// Dedicated relationship focus owns directional synthesis; generic relationship cluster copy remains fallback-only.
 test('relationship focus appears once and follows timing detail', () => {
   const annualKey = annual.indexOf('className="ai-key-window-section"')
   const annualRel = annual.indexOf('className="ai-relationship-section"')
