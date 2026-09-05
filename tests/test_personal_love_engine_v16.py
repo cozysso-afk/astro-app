@@ -74,10 +74,18 @@ def test_provisional_time_keeps_stable_planetary_timing_but_disables_angles_and_
     assert secondary["daily_samples"]
     assert secondary["birth_time_policy"]["mode"] == "provisional_stable_planets_only"
     assert secondary["birth_time_policy"]["convergence_eligible"] is True
+    assert result["timing"]["major_transits"]["birth_time_policy"]["mode"] == "provisional_stable_natal_targets_only"
+    assert result["timing"]["daily_transits"]["birth_time_policy"]["mode"] == "provisional_stable_natal_targets_only"
     for row in secondary["daily_samples"]:
         assert all(hit["source"] != "Moon" for hit in row["hits"])
         assert all(not hit["birth_time_sensitive_basis"] for hit in row["hits"])
         assert row["date_precision"] == "provisional_clock_time_stable_planets_only"
+    for row in result["timing"]["major_transits"]["daily_samples"]:
+        assert all(not hit["birth_time_sensitive_basis"] for hit in row["hits"])
+        assert row["date_precision"] == "provisional_clock_time_stable_targets_only"
+    for row in result["timing"]["daily_transits"]["daily"]:
+        assert all(not hit["birth_time_sensitive_basis"] for hit in row["hits"])
+        assert row["date_precision"] == "provisional_clock_time_stable_targets_only"
     assert result["focus"] == "new_connection"
 
 
@@ -364,6 +372,58 @@ def test_progression_uncertainty_scan_surfaces_moon_sensitivity(monkeypatch):
     assert diagnostic["diagnostic_only"] is True
 
 
+def test_provisional_transit_moon_target_is_diagnostic_only(monkeypatch):
+    natal = {
+        "time_reliability": {
+            "time_available": True,
+            "time_exact": False,
+            "status": "provisional",
+            "time_source": "user_estimate",
+            "time_confidence": "low",
+        },
+        "targets": {
+            "Venus": {
+                "longitude": 120.0,
+                "source": "natal_planet",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": False,
+            },
+            "Moon": {
+                "longitude": 0.0,
+                "source": "natal_planet",
+                "physical_key": "planet:Moon",
+                "birth_time_sensitive": True,
+            },
+        },
+    }
+
+    def fake_positions(jd, include_moon=True):
+        return {
+            "Sun": {"longitude": 240.0},
+            "Mercury": {"longitude": 240.0},
+            "Venus": {"longitude": 120.0},
+            "Mars": {"longitude": 240.0},
+            "Jupiter": {"longitude": 0.0},
+            "Saturn": {"longitude": 240.0},
+            "Uranus": {"longitude": 240.0},
+            "Neptune": {"longitude": 240.0},
+            "Pluto": {"longitude": 240.0},
+        }
+
+    monkeypatch.setattr(pl, "_positions", fake_positions)
+    monkeypatch.setattr(pl, "_jd", lambda dt: 0.0)
+    rows = pl._transit_rows(date(2026, 3, 1), date(2026, 3, 1), 9.0, natal)
+    major = rows["major"][0]
+    daily = rows["daily"][0]
+    assert major["birth_time_policy"] == "provisional_stable_natal_targets_only"
+    assert daily["birth_time_policy"] == "provisional_stable_natal_targets_only"
+    assert all(not hit["birth_time_sensitive_basis"] for hit in major["hits"])
+    assert all(not hit["birth_time_sensitive_basis"] for hit in daily["hits"])
+    assert major["diagnostic_time_sensitive_hits"]
+    assert any(hit["birth_time_sensitive_basis"] for hit in major["diagnostic_time_sensitive_hits"])
+    assert all(hit["diagnostic_only"] is True for hit in major["diagnostic_time_sensitive_hits"])
+
+
 def test_unknown_or_arbitrary_birth_time_progression_cannot_create_convergence():
     major = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
     daily = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
@@ -454,3 +514,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert "maximum applicable role weight" in policy["physical_target_deduplication"]
         assert "scanned daily" in policy["secondary_progression_sampling"]
         assert "diagnostic-only" in policy["secondary_progression_birth_time_safety"]
+        assert "uncertain Moon contacts cannot inflate" in policy["transit_birth_time_safety"]
