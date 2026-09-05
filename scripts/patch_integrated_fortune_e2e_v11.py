@@ -53,7 +53,6 @@ if s.count(old_thai_start) != 1:
     raise SystemExit(f'Thai start anchor count={s.count(old_thai_start)}')
 s = s.replace(old_thai_start, new_thai_start, 1)
 
-# Add Thai not_calculated next to already-preserved reliability/consensus status, regardless of formatting.
 thai_tail_pattern = re.compile(r'(predictive_status:thai\?\.predictive_status[^\n]*?consensus_policy:thai\?\.consensus_policy[^\n]*?reliability:thai\?\.reliability\?\?null)([^\n]*?\n\s*};)')
 m = thai_tail_pattern.search(s)
 if not m:
@@ -62,7 +61,6 @@ if 'not_calculated:' not in m.group(0):
     replacement = m.group(1) + ',not_calculated:Array.isArray(thai?.not_calculated)?thai.not_calculated.slice(0,8):[]' + m.group(2)
     s = s[:m.start()] + replacement + s[m.end():]
 
-# Replace the V21 key-date-filtered Saju packet with the bounded complete Saju packet.
 pattern = re.compile(
     r'saju:\{engine:payload\?\.saju\?\.engine,day_master:payload\?\.saju\?\.day_master\?\?null,'
     r'annual:\(payload\?\.saju\?\.annual\?\?\[\]\)\.map\(\(x:any\)=>\(\{.*?\}\)\),'
@@ -78,7 +76,12 @@ cost_path.write_text(s, encoding='utf-8')
 # 4) Strengthen the already-required V21 regression test; no workflow change needed.
 test_path = Path('supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs')
 s = test_path.read_text(encoding='utf-8')
-s = s.replace(r'/supabase-ai-v21\.3\.3-no-zero-paid-fallback/', r'/supabase-ai-v21\.4-e2e-evidence/', 1)
+old_assert = r'assert.match(src,/supabase-ai-v21\.3\.3-no-zero-paid-fallback/);'
+new_assert = r'assert.match(src,/supabase-ai-v21\.4-e2e-evidence/);'
+if s.count(old_assert) != 1:
+    raise SystemExit(f'legacy version assertion count={s.count(old_assert)}')
+s = s.replace(old_assert, new_assert, 1)
+s = s.replace("test('V21.3.3 runtime preserves paid usage and exposes local fallback instead of zero content'", "test('V21/V11 runtime preserves paid usage and exposes local fallback instead of zero content'", 1)
 append = r'''
 
 test('V11 E2E prompt keeps complete bounded Saju baseline/months and Thai limitations',()=>{
