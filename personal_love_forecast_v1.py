@@ -24,7 +24,7 @@ from personal_marriage_v1 import (
 )
 from relationship_reliability_v1 import decorate_aspect, sensitivity_scan_spec
 
-ENGINE_VERSION = "personal-love-western-v1.4-birth-time-safe-progression"
+ENGINE_VERSION = "personal-love-western-v1.5-birth-time-safe-timing"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
 
@@ -314,26 +314,120 @@ def _layer_day_row(day: date, hits: list[dict]) -> dict:
     }
 
 
+def _excluded_sensitive_hits(all_hits: list[dict], production_hits: list[dict], reason: str) -> list[dict]:
+    production_keys = {
+        (
+            str(hit.get("source") or ""),
+            str(hit.get("aspect") or ""),
+            str(hit.get("target_physical_key") or hit.get("target") or ""),
+        )
+        for hit in production_hits
+    }
+    out: list[dict] = []
+    for hit in all_hits:
+        key = (
+            str(hit.get("source") or ""),
+            str(hit.get("aspect") or ""),
+            str(hit.get("target_physical_key") or hit.get("target") or ""),
+        )
+        if key in production_keys:
+            continue
+        if hit.get("source") == "Moon" or bool(hit.get("birth_time_sensitive_basis")):
+            row = dict(hit)
+            row["diagnostic_only"] = True
+            row["production_excluded_reason"] = reason
+            out.append(row)
+    return out
+
+
+def _transit_birth_time_policy(natal: dict) -> dict:
+    reliability = natal["time_reliability"]
+    if bool(reliability.get("time_exact")):
+        return {
+            "mode": "exact_all_natal_targets",
+            "allow_birth_time_sensitive_targets": True,
+            "date_precision": "exact_birth_time",
+        }
+    if bool(reliability.get("time_available")):
+        return {
+            "mode": "provisional_stable_natal_targets_only",
+            "allow_birth_time_sensitive_targets": False,
+            "date_precision": "provisional_clock_time_stable_targets_only",
+        }
+    return {
+        "mode": "unknown_time_date_only_stable_targets",
+        "allow_birth_time_sensitive_targets": False,
+        "date_precision": "date_only_proxy",
+    }
+
+
+def _transit_production_targets(natal: dict) -> tuple[dict, dict]:
+    policy = _transit_birth_time_policy(natal)
+    if policy["allow_birth_time_sensitive_targets"]:
+        return natal["targets"], policy
+    return (
+        {
+            name: info for name, info in natal["targets"].items()
+            if not bool(info.get("birth_time_sensitive"))
+        },
+        policy,
+    )
+
+
 def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, natal: dict) -> dict[str, list[dict]]:
     major_rows: list[dict] = []
     daily_rows: list[dict] = []
+    production_targets, policy = _transit_production_targets(natal)
+    diagnostic_enabled = bool(
+        natal["time_reliability"].get("time_available")
+        and not natal["time_reliability"].get("time_exact")
+    )
     cursor = start_date
     while cursor <= end_date:
         positions = _positions(_jd(_local_noon_utc(cursor, utc_offset_hours)), include_moon=False)
         major_positions = {name: row for name, row in positions.items() if name in MAJOR_TRANSIT_PLANETS}
         daily_positions = {name: row for name, row in positions.items() if name in DAILY_TRANSIT_PLANETS}
         major_hits = _contact_rows(
-            major_positions, natal["targets"], source_layer="major_transit",
+            major_positions, production_targets, source_layer="major_transit",
             source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True,
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
         daily_hits = _contact_rows(
-            daily_positions, natal["targets"], source_layer="daily_transit",
+            daily_positions, production_targets, source_layer="daily_transit",
             source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True,
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
-        major_rows.append(_layer_day_row(cursor, major_hits))
-        daily_rows.append(_layer_day_row(cursor, daily_hits))
+        major_diagnostic: list[dict] = []
+        daily_diagnostic: list[dict] = []
+        if diagnostic_enabled:
+            major_all = _contact_rows(
+                major_positions, natal["targets"], source_layer="major_transit",
+                source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True, target_exact=False,
+            )
+            daily_all = _contact_rows(
+                daily_positions, natal["targets"], source_layer="daily_transit",
+                source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True, target_exact=False,
+            )
+            major_diagnostic = _excluded_sensitive_hits(
+                major_all, major_hits, "birth_time_sensitive_natal_target_major_transit"
+            )
+            daily_diagnostic = _excluded_sensitive_hits(
+                daily_all, daily_hits, "birth_time_sensitive_natal_target_daily_transit"
+            )
+        major_row = _layer_day_row(cursor, major_hits)
+        major_row.update({
+            "birth_time_policy": policy["mode"],
+            "date_precision": policy["date_precision"],
+            "diagnostic_time_sensitive_hits": major_diagnostic[:6],
+        })
+        daily_row = _layer_day_row(cursor, daily_hits)
+        daily_row.update({
+            "birth_time_policy": policy["mode"],
+            "date_precision": policy["date_precision"],
+            "diagnostic_time_sensitive_hits": daily_diagnostic[:6],
+        })
+        major_rows.append(major_row)
+        daily_rows.append(daily_row)
         cursor += timedelta(days=1)
     return {"major": major_rows, "daily": daily_rows}
 
@@ -478,27 +572,9 @@ def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float,
                 source_exact=False,
                 target_exact=False,
             )
-            production_keys = {
-                (
-                    str(hit.get("source") or ""),
-                    str(hit.get("aspect") or ""),
-                    str(hit.get("target_physical_key") or hit.get("target") or ""),
-                )
-                for hit in hits
-            }
-            for hit in all_hits:
-                key = (
-                    str(hit.get("source") or ""),
-                    str(hit.get("aspect") or ""),
-                    str(hit.get("target_physical_key") or hit.get("target") or ""),
-                )
-                if key in production_keys:
-                    continue
-                if hit.get("source") == "Moon" or bool(hit.get("birth_time_sensitive_basis")):
-                    row = dict(hit)
-                    row["diagnostic_only"] = True
-                    row["production_excluded_reason"] = "birth_time_sensitive_secondary_progression"
-                    diagnostic_hits.append(row)
+            diagnostic_hits = _excluded_sensitive_hits(
+                all_hits, hits, "birth_time_sensitive_secondary_progression"
+            )
         row = _layer_day_row(cursor, hits)
         row["calendar_month"] = cursor.strftime("%Y-%m")
         row["progression_key"] = "mean_day_for_year"
@@ -728,6 +804,7 @@ def build_personal_love_forecast(
     major_months = _monthly_summary(major_rows)
     daily_months = _monthly_summary(daily_rows)
     progression_policy = _progression_birth_time_policy(natal)
+    transit_policy = _transit_birth_time_policy(natal)
 
     static_structure = {
         "scope": "single_person_natal_only",
@@ -767,7 +844,8 @@ def build_personal_love_forecast(
                 "months": major_months,
                 "daily_samples": major_rows,
                 "planets": sorted(MAJOR_TRANSIT_PLANETS),
-                "policy": "Jupiter/Saturn/Uranus/Neptune/Pluto major-transit activation of the user's own natal factors; separate from fast daily timing",
+                "birth_time_policy": transit_policy,
+                "policy": "Jupiter/Saturn/Uranus/Neptune/Pluto major-transit activation of the user's own natal factors. Provisional birth times exclude birth-time-sensitive natal targets from production scores and retain them only as diagnostics; separate from fast daily timing.",
             },
             "daily_transits": {
                 "new_connection": _summary(daily_rows, "new_connection_activation"),
@@ -775,7 +853,8 @@ def build_personal_love_forecast(
                 "months": daily_months,
                 "daily": daily_rows,
                 "planets": sorted(DAILY_TRANSIT_PLANETS),
-                "policy": "Sun/Mercury/Venus/Mars fast timing support only; never overrides higher-priority secondary or major-transit structure",
+                "birth_time_policy": transit_policy,
+                "policy": "Sun/Mercury/Venus/Mars fast timing support only. Provisional birth times exclude birth-time-sensitive natal targets from production scores and retain them only as diagnostics; never overrides higher-priority secondary or major-transit structure.",
             },
             "convergence": _convergence(major_months, progression_months, daily_months),
         },
@@ -790,6 +869,7 @@ def build_personal_love_forecast(
             "physical_target_deduplication": "same natal body serving multiple semantic roles is scored once using the maximum applicable role weight; all roles remain in evidence",
             "secondary_progression_sampling": "mean day-for-year positions are scanned daily; monthly values use the strongest real daily peak so a mid-month sample is never presented as an exact progression date",
             "secondary_progression_birth_time_safety": "provisional birth times exclude progressed Moon and birth-time-sensitive natal targets from production progression scores; those contacts remain diagnostic-only. Unknown or arbitrary birth-time bases may show approximate stable-planet progression but are not convergence-eligible.",
+            "transit_birth_time_safety": "provisional birth times exclude natal Moon and other birth-time-sensitive natal targets from production major/daily transit scores; excluded contacts remain diagnostic-only so uncertain Moon contacts cannot inflate the major layer used by convergence.",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
             "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
