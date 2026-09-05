@@ -47,10 +47,38 @@ export type SignalSummary = {
   tightest: Aspect[]
 }
 
+export type RelationshipProgressedSynastry = {
+  available: boolean
+  reason?: string
+  user_progressed_to_partner_natal?: Aspect[]
+  partner_progressed_to_user_natal?: Aspect[]
+  progressed_to_progressed?: Aspect[]
+}
+
+export type RelationshipProgressedComposite = {
+  available: boolean
+  reason?: string
+  method?: string
+  chart?: Record<string, unknown>
+  to_natal_composite_aspects?: Aspect[]
+}
+
+export type RelationshipMarksTertiary = {
+  available: boolean
+  reason?: string
+  user?: { completed_lunar_months?: number; chart?: Record<string, unknown>; to_base_marks_aspects?: Aspect[] }
+  counterpart?: { completed_lunar_months?: number; chart?: Record<string, unknown>; to_base_marks_aspects?: Aspect[] }
+  directional_cross_aspects?: Aspect[]
+  angle_policy?: string
+}
+
 export type RelationshipMonth = {
   calendar_month: string
   representative_date: string
   signal_summary: SignalSummary
+  progressed_synastry?: RelationshipProgressedSynastry
+  progressed_composite?: RelationshipProgressedComposite
+  marks_tertiary?: RelationshipMarksTertiary
 }
 
 export type RelationshipApiResponse = {
@@ -61,6 +89,14 @@ export type RelationshipApiResponse = {
   period: { start: string; end: string; month_segments: number }
   result: {
     limitations?: string[]
+    timing_timezone_policy?: string
+    secondary_key?: string
+    tertiary_key?: string
+    orb_policy?: string
+    interpretation_policy?: Record<string, string>
+    relationship_focus?: { available: boolean; groups?: Record<string, Aspect[]>; policy?: string }
+    saju_relationship?: Record<string, unknown>
+    composite?: { available: boolean; reason?: string; chart?: Record<string, unknown>; note?: string }
     natal_synastry?: { available: boolean; partner_time_exact: boolean; aspects: Aspect[]; note?: string }
     house_overlays?: {
       available: boolean
@@ -68,8 +104,8 @@ export type RelationshipApiResponse = {
       user_in_counterpart?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; quadrant_house?:number|null; quadrant_system?:string; whole_house?:number|null }> }
       counterpart_in_user?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; quadrant_house?:number|null; quadrant_system?:string; whole_house?:number|null }> }
     }
-    davison?: { available: boolean; reason?: string }
-    marks?: { available: boolean; reason?: string }
+    davison?: { available: boolean; reason?: string; chart?: Record<string, unknown> }
+    marks?: { available: boolean; reason?: string; method?: string; user?: Record<string, unknown>; counterpart?: Record<string, unknown> }
     months?: RelationshipMonth[]
     reunion_transits?: {
       available: boolean
