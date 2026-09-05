@@ -24,7 +24,7 @@ from personal_marriage_v1 import (
 )
 from relationship_reliability_v1 import decorate_aspect, sensitivity_scan_spec
 
-ENGINE_VERSION = "personal-love-western-v1.5-birth-time-safe-timing"
+ENGINE_VERSION = "personal-love-western-v1.6-aligned-daily-support"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
 
@@ -731,15 +731,25 @@ def _monthly_summary(rows: list[dict]) -> list[dict]:
         strongest_partner = sorted(month_rows, key=lambda x: float(x["partnership_activation"]), reverse=True)[:5]
         new_score = round(sum(float(x["new_connection_activation"]) for x in strongest_new) / max(1, len(strongest_new)), 1)
         partnership_score = round(sum(float(x["partnership_activation"]) for x in strongest_partner) / max(1, len(strongest_partner)), 1)
+        new_peak = max(month_rows, key=lambda x: (float(x["new_connection_activation"]), x["date"]))
+        partner_peak = max(month_rows, key=lambda x: (float(x["partnership_activation"]), x["date"]))
         out.append({
             "calendar_month": month,
             "new_connection_activation": new_score,
             "new_connection_band": _band(new_score),
+            "new_connection_peak_date": new_peak["date"] if float(new_peak["new_connection_activation"]) > 0 else None,
             "partnership_activation": partnership_score,
             "partnership_band": _band(partnership_score),
+            "partnership_peak_date": partner_peak["date"] if float(partner_peak["partnership_activation"]) > 0 else None,
             "event_probability": "not_calculated",
         })
     return out
+
+
+def _dates_within_days(a: str | None, b: str | None, window_days: int) -> bool:
+    if not a or not b:
+        return False
+    return abs((date.fromisoformat(a) - date.fromisoformat(b)).days) <= int(window_days)
 
 
 def _convergence(major_months: list[dict], progression_months: list[dict], daily_months: list[dict]) -> list[dict]:
@@ -757,11 +767,22 @@ def _convergence(major_months: list[dict], progression_months: list[dict], daily
         if not dimensions:
             continue
         daily = daily_by_month.get(major["calendar_month"])
-        daily_support = [
-            name
-            for name, key in (("new_connection", "new_connection_activation"), ("partnership", "partnership_activation"))
-            if daily and float(daily[key]) >= 40.0 and name in dimensions
-        ]
+        daily_support: list[str] = []
+        daily_support_dates: dict[str, dict] = {}
+        support_window_days = 3
+        for name, key in (("new_connection", "new_connection_activation"), ("partnership", "partnership_activation")):
+            if name not in dimensions or not daily or float(daily[key]) < 40.0:
+                continue
+            progress_peak = progress.get(f"{name}_peak_date")
+            daily_peak = daily.get(f"{name}_peak_date")
+            if not _dates_within_days(progress_peak, daily_peak, support_window_days):
+                continue
+            daily_support.append(name)
+            daily_support_dates[name] = {
+                "secondary_progression_peak_date": progress_peak,
+                "daily_transit_peak_date": daily_peak,
+                "distance_days": abs((date.fromisoformat(progress_peak) - date.fromisoformat(daily_peak)).days),
+            }
         out.append({
             "calendar_month": major["calendar_month"],
             "dimensions": dimensions,
@@ -769,7 +790,9 @@ def _convergence(major_months: list[dict], progression_months: list[dict], daily
             "layer_count": 2,
             "progression_birth_time_policy": progress.get("birth_time_policy"),
             "daily_transit_support": daily_support,
-            "policy": "convergence requires independent higher-priority major-transit and birth-time-eligible secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
+            "daily_support_dates": daily_support_dates,
+            "daily_support_window_days": support_window_days,
+            "policy": "convergence requires independent higher-priority major-transit and birth-time-eligible secondary-progression layers; fast daily transits count as timing support only when their monthly peak falls within ±3 days of the corresponding secondary-progression peak and never create convergence by themselves",
         })
     return out
 
@@ -871,6 +894,7 @@ def build_personal_love_forecast(
             "secondary_progression_birth_time_safety": "provisional birth times exclude progressed Moon and birth-time-sensitive natal targets from production progression scores; those contacts remain diagnostic-only. Unknown or arbitrary birth-time bases may show approximate stable-planet progression but are not convergence-eligible.",
             "transit_birth_time_safety": "provisional birth times exclude natal Moon and other birth-time-sensitive natal targets from production major/daily transit scores; excluded contacts remain diagnostic-only so uncertain Moon contacts cannot inflate the major layer used by convergence.",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
+            "daily_support_alignment": "daily-transit support is only labeled when its dimension peak is within ±3 calendar days of the corresponding secondary-progression peak; same-month activity alone is insufficient",
             "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
     }
