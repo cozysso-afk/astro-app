@@ -21,5 +21,9 @@ This calculation layer is intentionally isolated from two-person relationship as
 - For a provisional clock time, excluded transit-to-Moon/time-sensitive contacts are retained as `diagnostic_time_sensitive_hits` with `diagnostic_only=true`; they cannot inflate the major-transit activation used by convergence.
 - Exact birth time still allows the full eligible natal target set for major/daily transit scoring.
 - Daily transit is only labeled as convergence timing support when its dimension-specific monthly peak is within ±3 calendar days of the matching secondary-progression peak. A strong daily transit somewhere else in the same month is not counted as support.
+- The HTTP boundary is purpose-locked: both personal-love request/profile models reject extra two-person or mode-smuggling fields instead of silently ignoring them. This includes counterpart/partner/reunion/relationship-status as well as attempted `analysis_mode`, `user`, `known_person`, or `synastry` shapes.
+- The legacy two-person `/v1/relationship/western` route rejects both personal single-person modes (`personal_love_forecast`, `new_relationship`) at schema validation.
+- Reversed or over-limit personal-love date ranges surface as HTTP 422, and `time_known=true` without a birth time is rejected. Unknown birth time remains accepted only under the conservative single-person/no-convergence policy.
+- `/v1/meta` exposes the runtime personal-love engine version and both personal-love routes, so wiring drift is regression-testable.
 
 The calculation and API regression contract lives in `tests/test_personal_love_engine_v16.py` and `tests/test_personal_love_api_v16.py`.
