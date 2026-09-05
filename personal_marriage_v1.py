@@ -15,7 +15,9 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 
 import swisseph as swe
 
-ENGINE_VERSION = "personal-marriage-western-v1.1-fun-forecast"
+from western_house_system_v1 import calculate_quadrant_houses
+
+ENGINE_VERSION = "personal-marriage-western-v1.2-polar-safe-houses"
 
 BODIES = {
     "Sun": swe.SUN,
@@ -173,14 +175,16 @@ def _positions(jd_ut: float, include_moon: bool = True) -> dict:
 
 
 def _house_data(jd_ut: float, latitude: float, longitude: float) -> dict:
-    cusps_raw, ascmc = swe.houses(jd_ut, float(latitude), float(longitude), b"P")
-    cusps = [_norm(x) for x in cusps_raw]
+    cusps_raw, ascmc, house_system = calculate_quadrant_houses(jd_ut, float(latitude), float(longitude))
+    quadrant_cusps = [_norm(x) for x in cusps_raw]
     asc = _norm(ascmc[0])
     mc = _norm(ascmc[1])
     asc_sign = int(asc // 30.0)
     return {
         "asc": asc, "mc": mc, "dsc": _norm(asc + 180.0), "ic": _norm(mc + 180.0),
-        "placidus_cusps": cusps,
+        "quadrant_cusps": quadrant_cusps,
+        "placidus_cusps": list(quadrant_cusps),
+        "house_system": house_system,
         "whole_asc_sign": asc_sign,
     }
 
@@ -204,28 +208,39 @@ def _whole_house(lon: float, asc_sign: int) -> int:
 def _house_profile(house_number: int, house: dict, positions: dict) -> dict:
     whole_sign_index = (house["whole_asc_sign"] + house_number - 1) % 12
     whole_ruler = RULER_BY_SIGN[whole_sign_index]
-    placidus_lon = house["placidus_cusps"][house_number - 1]
-    placidus_sign_index = int(placidus_lon // 30.0)
-    placidus_ruler = RULER_BY_SIGN[placidus_sign_index]
+    quadrant_cusps = house.get("quadrant_cusps") or house["placidus_cusps"]
+    quadrant_lon = quadrant_cusps[house_number - 1]
+    quadrant_sign_index = int(quadrant_lon // 30.0)
+    quadrant_ruler = RULER_BY_SIGN[quadrant_sign_index]
+    quadrant_system = (house.get("house_system") or {}).get("used", "Placidus")
 
     def placement(ruler: str) -> dict:
         p = positions[ruler]
+        quadrant_house = _placidus_house(p["longitude"], quadrant_cusps)
         return {
             "planet": ruler,
             "sign": p["sign"],
             "degree": p["degree"],
             "whole_house": _whole_house(p["longitude"], house["whole_asc_sign"]),
-            "placidus_house": _placidus_house(p["longitude"], house["placidus_cusps"]),
+            "quadrant_house": quadrant_house,
+            "quadrant_system": quadrant_system,
+            "placidus_house": quadrant_house,
         }
 
+    quadrant_sign = SIGNS_KO[quadrant_sign_index]
     return {
         "house": house_number,
         "whole_sign": SIGNS_KO[whole_sign_index],
         "whole_ruler": whole_ruler,
         "whole_ruler_placement": placement(whole_ruler),
-        "placidus_sign": SIGNS_KO[placidus_sign_index],
-        "placidus_ruler": placidus_ruler,
-        "placidus_ruler_placement": placement(placidus_ruler),
+        "quadrant_sign": quadrant_sign,
+        "quadrant_ruler": quadrant_ruler,
+        "quadrant_ruler_placement": placement(quadrant_ruler),
+        "quadrant_system": quadrant_system,
+        # Compatibility aliases for pre-V7 clients.
+        "placidus_sign": quadrant_sign,
+        "placidus_ruler": quadrant_ruler,
+        "placidus_ruler_placement": placement(quadrant_ruler),
     }
 
 
@@ -419,8 +434,11 @@ def _marriage_forecast(rows: list[dict]) -> dict:
 def _spouse_archetype(profiles: dict, natal_aspects: list[dict]) -> dict:
     seventh = profiles["7"]
     career_house = profiles["4"]  # 10th from the 7th = partner-career derivative house.
+    quadrant_sign = seventh.get("quadrant_sign") or seventh["placidus_sign"]
+    quadrant_system = seventh.get("quadrant_system") or "Placidus"
+    quadrant_label = "플라시두스" if quadrant_system == "Placidus" else "포르피리"
     signs = []
-    for sign in (seventh["whole_sign"], seventh["placidus_sign"]):
+    for sign in (seventh["whole_sign"], quadrant_sign):
         if sign not in signs:
             signs.append(sign)
     appearance = [SIGN_ARCHETYPE[x]["appearance"] for x in signs if x in SIGN_ARCHETYPE]
@@ -445,7 +463,7 @@ def _spouse_archetype(profiles: dict, natal_aspects: list[dict]) -> dict:
     personality.extend(x for x in extras if x not in personality)
     meeting = MEETING_BY_HOUSE.get(ruler_house, "7하우스 주인행성의 배치와 연결된 생활권")
     identity_clues = [
-        f"배우자 축: {seventh['whole_sign']} 중심" + (f" + 플라시두스 {seventh['placidus_sign']} 보조" if seventh['placidus_sign'] != seventh['whole_sign'] else ""),
+        f"배우자 축: {seventh['whole_sign']} 중심" + (f" + {quadrant_label} {quadrant_sign} 보조" if quadrant_sign != seventh['whole_sign'] else ""),
         f"7하우스 주인행성 {ruler}가 홀사인 {ruler_house}하우스에 위치",
         f"배우자 직업 단서는 7하우스의 10번째인 본인 4하우스와 그 주인행성 {career_ruler}를 우선 참고",
     ]
@@ -456,7 +474,7 @@ def _spouse_archetype(profiles: dict, natal_aspects: list[dict]) -> dict:
         "career_clusters": careers[:4],
         "meeting_route": meeting,
         "identity_clues": identity_clues,
-        "precision_note": "외모·직업·만남 경로는 7하우스/DSC와 주인행성, 파생 10하우스를 이용한 전통적 배우자상 추정이다. 실제 이름·주소·회사처럼 특정 개인의 신원을 맞히는 기능은 아니다.",
+        "precision_note": f"외모·직업·만남 경로는 7하우스/DSC와 주인행성, 파생 10하우스를 이용한 전통적 배우자상 추정이다. 사분면 하우스 체계는 {quadrant_label}({quadrant_system})를 사용했다. 실제 이름·주소·회사처럼 특정 개인의 신원을 맞히는 기능은 아니다.",
     }
 
 
@@ -488,6 +506,7 @@ def build_personal_marriage(*, birth_date: date, birth_time: dt_time, latitude: 
             "meaning": "상대가 없을 때도 개인 차트로 결혼 가능성 지수·강한 시기·배우자상(외모/성향/직업군/만남 경로)을 적극적으로 본다.",
         },
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat(), "day_count": len(timing_rows)},
+        "house_system": house["house_system"],
         "angles": {
             "asc": round(house["asc"], 6), "dsc": round(house["dsc"], 6),
             "mc": round(house["mc"], 6), "ic": round(house["ic"], 6),
@@ -497,7 +516,9 @@ def build_personal_marriage(*, birth_date: date, birth_time: dt_time, latitude: 
             name: {
                 **positions[name],
                 "whole_house": _whole_house(positions[name]["longitude"], house["whole_asc_sign"]),
-                "placidus_house": _placidus_house(positions[name]["longitude"], house["placidus_cusps"]),
+                "quadrant_house": _placidus_house(positions[name]["longitude"], house.get("quadrant_cusps") or house["placidus_cusps"]),
+                "quadrant_system": house["house_system"]["used"],
+                "placidus_house": _placidus_house(positions[name]["longitude"], house.get("quadrant_cusps") or house["placidus_cusps"]),
             }
             for name in ("Moon", "Venus", "Mars", "Jupiter", "Saturn")
         },
@@ -512,6 +533,7 @@ def build_personal_marriage(*, birth_date: date, birth_time: dt_time, latitude: 
             "top_months": _months(timing_rows)[:12],
         },
         "limits": [
+            *(["극지 위도에서 Swiss Ephemeris가 Placidus를 계산할 수 없어 Porphyry 사분면 하우스를 명시적으로 사용했다."] if house["house_system"]["fallback"] else []),
             "결혼 가능성 %는 통계적 확률이 아니라 점성학적 신호 강도를 재미용 0~100 지수로 번역한 값이다.",
             "배우자 외모·성향·직업군·만남 경로는 차트에서 적극적으로 추정하되 실제 미래 인물의 이름·주소·회사 같은 특정 신원은 만들어내지 않는다.",
             "특정 상대가 생기면 이 개인 결혼운과 별도로 두 사람의 실제 결혼궁합을 계산해야 한다.",

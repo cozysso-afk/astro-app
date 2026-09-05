@@ -7,6 +7,7 @@ export type PersonalMarriageResponse = {
   period: { start: string; end: string; day_count: number }
   result: {
     mode: 'personal_unmarried'
+    house_system?: { requested: string; used: string; fallback: boolean; fallback_reason?: string | null }
     policy: {
       counterpart_required: boolean
       marriage_probability: boolean
@@ -19,12 +20,16 @@ export type PersonalMarriageResponse = {
       house: number
       whole_sign: string
       whole_ruler: string
-      whole_ruler_placement: { planet: string; sign: string; degree: number; whole_house: number; placidus_house: number }
+      whole_ruler_placement: { planet: string; sign: string; degree: number; whole_house: number; placidus_house: number; quadrant_house?: number; quadrant_system?: string }
+      quadrant_sign?: string
+      quadrant_ruler?: string
+      quadrant_ruler_placement?: { planet: string; sign: string; degree: number; whole_house: number; placidus_house: number; quadrant_house?: number; quadrant_system?: string }
+      quadrant_system?: string
       placidus_sign: string
       placidus_ruler: string
-      placidus_ruler_placement: { planet: string; sign: string; degree: number; whole_house: number; placidus_house: number }
+      placidus_ruler_placement: { planet: string; sign: string; degree: number; whole_house: number; placidus_house: number; quadrant_house?: number; quadrant_system?: string }
     }>
-    relationship_planets: Record<string, { sign: string; degree: number; whole_house: number; placidus_house: number }>
+    relationship_planets: Record<string, { sign: string; degree: number; whole_house: number; placidus_house: number; quadrant_house?: number; quadrant_system?: string }>
     natal_aspects: Array<{ a: string; aspect: string; b: string; orb: number; tone: string }>
     forecast: {
       marriage_probability_percent: number
@@ -68,9 +73,14 @@ const aspectKo: Record<string,string> = {conjunction:'합',sextile:'육십분위
 const houseMeaning: Record<string,string> = {'4':'가정 · 함께 사는 생활','5':'연애 · 즐거움 · 애정표현','7':'배우자 · 동반자 관계','8':'친밀감 · 공유자원 · 깊은 결속'}
 
 function rulerLine(row: PersonalMarriageResponse['result']['relationship_houses'][string]) {
-  const same = row.whole_ruler === row.placidus_ruler
-  if (same) return `${row.whole_sign} / ${row.placidus_sign} · 주인행성 ${row.whole_ruler}(${planetKo[row.whole_ruler] ?? row.whole_ruler}) · 홀사인 ${row.whole_ruler_placement.whole_house}H / 플라시두스 ${row.whole_ruler_placement.placidus_house}H`
-  return `홀사인 ${row.whole_sign} → ${row.whole_ruler}(${planetKo[row.whole_ruler] ?? row.whole_ruler}) ${row.whole_ruler_placement.whole_house}H · 플라시두스 ${row.placidus_sign} → ${row.placidus_ruler}(${planetKo[row.placidus_ruler] ?? row.placidus_ruler}) ${row.placidus_ruler_placement.placidus_house}H`
+  const system = row.quadrant_system ?? 'Placidus'
+  const systemKo = system === 'Porphyry' ? '포르피리' : '플라시두스'
+  const quadrantSign = row.quadrant_sign ?? row.placidus_sign
+  const quadrantRuler = row.quadrant_ruler ?? row.placidus_ruler
+  const quadrantPlacement = row.quadrant_ruler_placement ?? row.placidus_ruler_placement
+  const same = row.whole_ruler === quadrantRuler
+  if (same) return `${row.whole_sign} / ${quadrantSign} · 주인행성 ${row.whole_ruler}(${planetKo[row.whole_ruler] ?? row.whole_ruler}) · 홀사인 ${row.whole_ruler_placement.whole_house}H / ${systemKo} ${row.whole_ruler_placement.quadrant_house ?? row.whole_ruler_placement.placidus_house}H`
+  return `홀사인 ${row.whole_sign} → ${row.whole_ruler}(${planetKo[row.whole_ruler] ?? row.whole_ruler}) ${row.whole_ruler_placement.whole_house}H · ${systemKo} ${quadrantSign} → ${quadrantRuler}(${planetKo[quadrantRuler] ?? quadrantRuler}) ${quadrantPlacement.quadrant_house ?? quadrantPlacement.placidus_house}H`
 }
 
 function hitText(hit?: { transit: string; aspect: string; target: string; orb: number }) {
@@ -86,6 +96,7 @@ export function PersonalMarriagePanel({ data }: { data: PersonalMarriageResponse
   const planets = ['Moon','Venus','Mars','Jupiter','Saturn'].map((key)=>[key,result.relationship_planets[key]] as const).filter(([,row])=>!!row)
   const windows = forecast.strong_windows.slice(0,3)
   const pressureDays = result.timing.pressure_days.filter((row)=>row.pressure_load>0).slice(0,3)
+  const quadrantLabel = (system?: string) => system === 'Porphyry' ? '포르피리' : '플라시두스'
 
   return <section className="relationship-ai-card personal-marriage-card">
     <span className="eyebrow">상대 없이 보는 미혼 결혼운</span>
@@ -117,7 +128,7 @@ export function PersonalMarriagePanel({ data }: { data: PersonalMarriageResponse
 
     <details className="ai-system-note"><summary>왜 이런 배우자상·결혼운이 나오는지 · 원차트 근거</summary>
       <div className="relationship-ai-grid">{houses.map(([key,row])=><article key={key}><strong>{row.house}하우스 · {houseMeaning[key]}</strong><p>{rulerLine(row)}</p></article>)}</div>
-      <div className="relationship-key-aspects"><strong>관계 행성의 기본 배치</strong>{planets.map(([key,row])=><div key={key}><b>{key}({planetKo[key]}) · {row.sign} {row.degree.toFixed(1)}°</b><p>홀사인 {row.whole_house}하우스 · 플라시두스 {row.placidus_house}하우스</p></div>)}</div>
+      <div className="relationship-key-aspects"><strong>관계 행성의 기본 배치</strong>{planets.map(([key,row])=><div key={key}><b>{key}({planetKo[key]}) · {row.sign} {row.degree.toFixed(1)}°</b><p>홀사인 {row.whole_house}하우스 · {quadrantLabel(row.quadrant_system ?? result.house_system?.used)} {row.quadrant_house ?? row.placidus_house}하우스</p></div>)}</div>
       {!!result.natal_aspects.length && <div className="relationship-key-aspects"><strong>주요 애스펙트</strong>{result.natal_aspects.slice(0,10).map((row,index)=><p key={`${row.a}-${row.b}-${index}`}><b>{row.a} {aspectKo[row.aspect] ?? row.aspect} {row.b}</b> · 오브 {row.orb.toFixed(2)}° · {row.tone==='supportive'?'조화':row.tone==='challenging'?'긴장':'혼합'}</p>)}</div>}
     </details>
 
