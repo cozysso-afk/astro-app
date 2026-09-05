@@ -34,6 +34,10 @@ def contact_time_sensitivity(a: str, b: str) -> str:
     return max(values, key=lambda value: levels[value])
 
 
+def point_birth_time_dependency(point: str, chart_exact: bool) -> bool:
+    return bool(point in ANGLE_POINTS or point == "Moon") and not bool(chart_exact)
+
+
 def orb_grade(mode: str, orb: float, orb_limit: float | None = None) -> str:
     value = max(0.0, float(orb))
     if mode == "natal":
@@ -65,22 +69,18 @@ def orb_grade(mode: str, orb: float, orb_limit: float | None = None) -> str:
     return "background"
 
 
-def evidence_confidence(
-    *,
-    grade: str,
-    sensitivity: str,
-    chart_a_exact: bool,
-    chart_b_exact: bool,
-) -> str:
-    if sensitivity == "fragile" and not (chart_a_exact and chart_b_exact):
+def evidence_confidence(*, grade: str, sensitivity: str, birth_time_dependency: bool) -> str:
+    if birth_time_dependency and sensitivity == "fragile":
         return "low"
-    if sensitivity == "sensitive" and not (chart_a_exact and chart_b_exact):
+    if birth_time_dependency and sensitivity == "sensitive":
         return "low-moderate"
     if grade == "very_tight" and sensitivity in {"robust", "medium"}:
         return "high"
-    if grade in {"very_tight", "strong"}:
-        return "moderate-high" if sensitivity != "fragile" else "moderate"
-    if sensitivity == "fragile":
+    if grade == "very_tight":
+        return "moderate-high"
+    if grade == "strong":
+        return "moderate-high" if not birth_time_dependency else "moderate"
+    if sensitivity == "fragile" and birth_time_dependency:
         return "low-moderate"
     return "moderate"
 
@@ -94,17 +94,19 @@ def decorate_aspect(
     orb_limit: float | None = None,
 ) -> dict[str, Any]:
     row = dict(aspect)
-    sensitivity = contact_time_sensitivity(str(row.get("a") or ""), str(row.get("b") or ""))
+    a = str(row.get("a") or "")
+    b = str(row.get("b") or "")
+    sensitivity = contact_time_sensitivity(a, b)
+    dependency = point_birth_time_dependency(a, chart_a_exact) or point_birth_time_dependency(b, chart_b_exact)
     grade = orb_grade(mode, float(row.get("orb") or 0.0), orb_limit=orb_limit)
     row.update({
         "orb_grade": grade,
         "time_sensitivity": sensitivity,
-        "birth_time_dependency": sensitivity in {"sensitive", "fragile"},
+        "birth_time_dependency": dependency,
         "evidence_confidence": evidence_confidence(
             grade=grade,
             sensitivity=sensitivity,
-            chart_a_exact=bool(chart_a_exact),
-            chart_b_exact=bool(chart_b_exact),
+            birth_time_dependency=dependency,
         ),
         "layer_priority": LAYER_PRIORITY.get(mode, 9),
         "event_probability": "not_calculated",
