@@ -12,6 +12,7 @@ on:
       - 'relationship_western_v1.py'
       - 'relationship_saju_v1.py'
       - 'personal_marriage_v1.py'
+      - 'western_house_system_v1.py'
       - 'astrocartography_v1.py'
       - 'thai_*.py'
       - 'api/main.py'
@@ -23,6 +24,7 @@ on:
       - 'tests/test_placidus_external_gold_v3.py'
       - 'tests/test_jpl_planetary_gold_v4.py'
       - 'tests/test_astrocartography_external_gold_v6.py'
+      - 'tests/test_western_polar_timezone_v7.py'
       - 'tests/test_thai_*.py'
       - 'tests/test_personal_marriage_v1.py'
       - '.github/workflows/calculation-audit-ci.yml'
@@ -63,7 +65,7 @@ jobs:
         run: python -m pip install -q -r api/requirements.txt pytest
 
       - name: Calculation syntax contract
-        run: python -m py_compile integrated_fortune_v1.py relationship_western_v1.py relationship_saju_v1.py personal_marriage_v1.py astrocartography_v1.py thai_lagna_v1.py thai_suriyayat_v1.py api/main.py
+        run: python -m py_compile integrated_fortune_v1.py relationship_western_v1.py relationship_saju_v1.py personal_marriage_v1.py western_house_system_v1.py astrocartography_v1.py thai_lagna_v1.py thai_suriyayat_v1.py api/main.py
 
       - name: Western, Saju, and astrocartography calculation audit
         run: |
@@ -75,6 +77,7 @@ jobs:
             tests/test_placidus_external_gold_v3.py \
             tests/test_jpl_planetary_gold_v4.py \
             tests/test_astrocartography_external_gold_v6.py \
+            tests/test_western_polar_timezone_v7.py \
             tests/test_personal_marriage_v1.py
 
       - name: Thai independent gold corpus
