@@ -24,7 +24,7 @@ from personal_marriage_v1 import (
 )
 from relationship_reliability_v1 import decorate_aspect
 
-ENGINE_VERSION = "personal-love-western-v1.2-physical-target-dedup"
+ENGINE_VERSION = "personal-love-western-v1.3-secondary-daily-peak"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
 
@@ -33,44 +33,18 @@ DAILY_TRANSIT_PLANETS = {"Sun", "Mercury", "Venus", "Mars"}
 
 TRANSIT_PLANET_WEIGHTS = {
     "new_connection": {
-        "Sun": 0.45,
-        "Mercury": 0.45,
-        "Venus": 1.00,
-        "Mars": 0.70,
-        "Jupiter": 0.95,
-        "Saturn": 0.38,
-        "Uranus": 0.90,
-        "Neptune": 0.42,
-        "Pluto": 0.55,
+        "Sun": 0.45, "Mercury": 0.45, "Venus": 1.00, "Mars": 0.70,
+        "Jupiter": 0.95, "Saturn": 0.38, "Uranus": 0.90, "Neptune": 0.42, "Pluto": 0.55,
     },
     "partnership": {
-        "Sun": 0.35,
-        "Mercury": 0.35,
-        "Venus": 0.90,
-        "Mars": 0.52,
-        "Jupiter": 1.00,
-        "Saturn": 0.95,
-        "Uranus": 0.65,
-        "Neptune": 0.45,
-        "Pluto": 0.68,
+        "Sun": 0.35, "Mercury": 0.35, "Venus": 0.90, "Mars": 0.52,
+        "Jupiter": 1.00, "Saturn": 0.95, "Uranus": 0.65, "Neptune": 0.45, "Pluto": 0.68,
     },
 }
 
 TARGET_WEIGHTS = {
-    "new_connection": {
-        "Venus": 1.00,
-        "Moon": 0.68,
-        "5th_ruler": 0.98,
-        "7th_ruler": 0.72,
-        "DSC": 0.68,
-    },
-    "partnership": {
-        "Venus": 0.85,
-        "Moon": 0.65,
-        "5th_ruler": 0.50,
-        "7th_ruler": 1.00,
-        "DSC": 1.00,
-    },
+    "new_connection": {"Venus": 1.00, "Moon": 0.68, "5th_ruler": 0.98, "7th_ruler": 0.72, "DSC": 0.68},
+    "partnership": {"Venus": 0.85, "Moon": 0.65, "5th_ruler": 0.50, "7th_ruler": 1.00, "DSC": 1.00},
 }
 
 PROGRESSED_PLANET_WEIGHTS = {
@@ -79,12 +53,8 @@ PROGRESSED_PLANET_WEIGHTS = {
 }
 
 ASPECT_WEIGHTS = {
-    "conjunction": 1.00,
-    "opposition": 0.95,
-    "square": 0.90,
-    "trine": 0.84,
-    "sextile": 0.78,
-    "quincunx": 0.66,
+    "conjunction": 1.00, "opposition": 0.95, "square": 0.90,
+    "trine": 0.84, "sextile": 0.78, "quincunx": 0.66,
 }
 
 
@@ -145,13 +115,7 @@ def _target_physical_key(target_name: str, target_info: dict) -> str:
 
 
 def _coalesce_targets(targets: dict) -> dict[str, dict]:
-    """Collapse semantic roles that point to the same physical natal factor.
-
-    A natal body may simultaneously be Venus and the ruler of the 5th/7th house.
-    Those labels are useful evidence, but counting the same transit-to-body contact
-    once per label inflates activation. Keep all roles, score the physical contact
-    once, and use the strongest role weight per dimension rather than summing roles.
-    """
+    """Score one physical natal factor once while preserving all semantic roles."""
     grouped: dict[str, dict] = {}
     for target_name, target_info in targets.items():
         physical_key = _target_physical_key(target_name, target_info)
@@ -162,30 +126,22 @@ def _coalesce_targets(targets: dict) -> dict[str, dict]:
         current = grouped.get(physical_key)
         if current is None:
             current = dict(target_info)
-            current.update(
-                {
-                    "physical_key": physical_key,
-                    "target_roles": [target_name],
-                    "target_weights": role_weights,
-                    "role_birth_time_sensitive": {
-                        target_name: bool(target_info.get("birth_time_sensitive"))
-                    },
-                }
-            )
+            current.update({
+                "physical_key": physical_key,
+                "target_roles": [target_name],
+                "target_weights": role_weights,
+                "role_birth_time_sensitive": {target_name: bool(target_info.get("birth_time_sensitive"))},
+            })
             grouped[physical_key] = current
             continue
-
         current["target_roles"].append(target_name)
         current["birth_time_sensitive"] = bool(
             current.get("birth_time_sensitive") or target_info.get("birth_time_sensitive")
         )
-        current["role_birth_time_sensitive"][target_name] = bool(
-            target_info.get("birth_time_sensitive")
-        )
+        current["role_birth_time_sensitive"][target_name] = bool(target_info.get("birth_time_sensitive"))
         for dimension, role_weight in role_weights.items():
             current["target_weights"][dimension] = max(
-                float(current["target_weights"].get(dimension, 0.0)),
-                role_weight,
+                float(current["target_weights"].get(dimension, 0.0)), role_weight
             )
     return grouped
 
@@ -193,21 +149,6 @@ def _coalesce_targets(targets: dict) -> dict[str, dict]:
 def _local_noon_utc(day: date, utc_offset_hours: float) -> datetime:
     local_tz = timezone(timedelta(hours=float(utc_offset_hours)))
     return datetime.combine(day, dt_time(12, 0), tzinfo=local_tz).astimezone(timezone.utc)
-
-
-def _month_samples(start_date: date, end_date: date) -> list[date]:
-    cursor = date(start_date.year, start_date.month, 1)
-    out: list[date] = []
-    while cursor <= end_date:
-        if cursor.month == 12:
-            next_month = date(cursor.year + 1, 1, 1)
-        else:
-            next_month = date(cursor.year, cursor.month + 1, 1)
-        seg_start = max(start_date, cursor)
-        seg_end = min(end_date, next_month - timedelta(days=1))
-        out.append(seg_start + timedelta(days=(seg_end - seg_start).days // 2))
-        cursor = next_month
-    return out
 
 
 def _moon_uncertainty(birth_date: date, utc_offset_hours: float) -> dict:
@@ -237,10 +178,7 @@ def _natal_context(profile: dict) -> dict:
     profiles = None
     if reliability["time_exact"] and profile.get("latitude") is not None and profile.get("longitude") is not None:
         house = _house_data(natal_jd, float(profile["latitude"]), float(profile["longitude"]))
-        profiles = {
-            "5": _house_profile(5, house, positions),
-            "7": _house_profile(7, house, positions),
-        }
+        profiles = {"5": _house_profile(5, house, positions), "7": _house_profile(7, house, positions)}
 
     targets: dict[str, dict] = {
         "Venus": {
@@ -287,7 +225,9 @@ def _natal_context(profile: dict) -> dict:
         "house_profiles": profiles,
         "targets": targets,
         "time_reliability": reliability,
-        "moon_uncertainty": None if reliability["time_available"] else _moon_uncertainty(profile["birth_date"], float(profile.get("utc_offset_hours", 9.0))),
+        "moon_uncertainty": None if reliability["time_available"] else _moon_uncertainty(
+            profile["birth_date"], float(profile.get("utc_offset_hours", 9.0))
+        ),
     }
 
 
@@ -331,42 +271,32 @@ def _contact_rows(
                     * factor
                 )
                 meta = decorate_aspect(
-                    {
-                        "a": source_name,
-                        "aspect": aspect,
-                        "b": target_name,
-                        "orb": round(orb, 3),
-                        "tone": _tone(aspect),
-                    },
+                    {"a": source_name, "aspect": aspect, "b": target_name, "orb": round(orb, 3), "tone": _tone(aspect)},
                     mode=source_layer,
                     chart_a_exact=source_exact,
                     chart_b_exact=target_exact,
                     orb_limit=orb_limit,
                 )
-                meta.update(
-                    {
-                        "layer": source_layer,
-                        "source": source_name,
-                        "target": target_name,
-                        "target_roles": target_roles,
-                        "target_physical_key": target_info.get("physical_key"),
-                        "target_source": target_info.get("source"),
-                        "target_weight_policy": "max_role_weight_no_duplicate_sum",
-                        "target_weights": dict(target_info.get("target_weights") or {}),
-                        "new_connection_score": round(new_score, 1),
-                        "partnership_score": round(partnership_score, 1),
-                        "birth_time_sensitive_basis": bool(target_info.get("birth_time_sensitive")),
-                        "role_birth_time_sensitive": dict(target_info.get("role_birth_time_sensitive") or {}),
-                    }
-                )
+                meta.update({
+                    "layer": source_layer,
+                    "source": source_name,
+                    "target": target_name,
+                    "target_roles": target_roles,
+                    "target_physical_key": target_info.get("physical_key"),
+                    "target_source": target_info.get("source"),
+                    "target_weight_policy": "max_role_weight_no_duplicate_sum",
+                    "target_weights": dict(target_info.get("target_weights") or {}),
+                    "new_connection_score": round(new_score, 1),
+                    "partnership_score": round(partnership_score, 1),
+                    "birth_time_sensitive_basis": bool(target_info.get("birth_time_sensitive")),
+                    "role_birth_time_sensitive": dict(target_info.get("role_birth_time_sensitive") or {}),
+                })
                 rows.append(meta)
                 break
-    rows.sort(
-        key=lambda x: (
-            -max(float(x.get("new_connection_score") or 0.0), float(x.get("partnership_score") or 0.0)),
-            float(x.get("orb") or 99.0),
-        )
-    )
+    rows.sort(key=lambda x: (
+        -max(float(x.get("new_connection_score") or 0.0), float(x.get("partnership_score") or 0.0)),
+        float(x.get("orb") or 99.0),
+    ))
     return rows[:12]
 
 
@@ -393,19 +323,13 @@ def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, nat
         major_positions = {name: row for name, row in positions.items() if name in MAJOR_TRANSIT_PLANETS}
         daily_positions = {name: row for name, row in positions.items() if name in DAILY_TRANSIT_PLANETS}
         major_hits = _contact_rows(
-            major_positions,
-            natal["targets"],
-            source_layer="major_transit",
-            source_weights=TRANSIT_PLANET_WEIGHTS,
-            source_exact=True,
+            major_positions, natal["targets"], source_layer="major_transit",
+            source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True,
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
         daily_hits = _contact_rows(
-            daily_positions,
-            natal["targets"],
-            source_layer="daily_transit",
-            source_weights=TRANSIT_PLANET_WEIGHTS,
-            source_exact=True,
+            daily_positions, natal["targets"], source_layer="daily_transit",
+            source_weights=TRANSIT_PLANET_WEIGHTS, source_exact=True,
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
         major_rows.append(_layer_day_row(cursor, major_hits))
@@ -415,6 +339,7 @@ def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, nat
 
 
 def _progressed_positions(natal: dict, target_date: date, utc_offset_hours: float) -> dict:
+    """Mean day-for-year secondary progression: one ephemeris day equals one tropical year."""
     target_utc = _local_noon_utc(target_date, utc_offset_hours)
     age_years = max(0.0, (target_utc - natal["natal_utc"]).total_seconds() / 86400.0 / YEAR_DAYS)
     progressed_jd = natal["natal_jd"] + age_years
@@ -423,9 +348,11 @@ def _progressed_positions(natal: dict, target_date: date, utc_offset_hours: floa
 
 
 def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float, natal: dict) -> list[dict]:
+    """Scan each requested calendar day so the monthly peak is not a midpoint proxy."""
     rows: list[dict] = []
-    for sample in _month_samples(start_date, end_date):
-        progressed = _progressed_positions(natal, sample, utc_offset_hours)
+    cursor = start_date
+    while cursor <= end_date:
+        progressed = _progressed_positions(natal, cursor, utc_offset_hours)
         hits = _contact_rows(
             progressed,
             natal["targets"],
@@ -434,21 +361,69 @@ def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float,
             source_exact=bool(natal["time_reliability"]["time_exact"]),
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
-        new_score = _dimension_score(hits, "new_connection_score")
-        partnership_score = _dimension_score(hits, "partnership_score")
-        rows.append(
-            {
-                "date": sample.isoformat(),
-                "calendar_month": sample.strftime("%Y-%m"),
-                "new_connection_activation": new_score,
-                "new_connection_band": _band(new_score),
-                "partnership_activation": partnership_score,
-                "partnership_band": _band(partnership_score),
-                "hits": hits[:8],
-                "event_probability": "not_calculated",
-            }
-        )
+        row = _layer_day_row(cursor, hits)
+        row["calendar_month"] = cursor.strftime("%Y-%m")
+        row["progression_key"] = "mean_day_for_year"
+        rows.append(row)
+        cursor += timedelta(days=1)
     return rows
+
+
+def _dimension_evidence(row: dict, dimension: str, limit: int = 3) -> list[dict]:
+    score_key = f"{dimension}_score"
+    return sorted(
+        list(row.get("hits") or []),
+        key=lambda hit: (-float(hit.get(score_key) or 0.0), float(hit.get("orb") or 99.0)),
+    )[:limit]
+
+
+def _merge_evidence(*groups: list[dict], limit: int = 8) -> list[dict]:
+    out: list[dict] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for group in groups:
+        for hit in group:
+            key = (
+                str(hit.get("source") or ""),
+                str(hit.get("aspect") or ""),
+                str(hit.get("target_physical_key") or hit.get("target") or ""),
+                str(hit.get("layer") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(hit)
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def _progression_months(rows: list[dict]) -> list[dict]:
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        grouped.setdefault(row["calendar_month"], []).append(row)
+    out: list[dict] = []
+    for month, month_rows in sorted(grouped.items()):
+        new_peak = max(month_rows, key=lambda x: (float(x["new_connection_activation"]), x["date"]))
+        partner_peak = max(month_rows, key=lambda x: (float(x["partnership_activation"]), x["date"]))
+        new_score = float(new_peak["new_connection_activation"])
+        partnership_score = float(partner_peak["partnership_activation"])
+        new_evidence = _dimension_evidence(new_peak, "new_connection") if new_score > 0 else []
+        partner_evidence = _dimension_evidence(partner_peak, "partnership") if partnership_score > 0 else []
+        out.append({
+            "calendar_month": month,
+            "new_connection_activation": round(new_score, 1),
+            "new_connection_band": _band(new_score),
+            "new_connection_peak_date": new_peak["date"] if new_score > 0 else None,
+            "new_connection_evidence": new_evidence,
+            "partnership_activation": round(partnership_score, 1),
+            "partnership_band": _band(partnership_score),
+            "partnership_peak_date": partner_peak["date"] if partnership_score > 0 else None,
+            "partnership_evidence": partner_evidence,
+            "hits": _merge_evidence(new_evidence, partner_evidence),
+            "sampling": "daily_peak_within_calendar_month",
+            "event_probability": "not_calculated",
+        })
+    return out
 
 
 def _summary(rows: list[dict], key: str) -> dict:
@@ -461,22 +436,43 @@ def _summary(rows: list[dict], key: str) -> dict:
         day = date.fromisoformat(row["date"])
         if any(abs((day - date.fromisoformat(x["date"])).days) <= 2 for x in selected):
             continue
-        selected.append(
-            {
-                "date": row["date"],
-                "score": row[key],
-                "band": _band(float(row[key])),
-                "evidence": row.get("hits", [])[:3],
-            }
-        )
+        selected.append({
+            "date": row["date"],
+            "score": row[key],
+            "band": _band(float(row[key])),
+            "evidence": row.get("hits", [])[:3],
+        })
         if len(selected) >= 8:
             break
-    return {
-        "average": average,
-        "band": _band(average),
-        "top_dates": selected,
-        "event_probability": "not_calculated",
-    }
+    return {"average": average, "band": _band(average), "top_dates": selected, "event_probability": "not_calculated"}
+
+
+def _progression_summary(months: list[dict], dimension: str) -> dict:
+    key = f"{dimension}_activation"
+    peak_key = f"{dimension}_peak_date"
+    evidence_key = f"{dimension}_evidence"
+    if not months:
+        return {"average": 0.0, "band": "low", "top_dates": [], "event_probability": "not_calculated"}
+    average = round(sum(float(row[key]) for row in months) / len(months), 1)
+    ordered = sorted(months, key=lambda row: (-float(row[key]), row["calendar_month"]))
+    selected: list[dict] = []
+    for row in ordered:
+        peak_date = row.get(peak_key)
+        if not peak_date or float(row[key]) <= 0:
+            continue
+        day = date.fromisoformat(peak_date)
+        if any(abs((day - date.fromisoformat(x["date"])).days) <= 7 for x in selected):
+            continue
+        selected.append({
+            "date": peak_date,
+            "calendar_month": row["calendar_month"],
+            "score": row[key],
+            "band": _band(float(row[key])),
+            "evidence": row.get(evidence_key, [])[:3],
+        })
+        if len(selected) >= 8:
+            break
+    return {"average": average, "band": _band(average), "top_dates": selected, "event_probability": "not_calculated"}
 
 
 def _monthly_summary(rows: list[dict]) -> list[dict]:
@@ -489,21 +485,19 @@ def _monthly_summary(rows: list[dict]) -> list[dict]:
         strongest_partner = sorted(month_rows, key=lambda x: float(x["partnership_activation"]), reverse=True)[:5]
         new_score = round(sum(float(x["new_connection_activation"]) for x in strongest_new) / max(1, len(strongest_new)), 1)
         partnership_score = round(sum(float(x["partnership_activation"]) for x in strongest_partner) / max(1, len(strongest_partner)), 1)
-        out.append(
-            {
-                "calendar_month": month,
-                "new_connection_activation": new_score,
-                "new_connection_band": _band(new_score),
-                "partnership_activation": partnership_score,
-                "partnership_band": _band(partnership_score),
-                "event_probability": "not_calculated",
-            }
-        )
+        out.append({
+            "calendar_month": month,
+            "new_connection_activation": new_score,
+            "new_connection_band": _band(new_score),
+            "partnership_activation": partnership_score,
+            "partnership_band": _band(partnership_score),
+            "event_probability": "not_calculated",
+        })
     return out
 
 
-def _convergence(major_months: list[dict], progression_rows: list[dict], daily_months: list[dict]) -> list[dict]:
-    progress_by_month = {row["calendar_month"]: row for row in progression_rows}
+def _convergence(major_months: list[dict], progression_months: list[dict], daily_months: list[dict]) -> list[dict]:
+    progress_by_month = {row["calendar_month"]: row for row in progression_months}
     daily_by_month = {row["calendar_month"]: row for row in daily_months}
     out = []
     for major in major_months:
@@ -511,10 +505,7 @@ def _convergence(major_months: list[dict], progression_rows: list[dict], daily_m
         if not progress:
             continue
         dimensions = []
-        for name, key in (
-            ("new_connection", "new_connection_activation"),
-            ("partnership", "partnership_activation"),
-        ):
+        for name, key in (("new_connection", "new_connection_activation"), ("partnership", "partnership_activation")):
             if float(major[key]) >= 40.0 and float(progress[key]) >= 40.0:
                 dimensions.append(name)
         if not dimensions:
@@ -522,22 +513,17 @@ def _convergence(major_months: list[dict], progression_rows: list[dict], daily_m
         daily = daily_by_month.get(major["calendar_month"])
         daily_support = [
             name
-            for name, key in (
-                ("new_connection", "new_connection_activation"),
-                ("partnership", "partnership_activation"),
-            )
+            for name, key in (("new_connection", "new_connection_activation"), ("partnership", "partnership_activation"))
             if daily and float(daily[key]) >= 40.0 and name in dimensions
         ]
-        out.append(
-            {
-                "calendar_month": major["calendar_month"],
-                "dimensions": dimensions,
-                "independent_layers": ["major_transit", "secondary_progression"],
-                "layer_count": 2,
-                "daily_transit_support": daily_support,
-                "policy": "convergence requires independent higher-priority major-transit and secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
-            }
-        )
+        out.append({
+            "calendar_month": major["calendar_month"],
+            "dimensions": dimensions,
+            "independent_layers": ["major_transit", "secondary_progression"],
+            "layer_count": 2,
+            "daily_transit_support": daily_support,
+            "policy": "convergence requires independent higher-priority major-transit and secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
+        })
     return out
 
 
@@ -562,10 +548,12 @@ def build_personal_love_forecast(
         raise ValueError("time_known=true requires birth_time")
 
     natal = _natal_context(profile)
-    transit_layers = _transit_rows(start_date, end_date, float(profile.get("utc_offset_hours", 9.0)), natal)
+    utc_offset_hours = float(profile.get("utc_offset_hours", 9.0))
+    transit_layers = _transit_rows(start_date, end_date, utc_offset_hours, natal)
     major_rows = transit_layers["major"]
     daily_rows = transit_layers["daily"]
-    progression_rows = _progression_rows(start_date, end_date, float(profile.get("utc_offset_hours", 9.0)), natal)
+    progression_daily_rows = _progression_rows(start_date, end_date, utc_offset_hours, natal)
+    progression_months = _progression_months(progression_daily_rows)
     major_months = _monthly_summary(major_rows)
     daily_months = _monthly_summary(daily_rows)
 
@@ -593,10 +581,12 @@ def build_personal_love_forecast(
         "static_structure": static_structure,
         "timing": {
             "secondary_progression": {
-                "new_connection": _summary(progression_rows, "new_connection_activation"),
-                "partnership": _summary(progression_rows, "partnership_activation"),
-                "months": progression_rows,
-                "policy": "secondary progression is an independent higher-priority timing layer and is never numerically merged into transit indices",
+                "new_connection": _progression_summary(progression_months, "new_connection"),
+                "partnership": _progression_summary(progression_months, "partnership"),
+                "months": progression_months,
+                "daily_samples": progression_daily_rows,
+                "progression_key": {"method": "mean_day_for_year", "year_days": YEAR_DAYS},
+                "policy": "secondary progression uses mean day-for-year mapping and scans every requested calendar day; monthly activation is the strongest daily peak and is never a midpoint proxy or numerically merged into transit indices",
             },
             "major_transits": {
                 "new_connection": _summary(major_rows, "new_connection_activation"),
@@ -614,7 +604,7 @@ def build_personal_love_forecast(
                 "planets": sorted(DAILY_TRANSIT_PLANETS),
                 "policy": "Sun/Mercury/Venus/Mars fast timing support only; never overrides higher-priority secondary or major-transit structure",
             },
-            "convergence": _convergence(major_months, progression_rows, daily_months),
+            "convergence": _convergence(major_months, progression_months, daily_months),
         },
         "focus": "new_connection" if mode == "new_relationship" else "balanced_personal_love",
         "interpretation_policy": {
@@ -625,6 +615,7 @@ def build_personal_love_forecast(
             "event_probability": "not_calculated",
             "score_semantics": "astrology activation index only",
             "physical_target_deduplication": "same natal body serving multiple semantic roles is scored once using the maximum applicable role weight; all roles remain in evidence",
+            "secondary_progression_sampling": "mean day-for-year positions are scanned daily; monthly values use the strongest real daily peak so a mid-month sample is never presented as an exact progression date",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
             "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
