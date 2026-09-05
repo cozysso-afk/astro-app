@@ -18,11 +18,8 @@ try:
 except ImportError:  # Render runs with api/ as the working directory.
     from main import app
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://dbynfabwfcakxayyggzi.supabase.co").rstrip("/")
-SUPABASE_PUBLISHABLE_KEY = os.getenv(
-    "SUPABASE_PUBLISHABLE_KEY",
-    "sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r",
-).strip()
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip()
 _AUTH_CACHE_TTL_SECONDS = 45
 _auth_cache: dict[str, tuple[float, dict]] = {}
 _auth_cache_lock = threading.Lock()
@@ -75,7 +72,7 @@ def _verify_app_access(token: str) -> dict:
 
     access_url = (
         f"{SUPABASE_URL}/rest/v1/app_access"
-        f"?select=email,role&email=eq.{quote(email, safe='')}&enabled=eq.true&limit=1"
+        f"?select=email,role,user_id&email=eq.{quote(email, safe='')}&enabled=eq.true&limit=1"
     )
     try:
         rows = _json_request(access_url, token)
@@ -89,6 +86,10 @@ def _verify_app_access(token: str) -> dict:
     if not isinstance(rows, list) or not rows:
         raise PermissionError("access_denied")
     row = rows[0] if isinstance(rows[0], dict) else {}
+    bound_user_id = str(row.get("user_id") or "").strip()
+    if bound_user_id and bound_user_id != user_id:
+        raise PermissionError("bound_user_mismatch")
+
     access = {
         "allowed": True,
         "user_id": user_id,
