@@ -72,6 +72,23 @@ def test_personal_routes_reject_counterpart_inside_profile():
     assert response.status_code == 422
 
 
+def test_personal_routes_reject_other_two_person_relationship_fields():
+    for field, value in (
+        ("relationship_status", "dating"),
+        ("reunion", True),
+        ("partner", {"present": True}),
+    ):
+        payload = request_payload()
+        payload[field] = value
+        response = client.post("/v1/love/personal", json=payload)
+        assert response.status_code == 422, (field, response.text)
+
+        nested = request_payload()
+        nested["profile"][field] = value
+        response = client.post("/v1/love/new-relationship", json=nested)
+        assert response.status_code == 422, (field, response.text)
+
+
 def test_relationship_route_rejects_personal_love_mode():
     payload = {
         "user": profile_payload(),
