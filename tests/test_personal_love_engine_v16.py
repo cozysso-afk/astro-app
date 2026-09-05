@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from datetime import date, time
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
@@ -42,7 +42,9 @@ def test_engine_is_single_person_and_not_relationship_wrapper():
 
 
 def test_exact_time_unlocks_5h_7h_dsc_and_keeps_static_separate():
-    result = pl.build_personal_love_forecast(exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 5), mode="personal_love_forecast")
+    result = pl.build_personal_love_forecast(
+        exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 5), mode="personal_love_forecast"
+    )
     static = result["static_structure"]
     assert static["house_angle_layers_enabled"] is True
     assert static["fifth_house"] is not None
@@ -55,7 +57,9 @@ def test_exact_time_unlocks_5h_7h_dsc_and_keeps_static_separate():
 
 
 def test_provisional_time_keeps_planetary_timing_but_disables_angles():
-    result = pl.build_personal_love_forecast(provisional_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 3), mode="new_relationship")
+    result = pl.build_personal_love_forecast(
+        provisional_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 3), mode="new_relationship"
+    )
     static = result["static_structure"]
     assert static["time_reliability"]["status"] == "provisional"
     assert static["house_angle_layers_enabled"] is False
@@ -65,16 +69,21 @@ def test_provisional_time_keeps_planetary_timing_but_disables_angles():
     assert result["timing"]["major_transits"]["daily_samples"]
     assert result["timing"]["daily_transits"]["daily"]
     assert result["timing"]["secondary_progression"]["months"]
+    assert result["timing"]["secondary_progression"]["daily_samples"]
     assert result["focus"] == "new_connection"
 
 
 def test_unknown_time_uses_moon_range_not_exact_moon_or_houses():
-    result = pl.build_personal_love_forecast(unknown_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="personal_love_forecast")
+    result = pl.build_personal_love_forecast(
+        unknown_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="personal_love_forecast"
+    )
     static = result["static_structure"]
     assert static["time_reliability"]["status"] == "unknown"
     assert static["moon"] is None
     assert static["moon_uncertainty"]["available"] is True
     assert static["house_angle_layers_enabled"] is False
+    for row in result["timing"]["secondary_progression"]["daily_samples"]:
+        assert all(hit["source"] != "Moon" for hit in row["hits"])
     for row in result["timing"]["secondary_progression"]["months"]:
         assert all(hit["source"] != "Moon" for hit in row["hits"])
 
@@ -83,7 +92,9 @@ def test_counterpart_fields_are_rejected_by_engine():
     profile = exact_profile()
     profile["counterpart"] = {"present": True}
     with pytest.raises(ValueError, match="does not accept counterpart"):
-        pl.build_personal_love_forecast(profile, start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="new_relationship")
+        pl.build_personal_love_forecast(
+            profile, start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="new_relationship"
+        )
 
 
 def test_same_physical_natal_body_is_scored_once_across_multiple_roles():
@@ -188,8 +199,69 @@ def test_same_longitude_different_physical_bodies_are_not_collapsed():
     assert {row["target_physical_key"] for row in rows} == {"planet:Venus", "planet:Mercury"}
 
 
+def test_secondary_progression_uses_mean_day_for_year_mapping(monkeypatch):
+    natal_utc = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    natal = {
+        "natal_utc": natal_utc,
+        "natal_jd": 1000.0,
+        "time_reliability": {"time_available": True},
+    }
+    captured = {}
+    monkeypatch.setattr(
+        pl,
+        "_local_noon_utc",
+        lambda target_date, utc_offset_hours: natal_utc + timedelta(days=pl.YEAR_DAYS * 10.0),
+    )
+
+    def fake_positions(jd, include_moon=True):
+        captured["jd"] = jd
+        return {
+            "Sun": {"longitude": 1.0},
+            "Moon": {"longitude": 2.0},
+            "Venus": {"longitude": 3.0},
+        }
+
+    monkeypatch.setattr(pl, "_positions", fake_positions)
+    result = pl._progressed_positions(natal, date(2010, 1, 1), 9.0)
+    assert captured["jd"] == pytest.approx(1010.0)
+    assert set(result) == {"Sun", "Moon", "Venus"}
+
+
+def test_secondary_progression_scans_daily_and_keeps_real_monthly_peak(monkeypatch):
+    natal = {
+        "targets": {
+            "Venus": {
+                "longitude": 0.0,
+                "source": "natal_planet",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": False,
+            }
+        },
+        "time_reliability": {"time_available": True, "time_exact": True},
+    }
+
+    def fake_progressed_positions(natal_arg, target_date, utc_offset_hours):
+        # Exact conjunction is deliberately on March 3, far from the old mid-month proxy.
+        return {"Moon": {"longitude": (target_date.day - 3) * 0.1}}
+
+    monkeypatch.setattr(pl, "_progressed_positions", fake_progressed_positions)
+    daily_rows = pl._progression_rows(date(2026, 3, 1), date(2026, 3, 31), 9.0, natal)
+    months = pl._progression_months(daily_rows)
+    assert len(daily_rows) == 31
+    assert len(months) == 1
+    month = months[0]
+    assert month["sampling"] == "daily_peak_within_calendar_month"
+    assert month["new_connection_peak_date"] == "2026-03-03"
+    midpoint = next(row for row in daily_rows if row["date"] == "2026-03-16")
+    assert month["new_connection_activation"] > midpoint["new_connection_activation"]
+    summary = pl._progression_summary(months, "new_connection")
+    assert summary["top_dates"][0]["date"] == "2026-03-03"
+
+
 def test_major_daily_and_secondary_are_independent_layers():
-    result = pl.build_personal_love_forecast(exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 10, 15), mode="personal_love_forecast")
+    result = pl.build_personal_love_forecast(
+        exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 10, 15), mode="personal_love_forecast"
+    )
     timing = result["timing"]
     assert set(timing) == {"major_transits", "daily_transits", "secondary_progression", "convergence"}
     assert "overall_score" not in timing
@@ -198,12 +270,20 @@ def test_major_daily_and_secondary_are_independent_layers():
     assert timing["secondary_progression"]["new_connection"]["event_probability"] == "not_calculated"
     assert set(timing["major_transits"]["planets"]) == pl.MAJOR_TRANSIT_PLANETS
     assert set(timing["daily_transits"]["planets"]) == pl.DAILY_TRANSIT_PLANETS
+    assert timing["secondary_progression"]["progression_key"] == {
+        "method": "mean_day_for_year",
+        "year_days": pl.YEAR_DAYS,
+    }
+    assert len(timing["secondary_progression"]["daily_samples"]) == 45
     for row in timing["major_transits"]["daily_samples"]:
         assert all(hit["layer"] == "major_transit" for hit in row["hits"])
         assert all(hit["source"] in pl.MAJOR_TRANSIT_PLANETS for hit in row["hits"])
     for row in timing["daily_transits"]["daily"]:
         assert all(hit["layer"] == "daily_transit" for hit in row["hits"])
         assert all(hit["source"] in pl.DAILY_TRANSIT_PLANETS for hit in row["hits"])
+    for row in timing["secondary_progression"]["daily_samples"]:
+        assert all(hit["layer"] == "secondary" for hit in row["hits"])
+        assert all(hit["source"] in pl.PROGRESSED_PLANET_WEIGHTS["new_connection"] for hit in row["hits"])
     for item in timing["convergence"]:
         assert item["layer_count"] == 2
         assert item["independent_layers"] == ["major_transit", "secondary_progression"]
@@ -230,3 +310,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert policy["static_synastry_used"] is False
         assert policy["layer_mixing"].startswith("forbidden")
         assert "maximum applicable role weight" in policy["physical_target_deduplication"]
+        assert "scanned daily" in policy["secondary_progression_sampling"]
