@@ -1,0 +1,103 @@
+name: Render Relationship Live V8
+
+on:
+  push:
+    branches:
+      - audit/relationship-midpoints-v8
+    paths:
+      - '.github/workflows/render-relationship-live-v8.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  relationship-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify live V8 relationship contract
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+          import urllib.error
+
+          base = 'https://astro-app-api-f7fn.onrender.com'
+          expected_engine = 'relationship-western-v1.7-midpoint-contract'
+
+          payload = {
+              'user': {
+                  'name': 'v8-user',
+                  'birth_date': '1990-01-01',
+                  'birth_time': '12:00:00',
+                  'time_known': True,
+                  'latitude': 10.0,
+                  'longitude': 20.0,
+                  'utc_offset_hours': 0,
+              },
+              'counterpart': {
+                  'name': 'v8-counterpart',
+                  'birth_date': '1990-01-03',
+                  'birth_time': '12:00:00',
+                  'time_known': True,
+                  'latitude': 30.0,
+                  'longitude': 80.0,
+                  'utc_offset_hours': 0,
+              },
+              'start_date': '2026-09-01',
+              'end_date': '2026-09-30',
+              'relationship_status': 'dating',
+              'analysis_mode': 'compatibility',
+          }
+
+          last_error = None
+          for attempt in range(1, 7):
+              try:
+                  with urllib.request.urlopen(base + '/v1/meta', timeout=60) as response:
+                      meta = json.load(response)
+                  if meta.get('relationship_engine') != expected_engine:
+                      raise AssertionError(f"relationship engine not ready: {meta.get('relationship_engine')}")
+
+                  req = urllib.request.Request(
+                      base + '/v1/relationship/western',
+                      data=json.dumps(payload).encode('utf-8'),
+                      headers={'Content-Type': 'application/json'},
+                      method='POST',
+                  )
+                  with urllib.request.urlopen(req, timeout=120) as response:
+                      result = json.load(response)
+
+                  assert result['ok'] is True, result
+                  assert result['engine'] == expected_engine, result.get('engine')
+                  body = result['result']
+                  assert body['engine'] == expected_engine, body.get('engine')
+
+                  davison = body['davison']
+                  assert davison['available'] is True, davison
+                  chart = davison['chart']
+                  assert chart['variant'] == 'uncorrected', chart
+                  assert chart['latitude'] == 20.0, chart
+                  assert chart['longitude'] == 50.0, chart
+
+                  marks = body['marks']
+                  assert marks['available'] is True, marks
+                  assert marks['user']['variant'] == 'uncorrected', marks['user']
+                  assert marks['counterpart']['variant'] == 'uncorrected', marks['counterpart']
+
+                  months = body['months']
+                  assert months and months[0]['progressed_composite']['available'] is True, months
+                  assert months[0]['marks_tertiary']['available'] is True, months[0]
+
+                  print('render-relationship-live-ok')
+                  print('engine=', result['engine'])
+                  print('davison=', {k: chart[k] for k in ('variant','latitude','longitude','method')})
+                  print('marks-tertiary-month=', months[0]['calendar_month'])
+                  break
+              except Exception as exc:
+                  last_error = exc
+                  print(f'attempt {attempt}/6 failed: {type(exc).__name__}: {exc}')
+                  if attempt == 6:
+                      raise
+                  time.sleep(10)
+          PY
