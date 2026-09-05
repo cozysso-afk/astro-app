@@ -102,7 +102,7 @@ def test_provisional_partner_gets_five_point_sensitivity_scan_without_unlocking_
         analysis_mode="reunion",
     )
     assert out["ok"] is True
-    assert out["engine"] == "relationship-western-v1.10-reliability-evidence"
+    assert out["engine"] == rw.ENGINE_VERSION
 
     scan = out["sensitivity_scan"]["counterpart"]
     assert scan["available"] is True

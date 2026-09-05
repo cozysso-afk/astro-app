@@ -94,6 +94,9 @@ function compactAspectForExternal(aspect: unknown) {
   return {
     a: String(row.a ?? ''), aspect: String(row.aspect ?? ''), b: String(row.b ?? ''),
     orb: Number(orb.toFixed(2)), tone: String(row.tone ?? 'mixed'), layer: row.layer ?? undefined,
+    orb_grade:row.orb_grade ?? undefined, time_sensitivity:row.time_sensitivity ?? undefined,
+    evidence_confidence:row.evidence_confidence ?? undefined, layer_priority:row.layer_priority ?? undefined,
+    event_probability:row.event_probability ?? 'not_calculated',
   }
 }
 
@@ -198,6 +201,63 @@ function compactAdvancedMonthForExternal(value: unknown, limit: number) {
   }
 }
 
+function compactReunionDimensionForExternal(value: unknown, monthLimit: number, evidenceLimit: number, statBest: number, statCaution: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const evidencePoint = (item: unknown) => {
+    if (!item || typeof item !== 'object') return null
+    const x = item as Record<string, unknown>
+    const list = (v: unknown) => (Array.isArray(v) ? v : []).slice(0,2).map(compactAspectForExternal).filter(Boolean)
+    return {
+      date:String(x.date ?? ''), score:Number(Number(x.score ?? 0).toFixed(1)),
+      user_score:Number(Number(x.user_score ?? 0).toFixed(1)), counterpart_score:Number(Number(x.counterpart_score ?? 0).toFixed(1)),
+      user_evidence:list(x.user_evidence), counterpart_evidence:list(x.counterpart_evidence), event_probability:'not_calculated',
+    }
+  }
+  const months = (Array.isArray(row.months) ? row.months : []).slice(0,monthLimit).map((item)=>{
+    const m = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    return {calendar_month:m.calendar_month ?? null,start:m.start ?? null,end:m.end ?? null,incoming:compactStatForExternal(m.incoming,1,1),outgoing:compactStatForExternal(m.outgoing,1,1),reconnection:compactStatForExternal(m.reconnection,1,1)}
+  })
+  return {
+    incoming:compactStatForExternal(row.incoming,statBest,statCaution),
+    outgoing:compactStatForExternal(row.outgoing,statBest,statCaution),
+    reconnection:compactStatForExternal(row.reconnection,statBest,statCaution),
+    months,
+    top_evidence:(Array.isArray(row.top_evidence) ? row.top_evidence : []).slice(0,evidenceLimit).map(evidencePoint).filter(Boolean),
+    event_probability:'not_calculated',
+  }
+}
+
+function compactReunionDimensionsForExternal(value: unknown, caps: { directionalMonths:number; transitDays:number; statBest:number; statCaution:number }) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const one = (key: string) => compactReunionDimensionForExternal(row[key],caps.directionalMonths,caps.transitDays,caps.statBest,caps.statCaution)
+  return {period:row.period ?? null,contact_recontact:one('contact_recontact'),emotional_reactivation:one('emotional_reactivation'),relationship_rebuilding:one('relationship_rebuilding'),policy:row.policy ?? null}
+}
+
+function compactSecondaryDimensionForExternal(value: unknown, evidenceLimit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  return {
+    label:row.label ?? null,
+    evidence:(Array.isArray(row.evidence) ? row.evidence : []).slice(0,evidenceLimit).map(compactAspectForExternal).filter(Boolean),
+    independent_primary_layers:(Array.isArray(row.independent_primary_layers) ? row.independent_primary_layers : []).slice(0,4),
+    independent_layer_count:Number(row.independent_layer_count ?? 0), convergence:Boolean(row.convergence), score:null,
+    policy:row.policy ?? null,event_probability:'not_calculated',
+  }
+}
+
+function compactReunionSecondarySupportForExternal(value: unknown, monthLimit: number, evidenceLimit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const months = (Array.isArray(row.months) ? row.months : []).slice(0,monthLimit).map((item)=>{
+    const m = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    const d = (m.dimensions && typeof m.dimensions === 'object' ? m.dimensions : {}) as Record<string, unknown>
+    return {calendar_month:m.calendar_month ?? null,representative_date:m.representative_date ?? null,dimensions:{contact_recontact:compactSecondaryDimensionForExternal(d.contact_recontact,evidenceLimit),emotional_reactivation:compactSecondaryDimensionForExternal(d.emotional_reactivation,evidenceLimit),relationship_rebuilding:compactSecondaryDimensionForExternal(d.relationship_rebuilding,evidenceLimit)}}
+  })
+  return {months,policy:row.policy ?? null,event_probability:'not_calculated'}
+}
+
 function compactRelationshipExternalPacket(calculation: RelationshipApiResponse | null | undefined, reunionContext: ReunionTimingContext | null | undefined, level: number) {
   if (!calculation) return null
   const rawResult = calculation.result as RelationshipApiResponse['result'] & Record<string, unknown>
@@ -253,6 +313,8 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     saju_relationship: compactSajuForExternal(rawResult.saju_relationship,caps.saju),
     advanced: { composite:compactAdvancedStaticForExternal(rawResult.composite), davison:compactAdvancedStaticForExternal(rawResult.davison), marks:compactAdvancedStaticForExternal(rawResult.marks), months },
     reunion_transits: transits,
+    reunion_dimensions: compactReunionDimensionsForExternal(rawResult.reunion_dimensions,caps),
+    reunion_secondary_support: compactReunionSecondarySupportForExternal(rawResult.reunion_secondary_support,caps.months,caps.tight),
     reunion_directional_context: reunionContext ? {
       period:reunionContext.period,
       incoming:compactStatForExternal(reunionContext.incoming,caps.statBest,caps.statCaution),
@@ -282,6 +344,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '',
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
+    '- 재회운은 reunion_dimensions의 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 분리하고, 각 축의 incoming/outgoing/reconnection도 합치지 않는다. reunion_secondary_support는 daily transit 점수와 합산하지 않는다.',
     '- 좁은 오브의 실제 접점과 서로 독립된 레이어에서 반복되는 근거를 우선한다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',

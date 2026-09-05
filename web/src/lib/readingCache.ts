@@ -13,7 +13,7 @@ const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
 const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
-const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.4-reliability-evidence'
+const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)

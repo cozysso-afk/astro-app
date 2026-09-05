@@ -21,8 +21,9 @@ import swisseph as swe
 from western_house_system_v1 import calculate_quadrant_houses
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
+from reunion_dimension_v1 import DIMENSIONS, daily_dimension_scores, secondary_support
 
-ENGINE_VERSION = "relationship-western-v1.10-reliability-evidence"
+ENGINE_VERSION = "relationship-western-v1.11-reunion-dimensions"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -196,6 +197,75 @@ def _relationship_directional_context(rows, start_date, end_date):
     }
 
 
+def _dimension_timing_stat(rows, dimension, score_key, label):
+    adapted = []
+    for row in rows:
+        value = ((row.get("dimensions") or {}).get(dimension) or {}).get(score_key)
+        if isinstance(value, (int, float)):
+            adapted.append({"date": row["date"], "value": float(value)})
+    return _relationship_timing_stat(adapted, "value", label) if adapted else None
+
+
+def _reunion_dimension_context(rows, start_date, end_date):
+    labels = {
+        "contact_recontact": "연락·재접촉 활성지수 · 사건 발생 확률 아님",
+        "emotional_reactivation": "감정·관계 재활성지수 · 실제 속마음/사건 확률 아님",
+        "relationship_rebuilding": "관계 재구축 지원 활성지수 · 실제 재결합/장기지속 확률 아님",
+    }
+    months = {}
+    for row in rows:
+        months.setdefault(row["date"][:7], []).append(row)
+
+    result = {}
+    for dimension in DIMENSIONS:
+        monthly = []
+        for month_key, month_rows in sorted(months.items()):
+            monthly.append({
+                "calendar_month": month_key,
+                "start": month_rows[0]["date"],
+                "end": month_rows[-1]["date"],
+                "incoming": _dimension_timing_stat(month_rows, dimension, "counterpart_score", labels[dimension]),
+                "outgoing": _dimension_timing_stat(month_rows, dimension, "user_score", labels[dimension]),
+                "reconnection": _dimension_timing_stat(month_rows, dimension, "score", labels[dimension]),
+            })
+        ranked = sorted(
+            rows,
+            key=lambda row: -float(((row.get("dimensions") or {}).get(dimension) or {}).get("score") or 0.0),
+        )
+        top_evidence = []
+        for row in ranked:
+            data = (row.get("dimensions") or {}).get(dimension) or {}
+            if float(data.get("score") or 0.0) <= 0:
+                continue
+            day = date.fromisoformat(row["date"])
+            if any(abs((day - date.fromisoformat(existing["date"])).days) <= 1 for existing in top_evidence):
+                continue
+            top_evidence.append({
+                "date": row["date"],
+                "score": data.get("score", 0.0),
+                "user_score": data.get("user_score", 0.0),
+                "counterpart_score": data.get("counterpart_score", 0.0),
+                "user_evidence": list(data.get("user_evidence") or [])[:2],
+                "counterpart_evidence": list(data.get("counterpart_evidence") or [])[:2],
+                "event_probability": "not_calculated",
+            })
+            if len(top_evidence) >= 8:
+                break
+        result[dimension] = {
+            "incoming": _dimension_timing_stat(rows, dimension, "counterpart_score", labels[dimension]),
+            "outgoing": _dimension_timing_stat(rows, dimension, "user_score", labels[dimension]),
+            "reconnection": _dimension_timing_stat(rows, dimension, "score", labels[dimension]),
+            "months": monthly,
+            "top_evidence": top_evidence,
+            "event_probability": "not_calculated",
+        }
+    return {
+        **result,
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "policy": "contact/recontact, emotional reactivation, and relationship rebuilding support are orthogonal transit-activation dimensions. Each keeps incoming/outgoing/reconnection directions separate. No overall reunion score or event probability is calculated.",
+    }
+
+
 def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
     rows = []
     cursor = start_date
@@ -208,6 +278,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         cp_score = _side_trigger_score(cp_hits)
         shared_bonus = 8.0 if user_score >= 35 and cp_score >= 35 else 0.0
         combined = round(min(100.0, user_score * .45 + cp_score * .55 + shared_bonus), 1)
+        dimensions = daily_dimension_scores(user_hits, cp_hits)
         rows.append({
             "date": cursor.isoformat(),
             "score": combined,
@@ -215,6 +286,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
             "counterpart_score": cp_score,
             "shared_activation": bool(user_score >= 25 and cp_score >= 25),
             "hits": (cp_hits[:3] + user_hits[:3])[:6],
+            "dimensions": dimensions,
         })
         cursor += timedelta(days=1)
 
@@ -246,6 +318,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         "top_days": top_days,
         "top_months": top_months[:12],
         "directional_context": _relationship_directional_context(rows, start_date, end_date),
+        "dimensions": _reunion_dimension_context(rows, start_date, end_date),
     }
 
 
@@ -845,6 +918,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         )
         result["relationship_transits"] = transit_layer
         result["reunion_transits"] = transit_layer
+        result["reunion_dimensions"] = transit_layer["dimensions"]
 
     davison = marks_a = marks_b = None
     if user_exact and cp_exact:
@@ -917,14 +991,26 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             row["marks_tertiary"] = {"available": False, "reason": "Exact-time Marks base charts unavailable."}
 
         row["signal_summary"] = _summary(layer_aspects)
+        if analysis_mode == "reunion":
+            row["reunion_secondary_support"] = secondary_support(row)
         monthly.append(row)
 
     result["months"] = monthly
+    if analysis_mode == "reunion":
+        result["reunion_secondary_support"] = {
+            "months": [
+                {"calendar_month": row["calendar_month"], "representative_date": row["representative_date"], "dimensions": row.get("reunion_secondary_support")}
+                for row in monthly
+            ],
+            "policy": "secondary progressed synastry and progressed composite are higher-priority timing evidence and remain separate from daily transit activation scores; Marks/Tertiary stays supplementary and is not folded into these primary dimension supports",
+            "event_probability": "not_calculated",
+        }
     result["interpretation_policy"] = {
         "static": "Natal synastry/composite/Davison/Marks describe different relationship structures and must not be collapsed into one score.",
         "timing": "Secondary progressed synastry/progressed composite and Marks Tertiary-I are timing layers. Repeated tight contacts across independent layers may be called convergence, never event certainty.",
         "layer_priority": "Interpret in this order: natal structure > secondary progression > major/medium-term transit > fast daily transit > tertiary/Marks supplementary. A tertiary-only hit cannot overturn higher-layer evidence.",
         "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
+        "reunion_dimensions": "For reunion mode keep three orthogonal outcomes separate: contact/recontact activation, emotional/relationship reactivation, and relationship-rebuilding support. Within every dimension keep incoming, outgoing and reconnection separate. Never collapse them into one reunion score.",
         "birth_time": "An entered clock time is not automatically an exact birth time. Provisional times may support planetary layers, while angles/houses/Davison/Marks require provenance-verified exact time.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }

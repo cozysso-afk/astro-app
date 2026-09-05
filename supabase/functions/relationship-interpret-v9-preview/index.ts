@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.4-reliability-evidence";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.6-reunion-compact-evidence";
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -58,6 +58,23 @@ function monthlyAdvancedPacket(m:any,n:number){
    }:unavailable(mt,"Marks tertiary unavailable"),
  };
 }
+function reunionDimensionPacket(raw:any,n:number){
+ if(!raw||typeof raw!=="object")return null;
+ const one=(x:any)=>x&&typeof x==="object"?{
+   incoming:stat(x?.incoming),outgoing:stat(x?.outgoing),reconnection:stat(x?.reconnection),
+   top_evidence:(Array.isArray(x?.top_evidence)?x.top_evidence:[]).slice(0,n).map((e:any)=>({date:e?.date??null,score:Number(e?.score??0),user_score:Number(e?.user_score??0),counterpart_score:Number(e?.counterpart_score??0),user_evidence:aspectList(e?.user_evidence,2),counterpart_evidence:aspectList(e?.counterpart_evidence,2),event_probability:"not_calculated"})),
+ }:null;
+ return {contact_recontact:one(raw?.contact_recontact),emotional_reactivation:one(raw?.emotional_reactivation),relationship_rebuilding:one(raw?.relationship_rebuilding),policy:raw?.policy??null};
+}
+function secondaryDimensionPacket(x:any,n:number){
+ if(!x||typeof x!=="object")return null;
+ return {label:x?.label??null,evidence:aspectList(x?.evidence,Math.min(3,n)),independent_primary_layers:Array.isArray(x?.independent_primary_layers)?x.independent_primary_layers.slice(0,4):[],independent_layer_count:Number(x?.independent_layer_count??0),convergence:Boolean(x?.convergence),score:null,policy:x?.policy??null,event_probability:"not_calculated"};
+}
+function secondarySupportPacket(raw:any,n:number){
+ if(!raw||typeof raw!=="object")return null;
+ const months=(Array.isArray(raw?.months)?raw.months:[]).slice(0,n).map((m:any)=>({calendar_month:m?.calendar_month??null,representative_date:m?.representative_date??null,dimensions:{contact_recontact:secondaryDimensionPacket(m?.dimensions?.contact_recontact,n),emotional_reactivation:secondaryDimensionPacket(m?.dimensions?.emotional_reactivation,n),relationship_rebuilding:secondaryDimensionPacket(m?.dimensions?.relationship_rebuilding,n)}}));
+ return {months,policy:raw?.policy??null,event_probability:"not_calculated"};
+}
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact),available=Boolean(n?.partner_time_available??exact);
  let aspects=(Array.isArray(n?.aspects)?n.aspects:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb);
@@ -80,6 +97,8 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
    saju_relationship:sajuPacket(r?.saju_relationship,L.cross),
    advanced:{composite:advancedPacket(r?.composite,L.chart),davison:advancedPacket(r?.davison,L.chart),marks:advancedPacket(r?.marks,L.chart),months:advancedMonths},
    directional:purpose==="reunion"&&ctx?{period:ctx?.period,incoming:stat(ctx?.incoming),outgoing:stat(ctx?.outgoing),reconnection:stat(ctx?.reconnection),ranked_months:rankedMonths}:null,
+   reunion_dimensions:purpose==="reunion"?reunionDimensionPacket(r?.reunion_dimensions,L.ranked):null,
+   reunion_secondary_support:purpose==="reunion"?secondarySupportPacket(r?.reunion_secondary_support,L.months):null,
    transit_triggers:trans?{period:trans?.period,policy:trans?.policy,top_days:transitDays,top_months:transitMonths}:null,
    limitations:Array.isArray(r?.limitations)?r.limitations.slice(0,8):[]
  });
@@ -93,7 +112,10 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - 출생시간을 입력했다는 사실과 exact 검증은 다르다. precision.birth_time_reliability를 우선 확인하고, exact가 아니면 ASC/DSC/MC/IC·하우스·Davison/Marks를 확정 근거로 사용하지 않는다. provisional 행성층은 잠정 근거라고 명시한다.
 - 오브가 좁은 실제 접점을 우선한다. 접점 개수보다 orb_grade·evidence_confidence·time_sensitivity를 우선한다.
 - 레이어 우선순위는 Natal structure > Secondary Progression > 주요/중장기 Transit > 빠른 Daily Transit > Tertiary/Marks 보조층이다. 하위 보조층 하나만으로 상위 레이어 결론을 뒤집지 않는다.
-- sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다. 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
+- sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다.
+- 재회운에서는 CALCULATED_DATA.reunion_dimensions의 ① contact_recontact(연락·재접촉) ② emotional_reactivation(감정·관계 재활성) ③ relationship_rebuilding(관계 재구축 지원층)을 절대 하나의 재회 점수로 합치지 않는다. 각 축 안에서도 incoming(상대측)·outgoing(내측)·reconnection(동시 재접점)을 분리한다.
+- reunion_secondary_support는 daily transit 점수와 합산하지 않는다. Secondary Progression(2차 진행)은 Daily Transit보다 상위 근거로 읽고, Marks/Tertiary 단독 신호로 관계 재구축 결론을 뒤집지 않는다.
+- 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
 - 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.
 - 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
 - 점수와 접점 개수는 확률이 아니다. 좋은 말/나쁜 말을 억지로 균형 맞추지 않는다.
@@ -134,12 +156,12 @@ marriage_reading의 bottom_line/bond/emotional_home/daily_life/intimacy_resource
 문체는 한국어 반말. 결론→근거→현실에서 체감되는 방식→시기 순서. 짧아서 민망한 요약 금지. JSON만 반환.`;
 
 const COMMON_SCHEMA:any={headline:S,overview:S,chemistry:S,emotional_dynamic:S,communication:S,conflict_pattern:S,power_boundaries:S,long_term:S,timing:S,reunion_context:S,felt_scenarios:{type:"ARRAY",items:S},practical_advice:{type:"ARRAY",items:S},top_aspects:{type:"ARRAY",items:{type:"OBJECT",properties:{label:S,meaning:S},required:["label","meaning"]}},limits:S};
-const REUNION_SCHEMA:any={type:"OBJECT",properties:{bottom_line:S,incoming_contact:S,outgoing_contact:S,reconnection_windows:S,low_windows:S,relationship_filter:S,precision_note:S},required:["bottom_line","incoming_contact","outgoing_contact","reconnection_windows","low_windows","relationship_filter","precision_note"]};
+const REUNION_SCHEMA:any={type:"OBJECT",properties:{bottom_line:S,contact_recontact:S,emotional_reactivation:S,relationship_rebuilding:S,incoming_contact:S,outgoing_contact:S,reconnection_windows:S,low_windows:S,relationship_filter:S,precision_note:S},required:["bottom_line","contact_recontact","emotional_reactivation","relationship_rebuilding","incoming_contact","outgoing_contact","reconnection_windows","low_windows","relationship_filter","precision_note"]};
 const MARRIAGE_SCHEMA:any={type:"OBJECT",properties:{mode:S,bottom_line:S,bond:S,emotional_home:S,daily_life:S,intimacy_resources:S,conflict_repair:S,commitment_or_current_cycle:S,timing:S,caution:S,precision_note:S},required:["mode","bottom_line","bond","emotional_home","daily_life","intimacy_resources","conflict_repair","commitment_or_current_cycle","timing","caution","precision_note"]};
 function schemaFor(purpose:Purpose){const properties:any={...COMMON_SCHEMA};const required=["headline","overview","chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term","timing","reunion_context","felt_scenarios","practical_advice","top_aspects","limits"];if(purpose==="reunion"){properties.reunion_reading=REUNION_SCHEMA;required.push("reunion_reading");}if(purpose.startsWith("marriage_")){properties.marriage_reading=MARRIAGE_SCHEMA;required.push("marriage_reading");}return {type:"OBJECT",properties,required};}
 
 function usage(raw:any){const u=raw?.usageMetadata??{};return {prompt_tokens:Number(u.promptTokenCount??0),candidate_tokens:Number(u.candidatesTokenCount??0),thought_tokens:Number(u.thoughtsTokenCount??0),total_tokens:Number(u.totalTokenCount??0)};}
-function validate(o:any,p:Purpose){if(!o||typeof o!=="object")return null;const rr=o.reunion_reading??{},mr=o.marriage_reading??{};const out:any={headline:cut(o.headline,450),overview:cut(o.overview,6500),chemistry:cut(o.chemistry,4200),emotional_dynamic:cut(o.emotional_dynamic,4200),communication:cut(o.communication,4200),conflict_pattern:cut(o.conflict_pattern,4200),power_boundaries:cut(o.power_boundaries,3800),long_term:cut(o.long_term,4500),timing:cut(o.timing,3500),reunion_context:cut(o.reunion_context,3500),felt_scenarios:Array.isArray(o.felt_scenarios)?o.felt_scenarios.slice(0,4).map((x:any)=>cut(x,1300)):[],reunion_reading:{bottom_line:cut(rr.bottom_line,4500),incoming_contact:cut(rr.incoming_contact,4000),outgoing_contact:cut(rr.outgoing_contact,3500),reconnection_windows:cut(rr.reconnection_windows,6000),low_windows:cut(rr.low_windows,3500),relationship_filter:cut(rr.relationship_filter,4500),precision_note:cut(rr.precision_note,1800)},marriage_reading:{mode:cut(mr.mode,80),bottom_line:cut(mr.bottom_line,4800),bond:cut(mr.bond,4200),emotional_home:cut(mr.emotional_home,4200),daily_life:cut(mr.daily_life,4800),intimacy_resources:cut(mr.intimacy_resources,4600),conflict_repair:cut(mr.conflict_repair,4200),commitment_or_current_cycle:cut(mr.commitment_or_current_cycle,4200),timing:cut(mr.timing,3800),caution:cut(mr.caution,3800),precision_note:cut(mr.precision_note,1800)},practical_advice:Array.isArray(o.practical_advice)?o.practical_advice.slice(0,4).map((x:any)=>cut(x,1200)):[],top_aspects:Array.isArray(o.top_aspects)?o.top_aspects.slice(0,10).map((x:any)=>({label:cut(x?.label,500),meaning:cut(x?.meaning,1800)})):[],limits:cut(o.limits,2200)};if(p!=="reunion")out.reunion_reading={bottom_line:"",incoming_contact:"",outgoing_contact:"",reconnection_windows:"",low_windows:"",relationship_filter:"",precision_note:""};if(!p.startsWith("marriage_"))out.marriage_reading={mode:"",bottom_line:"",bond:"",emotional_home:"",daily_life:"",intimacy_resources:"",conflict_repair:"",commitment_or_current_cycle:"",timing:"",caution:"",precision_note:""};return deep(out);}
+function validate(o:any,p:Purpose){if(!o||typeof o!=="object")return null;const rr=o.reunion_reading??{},mr=o.marriage_reading??{};const out:any={headline:cut(o.headline,450),overview:cut(o.overview,6500),chemistry:cut(o.chemistry,4200),emotional_dynamic:cut(o.emotional_dynamic,4200),communication:cut(o.communication,4200),conflict_pattern:cut(o.conflict_pattern,4200),power_boundaries:cut(o.power_boundaries,3800),long_term:cut(o.long_term,4500),timing:cut(o.timing,3500),reunion_context:cut(o.reunion_context,3500),felt_scenarios:Array.isArray(o.felt_scenarios)?o.felt_scenarios.slice(0,4).map((x:any)=>cut(x,1300)):[],reunion_reading:{bottom_line:cut(rr.bottom_line,4500),contact_recontact:cut(rr.contact_recontact,4000),emotional_reactivation:cut(rr.emotional_reactivation,4000),relationship_rebuilding:cut(rr.relationship_rebuilding,4500),incoming_contact:cut(rr.incoming_contact,4000),outgoing_contact:cut(rr.outgoing_contact,3500),reconnection_windows:cut(rr.reconnection_windows,6000),low_windows:cut(rr.low_windows,3500),relationship_filter:cut(rr.relationship_filter,4500),precision_note:cut(rr.precision_note,1800)},marriage_reading:{mode:cut(mr.mode,80),bottom_line:cut(mr.bottom_line,4800),bond:cut(mr.bond,4200),emotional_home:cut(mr.emotional_home,4200),daily_life:cut(mr.daily_life,4800),intimacy_resources:cut(mr.intimacy_resources,4600),conflict_repair:cut(mr.conflict_repair,4200),commitment_or_current_cycle:cut(mr.commitment_or_current_cycle,4200),timing:cut(mr.timing,3800),caution:cut(mr.caution,3800),precision_note:cut(mr.precision_note,1800)},practical_advice:Array.isArray(o.practical_advice)?o.practical_advice.slice(0,4).map((x:any)=>cut(x,1200)):[],top_aspects:Array.isArray(o.top_aspects)?o.top_aspects.slice(0,10).map((x:any)=>({label:cut(x?.label,500),meaning:cut(x?.meaning,1800)})):[],limits:cut(o.limits,2200)};if(p!=="reunion")out.reunion_reading={bottom_line:"",contact_recontact:"",emotional_reactivation:"",relationship_rebuilding:"",incoming_contact:"",outgoing_contact:"",reconnection_windows:"",low_windows:"",relationship_filter:"",precision_note:""};if(!p.startsWith("marriage_"))out.marriage_reading={mode:"",bottom_line:"",bond:"",emotional_home:"",daily_life:"",intimacy_resources:"",conflict_repair:"",commitment_or_current_cycle:"",timing:"",caution:"",precision_note:""};return deep(out);}
 function grounded(data:any,payload:any,p:Purpose,relaxed=false){
  const all=JSON.stringify(data),src=JSON.stringify(payload);
  const forbidden=["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"];
@@ -165,7 +187,7 @@ function grounded(data:any,payload:any,p:Purpose,relaxed=false){
  return true;
 }
 
-function modeInstruction(purpose:Purpose){return purpose==="compatibility"?"일반 연애 궁합이다. 표준 궁합 포인트와 사주 관계층을 빠짐없이 읽고 각 섹션을 충분히 길게 써라.":purpose==="reunion"?"재회운이다. 시기창과 실제 트랜짓 근거를 우선하되 기본 궁합의 재회 필터도 깊게 써라.":purpose==="marriage_unmarried"?"특정 상대가 있는 미혼 결혼궁합이다. 두 사람이 결혼생활로 들어갈 경우의 결속·정서적 집·생활 역할·돈/공유자원·친밀감·갈등회복·책임을 분리해 읽고, 결혼으로 공식화될 가능성과 프러포즈·약혼·결혼 결정이 강해지는 시기 흐름도 계산 근거 범위에서 적극적으로 제시하되 확정 사실처럼 단정하지 마라.":"이미 결혼한 두 사람의 결혼생활 분석이다. 결혼 가능성 표현은 금지하고 현재 결속·정서적 거리·생활 역할·공유재정/친밀감·반복갈등·회복 주기를 읽어라.";}
+function modeInstruction(purpose:Purpose){return purpose==="compatibility"?"일반 연애 궁합이다. 표준 궁합 포인트와 사주 관계층을 빠짐없이 읽고 각 섹션을 충분히 길게 써라.":purpose==="reunion"?"재회운이다. 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 각각 따로 결론내고, 각 축의 수신·발신·동시 재접점 방향도 분리하라. Secondary Progression을 Daily Transit보다 상위 시기근거로 두고 하나의 재회 점수는 만들지 마라.":purpose==="marriage_unmarried"?"특정 상대가 있는 미혼 결혼궁합이다. 두 사람이 결혼생활로 들어갈 경우의 결속·정서적 집·생활 역할·돈/공유자원·친밀감·갈등회복·책임을 분리해 읽고, 결혼으로 공식화될 가능성과 프러포즈·약혼·결혼 결정이 강해지는 시기 흐름도 계산 근거 범위에서 적극적으로 제시하되 확정 사실처럼 단정하지 마라.":"이미 결혼한 두 사람의 결혼생활 분석이다. 결혼 가능성 표현은 금지하고 현재 결속·정서적 거리·생활 역할·공유재정/친밀감·반복갈등·회복 주기를 읽어라.";}
 function promptText(payload:any,purpose:Purpose,compactMode=false){return `PURPOSE=${purpose}\n${modeInstruction(purpose)}\n${compactMode?"재시도다. 완전한 JSON을 만들되 근거·오브·사주 허용필드·시기는 유지하고 중복만 줄여라.\n":""}CALCULATED_DATA=${JSON.stringify(payload)}`;}
 function promptBudget(payload:any,purpose:Purpose){const bytes=enc.encode(SYSTEM+promptText(payload,purpose,false)).length;return {bytes,max_bytes:MAX_PROMPT_BYTES,ok:bytes<=MAX_PROMPT_BYTES,estimated_input_tokens:Math.ceil(bytes/2.6)};}
 function addUsage(a:any,b:any){return {prompt_tokens:Number(a?.prompt_tokens??0)+Number(b?.prompt_tokens??0),candidate_tokens:Number(a?.candidate_tokens??0)+Number(b?.candidate_tokens??0),thought_tokens:Number(a?.thought_tokens??0)+Number(b?.thought_tokens??0),total_tokens:Number(a?.total_tokens??0)+Number(b?.total_tokens??0)};}
