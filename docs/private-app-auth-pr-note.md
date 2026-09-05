@@ -10,7 +10,7 @@
 - [ ] Supabase Site URL / redirect configuration points to the production Vercel app.
 - [ ] Existing owner device links the current anonymous session before any logout/site-data cleanup.
 - [ ] Render runtime auth environment variables are present.
-- [ ] Render is switched to `private_app:app` only as part of the coordinated cutover.
+- [ ] Render start command changes from `uvicorn api.main:app --host 0.0.0.0 --port $PORT` to `uvicorn api.private_app:app --host 0.0.0.0 --port $PORT` only as part of the coordinated cutover.
 - [ ] Web auth gate is deployed to Vercel/main only as part of the coordinated cutover.
 - [ ] Unauthenticated `/v1/*` = blocked after cutover.
 - [ ] Authenticated but non-allowlisted `/v1/*` = blocked after cutover.
