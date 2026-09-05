@@ -1,0 +1,1061 @@
+{
+  "version": "horary-prashna-question-router-v1",
+  "language": "ko",
+  "purpose": "별빛의 운명 Horary+Prashna 자유질문을 계산 규칙으로 라우팅하기 위한 few-shot 분류 사전",
+  "principles": {
+    "classification_only": true,
+    "llm_must_not_judge_chart": true,
+    "multi_intent": true,
+    "confidence_threshold_auto_route": 0.8,
+    "confidence_threshold_clarify": 0.55,
+    "fallback_primary_type": "GENERAL_EVENT",
+    "notes": [
+      "질문 분류 단계는 해석을 만들지 않고 도메인·의도·대상·선택지만 구조화한다.",
+      "Western Horary와 Prashna는 각각 독립 규칙으로 판단하고 마지막에만 일치/부분일치/상충을 비교한다.",
+      "정확한 사실 확인이 필요한 건강·법률·금융·제3자 사생활 질문은 점성술적 상징으로만 표현하고 사실 단정이나 전문적 의사결정을 대신하지 않는다.",
+      "Western Horary의 전통 주인성은 고전 7행성 sign ruler를 기본으로 하고 외행성을 sign ruler로 쓰지 않는다.",
+      "Prashna 라우팅은 D1 Whole Sign bhava를 기본으로 하며 학파별 특수 규칙은 V1에서 강제하지 않는다."
+    ]
+  },
+  "classifier_contract": {
+    "required_output_fields": [
+      "primary_type",
+      "intents",
+      "policy_id",
+      "subject",
+      "counterparty",
+      "options",
+      "confidence",
+      "needs_clarification",
+      "clarification_question"
+    ],
+    "primary_types": [
+      "LOST_ITEM",
+      "RELATIONSHIP",
+      "CAREER",
+      "EXAM_EDUCATION",
+      "MONEY",
+      "BUSINESS_CONTRACT",
+      "PROPERTY_MOVE",
+      "TRAVEL_FOREIGN",
+      "HEALTH",
+      "LEGAL_CONFLICT",
+      "FAMILY_CHILDREN",
+      "COMMUNICATION_NEWS",
+      "GENERAL_EVENT"
+    ],
+    "intents": [
+      "YES_NO",
+      "TIMING",
+      "LOCATION",
+      "RECOVERY",
+      "CONTACT",
+      "RECONCILIATION",
+      "COMMITMENT",
+      "OPTION_RANKING",
+      "ACTION_ADVICE",
+      "OUTCOME",
+      "CAUSE",
+      "THIRD_PARTY_SYMBOLISM",
+      "THEFT_SYMBOLISM",
+      "JOB_OFFER",
+      "PROMOTION",
+      "PASS_FAIL",
+      "PURCHASE_SALE",
+      "SIGNING",
+      "PAYMENT",
+      "MOVE",
+      "TRAVEL",
+      "CONFLICT_RESOLUTION",
+      "NEWS_RESULT"
+    ],
+    "option_rule": "명시된 선택지가 2개 이상이면 OPTION_RANKING을 추가하고 사용자의 원문 순서를 보존한다.",
+    "clarification_rule": "질문의 대상 하우스가 달라질 정도로 핵심 대상이 모호하거나 confidence<0.55이면 한 번만 짧게 확인한다."
+  },
+  "policies": {
+    "H_LOST_ITEM": {
+      "domain": "분실물·위치",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "2H ruler for querent's movable possession",
+        "secondary": [
+          "4H home/end-of-matter",
+          "7H only when theft/another person is materially relevant"
+        ],
+        "location_clues": [
+          "quesited house",
+          "sign element/modality",
+          "angularity",
+          "retrograde",
+          "Moon/2H-ruler contacts"
+        ],
+        "note": "개인 소유 동산은 2H를 기본으로 하고 특정 방/장소 후보는 위치 상징과 비교한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "2H",
+          "2H lord"
+        ],
+        "secondary": [
+          "4H for home/property context",
+          "7H when another person/theft is relevant"
+        ],
+        "note": "D1 bhava strength and relevant lords are kept separate from Western scoring."
+      },
+      "default_outputs": [
+        "ranked_options",
+        "location_clues",
+        "recovery_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "standard"
+    },
+    "H_RELATIONSHIP": {
+      "domain": "연애·관계",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "7H ruler",
+        "secondary": [
+          "5H for courtship/romantic tone",
+          "3H/turned 3H for message mechanics when needed"
+        ],
+        "note": "특정 상대는 7H를 기본으로 하며 연락/재회/관계정립은 의도 태그로 분리한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "7H",
+          "7H lord"
+        ],
+        "secondary": [
+          "5H for romance",
+          "3H for communication context"
+        ],
+        "note": "상대의 실제 속마음을 사실처럼 단정하지 않고 관계 상징과 행동 가능성으로 표현한다."
+      },
+      "default_outputs": [
+        "relationship_tendency",
+        "contact_or_reconnection_tendency",
+        "timing_if_supported",
+        "observable_signals"
+      ],
+      "safety": "privacy_symbolic"
+    },
+    "H_CAREER": {
+      "domain": "직장·커리어",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "10H ruler",
+        "secondary": [
+          "6H for service/workload",
+          "7H for interviewer/other party when specifically relevant"
+        ],
+        "note": "직업·직위·승진은 10H를 기본으로 한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "10H",
+          "10H lord"
+        ],
+        "secondary": [
+          "6H for employment/service",
+          "11H for gains/fulfilment"
+        ],
+        "note": "직장 결과는 10H를 중심으로 판단한다."
+      },
+      "default_outputs": [
+        "outcome_tendency",
+        "timing_if_supported",
+        "decision_factors"
+      ],
+      "safety": "standard"
+    },
+    "H_EXAM": {
+      "domain": "시험·교육",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "9H ruler for higher study/exam context",
+        "secondary": [
+          "3H for study/learning mechanics",
+          "10H for public result/status"
+        ],
+        "note": "시험 성격에 따라 3H/9H를 보조하고 결과는 10H를 함께 본다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "4H",
+          "5H"
+        ],
+        "secondary": [
+          "9H for higher education",
+          "10H for result/status"
+        ],
+        "note": "V1은 교육 4H, 지성·시험 5H, 고등교육 9H를 함께 라우팅한다."
+      },
+      "default_outputs": [
+        "pass_fail_tendency",
+        "timing_if_supported",
+        "study_or_action_focus"
+      ],
+      "safety": "standard"
+    },
+    "H_MONEY": {
+      "domain": "금전·대금",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "2H ruler",
+        "secondary": [
+          "8H for debt/other party's money",
+          "11H for gains",
+          "5H for speculation only when explicitly asked"
+        ],
+        "note": "자기 돈·대금은 2H, 타인의 돈/부채는 8H를 보조한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "2H",
+          "2H lord"
+        ],
+        "secondary": [
+          "6H for debt",
+          "8H for shared/other resources",
+          "11H for gains"
+        ],
+        "note": "금융 의사결정을 대신하지 않고 수취·흐름·상징만 다룬다."
+      },
+      "default_outputs": [
+        "money_flow_tendency",
+        "payment_or_recovery_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "financial_decision_support_only"
+    },
+    "H_BUSINESS_CONTRACT": {
+      "domain": "사업·계약",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "7H ruler for counterpart/partner",
+        "secondary": [
+          "10H business",
+          "3H written agreement",
+          "2H querent money",
+          "8H counterpart money",
+          "11H profit"
+        ],
+        "note": "계약 상대는 7H, 계약 문서는 3H, 사업은 10H를 결합한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "7H",
+          "10H"
+        ],
+        "secondary": [
+          "2H money",
+          "3H agreement/communication",
+          "11H gains"
+        ],
+        "note": "계약 체결 여부와 사업 상대를 분리해 판단한다."
+      },
+      "default_outputs": [
+        "deal_tendency",
+        "counterparty_dynamics",
+        "timing_if_supported",
+        "decision_factors"
+      ],
+      "safety": "financial_legal_decision_support_only"
+    },
+    "H_PROPERTY_MOVE": {
+      "domain": "집·부동산·이사",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "4H ruler",
+        "secondary": [
+          "7H buyer/seller/counterparty",
+          "2H finances",
+          "8H counterpart finances"
+        ],
+        "note": "집·토지·거주지는 4H를 기본으로 한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "4H",
+          "4H lord"
+        ],
+        "secondary": [
+          "2H finances",
+          "7H counterpart",
+          "11H fulfilment"
+        ],
+        "note": "주거·부동산·차량 등 4H 주제를 구체적 선택지와 함께 비교할 수 있다."
+      },
+      "default_outputs": [
+        "property_or_move_tendency",
+        "option_ranking_if_any",
+        "timing_if_supported",
+        "decision_factors"
+      ],
+      "safety": "financial_decision_support_only"
+    },
+    "H_TRAVEL": {
+      "domain": "여행·해외",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "9H ruler for long/foreign travel",
+        "secondary": [
+          "3H for short/local travel",
+          "4H home/return"
+        ],
+        "note": "장거리·해외는 9H, 단거리 이동은 3H로 라우팅한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "9H",
+          "9H lord"
+        ],
+        "secondary": [
+          "3H short travel",
+          "12H foreign residence/separation context"
+        ],
+        "note": "해외 체류와 단기 여행을 intents/entities로 구분한다."
+      },
+      "default_outputs": [
+        "travel_tendency",
+        "timing_if_supported",
+        "option_ranking_if_any"
+      ],
+      "safety": "standard"
+    },
+    "H_HEALTH": {
+      "domain": "컨디션·건강",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "6H ruler for illness/condition",
+        "secondary": [
+          "7H physician when relevant",
+          "10H treatment/action when relevant"
+        ],
+        "note": "질병 진단이나 치료 결정을 하지 않고 컨디션·회복 흐름의 점성술적 상징만 제공한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "6H",
+          "6H lord"
+        ],
+        "secondary": [
+          "8H for severity/obstacle context only",
+          "11H recovery/relief context"
+        ],
+        "note": "의학적 판단을 대체하지 않는다."
+      },
+      "default_outputs": [
+        "condition_tendency",
+        "recovery_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "medical_non_diagnostic"
+    },
+    "H_LEGAL": {
+      "domain": "분쟁·법률",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "7H ruler for opponent",
+        "secondary": [
+          "9H law/court",
+          "10H judge/authority",
+          "4H end-of-matter"
+        ],
+        "note": "분쟁 당사자와 법/권한/결과를 분리한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "6H",
+          "7H"
+        ],
+        "secondary": [
+          "9H law",
+          "10H authority/judgment",
+          "11H settlement/gain"
+        ],
+        "note": "법률 조언을 대신하지 않고 상징적 흐름만 다룬다."
+      },
+      "default_outputs": [
+        "conflict_tendency",
+        "settlement_or_outcome_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "legal_decision_support_only"
+    },
+    "H_FAMILY": {
+      "domain": "가족·자녀",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "role-dependent",
+        "secondary": [
+          "4H parents/home",
+          "5H children",
+          "3H siblings"
+        ],
+        "note": "가족 구성원 관계를 먼저 추출해 해당 radical/turned house를 선택한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon"
+        ],
+        "secondary": [
+          "4H family/home",
+          "5H children",
+          "3H siblings"
+        ],
+        "note": "대상 관계에 따라 bhava를 선택한다."
+      },
+      "default_outputs": [
+        "family_tendency",
+        "outcome_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "standard"
+    },
+    "H_COMMUNICATION": {
+      "domain": "연락·소식 일반",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "3H ruler for messages/news",
+        "secondary": [
+          "7H specific counterpart",
+          "turned 3H when sender/recipient role matters"
+        ],
+        "note": "특정 연애 상대의 연락은 RELATIONSHIP을 primary로 두고 이 정책은 일반 소식/응답에 사용한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon",
+          "3H",
+          "3H lord"
+        ],
+        "secondary": [
+          "7H specific other person",
+          "11H expected fulfilment/news"
+        ],
+        "note": "연락 자체와 관계 결과를 혼동하지 않는다."
+      },
+      "default_outputs": [
+        "news_or_reply_tendency",
+        "timing_if_supported"
+      ],
+      "safety": "standard"
+    },
+    "H_GENERAL": {
+      "domain": "일반 사건·자유질문",
+      "western": {
+        "querent": "1H ruler + Moon",
+        "quesited": "infer matter house from extracted entity",
+        "secondary": [
+          "4H end-of-matter when applicable"
+        ],
+        "note": "도메인이 불명확하거나 V1 taxonomy 밖이면 억지로 특정 유형에 넣지 않고 일반 라우팅한다."
+      },
+      "prashna": {
+        "core": [
+          "Lagna",
+          "Lagna lord",
+          "Moon"
+        ],
+        "secondary": [
+          "infer relevant bhava from matter"
+        ],
+        "note": "관련 bhava를 명시적으로 추론하고 불확실하면 clarification을 요청한다."
+      },
+      "default_outputs": [
+        "general_tendency",
+        "yes_no_if_supported",
+        "timing_if_supported"
+      ],
+      "safety": "standard"
+    }
+  },
+  "examples": [
+    {
+      "id": "Q01",
+      "question": "현재 쿨픽스가 집 안에 있다면, 내 침실 수납 / 내 방 베란다 / 오래된 전자기기·서류·잡동사니 수납 중 어느 범주가 가장 강한가?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["LOCATION", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["ranked_options", "location_clues"],
+      "risk_profile": "standard",
+      "option_count": 3,
+      "note": ""
+    },
+    {
+      "id": "Q02",
+      "question": "차 키가 집 안, 차 안, 평소 들고 다니는 가방 중 어디에 있을 가능성이 가장 강할까?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["LOCATION", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["ranked_options", "location_clues"],
+      "risk_profile": "standard",
+      "option_count": 3,
+      "note": ""
+    },
+    {
+      "id": "Q03",
+      "question": "잃어버린 지갑을 다시 찾을 수 있을까?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["RECOVERY", "YES_NO"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["recovery_tendency"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q04",
+      "question": "무선 이어폰이 내 방 쪽에 있는지 거실 쪽에 있는지 알고 싶어.",
+      "primary_type": "LOST_ITEM",
+      "intents": ["LOCATION", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["ranked_options", "location_clues"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q05",
+      "question": "없어진 서류는 누가 옮긴 흔적이 강한지, 내가 다른 곳에 잘못 둔 흐름이 강한지 보고 싶어.",
+      "primary_type": "LOST_ITEM",
+      "intents": ["CAUSE", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["cause_symbols", "ranked_options"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": "실제 특정인을 범인으로 지목하지 않고 이동/오배치 상징만 비교"
+    },
+    {
+      "id": "Q06",
+      "question": "잃어버린 반지를 찾게 된다면 시기가 언제쯤일까?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["RECOVERY", "TIMING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["recovery_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q07",
+      "question": "내 물건이 단순 분실인지 다른 사람이 가져간 정황 쪽 상징이 더 강한가?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["CAUSE", "THEFT_SYMBOLISM", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["symbolic_cause_comparison"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 2,
+      "note": "도난을 사실로 단정하거나 특정인을 지목하지 않음"
+    },
+    {
+      "id": "Q08",
+      "question": "카메라 가방을 카페, 이동수단, 집 중 어디에 두고 왔을 가능성이 가장 강할까?",
+      "primary_type": "LOST_ITEM",
+      "intents": ["LOCATION", "OPTION_RANKING"],
+      "policy_id": "H_LOST_ITEM",
+      "expected_output": ["ranked_options", "location_clues"],
+      "risk_profile": "standard",
+      "option_count": 3,
+      "note": ""
+    },
+    {
+      "id": "Q09",
+      "question": "A가 앞으로 3개월 안에 나에게 연락할까? 연락한다면 언제가 유력할까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["CONTACT", "YES_NO", "TIMING"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["contact_tendency", "timing_if_supported"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q10",
+      "question": "이 관계에서 내가 먼저 연락하는 게 나을까, 기다리는 게 나을까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["ACTION_ADVICE", "OPTION_RANKING"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["ranked_options", "observable_signals"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q11",
+      "question": "헤어진 사람과 다시 관계가 이어질 가능성이 있는 흐름일까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["RECONCILIATION", "YES_NO"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["reconnection_tendency"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q12",
+      "question": "지금 만나고 있는 사람과 관계가 앞으로도 지속될까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["OUTCOME", "YES_NO"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["relationship_tendency", "observable_signals"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q13",
+      "question": "상대가 이번에 우리 관계를 명확히 정의하려는 행동을 보일까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["COMMITMENT", "YES_NO"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["commitment_tendency", "observable_signals"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q14",
+      "question": "A와 B 중 지금 내 연애 관계로 이어질 가능성이 더 강하게 나타나는 쪽은 누구일까?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["OPTION_RANKING", "OUTCOME"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["ranked_options", "relationship_tendency"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q15",
+      "question": "상대 주변에 다른 연애 가능성이나 제3자 변수가 강하게 보이는가?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["THIRD_PARTY_SYMBOLISM"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["third_party_symbolism", "uncertainty"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": "제3자의 실제 사생활을 사실처럼 단정하지 않음"
+    },
+    {
+      "id": "Q16",
+      "question": "우리가 약속한 만남이 실제로 성사될까? 성사된다면 언제쯤 흐름이 강해?",
+      "primary_type": "RELATIONSHIP",
+      "intents": ["YES_NO", "TIMING"],
+      "policy_id": "H_RELATIONSHIP",
+      "expected_output": ["meeting_tendency", "timing_if_supported"],
+      "risk_profile": "privacy_symbolic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q17",
+      "question": "이번에 지원한 회사에서 최종 오퍼를 받을 가능성이 있는 흐름일까?",
+      "primary_type": "CAREER",
+      "intents": ["JOB_OFFER", "YES_NO", "OUTCOME"],
+      "policy_id": "H_CAREER",
+      "expected_output": ["outcome_tendency"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q18",
+      "question": "올해 안에 승진이나 직위 상승 흐름이 들어올까?",
+      "primary_type": "CAREER",
+      "intents": ["PROMOTION", "YES_NO", "TIMING"],
+      "policy_id": "H_CAREER",
+      "expected_output": ["promotion_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q19",
+      "question": "이직을 실제로 움직이기 좋은 시기는 언제쯤일까?",
+      "primary_type": "CAREER",
+      "intents": ["ACTION_ADVICE", "TIMING"],
+      "policy_id": "H_CAREER",
+      "expected_output": ["timing_if_supported", "decision_factors"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q20",
+      "question": "A회사와 B회사 중 지금 내게 더 유리한 선택은 어디일까?",
+      "primary_type": "CAREER",
+      "intents": ["OPTION_RANKING", "ACTION_ADVICE"],
+      "policy_id": "H_CAREER",
+      "expected_output": ["ranked_options", "decision_factors"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q21",
+      "question": "이번 시험에 합격할 수 있을까?",
+      "primary_type": "EXAM_EDUCATION",
+      "intents": ["PASS_FAIL", "YES_NO"],
+      "policy_id": "H_EXAM",
+      "expected_output": ["pass_fail_tendency"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q22",
+      "question": "필기와 면접 중 어느 단계가 더 큰 변수가 될까?",
+      "primary_type": "EXAM_EDUCATION",
+      "intents": ["OPTION_RANKING", "CAUSE"],
+      "policy_id": "H_EXAM",
+      "expected_output": ["ranked_options", "risk_factors"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q23",
+      "question": "이번에 떨어지면 다음 회차 재응시에서는 결과가 나아질 흐름일까?",
+      "primary_type": "EXAM_EDUCATION",
+      "intents": ["PASS_FAIL", "OUTCOME"],
+      "policy_id": "H_EXAM",
+      "expected_output": ["outcome_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q24",
+      "question": "공부 계획을 지금 바꾸는 게 나을까, 현재 방식으로 밀고 가는 게 나을까?",
+      "primary_type": "EXAM_EDUCATION",
+      "intents": ["ACTION_ADVICE", "OPTION_RANKING"],
+      "policy_id": "H_EXAM",
+      "expected_output": ["ranked_options", "study_focus"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q25",
+      "question": "빌려준 돈을 돌려받을 수 있을까? 받는다면 언제쯤일까?",
+      "primary_type": "MONEY",
+      "intents": ["PAYMENT", "RECOVERY", "YES_NO", "TIMING"],
+      "policy_id": "H_MONEY",
+      "expected_output": ["payment_tendency", "timing_if_supported"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q26",
+      "question": "신청한 대출이 승인되는 흐름이 강한가?",
+      "primary_type": "MONEY",
+      "intents": ["YES_NO", "OUTCOME"],
+      "policy_id": "H_MONEY",
+      "expected_output": ["approval_tendency"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q27",
+      "question": "보유 자산을 이번 달에 정리하는 선택과 계속 보유하는 선택 중 어느 쪽 흐름이 더 안정적인가?",
+      "primary_type": "MONEY",
+      "intents": ["OPTION_RANKING", "ACTION_ADVICE"],
+      "policy_id": "H_MONEY",
+      "expected_output": ["ranked_options", "risk_factors"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q28",
+      "question": "받기로 한 환불금이나 정산금이 실제로 들어오는 시기는 언제쯤일까?",
+      "primary_type": "MONEY",
+      "intents": ["PAYMENT", "TIMING"],
+      "policy_id": "H_MONEY",
+      "expected_output": ["payment_tendency", "timing_if_supported"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q29",
+      "question": "이 계약서에 지금 서명하는 게 나을까, 조건을 더 조정하는 게 나을까?",
+      "primary_type": "BUSINESS_CONTRACT",
+      "intents": ["SIGNING", "ACTION_ADVICE", "OPTION_RANKING"],
+      "policy_id": "H_BUSINESS_CONTRACT",
+      "expected_output": ["ranked_options", "deal_tendency"],
+      "risk_profile": "financial_legal_decision_support_only",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q30",
+      "question": "이 사람과 사업 파트너십을 시작하면 안정적으로 이어질까?",
+      "primary_type": "BUSINESS_CONTRACT",
+      "intents": ["OUTCOME", "YES_NO"],
+      "policy_id": "H_BUSINESS_CONTRACT",
+      "expected_output": ["partnership_tendency", "risk_factors"],
+      "risk_profile": "financial_legal_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q31",
+      "question": "내가 내놓은 물건이나 사업체에 실제 구매자가 나타날까?",
+      "primary_type": "BUSINESS_CONTRACT",
+      "intents": ["PURCHASE_SALE", "YES_NO", "TIMING"],
+      "policy_id": "H_BUSINESS_CONTRACT",
+      "expected_output": ["buyer_tendency", "timing_if_supported"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q32",
+      "question": "지금 제시된 조건을 받아들이는 것과 재협상하는 것 중 어느 쪽이 더 유리할까?",
+      "primary_type": "BUSINESS_CONTRACT",
+      "intents": ["OPTION_RANKING", "ACTION_ADVICE"],
+      "policy_id": "H_BUSINESS_CONTRACT",
+      "expected_output": ["ranked_options", "counterparty_dynamics"],
+      "risk_profile": "financial_legal_decision_support_only",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q33",
+      "question": "지금 보고 있는 집을 계약하거나 매수하는 선택이 나와 잘 맞는 흐름일까?",
+      "primary_type": "PROPERTY_MOVE",
+      "intents": ["PURCHASE_SALE", "YES_NO", "ACTION_ADVICE"],
+      "policy_id": "H_PROPERTY_MOVE",
+      "expected_output": ["property_tendency", "decision_factors"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q34",
+      "question": "이사를 실제로 실행하기 좋은 시기는 언제쯤일까?",
+      "primary_type": "PROPERTY_MOVE",
+      "intents": ["MOVE", "TIMING"],
+      "policy_id": "H_PROPERTY_MOVE",
+      "expected_output": ["move_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q35",
+      "question": "A집과 B집 중 장기적으로 더 안정적인 선택은 어디일까?",
+      "primary_type": "PROPERTY_MOVE",
+      "intents": ["OPTION_RANKING", "ACTION_ADVICE"],
+      "policy_id": "H_PROPERTY_MOVE",
+      "expected_output": ["ranked_options", "decision_factors"],
+      "risk_profile": "financial_decision_support_only",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q36",
+      "question": "전세 보증금이나 집 관련 정산 문제가 원만하게 해결될까?",
+      "primary_type": "PROPERTY_MOVE",
+      "intents": ["PAYMENT", "CONFLICT_RESOLUTION", "YES_NO"],
+      "policy_id": "H_PROPERTY_MOVE",
+      "expected_output": ["resolution_tendency", "payment_tendency"],
+      "risk_profile": "financial_legal_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q37",
+      "question": "계획 중인 해외여행이 예정대로 성사될까?",
+      "primary_type": "TRAVEL_FOREIGN",
+      "intents": ["TRAVEL", "YES_NO"],
+      "policy_id": "H_TRAVEL",
+      "expected_output": ["travel_tendency"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q38",
+      "question": "해외로 장기 이동하거나 거주지를 옮기는 계획을 올해 실행하는 게 좋을까?",
+      "primary_type": "TRAVEL_FOREIGN",
+      "intents": ["TRAVEL", "MOVE", "ACTION_ADVICE"],
+      "policy_id": "H_TRAVEL",
+      "expected_output": ["travel_tendency", "decision_factors"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q39",
+      "question": "이번 달과 다음 달 중 여행을 떠나기 더 수월한 시기는 언제일까?",
+      "primary_type": "TRAVEL_FOREIGN",
+      "intents": ["TRAVEL", "TIMING", "OPTION_RANKING"],
+      "policy_id": "H_TRAVEL",
+      "expected_output": ["ranked_options", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q40",
+      "question": "요즘 컨디션 저하가 오래 끌기보다 회복 쪽으로 돌아서는 흐름이 있는가?",
+      "primary_type": "HEALTH",
+      "intents": ["RECOVERY", "OUTCOME"],
+      "policy_id": "H_HEALTH",
+      "expected_output": ["condition_tendency", "recovery_tendency"],
+      "risk_profile": "medical_non_diagnostic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q41",
+      "question": "컨디션 회복을 체감하기 쉬운 시기가 언제쯤으로 보이나?",
+      "primary_type": "HEALTH",
+      "intents": ["RECOVERY", "TIMING"],
+      "policy_id": "H_HEALTH",
+      "expected_output": ["timing_if_supported"],
+      "risk_profile": "medical_non_diagnostic",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q42",
+      "question": "지금 느끼는 피로가 단기적인 흐름인지 장기적으로 관리가 필요한 신호 쪽 상징이 강한지 보고 싶어.",
+      "primary_type": "HEALTH",
+      "intents": ["OPTION_RANKING", "OUTCOME"],
+      "policy_id": "H_HEALTH",
+      "expected_output": ["symbolic_condition_comparison"],
+      "risk_profile": "medical_non_diagnostic",
+      "option_count": 2,
+      "note": "의학적 진단이 아니라 점성술적 컨디션 상징만 제공"
+    },
+    {
+      "id": "Q43",
+      "question": "현재 진행 중인 분쟁이 내가 원하는 방향으로 정리될 가능성이 있는 흐름인가?",
+      "primary_type": "LEGAL_CONFLICT",
+      "intents": ["OUTCOME", "YES_NO"],
+      "policy_id": "H_LEGAL",
+      "expected_output": ["conflict_tendency", "outcome_tendency"],
+      "risk_profile": "legal_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q44",
+      "question": "상대와 합의가 성사될 가능성이 있는 시기는 언제쯤일까?",
+      "primary_type": "LEGAL_CONFLICT",
+      "intents": ["CONFLICT_RESOLUTION", "TIMING"],
+      "policy_id": "H_LEGAL",
+      "expected_output": ["settlement_tendency", "timing_if_supported"],
+      "risk_profile": "legal_decision_support_only",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q45",
+      "question": "직접 대응을 계속하는 것과 중재를 요청하는 것 중 어느 쪽이 갈등을 줄이기 유리할까?",
+      "primary_type": "LEGAL_CONFLICT",
+      "intents": ["OPTION_RANKING", "ACTION_ADVICE"],
+      "policy_id": "H_LEGAL",
+      "expected_output": ["ranked_options", "conflict_tendency"],
+      "risk_profile": "legal_decision_support_only",
+      "option_count": 2,
+      "note": ""
+    },
+    {
+      "id": "Q46",
+      "question": "가족과 지금 생긴 갈등이 가까운 시기에 풀릴까?",
+      "primary_type": "FAMILY_CHILDREN",
+      "intents": ["CONFLICT_RESOLUTION", "YES_NO", "TIMING"],
+      "policy_id": "H_FAMILY",
+      "expected_output": ["family_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q47",
+      "question": "아이와 관련된 지금의 고민이 시간이 지나면서 안정되는 방향으로 갈까?",
+      "primary_type": "FAMILY_CHILDREN",
+      "intents": ["OUTCOME", "YES_NO"],
+      "policy_id": "H_FAMILY",
+      "expected_output": ["family_tendency", "outcome_tendency"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q48",
+      "question": "기다리고 있는 답장이나 회신이 올까? 온다면 언제쯤일까?",
+      "primary_type": "COMMUNICATION_NEWS",
+      "intents": ["CONTACT", "NEWS_RESULT", "YES_NO", "TIMING"],
+      "policy_id": "H_COMMUNICATION",
+      "expected_output": ["news_or_reply_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q49",
+      "question": "심사 결과나 공식 소식이 이번 주 안에 도착할 가능성이 있는 흐름일까?",
+      "primary_type": "COMMUNICATION_NEWS",
+      "intents": ["NEWS_RESULT", "YES_NO", "TIMING"],
+      "policy_id": "H_COMMUNICATION",
+      "expected_output": ["news_tendency", "timing_if_supported"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": ""
+    },
+    {
+      "id": "Q50",
+      "question": "지금 고민 중인 선택을 실행하면 내가 기대하는 방향으로 이어질까?",
+      "primary_type": "GENERAL_EVENT",
+      "intents": ["YES_NO", "ACTION_ADVICE", "OUTCOME"],
+      "policy_id": "H_GENERAL",
+      "expected_output": ["general_tendency", "decision_factors"],
+      "risk_profile": "standard",
+      "option_count": 0,
+      "note": "대상이 불명확하면 실제 라우팅에서는 한 번 clarification 가능"
+    }
+  ]
+}
