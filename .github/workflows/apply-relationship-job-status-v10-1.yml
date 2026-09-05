@@ -1,0 +1,40 @@
+name: Apply Relationship Job Status V10.1 Once
+
+on:
+  push:
+    branches:
+      - fix/relationship-job-status-v10-1
+    paths:
+      - '.github/workflows/apply-relationship-job-status-v10-1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/relationship-job-status-v10-1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V10.1 status patch
+        run: python scripts/patch_relationship_job_status_v10_1.py
+      - name: Contract checks
+        run: |
+          node --test supabase/functions/relationship-interpret-v9-preview/jobStatusContract.test.mjs
+          node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
+      - name: Commit permanent V10.1 files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            supabase/functions/relationship-interpret-v9-preview/index.ts \
+            supabase/functions/relationship-interpret-v9-preview/jobStatusContract.test.mjs
+          git diff --cached --check
+          git commit -m 'fix(ai): align relationship job status with database contract V10.1'
+          git push origin HEAD:fix/relationship-job-status-v10-1
