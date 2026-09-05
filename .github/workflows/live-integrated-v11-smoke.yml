@@ -1,0 +1,96 @@
+name: Live Integrated Fortune V11 Smoke Once
+
+on:
+  push:
+    branches:
+      - audit/integrated-fortune-e2e-v11
+    paths:
+      - '.github/workflows/live-integrated-v11-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Verify production prompt evidence, then run one authenticated Gemini job
+        run: |
+          node --input-type=module <<'NODE'
+          import { createClient } from '@supabase/supabase-js'
+
+          const API='https://astro-app-api-f7fn.onrender.com'
+          const SB='https://dbynfabwfcakxayyggzi.supabase.co'
+          const KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+          const EXPECTED='supabase-ai-v21.4-e2e-evidence'
+          const request={profile:{name:'Synthetic Integrated V11',birth_date:'1990-01-01',birth_time:'12:00:00',latitude:51.4779,longitude:0,utc_offset_hours:0,gender:'female'},start_date:'2026-09-05',end_date:'2027-09-04'}
+
+          const calcRes=await fetch(`${API}/v1/fortune/integrated`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(180000)})
+          const calc=await calcRes.json()
+          if(!calcRes.ok||!calc?.ok)throw new Error(`integrated calculation failed: ${calcRes.status} ${JSON.stringify(calc).slice(0,600)}`)
+
+          const sb=createClient(SB,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
+          const signed=await sb.auth.signInAnonymously()
+          if(signed.error||!signed.data.session)throw signed.error??new Error('anonymous Supabase session unavailable')
+
+          const promptCall=await sb.functions.invoke('fortune-interpret-v21-preview',{body:{action:'prompt',calculation:calc,model:'gemini-3.7-flash'}})
+          if(promptCall.error)throw promptCall.error
+          const promptOut=promptCall.data
+          if(!promptOut?.ok||promptOut?.interpreter_version!==EXPECTED)throw new Error(`unexpected prompt response ${JSON.stringify(promptOut).slice(0,500)}`)
+          const marker='CALCULATED_DATA='
+          const pos=String(promptOut.prompt??'').indexOf(marker)
+          if(pos<0)throw new Error('CALCULATED_DATA marker missing')
+          const packet=JSON.parse(String(promptOut.prompt).slice(pos+marker.length).trim())
+          const sourceMonths=Array.isArray(calc?.saju?.monthly)?calc.saju.monthly.length:0
+          const promptMonths=Array.isArray(packet?.saju?.monthly)?packet.saju.monthly.length:0
+          if(sourceMonths<12||promptMonths!==sourceMonths)throw new Error(`Saju monthly evidence loss: source=${sourceMonths} prompt=${promptMonths}`)
+          if(!packet?.saju?.pillars||!packet?.saju?.elements)throw new Error('Saju natal baseline missing')
+          if(!Array.isArray(packet?.saju?.dayun)||packet.saju.dayun.length===0)throw new Error('Saju dayun missing')
+          if(!Object.prototype.hasOwnProperty.call(packet?.saju??{},'not_calculated'))throw new Error('Saju limitations contract missing')
+          if(!Object.prototype.hasOwnProperty.call(packet?.thai??{},'rule'))throw new Error('Thai rule contract missing')
+          if(!Object.prototype.hasOwnProperty.call(packet?.thai??{},'not_calculated'))throw new Error('Thai limitations contract missing')
+          if(Number(promptOut.prompt_bytes)>Number(promptOut.prompt_budget_bytes))throw new Error(`prompt over budget ${promptOut.prompt_bytes}/${promptOut.prompt_budget_bytes}`)
+
+          const startCall=await sb.functions.invoke('fortune-interpret-v21-preview',{body:{action:'start',calculation:calc,model:'gemini-3.7-flash'}})
+          if(startCall.error)throw startCall.error
+          const started=startCall.data
+          if(!started?.ok||!started?.job_id)throw new Error(`AI start failed: ${JSON.stringify(started).slice(0,800)}`)
+          if(started.interpreter_version!==EXPECTED)throw new Error(`start interpreter version mismatch: ${started.interpreter_version}`)
+
+          let final=null
+          for(let i=0;i<45;i++){
+            await new Promise(r=>setTimeout(r,i===0?2500:4000))
+            const statusCall=await sb.functions.invoke('fortune-interpret-v21-preview',{body:{action:'status',job_id:started.job_id}})
+            if(statusCall.error)throw statusCall.error
+            final=statusCall.data
+            if(final?.status==='done'||final?.status==='failed')break
+          }
+          if(final?.status!=='done')throw new Error(`AI job did not finish successfully: ${JSON.stringify(final).slice(0,1200)}`)
+          if(final?.interpreter_version!==EXPECTED)throw new Error(`status interpreter version mismatch: ${final?.interpreter_version}`)
+          if(!final?.data||typeof final.data!=='object')throw new Error('structured interpretation data missing')
+          if(!String(final?.data?.overview??final?.data?.summary??'').trim())throw new Error('interpretation overview/summary missing')
+          const usage=final?.usage??{}
+          if(Number(usage?.attempt_count)<1||Number(usage?.attempt_count)>2)throw new Error(`unexpected Gemini attempt_count ${usage?.attempt_count}`)
+          if(String(usage?.cost_guard_version??'')!==EXPECTED)throw new Error(`usage contract mismatch ${usage?.cost_guard_version}`)
+          if(!Array.isArray(usage?.call_trace)||usage.call_trace.length<1)throw new Error('Gemini call trace missing')
+
+          console.log(JSON.stringify({
+            ok:true,
+            calculation_engine:calc.engine,
+            interpreter_version:final.interpreter_version,
+            prompt:{bytes:promptOut.prompt_bytes,max_bytes:promptOut.prompt_budget_bytes,estimated_input_tokens:promptOut.estimated_input_tokens,saju_months_source:sourceMonths,saju_months_prompt:promptMonths,saju_pillars:Boolean(packet.saju.pillars),saju_dayun:packet.saju.dayun.length,thai_rule_present:Object.prototype.hasOwnProperty.call(packet.thai,'rule')},
+            job:{status:final.status,reused:Boolean(started.reused),inflight:Boolean(started.inflight),model:final.model,fallback_from:final.fallback_from??null},
+            usage:{prompt_tokens:usage.prompt_tokens??0,candidate_tokens:usage.candidate_tokens??0,thought_tokens:usage.thought_tokens??0,total_tokens:usage.total_tokens??0,attempt_count:usage.attempt_count,call_trace:usage.call_trace},
+          },null,2))
+          NODE
