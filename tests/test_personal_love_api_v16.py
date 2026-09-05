@@ -65,6 +65,13 @@ def test_personal_routes_reject_counterpart_payload():
     assert response.status_code == 422
 
 
+def test_personal_routes_reject_counterpart_inside_profile():
+    payload = request_payload()
+    payload["profile"]["counterpart"] = {"present": True}
+    response = client.post("/v1/love/new-relationship", json=payload)
+    assert response.status_code == 422
+
+
 def test_relationship_route_rejects_personal_love_mode():
     payload = {
         "user": profile_payload(),
