@@ -1,0 +1,68 @@
+name: Apply Reunion Dimensions V14 Retry
+
+on:
+  push:
+    branches:
+      - audit/reunion-dimensions-v14
+    paths:
+      - '.github/workflows/apply-reunion-dimensions-v14-retry.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/reunion-dimensions-v14
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Normalize V14 prompt anchor
+        run: python scripts/prepare_reunion_dimensions_v14_retry.py
+      - name: Apply V14 patches
+        run: python scripts/patch_reunion_dimensions_v14.py
+      - name: Install calculation dependencies
+        run: python -m pip install -q -r api/requirements.txt pytest
+      - name: Run V14 and prior relationship regressions
+        run: |
+          python -m py_compile reunion_dimension_v1.py relationship_reliability_v1.py relationship_western_v1.py birth_time_reliability_v1.py api/main.py
+          python -m pytest -q \
+            tests/test_reunion_dimensions_v14.py \
+            tests/test_relationship_reliability_v13.py \
+            tests/test_birth_time_reliability_v12.py \
+            tests/test_relationship_midpoints_v8.py \
+            tests/test_relationship_timing_v9.py
+      - name: Check relationship interpreter and contract tests
+        run: |
+          node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
+          node --test web/src/lib/relationshipModeContract.test.mjs
+          node --test web/src/lib/relationshipEvidencePipeline.test.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit permanent V14 product changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add reunion_dimension_v1.py relationship_western_v1.py \
+            tests/test_reunion_dimensions_v14.py \
+            supabase/functions/relationship-interpret-v9-preview/index.ts \
+            web/src/lib/resultFormatters.ts web/src/lib/readingCache.ts \
+            web/src/lib/relationshipModeContract.test.mjs web/src/lib/relationshipEvidencePipeline.test.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No permanent V14 product changes to commit.'
+          else
+            git commit -m 'feat(calc): split reunion activation dimensions V14'
+            git push origin HEAD:audit/reunion-dimensions-v14
+          fi
