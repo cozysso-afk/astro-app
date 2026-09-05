@@ -487,6 +487,42 @@ def test_major_daily_and_secondary_are_independent_layers():
         assert set(item["daily_transit_support"]).issubset(set(item["dimensions"]))
 
 
+def test_daily_support_requires_date_alignment_with_progression_peak():
+    major = [{
+        "calendar_month": "2026-09",
+        "new_connection_activation": 80.0,
+        "partnership_activation": 0.0,
+        "new_connection_peak_date": "2026-09-10",
+        "partnership_peak_date": None,
+    }]
+    progression = [{
+        "calendar_month": "2026-09",
+        "new_connection_activation": 80.0,
+        "partnership_activation": 0.0,
+        "new_connection_peak_date": "2026-09-10",
+        "partnership_peak_date": None,
+        "convergence_eligible": True,
+        "birth_time_policy": "exact_full_progression",
+    }]
+    far_daily = [{
+        "calendar_month": "2026-09",
+        "new_connection_activation": 90.0,
+        "partnership_activation": 0.0,
+        "new_connection_peak_date": "2026-09-25",
+        "partnership_peak_date": None,
+    }]
+    near_daily = [{
+        **far_daily[0],
+        "new_connection_peak_date": "2026-09-12",
+    }]
+    far = pl._convergence(major, progression, far_daily)
+    near = pl._convergence(major, progression, near_daily)
+    assert far[0]["daily_transit_support"] == []
+    assert near[0]["daily_transit_support"] == ["new_connection"]
+    assert near[0]["daily_support_window_days"] == 3
+    assert near[0]["daily_support_dates"]["new_connection"]["distance_days"] == 2
+
+
 def test_fast_daily_layer_cannot_create_convergence_by_itself():
     daily = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
     major = [{"calendar_month": "2026-09", "new_connection_activation": 0.0, "partnership_activation": 0.0}]
@@ -515,3 +551,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert "scanned daily" in policy["secondary_progression_sampling"]
         assert "diagnostic-only" in policy["secondary_progression_birth_time_safety"]
         assert "uncertain Moon contacts cannot inflate" in policy["transit_birth_time_safety"]
+        assert "within ±3 calendar days" in policy["daily_support_alignment"]
