@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './AppNext'
+import { AuthGate } from './AuthGate'
 import './styles.css'
 import './relationship.css'
 import './birthplace.css'
@@ -23,9 +24,12 @@ import './ux-readability-v22.css'
 import './mobile-design-v27.css'
 import './mobile-type-v28.css'
 import './mobile-density-v29.css'
+import './auth.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AuthGate>
+      <App />
+    </AuthGate>
   </React.StrictMode>,
 )

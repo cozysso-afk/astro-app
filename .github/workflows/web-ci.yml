@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "web/**"
+      - "api/private_app.py"
+      - "supabase/migrations/20260905_private_app*.sql"
+      - "tests/test_private_app_auth_contract.py"
       - "vercel.json"
       - ".github/workflows/web-ci.yml"
   push:
@@ -11,6 +14,9 @@ on:
       - main
     paths:
       - "web/**"
+      - "api/private_app.py"
+      - "supabase/migrations/20260905_private_app*.sql"
+      - "tests/test_private_app_auth_contract.py"
       - "vercel.json"
       - ".github/workflows/web-ci.yml"
   workflow_dispatch:
@@ -24,7 +30,7 @@ permissions:
 
 jobs:
   build:
-    name: TypeScript and Vite build
+    name: Private auth contract + TypeScript/Vite build
     runs-on: ubuntu-latest
     timeout-minutes: 12
     defaults:
@@ -43,6 +49,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify private email frontend contract
+        run: node src/lib/authContract.test.mjs
+
+      - name: Verify private API and DB contract
+        run: python ../tests/test_private_app_auth_contract.py
 
       - name: Type-check and build
         run: npm run build
