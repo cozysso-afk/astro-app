@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from integrated_fortune_v1 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
 from integrated_fortune_v1 import build_integrated_fortune
@@ -21,9 +21,10 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
+from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.6-relationship-e2e-contract"
+APP_VERSION = "api-fortune-v5.7-purpose-separated-love"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -83,8 +84,6 @@ class RelationshipProfile(BaseModel):
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
 
     def engine_payload(self) -> dict:
-        # `time_known` may be omitted by API clients. Infer only from the
-        # presence of a concrete birth_time; an explicit false still wins.
         normalized_time_known = self.time_known if self.time_known is not None else self.birth_time is not None
         raw = {
             "birth_time": self.birth_time,
@@ -116,6 +115,14 @@ class RelationshipRequest(BaseModel):
     end_date: date
     relationship_status: RelationshipStatus = "dating"
     analysis_mode: Literal["compatibility", "reunion", "marriage_unmarried", "marriage_married"] = "compatibility"
+
+
+class PersonalLoveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile: RelationshipProfile
+    start_date: date
+    end_date: date
 
 
 class FortuneProfile(BaseModel):
@@ -165,6 +172,7 @@ except ValueError:
 _calc_semaphore = threading.Semaphore(_MAX_CALC_CONCURRENCY)
 _JOB_TTL_SECONDS = 1800
 
+
 def _prune_jobs(store: dict, lock: threading.Lock):
     cutoff = time.time() - _JOB_TTL_SECONDS
     with lock:
@@ -185,6 +193,7 @@ def _calc_request_key(payload: dict) -> str:
     }
     raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
 
 def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
     if end_date < start_date:
@@ -252,10 +261,13 @@ def meta() -> dict:
         "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "location_engine": LOCATION_ENGINE_VERSION,
         "personal_marriage_engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
+        "personal_love_engine": PERSONAL_LOVE_ENGINE_VERSION,
         "calculation_engine_connected": True,
         "ai_interpretation": ai_status(),
         "routes": [
             "relationship/western",
+            "love/personal",
+            "love/new-relationship",
             "fortune/integrated",
             "fortune/interpret",
             "location/fit",
@@ -304,8 +316,6 @@ def fortune_interpret_job(job_id: str) -> dict:
     return {"job_id": job_id, **job}
 
 
-
-
 @app.post("/v1/location/fit")
 def location_fit(request: LocationFitRequest) -> dict:
     try:
@@ -321,6 +331,48 @@ def location_fit(request: LocationFitRequest) -> dict:
         "engine": LOCATION_ENGINE_VERSION,
         **result,
     }
+
+
+def _personal_love_response(request: PersonalLoveRequest, mode: Literal["personal_love_forecast", "new_relationship"]) -> dict:
+    profile_payload = request.profile.engine_payload()
+    try:
+        result = build_personal_love_forecast(
+            profile_payload,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            mode=mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"personal love calculation failed: {exc}") from exc
+    return {
+        "ok": bool(result.get("ok", True)),
+        "api_version": APP_VERSION,
+        "engine": result.get("engine", PERSONAL_LOVE_ENGINE_VERSION),
+        "analysis_mode": mode,
+        "period": result.get("period") or {"start": request.start_date.isoformat(), "end": request.end_date.isoformat()},
+        "result": result,
+        "interpretation_policy": {
+            "counterpart_required": False,
+            "counterpart_data_allowed": False,
+            "reunion_inference_allowed": False,
+            "known_person_private_intent_claims": False,
+            "event_probability": "not_calculated",
+            "score_semantics": "single-person astrology activation index only",
+        },
+    }
+
+
+@app.post("/v1/love/personal")
+def personal_love(request: PersonalLoveRequest) -> dict:
+    return _personal_love_response(request, "personal_love_forecast")
+
+
+@app.post("/v1/love/new-relationship")
+def new_relationship(request: PersonalLoveRequest) -> dict:
+    return _personal_love_response(request, "new_relationship")
+
 
 @app.post("/v1/marriage/personal")
 def personal_marriage(request: PersonalMarriageRequest) -> dict:
@@ -362,9 +414,6 @@ def relationship_western(request: RelationshipRequest) -> dict:
 
     if not user_payload["time_known"] or user_payload["birth_time"] is None:
         raise HTTPException(status_code=422, detail="user birth_time is required for the relationship engine")
-    # Coordinates are precision inputs, not an all-or-nothing API gate.
-    # Missing coordinates disable angle/house/Davison layers inside the engine
-    # while preserving valid planetary and Saju calculations.
     if cp_payload["time_known"] and cp_payload["birth_time"] is None:
         raise HTTPException(status_code=422, detail="counterpart birth_time is required when time_known=true")
 
