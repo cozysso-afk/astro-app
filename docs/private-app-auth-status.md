@@ -31,11 +31,18 @@ Production DB/Auth preparation completed:
 - Transaction-only DB test confirmed the pre-bound owner path is accepted and a different anonymous user is rejected. No Edge Function/Gemini call occurred.
 - Security Advisor no longer reports direct SECURITY DEFINER EXECUTE exposure for the private-app guard. Existing anonymous-policy warnings remain until anonymous sign-ins are disabled after conversion.
 
+Render read-only verification:
+- Service: `astro-app-api`.
+- Branch: `main`, auto-deploy on commit.
+- Current command: `uvicorn api.main:app --host 0.0.0.0 --port $PORT`.
+- Planned coordinated cutover command: `uvicorn api.private_app:app --host 0.0.0.0 --port $PORT`.
+- No Render production setting has been changed yet.
+
 Still not applied / not completed:
 - Supabase Authentication → URL Configuration production redirect verification.
 - Legacy/probe Gemini Edge Function tombstones.
 - Render runtime `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` verification.
-- Render start-command switch to `private_app:app`.
+- Render start-command switch to `api.private_app:app`.
 - Vercel/main deployment of the web auth gate.
 - Owner anonymous → permanent email identity conversion on the existing device.
 - Post-conversion UUID/archive verification.
