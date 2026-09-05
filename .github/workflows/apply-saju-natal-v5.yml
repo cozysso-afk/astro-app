@@ -1,0 +1,40 @@
+name: Apply Saju Natal V5
+
+on:
+  push:
+    branches:
+      - audit/saju-natal-boundary-v5
+    paths:
+      - 'scripts/patch_saju_natal_v5.py'
+      - '.github/workflows/apply-saju-natal-v5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/saju-natal-boundary-v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply deterministic patch
+        run: python scripts/patch_saju_natal_v5.py
+      - name: Syntax check
+        run: python -m py_compile integrated_fortune_v1.py relationship_saju_v1.py
+      - name: Commit patched runtime files
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integrated_fortune_v1.py relationship_saju_v1.py
+          if git diff --cached --quiet; then
+            echo 'No runtime changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix(saju): separate absolute Jie boundaries from true-solar day hour'
+          git push origin HEAD:audit/saju-natal-boundary-v5
