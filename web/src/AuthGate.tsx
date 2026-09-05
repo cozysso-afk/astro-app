@@ -2,18 +2,19 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { checkAppAccess, installAuthenticatedApiFetch } from './lib/auth'
 import {
+  clearPendingAnonymousLink,
   countCurrentCloudRecords,
+  getAuthRedirectError,
   getSupabaseSession,
   isPermanentEmailSession,
   linkAnonymousSessionToEmail,
-  requestEmailOtp,
+  readPendingAnonymousLink,
+  rememberPendingAnonymousLink,
+  requestEmailMagicLink,
   signOutSupabase,
-  verifyEmailChangeOtp,
-  verifyEmailOtp,
 } from './lib/supabase'
 
-type GateStage = 'booting' | 'email' | 'code' | 'allowed'
-type OtpKind = 'email' | 'email_change'
+type GateStage = 'booting' | 'email' | 'sent' | 'allowed'
 
 function authMessage(error: unknown) {
   if (error instanceof Error && error.message) return error.message
@@ -31,9 +32,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [stage, setStage] = useState<GateStage>('booting')
   const [session, setSession] = useState<Session | null>(null)
   const [email, setEmail] = useState('')
-  const [token, setToken] = useState('')
-  const [otpKind, setOtpKind] = useState<OtpKind>('email')
-  const [pendingAnonymousUserId, setPendingAnonymousUserId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -44,6 +42,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setStage('email')
       return
     }
+
+    const pending = readPendingAnonymousLink()
+    if (pending) {
+      const authenticatedEmail = (nextSession.user.email ?? '').trim().toLowerCase()
+      if (nextSession.user.id !== pending.userId || authenticatedEmail !== pending.email) {
+        await signOutSupabase().catch(() => undefined)
+        clearPendingAnonymousLink()
+        setSession(null)
+        setStage('email')
+        throw new Error('이메일 연결 뒤 기존 기록 계정과 다른 사용자 ID가 확인됐어. 기록 보호를 위해 로그인을 중단했어.')
+      }
+    }
+
     const access = await checkAppAccess(nextSession)
     if (!access.allowed) {
       await signOutSupabase().catch(() => undefined)
@@ -51,97 +62,89 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setStage('email')
       throw new Error('이 계정에는 별빛의 운명 접근 권한이 없어.')
     }
+
     installAuthenticatedApiFetch()
+    clearPendingAnonymousLink()
     setSession(nextSession)
     setEmail(nextSession.user.email ?? '')
-    setPendingAnonymousUserId(null)
     setError('')
+    setNotice('')
     setStage('allowed')
   }
 
   useEffect(() => {
     let active = true
+    const redirectError = getAuthRedirectError()
+    if (redirectError) setError(redirectError)
+
     getSupabaseSession()
       .then(async (current) => {
         if (!active) return
         setSession(current)
-        if (current && isPermanentEmailSession(current)) await authorize(current)
-        else setStage('email')
+        if (current && isPermanentEmailSession(current)) {
+          await authorize(current)
+          return
+        }
+
+        const pending = readPendingAnonymousLink()
+        if (current?.user?.is_anonymous && pending?.userId === current.user.id) {
+          setEmail(pending.email)
+          setNotice('인증 메일을 보냈어. 메일 안의 확인 링크를 누르면 기존 기록 계정 그대로 로그인돼.')
+          setStage('sent')
+          return
+        }
+        setStage('email')
       })
       .catch((err) => {
         if (!active) return
         setError(authMessage(err))
         setStage('email')
       })
+
     return () => {
       active = false
     }
   }, [])
 
-  async function sendCode(event: FormEvent) {
+  async function sendLink(event: FormEvent) {
     event.preventDefault()
     const normalized = email.trim().toLowerCase()
     if (!normalized || !normalized.includes('@')) {
       setError('이메일 주소를 확인해줘.')
       return
     }
+
     setBusy(true)
     setError('')
     setNotice('')
     try {
       const current = session ?? await getSupabaseSession()
       if (current?.user?.is_anonymous) {
-        setPendingAnonymousUserId(current.user.id)
+        rememberPendingAnonymousLink(current.user.id, normalized)
         try {
           await linkAnonymousSessionToEmail(normalized)
-          setOtpKind('email_change')
-          setNotice('기존 기록 계정 ID를 유지하면서 이메일을 연결하고 있어. 메일로 받은 6자리 코드를 입력해줘.')
+          setNotice('기존 기록 계정 ID를 유지하면서 이메일을 연결하고 있어. 메일에서 새 이메일 확인 링크를 눌러줘.')
         } catch (linkError) {
+          clearPendingAnonymousLink()
           if (!existingEmailError(linkError)) throw linkError
+
           const cloudRecordCount = await countCurrentCloudRecords()
           if (cloudRecordCount > 0) {
             throw new Error(`이 기기의 익명 계정에 클라우드 기록 ${cloudRecordCount}건이 있어서 기존 이메일 계정으로 자동 전환하지 않았어. 기록 이전을 먼저 확인해야 해.`)
           }
-          setPendingAnonymousUserId(null)
+
           await signOutSupabase()
           setSession(null)
-          await requestEmailOtp(normalized)
-          setOtpKind('email')
-          setNotice('이미 연결된 계정이야. 이 익명 계정에는 저장 기록이 없어 안전하게 기존 이메일 계정으로 로그인해. 메일로 받은 6자리 코드를 입력해줘.')
+          await requestEmailMagicLink(normalized)
+          setNotice('이미 연결된 계정이야. 이 익명 계정에는 저장 기록이 없어 기존 이메일 계정용 로그인 링크를 보냈어.')
         }
       } else {
-        setPendingAnonymousUserId(null)
-        await requestEmailOtp(normalized)
-        setOtpKind('email')
-        setNotice('메일로 받은 6자리 코드를 입력해줘.')
+        clearPendingAnonymousLink()
+        await requestEmailMagicLink(normalized)
+        setNotice('로그인 링크를 이메일로 보냈어. 메일 안의 Sign in 링크를 눌러줘.')
       }
       setEmail(normalized)
-      setToken('')
-      setStage('code')
-    } catch (err) {
-      setError(authMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function verifyCode(event: FormEvent) {
-    event.preventDefault()
-    if (!/^\d{6}$/.test(token.trim())) {
-      setError('6자리 인증 코드를 입력해줘.')
-      return
-    }
-    setBusy(true)
-    setError('')
-    try {
-      const nextSession = otpKind === 'email_change'
-        ? await verifyEmailChangeOtp(email, token)
-        : await verifyEmailOtp(email, token)
-      if (!nextSession) throw new Error('인증 세션을 만들지 못했어.')
-      if (otpKind === 'email_change' && pendingAnonymousUserId && nextSession.user.id !== pendingAnonymousUserId) {
-        throw new Error('이메일 연결 뒤 사용자 ID가 달라졌어. 기존 기록 보호를 위해 앱 진입을 중단했어.')
-      }
-      await authorize(nextSession)
+      setStage('sent')
     } catch (err) {
       setError(authMessage(err))
     } finally {
@@ -153,9 +156,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setBusy(true)
     try {
       await signOutSupabase()
+      clearPendingAnonymousLink()
       setSession(null)
-      setPendingAnonymousUserId(null)
-      setToken('')
       setNotice('로그아웃했어.')
       setStage('email')
     } finally {
@@ -187,7 +189,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         {stage === 'booting' ? (
           <div className="private-auth-loading">로그인 상태 확인 중…</div>
         ) : stage === 'email' ? (
-          <form className="private-auth-form" onSubmit={sendCode}>
+          <form className="private-auth-form" onSubmit={sendLink}>
             <label htmlFor="private-auth-email">이메일</label>
             <input
               id="private-auth-email"
@@ -199,33 +201,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
               placeholder="name@example.com"
               disabled={busy}
             />
-            <button type="submit" disabled={busy}>{busy ? '전송 중…' : '인증 코드 받기'}</button>
+            <button type="submit" disabled={busy}>{busy ? '전송 중…' : '로그인 링크 받기'}</button>
           </form>
         ) : (
-          <form className="private-auth-form" onSubmit={verifyCode}>
-            <label htmlFor="private-auth-code">6자리 인증 코드</label>
-            <input
-              id="private-auth-code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              value={token}
-              onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              disabled={busy}
-            />
-            <button type="submit" disabled={busy}>{busy ? '확인 중…' : '로그인'}</button>
-            <button className="private-auth-secondary" type="button" onClick={() => { setStage('email'); setToken(''); setError('') }} disabled={busy}>
-              다른 이메일 사용
+          <div className="private-auth-form">
+            <div className="private-auth-loading">메일 확인을 기다리고 있어.</div>
+            <button className="private-auth-secondary" type="button" onClick={() => { setStage('email'); setError(''); setNotice('') }} disabled={busy}>
+              이메일 다시 입력
             </button>
-          </form>
+          </div>
         )}
 
         {notice && <p className="private-auth-notice">{notice}</p>}
         {error && <p className="private-auth-error">{error}</p>}
-        <p className="private-auth-footnote">비밀번호는 저장하지 않아. 인증 메일과 Supabase 세션만 사용해.</p>
+        <p className="private-auth-footnote">비밀번호는 저장하지 않아. Supabase의 일회용 이메일 링크와 세션만 사용해.</p>
       </section>
     </main>
   )
