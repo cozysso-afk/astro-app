@@ -1,5 +1,5 @@
 name: Audit Integrated Fortune E2E V11 Once
-# rerun after legacy version assertion fix
+# rerun with both legacy version assertions normalized
 on:
   push:
     branches:
@@ -24,6 +24,16 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Normalize one-shot patcher legacy assertion count
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/patch_integrated_fortune_e2e_v11.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('if s.count(old_assert) != 1:', 'if s.count(old_assert) != 2:', 1)
+          s=s.replace('s = s.replace(old_assert, new_assert, 1)', 's = s.replace(old_assert, new_assert)', 1)
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Apply V11 evidence patch
         run: python scripts/patch_integrated_fortune_e2e_v11.py
       - name: Run V21/V11 interpretation contracts
