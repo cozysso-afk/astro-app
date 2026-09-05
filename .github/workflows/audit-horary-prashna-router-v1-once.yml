@@ -1,0 +1,26 @@
+name: Audit Horary Prashna Router V1 Once
+
+on:
+  push:
+    branches:
+      - feature/horary-prashna-router-v1
+    paths:
+      - '.github/workflows/audit-horary-prashna-router-v1-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  router-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install --quiet pytest
+      - name: Validate router module
+        run: python -m py_compile horary_prashna_router_v1.py
+      - name: Run Horary Prashna router tests
+        run: python -m pytest -q tests/test_horary_prashna_question_router_v1.py
