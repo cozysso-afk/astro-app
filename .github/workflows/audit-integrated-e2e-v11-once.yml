@@ -8,45 +8,42 @@ on:
       - '.github/workflows/audit-integrated-e2e-v11-once.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    defaults:
-      run:
-        working-directory: web
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: audit/integrated-fortune-e2e-v11
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - name: Compare live calculation with production AI prompt packet without Gemini
+      - name: Apply V11 evidence patch
+        run: python scripts/patch_integrated_fortune_e2e_v11.py
+      - name: Run V21/V11 interpretation contracts
         run: |
-          node --input-type=module <<'NODE'
-          import { createClient } from '@supabase/supabase-js'
-          const API='https://astro-app-api-f7fn.onrender.com'
-          const SB='https://dbynfabwfcakxayyggzi.supabase.co'
-          const KEY='sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
-          const body={profile:{name:'Synthetic E2E',birth_date:'1990-01-01',birth_time:'12:00:00',latitude:51.4779,longitude:0,utc_offset_hours:0,gender:'female'},start_date:'2026-09-05',end_date:'2027-09-04'}
-          const r=await fetch(`${API}/v1/fortune/integrated`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(180000)})
-          const calc=await r.json(); if(!r.ok||!calc?.ok)throw new Error(`calc failed ${r.status} ${JSON.stringify(calc).slice(0,600)}`)
-          const sb=createClient(SB,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
-          const signed=await sb.auth.signInAnonymously(); if(signed.error||!signed.data.session)throw signed.error??new Error('anon auth failed')
-          const invoked=await sb.functions.invoke('fortune-interpret-v21-preview',{body:{action:'prompt',calculation:calc,model:'gemini-3.7-flash'}})
-          if(invoked.error)throw invoked.error
-          const out=invoked.data; if(!out?.ok||!out?.prompt)throw new Error(`prompt failed ${JSON.stringify(out).slice(0,500)}`)
-          const marker='CALCULATED_DATA='; const idx=String(out.prompt).indexOf(marker); if(idx<0)throw new Error('CALCULATED_DATA marker missing')
-          const packet=JSON.parse(String(out.prompt).slice(idx+marker.length).trim())
-          const keys=(x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort():[]
-          const count=(x)=>Array.isArray(x)?x.length:0
-          console.log(JSON.stringify({
-            calculation:{api_version:calc.api_version,engine:calc.engine,top_keys:keys(calc),western_keys:keys(calc.western),saju_keys:keys(calc.saju),thai_keys:keys(calc.thai),western_months:count(calc.western?.months),western_daily_scores:count(calc.western?.daily_scores),western_key_dates:count(calc.western?.key_dates),saju_annual:count(calc.saju?.annual),saju_monthly:count(calc.saju?.monthly)},
-            prompt:{packet_version:packet.packet_version,source_packet_version:packet.source_packet_version,top_keys:keys(packet),western_keys:keys(packet.western),saju_keys:keys(packet.saju),thai_keys:keys(packet.thai),western_months:count(packet.western?.months),western_detail_days:count(packet.western?.detail_days),key_dates:count(packet.key_dates),evidence_ledger:count(packet.evidence_ledger),saju_annual:count(packet.saju?.annual),saju_monthly:count(packet.saju?.monthly)},
-            prompt_meta:{prompt_bytes:out.prompt_bytes,prompt_budget_bytes:out.prompt_budget_bytes,estimated_input_tokens:out.estimated_input_tokens},
-          },null,2))
-          NODE
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v21-preview/index.ts
+      - name: Build production web
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Commit permanent V11 files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            supabase/functions/fortune-interpret-v21-preview/index.ts \
+            supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts \
+            supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs \
+            web/src/lib/readingCache.ts
+          git diff --cached --check
+          git commit -m 'fix(ai): preserve integrated fortune evidence end to end V11'
+          git push origin HEAD:audit/integrated-fortune-e2e-v11
