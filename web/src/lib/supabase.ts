@@ -15,27 +15,64 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 })
 
-let sessionBootstrap: Promise<Session> | null = null
-
-async function createOrGetSession(): Promise<Session> {
+export async function getSupabaseSession(): Promise<Session | null> {
   const current = await supabase.auth.getSession()
   if (current.error) throw current.error
-  if (current.data.session) return current.data.session
+  return current.data.session ?? null
+}
 
-  const created = await supabase.auth.signInAnonymously()
-  if (created.error || !created.data.session) {
-    throw created.error ?? new Error('클라우드 기록 세션을 만들지 못했어.')
-  }
-  return created.data.session
+export function isPermanentEmailSession(session: Session | null): boolean {
+  return Boolean(session?.user?.email && session?.user?.is_anonymous !== true)
+}
+
+// Existing anonymous sessions are intentionally preserved so the current device can
+// link its email identity without changing user_id. New anonymous sessions are never created.
+export async function linkAnonymousSessionToEmail(email: string) {
+  const session = await getSupabaseSession()
+  if (!session?.user?.is_anonymous) throw new Error('연결할 기존 익명 세션이 없어.')
+  const result = await supabase.auth.updateUser({ email: email.trim().toLowerCase() })
+  if (result.error) throw result.error
+  return result.data
+}
+
+export async function requestEmailOtp(email: string) {
+  const normalized = email.trim().toLowerCase()
+  const result = await supabase.auth.signInWithOtp({
+    email: normalized,
+    options: { shouldCreateUser: false },
+  })
+  if (result.error) throw result.error
+  return result.data
+}
+
+export async function verifyEmailOtp(email: string, token: string) {
+  const result = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: 'email',
+  })
+  if (result.error) throw result.error
+  return result.data.session ?? null
+}
+
+export async function verifyEmailChangeOtp(email: string, token: string) {
+  const result = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: 'email_change',
+  })
+  if (result.error) throw result.error
+  return result.data.session ?? (await getSupabaseSession())
+}
+
+export async function signOutSupabase() {
+  const result = await supabase.auth.signOut()
+  if (result.error) throw result.error
 }
 
 export async function ensureSupabaseSession(): Promise<Session> {
-  if (sessionBootstrap) return sessionBootstrap
-
-  sessionBootstrap = createOrGetSession()
-  try {
-    return await sessionBootstrap
-  } finally {
-    sessionBootstrap = null
-  }
+  const session = await getSupabaseSession()
+  if (!session) throw new Error('이메일 로그인이 필요해.')
+  if (!isPermanentEmailSession(session)) throw new Error('이메일 인증을 완료해줘.')
+  return session
 }
