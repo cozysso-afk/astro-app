@@ -1,0 +1,37 @@
+name: Apply Relationship Midpoints V8
+
+on:
+  push:
+    branches:
+      - audit/relationship-midpoints-v8
+    paths:
+      - 'scripts/apply_relationship_midpoints_v8.py'
+      - '.github/workflows/apply-relationship-midpoints-v8.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/relationship-midpoints-v8
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply V8 patch
+        run: python scripts/apply_relationship_midpoints_v8.py
+      - name: Commit patched runtime
+        run: |
+          if git diff --quiet; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add relationship_western_v1.py
+          git commit -m "fix(calc): align Davison and composite midpoint contracts V8"
+          git push origin HEAD:audit/relationship-midpoints-v8
