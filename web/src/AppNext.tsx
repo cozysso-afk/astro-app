@@ -46,6 +46,7 @@ import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
 import { LocationResults } from './LocationResults'
+import { HoraryPrashnaPanel } from './HoraryPrashnaPanel'
 import { ArchiveView } from './ArchiveView'
 import { ProfileView } from './ProfileView'
 import { SettingsView } from './SettingsView'
@@ -1519,6 +1520,8 @@ export default function AppNext() {
             onPeriodSelect={selectHomePeriod}
             onToolSelect={selectHomeTool}
           />
+
+          {selectedTool === 'horary' && <HoraryPrashnaPanel apiBase={API_BASE} gender={birthProfile.gender}/>}
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>

@@ -21,8 +21,9 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
+from api.horary_prashna_v1 import router as horary_prashna_router
 
-APP_VERSION = "api-fortune-v5.4-personal-marriage-forecast"
+APP_VERSION = "api-fortune-v5.5-horary-prashna-router"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -47,6 +48,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+app.include_router(horary_prashna_router)
 
 
 RelationshipStatus = Literal[
@@ -229,6 +231,7 @@ def meta() -> dict:
             "fortune/interpret",
             "location/fit",
             "marriage/personal",
+            "horary-prashna/classify",
         ],
     }
 
