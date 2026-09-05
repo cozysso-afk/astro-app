@@ -8,7 +8,6 @@ import {
   linkAnonymousSessionToEmail,
   requestEmailOtp,
   signOutSupabase,
-  supabase,
   verifyEmailChangeOtp,
   verifyEmailOtp,
 } from './lib/supabase'
@@ -74,14 +73,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         setError(authMessage(err))
         setStage('email')
       })
-
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!active || !nextSession || !isPermanentEmailSession(nextSession)) return
-      void authorize(nextSession).catch((err) => setError(authMessage(err)))
-    })
     return () => {
       active = false
-      data.subscription.unsubscribe()
     }
   }, [])
 
