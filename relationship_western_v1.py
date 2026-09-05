@@ -20,7 +20,7 @@ import swisseph as swe
 
 from western_house_system_v1 import calculate_quadrant_houses
 
-ENGINE_VERSION = "relationship-western-v1.7-midpoint-contract"
+ENGINE_VERSION = "relationship-western-v1.8-timing-timezone-contract"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -181,10 +181,9 @@ def _relationship_directional_context(rows, start_date, end_date):
 def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
     rows = []
     cursor = start_date
-    tz = timezone(timedelta(hours=float(utc_offset_hours or 9.0)))
     while cursor <= end_date:
-        target_local = datetime.combine(cursor, dt_time(12, 0), tzinfo=tz)
-        transit_chart = _chart_from_jd(_jd_from_utc(target_local.astimezone(timezone.utc)), include_moon=False, include_angles=False)
+        target_utc = _local_noon_utc(cursor, utc_offset_hours)
+        transit_chart = _chart_from_jd(_jd_from_utc(target_utc), include_moon=False, include_angles=False)
         user_hits = _transit_hits(transit_chart, user_natal, "user")
         cp_hits = _transit_hits(transit_chart, cp_natal, "counterpart")
         user_score = _side_trigger_score(user_hits)
@@ -255,6 +254,18 @@ def _mid_angle(a, b):
 def _utc_datetime(birth_date, birth_time, utc_offset_hours):
     local = datetime.combine(birth_date, birth_time)
     return (local - timedelta(hours=float(utc_offset_hours))).replace(tzinfo=timezone.utc)
+
+
+def _utc_offset_value(value, default=9.0):
+    """Return a fixed UTC offset without treating numeric zero as missing."""
+    return float(default if value is None else value)
+
+
+def _local_noon_utc(day, utc_offset_hours):
+    """Map a user-facing local calendar date to local noon, then UTC."""
+    offset = _utc_offset_value(utc_offset_hours)
+    local_tz = timezone(timedelta(hours=offset))
+    return datetime.combine(day, dt_time(12, 0), tzinfo=local_tz).astimezone(timezone.utc)
 
 
 def _jd_from_utc(dt):
@@ -560,8 +571,9 @@ def _summary(aspect_sets):
 def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility"):
     """Return static and monthly advanced relationship layers.
 
-    month_segments: iterable of (segment_start: date, segment_end: date); midpoint noon KST is used as
-    the representative timing date. Exact partner birth time/place unlocks Davison and Marks layers.
+    month_segments: iterable of (segment_start: date, segment_end: date); midpoint local noon in the
+    user profile's fixed UTC offset is used as the representative timing instant. Exact partner birth
+    time/place unlocks Davison and Marks layers.
     Daily two-person reunion transit scanning runs only for analysis_mode="reunion".
     """
     month_segments = list(month_segments)
@@ -573,6 +585,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "secondary_key": "1 ephemeris day = 1 tropical year of life (365.2422 days)",
         "tertiary_key": f"Tertiary I: 1 ephemeris day = {TROPICAL_MONTH_DAYS} life days; completed lunar months",
         "orb_policy": "natal 3-6° by point; secondary 1.5°; tertiary 1.0°; major aspects + quincunx",
+        "timing_timezone_policy": "user-facing calendar dates use local noon in the user profile fixed utc_offset_hours; numeric 0 is preserved; IANA/DST inference is not performed",
         "limitations": [],
     }
 
@@ -658,7 +671,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     monthly = []
     for seg_start, seg_end in month_segments:
         rep_date = seg_start + (seg_end - seg_start) // 2
-        target = datetime.combine(rep_date, dt_time(12, 0), tzinfo=timezone(timedelta(hours=9))).astimezone(timezone.utc)
+        target = _local_noon_utc(rep_date, user_profile.get("utc_offset_hours", 9.0))
         row = {"calendar_month": f"{seg_start.year}-{seg_start.month:02d}", "representative_date": rep_date.isoformat()}
         layer_aspects = {}
 

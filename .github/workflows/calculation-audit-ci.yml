@@ -26,6 +26,7 @@ on:
       - 'tests/test_astrocartography_external_gold_v6.py'
       - 'tests/test_western_polar_timezone_v7.py'
       - 'tests/test_relationship_midpoints_v8.py'
+      - 'tests/test_relationship_timing_v9.py'
       - 'tests/test_thai_*.py'
       - 'tests/test_personal_marriage_v1.py'
       - '.github/workflows/calculation-audit-ci.yml'
@@ -80,6 +81,7 @@ jobs:
             tests/test_astrocartography_external_gold_v6.py \
             tests/test_western_polar_timezone_v7.py \
             tests/test_relationship_midpoints_v8.py \
+            tests/test_relationship_timing_v9.py \
             tests/test_personal_marriage_v1.py
 
       - name: Thai independent gold corpus
