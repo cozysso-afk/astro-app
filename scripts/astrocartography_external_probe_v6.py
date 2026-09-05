@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -105,15 +106,26 @@ def _hours_from_value(value) -> float:
 
 
 def usno_gast_hours(moment: datetime) -> float:
+    # Use the full interval parameter set shown by USNO's API docs. GAST is a
+    # Greenwich quantity, so the non-zero location is only there to satisfy the
+    # location input contract; its latitude/local longitude do not alter GAST.
     params = {
+        "ID": "AstroApp",
         "date": moment.strftime("%Y-%m-%d"),
         "time": moment.strftime("%H:%M:%S"),
-        "coords": "0,0",
+        "coords": "41.89, 12.48",
+        "reps": "1",
+        "intv_mag": "1",
+        "intv_unit": "seconds",
     }
     url = "https://aa.usno.navy.mil/api/siderealtime?" + urllib.parse.urlencode(params)
     request = urllib.request.Request(url, headers={"User-Agent": "astro-app-calculation-audit/1.0"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        payload = json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"USNO HTTP {exc.code}: {url}\n{body[:4000]}") from exc
     gast = _find_key(payload, "gast")
     if gast is None:
         print("USNO payload:", json.dumps(payload, ensure_ascii=False, indent=2))
