@@ -18,6 +18,7 @@ on:
       - 'tests/test_western_calculation_audit_v1.py'
       - 'tests/test_saju_calculation_gold_v1.py'
       - 'tests/test_external_astronomy_gold_v2.py'
+      - 'tests/test_placidus_external_gold_v3.py'
       - 'tests/test_thai_*.py'
       - 'tests/test_personal_marriage_v1.py'
       - '.github/workflows/calculation-audit-ci.yml'
@@ -66,6 +67,7 @@ jobs:
             tests/test_western_calculation_audit_v1.py \
             tests/test_saju_calculation_gold_v1.py \
             tests/test_external_astronomy_gold_v2.py \
+            tests/test_placidus_external_gold_v3.py \
             tests/test_personal_marriage_v1.py
 
       - name: Thai independent gold corpus
