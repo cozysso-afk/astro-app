@@ -1,0 +1,53 @@
+name: Render Polar Live V7
+
+on:
+  push:
+    branches:
+      - audit/western-polar-timezone-v7
+    paths:
+      - '.github/workflows/render-polar-live-v7.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  polar-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify live polar Porphyry fallback
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          payload = {
+              'profile': {
+                  'name': 'polar-live-v7',
+                  'birth_date': '1990-01-01',
+                  'birth_time': '12:00:00',
+                  'latitude': 69.6492,
+                  'longitude': 18.9553,
+                  'utc_offset_hours': 1,
+                  'gender': 'female',
+              },
+              'start_date': '2026-08-28',
+              'end_date': '2026-08-28',
+          }
+          request = urllib.request.Request(
+              'https://astro-app-api-f7fn.onrender.com/v1/fortune/integrated',
+              data=json.dumps(payload).encode('utf-8'),
+              headers={'Content-Type': 'application/json'},
+              method='POST',
+          )
+          with urllib.request.urlopen(request, timeout=120) as response:
+              result = json.load(response)
+
+          assert result['ok'] is True
+          assert result['engine'] == 'integrated-fortune-v2.12-polar-safe-houses', result.get('engine')
+          meta = result['western']['natal']['house_system']
+          assert meta['requested'] == 'Placidus', meta
+          assert meta['used'] == 'Porphyry', meta
+          assert meta['fallback'] is True, meta
+          print('render-polar-live-ok', result['engine'], meta)
+          PY
