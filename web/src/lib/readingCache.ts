@@ -12,7 +12,7 @@ const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
-const FORTUNE_AI_CACHE_CONTRACT = 'release-contract-v21.3.2-relationship-direction-depth'
+const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.2-evidence-pipeline'
 
 function stableStringify(value: unknown): string {
