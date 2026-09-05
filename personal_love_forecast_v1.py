@@ -24,9 +24,12 @@ from personal_marriage_v1 import (
 )
 from relationship_reliability_v1 import decorate_aspect
 
-ENGINE_VERSION = "personal-love-western-v1.0-purpose-separated"
+ENGINE_VERSION = "personal-love-western-v1.1-purpose-layer-separated"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
+
+MAJOR_TRANSIT_PLANETS = {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"}
+DAILY_TRANSIT_PLANETS = {"Sun", "Mercury", "Venus", "Mars"}
 
 TRANSIT_PLANET_WEIGHTS = {
     "new_connection": {
@@ -84,8 +87,6 @@ ASPECT_WEIGHTS = {
     "quincunx": 0.66,
 }
 
-HOUSE_DERIVED_TARGETS = {"5th_ruler", "7th_ruler", "DSC"}
-
 
 def _norm(value: float) -> float:
     return float(value) % 360.0
@@ -97,7 +98,7 @@ def _angle_distance(a: float, b: float) -> float:
 
 
 def _transit_orb(planet: str) -> float:
-    return 1.4 if planet in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else 1.0
+    return 1.4 if planet in MAJOR_TRANSIT_PLANETS else 1.0
 
 
 def _progression_orb(planet: str) -> float:
@@ -146,8 +147,7 @@ def _month_samples(start_date: date, end_date: date) -> list[date]:
             next_month = date(cursor.year, cursor.month + 1, 1)
         seg_start = max(start_date, cursor)
         seg_end = min(end_date, next_month - timedelta(days=1))
-        midpoint = seg_start + timedelta(days=(seg_end - seg_start).days // 2)
-        out.append(midpoint)
+        out.append(seg_start + timedelta(days=(seg_end - seg_start).days // 2))
         cursor = next_month
     return out
 
@@ -280,6 +280,7 @@ def _contact_rows(
                 )
                 meta.update(
                     {
+                        "layer": source_layer,
                         "source": source_name,
                         "target": target_name,
                         "target_source": target_info.get("source"),
@@ -299,35 +300,48 @@ def _contact_rows(
     return rows[:12]
 
 
-def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, natal: dict) -> list[dict]:
-    rows: list[dict] = []
+def _layer_day_row(day: date, hits: list[dict]) -> dict:
+    new_score = _dimension_score(hits, "new_connection_score")
+    partnership_score = _dimension_score(hits, "partnership_score")
+    return {
+        "date": day.isoformat(),
+        "new_connection_activation": new_score,
+        "new_connection_band": _band(new_score),
+        "partnership_activation": partnership_score,
+        "partnership_band": _band(partnership_score),
+        "hits": hits[:6],
+        "event_probability": "not_calculated",
+    }
+
+
+def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, natal: dict) -> dict[str, list[dict]]:
+    major_rows: list[dict] = []
+    daily_rows: list[dict] = []
     cursor = start_date
-    transit_weights = TRANSIT_PLANET_WEIGHTS
     while cursor <= end_date:
         positions = _positions(_jd(_local_noon_utc(cursor, utc_offset_hours)), include_moon=False)
-        hits = _contact_rows(
-            positions,
+        major_positions = {name: row for name, row in positions.items() if name in MAJOR_TRANSIT_PLANETS}
+        daily_positions = {name: row for name, row in positions.items() if name in DAILY_TRANSIT_PLANETS}
+        major_hits = _contact_rows(
+            major_positions,
             natal["targets"],
             source_layer="major_transit",
-            source_weights=transit_weights,
+            source_weights=TRANSIT_PLANET_WEIGHTS,
             source_exact=True,
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
-        new_score = _dimension_score(hits, "new_connection_score")
-        partnership_score = _dimension_score(hits, "partnership_score")
-        rows.append(
-            {
-                "date": cursor.isoformat(),
-                "new_connection_activation": new_score,
-                "new_connection_band": _band(new_score),
-                "partnership_activation": partnership_score,
-                "partnership_band": _band(partnership_score),
-                "hits": hits[:6],
-                "event_probability": "not_calculated",
-            }
+        daily_hits = _contact_rows(
+            daily_positions,
+            natal["targets"],
+            source_layer="daily_transit",
+            source_weights=TRANSIT_PLANET_WEIGHTS,
+            source_exact=True,
+            target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
+        major_rows.append(_layer_day_row(cursor, major_hits))
+        daily_rows.append(_layer_day_row(cursor, daily_hits))
         cursor += timedelta(days=1)
-    return rows
+    return {"major": major_rows, "daily": daily_rows}
 
 
 def _progressed_positions(natal: dict, target_date: date, utc_offset_hours: float) -> dict:
@@ -369,7 +383,7 @@ def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float,
 
 def _summary(rows: list[dict], key: str) -> dict:
     if not rows:
-        return {"average": 0.0, "band": "low", "top_dates": []}
+        return {"average": 0.0, "band": "low", "top_dates": [], "event_probability": "not_calculated"}
     average = round(sum(float(x[key]) for x in rows) / len(rows), 1)
     ordered = sorted(rows, key=lambda x: (-float(x[key]), x["date"]))
     selected: list[dict] = []
@@ -395,7 +409,7 @@ def _summary(rows: list[dict], key: str) -> dict:
     }
 
 
-def _monthly_transit_summary(rows: list[dict]) -> list[dict]:
+def _monthly_summary(rows: list[dict]) -> list[dict]:
     grouped: dict[str, list[dict]] = {}
     for row in rows:
         grouped.setdefault(row["date"][:7], []).append(row)
@@ -418,11 +432,12 @@ def _monthly_transit_summary(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _convergence(monthly_transits: list[dict], progression_rows: list[dict]) -> list[dict]:
+def _convergence(major_months: list[dict], progression_rows: list[dict], daily_months: list[dict]) -> list[dict]:
     progress_by_month = {row["calendar_month"]: row for row in progression_rows}
+    daily_by_month = {row["calendar_month"]: row for row in daily_months}
     out = []
-    for transit in monthly_transits:
-        progress = progress_by_month.get(transit["calendar_month"])
+    for major in major_months:
+        progress = progress_by_month.get(major["calendar_month"])
         if not progress:
             continue
         dimensions = []
@@ -430,18 +445,29 @@ def _convergence(monthly_transits: list[dict], progression_rows: list[dict]) -> 
             ("new_connection", "new_connection_activation"),
             ("partnership", "partnership_activation"),
         ):
-            if float(transit[key]) >= 40.0 and float(progress[key]) >= 40.0:
+            if float(major[key]) >= 40.0 and float(progress[key]) >= 40.0:
                 dimensions.append(name)
-        if dimensions:
-            out.append(
-                {
-                    "calendar_month": transit["calendar_month"],
-                    "dimensions": dimensions,
-                    "independent_layers": ["transit", "secondary_progression"],
-                    "layer_count": 2,
-                    "policy": "convergence means independent astrology layers repeat the same activation theme; it is not an event probability",
-                }
+        if not dimensions:
+            continue
+        daily = daily_by_month.get(major["calendar_month"])
+        daily_support = [
+            name
+            for name, key in (
+                ("new_connection", "new_connection_activation"),
+                ("partnership", "partnership_activation"),
             )
+            if daily and float(daily[key]) >= 40.0 and name in dimensions
+        ]
+        out.append(
+            {
+                "calendar_month": major["calendar_month"],
+                "dimensions": dimensions,
+                "independent_layers": ["major_transit", "secondary_progression"],
+                "layer_count": 2,
+                "daily_transit_support": daily_support,
+                "policy": "convergence requires independent higher-priority major-transit and secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
+            }
+        )
     return out
 
 
@@ -459,18 +485,19 @@ def build_personal_love_forecast(
     if (end_date - start_date).days > 365:
         raise ValueError("personal love forecast range is limited to 366 days per request")
 
-    # Contract guard: this engine is single-person only by design.
     forbidden = {"counterpart", "partner", "relationship_status", "reunion"} & set(profile)
     if forbidden:
         raise ValueError(f"single-person love engine does not accept counterpart relationship fields: {sorted(forbidden)}")
-
     if profile.get("birth_time") is None and bool(profile.get("time_known")):
         raise ValueError("time_known=true requires birth_time")
 
     natal = _natal_context(profile)
-    transit_rows = _transit_rows(start_date, end_date, float(profile.get("utc_offset_hours", 9.0)), natal)
+    transit_layers = _transit_rows(start_date, end_date, float(profile.get("utc_offset_hours", 9.0)), natal)
+    major_rows = transit_layers["major"]
+    daily_rows = transit_layers["daily"]
     progression_rows = _progression_rows(start_date, end_date, float(profile.get("utc_offset_hours", 9.0)), natal)
-    monthly = _monthly_transit_summary(transit_rows)
+    major_months = _monthly_summary(major_rows)
+    daily_months = _monthly_summary(daily_rows)
 
     static_structure = {
         "scope": "single_person_natal_only",
@@ -495,20 +522,29 @@ def build_personal_love_forecast(
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
         "static_structure": static_structure,
         "timing": {
-            "transits": {
-                "new_connection": _summary(transit_rows, "new_connection_activation"),
-                "partnership": _summary(transit_rows, "partnership_activation"),
-                "months": monthly,
-                "daily": transit_rows,
-                "policy": "current activation of the user's own natal love/partnership factors; not a known person's contact or reunion signal",
-            },
             "secondary_progression": {
                 "new_connection": _summary(progression_rows, "new_connection_activation"),
                 "partnership": _summary(progression_rows, "partnership_activation"),
                 "months": progression_rows,
-                "policy": "secondary progression is an independent higher-priority timing layer and is not numerically merged into daily transit scores",
+                "policy": "secondary progression is an independent higher-priority timing layer and is never numerically merged into transit indices",
             },
-            "convergence": _convergence(monthly, progression_rows),
+            "major_transits": {
+                "new_connection": _summary(major_rows, "new_connection_activation"),
+                "partnership": _summary(major_rows, "partnership_activation"),
+                "months": major_months,
+                "daily_samples": major_rows,
+                "planets": sorted(MAJOR_TRANSIT_PLANETS),
+                "policy": "Jupiter/Saturn/Uranus/Neptune/Pluto major-transit activation of the user's own natal factors; separate from fast daily timing",
+            },
+            "daily_transits": {
+                "new_connection": _summary(daily_rows, "new_connection_activation"),
+                "partnership": _summary(daily_rows, "partnership_activation"),
+                "months": daily_months,
+                "daily": daily_rows,
+                "planets": sorted(DAILY_TRANSIT_PLANETS),
+                "policy": "Sun/Mercury/Venus/Mars fast timing support only; never overrides higher-priority secondary or major-transit structure",
+            },
+            "convergence": _convergence(major_months, progression_rows, daily_months),
         },
         "focus": "new_connection" if mode == "new_relationship" else "balanced_personal_love",
         "interpretation_policy": {
@@ -519,5 +555,6 @@ def build_personal_love_forecast(
             "event_probability": "not_calculated",
             "score_semantics": "astrology activation index only",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
+            "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
     }
