@@ -20,5 +20,6 @@ This calculation layer is intentionally isolated from two-person relationship as
 - Major and daily transit scoring follows the same birth-time safety boundary. With provisional or unknown birth time, natal Moon and any other birth-time-sensitive target are excluded from production transit scores.
 - For a provisional clock time, excluded transit-to-Moon/time-sensitive contacts are retained as `diagnostic_time_sensitive_hits` with `diagnostic_only=true`; they cannot inflate the major-transit activation used by convergence.
 - Exact birth time still allows the full eligible natal target set for major/daily transit scoring.
+- Daily transit is only labeled as convergence timing support when its dimension-specific monthly peak is within ±3 calendar days of the matching secondary-progression peak. A strong daily transit somewhere else in the same month is not counted as support.
 
 The calculation and API regression contract lives in `tests/test_personal_love_engine_v16.py` and `tests/test_personal_love_api_v16.py`.
