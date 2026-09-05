@@ -1,5 +1,7 @@
 from datetime import date, time
 
+from pydantic import ValidationError
+
 from personal_marriage_v1 import build_personal_marriage
 
 
@@ -50,3 +52,60 @@ def test_personal_marriage_never_accepts_more_than_one_year():
         assert "366 days" in str(exc)
     else:
         raise AssertionError("expected one-year range guard")
+
+
+# Temporary integration bridge for V16 validation against the current main gate.
+def test_v16_personal_love_is_single_person_and_separate_from_reunion():
+    from personal_love_forecast_v1 import build_personal_love_forecast
+
+    profile = {
+        "birth_date": date(1990, 1, 15),
+        "birth_time": time(10, 20),
+        "time_known": True,
+        "time_source": "official_record",
+        "time_confidence": "exact",
+        "latitude": 37.5,
+        "longitude": 127.0,
+        "utc_offset_hours": 9.0,
+    }
+    result = build_personal_love_forecast(
+        profile,
+        start_date=date(2026, 9, 1),
+        end_date=date(2026, 9, 2),
+        mode="new_relationship",
+    )
+    assert result["source_scope"] == "single_person_only"
+    assert result["counterpart_used"] is False
+    assert result["relationship_engine_used"] is False
+    assert result["static_structure"]["fifth_house"] is not None
+    assert result["static_structure"]["seventh_house"] is not None
+    assert result["static_structure"]["dsc"] is not None
+    assert "overall_score" not in result["timing"]
+    assert result["interpretation_policy"]["reunion_inference_allowed"] is False
+    assert result["interpretation_policy"]["event_probability"] == "not_calculated"
+
+
+def test_v16_personal_love_request_schema_rejects_counterpart():
+    from api.main import PersonalLoveRequest
+
+    payload = {
+        "profile": {
+            "birth_date": "1990-01-15",
+            "birth_time": "10:20:00",
+            "time_known": True,
+            "time_source": "official_record",
+            "time_confidence": "exact",
+            "latitude": 37.5,
+            "longitude": 127.0,
+            "utc_offset_hours": 9,
+        },
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-02",
+        "counterpart": {"present": True},
+    }
+    try:
+        PersonalLoveRequest.model_validate(payload)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("personal love request must reject counterpart data")
