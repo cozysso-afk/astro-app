@@ -54,13 +54,15 @@ def test_exact_time_unlocks_5h_7h_dsc_and_keeps_static_separate():
     assert result["relationship_engine_used"] is False
     assert "timing" not in static
     assert result["interpretation_policy"]["event_probability"] == "not_calculated"
+    assert result["timing"]["secondary_progression"]["birth_time_policy"]["mode"] == "exact_full_progression"
 
 
-def test_provisional_time_keeps_planetary_timing_but_disables_angles():
+def test_provisional_time_keeps_stable_planetary_timing_but_disables_angles_and_moon_scoring():
     result = pl.build_personal_love_forecast(
         provisional_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 3), mode="new_relationship"
     )
     static = result["static_structure"]
+    secondary = result["timing"]["secondary_progression"]
     assert static["time_reliability"]["status"] == "provisional"
     assert static["house_angle_layers_enabled"] is False
     assert static["fifth_house"] is None
@@ -68,24 +70,38 @@ def test_provisional_time_keeps_planetary_timing_but_disables_angles():
     assert static["dsc"] is None
     assert result["timing"]["major_transits"]["daily_samples"]
     assert result["timing"]["daily_transits"]["daily"]
-    assert result["timing"]["secondary_progression"]["months"]
-    assert result["timing"]["secondary_progression"]["daily_samples"]
+    assert secondary["months"]
+    assert secondary["daily_samples"]
+    assert secondary["birth_time_policy"]["mode"] == "provisional_stable_planets_only"
+    assert secondary["birth_time_policy"]["convergence_eligible"] is True
+    for row in secondary["daily_samples"]:
+        assert all(hit["source"] != "Moon" for hit in row["hits"])
+        assert all(not hit["birth_time_sensitive_basis"] for hit in row["hits"])
+        assert row["date_precision"] == "provisional_clock_time_stable_planets_only"
     assert result["focus"] == "new_connection"
 
 
-def test_unknown_time_uses_moon_range_not_exact_moon_or_houses():
+def test_unknown_time_uses_moon_range_and_blocks_secondary_convergence():
     result = pl.build_personal_love_forecast(
         unknown_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="personal_love_forecast"
     )
     static = result["static_structure"]
+    secondary = result["timing"]["secondary_progression"]
     assert static["time_reliability"]["status"] == "unknown"
     assert static["moon"] is None
     assert static["moon_uncertainty"]["available"] is True
     assert static["house_angle_layers_enabled"] is False
-    for row in result["timing"]["secondary_progression"]["daily_samples"]:
+    assert secondary["birth_time_policy"]["mode"] == "unknown_time_date_only_proxy"
+    assert secondary["birth_time_policy"]["convergence_eligible"] is False
+    for row in secondary["daily_samples"]:
         assert all(hit["source"] != "Moon" for hit in row["hits"])
-    for row in result["timing"]["secondary_progression"]["months"]:
+        assert row["convergence_eligible"] is False
+        assert row["date_precision"] == "date_only_proxy_not_convergence_eligible"
+    for row in secondary["months"]:
         assert all(hit["source"] != "Moon" for hit in row["hits"])
+        assert row["convergence_eligible"] is False
+    for summary_name in ("new_connection", "partnership"):
+        assert all(item["convergence_eligible"] is False for item in secondary[summary_name]["top_dates"])
 
 
 def test_counterpart_fields_are_rejected_by_engine():
@@ -237,7 +253,7 @@ def test_secondary_progression_scans_daily_and_keeps_real_monthly_peak(monkeypat
                 "birth_time_sensitive": False,
             }
         },
-        "time_reliability": {"time_available": True, "time_exact": True},
+        "time_reliability": {"time_available": True, "time_exact": True, "status": "exact"},
     }
 
     def fake_progressed_positions(natal_arg, target_date, utc_offset_hours):
@@ -246,7 +262,7 @@ def test_secondary_progression_scans_daily_and_keeps_real_monthly_peak(monkeypat
 
     monkeypatch.setattr(pl, "_progressed_positions", fake_progressed_positions)
     daily_rows = pl._progression_rows(date(2026, 3, 1), date(2026, 3, 31), 9.0, natal)
-    months = pl._progression_months(daily_rows)
+    months = pl._progression_months(daily_rows, natal, 9.0)
     assert len(daily_rows) == 31
     assert len(months) == 1
     month = months[0]
@@ -256,6 +272,125 @@ def test_secondary_progression_scans_daily_and_keeps_real_monthly_peak(monkeypat
     assert month["new_connection_activation"] > midpoint["new_connection_activation"]
     summary = pl._progression_summary(months, "new_connection")
     assert summary["top_dates"][0]["date"] == "2026-03-03"
+    assert summary["top_dates"][0]["date_precision"] == "exact_birth_time"
+
+
+def test_provisional_progression_moon_is_diagnostic_only(monkeypatch):
+    natal = {
+        "natal_utc": datetime(2000, 1, 1, tzinfo=timezone.utc),
+        "natal_jd": 1000.0,
+        "targets": {
+            "Venus": {
+                "longitude": 120.0,
+                "source": "natal_planet",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": False,
+            },
+            "Moon": {
+                "longitude": 0.0,
+                "source": "natal_planet",
+                "physical_key": "planet:Moon",
+                "birth_time_sensitive": True,
+            },
+        },
+        "time_reliability": {
+            "time_available": True,
+            "time_exact": False,
+            "status": "provisional",
+            "time_source": "user_estimate",
+            "time_confidence": "low",
+        },
+    }
+    monkeypatch.setattr(
+        pl,
+        "_progressed_positions",
+        lambda natal_arg, target_date, utc_offset_hours: {
+            "Sun": {"longitude": 240.0},
+            "Moon": {"longitude": 0.0},
+            "Venus": {"longitude": 120.0},
+        },
+    )
+    rows = pl._progression_rows(date(2026, 3, 1), date(2026, 3, 1), 9.0, natal)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["convergence_eligible"] is True
+    assert row["birth_time_policy"] == "provisional_stable_planets_only"
+    assert all(hit["source"] != "Moon" for hit in row["hits"])
+    assert all(not hit["birth_time_sensitive_basis"] for hit in row["hits"])
+    assert row["diagnostic_time_sensitive_hits"]
+    assert any(
+        hit["source"] == "Moon" or hit["birth_time_sensitive_basis"]
+        for hit in row["diagnostic_time_sensitive_hits"]
+    )
+    assert all(hit["diagnostic_only"] is True for hit in row["diagnostic_time_sensitive_hits"])
+
+
+def test_progression_uncertainty_scan_surfaces_moon_sensitivity(monkeypatch):
+    natal_utc = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    natal = {
+        "natal_utc": natal_utc,
+        "natal_jd": 1000.0,
+        "time_reliability": {
+            "time_available": True,
+            "time_exact": False,
+            "status": "provisional",
+            "time_source": "user_estimate",
+            "time_confidence": "low",
+        },
+    }
+    monkeypatch.setattr(
+        pl,
+        "_local_noon_utc",
+        lambda target_date, utc_offset_hours: natal_utc + timedelta(days=pl.YEAR_DAYS * 10.0),
+    )
+
+    def fake_positions(jd, include_moon=True):
+        delta = jd - 1010.0
+        result = {
+            "Sun": {"longitude": delta * 1.0},
+            "Venus": {"longitude": delta * 1.2},
+        }
+        if include_moon:
+            result["Moon"] = {"longitude": delta * 13.0}
+        return result
+
+    monkeypatch.setattr(pl, "_positions", fake_positions)
+    diagnostic = pl._progression_time_uncertainty(natal, date(2010, 1, 1), 9.0)
+    assert diagnostic is not None
+    assert diagnostic["shifts_minutes"] == [-60, -30, 0, 30, 60]
+    variation = diagnostic["max_longitude_variation_deg"]
+    assert variation["Moon"] > variation["Venus"] > variation["Sun"]
+    assert variation["Moon"] > 0.4
+    assert diagnostic["diagnostic_only"] is True
+
+
+def test_unknown_or_arbitrary_birth_time_progression_cannot_create_convergence():
+    major = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
+    daily = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
+    for policy in ("unknown_time_date_only_proxy", "provisional_stable_planets_only"):
+        progression = [{
+            "calendar_month": "2026-09",
+            "new_connection_activation": 99.0,
+            "partnership_activation": 99.0,
+            "convergence_eligible": False,
+            "birth_time_policy": policy,
+        }]
+        assert pl._convergence(major, progression, daily) == []
+
+
+def test_arbitrary_input_is_not_convergence_eligible_even_with_clock_time():
+    natal = {
+        "time_reliability": {
+            "time_available": True,
+            "time_exact": False,
+            "status": "provisional",
+            "time_source": "arbitrary_input",
+            "time_confidence": "low",
+        }
+    }
+    policy = pl._progression_birth_time_policy(natal)
+    assert policy["mode"] == "provisional_stable_planets_only"
+    assert policy["convergence_eligible"] is False
 
 
 def test_major_daily_and_secondary_are_independent_layers():
@@ -274,6 +409,7 @@ def test_major_daily_and_secondary_are_independent_layers():
         "method": "mean_day_for_year",
         "year_days": pl.YEAR_DAYS,
     }
+    assert timing["secondary_progression"]["birth_time_policy"]["mode"] == "exact_full_progression"
     assert len(timing["secondary_progression"]["daily_samples"]) == 45
     for row in timing["major_transits"]["daily_samples"]:
         assert all(hit["layer"] == "major_transit" for hit in row["hits"])
@@ -284,6 +420,7 @@ def test_major_daily_and_secondary_are_independent_layers():
     for row in timing["secondary_progression"]["daily_samples"]:
         assert all(hit["layer"] == "secondary" for hit in row["hits"])
         assert all(hit["source"] in pl.PROGRESSED_PLANET_WEIGHTS["new_connection"] for hit in row["hits"])
+        assert row["convergence_eligible"] is True
     for item in timing["convergence"]:
         assert item["layer_count"] == 2
         assert item["independent_layers"] == ["major_transit", "secondary_progression"]
@@ -293,7 +430,12 @@ def test_major_daily_and_secondary_are_independent_layers():
 def test_fast_daily_layer_cannot_create_convergence_by_itself():
     daily = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
     major = [{"calendar_month": "2026-09", "new_connection_activation": 0.0, "partnership_activation": 0.0}]
-    secondary = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
+    secondary = [{
+        "calendar_month": "2026-09",
+        "new_connection_activation": 99.0,
+        "partnership_activation": 99.0,
+        "convergence_eligible": True,
+    }]
     assert pl._convergence(major, secondary, daily) == []
 
 
@@ -311,3 +453,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert policy["layer_mixing"].startswith("forbidden")
         assert "maximum applicable role weight" in policy["physical_target_deduplication"]
         assert "scanned daily" in policy["secondary_progression_sampling"]
+        assert "diagnostic-only" in policy["secondary_progression_birth_time_safety"]
