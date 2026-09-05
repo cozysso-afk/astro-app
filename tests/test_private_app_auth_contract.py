@@ -33,6 +33,8 @@ def test_private_api_wrapper_guards_every_v1_route_and_fails_closed():
     assert "/rest/v1/app_access" in source
     assert "select=email,role,user_id" in source
     assert "bound_user_id != user_id" in source
+    assert 'os.getenv("SUPABASE_URL", "")' in source
+    assert 'os.getenv("SUPABASE_PUBLISHABLE_KEY", "")' in source
 
 
 def test_private_api_hides_fastapi_schema_routes():
@@ -71,12 +73,24 @@ def test_bound_user_migration_preserves_archive_identity_and_tightens_ai_guard()
     assert "revoke execute on function public.enforce_private_app_ai_job_access() from anon, authenticated" in lowered
 
 
+def test_transition_guard_allows_only_the_prebound_anonymous_owner():
+    sql = (ROOT / "supabase/migrations/20260906_private_app_bound_anonymous_owner_transition.sql").read_text(encoding="utf-8")
+    lowered = sql.lower()
+    assert "if user_is_anonymous then" in lowered
+    assert "a.role = 'owner'" in lowered
+    assert "a.user_id = new.user_id" in lowered
+    assert "raise insufficient_privilege" in lowered
+    assert "return new" in lowered
+    assert "revoke execute on function public.enforce_private_app_ai_job_access() from anon, authenticated" in lowered
+
+
 def test_owner_email_is_not_committed_to_source():
     migration_paths = [
         ROOT / "supabase/migrations/20260905_private_app_access.sql",
         ROOT / "supabase/migrations/20260905_private_app_paid_ai_guard.sql",
         ROOT / "supabase/migrations/20260906_private_app_paid_ai_guard_acl.sql",
         ROOT / "supabase/migrations/20260906_private_app_access_user_binding.sql",
+        ROOT / "supabase/migrations/20260906_private_app_bound_anonymous_owner_transition.sql",
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in migration_paths).lower()
     assert "owner@example.com" in combined
@@ -93,6 +107,7 @@ def run_contract() -> None:
         test_access_allowlist_is_rls_protected_without_enabling_paid_guard_too_early,
         test_paid_ai_guard_requires_seeded_owner_and_blocks_unapproved_job_inserts,
         test_bound_user_migration_preserves_archive_identity_and_tightens_ai_guard,
+        test_transition_guard_allows_only_the_prebound_anonymous_owner,
         test_owner_email_is_not_committed_to_source,
     ]
     for test in tests:
