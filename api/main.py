@@ -117,10 +117,14 @@ class RelationshipRequest(BaseModel):
     analysis_mode: Literal["compatibility", "reunion", "marriage_unmarried", "marriage_married"] = "compatibility"
 
 
+class PersonalLoveProfile(RelationshipProfile):
+    model_config = ConfigDict(extra="forbid")
+
+
 class PersonalLoveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    profile: RelationshipProfile
+    profile: PersonalLoveProfile
     start_date: date
     end_date: date
 
