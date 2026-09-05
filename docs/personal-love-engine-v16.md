@@ -25,5 +25,6 @@ This calculation layer is intentionally isolated from two-person relationship as
 - The legacy two-person `/v1/relationship/western` route rejects both personal single-person modes (`personal_love_forecast`, `new_relationship`) at schema validation.
 - Reversed or over-limit personal-love date ranges surface as HTTP 422, and `time_known=true` without a birth time is rejected. Unknown birth time remains accepted only under the conservative single-person/no-convergence policy.
 - `/v1/meta` exposes the runtime personal-love engine version and both personal-love routes, so wiring drift is regression-testable.
+- Personal-love calculation routes do not enter the AI interpretation path. The API regression suite replaces `interpret_integrated_fortune` with a fail-fast sentinel and verifies both personal routes still return through the deterministic calculation engine only. AI billing remains isolated to explicit `/v1/fortune/interpret*` calls.
 
 The calculation and API regression contract lives in `tests/test_personal_love_engine_v16.py` and `tests/test_personal_love_api_v16.py`.
