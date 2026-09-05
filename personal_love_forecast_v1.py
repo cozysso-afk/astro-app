@@ -24,7 +24,7 @@ from personal_marriage_v1 import (
 )
 from relationship_reliability_v1 import decorate_aspect
 
-ENGINE_VERSION = "personal-love-western-v1.1-purpose-layer-separated"
+ENGINE_VERSION = "personal-love-western-v1.2-physical-target-dedup"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
 
@@ -132,6 +132,64 @@ def _dimension_score(hits: list[dict], key: str) -> float:
     return round(min(100.0, sum(values) / 2.35), 1)
 
 
+def _target_physical_key(target_name: str, target_info: dict) -> str:
+    explicit = target_info.get("physical_key")
+    if explicit:
+        return str(explicit)
+    source = target_info.get("source")
+    if target_name in {"Venus", "Moon"}:
+        return f"planet:{target_name}"
+    if target_name.endswith("_ruler") and source:
+        return f"planet:{source}"
+    return f"factor:{target_name}"
+
+
+def _coalesce_targets(targets: dict) -> dict[str, dict]:
+    """Collapse semantic roles that point to the same physical natal factor.
+
+    A natal body may simultaneously be Venus and the ruler of the 5th/7th house.
+    Those labels are useful evidence, but counting the same transit-to-body contact
+    once per label inflates activation. Keep all roles, score the physical contact
+    once, and use the strongest role weight per dimension rather than summing roles.
+    """
+    grouped: dict[str, dict] = {}
+    for target_name, target_info in targets.items():
+        physical_key = _target_physical_key(target_name, target_info)
+        role_weights = {
+            dimension: float(weights.get(target_name, 0.0))
+            for dimension, weights in TARGET_WEIGHTS.items()
+        }
+        current = grouped.get(physical_key)
+        if current is None:
+            current = dict(target_info)
+            current.update(
+                {
+                    "physical_key": physical_key,
+                    "target_roles": [target_name],
+                    "target_weights": role_weights,
+                    "role_birth_time_sensitive": {
+                        target_name: bool(target_info.get("birth_time_sensitive"))
+                    },
+                }
+            )
+            grouped[physical_key] = current
+            continue
+
+        current["target_roles"].append(target_name)
+        current["birth_time_sensitive"] = bool(
+            current.get("birth_time_sensitive") or target_info.get("birth_time_sensitive")
+        )
+        current["role_birth_time_sensitive"][target_name] = bool(
+            target_info.get("birth_time_sensitive")
+        )
+        for dimension, role_weight in role_weights.items():
+            current["target_weights"][dimension] = max(
+                float(current["target_weights"].get(dimension, 0.0)),
+                role_weight,
+            )
+    return grouped
+
+
 def _local_noon_utc(day: date, utc_offset_hours: float) -> datetime:
     local_tz = timezone(timedelta(hours=float(utc_offset_hours)))
     return datetime.combine(day, dt_time(12, 0), tzinfo=local_tz).astimezone(timezone.utc)
@@ -188,6 +246,7 @@ def _natal_context(profile: dict) -> dict:
         "Venus": {
             "longitude": positions["Venus"]["longitude"],
             "source": "natal_planet",
+            "physical_key": "planet:Venus",
             "birth_time_sensitive": False,
         }
     }
@@ -195,25 +254,28 @@ def _natal_context(profile: dict) -> dict:
         targets["Moon"] = {
             "longitude": positions["Moon"]["longitude"],
             "source": "natal_planet",
+            "physical_key": "planet:Moon",
             "birth_time_sensitive": True,
         }
-
     if house and profiles:
         fifth_ruler = profiles["5"]["whole_ruler"]
         seventh_ruler = profiles["7"]["whole_ruler"]
         targets["5th_ruler"] = {
             "longitude": positions[fifth_ruler]["longitude"],
             "source": fifth_ruler,
+            "physical_key": f"planet:{fifth_ruler}",
             "birth_time_sensitive": True,
         }
         targets["7th_ruler"] = {
             "longitude": positions[seventh_ruler]["longitude"],
             "source": seventh_ruler,
+            "physical_key": f"planet:{seventh_ruler}",
             "birth_time_sensitive": True,
         }
         targets["DSC"] = {
             "longitude": house["dsc"],
             "source": "DSC",
+            "physical_key": "angle:DSC",
             "birth_time_sensitive": True,
         }
 
@@ -239,12 +301,15 @@ def _contact_rows(
     target_exact: bool,
 ) -> list[dict]:
     rows: list[dict] = []
+    coalesced_targets = _coalesce_targets(targets)
     for source_name, source_info in source_positions.items():
         if source_name not in source_weights["new_connection"] and source_name not in source_weights["partnership"]:
             continue
         source_lon = float(source_info["longitude"])
         orb_limit = _progression_orb(source_name) if source_layer == "secondary" else _transit_orb(source_name)
-        for target_name, target_info in targets.items():
+        for target_info in coalesced_targets.values():
+            target_roles = list(target_info.get("target_roles") or [])
+            target_name = target_roles[0] if target_roles else str(target_info.get("physical_key") or "target")
             distance = _angle_distance(source_lon, float(target_info["longitude"]))
             for aspect, exact in ASPECTS.items():
                 orb = abs(distance - exact)
@@ -254,14 +319,14 @@ def _contact_rows(
                 new_score = (
                     100.0
                     * source_weights["new_connection"].get(source_name, 0.0)
-                    * TARGET_WEIGHTS["new_connection"].get(target_name, 0.0)
+                    * float(target_info["target_weights"].get("new_connection", 0.0))
                     * ASPECT_WEIGHTS[aspect]
                     * factor
                 )
                 partnership_score = (
                     100.0
                     * source_weights["partnership"].get(source_name, 0.0)
-                    * TARGET_WEIGHTS["partnership"].get(target_name, 0.0)
+                    * float(target_info["target_weights"].get("partnership", 0.0))
                     * ASPECT_WEIGHTS[aspect]
                     * factor
                 )
@@ -283,10 +348,15 @@ def _contact_rows(
                         "layer": source_layer,
                         "source": source_name,
                         "target": target_name,
+                        "target_roles": target_roles,
+                        "target_physical_key": target_info.get("physical_key"),
                         "target_source": target_info.get("source"),
+                        "target_weight_policy": "max_role_weight_no_duplicate_sum",
+                        "target_weights": dict(target_info.get("target_weights") or {}),
                         "new_connection_score": round(new_score, 1),
                         "partnership_score": round(partnership_score, 1),
                         "birth_time_sensitive_basis": bool(target_info.get("birth_time_sensitive")),
+                        "role_birth_time_sensitive": dict(target_info.get("role_birth_time_sensitive") or {}),
                     }
                 )
                 rows.append(meta)
@@ -554,6 +624,7 @@ def build_personal_love_forecast(
             "static_synastry_used": False,
             "event_probability": "not_calculated",
             "score_semantics": "astrology activation index only",
+            "physical_target_deduplication": "same natal body serving multiple semantic roles is scored once using the maximum applicable role weight; all roles remain in evidence",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
             "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
