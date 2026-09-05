@@ -8,9 +8,13 @@ const gate = fs.readFileSync(new URL('../AuthGate.tsx', import.meta.url), 'utf8'
 assert.equal(supabase.includes('signInAnonymously'), false, 'web auth must not create new anonymous users')
 assert.equal(supabase.includes('shouldCreateUser: false'), true, 'email OTP must not auto-create arbitrary users')
 assert.equal(supabase.includes("type: 'email_change'"), true, 'existing anonymous session migration must preserve user id via email change')
+assert.equal(supabase.includes('countCurrentCloudRecords'), true, 'anonymous-to-existing-account fallback must inspect cloud records first')
 assert.equal(auth.includes('/v1/auth/me'), true, 'frontend must verify server-side allowlist before rendering the app')
 assert.equal(auth.includes("headers.set('Authorization'"), true, 'Render API calls must carry the Supabase bearer token')
 assert.equal(gate.includes('<AuthGate'), false, 'AuthGate must not recursively render itself')
 assert.equal(gate.includes('checkAppAccess'), true, 'AuthGate must enforce server-side authorization')
+assert.equal(gate.includes('pendingAnonymousUserId'), true, 'email-link verification must compare the pre-link and post-link user id')
+assert.equal(gate.includes('cloudRecordCount > 0'), true, 'cloud-bearing anonymous accounts must never be silently abandoned')
+assert.equal(gate.includes('nextSession.user.id !== pendingAnonymousUserId'), true, 'mismatched user ids must block app entry')
 
 console.log('private email auth contract: ok')
