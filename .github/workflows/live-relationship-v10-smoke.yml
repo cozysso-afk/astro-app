@@ -1,0 +1,132 @@
+name: Live Relationship V10 Smoke Once
+
+on:
+  push:
+    branches:
+      - audit/relationship-e2e-v10
+    paths:
+      - '.github/workflows/live-relationship-v10-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install browser client dependencies
+        run: npm ci
+      - name: Run one synthetic production calculation and one authenticated relationship interpretation
+        run: |
+          node --input-type=module <<'NODE'
+          import { createClient } from '@supabase/supabase-js'
+
+          const SUPABASE_URL = 'https://dbynfabwfcakxayyggzi.supabase.co'
+          const PUBLISHABLE_KEY = 'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
+          const API_BASE = 'https://astro-app-api-f7fn.onrender.com'
+
+          const calculationRequest = {
+            user: {
+              name: 'Synthetic Greenwich',
+              birth_date: '1990-01-01',
+              birth_time: '12:00:00',
+              time_known: true,
+              latitude: 51.4779,
+              longitude: 0,
+              utc_offset_hours: 0,
+            },
+            counterpart: {
+              name: 'Synthetic Seoul',
+              birth_date: '1992-02-29',
+              birth_time: '08:30:00',
+              time_known: true,
+              latitude: 37.5665,
+              longitude: 126.978,
+              utc_offset_hours: 9,
+            },
+            start_date: '2026-09-01',
+            end_date: '2026-09-30',
+            relationship_status: 'dating',
+            analysis_mode: 'compatibility',
+          }
+
+          const calcResponse = await fetch(`${API_BASE}/v1/relationship/western`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(calculationRequest),
+            signal: AbortSignal.timeout(150000),
+          })
+          const calculation = await calcResponse.json()
+          if (!calcResponse.ok || !calculation?.ok) {
+            throw new Error(`production relationship calculation failed: HTTP ${calcResponse.status} ${JSON.stringify(calculation).slice(0,600)}`)
+          }
+          if (calculation?.result?.composite?.available !== true) throw new Error('synthetic smoke did not produce composite evidence')
+          const month0 = calculation?.result?.months?.[0]
+          if (month0?.progressed_synastry?.available !== true) throw new Error('synthetic smoke did not produce progressed synastry evidence')
+          if (month0?.progressed_composite?.available !== true) throw new Error('synthetic smoke did not produce progressed composite evidence')
+          if (month0?.marks_tertiary?.available !== true) throw new Error('synthetic smoke did not produce Marks Tertiary evidence')
+          if (!String(calculation?.result?.timing_timezone_policy ?? '').includes('fixed utc_offset_hours')) throw new Error('V9 timing timezone policy missing from production calculation')
+
+          const supabase = createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          })
+          const signed = await supabase.auth.signInAnonymously()
+          if (signed.error || !signed.data.session) throw signed.error ?? new Error('anonymous Supabase session unavailable')
+
+          const invoked = await supabase.functions.invoke('relationship-interpret', {
+            body: {
+              calculation,
+              purpose: 'compatibility',
+              model: 'gemini-3.7-flash',
+            },
+          })
+          if (invoked.error) throw invoked.error
+          const result = invoked.data
+          if (!result?.ok) throw new Error(`relationship interpreter returned not-ok: ${JSON.stringify(result).slice(0,800)}`)
+          if (result?.interpreter_version !== 'relationship-v11.2-evidence-pipeline') {
+            throw new Error(`unexpected interpreter version: ${String(result?.interpreter_version)}`)
+          }
+          if (!Number.isFinite(Number(result?.prompt_bytes)) || Number(result.prompt_bytes) <= 0) throw new Error('prompt_bytes missing')
+          if (!Number.isFinite(Number(result?.prompt_compression_level))) throw new Error('prompt_compression_level missing')
+          if (!Number.isFinite(Number(result?.usage?.attempt_count)) || Number(result.usage.attempt_count) < 1) throw new Error('Gemini attempt_count missing')
+          if (!result?.data?.headline || !result?.data?.overview) throw new Error('structured relationship interpretation missing')
+
+          console.log(JSON.stringify({
+            ok: true,
+            calculation_engine: calculation.engine,
+            evidence: {
+              composite: true,
+              progressed_synastry: true,
+              progressed_composite: true,
+              marks_tertiary: true,
+              timing_timezone_policy: true,
+            },
+            interpreter_version: result.interpreter_version,
+            model: result.model,
+            cached: Boolean(result.cached),
+            server_cache: Boolean(result.server_cache),
+            prompt_bytes: result.prompt_bytes,
+            max_prompt_bytes: result.max_prompt_bytes,
+            prompt_compression_level: result.prompt_compression_level,
+            original_prompt_bytes: result.original_prompt_bytes,
+            usage: {
+              prompt_tokens: result.usage?.prompt_tokens ?? 0,
+              candidate_tokens: result.usage?.candidate_tokens ?? 0,
+              thought_tokens: result.usage?.thought_tokens ?? 0,
+              total_tokens: result.usage?.total_tokens ?? 0,
+              attempt_count: result.usage?.attempt_count ?? 0,
+            },
+            headline_chars: String(result.data.headline).length,
+            overview_chars: String(result.data.overview).length,
+          }, null, 2))
+          NODE
