@@ -86,6 +86,108 @@ def test_counterpart_fields_are_rejected_by_engine():
         pl.build_personal_love_forecast(profile, start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="new_relationship")
 
 
+def test_same_physical_natal_body_is_scored_once_across_multiple_roles():
+    targets = {
+        "Venus": {
+            "longitude": 0.0,
+            "source": "natal_planet",
+            "physical_key": "planet:Venus",
+            "birth_time_sensitive": False,
+        },
+        "5th_ruler": {
+            "longitude": 0.0,
+            "source": "Venus",
+            "physical_key": "planet:Venus",
+            "birth_time_sensitive": True,
+        },
+        "7th_ruler": {
+            "longitude": 0.0,
+            "source": "Venus",
+            "physical_key": "planet:Venus",
+            "birth_time_sensitive": True,
+        },
+    }
+    rows = pl._contact_rows(
+        {"Venus": {"longitude": 0.0}},
+        targets,
+        source_layer="daily_transit",
+        source_weights=pl.TRANSIT_PLANET_WEIGHTS,
+        source_exact=True,
+        target_exact=True,
+    )
+    assert len(rows) == 1
+    hit = rows[0]
+    assert set(hit["target_roles"]) == {"Venus", "5th_ruler", "7th_ruler"}
+    assert hit["target_physical_key"] == "planet:Venus"
+    assert hit["target_weight_policy"] == "max_role_weight_no_duplicate_sum"
+    assert hit["target_weights"] == {"new_connection": 1.0, "partnership": 1.0}
+    assert hit["new_connection_score"] == 100.0
+    assert hit["partnership_score"] == 90.0
+    assert pl._dimension_score(rows, "new_connection_score") == 42.6
+
+
+def test_physical_target_dedup_uses_max_role_weight_not_sum():
+    grouped = pl._coalesce_targets(
+        {
+            "Venus": {
+                "longitude": 12.5,
+                "source": "natal_planet",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": False,
+            },
+            "5th_ruler": {
+                "longitude": 12.5,
+                "source": "Venus",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": True,
+            },
+            "7th_ruler": {
+                "longitude": 12.5,
+                "source": "Venus",
+                "physical_key": "planet:Venus",
+                "birth_time_sensitive": True,
+            },
+        }
+    )
+    assert set(grouped) == {"planet:Venus"}
+    target = grouped["planet:Venus"]
+    assert target["target_weights"]["new_connection"] == 1.0
+    assert target["target_weights"]["partnership"] == 1.0
+    assert target["birth_time_sensitive"] is True
+    assert target["role_birth_time_sensitive"] == {
+        "Venus": False,
+        "5th_ruler": True,
+        "7th_ruler": True,
+    }
+
+
+def test_same_longitude_different_physical_bodies_are_not_collapsed():
+    targets = {
+        "Venus": {
+            "longitude": 0.0,
+            "source": "natal_planet",
+            "physical_key": "planet:Venus",
+            "birth_time_sensitive": False,
+        },
+        "5th_ruler": {
+            "longitude": 0.0,
+            "source": "Mercury",
+            "physical_key": "planet:Mercury",
+            "birth_time_sensitive": True,
+        },
+    }
+    rows = pl._contact_rows(
+        {"Venus": {"longitude": 0.0}},
+        targets,
+        source_layer="daily_transit",
+        source_weights=pl.TRANSIT_PLANET_WEIGHTS,
+        source_exact=True,
+        target_exact=True,
+    )
+    assert len(rows) == 2
+    assert {row["target_physical_key"] for row in rows} == {"planet:Venus", "planet:Mercury"}
+
+
 def test_major_daily_and_secondary_are_independent_layers():
     result = pl.build_personal_love_forecast(exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 10, 15), mode="personal_love_forecast")
     timing = result["timing"]
@@ -127,3 +229,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert policy["reunion_inference_allowed"] is False
         assert policy["static_synastry_used"] is False
         assert policy["layer_mixing"].startswith("forbidden")
+        assert "maximum applicable role weight" in policy["physical_target_deduplication"]
