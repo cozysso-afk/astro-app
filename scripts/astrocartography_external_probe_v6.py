@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from astrocartography_v1 import BODIES, _birth_jd, _planet_equatorial
+from astrocartography_v1 import BODIES, _planet_equatorial
 
 TARGETS = {
     "Sun": "10",
@@ -68,7 +68,6 @@ def horizons_apparent_ra_dec(command: str, moment: datetime) -> tuple[float, flo
             pass
     if len(numeric) < 3:
         raise RuntimeError(f"Could not parse apparent RA/DEC from {row!r}\n{text[:4000]}")
-    # CSV observer rows are JD, [presence fields], RA, DEC for quantity 2.
     ra, dec = numeric[-2], numeric[-1]
     if not 0.0 <= ra < 360.0 or not -90.0 <= dec <= 90.0:
         raise RuntimeError(f"Bad RA/DEC candidate: {ra}, {dec}; row={row!r}")
@@ -110,7 +109,6 @@ def usno_gast_hours(moment: datetime) -> float:
         "date": moment.strftime("%Y-%m-%d"),
         "time": moment.strftime("%H:%M:%S"),
         "coords": "0,0",
-        "reps": "1",
     }
     url = "https://aa.usno.navy.mil/api/siderealtime?" + urllib.parse.urlencode(params)
     request = urllib.request.Request(url, headers={"User-Agent": "astro-app-calculation-audit/1.0"})
