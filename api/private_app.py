@@ -26,6 +26,7 @@ SUPABASE_PUBLISHABLE_KEY = os.getenv(
 _AUTH_CACHE_TTL_SECONDS = 45
 _auth_cache: dict[str, tuple[float, dict]] = {}
 _auth_cache_lock = threading.Lock()
+_HIDDEN_SCHEMA_PATHS = {"/openapi.json", "/docs", "/docs/", "/docs/oauth2-redirect", "/redoc", "/redoc/"}
 
 
 def _json_request(url: str, token: str) -> object:
@@ -112,7 +113,10 @@ def _bearer_token(request: Request) -> str:
 
 @app.middleware("http")
 async def private_app_access_guard(request: Request, call_next):
-    if request.method == "OPTIONS" or not request.url.path.startswith("/v1/"):
+    path = request.url.path
+    if path in _HIDDEN_SCHEMA_PATHS:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    if request.method == "OPTIONS" or not path.startswith("/v1/"):
         return await call_next(request)
 
     token = _bearer_token(request)
