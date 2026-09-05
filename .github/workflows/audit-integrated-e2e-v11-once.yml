@@ -39,9 +39,9 @@ jobs:
           const signed=await sb.auth.signInAnonymously(); if(signed.error||!signed.data.session)throw signed.error??new Error('anon auth failed')
           const invoked=await sb.functions.invoke('fortune-interpret-v21-preview',{body:{action:'prompt',calculation:calc,model:'gemini-3.7-flash'}})
           if(invoked.error)throw invoked.error
-          const out=invoked.data; if(!out?.ok||!out?.external_prompt)throw new Error(`prompt failed ${JSON.stringify(out).slice(0,500)}`)
-          const marker='CALCULATED_DATA='; const idx=String(out.external_prompt).indexOf(marker); if(idx<0)throw new Error('CALCULATED_DATA marker missing')
-          const packet=JSON.parse(String(out.external_prompt).slice(idx+marker.length).trim())
+          const out=invoked.data; if(!out?.ok||!out?.prompt)throw new Error(`prompt failed ${JSON.stringify(out).slice(0,500)}`)
+          const marker='CALCULATED_DATA='; const idx=String(out.prompt).indexOf(marker); if(idx<0)throw new Error('CALCULATED_DATA marker missing')
+          const packet=JSON.parse(String(out.prompt).slice(idx+marker.length).trim())
           const keys=(x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort():[]
           const count=(x)=>Array.isArray(x)?x.length:0
           console.log(JSON.stringify({
