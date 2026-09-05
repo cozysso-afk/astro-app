@@ -23,7 +23,7 @@ from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.5-birth-time-provenance"
+APP_VERSION = "api-fortune-v5.6-relationship-e2e-contract"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -74,7 +74,7 @@ class RelationshipProfile(BaseModel):
     name: str | None = None
     birth_date: date
     birth_time: dt_time | None = None
-    time_known: bool = True
+    time_known: bool | None = None
     time_source: TimeSource = "unknown"
     time_confidence: TimeConfidence = "unknown"
     rectified_window: RectifiedWindow | None = None
@@ -83,9 +83,12 @@ class RelationshipProfile(BaseModel):
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
 
     def engine_payload(self) -> dict:
+        # `time_known` may be omitted by API clients. Infer only from the
+        # presence of a concrete birth_time; an explicit false still wins.
+        normalized_time_known = self.time_known if self.time_known is not None else self.birth_time is not None
         raw = {
             "birth_time": self.birth_time,
-            "time_known": self.time_known,
+            "time_known": normalized_time_known,
             "time_source": self.time_source,
             "time_confidence": self.time_confidence,
             "rectified_window": self.rectified_window.model_dump() if self.rectified_window else None,
@@ -357,15 +360,18 @@ def relationship_western(request: RelationshipRequest) -> dict:
     user_payload = request.user.engine_payload()
     cp_payload = request.counterpart.engine_payload()
 
-    if not request.user.time_known or request.user.birth_time is None:
-        raise HTTPException(status_code=422, detail="user birth_time is required for the precision relationship engine")
-    if request.user.latitude is None or request.user.longitude is None:
-        raise HTTPException(status_code=422, detail="user birth coordinates are required for the precision relationship engine")
-    if request.counterpart.time_known:
-        if request.counterpart.birth_time is None:
-            raise HTTPException(status_code=422, detail="counterpart birth_time is required when time_known=true")
-        if request.counterpart.latitude is None or request.counterpart.longitude is None:
-            raise HTTPException(status_code=422, detail="counterpart birth coordinates are required when time_known=true")
+    if not user_payload["time_known"] or user_payload["birth_time"] is None:
+        raise HTTPException(status_code=422, detail="user birth_time is required for the relationship engine")
+    # Coordinates are precision inputs, not an all-or-nothing API gate.
+    # Missing coordinates disable angle/house/Davison layers inside the engine
+    # while preserving valid planetary and Saju calculations.
+    if cp_payload["time_known"] and cp_payload["birth_time"] is None:
+        raise HTTPException(status_code=422, detail="counterpart birth_time is required when time_known=true")
+
+    if request.analysis_mode == "marriage_married" and request.relationship_status != "married":
+        raise HTTPException(status_code=422, detail="analysis_mode=marriage_married requires relationship_status=married")
+    if request.analysis_mode == "marriage_unmarried" and request.relationship_status == "married":
+        raise HTTPException(status_code=422, detail="analysis_mode=marriage_unmarried cannot be used with relationship_status=married")
 
     segments = _month_segments(request.start_date, request.end_date)
     try:

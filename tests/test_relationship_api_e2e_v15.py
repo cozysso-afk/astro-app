@@ -153,7 +153,6 @@ def test_unknown_counterpart_time_survives_full_http_calculation_without_fake_ex
     assert result["months"][0]["progressed_synastry"]["available"] is False
     assert result["saju_relationship"]["counterpart"]["hour"] is None
     assert result["saju_relationship"]["counterpart"]["precision"] == "date_noon_proxy"
-    assert result["reunion_dimensions"]["event_probability"] if False else True
     for name in ("contact_recontact", "emotional_reactivation", "relationship_rebuilding"):
         axis = result["reunion_dimensions"][name]
         assert axis["incoming"] is not None
