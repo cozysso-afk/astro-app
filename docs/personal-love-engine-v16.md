@@ -10,5 +10,7 @@ This calculation layer is intentionally isolated from two-person relationship as
 - Convergence requires the independent higher-priority layers (secondary progression + major transit); daily transit can only support timing.
 - All 0–100 values are astrology activation indices, not event probabilities.
 - Exact birth time unlocks house/angle-sensitive 5H/7H/DSC evidence. Provisional time keeps planetary layers without treating angles/houses as exact. Unknown time exposes Moon uncertainty instead of an exact Moon/house result.
+- If one physical natal body serves multiple semantic roles (for example Venus + 5th ruler + 7th ruler), one transit/progression contact is counted once. The evidence keeps every role, while the score uses the maximum applicable role weight for each dimension instead of summing duplicate labels.
+- Physical deduplication is identity-based, not longitude-based: distinct natal bodies at the same degree remain separate evidence contacts.
 
 The calculation and API regression contract lives in `tests/test_personal_love_engine_v16.py` and `tests/test_personal_love_api_v16.py`.
