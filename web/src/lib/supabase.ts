@@ -79,7 +79,7 @@ export function getAuthRedirectError(): string | null {
   const code = params.get('error_code')
   const description = params.get('error_description')
   if (!code && !description) return null
-  return description ? decodeURIComponent(description.replace(/\+/g, ' ')) : `인증 링크 오류 (${code})`
+  return description ? description.replace(/\+/g, ' ') : `인증 링크 오류 (${code})`
 }
 
 export async function countCurrentCloudRecords(): Promise<number> {
