@@ -62,3 +62,21 @@ def test_owner_email_is_not_committed_to_source():
     assert "@gmail.com" not in combined
     assert "@naver.com" not in combined
     assert "@icloud.com" not in combined
+
+
+def run_contract() -> None:
+    tests = [
+        test_web_auth_does_not_create_new_anonymous_users,
+        test_private_api_wrapper_guards_every_v1_route_and_fails_closed,
+        test_private_api_hides_fastapi_schema_routes,
+        test_access_allowlist_is_rls_protected_without_enabling_paid_guard_too_early,
+        test_paid_ai_guard_requires_seeded_owner_and_blocks_unapproved_job_inserts,
+        test_owner_email_is_not_committed_to_source,
+    ]
+    for test in tests:
+        test()
+    print("private app auth server/db contract: ok")
+
+
+if __name__ == "__main__":
+    run_contract()
