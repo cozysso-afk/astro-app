@@ -26,7 +26,7 @@ from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_
 
 ENGINE_VERSION = "integrated-fortune-v2.11-full-daily-evidence"
 WESTERN_ENGINE_VERSION = "western-period-engine-v11-full-daily-evidence"
-SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-jie-exact"
+SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-absolute-jie-v5"
 
 KST = pytz.timezone("Asia/Seoul")
 UTC = pytz.UTC
@@ -1286,6 +1286,71 @@ def _aware_to_lunar_exact(value: datetime):
     return Solar.fromYmdHms(cst.year, cst.month, cst.day, cst.hour, cst.minute, cst.second).getLunar()
 
 
+def _set_saju_sect2(eight):
+    try:
+        eight.setSect(2)
+    except Exception:
+        pass
+    return eight
+
+
+def _natal_saju_components(
+    birth_date: date,
+    birth_time: dt_time,
+    utc_offset_hours: float,
+    longitude: float | None = None,
+):
+    """Build natal Four Pillars with consistent time frames.
+
+    Year/month are solar-term boundaries, so they are selected from the birth
+    instant itself after normalizing that instant to lunar_python's UTC+8
+    boundary frame. Day/hour use the effective local clock used by this app:
+    local apparent solar time when longitude is known, otherwise legal local
+    time. This avoids moving LiChun/Jie merely because true-solar correction
+    changes the displayed wall clock.
+    """
+    offset = float(utc_offset_hours)
+    legal_local = datetime.combine(birth_date, birth_time)
+    legal_aware = legal_local.replace(tzinfo=_fixed_timezone(offset))
+    boundary_eight = _set_saju_sect2(_aware_to_lunar_exact(legal_aware).getEightChar())
+
+    if longitude is None:
+        effective_local = legal_local
+        true_solar_meta = None
+        effective_policy = "legal_local_time"
+    else:
+        effective_local, true_solar_meta = _true_solar_datetime(
+            birth_date, birth_time, float(longitude), offset
+        )
+        effective_policy = "local_apparent_solar_time"
+
+    effective_eight = _set_saju_sect2(
+        Solar.fromYmdHms(
+            effective_local.year, effective_local.month, effective_local.day,
+            effective_local.hour, effective_local.minute, effective_local.second,
+        ).getLunar().getEightChar()
+    )
+    pillars = {
+        "year": boundary_eight.getYear(),
+        "month": boundary_eight.getMonth(),
+        "day": effective_eight.getDay(),
+        "hour": effective_eight.getTime(),
+    }
+    return {
+        "pillars": pillars,
+        "boundary_eight": boundary_eight,
+        "effective_eight": effective_eight,
+        "effective_local": effective_local,
+        "true_solar_meta": true_solar_meta,
+        "effective_policy": effective_policy,
+        "boundary_policy": {
+            "year_month": "absolute birth instant vs exact LiChun/Jie boundary (lunar_python UTC+8 boundary frame)",
+            "day_hour": "local apparent solar time when longitude is known; legal local time otherwise",
+            "late_zi": "EightChar sect=2: 23:00-23:59 day pillar stays on the civil day; lunar_python late-Zi hour stem follows its built-in next-day stem convention",
+        },
+    }
+
+
 def _jie_solar_to_target(solar, offset_hours: float) -> datetime:
     cst = datetime(
         int(solar.getYear()), int(solar.getMonth()), int(solar.getDay()),
@@ -1404,25 +1469,13 @@ def _saju_payload(
     end_date: date,
 ):
     try:
-        true_solar, true_solar_meta = _true_solar_datetime(
-            birth_date, birth_time, longitude, utc_offset_hours
+        natal = _natal_saju_components(
+            birth_date, birth_time, utc_offset_hours, longitude
         )
-        solar = Solar.fromYmdHms(
-            true_solar.year, true_solar.month, true_solar.day,
-            true_solar.hour, true_solar.minute, true_solar.second,
-        )
-        eight = solar.getLunar().getEightChar()
-        try:
-            eight.setSect(2)
-        except Exception:
-            pass
-
-        pillars = {
-            "year": eight.getYear(),
-            "month": eight.getMonth(),
-            "day": eight.getDay(),
-            "hour": eight.getTime(),
-        }
+        true_solar_meta = natal["true_solar_meta"]
+        eight = natal["effective_eight"]
+        boundary_eight = natal["boundary_eight"]
+        pillars = natal["pillars"]
         day_master = eight.getDayGan() if hasattr(eight, "getDayGan") else pillars["day"][:1]
         branches = {
             "년지": pillars["year"][1:2],
@@ -1431,26 +1484,26 @@ def _saju_payload(
             "시지": pillars["hour"][1:2],
         }
         elements = []
-        for getter in ["getYearWuXing", "getMonthWuXing", "getDayWuXing", "getTimeWuXing"]:
+        for source, getter in [
+            (boundary_eight, "getYearWuXing"),
+            (boundary_eight, "getMonthWuXing"),
+            (eight, "getDayWuXing"),
+            (eight, "getTimeWuXing"),
+        ]:
             try:
-                elements.extend(list(getattr(eight, getter)()))
+                elements.extend(list(getattr(source, getter)()))
             except Exception:
                 pass
         element_count = {e: elements.count(e) for e in ["木", "火", "土", "金", "水"]}
 
-        natal_ten_gods = {}
-        for label, getter in [
-            ("년간", "getYearShiShenGan"),
-            ("월간", "getMonthShiShenGan"),
-            ("시간", "getTimeShiShenGan"),
-        ]:
-            try:
-                natal_ten_gods[label] = getattr(eight, getter)()
-            except Exception:
-                pass
+        natal_ten_gods = {
+            "년간": _ten_god(day_master, pillars["year"][:1]),
+            "월간": _ten_god(day_master, pillars["month"][:1]),
+            "시간": _ten_god(day_master, pillars["hour"][:1]),
+        }
 
         gender_code = 1 if gender in {"male", "남성", "남"} else 0
-        yun = eight.getYun(gender_code, 1)
+        yun = boundary_eight.getYun(gender_code, 1)
         dayuns = []
         for dy in yun.getDaYun(12):
             try:
@@ -1496,8 +1549,9 @@ def _saju_payload(
         return {
             "ok": True,
             "engine": SAJU_ENGINE_VERSION,
-            "calendar_input": "legal local time corrected to local apparent solar time",
+            "calendar_input": "year/month from absolute solar-term instant; day/hour from effective local time",
             "true_solar": true_solar_meta,
+            "pillar_boundary_policy": natal["boundary_policy"],
             "pillars": pillars,
             "day_master": day_master,
             "elements": element_count,
