@@ -48,11 +48,13 @@ def test_personal_routes_force_distinct_single_person_modes(monkeypatch):
     response = client.post("/v1/love/personal", json=request_payload())
     assert response.status_code == 200, response.text
     assert response.json()["analysis_mode"] == "personal_love_forecast"
+    assert response.json()["interpretation_policy"]["counterpart_data_allowed"] is False
     assert captured[-1] == "personal_love_forecast"
 
     response = client.post("/v1/love/new-relationship", json=request_payload())
     assert response.status_code == 200, response.text
     assert response.json()["analysis_mode"] == "new_relationship"
+    assert response.json()["interpretation_policy"]["reunion_inference_allowed"] is False
     assert captured[-1] == "new_relationship"
 
 
