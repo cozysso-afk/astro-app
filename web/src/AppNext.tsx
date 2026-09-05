@@ -48,6 +48,7 @@ import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
 import { LocationResults } from './LocationResults'
 import { ArchiveView } from './ArchiveView'
 import { ProfileView } from './ProfileView'
+import { BirthTimeReliabilityFields } from './BirthTimeReliabilityFields'
 import { SettingsView } from './SettingsView'
 import { AppHeader, BottomNavigation } from './AppChrome'
 import { analysisTools as tools, fortunePeriods as periods, HomeControls } from './HomeControls'
@@ -87,6 +88,7 @@ const relationshipModes: Array<[RelationshipStatus, string]> = [
 
 const emptyProfile: BirthProfile = {
   name: '', birthDate: '', birthTime: '', placeKey: '', latitude: '', longitude: '', utcOffset: '9', gender: 'female',
+  timeSource: 'unknown', timeConfidence: 'unknown', rectifiedWindowStart: '', rectifiedWindowEnd: '',
 }
 const emptyCounterpart: CounterpartProfile = { ...emptyProfile, timeKnown: true }
 
@@ -254,6 +256,18 @@ function periodRangeLabel(period: PeriodKey) {
 }
 function parseOptionalNumber(value: string) {
   const n = Number(value.trim()); return value.trim() && Number.isFinite(n) ? n : null
+}
+function birthTimeRequestMeta(profile: BirthProfile, timeKnown = Boolean(profile.birthTime)) {
+  const available = Boolean(timeKnown && profile.birthTime)
+  const rectifiedWindow = profile.timeSource === 'rectified' && (profile.rectifiedWindowStart || profile.rectifiedWindowEnd)
+    ? { start: profile.rectifiedWindowStart || null, end: profile.rectifiedWindowEnd || null }
+    : null
+  return {
+    time_known: available,
+    time_source: profile.timeSource,
+    time_confidence: profile.timeConfidence,
+    rectified_window: rectifiedWindow,
+  }
 }
 function loadUiSettings() {
   if (typeof window === 'undefined') return { glow: true, motion: true }
@@ -518,7 +532,7 @@ export default function AppNext() {
 
   const selectedToolInfo = selectedTool ? tools.find((tool) => tool.key === selectedTool) : null
   const hasProfile = Boolean(birthProfile.birthDate && birthProfile.birthTime)
-  const resultMonths = (relationshipResult?.result?.natal_synastry?.partner_time_exact ? relationshipResult?.result?.months : []) ?? []
+  const resultMonths = relationshipResult?.result?.months ?? []
   const partnerTimeExact = Boolean(relationshipResult?.result?.natal_synastry?.partner_time_exact)
   const rawNatalAspects = relationshipResult?.result?.natal_synastry?.aspects ?? []
   const natalAspects = partnerTimeExact ? rawNatalAspects : rawNatalAspects.filter((aspect) => !relationshipTimeSensitivePoints.has(aspect.a) && !relationshipTimeSensitivePoints.has(aspect.b))
@@ -893,6 +907,7 @@ export default function AppNext() {
           name: birthProfile.name || '나',
           birth_date: birthProfile.birthDate,
           birth_time: birthProfile.birthTime,
+          ...birthTimeRequestMeta(birthProfile),
           latitude: Number(birthProfile.latitude),
           longitude: Number(birthProfile.longitude),
           utc_offset_hours: Number(birthProfile.utcOffset || 9),
@@ -983,6 +998,7 @@ export default function AppNext() {
     const body = {
       profile: {
         name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime,
+        ...birthTimeRequestMeta(birthProfile),
         latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey,
       },
       start_date: relationshipStartDate, end_date: relationshipEndDate,
@@ -1015,12 +1031,13 @@ export default function AppNext() {
     if (counterpart.timeKnown && (counterpartLatitude === null || counterpartLongitude === null)) { setRelationshipError('상대 출생시간을 안다면 출생지역도 선택해줘. 모르면 “출생시간 모름”을 체크해줘.'); return }
     const body = {
       user: {
-        name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, time_known: true,
+        name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime,
+        ...birthTimeRequestMeta(birthProfile),
         latitude: userLatitude, longitude: userLongitude, utc_offset_hours: Number(birthProfile.utcOffset || 9),
       },
       counterpart: {
         name: counterpart.name || '상대', birth_date: counterpart.birthDate, birth_time: counterpart.timeKnown ? counterpart.birthTime : null,
-        time_known: counterpart.timeKnown, latitude: counterpartLatitude,
+        ...birthTimeRequestMeta(counterpart, counterpart.timeKnown), latitude: counterpartLatitude,
         longitude: counterpartLongitude, utc_offset_hours: Number(counterpart.utcOffset || 9),
       },
       start_date: relationshipStartDate,
@@ -1624,7 +1641,8 @@ export default function AppNext() {
               <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
               <label className="field birth-time-field"><span>출생시간</span><input type="time" value={counterpart.birthTime} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,birthTime:e.target.value})}/></label>
-              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime})}/><span>상대 출생시간 모름 — 출생지역은 그대로 기록 가능 · Moon(달)·각도·하우스·다빈슨/마크스 등 시간민감 레이어만 자동 제외</span></label>
+              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime,timeSource:e.target.checked?'unknown':counterpart.timeSource,timeConfidence:e.target.checked?'unknown':counterpart.timeConfidence})}/><span>상대 출생시간 모름 — 출생지역은 그대로 기록 가능 · Moon(달)·각도·하우스·다빈슨/마크스 등 시간민감 레이어만 자동 제외</span></label>
+              <BirthTimeReliabilityFields value={counterpart} disabled={!counterpart.timeKnown} onChange={(patch)=>setCounterpart({...counterpart,...patch})}/>
               <KoreaBirthplaceSelector value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
               <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
                 <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>

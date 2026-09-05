@@ -9,6 +9,19 @@ export type RelationshipPurpose = 'compatibility' | 'reunion'
 export type MarriageMode = 'unmarried' | 'married'
 export type RelationshipAnalysisMode = RelationshipPurpose | 'marriage_unmarried' | 'marriage_married'
 export type Gender = 'female' | 'male'
+export type TimeSource = 'official_record' | 'family_memory' | 'user_estimate' | 'arbitrary_input' | 'rectified' | 'unknown'
+export type TimeConfidence = 'exact' | 'high' | 'medium' | 'low' | 'unknown'
+
+export type BirthTimeReliability = {
+  time_available: boolean
+  time_exact: boolean
+  status: 'exact' | 'provisional' | 'unknown'
+  time_source: TimeSource
+  time_confidence: TimeConfidence
+  rectified_window?: { start?: string | null; end?: string | null } | null
+  provisional?: boolean
+  policy?: string
+}
 
 export type BirthProfile = {
   name: string
@@ -19,6 +32,10 @@ export type BirthProfile = {
   longitude: string
   utcOffset: string
   gender: Gender
+  timeSource: TimeSource
+  timeConfidence: TimeConfidence
+  rectifiedWindowStart: string
+  rectifiedWindowEnd: string
 }
 
 export type CounterpartProfile = BirthProfile & { timeKnown: boolean }
@@ -89,6 +106,7 @@ export type RelationshipApiResponse = {
   period: { start: string; end: string; month_segments: number }
   result: {
     limitations?: string[]
+    birth_time_reliability?: { user: BirthTimeReliability; counterpart: BirthTimeReliability }
     timing_timezone_policy?: string
     secondary_key?: string
     tertiary_key?: string
@@ -97,7 +115,7 @@ export type RelationshipApiResponse = {
     relationship_focus?: { available: boolean; groups?: Record<string, Aspect[]>; policy?: string }
     saju_relationship?: Record<string, unknown>
     composite?: { available: boolean; reason?: string; chart?: Record<string, unknown>; note?: string }
-    natal_synastry?: { available: boolean; partner_time_exact: boolean; aspects: Aspect[]; note?: string }
+    natal_synastry?: { available: boolean; user_time_available?: boolean; user_time_exact?: boolean; partner_time_available?: boolean; partner_time_exact: boolean; user_time_reliability?: BirthTimeReliability; partner_time_reliability?: BirthTimeReliability; aspects: Aspect[]; note?: string }
     house_overlays?: {
       available: boolean
       precision_note?: string

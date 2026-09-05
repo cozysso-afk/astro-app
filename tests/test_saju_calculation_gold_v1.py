@@ -75,6 +75,8 @@ def test_relationship_and_integrated_saju_share_identical_true_solar_pillars():
         "birth_date": date(2000, 1, 1),
         "birth_time": dt_time(12, 0),
         "time_known": True,
+        "time_source": "official_record",
+        "time_confidence": "exact",
         "longitude": 120.0,
         "utc_offset_hours": 8.0,
     }

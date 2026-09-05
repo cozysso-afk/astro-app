@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.2-evidence-pipeline";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.3-birth-time-provenance";
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -24,7 +24,7 @@ function aspectList(v:any,n:number){return (Array.isArray(v)?v:[]).map(aspect).f
 function focusPacket(f:any,n:number){const keys=["core_identity_emotion","attraction_romance","sexual_intimacy","communication","stability_commitment","conflict_reactivity","idealization_confusion","power_attachment","freedom_unpredictability","home_marriage"];return Object.fromEntries(keys.map(k=>[k,aspectList(f?.[k],n)]));}
 function houseRows(v:any,n:number){return (Array.isArray(v)?v:[]).slice(0,n).map((x:any)=>({planet:String(x?.planet??""),whole_house:x?.whole_house??null,placidus_house:x?.placidus_house??x?.house??null}));}
 function housePacket(h:any,n:number){if(!h||typeof h!=="object")return null;if(!h.available)return {available:false,precision_note:h?.precision_note??""};return {available:true,precision_note:h?.precision_note??"",user_in_counterpart:{relationship_houses:houseRows(h?.user_in_counterpart?.relationship_houses,n)},counterpart_in_user:{relationship_houses:houseRows(h?.counterpart_in_user?.relationship_houses,n)}};}
-function sajuPerson(x:any){if(!x||typeof x!=="object")return null;return {year:x?.year??null,month:x?.month??null,day:x?.day??null,hour:x?.hour??null,day_stem:x?.day_stem??null,day_branch:x?.day_branch??null,precision:x?.precision??null,time_known:Boolean(x?.time_known)};}
+function sajuPerson(x:any){if(!x||typeof x!=="object")return null;return {year:x?.year??null,month:x?.month??null,day:x?.day??null,hour:x?.hour??null,day_stem:x?.day_stem??null,day_branch:x?.day_branch??null,precision:x?.precision??null,time_known:Boolean(x?.time_known),time_exact:Boolean(x?.time_exact),time_reliability:x?.time_reliability??null};}
 function sajuPacket(x:any,n:number){if(!x||typeof x!=="object")return null;if(!x.available)return {available:false,error:x?.error??""};return {available:true,policy:x?.policy??"",user:sajuPerson(x?.user),counterpart:sajuPerson(x?.counterpart),day_master_relation:x?.day_master_relation??null,spouse_palace:x?.spouse_palace??null,cross_branch_links:Array.isArray(x?.cross_branch_links)?x.cross_branch_links.slice(0,n):[],limitations:Array.isArray(x?.limitations)?x.limitations.slice(0,6):[]};}
 function compactSignal(s:any,n:number){if(!s||typeof s!=="object")return null;return {exact_contacts:Number(s?.exact_contacts??0),supportive_contacts:Number(s?.supportive_contacts??0),challenging_contacts:Number(s?.challenging_contacts??0),tightest:aspectList(s?.tightest,n)};}
 const CORE_PLANETS=["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","True Node","ASC","MC"];
@@ -59,7 +59,7 @@ function monthlyAdvancedPacket(m:any,n:number){
  };
 }
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
- const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact);
+ const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact),available=Boolean(n?.partner_time_available??exact);
  let aspects=(Array.isArray(n?.aspects)?n.aspects:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb);
  if(!exact)aspects=aspects.filter((a:any)=>!TIME_SENSITIVE.has(a.a)&&!TIME_SENSITIVE.has(a.b));
  const L=level===0?{static:36,focus:6,house:12,cross:12,chart:13,months:12,tight:5,ranked:12,days:14,hits:5,topMonths:10}:level===1?{static:28,focus:4,house:9,cross:9,chart:10,months:9,tight:3,ranked:9,days:10,hits:3,topMonths:8}:{static:20,focus:3,house:6,cross:6,chart:8,months:6,tight:2,ranked:6,days:8,hits:2,topMonths:6};
@@ -73,7 +73,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  return deep({
    analysis_mode:r?.analysis_mode??null,period:calc?.period,relationship_status:calc?.relationship_status,
    timing_contract:{timing_timezone_policy:r?.timing_timezone_policy??null,secondary_key:r?.secondary_key??null,tertiary_key:r?.tertiary_key??null,orb_policy:r?.orb_policy??null,interpretation_policy:r?.interpretation_policy??null},
-   precision:{partner_time_exact:exact,removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
+   precision:{partner_time_available:available,partner_time_exact:exact,birth_time_reliability:r?.birth_time_reliability??null,removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
    static:{aspects:aspects.slice(0,L.static),strongest:aspects.slice(0,Math.min(14,L.static))},
    focus:focusPacket(focus,L.focus),
    house_overlays:housePacket(r?.house_overlays,L.house),
@@ -90,6 +90,7 @@ function selectPromptPacket(calc:any,ctx:any,purpose:Purpose){let originalBytes=
 const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가 별도로 차트를 복사해 다른 GPT에게 물어볼 필요가 없도록 계산 근거가 풍부한 리딩을 작성한다. 다만 계산되지 않은 사실·상대의 실제 속마음·사건 확률을 만들지 않는다.
 
 공통 절대규칙:
+- 출생시간을 입력했다는 사실과 exact 검증은 다르다. precision.birth_time_reliability를 우선 확인하고, exact가 아니면 ASC/DSC/MC/IC·하우스·Davison/Marks를 확정 근거로 사용하지 않는다. provisional 행성층은 잠정 근거라고 명시한다.
 - 오브가 좁은 실제 접점을 우선한다. 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
 - 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.
 - 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
