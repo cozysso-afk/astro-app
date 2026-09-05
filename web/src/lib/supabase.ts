@@ -95,10 +95,17 @@ export async function countCurrentCloudRecords(): Promise<number> {
   return Number(readingResult.count ?? 0) + Number(relationshipResult.count ?? 0)
 }
 
+function currentAppRedirectUrl(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  return `${window.location.origin}/`
+}
+
 // Existing anonymous sessions are intentionally preserved so the current device can
 // link its email identity without changing user_id. New anonymous sessions are never created.
 // Supabase's default email-change template contains a confirmation link, so custom SMTP
 // or a custom six-digit OTP template is not required for this private-app flow.
+// The first anonymous-email conversion still relies on Supabase Site URL because updateUser
+// owns that confirmation redirect; post-conversion Magic Link sign-ins are pinned below.
 export async function linkAnonymousSessionToEmail(email: string) {
   const session = await getSupabaseSession()
   if (!session?.user?.is_anonymous) throw new Error('연결할 기존 익명 세션이 없어.')
@@ -109,11 +116,16 @@ export async function linkAnonymousSessionToEmail(email: string) {
 
 // signInWithOtp sends the project's default Magic Link email when the template still
 // uses {{ .ConfirmationURL }}. shouldCreateUser=false prevents arbitrary sign-up.
+// Explicit emailRedirectTo prevents a stale/default Site URL from hijacking normal logins.
 export async function requestEmailMagicLink(email: string) {
   const normalized = email.trim().toLowerCase()
+  const emailRedirectTo = currentAppRedirectUrl()
   const result = await supabase.auth.signInWithOtp({
     email: normalized,
-    options: { shouldCreateUser: false },
+    options: {
+      shouldCreateUser: false,
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
+    },
   })
   if (result.error) throw result.error
   return result.data
