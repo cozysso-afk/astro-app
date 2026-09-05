@@ -14,6 +14,7 @@ export const analysisTools = [
   { key: 'compatibility' as const, label: '궁합운', desc: '두 사람의 기본 관계 구조와 선택 기간의 시기 흐름', icon: Heart, tone: 'rose' },
   { key: 'marriage' as const, label: '결혼운', desc: '개인 결혼운 · 특정 상대 결혼궁합 · 기혼 부부운을 분리 분석', icon: Gem, tone: 'champagne' },
   { key: 'location' as const, label: '지역·국가운', desc: '나와 잘 맞는 국가·도시를 목적별로 비교', icon: MapPin, tone: 'sage' },
+  { key: 'horary' as const, label: '호라리·프라슈나', desc: '질문한 시각과 현재 위치로 자유질문의 규칙을 잡아 분석', icon: Moon, tone: 'sage' },
   { key: 'precision' as const, label: '정밀분석', desc: '세부 계산과 고급 점성 레이어', icon: Search, tone: 'sage' },
 ]
 
@@ -62,7 +63,7 @@ function displayRange(value: string, period: PeriodKey) {
 
 export function HomeControls({ birthProfile, hasProfile, queryDate, period, selectedTool, apiStatus, apiLabel, onOpenProfile, onQueryDateChange, onPeriodSelect, onToolSelect }: HomeControlsProps) {
   const periodDriven = selectedTool === null || selectedTool === 'precision'
-  const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location'
+  const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location' && selectedTool !== 'horary'
   const effectivePeriod: PeriodKey = periodDriven ? period : 'today'
   const now = toDateValue(new Date())
   const resetLabel = effectivePeriod === 'today' ? '오늘' : effectivePeriod === 'week' ? '이번 주' : effectivePeriod === 'month' ? '이번 달' : '올해'

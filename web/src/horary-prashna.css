@@ -1,0 +1,29 @@
+.horary-prashna-panel{display:grid;gap:0}
+.horary-question-block{margin-top:18px}
+.horary-prashna-panel textarea{width:100%;min-height:126px;resize:vertical;border:1px solid rgba(92,62,43,.12);border-radius:15px;padding:12px 13px;color:#3e3028;background:#fffefa;font:inherit;font-size:.78rem;font-weight:650;line-height:1.6;box-sizing:border-box}
+.horary-prashna-panel textarea::placeholder{color:#aa9b91;font-weight:550}
+.horary-prashna-panel textarea:focus-visible{outline:2px solid rgba(178,125,69,.45);outline-offset:2px}
+.horary-input-caption{display:flex;justify-content:space-between;gap:12px;margin:6px 2px 0;color:#9a887d;font-size:.62rem;line-height:1.4}
+.horary-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:9px}
+.horary-secondary-button,.horary-location-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;border:1px solid rgba(95,66,47,.13);border-radius:13px;padding:0 13px;color:#715b4d;background:#fffdf9;font-size:.7rem;font-weight:850;cursor:pointer}
+.horary-secondary-button:disabled,.horary-location-button:disabled{opacity:.55;cursor:default}
+.horary-time-row>.horary-secondary-button{height:44px}
+.horary-location-button{width:100%;margin-top:1px;background:linear-gradient(135deg,rgba(247,242,232,.98),rgba(250,247,241,.98));border-color:rgba(126,102,76,.16)}
+.horary-coordinate-grid{margin-top:10px}
+.horary-location-ready{display:flex;align-items:center;gap:6px;margin:8px 2px 0;color:#64775f;font-size:.65rem;font-weight:800}
+.horary-classify-button{margin-top:15px}
+.horary-routing-result{margin-top:16px}
+.horary-route-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.horary-route-meta span{padding:6px 9px;border-radius:999px;background:#f8f3eb;color:#7b6759;font-size:.63rem}
+.horary-route-meta b{color:#4d3b30}
+.horary-intent-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.horary-intent-list span{padding:6px 9px;border:1px solid rgba(112,87,66,.1);border-radius:999px;background:#fffdf8;color:#735f51;font-size:.64rem;font-weight:800}
+.horary-options{margin-top:13px;padding:11px 12px;border-radius:14px;background:#faf6ef}
+.horary-options>span{display:block;color:#917765;font-size:.62rem;font-weight:850;text-transform:uppercase;letter-spacing:.05em}
+.horary-options ol{margin:7px 0 0;padding-left:20px;color:#4e3d32;font-size:.72rem;line-height:1.65}
+.horary-route-systems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.horary-route-systems>div{display:grid;gap:3px;padding:10px;border:1px solid rgba(105,80,60,.1);border-radius:13px;background:#fffefa}
+.horary-route-systems span{color:#998478;font-size:.59rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
+.horary-route-systems strong{color:#554237;font-size:.68rem;line-height:1.4}
+.horary-routing-result>.horary-secondary-button{margin-top:10px}
+@media(max-width:480px){.horary-input-caption{display:grid;gap:2px}.horary-route-systems{grid-template-columns:1fr}.horary-time-row{grid-template-columns:1fr}.horary-time-row>.horary-secondary-button{height:40px}}
