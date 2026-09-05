@@ -46,8 +46,7 @@ jobs:
             web/src/appTypes.ts \
             web/src/lib/readingCache.ts \
             web/src/lib/relationshipModeContract.test.mjs \
-            web/src/lib/relationshipEvidencePipeline.test.mjs \
-            .github/workflows/interpretation-v3-ci.yml
+            web/src/lib/relationshipEvidencePipeline.test.mjs
           git diff --cached --check
           git commit -m 'fix(ai): preserve relationship calculation evidence end to end V10'
           git push origin HEAD:audit/relationship-e2e-v10
