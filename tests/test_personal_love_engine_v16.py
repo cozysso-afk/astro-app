@@ -62,7 +62,8 @@ def test_provisional_time_keeps_planetary_timing_but_disables_angles():
     assert static["fifth_house"] is None
     assert static["seventh_house"] is None
     assert static["dsc"] is None
-    assert result["timing"]["transits"]["daily"]
+    assert result["timing"]["major_transits"]["daily_samples"]
+    assert result["timing"]["daily_transits"]["daily"]
     assert result["timing"]["secondary_progression"]["months"]
     assert result["focus"] == "new_connection"
 
@@ -85,16 +86,33 @@ def test_counterpart_fields_are_rejected_by_engine():
         pl.build_personal_love_forecast(profile, start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), mode="new_relationship")
 
 
-def test_transit_and_secondary_are_independent_layers():
+def test_major_daily_and_secondary_are_independent_layers():
     result = pl.build_personal_love_forecast(exact_profile(), start_date=date(2026, 9, 1), end_date=date(2026, 10, 15), mode="personal_love_forecast")
     timing = result["timing"]
-    assert set(timing) == {"transits", "secondary_progression", "convergence"}
+    assert set(timing) == {"major_transits", "daily_transits", "secondary_progression", "convergence"}
     assert "overall_score" not in timing
-    assert timing["transits"]["new_connection"]["event_probability"] == "not_calculated"
+    assert timing["major_transits"]["new_connection"]["event_probability"] == "not_calculated"
+    assert timing["daily_transits"]["new_connection"]["event_probability"] == "not_calculated"
     assert timing["secondary_progression"]["new_connection"]["event_probability"] == "not_calculated"
+    assert set(timing["major_transits"]["planets"]) == pl.MAJOR_TRANSIT_PLANETS
+    assert set(timing["daily_transits"]["planets"]) == pl.DAILY_TRANSIT_PLANETS
+    for row in timing["major_transits"]["daily_samples"]:
+        assert all(hit["layer"] == "major_transit" for hit in row["hits"])
+        assert all(hit["source"] in pl.MAJOR_TRANSIT_PLANETS for hit in row["hits"])
+    for row in timing["daily_transits"]["daily"]:
+        assert all(hit["layer"] == "daily_transit" for hit in row["hits"])
+        assert all(hit["source"] in pl.DAILY_TRANSIT_PLANETS for hit in row["hits"])
     for item in timing["convergence"]:
         assert item["layer_count"] == 2
-        assert item["independent_layers"] == ["transit", "secondary_progression"]
+        assert item["independent_layers"] == ["major_transit", "secondary_progression"]
+        assert set(item["daily_transit_support"]).issubset(set(item["dimensions"]))
+
+
+def test_fast_daily_layer_cannot_create_convergence_by_itself():
+    daily = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
+    major = [{"calendar_month": "2026-09", "new_connection_activation": 0.0, "partnership_activation": 0.0}]
+    secondary = [{"calendar_month": "2026-09", "new_connection_activation": 99.0, "partnership_activation": 99.0}]
+    assert pl._convergence(major, secondary, daily) == []
 
 
 def test_modes_change_focus_without_known_person_inference():
@@ -108,3 +126,4 @@ def test_modes_change_focus_without_known_person_inference():
         assert policy["counterpart_data_allowed"] is False
         assert policy["reunion_inference_allowed"] is False
         assert policy["static_synastry_used"] is False
+        assert policy["layer_mixing"].startswith("forbidden")
