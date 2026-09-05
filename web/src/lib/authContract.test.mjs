@@ -16,5 +16,6 @@ assert.equal(gate.includes('checkAppAccess'), true, 'AuthGate must enforce serve
 assert.equal(gate.includes('pendingAnonymousUserId'), true, 'email-link verification must compare the pre-link and post-link user id')
 assert.equal(gate.includes('cloudRecordCount > 0'), true, 'cloud-bearing anonymous accounts must never be silently abandoned')
 assert.equal(gate.includes('nextSession.user.id !== pendingAnonymousUserId'), true, 'mismatched user ids must block app entry')
+assert.equal(gate.includes('onAuthStateChange'), false, 'auth-state callbacks must not bypass the explicit post-OTP user-id verification path')
 
 console.log('private email auth contract: ok')
