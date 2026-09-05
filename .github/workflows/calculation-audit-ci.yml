@@ -1,0 +1,77 @@
+name: Calculation Audit CI
+
+on:
+  # Keep this workflow visible on every pull request so it can safely be
+  # configured as a required status check without path-filter deadlocks.
+  pull_request: {}
+  push:
+    branches:
+      - main
+    paths:
+      - 'integrated_fortune_v1.py'
+      - 'relationship_western_v1.py'
+      - 'relationship_saju_v1.py'
+      - 'personal_marriage_v1.py'
+      - 'thai_*.py'
+      - 'api/main.py'
+      - 'api/requirements.txt'
+      - 'tests/test_western_calculation_audit_v1.py'
+      - 'tests/test_saju_calculation_gold_v1.py'
+      - 'tests/test_thai_*.py'
+      - 'tests/test_personal_marriage_v1.py'
+      - '.github/workflows/calculation-audit-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: calculation-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  calculation-audit:
+    name: Western + Saju + Thai gold regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Cache Skyfield ephemeris
+        uses: actions/cache@v4
+        with:
+          path: |
+            de440s.bsp
+            de421.bsp
+          key: skyfield-ephemeris-v1-${{ runner.os }}
+
+      - name: Install calculation dependencies
+        run: python -m pip install -q -r api/requirements.txt pytest
+
+      - name: Calculation syntax contract
+        run: python -m py_compile integrated_fortune_v1.py relationship_western_v1.py relationship_saju_v1.py personal_marriage_v1.py thai_lagna_v1.py thai_suriyayat_v1.py api/main.py
+
+      - name: Western and Saju calculation audit
+        run: |
+          python -m pytest -q \
+            tests/test_western_calculation_audit_v1.py \
+            tests/test_saju_calculation_gold_v1.py \
+            tests/test_personal_marriage_v1.py
+
+      - name: Thai independent gold corpus
+        run: |
+          python -m pytest -q \
+            tests/test_thai_lagna_boundary_gold.py \
+            tests/test_thai_lagna_world_gold.py \
+            tests/test_thai_lagna_v1.py \
+            tests/test_thai_aspects_v1.py \
+            tests/test_thai_dignities_v1.py \
+            tests/test_thai_houses_v1.py

@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from datetime import date, time as dt_time, timezone
+
+import pytest
+
+from integrated_fortune_v1 import PLANET_KEYS, _aware_local, _compute_houses, _planet_lon, _to_jd_ut
+from personal_marriage_v1 import (
+    _house_data as _marriage_house_data,
+    _jd as _marriage_jd,
+    _positions as _marriage_positions,
+    _utc_datetime as _marriage_utc_datetime,
+)
+from relationship_western_v1 import _angles, _jd_from_utc, _planet_positions
+
+
+def _angular_delta_deg(a: float, b: float) -> float:
+    return abs((float(a) - float(b) + 180.0) % 360.0 - 180.0)
+
+
+WESTERN_AUDIT_CASES = (
+    {
+        "name": "Greenwich J2000",
+        "birth_date": date(2000, 1, 1),
+        "birth_time": dt_time(12, 0),
+        "latitude": 51.4779,
+        "longitude": 0.0,
+        "utc_offset_hours": 0.0,
+    },
+    {
+        "name": "Seoul",
+        "birth_date": date(2024, 2, 4),
+        "birth_time": dt_time(17, 26, 53),
+        "latitude": 37.5665,
+        "longitude": 126.9780,
+        "utc_offset_hours": 9.0,
+    },
+    {
+        "name": "New York winter",
+        "birth_date": date(2024, 1, 15),
+        "birth_time": dt_time(12, 0),
+        "latitude": 40.7128,
+        "longitude": -74.0060,
+        "utc_offset_hours": -5.0,
+    },
+    {
+        "name": "Sydney winter",
+        "birth_date": date(2024, 6, 15),
+        "birth_time": dt_time(12, 0),
+        "latitude": -33.8688,
+        "longitude": 151.2093,
+        "utc_offset_hours": 10.0,
+    },
+)
+
+
+@pytest.mark.parametrize("case", WESTERN_AUDIT_CASES, ids=lambda case: case["name"])
+def test_julian_day_path_is_identical_across_all_western_product_engines(case):
+    local = _aware_local(case["birth_date"], case["birth_time"], case["utc_offset_hours"])
+    utc = local.astimezone(timezone.utc)
+    relationship_jd = _jd_from_utc(utc)
+    marriage_utc = _marriage_utc_datetime(case["birth_date"], case["birth_time"], case["utc_offset_hours"])
+
+    assert marriage_utc == utc
+    assert abs(_to_jd_ut(utc) - relationship_jd) <= 1e-9
+    assert abs(_marriage_jd(marriage_utc) - relationship_jd) <= 1e-9
+
+
+@pytest.mark.parametrize("case", WESTERN_AUDIT_CASES, ids=lambda case: case["name"])
+def test_skyfield_and_swiss_ephemeris_planet_longitudes_stay_within_six_arcminutes(case):
+    local = _aware_local(case["birth_date"], case["birth_time"], case["utc_offset_hours"])
+    utc = local.astimezone(timezone.utc)
+    jd_ut = _to_jd_ut(utc)
+    swiss = _planet_positions(jd_ut, include_moon=True)
+
+    errors_arcmin = {}
+    for body in PLANET_KEYS:
+        skyfield_lon = _planet_lon(body, utc)
+        swiss_lon = float(swiss[body]["lon"])
+        error_arcmin = _angular_delta_deg(skyfield_lon, swiss_lon) * 60.0
+        errors_arcmin[body] = error_arcmin
+        assert error_arcmin <= 6.0, (
+            f"{case['name']} {body}: Skyfield={skyfield_lon:.6f}°, "
+            f"Swiss={swiss_lon:.6f}°, Δ={error_arcmin:.3f}′"
+        )
+
+    assert max(errors_arcmin.values()) <= 6.0
+
+
+@pytest.mark.parametrize("case", WESTERN_AUDIT_CASES, ids=lambda case: case["name"])
+def test_swiss_planet_positions_are_identical_between_relationship_and_marriage_paths(case):
+    local = _aware_local(case["birth_date"], case["birth_time"], case["utc_offset_hours"])
+    utc = local.astimezone(timezone.utc)
+    jd_ut = _to_jd_ut(utc)
+    relationship = _planet_positions(jd_ut, include_moon=True)
+    marriage = _marriage_positions(jd_ut, include_moon=True)
+
+    for body in PLANET_KEYS:
+        assert _angular_delta_deg(relationship[body]["lon"], marriage[body]["longitude"]) <= 1e-6
+
+
+@pytest.mark.parametrize("case", WESTERN_AUDIT_CASES, ids=lambda case: case["name"])
+def test_house_axes_and_placidus_cusps_are_identical_across_product_paths(case):
+    local = _aware_local(case["birth_date"], case["birth_time"], case["utc_offset_hours"])
+    utc = local.astimezone(timezone.utc)
+    jd_ut = _to_jd_ut(utc)
+
+    integrated = _compute_houses(utc, case["latitude"], case["longitude"])
+    relationship = _angles(jd_ut, case["latitude"], case["longitude"])
+    marriage = _marriage_house_data(jd_ut, case["latitude"], case["longitude"])
+
+    assert _angular_delta_deg(integrated["asc"], relationship["ASC"]) <= 1e-5
+    assert _angular_delta_deg(integrated["mc"], relationship["MC"]) <= 1e-5
+    assert _angular_delta_deg(integrated["asc"], marriage["asc"]) <= 1e-5
+    assert _angular_delta_deg(integrated["mc"], marriage["mc"]) <= 1e-5
+    assert len(integrated["placidus_cusps"]) == len(relationship["placidus_cusps"]) == len(marriage["placidus_cusps"]) == 12
+    for index, (integrated_cusp, relationship_cusp, marriage_cusp) in enumerate(
+        zip(integrated["placidus_cusps"], relationship["placidus_cusps"], marriage["placidus_cusps"]),
+        start=1,
+    ):
+        assert _angular_delta_deg(integrated_cusp, relationship_cusp) <= 1e-5, (
+            f"{case['name']} cusp {index}: integrated={integrated_cusp} relationship={relationship_cusp}"
+        )
+        assert _angular_delta_deg(integrated_cusp, marriage_cusp) <= 1e-5, (
+            f"{case['name']} cusp {index}: integrated={integrated_cusp} marriage={marriage_cusp}"
+        )
