@@ -44,7 +44,7 @@ Keep the Vercel URL reachable on the Hobby plan while making the actual app and 
 1. Confirm Supabase Authentication → URL Configuration points email confirmations back to the real production Vercel URL.
 2. Retire/tombstone legacy Gemini-capable Edge Functions except the current guarded endpoints documented in `private-app-ai-endpoints.md`.
 3. Verify Render has `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as runtime environment variables; `private_app.py` intentionally fails closed if they are absent.
-4. Deploy the web auth gate and switch Render from the current app entrypoint to `private_app:app` while preserving existing host/port/worker options.
+4. Deploy the web auth gate and change the current Render command `uvicorn api.main:app --host 0.0.0.0 --port $PORT` to `uvicorn api.private_app:app --host 0.0.0.0 --port $PORT` as one coordinated cutover.
 5. On the owner's existing device, enter the owner email and click the email confirmation link. Do not log out or clear site data before this conversion.
 6. Verify the Auth `user_id` remains the pre-bound archive UUID, the account is no longer anonymous, and the existing cloud archive remains present.
 7. Verify unauthenticated/non-allowlisted `/v1/*` calls fail and current paid-AI endpoints remain usable only for the owner.
@@ -65,4 +65,4 @@ If this grows beyond a few trusted users, add per-user quotas/roles, account-man
 
 ## Deployment safety
 
-Do not switch Render/Vercel to the auth-gated build until URL Configuration and Render auth environment variables are verified. Main/Vercel/Render production remain separate from the DB preparation steps and require an explicit cutover decision.
+Render is currently on `main`, auto-deploys on commits, and has repository root as its working root. Do not merge or change the Render start command until URL Configuration and Render auth environment variables are verified and the coordinated cutover is explicitly approved.
