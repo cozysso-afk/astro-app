@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.1-adaptive-prompt-pack";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.2-evidence-pipeline";
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -33,6 +33,31 @@ function advancedPacket(x:any,n:number){if(!x||typeof x!=="object")return null;i
 function transitHit(x:any){if(!x||typeof x!=="object")return null;return {person:x?.person??null,transit:x?.transit??null,aspect:x?.aspect??null,target:x?.target??null,orb:Number(x?.orb??0),tone:x?.tone??null,score:Number(x?.score??0)};}
 function transitDay(x:any,n:number){if(!x||typeof x!=="object")return null;return {date:x?.date??null,score:Number(x?.score??0),user_score:Number(x?.user_score??0),counterpart_score:Number(x?.counterpart_score??0),shared_activation:Boolean(x?.shared_activation),hits:(Array.isArray(x?.hits)?x.hits:[]).map(transitHit).filter(Boolean).slice(0,n)};}
 function transitMonth(x:any){if(!x||typeof x!=="object")return null;return {calendar_month:x?.calendar_month??null,score:Number(x?.score??0),top_dates:Array.isArray(x?.top_dates)?x.top_dates.slice(0,4):[]};}
+function monthlyAdvancedPacket(m:any,n:number){
+ const ps=m?.progressed_synastry,pc=m?.progressed_composite,mt=m?.marks_tertiary;
+ const unavailable=(x:any,fallback:string)=>({available:false,reason:x?.reason??fallback});
+ return {
+   calendar_month:m?.calendar_month??null,representative_date:m?.representative_date??null,
+   signal_summary:compactSignal(m?.signal_summary,n),
+   progressed_synastry:ps?.available===true?{
+     available:true,
+     user_progressed_to_partner_natal:aspectList(ps?.user_progressed_to_partner_natal,n),
+     partner_progressed_to_user_natal:aspectList(ps?.partner_progressed_to_user_natal,n),
+     progressed_to_progressed:aspectList(ps?.progressed_to_progressed,n),
+   }:unavailable(ps,"progressed synastry unavailable"),
+   progressed_composite:pc?.available===true?{
+     available:true,method:pc?.method??null,
+     to_natal_composite_aspects:aspectList(pc?.to_natal_composite_aspects,n),
+   }:unavailable(pc,"progressed composite unavailable"),
+   marks_tertiary:mt?.available===true?{
+     available:true,
+     user:{completed_lunar_months:mt?.user?.completed_lunar_months??null,to_base_marks_aspects:aspectList(mt?.user?.to_base_marks_aspects,n)},
+     counterpart:{completed_lunar_months:mt?.counterpart?.completed_lunar_months??null,to_base_marks_aspects:aspectList(mt?.counterpart?.to_base_marks_aspects,n)},
+     directional_cross_aspects:aspectList(mt?.directional_cross_aspects,n),
+     angle_policy:mt?.angle_policy??null,
+   }:unavailable(mt,"Marks tertiary unavailable"),
+ };
+}
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact);
  let aspects=(Array.isArray(n?.aspects)?n.aspects:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb);
@@ -42,17 +67,18 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  const trans=r?.relationship_transits??r?.reunion_transits??null;
  const ctxMonths=Array.isArray(ctx?.months)?ctx.months.map((m:any)=>({calendar_month:m?.calendar_month,start:m?.start,end:m?.end,incoming:stat(m?.incoming),outgoing:stat(m?.outgoing),reconnection:stat(m?.reconnection)})):[];
  const rankedMonths=ctxMonths.map((m:any)=>({...m,rank_score:Number(m?.reconnection?.average??0)*.5+Number(m?.incoming?.average??0)*.35+Number(m?.outgoing?.average??0)*.15})).sort((a:any,b:any)=>b.rank_score-a.rank_score).slice(0,L.ranked);
- const advancedMonths=(Array.isArray(r?.months)?r.months:[]).slice(0,L.months).map((m:any)=>({calendar_month:m?.calendar_month,representative_date:m?.representative_date,signal_summary:compactSignal(m?.signal_summary,L.tight)}));
+ const advancedMonths=(Array.isArray(r?.months)?r.months:[]).slice(0,L.months).map((m:any)=>monthlyAdvancedPacket(m,L.tight));
  const transitDays=(Array.isArray(trans?.top_days)?trans.top_days:[]).slice(0,L.days).map((d:any)=>transitDay(d,L.hits)).filter(Boolean);
  const transitMonths=(Array.isArray(trans?.top_months)?trans.top_months:[]).slice(0,L.topMonths).map(transitMonth).filter(Boolean);
  return deep({
    analysis_mode:r?.analysis_mode??null,period:calc?.period,relationship_status:calc?.relationship_status,
+   timing_contract:{timing_timezone_policy:r?.timing_timezone_policy??null,secondary_key:r?.secondary_key??null,tertiary_key:r?.tertiary_key??null,orb_policy:r?.orb_policy??null,interpretation_policy:r?.interpretation_policy??null},
    precision:{partner_time_exact:exact,removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
    static:{aspects:aspects.slice(0,L.static),strongest:aspects.slice(0,Math.min(14,L.static))},
    focus:focusPacket(focus,L.focus),
    house_overlays:housePacket(r?.house_overlays,L.house),
    saju_relationship:sajuPacket(r?.saju_relationship,L.cross),
-   advanced:{davison:advancedPacket(r?.davison,L.chart),marks:advancedPacket(r?.marks,L.chart),months:advancedMonths},
+   advanced:{composite:advancedPacket(r?.composite,L.chart),davison:advancedPacket(r?.davison,L.chart),marks:advancedPacket(r?.marks,L.chart),months:advancedMonths},
    directional:purpose==="reunion"&&ctx?{period:ctx?.period,incoming:stat(ctx?.incoming),outgoing:stat(ctx?.outgoing),reconnection:stat(ctx?.reconnection),ranked_months:rankedMonths}:null,
    transit_triggers:trans?{period:trans?.period,policy:trans?.policy,top_days:transitDays,top_months:transitMonths}:null,
    limitations:Array.isArray(r?.limitations)?r.limitations.slice(0,8):[]
@@ -68,6 +94,8 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.
 - 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
 - 점수와 접점 개수는 확률이 아니다. 좋은 말/나쁜 말을 억지로 균형 맞추지 않는다.
+- timing_contract의 fixed UTC offset·local noon 규칙을 그대로 따른다. IANA/DST를 임의 추정해 날짜를 바꾸지 않는다.
+- advanced.composite와 advanced.months의 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 계산층으로 읽고 signal_summary 하나로 뭉개지 않는다.
 - 영어·한자·전문용어는 바로 뒤 괄호에 한글 읽기/뜻을 붙인다.
 - 서양점성술과 사주는 독립 근거로 읽고, 둘이 같은 주제를 가리킬 때만 '교차해서 보면'이라고 종합한다.
 - 사주는 CALCULATED_DATA.saju_relationship에 실제로 들어온 원주·day_master_relation(일간 상호관계·십성)·spouse_palace(일지·배우자궁 합충해파)·cross_branch_links(교차 지지관계)만 사용한다. 데이터에 없는 天干合(천간합: 갑기합·을경합·병신합·정임합·무계합), 신강·신약, 용신·희신·기신, 배우자성, 합혼점수, 도화/홍염은 절대 만들지 않는다.

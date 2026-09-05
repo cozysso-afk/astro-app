@@ -142,6 +142,62 @@ function compactSajuForExternal(value: unknown, limit: number) {
   }
 }
 
+const RELATIONSHIP_CORE_POINTS = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','True Node','ASC','MC']
+
+function compactRelationshipChartForExternal(value: unknown, limit = 10) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const positions = (row.positions && typeof row.positions === 'object' ? row.positions : {}) as Record<string, unknown>
+  const keys = RELATIONSHIP_CORE_POINTS.filter((key)=>positions[key]).slice(0,limit)
+  const compactPositions = Object.fromEntries(keys.map((key)=>{
+    const source = (positions[key] && typeof positions[key] === 'object' ? positions[key] : {}) as Record<string, unknown>
+    const lon = Number(source.lon ?? source.longitude ?? source.longitude_deg ?? 0)
+    return [key,{ lon:Number.isFinite(lon)?Number(lon.toFixed(4)):0, sign:source.sign ?? source.sign_ko ?? null, house:source.house ?? null }]
+  }))
+  const angles = (row.angles && typeof row.angles === 'object' ? row.angles : null) as Record<string, unknown> | null
+  return { positions:compactPositions, angles:angles?{ASC:angles.ASC??null,MC:angles.MC??null,IC:angles.IC??null,DSC:angles.DSC??null}:null }
+}
+
+function compactAdvancedStaticForExternal(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  if (row.available === false) return { available:false, reason:row.reason ?? null }
+  return {
+    available:row.available ?? true, reason:row.reason ?? null, method:row.method ?? null,
+    chart:compactRelationshipChartForExternal(row.chart),
+    user:compactRelationshipChartForExternal(row.user),
+    counterpart:compactRelationshipChartForExternal(row.counterpart),
+  }
+}
+
+function compactAdvancedMonthForExternal(value: unknown, limit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const ps = (row.progressed_synastry && typeof row.progressed_synastry === 'object' ? row.progressed_synastry : {}) as Record<string, unknown>
+  const pc = (row.progressed_composite && typeof row.progressed_composite === 'object' ? row.progressed_composite : {}) as Record<string, unknown>
+  const mt = (row.marks_tertiary && typeof row.marks_tertiary === 'object' ? row.marks_tertiary : {}) as Record<string, unknown>
+  const mtUser = (mt.user && typeof mt.user === 'object' ? mt.user : {}) as Record<string, unknown>
+  const mtCounterpart = (mt.counterpart && typeof mt.counterpart === 'object' ? mt.counterpart : {}) as Record<string, unknown>
+  const list = (x: unknown) => (Array.isArray(x) ? x : []).slice(0,limit).map(compactAspectForExternal).filter(Boolean)
+  const summary = (row.signal_summary && typeof row.signal_summary === 'object' ? row.signal_summary : {}) as Record<string, unknown>
+  return {
+    calendar_month:row.calendar_month ?? null, representative_date:row.representative_date ?? null,
+    signal_summary:{
+      exact_contacts:Number(summary.exact_contacts ?? 0), supportive_contacts:Number(summary.supportive_contacts ?? 0), challenging_contacts:Number(summary.challenging_contacts ?? 0), tightest:list(summary.tightest),
+    },
+    progressed_synastry:ps.available === true ? {
+      available:true, user_progressed_to_partner_natal:list(ps.user_progressed_to_partner_natal), partner_progressed_to_user_natal:list(ps.partner_progressed_to_user_natal), progressed_to_progressed:list(ps.progressed_to_progressed),
+    } : { available:false, reason:ps.reason ?? null },
+    progressed_composite:pc.available === true ? { available:true, method:pc.method ?? null, to_natal_composite_aspects:list(pc.to_natal_composite_aspects) } : { available:false, reason:pc.reason ?? null },
+    marks_tertiary:mt.available === true ? {
+      available:true,
+      user:{completed_lunar_months:mtUser.completed_lunar_months ?? null,to_base_marks_aspects:list(mtUser.to_base_marks_aspects)},
+      counterpart:{completed_lunar_months:mtCounterpart.completed_lunar_months ?? null,to_base_marks_aspects:list(mtCounterpart.to_base_marks_aspects)},
+      directional_cross_aspects:list(mt.directional_cross_aspects), angle_policy:mt.angle_policy ?? null,
+    } : { available:false, reason:mt.reason ?? null },
+  }
+}
+
 function compactRelationshipExternalPacket(calculation: RelationshipApiResponse | null | undefined, reunionContext: ReunionTimingContext | null | undefined, level: number) {
   if (!calculation) return null
   const rawResult = calculation.result as RelationshipApiResponse['result'] & Record<string, unknown>
@@ -155,16 +211,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
   const house = rawResult.house_overlays
   const focusSource = ((rawResult.relationship_focus as Record<string, unknown> | undefined)?.groups ?? {}) as Record<string, unknown>
   const focus = Object.fromEntries(Object.entries(focusSource).map(([key,value]) => [key, (Array.isArray(value) ? value : []).slice().sort((a,b)=>Number((a as Record<string, unknown>)?.orb ?? 99)-Number((b as Record<string, unknown>)?.orb ?? 99)).slice(0,caps.focus).map(compactAspectForExternal).filter(Boolean)]))
-  const months = (rawResult.months ?? []).slice(0,caps.months).map((month) => ({
-    calendar_month: month.calendar_month,
-    representative_date: month.representative_date,
-    signal_summary: {
-      exact_contacts: month.signal_summary.exact_contacts,
-      supportive_contacts: month.signal_summary.supportive_contacts,
-      challenging_contacts: month.signal_summary.challenging_contacts,
-      tightest: month.signal_summary.tightest.slice(0,caps.tight).map(compactAspectForExternal).filter(Boolean),
-    },
-  }))
+  const months = (rawResult.months ?? []).slice(0,caps.months).map((month) => compactAdvancedMonthForExternal(month,caps.tight))
   const transits = rawResult.reunion_transits?.available ? {
     available: true,
     period: rawResult.reunion_transits.period,
@@ -187,6 +234,13 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     api_version: calculation.api_version,
     relationship_status: calculation.relationship_status,
     period: calculation.period,
+    timing_contract: {
+      timing_timezone_policy:rawResult.timing_timezone_policy ?? null,
+      secondary_key:rawResult.secondary_key ?? null,
+      tertiary_key:rawResult.tertiary_key ?? null,
+      orb_policy:rawResult.orb_policy ?? null,
+      interpretation_policy:rawResult.interpretation_policy ?? null,
+    },
     precision: { partner_time_exact:Boolean(natal?.partner_time_exact), note:natal?.note ?? null },
     natal_synastry: { aspects },
     relationship_focus: focus,
@@ -197,7 +251,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
       counterpart_in_user:compactHouseRowsForExternal(house.counterpart_in_user?.relationship_houses,caps.house),
     } : null,
     saju_relationship: compactSajuForExternal(rawResult.saju_relationship,caps.saju),
-    advanced: { davison:rawResult.davison ?? null, marks:rawResult.marks ?? null, months },
+    advanced: { composite:compactAdvancedStaticForExternal(rawResult.composite), davison:compactAdvancedStaticForExternal(rawResult.davison), marks:compactAdvancedStaticForExternal(rawResult.marks), months },
     reunion_transits: transits,
     reunion_directional_context: reunionContext ? {
       period:reunionContext.period,
@@ -229,6 +283,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
     '- 좁은 오브의 실제 접점과 서로 독립된 레이어에서 반복되는 근거를 우선한다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
+    '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
     '- 사주는 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고 없는 천간합·신강/신약·용신·배우자성은 만들지 않는다.',
     modeRule,
