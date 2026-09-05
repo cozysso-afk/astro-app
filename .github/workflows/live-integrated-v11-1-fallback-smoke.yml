@@ -1,0 +1,70 @@
+name: Live Integrated Fortune V11.1 Fallback Smoke Once
+
+on:
+  push:
+    branches:
+      - audit/integrated-v11-1-production-fallback-smoke
+    paths:
+      - '.github/workflows/live-integrated-v11-1-fallback-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fallback-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/integrated-v11-1-production-fallback-smoke
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate production-shaped local fallback without Gemini
+        run: |
+          node --experimental-strip-types --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { compactCalculation, validateOutput } from './supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts'
+          import { buildLocalQualityFallbackCore, stabilizeCoreForQuality } from './supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts'
+          import { inspectInterpretationQuality } from './supabase/functions/fortune-interpret-v6-preview/qualityV2.ts'
+
+          const API='https://astro-app-api-f7fn.onrender.com'
+          const request={profile:{name:'Synthetic Integrated V11.1',birth_date:'1990-01-01',birth_time:'12:00:00',latitude:51.4779,longitude:0,utc_offset_hours:0,gender:'female'},start_date:'2026-09-05',end_date:'2027-09-04'}
+          const calcRes=await fetch(`${API}/v1/fortune/integrated`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(180000)})
+          const calc=await calcRes.json()
+          assert.ok(calcRes.ok&&calc?.ok,`production calculation failed: ${calcRes.status}`)
+
+          const payload=compactCalculation(calc)
+          const core=buildLocalQualityFallbackCore(payload)
+          const fixed=stabilizeCoreForQuality(core,payload)
+          const validated=validateOutput(fixed)
+          assert.ok(validated,'local fallback must satisfy schema')
+          const report=inspectInterpretationQuality(validated,payload)
+          for(const stage of [1,2,3,4]){
+            const row=report.stages.find(x=>x.stage===stage)
+            assert.equal(row?.passed,true,`critical quality stage ${stage} failed: ${(row?.issues??[]).join(' / ')}`)
+          }
+
+          const ledger=new Map((payload.evidence_ledger??[]).map(row=>[String(row.id??''),row]))
+          const focus=String(validated?.relationship_reading?.focus_timing??'')
+          const focusDates=[...focus.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)].map(m=>m[1])
+          const rrRefs=validated?.relationship_reading?.evidence_refs??[]
+          for(const date of focusDates){
+            assert.ok(rrRefs.some(ref=>String(ledger.get(String(ref))?.date??'').slice(0,10)===date),`relationship focus date ${date} lacks surviving exact evidence ref`)
+          }
+
+          for(const x of validated?.cross_checks??[]){
+            const systems=new Set((x?.evidence_refs??[]).map(ref=>String(ledger.get(String(ref))?.system??'')).filter(Boolean))
+            if(x?.mode==='Western단독')assert.ok(systems.has('western'),`Western-only cross check lacks western ref: ${x?.label}`)
+            else assert.ok(systems.has('western')&&systems.size>=2,`multi-system cross check does not match final refs: ${x?.label} systems=${[...systems].join(',')}`)
+          }
+
+          console.log(JSON.stringify({
+            ok:true,
+            engine:calc.engine,
+            quality:{score:report.score,stages:report.stages.map(x=>({stage:x.stage,passed:x.passed,issues:x.issues}))},
+            relationship:{focus_timing:focus,focus_dates:focusDates,evidence_ref_count:rrRefs.length},
+            cross_checks:(validated.cross_checks??[]).map(x=>({label:x.label,mode:x.mode,systems:[...new Set((x.evidence_refs??[]).map(ref=>String(ledger.get(String(ref))?.system??'')).filter(Boolean))],ref_count:(x.evidence_refs??[]).length})),
+          },null,2))
+          NODE
