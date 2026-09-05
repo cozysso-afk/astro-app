@@ -25,6 +25,19 @@ export function isPermanentEmailSession(session: Session | null): boolean {
   return Boolean(session?.user?.email && session?.user?.is_anonymous !== true)
 }
 
+export async function countCurrentCloudRecords(): Promise<number> {
+  const session = await getSupabaseSession()
+  if (!session) return 0
+
+  const [readingResult, relationshipResult] = await Promise.all([
+    supabase.from('readings').select('id', { count: 'exact', head: true }),
+    supabase.from('relationship_readings').select('id', { count: 'exact', head: true }),
+  ])
+  if (readingResult.error) throw readingResult.error
+  if (relationshipResult.error) throw relationshipResult.error
+  return Number(readingResult.count ?? 0) + Number(relationshipResult.count ?? 0)
+}
+
 // Existing anonymous sessions are intentionally preserved so the current device can
 // link its email identity without changing user_id. New anonymous sessions are never created.
 export async function linkAnonymousSessionToEmail(email: string) {
