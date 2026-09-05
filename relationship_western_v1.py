@@ -5,7 +5,7 @@ Calculated layers:
 - natal synastry
 - secondary progressed synastry (progressed->natal in both directions + progressed->progressed)
 - midpoint composite and secondary progressed composite
-- Davison relationship chart (uncorrected time/space midpoint)
+- Davison relationship chart (classical uncorrected mean latitude/longitude; optional spherical variant)
 - Bob Marks directional charts (A<->Davison and B<->Davison)
 - Tertiary-I progressions of each Marks chart (1 ephemeris day = 27.32158218 life days)
 
@@ -20,7 +20,7 @@ import swisseph as swe
 
 from western_house_system_v1 import calculate_quadrant_houses
 
-ENGINE_VERSION = "relationship-western-v1.6-polar-safe-houses"
+ENGINE_VERSION = "relationship-western-v1.7-midpoint-contract"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -243,6 +243,11 @@ def _angle_distance(a, b):
 
 def _mid_angle(a, b):
     a = _norm(a); b = _norm(b)
+    separation = _angle_distance(a, b)
+    if abs(separation - 180.0) <= 1e-10:
+        # Exact opposition has two equally valid midpoint candidates. Pick a
+        # canonical numeric candidate so A/B ordering cannot flip the composite.
+        return min(_norm(a + 90.0), _norm(a - 90.0))
     d = ((_norm(b - a) + 180.0) % 360.0) - 180.0
     return _norm(a + d / 2.0)
 
@@ -387,27 +392,52 @@ def _secondary_progressed_chart(profile, target_dt, include_angles=False):
     return _chart_from_jd(jd, include_moon=True, include_angles=False)
 
 
-def _geo_midpoint(lat1, lon1, lat2, lon2):
-    # Great-circle midpoint; stable across the date line.
-    phi1, lam1, phi2, lam2 = map(math.radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+def _geo_midpoint(lat1, lon1, lat2, lon2, variant="uncorrected"):
+    """Return the geographic location for an explicit Davison variant.
+
+    `uncorrected` follows the classical DRC convention used by Astrodienst:
+    latitude and longitude are averaged separately. `spherical` follows the
+    shortest great-circle path and is a distinct Davison variant.
+    """
+    lat1 = float(lat1); lon1 = float(lon1); lat2 = float(lat2); lon2 = float(lon2)
+    if variant == "uncorrected":
+        return (lat1 + lat2) / 2.0, (lon1 + lon2) / 2.0
+    if variant != "spherical":
+        raise ValueError(f"unsupported Davison geographic midpoint variant: {variant}")
+
+    phi1, lam1, phi2, lam2 = map(math.radians, [lat1, lon1, lat2, lon2])
     x1, y1, z1 = math.cos(phi1)*math.cos(lam1), math.cos(phi1)*math.sin(lam1), math.sin(phi1)
     x2, y2, z2 = math.cos(phi2)*math.cos(lam2), math.cos(phi2)*math.sin(lam2), math.sin(phi2)
     x, y, z = x1+x2, y1+y2, z1+z2
+    magnitude = math.sqrt(x*x + y*y + z*z)
+    if magnitude <= 1e-12:
+        raise ValueError("spherical geographic midpoint is undefined for antipodal locations")
     lon = math.degrees(math.atan2(y, x))
     hyp = math.hypot(x, y)
     lat = math.degrees(math.atan2(z, hyp))
     return lat, lon
 
 
-def _davison_from_profiles(a, b):
+def _davison_from_profiles(a, b, variant="uncorrected"):
     a_utc = _utc_datetime(a["birth_date"], a["birth_time"], a.get("utc_offset_hours", 9.0))
     b_utc = _utc_datetime(b["birth_date"], b["birth_time"], b.get("utc_offset_hours", 9.0))
     mid_ts = (a_utc.timestamp() + b_utc.timestamp()) / 2.0
     mid_utc = datetime.fromtimestamp(mid_ts, tz=timezone.utc)
-    lat, lon = _geo_midpoint(a["latitude"], a["longitude"], b["latitude"], b["longitude"])
+    lat, lon = _geo_midpoint(
+        a["latitude"], a["longitude"], b["latitude"], b["longitude"], variant=variant
+    )
     jd = _jd_from_utc(mid_utc)
     chart = _chart_from_jd(jd, lat, lon, include_moon=True, include_angles=True)
-    chart.update({"latitude": round(lat, 6), "longitude": round(lon, 6), "method": "uncorrected Davison: midpoint in UTC time + great-circle geographic midpoint"})
+    if variant == "uncorrected":
+        method = "uncorrected Davison: midpoint in UTC time + separate mean latitude and longitude"
+    else:
+        method = "spherical Davison: midpoint in UTC time + great-circle geographic midpoint"
+    chart.update({
+        "latitude": round(lat, 6),
+        "longitude": round(lon, 6),
+        "variant": variant,
+        "method": method,
+    })
     return chart
 
 
