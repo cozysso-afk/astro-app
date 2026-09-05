@@ -65,3 +65,13 @@ These values are product heuristics. They are descriptive activation scores, not
 - transit score math and orb cutoff
 - side-score aggregation
 - adjacent-peak spacing
+
+## Validation
+
+The first PR audit exposed one stale V8 regression assertion that hard-coded the previous engine version string. It was changed to follow `ENGINE_VERSION`; no calculation failure was involved.
+
+Final required audit before merge:
+
+- Western/Saju/relationship/personal calculation corpus: **103 passed**
+- Thai corpus: **38 passed + 31 subtests passed**
+- required status check: **SUCCESS**
