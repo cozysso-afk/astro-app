@@ -25,9 +25,14 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
   assert.match(formatters, /compactAdvancedMonthForExternal\(month,caps\.tight\)/)
   assert.match(formatters, /composite:compactAdvancedStaticForExternal\(rawResult\.composite\)/)
   assert.match(formatters, /timing_contract:\s*\{/)
+  assert.match(formatters, /compactReunionDimensionsForExternal\(rawResult\.reunion_dimensions,caps\)/)
+  assert.match(formatters, /compactReunionSecondarySupportForExternal\(rawResult\.reunion_secondary_support,caps\.months,caps\.tight\)/)
+  assert.doesNotMatch(formatters, /reunion_dimensions: rawResult\.reunion_dimensions \?\? null/)
+  assert.doesNotMatch(formatters, /reunion_secondary_support: rawResult\.reunion_secondary_support \?\? null/)
+  assert.match(edge, /secondaryDimensionPacket/)
 })
 
 test('relationship interpretation cache version changes with the evidence packet contract', () => {
-  assert.match(edge, /relationship-v11\.5-reunion-dimensions/)
-  assert.match(cache, /relationship-v11\.5-reunion-dimensions/)
+  assert.match(edge, /relationship-v11\.6-reunion-compact-evidence/)
+  assert.match(cache, /relationship-v11\.6-reunion-compact-evidence/)
 })

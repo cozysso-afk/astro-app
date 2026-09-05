@@ -201,6 +201,63 @@ function compactAdvancedMonthForExternal(value: unknown, limit: number) {
   }
 }
 
+function compactReunionDimensionForExternal(value: unknown, monthLimit: number, evidenceLimit: number, statBest: number, statCaution: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const evidencePoint = (item: unknown) => {
+    if (!item || typeof item !== 'object') return null
+    const x = item as Record<string, unknown>
+    const list = (v: unknown) => (Array.isArray(v) ? v : []).slice(0,2).map(compactAspectForExternal).filter(Boolean)
+    return {
+      date:String(x.date ?? ''), score:Number(Number(x.score ?? 0).toFixed(1)),
+      user_score:Number(Number(x.user_score ?? 0).toFixed(1)), counterpart_score:Number(Number(x.counterpart_score ?? 0).toFixed(1)),
+      user_evidence:list(x.user_evidence), counterpart_evidence:list(x.counterpart_evidence), event_probability:'not_calculated',
+    }
+  }
+  const months = (Array.isArray(row.months) ? row.months : []).slice(0,monthLimit).map((item)=>{
+    const m = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    return {calendar_month:m.calendar_month ?? null,start:m.start ?? null,end:m.end ?? null,incoming:compactStatForExternal(m.incoming,1,1),outgoing:compactStatForExternal(m.outgoing,1,1),reconnection:compactStatForExternal(m.reconnection,1,1)}
+  })
+  return {
+    incoming:compactStatForExternal(row.incoming,statBest,statCaution),
+    outgoing:compactStatForExternal(row.outgoing,statBest,statCaution),
+    reconnection:compactStatForExternal(row.reconnection,statBest,statCaution),
+    months,
+    top_evidence:(Array.isArray(row.top_evidence) ? row.top_evidence : []).slice(0,evidenceLimit).map(evidencePoint).filter(Boolean),
+    event_probability:'not_calculated',
+  }
+}
+
+function compactReunionDimensionsForExternal(value: unknown, caps: { directionalMonths:number; transitDays:number; statBest:number; statCaution:number }) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const one = (key: string) => compactReunionDimensionForExternal(row[key],caps.directionalMonths,caps.transitDays,caps.statBest,caps.statCaution)
+  return {period:row.period ?? null,contact_recontact:one('contact_recontact'),emotional_reactivation:one('emotional_reactivation'),relationship_rebuilding:one('relationship_rebuilding'),policy:row.policy ?? null}
+}
+
+function compactSecondaryDimensionForExternal(value: unknown, evidenceLimit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  return {
+    label:row.label ?? null,
+    evidence:(Array.isArray(row.evidence) ? row.evidence : []).slice(0,evidenceLimit).map(compactAspectForExternal).filter(Boolean),
+    independent_primary_layers:(Array.isArray(row.independent_primary_layers) ? row.independent_primary_layers : []).slice(0,4),
+    independent_layer_count:Number(row.independent_layer_count ?? 0), convergence:Boolean(row.convergence), score:null,
+    policy:row.policy ?? null,event_probability:'not_calculated',
+  }
+}
+
+function compactReunionSecondarySupportForExternal(value: unknown, monthLimit: number, evidenceLimit: number) {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const months = (Array.isArray(row.months) ? row.months : []).slice(0,monthLimit).map((item)=>{
+    const m = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    const d = (m.dimensions && typeof m.dimensions === 'object' ? m.dimensions : {}) as Record<string, unknown>
+    return {calendar_month:m.calendar_month ?? null,representative_date:m.representative_date ?? null,dimensions:{contact_recontact:compactSecondaryDimensionForExternal(d.contact_recontact,evidenceLimit),emotional_reactivation:compactSecondaryDimensionForExternal(d.emotional_reactivation,evidenceLimit),relationship_rebuilding:compactSecondaryDimensionForExternal(d.relationship_rebuilding,evidenceLimit)}}
+  })
+  return {months,policy:row.policy ?? null,event_probability:'not_calculated'}
+}
+
 function compactRelationshipExternalPacket(calculation: RelationshipApiResponse | null | undefined, reunionContext: ReunionTimingContext | null | undefined, level: number) {
   if (!calculation) return null
   const rawResult = calculation.result as RelationshipApiResponse['result'] & Record<string, unknown>
@@ -256,8 +313,8 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     saju_relationship: compactSajuForExternal(rawResult.saju_relationship,caps.saju),
     advanced: { composite:compactAdvancedStaticForExternal(rawResult.composite), davison:compactAdvancedStaticForExternal(rawResult.davison), marks:compactAdvancedStaticForExternal(rawResult.marks), months },
     reunion_transits: transits,
-    reunion_dimensions: rawResult.reunion_dimensions ?? null,
-    reunion_secondary_support: rawResult.reunion_secondary_support ?? null,
+    reunion_dimensions: compactReunionDimensionsForExternal(rawResult.reunion_dimensions,caps),
+    reunion_secondary_support: compactReunionSecondarySupportForExternal(rawResult.reunion_secondary_support,caps.months,caps.tight),
     reunion_directional_context: reunionContext ? {
       period:reunionContext.period,
       incoming:compactStatForExternal(reunionContext.incoming,caps.statBest,caps.statCaution),

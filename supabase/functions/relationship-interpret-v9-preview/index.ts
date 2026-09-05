@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.5-reunion-dimensions";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.6-reunion-compact-evidence";
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -66,9 +66,13 @@ function reunionDimensionPacket(raw:any,n:number){
  }:null;
  return {contact_recontact:one(raw?.contact_recontact),emotional_reactivation:one(raw?.emotional_reactivation),relationship_rebuilding:one(raw?.relationship_rebuilding),policy:raw?.policy??null};
 }
+function secondaryDimensionPacket(x:any,n:number){
+ if(!x||typeof x!=="object")return null;
+ return {label:x?.label??null,evidence:aspectList(x?.evidence,Math.min(3,n)),independent_primary_layers:Array.isArray(x?.independent_primary_layers)?x.independent_primary_layers.slice(0,4):[],independent_layer_count:Number(x?.independent_layer_count??0),convergence:Boolean(x?.convergence),score:null,policy:x?.policy??null,event_probability:"not_calculated"};
+}
 function secondarySupportPacket(raw:any,n:number){
  if(!raw||typeof raw!=="object")return null;
- const months=(Array.isArray(raw?.months)?raw.months:[]).slice(0,n).map((m:any)=>({calendar_month:m?.calendar_month??null,representative_date:m?.representative_date??null,dimensions:m?.dimensions??null}));
+ const months=(Array.isArray(raw?.months)?raw.months:[]).slice(0,n).map((m:any)=>({calendar_month:m?.calendar_month??null,representative_date:m?.representative_date??null,dimensions:{contact_recontact:secondaryDimensionPacket(m?.dimensions?.contact_recontact,n),emotional_reactivation:secondaryDimensionPacket(m?.dimensions?.emotional_reactivation,n),relationship_rebuilding:secondaryDimensionPacket(m?.dimensions?.relationship_rebuilding,n)}}));
  return {months,policy:raw?.policy??null,event_probability:"not_calculated"};
 }
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
