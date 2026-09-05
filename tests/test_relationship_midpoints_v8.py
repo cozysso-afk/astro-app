@@ -13,6 +13,7 @@ from relationship_western_v1 import (
     _secondary_progressed_chart,
     _tertiary_progressed_chart,
     _utc_datetime,
+    build_relationship_western,
 )
 
 
@@ -168,3 +169,33 @@ def test_secondary_progression_keeps_continuous_day_for_year_ratio():
     # Half a tropical year of life corresponds to half an ephemeris day.
     birth_jd = 2451545.0
     assert abs(float(progressed["jd_ut"]) - (birth_jd + 0.5)) <= 1e-7
+
+
+def test_full_relationship_build_threads_uncorrected_davison_into_marks_and_tertiary_layers():
+    user = _profile(
+        birth_date=date(1990, 1, 1), birth_time=dt_time(9, 30), utc_offset_hours=9,
+        latitude=37.5665, longitude=126.9780,
+    )
+    counterpart = _profile(
+        birth_date=date(1992, 6, 15), birth_time=dt_time(18, 20), utc_offset_hours=-4,
+        latitude=40.7128, longitude=-74.0060,
+    )
+    out = build_relationship_western(
+        user,
+        counterpart,
+        [(date(2026, 9, 1), date(2026, 9, 30))],
+        analysis_mode="compatibility",
+    )
+
+    assert out["ok"] is True
+    assert out["engine"] == "relationship-western-v1.7-midpoint-contract"
+    assert out["composite"]["available"] is True
+    assert out["davison"]["available"] is True
+    assert out["davison"]["chart"]["variant"] == "uncorrected"
+    assert "mean latitude" in out["davison"]["chart"]["method"]
+    assert out["marks"]["available"] is True
+    assert out["marks"]["user"]["variant"] == "uncorrected"
+    assert out["marks"]["counterpart"]["variant"] == "uncorrected"
+    assert len(out["months"]) == 1
+    assert out["months"][0]["progressed_composite"]["available"] is True
+    assert out["months"][0]["marks_tertiary"]["available"] is True
