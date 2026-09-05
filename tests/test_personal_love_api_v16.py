@@ -72,28 +72,22 @@ def test_personal_routes_force_distinct_single_person_modes(monkeypatch):
     assert captured[-1] == "new_relationship"
 
 
-def test_personal_routes_never_enter_ai_interpretation_path(monkeypatch):
+def test_personal_routes_real_engine_never_enters_ai_interpretation_path(monkeypatch):
     def fail_if_ai_called(*args, **kwargs):
         raise AssertionError("personal love calculation must not invoke AI interpretation")
 
     monkeypatch.setattr(api_main, "interpret_integrated_fortune", fail_if_ai_called)
-    monkeypatch.setattr(
-        api_main,
-        "build_personal_love_forecast",
-        lambda profile, *, start_date, end_date, mode: {
-            "ok": True,
-            "engine": "personal-love-stub",
-            "analysis_mode": mode,
-            "source_scope": "single_person_only",
-            "counterpart_used": False,
-            "relationship_engine_used": False,
-            "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
-        },
-    )
+    payload = request_payload()
+    payload["end_date"] = payload["start_date"]
 
     for route in ("/v1/love/personal", "/v1/love/new-relationship"):
-        response = client.post(route, json=request_payload())
+        response = client.post(route, json=payload)
         assert response.status_code == 200, (route, response.text)
+        result = response.json()["result"]
+        assert result["engine"] == api_main.PERSONAL_LOVE_ENGINE_VERSION
+        assert result["source_scope"] == "single_person_only"
+        assert result["counterpart_used"] is False
+        assert result["relationship_engine_used"] is False
 
 
 def test_personal_routes_reject_counterpart_payload():
