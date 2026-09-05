@@ -17,5 +17,8 @@ This calculation layer is intentionally isolated from two-person relationship as
 - Provisional birth time keeps production secondary progression conservative: progressed Moon and birth-time-sensitive natal targets are excluded from production scores and kept only as diagnostic evidence. Stable progressed Sun/Venus may remain production evidence.
 - A credible approximate clock time (`official_record`, `family_memory`, `user_estimate`, or non-exact `rectified`, with non-unknown confidence) may allow stable-planet secondary progression to participate in convergence. `arbitrary_input` and unknown birth time never make secondary progression convergence-eligible.
 - Unknown birth time may expose date-only proxy Sun/Venus progression plus midnight/noon/end-of-day longitude-spread diagnostics, but those dates are explicitly approximate and cannot create convergence.
+- Major and daily transit scoring follows the same birth-time safety boundary. With provisional or unknown birth time, natal Moon and any other birth-time-sensitive target are excluded from production transit scores.
+- For a provisional clock time, excluded transit-to-Moon/time-sensitive contacts are retained as `diagnostic_time_sensitive_hits` with `diagnostic_only=true`; they cannot inflate the major-transit activation used by convergence.
+- Exact birth time still allows the full eligible natal target set for major/daily transit scoring.
 
 The calculation and API regression contract lives in `tests/test_personal_love_engine_v16.py` and `tests/test_personal_love_api_v16.py`.
