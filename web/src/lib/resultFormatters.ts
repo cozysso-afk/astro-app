@@ -94,6 +94,9 @@ function compactAspectForExternal(aspect: unknown) {
   return {
     a: String(row.a ?? ''), aspect: String(row.aspect ?? ''), b: String(row.b ?? ''),
     orb: Number(orb.toFixed(2)), tone: String(row.tone ?? 'mixed'), layer: row.layer ?? undefined,
+    orb_grade:row.orb_grade ?? undefined, time_sensitivity:row.time_sensitivity ?? undefined,
+    evidence_confidence:row.evidence_confidence ?? undefined, layer_priority:row.layer_priority ?? undefined,
+    event_probability:row.event_probability ?? 'not_calculated',
   }
 }
 
@@ -253,6 +256,8 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     saju_relationship: compactSajuForExternal(rawResult.saju_relationship,caps.saju),
     advanced: { composite:compactAdvancedStaticForExternal(rawResult.composite), davison:compactAdvancedStaticForExternal(rawResult.davison), marks:compactAdvancedStaticForExternal(rawResult.marks), months },
     reunion_transits: transits,
+    reunion_dimensions: rawResult.reunion_dimensions ?? null,
+    reunion_secondary_support: rawResult.reunion_secondary_support ?? null,
     reunion_directional_context: reunionContext ? {
       period:reunionContext.period,
       incoming:compactStatForExternal(reunionContext.incoming,caps.statBest,caps.statCaution),
@@ -282,6 +287,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '',
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
+    '- 재회운은 reunion_dimensions의 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 분리하고, 각 축의 incoming/outgoing/reconnection도 합치지 않는다. reunion_secondary_support는 daily transit 점수와 합산하지 않는다.',
     '- 좁은 오브의 실제 접점과 서로 독립된 레이어에서 반복되는 근거를 우선한다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',

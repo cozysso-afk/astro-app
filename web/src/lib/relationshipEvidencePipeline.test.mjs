@@ -28,6 +28,6 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
 })
 
 test('relationship interpretation cache version changes with the evidence packet contract', () => {
-  assert.match(edge, /relationship-v11\.4-reliability-evidence/)
-  assert.match(cache, /relationship-v11\.4-reliability-evidence/)
+  assert.match(edge, /relationship-v11\.5-reunion-dimensions/)
+  assert.match(cache, /relationship-v11\.5-reunion-dimensions/)
 })
