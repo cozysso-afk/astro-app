@@ -26,4 +26,4 @@ jobs:
       - name: Install calculation dependencies
         run: python -m pip install -q -r api/requirements.txt
       - name: Fetch JPL Horizons gold candidates
-        run: python scripts/jpl_horizons_probe_v4.py
+        run: PYTHONPATH=. python scripts/jpl_horizons_probe_v4.py
