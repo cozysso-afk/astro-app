@@ -1,0 +1,29 @@
+name: Polar House Probe V7
+
+on:
+  push:
+    branches:
+      - audit/western-polar-timezone-v7
+    paths:
+      - 'scripts/polar_house_probe_v7.py'
+      - '.github/workflows/polar-house-probe-v7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install calculation dependencies
+        run: python -m pip install -q -r api/requirements.txt
+      - name: Inspect polar house behavior
+        run: python scripts/polar_house_probe_v7.py
