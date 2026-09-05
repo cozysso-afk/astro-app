@@ -23,9 +23,10 @@ from lunar_python import Solar
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 from thai_astrology_v2 import ENGINE_VERSION as THAI_ENGINE_VERSION, build_thai_fortune
+from western_house_system_v1 import calculate_quadrant_houses
 
-ENGINE_VERSION = "integrated-fortune-v2.11-full-daily-evidence"
-WESTERN_ENGINE_VERSION = "western-period-engine-v11-full-daily-evidence"
+ENGINE_VERSION = "integrated-fortune-v2.12-polar-safe-houses"
+WESTERN_ENGINE_VERSION = "western-period-engine-v12-polar-safe-houses"
 SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-absolute-jie-v5"
 
 KST = pytz.timezone("Asia/Seoul")
@@ -241,7 +242,10 @@ def _angular_separation(a: float, b: float):
 
 def _compute_houses(dt_utc: datetime, latitude: float, longitude: float):
     jd_ut = _to_jd_ut(dt_utc)
-    placidus_cusps, ascmc = swe.houses_ex(jd_ut, float(latitude), float(longitude), b"P", 0)
+    quadrant_raw, ascmc, house_system = calculate_quadrant_houses(
+        jd_ut, float(latitude), float(longitude), extended=True
+    )
+    quadrant_cusps = [float(x % 360) for x in quadrant_raw]
     asc, mc, vertex = float(ascmc[0] % 360), float(ascmc[1] % 360), float(ascmc[3] % 360)
     asc_sign = int(asc // 30)
     whole_cusps = [float(((asc_sign + i) % 12) * 30.0) for i in range(12)]
@@ -251,7 +255,11 @@ def _compute_houses(dt_utc: datetime, latitude: float, longitude: float):
         "mc": mc,
         "vertex": vertex,
         "whole_cusps": whole_cusps,
-        "placidus_cusps": [float(x % 360) for x in placidus_cusps],
+        "quadrant_cusps": quadrant_cusps,
+        # Backward-compatible alias. `house_system` identifies whether these are
+        # true Placidus cusps or the explicit polar Porphyry fallback.
+        "placidus_cusps": list(quadrant_cusps),
+        "house_system": house_system,
     }
 
 
@@ -441,7 +449,7 @@ def _build_transit_records_subset(query_dt_utc: datetime, natal_lons: dict, nata
     records = []
     for body, snap in snapshots.items():
         w_house = _whole_sign_house(snap["lon"], natal_houses["asc"])
-        p_house = _cusp_house(snap["lon"], natal_houses["placidus_cusps"])
+        p_house = _cusp_house(snap["lon"], natal_houses.get("quadrant_cusps") or natal_houses["placidus_cusps"])
         for target, target_lon in natal_core.items():
             asp = _analyze_aspect(body, snap, target_lon)
             if asp:
@@ -450,6 +458,8 @@ def _build_transit_records_subset(query_dt_utc: datetime, natal_lons: dict, nata
                     "transit": body,
                     "target": target,
                     "whole_house": w_house,
+                    "quadrant_house": p_house,
+                    "quadrant_system": (natal_houses.get("house_system") or {}).get("used", "Placidus"),
                     "placidus_house": p_house,
                     "speed": snap["speed"],
                     "direction": snap["direction"],
@@ -536,7 +546,7 @@ def _score_topic(topic_name: str, transit_records: list[dict], snapshots: dict, 
         if transit_w <= 0:
             continue
         w_house = _whole_sign_house(snap["lon"], natal_houses["asc"])
-        p_house = _cusp_house(snap["lon"], natal_houses["placidus_cusps"])
+        p_house = _cusp_house(snap["lon"], natal_houses.get("quadrant_cusps") or natal_houses["placidus_cusps"])
         w_weight = spec["houses"].get(w_house, 0.0)
         p_weight = spec["houses"].get(p_house, 0.0) if p_house else 0.0
         house_contrib = .22 * transit_w * w_weight + .09 * transit_w * p_weight
@@ -550,6 +560,8 @@ def _score_topic(topic_name: str, transit_records: list[dict], snapshots: dict, 
             "polarity": 0.0,
             "transit": body,
             "whole_house": w_house,
+            "quadrant_house": p_house,
+            "quadrant_system": (natal_houses.get("house_system") or {}).get("used", "Placidus"),
             "placidus_house": p_house,
             "whole_relevant": bool(w_weight),
             "placidus_relevant": bool(p_weight),
@@ -726,8 +738,9 @@ def _evidence_text(item: dict) -> str:
     if item.get("kind") == "house":
         transit = item.get("transit", "")
         whole = item.get("whole_house")
-        placidus = item.get("placidus_house")
-        return f"{transit} · Whole Sign {whole}H · Placidus {placidus}H"
+        quadrant = item.get("quadrant_house", item.get("placidus_house"))
+        system = item.get("quadrant_system") or "Placidus"
+        return f"{transit} · Whole Sign {whole}H · {system} {quadrant}H"
     return str(item)
 
 
@@ -771,23 +784,50 @@ def _unpack_natal_lons(packed):
 
 
 def _pack_houses(houses: dict):
+    meta = houses.get("house_system") or {
+        "requested": "Placidus", "used": "Placidus", "fallback": False,
+        "fallback_reason": None, "swiss_error": None,
+    }
+    quadrant = houses.get("quadrant_cusps") or houses["placidus_cusps"]
     return (
         float(houses["asc"]),
         float(houses["mc"]),
         float(houses["vertex"]),
         tuple(float(x) for x in houses["whole_cusps"]),
-        tuple(float(x) for x in houses["placidus_cusps"]),
+        tuple(float(x) for x in quadrant),
+        str(meta.get("requested") or "Placidus"),
+        str(meta.get("used") or "Placidus"),
+        bool(meta.get("fallback")),
+        meta.get("fallback_reason"),
+        meta.get("swiss_error"),
     )
 
 
 def _unpack_houses(packed):
-    asc, mc, vertex, whole, placidus = packed
+    # Accept the pre-V7 five-field tuple so an in-process legacy cache or test
+    # fixture cannot crash during a rolling deployment.
+    if len(packed) == 5:
+        asc, mc, vertex, whole, quadrant = packed
+        requested = used = "Placidus"
+        fallback = False
+        fallback_reason = swiss_error = None
+    else:
+        asc, mc, vertex, whole, quadrant, requested, used, fallback, fallback_reason, swiss_error = packed
+    quadrant_list = list(quadrant)
     return {
         "asc": asc,
         "mc": mc,
         "vertex": vertex,
         "whole_cusps": list(whole),
-        "placidus_cusps": list(placidus),
+        "quadrant_cusps": quadrant_list,
+        "placidus_cusps": list(quadrant_list),
+        "house_system": {
+            "requested": requested,
+            "used": used,
+            "fallback": bool(fallback),
+            "fallback_reason": fallback_reason,
+            "swiss_error": swiss_error,
+        },
     }
 
 
@@ -894,7 +934,7 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
                     }
                     for key in (
                         "transit", "target", "aspect", "orb", "motion", "direction",
-                        "whole_house", "placidus_house", "polarity",
+                        "whole_house", "quadrant_house", "quadrant_system", "placidus_house", "polarity",
                     ):
                         if evidence.get(key) is not None:
                             packed[key] = evidence.get(key)
@@ -1203,6 +1243,7 @@ def _western_payload(
         "natal": {
             "asc": round(natal_houses["asc"], 6),
             "mc": round(natal_houses["mc"], 6),
+            "house_system": natal_houses["house_system"],
         },
         "overall": overall,
         "relationship_signals": relationship_signals,

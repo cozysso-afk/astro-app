@@ -23,6 +23,14 @@ export type BirthProfile = {
 
 export type CounterpartProfile = BirthProfile & { timeKnown: boolean }
 
+export type HouseSystemMeta = {
+  requested: string
+  used: string
+  fallback: boolean
+  fallback_reason?: string | null
+  swiss_error?: string | null
+}
+
 export type Aspect = {
   a: string
   aspect: string
@@ -57,8 +65,8 @@ export type RelationshipApiResponse = {
     house_overlays?: {
       available: boolean
       precision_note?: string
-      user_in_counterpart?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
-      counterpart_in_user?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; whole_house?:number|null }> }
+      user_in_counterpart?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; quadrant_house?:number|null; quadrant_system?:string; whole_house?:number|null }> }
+      counterpart_in_user?: { available: boolean; relationship_houses?: Array<{ source:string; planet:string; target:string; house?:number|null; placidus_house?:number|null; quadrant_house?:number|null; quadrant_system?:string; whole_house?:number|null }> }
     }
     davison?: { available: boolean; reason?: string }
     marks?: { available: boolean; reason?: string }
@@ -170,6 +178,8 @@ export type FortuneDailyEvidence = {
   direction?: string
   whole_house?: number
   placidus_house?: number | null
+  quadrant_house?: number | null
+  quadrant_system?: string
   polarity?: number
 }
 export type FortuneDailyScore = {
@@ -190,7 +200,7 @@ export type IntegratedApiResponse = {
     engine: string
     ephemeris: string
     score_policy: string
-    natal: { asc: number; mc: number }
+    natal: { asc: number; mc: number; house_system?: HouseSystemMeta }
     overall: Record<string, FortuneStat | null>
     relationship_signals: Record<string, FortuneStat | null>
     market?: { has_open_session: boolean; session_count: number; session_dates: string[]; calendar_mode?: string; calendar_exact_range?: string[] | null; calendar_warning?: string | null }

@@ -18,11 +18,12 @@ export function RelationshipPrecisionDetails({ result, partnerTimeExact, aspects
     { title: '상대 행성 → 내 하우스', rows: houseOverlays?.counterpart_in_user?.relationship_houses ?? [] },
   ]
   const houseContactCount = houseGroups.reduce((sum, group) => sum + group.rows.length, 0)
+  const quadrantLabel = (system?: string) => system === 'Porphyry' ? '포르피리' : system === 'Placidus' ? '플라시두스' : (system ?? '사분면')
 
   return <>
     {partnerTimeExact && houseOverlays?.available && <details className="result-card relationship-precision-card">
-      <summary className="relationship-precision-summary"><span>관계 하우스</span><strong>홀사인 + 플라시두스 상세</strong><small>{houseContactCount}개 접점 · 펼쳐보기</small></summary>
-      <div className="relationship-precision-body"><p className="result-note">두 하우스 체계를 따로 보여줘. 숫자가 같으면 중첩 근거, 다르면 서로 다른 해석층이야.</p><div className="month-list">{houseGroups.map((group)=><div className="month-card relationship-precision-month" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · 플라시두스 {row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></div>
+      <summary className="relationship-precision-summary"><span>관계 하우스</span><strong>홀사인 + 사분면 하우스 상세</strong><small>{houseContactCount}개 접점 · 펼쳐보기</small></summary>
+      <div className="relationship-precision-body"><p className="result-note">사분면 하우스는 플라시두스를 우선 사용하고, 극지에서 계산이 불가능하면 포르피리로 명시 전환해. 숫자가 같으면 중첩 근거, 다르면 서로 다른 해석층이야.</p><div className="month-list">{houseGroups.map((group)=><div className="month-card relationship-precision-month" key={group.title}><div className="month-title"><strong>{group.title}</strong><span>{group.rows.length}개 접점</span></div>{group.rows.slice(0,12).map((row,index)=><div className="tight-row" key={`${group.title}-${row.planet}-${index}`}><span>{planetLabels[row.planet]??row.planet}</span><b>홀사인 {row.whole_house??'—'}H · {quadrantLabel(row.quadrant_system)} {row.quadrant_house??row.placidus_house??row.house??'—'}H</b></div>)}</div>)}</div></div>
     </details>}
     <RelationshipEvidenceDetails aspects={aspects} />
     {!partnerTimeExact ? <section className="result-card">
