@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.3-birth-time-provenance";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.4-reliability-evidence";
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -17,7 +17,7 @@ function respond(x:unknown,status=200){return new Response(JSON.stringify(x),{st
 function cut(v:unknown,n:number){return String(v??"").trim().slice(0,n);}
 function gloss(s:string){let t=s;const pairs:[RegExp,string][]=[[/\bSun\b(?!\s*\()/g,"Sun(태양)"],[/\bMoon\b(?!\s*\()/g,"Moon(달)"],[/\bMercury\b(?!\s*\()/g,"Mercury(수성)"],[/\bVenus\b(?!\s*\()/g,"Venus(금성)"],[/\bMars\b(?!\s*\()/g,"Mars(화성)"],[/\bJupiter\b(?!\s*\()/g,"Jupiter(목성)"],[/\bSaturn\b(?!\s*\()/g,"Saturn(토성)"],[/\bUranus\b(?!\s*\()/g,"Uranus(천왕성)"],[/\bNeptune\b(?!\s*\()/g,"Neptune(해왕성)"],[/\bPluto\b(?!\s*\()/g,"Pluto(명왕성)"],[/\bASC\b(?!\s*\()/g,"ASC(상승점)"],[/\bDSC\b(?!\s*\()/g,"DSC(하강점)"],[/\bMC\b(?!\s*\()/g,"MC(중천점)"],[/\bIC\b(?!\s*\()/g,"IC(천저점)"],[/\bconjunction\b(?!\s*\()/gi,"conjunction(합)"],[/\bsextile\b(?!\s*\()/gi,"sextile(육십분위)"],[/\bsquare\b(?!\s*\()/gi,"square(사각)"],[/\btrine\b(?!\s*\()/gi,"trine(삼각)"],[/\bquincunx\b(?!\s*\()/gi,"quincunx(퀸컨스·150도각)"],[/\bopposition\b(?!\s*\()/gi,"opposition(대립)"],[/\bsynastry\b(?!\s*\()/gi,"synastry(시너스트리·궁합차트)"],[/\btransit\b(?!\s*\()/gi,"transit(트랜짓·현재 행성 이동)"],[/\bDavison\b(?!\s*\()/g,"Davison(데이비슨)"],[/\bMarks\b(?!\s*\()/g,"Marks(마크스)"]];for(const [r,v] of pairs)t=t.replace(r,v);return t;}
 function deep(v:any):any{if(typeof v==="string")return gloss(v);if(Array.isArray(v))return v.map(deep);if(v&&typeof v==="object")return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,deep(x)]));return v;}
-function aspect(a:any){if(!a||typeof a!=="object")return null;const orb=Number(a.orb??99);if(!Number.isFinite(orb))return null;return {a:String(a.a??""),aspect:String(a.aspect??""),b:String(a.b??""),orb,tone:String(a.tone??"mixed"),layer:a.layer??null};}
+function aspect(a:any){if(!a||typeof a!=="object")return null;const orb=Number(a.orb??99);if(!Number.isFinite(orb))return null;return {a:String(a.a??""),aspect:String(a.aspect??""),b:String(a.b??""),orb,tone:String(a.tone??"mixed"),layer:a.layer??null,orb_grade:a.orb_grade??null,time_sensitivity:a.time_sensitivity??null,evidence_confidence:a.evidence_confidence??null,layer_priority:a.layer_priority??null,event_probability:a.event_probability??"not_calculated"};}
 function stat(s:any){if(!s||typeof s!=="object")return null;return {average:Number(s.average??0),band:String(s.band??""),spread:Number(s.spread??0),best_days:Array.isArray(s.best_days)?s.best_days.slice(0,10):[],caution_days:Array.isArray(s.caution_days)?s.caution_days.slice(0,8):[]};}
 
 function aspectList(v:any,n:number){return (Array.isArray(v)?v:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb).slice(0,n);}
@@ -30,7 +30,7 @@ function compactSignal(s:any,n:number){if(!s||typeof s!=="object")return null;re
 const CORE_PLANETS=["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","True Node","ASC","MC"];
 function chartCore(c:any,n:number){if(!c||typeof c!=="object")return null;const pos=c?.positions??{};const keys=CORE_PLANETS.filter(k=>pos?.[k]).slice(0,n);return {positions:Object.fromEntries(keys.map(k=>{const v=pos[k]??{};return [k,{lon:Number(v?.lon??v?.longitude??v?.longitude_deg??0),sign:v?.sign??v?.sign_ko??null,house:v?.house??null}]})),angles:c?.angles?{ASC:c.angles?.ASC??null,MC:c.angles?.MC??null,IC:c.angles?.IC??null,DSC:c.angles?.DSC??null}:null};}
 function advancedPacket(x:any,n:number){if(!x||typeof x!=="object")return null;if(!x.available)return {available:false,reason:x?.reason??""};return {available:true,reason:x?.reason??"",method:x?.method??null,chart:chartCore(x?.chart,n),user:chartCore(x?.user,n),counterpart:chartCore(x?.counterpart,n)};}
-function transitHit(x:any){if(!x||typeof x!=="object")return null;return {person:x?.person??null,transit:x?.transit??null,aspect:x?.aspect??null,target:x?.target??null,orb:Number(x?.orb??0),tone:x?.tone??null,score:Number(x?.score??0)};}
+function transitHit(x:any){if(!x||typeof x!=="object")return null;return {person:x?.person??null,transit:x?.transit??null,aspect:x?.aspect??null,target:x?.target??null,orb:Number(x?.orb??0),tone:x?.tone??null,score:Number(x?.score??0),layer_class:x?.layer_class??null,orb_grade:x?.orb_grade??null,time_sensitivity:x?.time_sensitivity??null,evidence_confidence:x?.evidence_confidence??null,layer_priority:x?.layer_priority??null,event_probability:x?.event_probability??"not_calculated"};}
 function transitDay(x:any,n:number){if(!x||typeof x!=="object")return null;return {date:x?.date??null,score:Number(x?.score??0),user_score:Number(x?.user_score??0),counterpart_score:Number(x?.counterpart_score??0),shared_activation:Boolean(x?.shared_activation),hits:(Array.isArray(x?.hits)?x.hits:[]).map(transitHit).filter(Boolean).slice(0,n)};}
 function transitMonth(x:any){if(!x||typeof x!=="object")return null;return {calendar_month:x?.calendar_month??null,score:Number(x?.score??0),top_dates:Array.isArray(x?.top_dates)?x.top_dates.slice(0,4):[]};}
 function monthlyAdvancedPacket(m:any,n:number){
@@ -73,7 +73,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  return deep({
    analysis_mode:r?.analysis_mode??null,period:calc?.period,relationship_status:calc?.relationship_status,
    timing_contract:{timing_timezone_policy:r?.timing_timezone_policy??null,secondary_key:r?.secondary_key??null,tertiary_key:r?.tertiary_key??null,orb_policy:r?.orb_policy??null,interpretation_policy:r?.interpretation_policy??null},
-   precision:{partner_time_available:available,partner_time_exact:exact,birth_time_reliability:r?.birth_time_reliability??null,removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
+   precision:{partner_time_available:available,partner_time_exact:exact,birth_time_reliability:r?.birth_time_reliability??null,sensitivity_scan:r?.sensitivity_scan??null,removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
    static:{aspects:aspects.slice(0,L.static),strongest:aspects.slice(0,Math.min(14,L.static))},
    focus:focusPacket(focus,L.focus),
    house_overlays:housePacket(r?.house_overlays,L.house),
@@ -91,7 +91,9 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 
 공통 절대규칙:
 - 출생시간을 입력했다는 사실과 exact 검증은 다르다. precision.birth_time_reliability를 우선 확인하고, exact가 아니면 ASC/DSC/MC/IC·하우스·Davison/Marks를 확정 근거로 사용하지 않는다. provisional 행성층은 잠정 근거라고 명시한다.
-- 오브가 좁은 실제 접점을 우선한다. 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
+- 오브가 좁은 실제 접점을 우선한다. 접점 개수보다 orb_grade·evidence_confidence·time_sensitivity를 우선한다.
+- 레이어 우선순위는 Natal structure > Secondary Progression > 주요/중장기 Transit > 빠른 Daily Transit > Tertiary/Marks 보조층이다. 하위 보조층 하나만으로 상위 레이어 결론을 뒤집지 않는다.
+- sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다. 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
 - 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.
 - 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
 - 점수와 접점 개수는 확률이 아니다. 좋은 말/나쁜 말을 억지로 균형 맞추지 않는다.
