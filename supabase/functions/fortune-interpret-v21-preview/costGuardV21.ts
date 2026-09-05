@@ -184,14 +184,31 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   return [...western.slice(0,limit-reserve),...context.slice(0,reserve)];
 }
 
+function compactSaju(saju:any){
+  if(!saju)return null;
+  return {
+    engine:saju?.engine,
+    pillars:saju?.pillars??null,
+    day_master:saju?.day_master??null,
+    elements:saju?.elements??null,
+    true_solar:saju?.true_solar??null,
+    dayun:Array.isArray(saju?.dayun)?saju.dayun.slice(0,5):[],
+    annual:Array.isArray(saju?.annual)?saju.annual:[],
+    monthly:Array.isArray(saju?.monthly)?saju.monthly:[],
+    pillar_boundary_policy:saju?.pillar_boundary_policy??null,
+    yun_policy:saju?.yun_policy??null,
+    not_calculated:Array.isArray(saju?.not_calculated)?saju.not_calculated.slice(0,8):[],
+  };
+}
+
 function compactThai(thai:any){
   if(!thai)return null;
   return {
-    engine:thai?.engine,thai_day:thai?.thai_day,birth_planet:thai?.birth_planet??null,ruler:thai?.ruler,
+    engine:thai?.engine,thai_day:thai?.thai_day,birth_planet:thai?.birth_planet??null,ruler:thai?.ruler,rule:thai?.rule??null,
     mahathaksa:thai?.mahathaksa?{available:thai.mahathaksa.available,method:thai.mahathaksa.method,evidence_id:thai.mahathaksa.evidence_id}:null,
     taksajorn:thai?.taksajorn?{available:thai.taksajorn.available,segments:(thai.taksajorn.segments??[]).map((x:any)=>({start:x.start,end:x.end,annual_boriwan:x.annual_boriwan,landed_center:x.landed_center,evidence_id:x.evidence_id}))}:null,
     suriyayat:thai?.suriyayat?{available:thai.suriyayat.available,lagna:thai.suriyayat.lagna?{available:thai.suriyayat.lagna.available,display:thai.suriyayat.lagna.display,interpretation_scope:thai.suriyayat.lagna.interpretation_scope}:null,interpretation_status:thai.suriyayat.interpretation_status}:null,
-    predictive_status:thai?.predictive_status,consensus_policy:thai?.consensus_policy,reliability:thai?.reliability??null,
+    predictive_status:thai?.predictive_status,consensus_policy:thai?.consensus_policy,reliability:thai?.reliability??null,not_calculated:Array.isArray(thai?.not_calculated)?thai.not_calculated.slice(0,8):[],
   };
 }
 
@@ -453,7 +470,7 @@ export function buildPromptPacket(payload:any){
       daily_evidence_coverage:payload?.western?.daily_evidence_coverage,market:payload?.western?.market,
     },
     key_dates:keyDates,cross_system_timeline:cross,
-    saju:{engine:payload?.saju?.engine,day_master:payload?.saju?.day_master??null,annual:(payload?.saju?.annual??[]).map((x:any)=>({segment_start:x.segment_start,segment_end_exclusive:x.segment_end_exclusive,ganzhi:x.ganzhi,stem_ten_god:x.stem_ten_god,branch_links:x.branch_links,evidence_id:x.evidence_id})),monthly:(payload?.saju?.monthly??[]).filter((x:any)=>keyDates.some((k:any)=>String(k.date)>=String(x.segment_start??"")&&String(k.date)<String(x.segment_end_exclusive??""))).map((x:any)=>({segment_start:x.segment_start,segment_end_exclusive:x.segment_end_exclusive,ganzhi:x.ganzhi,stem_ten_god:x.stem_ten_god,branch_links:x.branch_links,evidence_id:x.evidence_id}))},
+    saju:compactSaju(payload?.saju),
     thai:compactThai(payload?.thai),
     evidence_ledger:promptEvidence(payload,topics,keyDates),
   };

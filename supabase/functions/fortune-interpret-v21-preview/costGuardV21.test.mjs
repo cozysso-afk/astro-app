@@ -90,7 +90,7 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
   assert.equal((src.match(/:generateContent/g)||[]).length,1);
   assert.match(src,/MAX_GEMINI_CALLS=2/);
-  assert.match(src,/supabase-ai-v21\.3\.3-no-zero-paid-fallback/);
+  assert.match(src,/supabase-ai-v21\.4-e2e-evidence/);
   assert.match(src,/MAX_USER_NEW_JOBS_10M=6/);
   assert.match(src,/MAX_USER_NEW_JOBS_24H=20/);
   assert.match(src,/MAX_GLOBAL_NEW_JOBS_10M=18/);
@@ -223,12 +223,48 @@ test('V21.3.3 local fallback keeps paid jobs from becoming zero-content when cri
   assert.match(validated.limits,/안전 보정본/);
 });
 
-test('V21.3.3 runtime preserves paid usage and exposes local fallback instead of zero content',()=>{
+test('V21/V11 runtime preserves paid usage and exposes local fallback instead of zero content',()=>{
   const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
-  assert.match(src,/supabase-ai-v21\.3\.3-no-zero-paid-fallback/);
+  assert.match(src,/supabase-ai-v21\.4-e2e-evidence/);
   assert.match(src,/buildLocalQualityFallbackCore/);
   assert.match(src,/allow_degraded_quality:true/);
   assert.match(src,/local_quality_fallback:true/);
   assert.match(src,/criticalQualityPassed/);
   assert.match(src,/usage:\{\.\.\.combined,quality_validation:/);
+});
+
+
+test('V11 E2E prompt keeps complete bounded Saju baseline/months and Thai limitations',()=>{
+  const p=packet();
+  p.saju.pillars={year:'庚午',month:'戊子',day:'丙寅',hour:'甲午'};
+  p.saju.elements={wood:2,fire:3,earth:1,metal:1,water:1};
+  p.saju.true_solar={legal_local_time:'1990-01-01T12:00:00',true_solar_time:'1990-01-01T11:56:00',total_correction_minutes:-4};
+  p.saju.dayun=Array.from({length:5},(_,i)=>({start_year:1995+i*10,end_year:2004+i*10,start_age:5+i*10,end_age:14+i*10,ganzhi:`D${i}`}));
+  p.saju.monthly=Array.from({length:13},(_,i)=>({calendar_month:`2026-${String((i%12)+1).padStart(2,'0')}`,ganzhi:`M${i}`,stem_ten_god:'context',branch_links:[],segment_start:`2026-${String((i%12)+1).padStart(2,'0')}-01`,segment_end_exclusive:`2026-${String((i%12)+1).padStart(2,'0')}-28`,evidence_id:`S:month:${i+1}`}));
+  p.saju.pillar_boundary_policy='absolute Jie for year/month; true-solar for day/hour';
+  p.saju.yun_policy='bounded test policy';
+  p.saju.not_calculated=['unsupported historic timezone inference'];
+  p.thai.rule='06:00 traditional day boundary';
+  p.thai.not_calculated=['research-only predictive route'];
+
+  const compact=buildPromptPacket(p);
+  assert.deepEqual(compact.saju.pillars,p.saju.pillars);
+  assert.deepEqual(compact.saju.elements,p.saju.elements);
+  assert.equal(compact.saju.dayun.length,5);
+  assert.equal(compact.saju.annual.length,p.saju.annual.length);
+  assert.equal(compact.saju.monthly.length,p.saju.monthly.length,'Saju months must not be filtered by Western key dates');
+  assert.deepEqual(compact.saju.not_calculated,p.saju.not_calculated);
+  assert.equal(compact.thai.rule,p.thai.rule);
+  assert.deepEqual(compact.thai.not_calculated,p.thai.not_calculated);
+  const budget=promptBudget(p);
+  assert.equal(budget.ok,true,`expanded V11 evidence must remain inside ${budget.max_bytes} byte budget; got ${budget.bytes}`);
+});
+
+test('V11 server interpreter version and browser fortune AI cache contract stay identical',()=>{
+  const runtime=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+  const cache=fs.readFileSync(new URL('../../../web/src/lib/readingCache.ts',import.meta.url),'utf8');
+  const runtimeVersion=runtime.match(/const VERSION=\"([^\"]+)\";/)?.[1];
+  const cacheVersion=cache.match(/FORTUNE_AI_CACHE_CONTRACT = '([^']+)'/)?.[1];
+  assert.ok(runtimeVersion);
+  assert.equal(cacheVersion,runtimeVersion,'browser cache must break whenever the fortune interpreter contract changes');
 });
