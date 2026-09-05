@@ -30,6 +30,8 @@ def _relationship_case(day: date, clock: dt_time, longitude: float | None, offse
             "longitude": longitude,
             "utc_offset_hours": offset,
             "time_known": True,
+            "time_source": "official_record",
+            "time_confidence": "exact",
         }
     )
 
@@ -70,8 +72,8 @@ def test_year_month_boundary_is_still_absolute_when_longitude_is_missing():
     before = _relationship_case(date(2024, 2, 4), dt_time(17, 20), None)
     after = _relationship_case(date(2024, 2, 4), dt_time(17, 30), None)
 
-    assert before["precision"] == "legal_time_no_longitude"
-    assert after["precision"] == "legal_time_no_longitude"
+    assert before["precision"] == "exact_clock_no_longitude"
+    assert after["precision"] == "exact_clock_no_longitude"
     assert (before["year"], before["month"]) == ("癸卯", "乙丑")
     assert (after["year"], after["month"]) == ("甲辰", "丙寅")
 

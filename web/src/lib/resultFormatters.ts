@@ -241,7 +241,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
       orb_policy:rawResult.orb_policy ?? null,
       interpretation_policy:rawResult.interpretation_policy ?? null,
     },
-    precision: { partner_time_exact:Boolean(natal?.partner_time_exact), note:natal?.note ?? null },
+    precision: { partner_time_available:Boolean(natal?.partner_time_available), partner_time_exact:Boolean(natal?.partner_time_exact), birth_time_reliability:rawResult.birth_time_reliability ?? null, note:natal?.note ?? null },
     natal_synastry: { aspects },
     relationship_focus: focus,
     house_overlays: house ? {

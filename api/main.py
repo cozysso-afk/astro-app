@@ -21,8 +21,9 @@ from relationship_western_v1 import build_relationship_western
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
+from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.4-personal-marriage-forecast"
+APP_VERSION = "api-fortune-v5.5-birth-time-provenance"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -60,22 +61,45 @@ RelationshipStatus = Literal[
 Gender = Literal["female", "male"]
 
 
+TimeSource = Literal["official_record", "family_memory", "user_estimate", "arbitrary_input", "rectified", "unknown"]
+TimeConfidence = Literal["exact", "high", "medium", "low", "unknown"]
+
+
+class RectifiedWindow(BaseModel):
+    start: dt_time | None = None
+    end: dt_time | None = None
+
+
 class RelationshipProfile(BaseModel):
     name: str | None = None
     birth_date: date
     birth_time: dt_time | None = None
     time_known: bool = True
+    time_source: TimeSource = "unknown"
+    time_confidence: TimeConfidence = "unknown"
+    rectified_window: RectifiedWindow | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
 
     def engine_payload(self) -> dict:
-        exact_time = bool(self.time_known and self.birth_time is not None)
+        raw = {
+            "birth_time": self.birth_time,
+            "time_known": self.time_known,
+            "time_source": self.time_source,
+            "time_confidence": self.time_confidence,
+            "rectified_window": self.rectified_window.model_dump() if self.rectified_window else None,
+        }
+        reliability = resolve_birth_time_reliability(raw)
         return {
             "name": self.name or "",
             "birth_date": self.birth_date,
-            "birth_time": self.birth_time if exact_time else None,
-            "time_known": exact_time,
+            "birth_time": self.birth_time if reliability["time_available"] else None,
+            "time_known": reliability["time_available"],
+            "time_source": reliability["time_source"],
+            "time_confidence": reliability["time_confidence"],
+            "rectified_window": reliability["rectified_window"],
+            "time_reliability": reliability,
             "latitude": self.latitude,
             "longitude": self.longitude,
             "utc_offset_hours": self.utc_offset_hours,
@@ -95,6 +119,10 @@ class FortuneProfile(BaseModel):
     name: str | None = None
     birth_date: date
     birth_time: dt_time
+    time_known: bool = True
+    time_source: TimeSource = "unknown"
+    time_confidence: TimeConfidence = "unknown"
+    rectified_window: RectifiedWindow | None = None
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)

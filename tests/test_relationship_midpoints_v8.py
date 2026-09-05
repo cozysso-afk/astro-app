@@ -26,6 +26,8 @@ def _profile(*, birth_date, birth_time, utc_offset_hours, latitude, longitude):
         "latitude": latitude,
         "longitude": longitude,
         "time_known": True,
+        "time_source": "official_record",
+        "time_confidence": "exact",
     }
 
 

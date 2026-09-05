@@ -10,8 +10,9 @@ from datetime import date, time as dt_time
 from lunar_python import Solar
 
 from integrated_fortune_v1 import _natal_saju_components, _ten_god
+from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-ENGINE_VERSION = "relationship-saju-v1"
+ENGINE_VERSION = "relationship-saju-v1.1-birth-time-provenance"
 
 STEM_ELEMENT = {
     "甲":"木","乙":"木","丙":"火","丁":"火","戊":"土","己":"土","庚":"金","辛":"金","壬":"水","癸":"水",
@@ -25,7 +26,9 @@ LIUPO = {frozenset(x) for x in [("子","酉"),("丑","辰"),("寅","亥"),("卯"
 
 
 def _pillars(profile: dict) -> dict:
-    known = bool(profile.get("time_known", True) and profile.get("birth_time") is not None)
+    time_reliability = resolve_birth_time_reliability(profile)
+    known = bool(time_reliability["time_available"])
+    exact = bool(time_reliability["time_exact"])
     bt = profile.get("birth_time") or dt_time(12, 0)
     bd: date = profile["birth_date"]
     lon = profile.get("longitude")
@@ -35,8 +38,10 @@ def _pillars(profile: dict) -> dict:
     pillars = natal["pillars"]
     day = pillars["day"]
     precision = (
-        "exact_true_solar" if known and lon is not None
-        else "legal_time_no_longitude" if known
+        "exact_true_solar" if exact and lon is not None
+        else "exact_clock_no_longitude" if exact
+        else "provisional_true_solar" if known and lon is not None
+        else "provisional_legal_time_no_longitude" if known
         else "date_noon_proxy"
     )
     return {
@@ -47,6 +52,8 @@ def _pillars(profile: dict) -> dict:
         "true_solar": natal["true_solar_meta"] if known and natal["true_solar_meta"] else None,
         "pillar_boundary_policy": natal["boundary_policy"],
         "time_known": known,
+        "time_exact": exact,
+        "time_reliability": time_reliability,
     }
 
 
@@ -92,7 +99,9 @@ def build_relationship_saju(user_profile: dict, counterpart_profile: dict) -> di
                 cross.append({"a": a_label, "a_branch": a_p[1:2], "b": b_label, "b_branch": b_p[1:2], "relations": rel})
     limitations=[]
     if not a["time_known"]: limitations.append("A 출생시간 미상: 시주 제외, 일주는 경계시각 출생이면 달라질 수 있음")
+    elif not a["time_exact"]: limitations.append("A 출생시간 입력값은 있으나 exact 검증 아님: 입력 시각 기준 시주는 provisional로 사용")
     if not b["time_known"]: limitations.append("B 출생시간 미상: 시주 제외, 일주는 경계시각 출생이면 달라질 수 있음")
+    elif not b["time_exact"]: limitations.append("B 출생시간 입력값은 있으나 exact 검증 아님: 입력 시각 기준 시주는 provisional로 사용")
     return {
         "available": True,
         "engine": ENGINE_VERSION,
