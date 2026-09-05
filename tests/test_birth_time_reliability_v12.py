@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, time as dt_time
+from datetime import date, datetime, time as dt_time, timezone
 
 from api.main import RelationshipProfile
 from birth_time_reliability_v1 import resolve_birth_time_reliability
@@ -48,7 +48,9 @@ def test_legacy_entered_time_is_preserved_but_not_silently_promoted_to_exact():
 
     chart = _profile_chart(legacy, allow_unknown_time=True)
     assert chart is not None
-    assert chart["utc"].startswith("1992-02-29T10:00:00")  # entered 19:00 KST, not noon proxy
+    expected_utc = datetime(1992, 2, 29, 10, 0, tzinfo=timezone.utc)
+    actual_utc = datetime.fromisoformat(chart["utc"])
+    assert abs((actual_utc - expected_utc).total_seconds()) < 0.001  # entered 19:00 KST, not noon proxy
     assert "Moon" in chart["positions"]
     assert chart["angles"] == {}
     assert chart["time_reliability"]["time_exact"] is False
@@ -76,7 +78,9 @@ def test_unknown_time_uses_noon_proxy_without_moon_or_angles():
     assert reliability["time_exact"] is False
     chart = _profile_chart(profile, allow_unknown_time=True)
     assert chart is not None
-    assert chart["utc"].startswith("1992-02-29T03:00:00")
+    expected_utc = datetime(1992, 2, 29, 3, 0, tzinfo=timezone.utc)
+    actual_utc = datetime.fromisoformat(chart["utc"])
+    assert abs((actual_utc - expected_utc).total_seconds()) < 0.001
     assert "Moon" not in chart["positions"]
     assert chart["angles"] == {}
 
