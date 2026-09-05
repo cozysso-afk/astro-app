@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, time as dt_time
 from lunar_python import Solar
 
-from integrated_fortune_v1 import _true_solar_datetime, _ten_god
+from integrated_fortune_v1 import _natal_saju_components, _ten_god
 
 ENGINE_VERSION = "relationship-saju-v1"
 
@@ -30,24 +30,22 @@ def _pillars(profile: dict) -> dict:
     bd: date = profile["birth_date"]
     lon = profile.get("longitude")
     offset = float(profile.get("utc_offset_hours", 9.0))
-    if known and lon is not None:
-        true_solar, meta = _true_solar_datetime(bd, bt, float(lon), offset)
-        precision = "exact_true_solar"
-    else:
-        true_solar = __import__("datetime").datetime.combine(bd, bt)
-        meta = None
-        precision = "date_noon_proxy" if not known else "legal_time_no_longitude"
-    eight = Solar.fromYmdHms(true_solar.year, true_solar.month, true_solar.day, true_solar.hour, true_solar.minute, true_solar.second).getLunar().getEightChar()
-    try:
-        eight.setSect(2)
-    except Exception:
-        pass
-    year = eight.getYear(); month = eight.getMonth(); day = eight.getDay(); hour = eight.getTime() if known else None
+    effective_lon = float(lon) if known and lon is not None else None
+    natal = _natal_saju_components(bd, bt, offset, effective_lon)
+    pillars = natal["pillars"]
+    day = pillars["day"]
+    precision = (
+        "exact_true_solar" if known and lon is not None
+        else "legal_time_no_longitude" if known
+        else "date_noon_proxy"
+    )
     return {
-        "year": year, "month": month, "day": day, "hour": hour,
+        "year": pillars["year"], "month": pillars["month"], "day": day,
+        "hour": pillars["hour"] if known else None,
         "day_stem": day[:1], "day_branch": day[1:2],
         "precision": precision,
-        "true_solar": meta if known and meta else None,
+        "true_solar": natal["true_solar_meta"] if known and natal["true_solar_meta"] else None,
+        "pillar_boundary_policy": natal["boundary_policy"],
         "time_known": known,
     }
 
