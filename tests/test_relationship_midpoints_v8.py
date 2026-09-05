@@ -5,6 +5,7 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 import pytest
 
 from relationship_western_v1 import (
+    ENGINE_VERSION,
     TROPICAL_MONTH_DAYS,
     _davison_from_profiles,
     _geo_midpoint,
@@ -188,7 +189,7 @@ def test_full_relationship_build_threads_uncorrected_davison_into_marks_and_tert
     )
 
     assert out["ok"] is True
-    assert out["engine"] == "relationship-western-v1.7-midpoint-contract"
+    assert out["engine"] == ENGINE_VERSION
     assert out["composite"]["available"] is True
     assert out["davison"]["available"] is True
     assert out["davison"]["chart"]["variant"] == "uncorrected"
