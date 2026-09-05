@@ -18,8 +18,8 @@ replace_once(
 
 replace_once(
     'api/main.py',
-    '    time_known: bool = True\n    time_source: TimeSource = "unknown"\n',
-    '    time_known: bool | None = None\n    time_source: TimeSource = "unknown"\n',
+    '''class RelationshipProfile(BaseModel):\n    name: str | None = None\n    birth_date: date\n    birth_time: dt_time | None = None\n    time_known: bool = True\n    time_source: TimeSource = "unknown"\n''',
+    '''class RelationshipProfile(BaseModel):\n    name: str | None = None\n    birth_date: date\n    birth_time: dt_time | None = None\n    time_known: bool | None = None\n    time_source: TimeSource = "unknown"\n''',
 )
 
 replace_once(
@@ -34,8 +34,6 @@ replace_once(
     '''    if not user_payload["time_known"] or user_payload["birth_time"] is None:\n        raise HTTPException(status_code=422, detail="user birth_time is required for the relationship engine")\n    # Coordinates are precision inputs, not an all-or-nothing API gate.\n    # Missing coordinates disable angle/house/Davison layers inside the engine\n    # while preserving valid planetary and Saju calculations.\n    if cp_payload["time_known"] and cp_payload["birth_time"] is None:\n        raise HTTPException(status_code=422, detail="counterpart birth_time is required when time_known=true")\n\n    if request.analysis_mode == "marriage_married" and request.relationship_status != "married":\n        raise HTTPException(status_code=422, detail="analysis_mode=marriage_married requires relationship_status=married")\n    if request.analysis_mode == "marriage_unmarried" and request.relationship_status == "married":\n        raise HTTPException(status_code=422, detail="analysis_mode=marriage_unmarried cannot be used with relationship_status=married")\n\n    segments = _month_segments(request.start_date, request.end_date)\n''',
 )
 
-# Remove an accidental no-op assertion from the probe test now that the real
-# axis-level probability contract is asserted immediately below it.
 replace_once(
     'tests/test_relationship_api_e2e_v15.py',
     '    assert result["reunion_dimensions"]["event_probability"] if False else True\n',
