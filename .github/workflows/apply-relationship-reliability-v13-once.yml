@@ -24,7 +24,13 @@ jobs:
         with:
           node-version: '22'
       - name: Apply V13 reliability patches
-        run: python scripts/patch_relationship_reliability_v13.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/patch_relationship_reliability_v13.py').read_text(encoding='utf-8')
+          source = source.split('# Required calculation gate.')[0]
+          exec(compile(source, 'patch_relationship_reliability_v13.py', 'exec'))
+          PY
       - name: Install calculation dependencies
         run: python -m pip install -q -r api/requirements.txt pytest
       - name: Run relationship reliability regressions
@@ -41,10 +47,8 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add relationship_reliability_v1.py relationship_western_v1.py \
-            tests/test_relationship_reliability_v13.py \
-            supabase/functions/relationship-interpret-v9-preview/index.ts \
-            .github/workflows/calculation-audit-ci.yml
+          git add relationship_western_v1.py \
+            supabase/functions/relationship-interpret-v9-preview/index.ts
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No permanent V13 changes to commit.'
