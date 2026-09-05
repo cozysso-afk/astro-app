@@ -1,5 +1,5 @@
 name: Audit Integrated Fortune E2E V11 Once
-
+# rerun after legacy version assertion fix
 on:
   push:
     branches:
