@@ -124,3 +124,8 @@ def test_house_axes_and_placidus_cusps_are_identical_across_product_paths(case):
         assert _angular_delta_deg(integrated_cusp, marriage_cusp) <= 1e-5, (
             f"{case['name']} cusp {index}: integrated={integrated_cusp} marriage={marriage_cusp}"
         )
+
+
+def test_ruleset_protection_intentional_failure():
+    """Intentional red test used only to prove required-check merge blocking."""
+    assert False, "intentional protection test: this PR must not be mergeable"
