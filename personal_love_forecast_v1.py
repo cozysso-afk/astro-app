@@ -22,9 +22,9 @@ from personal_marriage_v1 import (
     _positions,
     _utc_datetime,
 )
-from relationship_reliability_v1 import decorate_aspect
+from relationship_reliability_v1 import decorate_aspect, sensitivity_scan_spec
 
-ENGINE_VERSION = "personal-love-western-v1.3-secondary-daily-peak"
+ENGINE_VERSION = "personal-love-western-v1.4-birth-time-safe-progression"
 YEAR_DAYS = 365.2422
 PersonalLoveMode = Literal["personal_love_forecast", "new_relationship"]
 
@@ -338,13 +338,119 @@ def _transit_rows(start_date: date, end_date: date, utc_offset_hours: float, nat
     return {"major": major_rows, "daily": daily_rows}
 
 
-def _progressed_positions(natal: dict, target_date: date, utc_offset_hours: float) -> dict:
-    """Mean day-for-year secondary progression: one ephemeris day equals one tropical year."""
+def _progression_birth_time_policy(natal: dict) -> dict:
+    reliability = natal["time_reliability"]
+    if bool(reliability.get("time_exact")):
+        return {
+            "mode": "exact_full_progression",
+            "production_sources": ["Sun", "Moon", "Venus"],
+            "allow_birth_time_sensitive_targets": True,
+            "convergence_eligible": True,
+            "date_precision": "exact_birth_time",
+            "diagnostic_scan": None,
+        }
+
+    if bool(reliability.get("time_available")):
+        source = str(reliability.get("time_source") or "unknown")
+        confidence = str(reliability.get("time_confidence") or "unknown")
+        credible_approximation = (
+            source in {"official_record", "family_memory", "user_estimate", "rectified"}
+            and confidence in {"high", "medium", "low"}
+        )
+        return {
+            "mode": "provisional_stable_planets_only",
+            "production_sources": ["Sun", "Venus"],
+            "allow_birth_time_sensitive_targets": False,
+            "convergence_eligible": credible_approximation,
+            "date_precision": "provisional_clock_time_stable_planets_only",
+            "diagnostic_scan": sensitivity_scan_spec(reliability),
+        }
+
+    return {
+        "mode": "unknown_time_date_only_proxy",
+        "production_sources": ["Sun", "Venus"],
+        "allow_birth_time_sensitive_targets": False,
+        "convergence_eligible": False,
+        "date_precision": "date_only_proxy_not_convergence_eligible",
+        "diagnostic_scan": {
+            "window_minutes": 720,
+            "step_minutes": None,
+            "shifts_minutes": [-720, 0, 719],
+            "policy": "unknown birth time uses local-midnight/noon/end-of-day anchors for diagnostic longitude spread only",
+        },
+    }
+
+
+def _progression_production_inputs(natal: dict, progressed: dict) -> tuple[dict, dict, dict]:
+    policy = _progression_birth_time_policy(natal)
+    sources = {
+        name: info for name, info in progressed.items()
+        if name in policy["production_sources"]
+    }
+    if policy["allow_birth_time_sensitive_targets"]:
+        targets = natal["targets"]
+    else:
+        targets = {
+            name: info for name, info in natal["targets"].items()
+            if not bool(info.get("birth_time_sensitive"))
+        }
+    return sources, targets, policy
+
+
+def _progressed_positions_shifted(
+    natal: dict,
+    target_date: date,
+    utc_offset_hours: float,
+    shift_minutes: int = 0,
+) -> dict:
+    """Mean day-for-year positions after shifting the birth clock for sensitivity diagnostics."""
+    shift_days = float(shift_minutes) / 1440.0
+    shifted_natal_utc = natal["natal_utc"] + timedelta(minutes=int(shift_minutes))
+    shifted_natal_jd = float(natal["natal_jd"]) + shift_days
     target_utc = _local_noon_utc(target_date, utc_offset_hours)
-    age_years = max(0.0, (target_utc - natal["natal_utc"]).total_seconds() / 86400.0 / YEAR_DAYS)
-    progressed_jd = natal["natal_jd"] + age_years
+    age_years = max(0.0, (target_utc - shifted_natal_utc).total_seconds() / 86400.0 / YEAR_DAYS)
+    progressed_jd = shifted_natal_jd + age_years
     positions = _positions(progressed_jd, include_moon=bool(natal["time_reliability"]["time_available"]))
     return {name: positions[name] for name in ("Sun", "Moon", "Venus") if name in positions}
+
+
+def _progressed_positions(natal: dict, target_date: date, utc_offset_hours: float) -> dict:
+    """Mean day-for-year secondary progression: one ephemeris day equals one tropical year."""
+    return _progressed_positions_shifted(natal, target_date, utc_offset_hours, shift_minutes=0)
+
+
+def _progression_time_uncertainty(natal: dict, target_date: date, utc_offset_hours: float) -> dict | None:
+    policy = _progression_birth_time_policy(natal)
+    scan = policy.get("diagnostic_scan")
+    if not scan:
+        return None
+    shifts = list(scan.get("shifts_minutes") or [])
+    if 0 not in shifts:
+        shifts.append(0)
+    shifts = sorted(set(int(value) for value in shifts))
+    samples = {
+        shift: _progressed_positions_shifted(natal, target_date, utc_offset_hours, shift_minutes=shift)
+        for shift in shifts
+    }
+    center = samples.get(0) or {}
+    variation = {}
+    for planet, center_info in center.items():
+        values = [sample[planet]["longitude"] for sample in samples.values() if planet in sample]
+        if values:
+            variation[planet] = round(
+                max(_angle_distance(float(value), float(center_info["longitude"])) for value in values),
+                3,
+            )
+    return {
+        "date": target_date.isoformat(),
+        "mode": policy["mode"],
+        "date_precision": policy["date_precision"],
+        "convergence_eligible": policy["convergence_eligible"],
+        "shifts_minutes": shifts,
+        "max_longitude_variation_deg": variation,
+        "diagnostic_only": True,
+        "policy": scan.get("policy"),
+    }
 
 
 def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float, natal: dict) -> list[dict]:
@@ -353,17 +459,53 @@ def _progression_rows(start_date: date, end_date: date, utc_offset_hours: float,
     cursor = start_date
     while cursor <= end_date:
         progressed = _progressed_positions(natal, cursor, utc_offset_hours)
+        production_sources, production_targets, policy = _progression_production_inputs(natal, progressed)
         hits = _contact_rows(
-            progressed,
-            natal["targets"],
+            production_sources,
+            production_targets,
             source_layer="secondary",
             source_weights=PROGRESSED_PLANET_WEIGHTS,
             source_exact=bool(natal["time_reliability"]["time_exact"]),
             target_exact=bool(natal["time_reliability"]["time_exact"]),
         )
+        diagnostic_hits: list[dict] = []
+        if not bool(natal["time_reliability"]["time_exact"]) and bool(natal["time_reliability"]["time_available"]):
+            all_hits = _contact_rows(
+                progressed,
+                natal["targets"],
+                source_layer="secondary",
+                source_weights=PROGRESSED_PLANET_WEIGHTS,
+                source_exact=False,
+                target_exact=False,
+            )
+            production_keys = {
+                (
+                    str(hit.get("source") or ""),
+                    str(hit.get("aspect") or ""),
+                    str(hit.get("target_physical_key") or hit.get("target") or ""),
+                )
+                for hit in hits
+            }
+            for hit in all_hits:
+                key = (
+                    str(hit.get("source") or ""),
+                    str(hit.get("aspect") or ""),
+                    str(hit.get("target_physical_key") or hit.get("target") or ""),
+                )
+                if key in production_keys:
+                    continue
+                if hit.get("source") == "Moon" or bool(hit.get("birth_time_sensitive_basis")):
+                    row = dict(hit)
+                    row["diagnostic_only"] = True
+                    row["production_excluded_reason"] = "birth_time_sensitive_secondary_progression"
+                    diagnostic_hits.append(row)
         row = _layer_day_row(cursor, hits)
         row["calendar_month"] = cursor.strftime("%Y-%m")
         row["progression_key"] = "mean_day_for_year"
+        row["birth_time_policy"] = policy["mode"]
+        row["date_precision"] = policy["date_precision"]
+        row["convergence_eligible"] = bool(policy["convergence_eligible"])
+        row["diagnostic_time_sensitive_hits"] = diagnostic_hits[:6]
         rows.append(row)
         cursor += timedelta(days=1)
     return rows
@@ -397,7 +539,7 @@ def _merge_evidence(*groups: list[dict], limit: int = 8) -> list[dict]:
     return out
 
 
-def _progression_months(rows: list[dict]) -> list[dict]:
+def _progression_months(rows: list[dict], natal: dict, utc_offset_hours: float) -> list[dict]:
     grouped: dict[str, list[dict]] = {}
     for row in rows:
         grouped.setdefault(row["calendar_month"], []).append(row)
@@ -409,18 +551,43 @@ def _progression_months(rows: list[dict]) -> list[dict]:
         partnership_score = float(partner_peak["partnership_activation"])
         new_evidence = _dimension_evidence(new_peak, "new_connection") if new_score > 0 else []
         partner_evidence = _dimension_evidence(partner_peak, "partnership") if partnership_score > 0 else []
+        new_sensitivity = (
+            _progression_time_uncertainty(natal, date.fromisoformat(new_peak["date"]), utc_offset_hours)
+            if new_score > 0 else None
+        )
+        partner_sensitivity = (
+            new_sensitivity
+            if partner_peak["date"] == new_peak["date"] and new_sensitivity is not None
+            else (
+                _progression_time_uncertainty(natal, date.fromisoformat(partner_peak["date"]), utc_offset_hours)
+                if partnership_score > 0 else None
+            )
+        )
+        convergence_eligible = bool(new_peak.get("convergence_eligible") and partner_peak.get("convergence_eligible"))
+        date_precision = str(new_peak.get("date_precision") or partner_peak.get("date_precision") or "unknown")
+        diagnostic_hits = _merge_evidence(
+            list(new_peak.get("diagnostic_time_sensitive_hits") or []),
+            list(partner_peak.get("diagnostic_time_sensitive_hits") or []),
+        )
         out.append({
             "calendar_month": month,
             "new_connection_activation": round(new_score, 1),
             "new_connection_band": _band(new_score),
             "new_connection_peak_date": new_peak["date"] if new_score > 0 else None,
+            "new_connection_peak_date_precision": date_precision,
             "new_connection_evidence": new_evidence,
+            "new_connection_birth_time_sensitivity": new_sensitivity,
             "partnership_activation": round(partnership_score, 1),
             "partnership_band": _band(partnership_score),
             "partnership_peak_date": partner_peak["date"] if partnership_score > 0 else None,
+            "partnership_peak_date_precision": str(partner_peak.get("date_precision") or date_precision),
             "partnership_evidence": partner_evidence,
+            "partnership_birth_time_sensitivity": partner_sensitivity,
             "hits": _merge_evidence(new_evidence, partner_evidence),
+            "diagnostic_time_sensitive_hits": diagnostic_hits,
             "sampling": "daily_peak_within_calendar_month",
+            "birth_time_policy": new_peak.get("birth_time_policy"),
+            "convergence_eligible": convergence_eligible,
             "event_probability": "not_calculated",
         })
     return out
@@ -450,6 +617,7 @@ def _summary(rows: list[dict], key: str) -> dict:
 def _progression_summary(months: list[dict], dimension: str) -> dict:
     key = f"{dimension}_activation"
     peak_key = f"{dimension}_peak_date"
+    precision_key = f"{dimension}_peak_date_precision"
     evidence_key = f"{dimension}_evidence"
     if not months:
         return {"average": 0.0, "band": "low", "top_dates": [], "event_probability": "not_calculated"}
@@ -465,9 +633,11 @@ def _progression_summary(months: list[dict], dimension: str) -> dict:
             continue
         selected.append({
             "date": peak_date,
+            "date_precision": row.get(precision_key),
             "calendar_month": row["calendar_month"],
             "score": row[key],
             "band": _band(float(row[key])),
+            "convergence_eligible": bool(row.get("convergence_eligible")),
             "evidence": row.get(evidence_key, [])[:3],
         })
         if len(selected) >= 8:
@@ -502,7 +672,7 @@ def _convergence(major_months: list[dict], progression_months: list[dict], daily
     out = []
     for major in major_months:
         progress = progress_by_month.get(major["calendar_month"])
-        if not progress:
+        if not progress or not bool(progress.get("convergence_eligible")):
             continue
         dimensions = []
         for name, key in (("new_connection", "new_connection_activation"), ("partnership", "partnership_activation")):
@@ -521,8 +691,9 @@ def _convergence(major_months: list[dict], progression_months: list[dict], daily
             "dimensions": dimensions,
             "independent_layers": ["major_transit", "secondary_progression"],
             "layer_count": 2,
+            "progression_birth_time_policy": progress.get("birth_time_policy"),
             "daily_transit_support": daily_support,
-            "policy": "convergence requires independent higher-priority major-transit and secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
+            "policy": "convergence requires independent higher-priority major-transit and birth-time-eligible secondary-progression layers; fast daily transits may support timing but never create convergence by themselves",
         })
     return out
 
@@ -553,9 +724,10 @@ def build_personal_love_forecast(
     major_rows = transit_layers["major"]
     daily_rows = transit_layers["daily"]
     progression_daily_rows = _progression_rows(start_date, end_date, utc_offset_hours, natal)
-    progression_months = _progression_months(progression_daily_rows)
+    progression_months = _progression_months(progression_daily_rows, natal, utc_offset_hours)
     major_months = _monthly_summary(major_rows)
     daily_months = _monthly_summary(daily_rows)
+    progression_policy = _progression_birth_time_policy(natal)
 
     static_structure = {
         "scope": "single_person_natal_only",
@@ -586,7 +758,8 @@ def build_personal_love_forecast(
                 "months": progression_months,
                 "daily_samples": progression_daily_rows,
                 "progression_key": {"method": "mean_day_for_year", "year_days": YEAR_DAYS},
-                "policy": "secondary progression uses mean day-for-year mapping and scans every requested calendar day; monthly activation is the strongest daily peak and is never a midpoint proxy or numerically merged into transit indices",
+                "birth_time_policy": progression_policy,
+                "policy": "secondary progression uses mean day-for-year mapping and scans every requested calendar day. Exact birth time uses Sun/Moon/Venus and all eligible natal targets. Provisional time scores only stable Sun/Venus to birth-time-stable natal targets while Moon-sensitive contacts remain diagnostic-only. Unknown or arbitrary birth-time basis cannot create convergence.",
             },
             "major_transits": {
                 "new_connection": _summary(major_rows, "new_connection_activation"),
@@ -616,6 +789,7 @@ def build_personal_love_forecast(
             "score_semantics": "astrology activation index only",
             "physical_target_deduplication": "same natal body serving multiple semantic roles is scored once using the maximum applicable role weight; all roles remain in evidence",
             "secondary_progression_sampling": "mean day-for-year positions are scanned daily; monthly values use the strongest real daily peak so a mid-month sample is never presented as an exact progression date",
+            "secondary_progression_birth_time_safety": "provisional birth times exclude progressed Moon and birth-time-sensitive natal targets from production progression scores; those contacts remain diagnostic-only. Unknown or arbitrary birth-time bases may show approximate stable-planet progression but are not convergence-eligible.",
             "layer_priority": ["natal_structure", "secondary_progression", "major_transit", "daily_transit"],
             "layer_mixing": "forbidden; convergence is categorical repetition across independent layers, not a summed score",
         },
