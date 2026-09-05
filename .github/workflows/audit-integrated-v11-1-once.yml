@@ -1,0 +1,40 @@
+name: Audit Integrated Fortune V11.1 Once
+
+on:
+  push:
+    branches:
+      - fix/integrated-fortune-v11-1-fallback-contract
+    paths:
+      - '.github/workflows/audit-integrated-v11-1-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/integrated-fortune-v11-1-fallback-contract
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V11.1 fallback contract patch
+        run: python scripts/patch_integrated_fortune_v11_1.py
+      - name: Run V11/V11.1 interpretation contracts
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v21-preview/index.ts
+      - name: Commit permanent V11.1 files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts \
+            supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          git diff --cached --check
+          git commit -m 'fix(ai): align integrated fortune fallback evidence contract V11.1'
+          git push origin HEAD:fix/integrated-fortune-v11-1-fallback-contract
