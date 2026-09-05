@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { checkAppAccess, installAuthenticatedApiFetch } from './lib/auth'
 import {
+  countCurrentCloudRecords,
   getSupabaseSession,
   isPermanentEmailSession,
   linkAnonymousSessionToEmail,
@@ -33,6 +34,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState('')
   const [token, setToken] = useState('')
   const [otpKind, setOtpKind] = useState<OtpKind>('email')
+  const [pendingAnonymousUserId, setPendingAnonymousUserId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -53,6 +55,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     installAuthenticatedApiFetch()
     setSession(nextSession)
     setEmail(nextSession.user.email ?? '')
+    setPendingAnonymousUserId(null)
     setError('')
     setStage('allowed')
   }
@@ -95,19 +98,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       const current = session ?? await getSupabaseSession()
       if (current?.user?.is_anonymous) {
+        setPendingAnonymousUserId(current.user.id)
         try {
           await linkAnonymousSessionToEmail(normalized)
           setOtpKind('email_change')
-          setNotice('기존 기록 계정을 유지하면서 이메일을 연결하고 있어. 메일로 받은 6자리 코드를 입력해줘.')
+          setNotice('기존 기록 계정 ID를 유지하면서 이메일을 연결하고 있어. 메일로 받은 6자리 코드를 입력해줘.')
         } catch (linkError) {
           if (!existingEmailError(linkError)) throw linkError
+          const cloudRecordCount = await countCurrentCloudRecords()
+          if (cloudRecordCount > 0) {
+            throw new Error(`이 기기의 익명 계정에 클라우드 기록 ${cloudRecordCount}건이 있어서 기존 이메일 계정으로 자동 전환하지 않았어. 기록 이전을 먼저 확인해야 해.`)
+          }
+          setPendingAnonymousUserId(null)
           await signOutSupabase()
           setSession(null)
           await requestEmailOtp(normalized)
           setOtpKind('email')
-          setNotice('이미 연결된 계정이야. 메일로 받은 6자리 코드를 입력해줘.')
+          setNotice('이미 연결된 계정이야. 이 익명 계정에는 저장 기록이 없어 안전하게 기존 이메일 계정으로 로그인해. 메일로 받은 6자리 코드를 입력해줘.')
         }
       } else {
+        setPendingAnonymousUserId(null)
         await requestEmailOtp(normalized)
         setOtpKind('email')
         setNotice('메일로 받은 6자리 코드를 입력해줘.')
@@ -135,6 +145,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
         ? await verifyEmailChangeOtp(email, token)
         : await verifyEmailOtp(email, token)
       if (!nextSession) throw new Error('인증 세션을 만들지 못했어.')
+      if (otpKind === 'email_change' && pendingAnonymousUserId && nextSession.user.id !== pendingAnonymousUserId) {
+        throw new Error('이메일 연결 뒤 사용자 ID가 달라졌어. 기존 기록 보호를 위해 앱 진입을 중단했어.')
+      }
       await authorize(nextSession)
     } catch (err) {
       setError(authMessage(err))
@@ -148,6 +161,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       await signOutSupabase()
       setSession(null)
+      setPendingAnonymousUserId(null)
       setToken('')
       setNotice('로그아웃했어.')
       setStage('email')
