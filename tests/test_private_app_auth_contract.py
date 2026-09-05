@@ -14,16 +14,25 @@ def test_web_auth_does_not_create_new_anonymous_users():
     assert "pendingAnonymousUserId" in gate_source
     assert "nextSession.user.id !== pendingAnonymousUserId" in gate_source
     assert "cloudRecordCount > 0" in gate_source
+    assert "onAuthStateChange" not in gate_source
 
 
 def test_private_api_wrapper_guards_every_v1_route_and_fails_closed():
     source = (ROOT / "api/private_app.py").read_text(encoding="utf-8")
-    assert 'request.url.path.startswith("/v1/")' in source
+    assert 'path.startswith("/v1/")' in source
     assert "status_code=401" in source
     assert "status_code=403" in source
     assert "status_code=503" in source
     assert '@app.get("/v1/auth/me")' in source
     assert "/rest/v1/app_access" in source
+
+
+def test_private_api_hides_fastapi_schema_routes():
+    source = (ROOT / "api/private_app.py").read_text(encoding="utf-8")
+    assert '"/openapi.json"' in source
+    assert '"/docs"' in source
+    assert '"/redoc"' in source
+    assert "status_code=404" in source
 
 
 def test_access_allowlist_is_rls_protected_without_enabling_paid_guard_too_early():
