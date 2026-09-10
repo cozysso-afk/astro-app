@@ -2,6 +2,7 @@ import { CheckCircle2, MapPin, Save, User } from 'lucide-react'
 
 import type { BirthProfile, Gender } from './appTypes'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
+import { BirthTimeReliabilityFields } from './BirthTimeReliabilityFields'
 
 type ProfileViewProps = {
   birthProfile: BirthProfile
@@ -18,6 +19,7 @@ export function ProfileView({ birthProfile, profileSaved, onChange, onSave }: Pr
       <label className="field field-wide"><span>이름 / 닉네임</span><input value={birthProfile.name} onChange={(event)=>onChange({...birthProfile,name:event.target.value})} placeholder="선택 입력"/></label>
       <label className="field birth-date-field"><span>생년월일</span><input type="date" value={birthProfile.birthDate} onChange={(event)=>onChange({...birthProfile,birthDate:event.target.value})}/></label>
       <label className="field birth-time-field"><span>출생시간</span><input type="time" value={birthProfile.birthTime} onChange={(event)=>onChange({...birthProfile,birthTime:event.target.value})}/></label>
+      <BirthTimeReliabilityFields value={birthProfile} onChange={(patch)=>onChange({...birthProfile,...patch})}/>
       <label className="field field-wide"><span>성별 · 사주 대운 계산 기준</span><select value={birthProfile.gender} onChange={(event)=>onChange({...birthProfile,gender:event.target.value as Gender})}><option value="female">여성</option><option value="male">남성</option></select></label>
       <KoreaBirthplaceSelector value={birthProfile} onChange={(location)=>onChange({...birthProfile,...location})}/>
       <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">

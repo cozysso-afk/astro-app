@@ -19,8 +19,11 @@ from datetime import date, datetime, time as dt_time, timedelta, timezone
 import swisseph as swe
 
 from western_house_system_v1 import calculate_quadrant_houses
+from birth_time_reliability_v1 import resolve_birth_time_reliability
+from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
+from reunion_dimension_v1 import DIMENSIONS, daily_dimension_scores, secondary_support
 
-ENGINE_VERSION = "relationship-western-v1.8-timing-timezone-contract"
+ENGINE_VERSION = "relationship-western-v1.11-reunion-dimensions"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -72,12 +75,14 @@ def _transit_orb_limit(planet):
 def _transit_hits(transit_chart, natal_chart, person):
     transits = transit_chart.get("positions") or {}
     targets = _point_map(natal_chart)
+    natal_exact = _chart_time_exact(natal_chart)
     found = []
     for t_name, t_info in transits.items():
         if t_name not in TRANSIT_WEIGHTS:
             continue
         t_lon = float(t_info["lon"])
         orb_limit = _transit_orb_limit(t_name)
+        layer_class = "major_transit" if t_name in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else "daily_transit"
         for target, n_lon in targets.items():
             target_weight = TRANSIT_TARGET_WEIGHTS.get(target, .35)
             dist = _angle_distance(t_lon, float(n_lon))
@@ -88,6 +93,13 @@ def _transit_hits(transit_chart, natal_chart, person):
                 orb_factor = max(0.0, 1.0 - orb / orb_limit)
                 score = 100.0 * TRANSIT_WEIGHTS[t_name] * target_weight * TRANSIT_ASPECT_WEIGHTS[aspect] * orb_factor
                 tone = "supportive" if aspect in SUPPORTIVE else ("challenging" if aspect in CHALLENGING else "mixed")
+                meta = decorate_aspect(
+                    {"a": t_name, "aspect": aspect, "b": target, "orb": round(orb, 3), "tone": tone},
+                    mode=layer_class,
+                    chart_a_exact=True,
+                    chart_b_exact=natal_exact,
+                    orb_limit=orb_limit,
+                )
                 found.append({
                     "person": person,
                     "transit": t_name,
@@ -96,6 +108,13 @@ def _transit_hits(transit_chart, natal_chart, person):
                     "orb": round(orb, 3),
                     "tone": tone,
                     "score": round(score, 1),
+                    "layer_class": layer_class,
+                    "orb_grade": meta["orb_grade"],
+                    "time_sensitivity": meta["time_sensitivity"],
+                    "birth_time_dependency": meta["birth_time_dependency"],
+                    "evidence_confidence": meta["evidence_confidence"],
+                    "layer_priority": meta["layer_priority"],
+                    "event_probability": "not_calculated",
                 })
     found.sort(key=lambda x: (-x["score"], x["orb"]))
     return found[:10]
@@ -178,6 +197,75 @@ def _relationship_directional_context(rows, start_date, end_date):
     }
 
 
+def _dimension_timing_stat(rows, dimension, score_key, label):
+    adapted = []
+    for row in rows:
+        value = ((row.get("dimensions") or {}).get(dimension) or {}).get(score_key)
+        if isinstance(value, (int, float)):
+            adapted.append({"date": row["date"], "value": float(value)})
+    return _relationship_timing_stat(adapted, "value", label) if adapted else None
+
+
+def _reunion_dimension_context(rows, start_date, end_date):
+    labels = {
+        "contact_recontact": "연락·재접촉 활성지수 · 사건 발생 확률 아님",
+        "emotional_reactivation": "감정·관계 재활성지수 · 실제 속마음/사건 확률 아님",
+        "relationship_rebuilding": "관계 재구축 지원 활성지수 · 실제 재결합/장기지속 확률 아님",
+    }
+    months = {}
+    for row in rows:
+        months.setdefault(row["date"][:7], []).append(row)
+
+    result = {}
+    for dimension in DIMENSIONS:
+        monthly = []
+        for month_key, month_rows in sorted(months.items()):
+            monthly.append({
+                "calendar_month": month_key,
+                "start": month_rows[0]["date"],
+                "end": month_rows[-1]["date"],
+                "incoming": _dimension_timing_stat(month_rows, dimension, "counterpart_score", labels[dimension]),
+                "outgoing": _dimension_timing_stat(month_rows, dimension, "user_score", labels[dimension]),
+                "reconnection": _dimension_timing_stat(month_rows, dimension, "score", labels[dimension]),
+            })
+        ranked = sorted(
+            rows,
+            key=lambda row: -float(((row.get("dimensions") or {}).get(dimension) or {}).get("score") or 0.0),
+        )
+        top_evidence = []
+        for row in ranked:
+            data = (row.get("dimensions") or {}).get(dimension) or {}
+            if float(data.get("score") or 0.0) <= 0:
+                continue
+            day = date.fromisoformat(row["date"])
+            if any(abs((day - date.fromisoformat(existing["date"])).days) <= 1 for existing in top_evidence):
+                continue
+            top_evidence.append({
+                "date": row["date"],
+                "score": data.get("score", 0.0),
+                "user_score": data.get("user_score", 0.0),
+                "counterpart_score": data.get("counterpart_score", 0.0),
+                "user_evidence": list(data.get("user_evidence") or [])[:2],
+                "counterpart_evidence": list(data.get("counterpart_evidence") or [])[:2],
+                "event_probability": "not_calculated",
+            })
+            if len(top_evidence) >= 8:
+                break
+        result[dimension] = {
+            "incoming": _dimension_timing_stat(rows, dimension, "counterpart_score", labels[dimension]),
+            "outgoing": _dimension_timing_stat(rows, dimension, "user_score", labels[dimension]),
+            "reconnection": _dimension_timing_stat(rows, dimension, "score", labels[dimension]),
+            "months": monthly,
+            "top_evidence": top_evidence,
+            "event_probability": "not_calculated",
+        }
+    return {
+        **result,
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "policy": "contact/recontact, emotional reactivation, and relationship rebuilding support are orthogonal transit-activation dimensions. Each keeps incoming/outgoing/reconnection directions separate. No overall reunion score or event probability is calculated.",
+    }
+
+
 def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
     rows = []
     cursor = start_date
@@ -190,6 +278,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         cp_score = _side_trigger_score(cp_hits)
         shared_bonus = 8.0 if user_score >= 35 and cp_score >= 35 else 0.0
         combined = round(min(100.0, user_score * .45 + cp_score * .55 + shared_bonus), 1)
+        dimensions = daily_dimension_scores(user_hits, cp_hits)
         rows.append({
             "date": cursor.isoformat(),
             "score": combined,
@@ -197,6 +286,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
             "counterpart_score": cp_score,
             "shared_activation": bool(user_score >= 25 and cp_score >= 25),
             "hits": (cp_hits[:3] + user_hits[:3])[:6],
+            "dimensions": dimensions,
         })
         cursor += timedelta(days=1)
 
@@ -228,6 +318,7 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         "top_days": top_days,
         "top_months": top_months[:12],
         "directional_context": _relationship_directional_context(rows, start_date, end_date),
+        "dimensions": _reunion_dimension_context(rows, start_date, end_date),
     }
 
 
@@ -323,19 +414,144 @@ def _chart_from_jd(jd, lat=None, lon=None, include_moon=True, include_angles=Tru
 
 
 def _profile_chart(profile, allow_unknown_time=False):
-    time_known = bool(profile.get("time_known", True))
+    reliability = resolve_birth_time_reliability(profile)
+    time_available = bool(reliability["time_available"])
     bt = profile.get("birth_time")
-    if not time_known or bt is None:
+    using_noon_proxy = False
+    if not time_available or bt is None:
         if not allow_unknown_time:
             return None
         bt = dt_time(12, 0)
+        using_noon_proxy = True
     jd = _jd_from_utc(_utc_datetime(profile["birth_date"], bt, profile.get("utc_offset_hours", 9.0)))
-    return _chart_from_jd(
+    chart = _chart_from_jd(
         jd,
         profile.get("latitude"), profile.get("longitude"),
-        include_moon=time_known,
-        include_angles=time_known and profile.get("latitude") is not None and profile.get("longitude") is not None,
+        include_moon=time_available,
+        include_angles=bool(
+            reliability["time_exact"]
+            and profile.get("latitude") is not None
+            and profile.get("longitude") is not None
+        ),
     )
+    chart["time_reliability"] = reliability
+    chart["time_basis"] = "local_noon_proxy" if using_noon_proxy else "entered_birth_time"
+    if time_available and not reliability["time_exact"]:
+        chart["time_sensitive_points_omitted"] = ["ASC", "DSC", "MC", "IC", "quadrant_houses"]
+    elif not time_available:
+        chart["time_sensitive_points_omitted"] = ["Moon", "ASC", "DSC", "MC", "IC", "quadrant_houses"]
+    return chart
+
+
+def _chart_time_exact(chart):
+    reliability = chart.get("time_reliability") or {}
+    return bool(reliability.get("time_exact"))
+
+
+def _diagnostic_profile_chart(profile, shift_minutes):
+    reliability = resolve_birth_time_reliability(profile)
+    if not reliability.get("time_available") or profile.get("birth_time") is None:
+        return None
+    base = datetime.combine(profile["birth_date"], profile["birth_time"]) + timedelta(minutes=int(shift_minutes))
+    jd = _jd_from_utc(_utc_datetime(base.date(), base.time(), profile.get("utc_offset_hours", 9.0)))
+    chart = _chart_from_jd(
+        jd,
+        profile.get("latitude"),
+        profile.get("longitude"),
+        include_moon=True,
+        include_angles=profile.get("latitude") is not None and profile.get("longitude") is not None,
+    )
+    chart["time_reliability"] = reliability
+    chart["time_basis"] = "diagnostic_sensitivity_candidate"
+    chart["diagnostic_only"] = True
+    chart["shift_minutes"] = int(shift_minutes)
+    chart["candidate_local"] = base.isoformat(timespec="minutes")
+    return chart
+
+
+def _birth_time_sensitivity_scan(variable_profile, fixed_chart, variable_side):
+    reliability = resolve_birth_time_reliability(variable_profile)
+    spec = sensitivity_scan_spec(reliability)
+    if spec is None:
+        reason = "verified exact birth time; diagnostic scan not required" if reliability.get("time_exact") else "no concrete birth time available to scan"
+        return {"available": False, "reason": reason, "time_reliability": reliability}
+
+    samples = []
+    occurrences = {}
+    center_rows = {}
+    center_angles = {}
+    for shift in spec["shifts_minutes"]:
+        candidate = _diagnostic_profile_chart(variable_profile, shift)
+        if candidate is None:
+            continue
+        aspects = _aspects(candidate, fixed_chart, mode="natal", limit=200) if variable_side == "a" else _aspects(fixed_chart, candidate, mode="natal", limit=200)
+        sample_angles = {key: value for key, value in (candidate.get("angles") or {}).items() if key in {"ASC", "DSC", "MC", "IC"}}
+        if shift == 0:
+            center_angles = sample_angles
+        samples.append({
+            "shift_minutes": int(shift),
+            "candidate_local": candidate["candidate_local"],
+            "angles": sample_angles,
+            "aspect_count": len(aspects),
+        })
+        for aspect in aspects:
+            sig = aspect_signature(aspect)
+            occurrences.setdefault(sig, []).append((int(shift), aspect))
+            if shift == 0:
+                center_rows[sig] = aspect
+
+    sample_count = len(samples)
+    contacts = []
+    for sig, entries in occurrences.items():
+        if not sample_count:
+            continue
+        ratio = len(entries) / sample_count
+        representative = center_rows.get(sig) or min((row for _, row in entries), key=lambda row: row["orb"])
+        row = dict(representative)
+        row.update({
+            "sample_hits": len(entries),
+            "sample_count": sample_count,
+            "presence_ratio": round(ratio, 3),
+            "scan_class": classify_scan_ratio(ratio),
+            "min_orb": round(min(float(item["orb"]) for _, item in entries), 3),
+            "max_orb": round(max(float(item["orb"]) for _, item in entries), 3),
+            "center_present": sig in center_rows,
+            "diagnostic_only": True,
+        })
+        contacts.append(row)
+
+    rank = {"robust": 0, "sensitive": 1, "fragile": 2}
+    contacts.sort(key=lambda row: (rank[row["scan_class"]], -row["presence_ratio"], row["orb"]))
+
+    angle_variation = {}
+    for key, center in center_angles.items():
+        values = [sample.get("angles", {}).get(key) for sample in samples if sample.get("angles", {}).get(key) is not None]
+        if values:
+            angle_variation[key] = round(max(_angle_distance(float(value), float(center)) for value in values), 3)
+
+    warnings = []
+    fragile_center_angles = [
+        row for row in contacts
+        if row.get("center_present") and row.get("time_sensitivity") == "fragile" and row.get("scan_class") != "robust"
+    ]
+    if fragile_center_angles:
+        warnings.append("entered-time angle contacts vary materially across the scan window; they are diagnostic only and excluded from production angle/house scoring until exact birth time is verified")
+
+    return {
+        "available": True,
+        "time_reliability": reliability,
+        "window_minutes": spec["window_minutes"],
+        "step_minutes": spec["step_minutes"],
+        "sample_count": sample_count,
+        "samples": samples,
+        "robust_contacts": [row for row in contacts if row["scan_class"] == "robust"][:24],
+        "sensitive_contacts": [row for row in contacts if row["scan_class"] == "sensitive"][:24],
+        "fragile_contacts": [row for row in contacts if row["scan_class"] == "fragile"][:24],
+        "angle_variation_deg": angle_variation,
+        "warnings": warnings,
+        "policy": spec["policy"],
+        "event_probability": "not_calculated",
+    }
 
 
 def _point_map(chart):
@@ -361,22 +577,32 @@ def _orb_limit(p1, p2, mode):
 def _aspects(chart_a, chart_b, mode="natal", limit=40):
     a = _point_map(chart_a); b = _point_map(chart_b)
     found = []
+    a_exact = _chart_time_exact(chart_a)
+    b_exact = _chart_time_exact(chart_b)
     for p1, l1 in a.items():
         for p2, l2 in b.items():
             dist = _angle_distance(l1, l2)
             best = None
+            limit_value = _orb_limit(p1, p2, mode)
             for name, exact in ASPECTS.items():
                 orb = abs(dist - exact)
-                if orb <= _orb_limit(p1, p2, mode) and (best is None or orb < best[0]):
+                if orb <= limit_value and (best is None or orb < best[0]):
                     best = (orb, name, exact)
             if best:
                 orb, name, exact = best
                 tone = "supportive" if name in SUPPORTIVE else ("challenging" if name in CHALLENGING else "mixed")
-                found.append({
+                row = {
                     "a": p1, "aspect": name, "b": p2,
                     "orb": round(orb, 3), "distance": round(dist, 3), "exact_angle": exact, "tone": tone,
-                })
-    found.sort(key=lambda x: (x["orb"], 0 if x["a"] in {"Sun", "Moon", "Venus", "Mars", "ASC", "DSC"} else 1))
+                }
+                found.append(decorate_aspect(
+                    row,
+                    mode=mode,
+                    chart_a_exact=a_exact,
+                    chart_b_exact=b_exact,
+                    orb_limit=limit_value,
+                ))
+    found.sort(key=lambda x: (x["layer_priority"], x["orb"], 0 if x["a"] in {"Sun", "Moon", "Venus", "Mars", "ASC", "DSC"} else 1))
     return found[:limit]
 
 
@@ -390,7 +616,12 @@ def _midpoint_chart(chart_a, chart_b):
     for key in ("ASC", "MC", "DSC", "IC"):
         if key in aa and key in ab:
             angles[key] = round(_mid_angle(aa[key], ab[key]), 6)
-    return {"positions": positions, "angles": angles, "method": "shortest-arc midpoint of corresponding points"}
+    return {
+        "positions": positions,
+        "angles": angles,
+        "method": "shortest-arc midpoint of corresponding points",
+        "time_reliability": {"time_exact": bool(_chart_time_exact(chart_a) and _chart_time_exact(chart_b))},
+    }
 
 
 def _secondary_progressed_chart(profile, target_dt, include_angles=False):
@@ -400,7 +631,10 @@ def _secondary_progressed_chart(profile, target_dt, include_angles=False):
     jd = _jd_from_utc(birth_utc) + progressed_days
     # Planetary secondary progressions are astronomical day-for-year positions.
     # Angles are intentionally omitted here rather than pretending a single disputed angle method.
-    return _chart_from_jd(jd, include_moon=True, include_angles=False)
+    chart = _chart_from_jd(jd, include_moon=True, include_angles=False)
+    chart["time_reliability"] = resolve_birth_time_reliability(profile)
+    chart["time_basis"] = "secondary_progression_from_entered_birth_time"
+    return chart
 
 
 def _geo_midpoint(lat1, lon1, lat2, lon2, variant="uncorrected"):
@@ -555,16 +789,23 @@ def _focus_groups(aspects):
 
 def _summary(aspect_sets):
     flat = []
+    contributing_layers = set()
     for label, aspects in aspect_sets.items():
+        if aspects:
+            contributing_layers.add(label)
         for x in aspects:
             y = dict(x); y["layer"] = label; flat.append(y)
-    flat.sort(key=lambda x: x["orb"])
+    flat.sort(key=lambda x: (x.get("layer_priority", 9), x["orb"]))
     return {
         "exact_contacts": len([x for x in flat if x["orb"] <= 0.5]),
+        "very_tight_contacts": len([x for x in flat if x.get("orb_grade") == "very_tight"]),
+        "strong_contacts": len([x for x in flat if x.get("orb_grade") == "strong"]),
         "supportive_contacts": len([x for x in flat if x["tone"] == "supportive"]),
         "challenging_contacts": len([x for x in flat if x["tone"] == "challenging"]),
+        "independent_layers": len(contributing_layers),
+        "convergence": len(contributing_layers) >= 2,
         "tightest": flat[:10],
-        "note": "contact counts are descriptive aspect counts, not probabilities or a good/bad relationship score",
+        "note": "orb grade and layer priority outrank raw contact count; convergence requires repeated evidence across independent layers and is never an event probability",
     }
 
 
@@ -584,18 +825,30 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "house_system": "Whole Sign + quadrant houses; Placidus primary, explicit Porphyry fallback when Swiss cannot calculate Placidus",
         "secondary_key": "1 ephemeris day = 1 tropical year of life (365.2422 days)",
         "tertiary_key": f"Tertiary I: 1 ephemeris day = {TROPICAL_MONTH_DAYS} life days; completed lunar months",
-        "orb_policy": "natal 3-6° by point; secondary 1.5°; tertiary 1.0°; major aspects + quincunx",
+        "orb_policy": "natal 3-6° by point with very_tight/strong/background grades; secondary 1.5° with narrow-orb priority; tertiary 1.0° supplementary; major aspects + quincunx",
+        "layer_priority": ["natal", "secondary", "major_transit", "daily_transit", "tertiary"],
         "timing_timezone_policy": "user-facing calendar dates use local noon in the user profile fixed utc_offset_hours; numeric 0 is preserved; IANA/DST inference is not performed",
         "limitations": [],
     }
 
-    user_exact = bool(user_profile.get("birth_time") is not None and user_profile.get("latitude") is not None and user_profile.get("longitude") is not None)
-    cp_exact = bool(counterpart_profile.get("time_known") and counterpart_profile.get("birth_time") is not None and counterpart_profile.get("latitude") is not None and counterpart_profile.get("longitude") is not None)
+    user_reliability = resolve_birth_time_reliability(user_profile)
+    cp_reliability = resolve_birth_time_reliability(counterpart_profile)
+    user_available = bool(user_reliability["time_available"])
+    cp_available = bool(cp_reliability["time_available"])
+    user_exact = bool(user_reliability["time_exact"] and user_profile.get("latitude") is not None and user_profile.get("longitude") is not None)
+    cp_exact = bool(cp_reliability["time_exact"] and counterpart_profile.get("latitude") is not None and counterpart_profile.get("longitude") is not None)
+    result["birth_time_reliability"] = {"user": user_reliability, "counterpart": cp_reliability}
 
-    user_natal = _profile_chart(user_profile, allow_unknown_time=False)
+    user_natal = _profile_chart(user_profile, allow_unknown_time=True)
     cp_natal = _profile_chart(counterpart_profile, allow_unknown_time=True)
     if user_natal is None or cp_natal is None:
         return {"ok": False, "error": "natal chart inputs unavailable", "engine": ENGINE_VERSION}
+
+    result["sensitivity_scan"] = {
+        "user": _birth_time_sensitivity_scan(user_profile, cp_natal, "a"),
+        "counterpart": _birth_time_sensitivity_scan(counterpart_profile, user_natal, "b"),
+        "policy": "non-exact entered times are scanned diagnostically; scan-only angle/house candidates never enter production scores",
+    }
 
     fallback_labels = []
     for label, chart in (("user", user_natal), ("counterpart", cp_natal)):
@@ -610,11 +863,25 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         )
 
     natal_aspects = _aspects(user_natal, cp_natal, mode="natal")
+    if cp_exact:
+        natal_precision_note = "Counterpart birth time is provenance-verified exact; planets and angles are available."
+    elif cp_available:
+        natal_precision_note = "Counterpart entered birth time is available but not verified exact; planetary positions including Moon use the entered clock time, while ASC/DSC/MC/IC and houses are omitted."
+    else:
+        natal_precision_note = "Counterpart birth time is unknown; Moon and angles are excluded and remaining planets use local noon as a non-exact proxy."
     result["natal_synastry"] = {
         "available": True,
+        "user_time_available": user_available,
+        "user_time_exact": user_exact,
+        "partner_time_available": cp_available,
         "partner_time_exact": cp_exact,
+        "user_time_reliability": user_reliability,
+        "partner_time_reliability": cp_reliability,
         "aspects": natal_aspects,
-        "note": "If partner birth time is unknown, partner Moon and angles are excluded; remaining planets use local noon and should be treated as lower precision near orb boundaries." if not cp_exact else "Both birth times/locations available; planets and angles included.",
+        "robust_aspects": [row for row in natal_aspects if row.get("time_sensitivity") == "robust"],
+        "conditional_aspects": [row for row in natal_aspects if row.get("time_sensitivity") == "medium"],
+        "time_sensitive_aspects": [row for row in natal_aspects if row.get("time_sensitivity") in {"sensitive", "fragile"}],
+        "note": natal_precision_note,
     }
     result["relationship_focus"] = {
         "available": True,
@@ -626,17 +893,18 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "user_in_counterpart": _house_overlays(user_natal, cp_natal, "user", "counterpart"),
         "counterpart_in_user": _house_overlays(cp_natal, user_natal, "counterpart", "user"),
         "precision_note": (
-            "Both exact birth times/places required. Unknown partner time disables partner-house overlays rather than estimating them."
-            if not cp_exact else (
-                "Exact-time Whole Sign + Porphyry polar fallback house overlays available."
-                if fallback_labels else "Exact-time Whole Sign + Placidus house overlays available."
-            )
+            "Exact-time Whole Sign + Porphyry polar fallback house overlays available."
+            if user_exact and cp_exact and fallback_labels else
+            "Exact-time Whole Sign + Placidus house overlays available."
+            if user_exact and cp_exact else
+            "House overlays require provenance-verified exact birth times for both people. Entered but unverified times are preserved for provisional planet layers, not promoted to exact houses."
         ),
     }
     result["composite"] = {
         "available": True,
         "chart": _midpoint_chart(user_natal, cp_natal),
-        "note": "Mathematical midpoint composite. Partner angles/Moon are omitted when partner time is unknown.",
+        "precision": "exact" if user_exact and cp_exact else ("provisional" if user_available and cp_available else "time_unknown"),
+        "note": "Mathematical midpoint composite. Unverified entered times may support provisional planetary midpoints but never exact angles/houses; unknown time omits Moon and angles.",
     }
 
     result["analysis_mode"] = analysis_mode
@@ -650,6 +918,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         )
         result["relationship_transits"] = transit_layer
         result["reunion_transits"] = transit_layer
+        result["reunion_dimensions"] = transit_layer["dimensions"]
 
     davison = marks_a = marks_b = None
     if user_exact and cp_exact:
@@ -666,7 +935,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     else:
         result["davison"] = {"available": False, "reason": "Davison requires exact birth time and coordinates for both people."}
         result["marks"] = {"available": False, "reason": "Marks charts require the exact-time Davison base chart."}
-        result["limitations"].append("Partner exact birth time/place missing: Davison, Marks and Marks tertiary progression are disabled rather than estimated.")
+        result["limitations"].append("Provenance-verified exact birth time/place missing for one or both people: Davison, Marks and Marks tertiary progression are disabled rather than estimated.")
 
     monthly = []
     for seg_start, seg_end in month_segments:
@@ -675,15 +944,16 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         row = {"calendar_month": f"{seg_start.year}-{seg_start.month:02d}", "representative_date": rep_date.isoformat()}
         layer_aspects = {}
 
-        if cp_exact:
+        if user_available and cp_available:
             up = _secondary_progressed_chart(user_profile, target)
             cp = _secondary_progressed_chart(counterpart_profile, target)
+            progressed_precision = "exact" if user_exact and cp_exact else "provisional"
             ps = {
                 "user_progressed_to_partner_natal": _aspects(up, cp_natal, mode="secondary", limit=24),
                 "partner_progressed_to_user_natal": _aspects(cp, user_natal, mode="secondary", limit=24),
                 "progressed_to_progressed": _aspects(up, cp, mode="secondary", limit=24),
             }
-            row["progressed_synastry"] = {"available": True, **ps}
+            row["progressed_synastry"] = {"available": True, "precision": progressed_precision, **ps}
             layer_aspects.update({f"progressed_synastry.{k}": v for k, v in ps.items()})
 
             prog_comp = _midpoint_chart(up, cp)
@@ -691,14 +961,15 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             pc_aspects = _aspects(prog_comp, natal_comp, mode="secondary", limit=24)
             row["progressed_composite"] = {
                 "available": True,
+                "precision": progressed_precision,
                 "chart": prog_comp,
                 "to_natal_composite_aspects": pc_aspects,
                 "method": "secondary-progress both natal charts to target date, then midpoint corresponding progressed points",
             }
             layer_aspects["progressed_composite_to_natal_composite"] = pc_aspects
         else:
-            row["progressed_synastry"] = {"available": False, "reason": "Exact partner birth time required for reliable progressed synastry."}
-            row["progressed_composite"] = {"available": False, "reason": "Exact partner birth time required for progressed composite."}
+            row["progressed_synastry"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed synastry."}
+            row["progressed_composite"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed composite."}
 
         if marks_a is not None and marks_b is not None:
             mt_a, n_a = _tertiary_progressed_chart(marks_a, target)
@@ -720,12 +991,27 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             row["marks_tertiary"] = {"available": False, "reason": "Exact-time Marks base charts unavailable."}
 
         row["signal_summary"] = _summary(layer_aspects)
+        if analysis_mode == "reunion":
+            row["reunion_secondary_support"] = secondary_support(row)
         monthly.append(row)
 
     result["months"] = monthly
+    if analysis_mode == "reunion":
+        result["reunion_secondary_support"] = {
+            "months": [
+                {"calendar_month": row["calendar_month"], "representative_date": row["representative_date"], "dimensions": row.get("reunion_secondary_support")}
+                for row in monthly
+            ],
+            "policy": "secondary progressed synastry and progressed composite are higher-priority timing evidence and remain separate from daily transit activation scores; Marks/Tertiary stays supplementary and is not folded into these primary dimension supports",
+            "event_probability": "not_calculated",
+        }
     result["interpretation_policy"] = {
         "static": "Natal synastry/composite/Davison/Marks describe different relationship structures and must not be collapsed into one score.",
         "timing": "Secondary progressed synastry/progressed composite and Marks Tertiary-I are timing layers. Repeated tight contacts across independent layers may be called convergence, never event certainty.",
+        "layer_priority": "Interpret in this order: natal structure > secondary progression > major/medium-term transit > fast daily transit > tertiary/Marks supplementary. A tertiary-only hit cannot overturn higher-layer evidence.",
+        "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
+        "reunion_dimensions": "For reunion mode keep three orthogonal outcomes separate: contact/recontact activation, emotional/relationship reactivation, and relationship-rebuilding support. Within every dimension keep incoming, outgoing and reconnection separate. Never collapse them into one reunion score.",
+        "birth_time": "An entered clock time is not automatically an exact birth time. Provisional times may support planetary layers, while angles/houses/Davison/Marks require provenance-verified exact time.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }
     return result
