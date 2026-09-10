@@ -27,9 +27,11 @@ jobs:
         run: |
           npm ci
           npm run build -- --base=/astro-app/mobile/
-      - name: Publish into Pages-served tree
+      - name: Publish generated mobile build to review branch
         shell: bash
         run: |
+          set -euo pipefail
+          BRANCH="deploy/mobile-pages-${GITHUB_SHA:0:12}"
           rm -rf mobile
           mkdir -p mobile
           cp -R web/dist/. mobile/
@@ -41,6 +43,7 @@ jobs:
             echo 'Mobile build is already current.'
             exit 0
           fi
-          git commit -m 'deploy: refresh mobile frontend on GitHub Pages'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git checkout -B "$BRANCH"
+          git commit -m 'deploy: refresh mobile frontend on GitHub Pages [skip render]'
+          git push --force-with-lease origin "HEAD:refs/heads/$BRANCH"
+          echo "Mobile review branch: $BRANCH"
