@@ -13,3 +13,8 @@ test('residue audit catches time and house leaks',()=>{assert.equal(auditProvisi
 test('packet metadata is Western-only in provisional',()=>{const p=attachPrecisionPacketMetadata({saju:{x:1},thai:{x:1},evidence_ledger:[{ref:'W:window:1'},{ref:'W:planet:1'}]},{precision:provisional});assert.equal(p.precision_mode,'provisional');assert.equal(p.saju,null);assert.equal(p.thai,null);assert.deepEqual(p.evidence_ledger,[{ref:'W:planet:1'}])})
 test('final provisional output strips cross-system claims',()=>{const out=sanitizeProvisionalInterpretationOutput({overall:{summary:'Western flow. Thai says X.',dominant_pattern:'사주 흐름. stable.'},systems:{western:'ok',saju:'bad',thai:'bad'},cross_checks:[{mode:'복수체계',saju:'x',thai:'y',synthesis:'Thai match'}]});assert.equal(out.systems.saju,'');assert.equal(out.systems.thai,'');assert.equal(out.cross_checks[0].mode,'Western단독');assert.doesNotMatch(out.overall.summary,/Thai/)})
 test('transit Moon to robust natal planet remains allowed',()=>{assert.equal(auditProvisionalResidue({evidence:[{kind:'aspect',transit:'Moon',target:'Venus',text:'Moon→Venus trine'}]}).ok,true)})
+test('date-scoped western reference IDs are not mistaken for HH:MM clock evidence',()=>{
+  const packet={key_dates:[{western_refs:['W:daily:2026-09-10:10','W:date:2026-09-10:연애:best']}]}
+  assert.equal(auditProvisionalResidue(packet).ok,true)
+  assert.equal(auditProvisionalResidue({text:'정확한 시각 10:10'}).ok,false)
+})

@@ -63,6 +63,10 @@ function walk(value:any,path:string,visit:(value:any,path:string)=>void) {
   else if (value && typeof value === 'object') Object.entries(value).forEach(([k,v])=>walk(v,path?`${path}.${k}`:k,visit))
 }
 
+function isSafeWesternReference(value:string) {
+  return /^W:(?:daily|date):\d{4}-\d{2}-\d{2}:[^:\s]+(?::(?:best|\d+))?$/.test(value)
+}
+
 export function auditProvisionalResidue(value:any) {
   const violations:string[]=[]
   walk(value,'',(node,path)=>{
@@ -70,6 +74,9 @@ export function auditProvisionalResidue(value:any) {
     if (['asc','mc','house_system','whole_house','placidus_house','quadrant_house','quadrant_system','sample_time'].includes(leaf) && node != null) violations.push(path)
     if (leaf === 'target' && SENSITIVE_TARGETS.has(String(node ?? ''))) violations.push(path)
     if (typeof node === 'string') {
+      // These are opaque, date-scoped evidence IDs. In particular,
+      // W:daily:2026-09-10:10 contains the substring "10:10", but no clock time.
+      if (isSafeWesternReference(node)) return
       if (/\b(?:Whole Sign|Placidus|Porphyry)\b/i.test(node)) violations.push(path)
       if (/\b(?:ASC|MC)\b/.test(node)) violations.push(path)
       if (/\b\d{1,2}H\b/.test(node)) violations.push(path)
