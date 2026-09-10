@@ -47,6 +47,8 @@ export function sanitizeProvisionalCalculation(calculation:any) {
   out.thai={ok:false,provisional_excluded_from_ai:true}
   if (!out.western || typeof out.western !== 'object') out.western={}
   out.western.natal={asc:null,mc:null,house_system:null,precision_note:'provisional birth-time-sensitive layers excluded'}
+  out.western.score_policy='provisional planet-only relative flow; birth-time-sensitive natal layers excluded'
+  out.western.method='provisional planet-only period sampling; exact clock timing excluded'
   out.western.detail_days=[]
   out.western.key_dates=[]
   if (Array.isArray(out.western.daily_scores)) out.western.daily_scores=out.western.daily_scores.map((day:any)=>({...day,evidence:sanitizeEvidence(day?.evidence)}))
