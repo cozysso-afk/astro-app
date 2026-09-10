@@ -14,7 +14,8 @@ const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
-const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.5-integrated-precision-v2'
+const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
+const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
 
 function stableStringify(value: unknown): string {
@@ -114,6 +115,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
+    precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
     precision: calculation.precision ?? null,
     model, request,
     api_version: calculation.api_version, engine: calculation.engine, period,
