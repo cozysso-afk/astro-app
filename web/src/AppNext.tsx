@@ -362,7 +362,9 @@ function archiveSaveMessage(result: ArchiveSaveResult, label: string) {
 }
 
 function fortuneAiErrorLooksUnsafe(text: string) {
-  return /authorization\s*:|\baccess[_-]?token\b|\bapi[_-]?key\b|\bapikey\b|\bservice[_-]?role\b|\bbearer\s+[a-z0-9\-._~+/]+=*|\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(sk-|sb_secret_|sb_publishable_)[A-Za-z0-9_\-]+/i.test(text)
+  const credentialMarker = /authorization\s*:|\b(?:access|refresh|id)?[_-]?token\s*[:=]|\b(?:x-)?api[_-]?key\s*[:=]|\bapikey\s*[:=]|\b(?:client[_-]?secret|password|passwd|cookie|set-cookie|service[_-]?role)\s*[:=]|\b(?:request[_ -]?)?headers?\s*:|\bbearer\s+[a-z0-9\-._~+/]+=*|\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b(sk-|sb_secret_|sb_publishable_)[A-Za-z0-9_\-]+/i
+  const secretQuery = /https?:\/\/\S*(?:[?&]|%3[fF]|%26)[^#\s&]*(?:token|key|secret|password|signature|credential|code)(?:=|%3[dD])/i
+  return credentialMarker.test(text) || secretQuery.test(text)
 }
 
 function safeFortuneAiErrorString(value: unknown) {
