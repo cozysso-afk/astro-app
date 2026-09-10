@@ -38,27 +38,6 @@ Deno.serve(async(req)=>{
   const packetAudit=auditProvisionalResidue(packet);
   if(!packetAudit.ok)return res({ok:false,error:"AI 패킷 2차 정밀도 감사에서 시간민감 잔여물이 발견돼 차단했어.",precision_residue:packetAudit.violations,gemini_paid_call:false},409);
   if(body?.action==="inspect")return res({ok:true,interpreter_version:VERSION,precision_mode:"provisional",gemini_paid_call:false,payload_bytes:new TextEncoder().encode(JSON.stringify(packet)).byteLength});
-  if(body?.action==="diagnose-start"){
-    const report:any={ok:false,authenticated:false,deterministic_generation:"not_run",final_audit:"not_run",db_read:"not_run",failing_stage:null,gemini_paid_call:false};
-    const user=await currentUser(req);
-    if(!user)return res({...report,failing_stage:"currentUser"},401);
-    report.authenticated=true;
-    let raw:any;
-    try{raw=buildLocalQualityFallbackCore(packet);report.deterministic_generation="pass";}
-    catch(e){return res({...report,deterministic_generation:"fail",failing_stage:"buildLocalQualityFallbackCore",error_class:e instanceof Error?e.name:"Error",error_message:(e instanceof Error?e.message:String(e)).slice(0,240)},500);}
-    let finalData:any;
-    try{finalData=sanitizeProvisionalInterpretationOutput(raw);}
-    catch(e){return res({...report,failing_stage:"sanitizeProvisionalInterpretationOutput",error_class:e instanceof Error?e.name:"Error",error_message:(e instanceof Error?e.message:String(e)).slice(0,240)},500);}
-    const finalAudit=auditProvisionalResidue(finalData);
-    if(!finalAudit.ok)return res({...report,final_audit:"fail",failing_stage:"final_audit",precision_residue:finalAudit.violations},409);
-    report.final_audit="pass";
-    try{
-      const hash=await payloadHash(packet);const kind=`${VERSION}:${hash.slice(0,32)}`;const a=admin();
-      const {data:cached,error}=await a.from("ai_interpret_jobs").select("id").eq("user_id",user.id).eq("kind",kind).eq("status","done").order("completed_at",{ascending:false}).limit(1).maybeSingle();
-      if(error)return res({...report,db_read:"fail",failing_stage:"db_read",db_error_code:String(error.code??"unknown")},500);
-      return res({...report,ok:true,db_read:"pass",failing_stage:null,cache_hit:Boolean(cached?.id)},200);
-    }catch(e){return res({...report,db_read:"fail",failing_stage:"db_read",error_class:e instanceof Error?e.name:"Error",error_message:(e instanceof Error?e.message:String(e)).slice(0,240)},500);}
-  }
   if(body?.action!=="start")return res({ok:false,error:"지원하지 않는 action이야.",gemini_paid_call:false},400);
   const user=await currentUser(req);if(!user)return res({ok:false,error:"인증 세션이 필요해.",gemini_paid_call:false},401);
   try{
