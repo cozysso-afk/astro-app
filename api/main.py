@@ -13,8 +13,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
-from integrated_fortune_v1 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
-from integrated_fortune_v1 import build_integrated_fortune
+from integrated_fortune_precision_v2 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
+from integrated_fortune_precision_v2 import build_integrated_fortune_precision_v2, build_precision_contract
 from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
@@ -24,7 +24,7 @@ from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERS
 from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.7-purpose-separated-love"
+APP_VERSION = "api-fortune-v5.8-integrated-precision-v2"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -199,6 +199,33 @@ def _calc_request_key(payload: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+_REQUIRED_INTEGRATED_PROVENANCE = {"time_known", "time_source", "time_confidence"}
+
+
+def _integrated_precision(profile: FortuneProfile) -> dict:
+    missing = sorted(_REQUIRED_INTEGRATED_PROVENANCE - set(profile.model_fields_set))
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail="출생시간 정밀도 정보를 보내지 않는 이전 앱 요청이야. 앱을 새로고침한 뒤 다시 계산해.",
+        )
+    reliability = resolve_birth_time_reliability({
+        "birth_time": profile.birth_time,
+        "time_known": profile.time_known,
+        "time_source": profile.time_source,
+        "time_confidence": profile.time_confidence,
+        "rectified_window": profile.rectified_window,
+    })
+    if reliability["status"] == "unknown":
+        raise HTTPException(
+            status_code=422,
+            detail="integrated-precision-v2 phase 1 requires an entered birth_time; unknown birth time is not supported",
+        )
+    precision = build_precision_contract(reliability)
+    precision["rectified_window"] = reliability.get("rectified_window")
+    return precision
+
+
 def _month_segments(start_date: date, end_date: date) -> list[tuple[date, date]]:
     if end_date < start_date:
         raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
@@ -246,7 +273,7 @@ def _run_calc_job(job_id: str, payload: dict):
             percent = int(round((completed / max(1, total)) * 100))
             _set_job(_calc_jobs, _calc_jobs_lock, job_id, progress={"completed": completed, "total": total, "percent": percent, "stage": stage})
         try:
-            result = build_integrated_fortune(**payload, progress_callback=on_progress)
+            result = build_integrated_fortune_precision_v2(**payload, progress_callback=on_progress)
             _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="done", progress={"completed": total_days, "total": total_days, "percent": 100, "stage": "done"}, result=result)
         except Exception as exc:  # noqa: BLE001
             _set_job(_calc_jobs, _calc_jobs_lock, job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
@@ -338,6 +365,8 @@ def location_fit(request: LocationFitRequest) -> dict:
 
 
 def _personal_love_response(request: PersonalLoveRequest, mode: Literal["personal_love_forecast", "new_relationship"]) -> dict:
+    if request.profile.time_known is True and request.profile.birth_time is None:
+        raise HTTPException(status_code=422, detail="profile birth_time is required when time_known=true")
     profile_payload = request.profile.engine_payload()
     try:
         result = build_personal_love_forecast(
@@ -458,8 +487,9 @@ def relationship_western(request: RelationshipRequest) -> dict:
 @app.post("/v1/fortune/integrated")
 def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
     profile = request.profile
+    precision = _integrated_precision(profile)
     with _calc_semaphore:
-        return build_integrated_fortune(
+        return build_integrated_fortune_precision_v2(
             birth_date=profile.birth_date,
             birth_time=profile.birth_time,
             latitude=profile.latitude,
@@ -468,6 +498,7 @@ def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
             gender=profile.gender,
             start_date=request.start_date,
             end_date=request.end_date,
+            precision=precision,
         )
 
 
@@ -475,6 +506,7 @@ def fortune_integrated(request: IntegratedFortuneRequest) -> dict:
 def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
     _prune_jobs(_calc_jobs, _calc_jobs_lock)
     profile = request.profile
+    precision = _integrated_precision(profile)
     payload = {
         "birth_date": profile.birth_date,
         "birth_time": profile.birth_time,
@@ -484,6 +516,7 @@ def fortune_integrated_start(request: IntegratedFortuneRequest) -> dict:
         "gender": profile.gender,
         "start_date": request.start_date,
         "end_date": request.end_date,
+        "precision": precision,
     }
     request_key = _calc_request_key(payload)
     with _calc_jobs_lock:
