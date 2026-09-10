@@ -6,8 +6,13 @@ const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? DEFAULT_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? DEFAULT_SUPABASE_PUBLISHABLE_KEY
 
+// Resolve the browser fetch at invocation time so the narrow precision transport
+// guard installed before React render also applies to Supabase Edge calls.
+const dynamicFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)
+
 // Only the browser-safe publishable key is used here. Never put a secret/service-role key in Vite client code.
 export const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: { fetch: dynamicFetch },
   auth: {
     persistSession: true,
     autoRefreshToken: true,

@@ -1,3 +1,5 @@
+import { applyIntegratedPrecisionToRequest, fortuneAiPrecisionReadiness } from './precisionTransport'
+
 export type CacheKind = 'fortune-calculation' | 'fortune-ai' | 'relationship-ai'
 
 type CacheRecord<T = unknown> = {
@@ -11,8 +13,9 @@ type CacheRecord<T = unknown> = {
 const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
-const FORTUNE_CALC_CACHE_CONTRACT = 'full-daily-evidence-v3'
+const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
 const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
+const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
 
 function stableStringify(value: unknown): string {
@@ -64,9 +67,14 @@ async function transact<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore)
       })
     }
     return result
-  } finally {
-    db.close()
-  }
+  } finally { db.close() }
+}
+
+function calculationPayloadPrecisionValid(kind: CacheKind, payload: unknown) {
+  if (kind !== 'fortune-calculation') return true
+  const value = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null
+  const result = value?.result
+  return fortuneAiPrecisionReadiness(result).ok
 }
 
 export async function readReadingCache<T>(id: string): Promise<T | null> {
@@ -74,43 +82,29 @@ export async function readReadingCache<T>(id: string): Promise<T | null> {
   try {
     const record = await transact<CacheRecord<T> | undefined>('readonly', (store)=>store.get(id))
     if (!record) return null
-    if (record.expiresAt <= Date.now()) {
+    if (record.expiresAt <= Date.now() || !calculationPayloadPrecisionValid(record.kind, record.payload)) {
       void deleteReadingCache(id)
       return null
     }
     return record.payload
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
 export async function writeReadingCache<T>(id: string, kind: CacheKind, payload: T, ttlDays: number): Promise<void> {
   if (typeof indexedDB === 'undefined') return
+  if (!calculationPayloadPrecisionValid(kind, payload)) return
   const now = Date.now()
-  const record: CacheRecord<T> = {
-    id,
-    kind,
-    savedAt: now,
-    expiresAt: now + Math.max(1, ttlDays) * 86400000,
-    payload,
-  }
-  try {
-    await transact<IDBValidKey>('readwrite', (store)=>store.put(record))
-  } catch {
-    // Cache failure must never block the reading itself.
-  }
+  const record: CacheRecord<T> = { id, kind, savedAt: now, expiresAt: now + Math.max(1, ttlDays) * 86400000, payload }
+  try { await transact<IDBValidKey>('readwrite', (store)=>store.put(record)) } catch { /* cache is best effort */ }
 }
 
 export async function deleteReadingCache(id: string): Promise<void> {
   if (typeof indexedDB === 'undefined') return
-  try {
-    await transact<undefined>('readwrite', (store)=>store.delete(id) as IDBRequest<undefined>)
-  } catch {
-    // best effort
-  }
+  try { await transact<undefined>('readwrite', (store)=>store.delete(id) as IDBRequest<undefined>) } catch { /* best effort */ }
 }
 
 export function fortuneCalculationCacheId(request: Record<string, unknown>): string {
+  applyIntegratedPrecisionToRequest(request)
   return `fortune-calc:${hashText(stableStringify({ contract: FORTUNE_CALC_CACHE_CONTRACT, request }))}`
 }
 
@@ -121,25 +115,14 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
-    model,
-    request,
-    api_version: calculation.api_version,
-    engine: calculation.engine,
-    period,
-    western_engine: western.engine,
-    overall: western.overall,
-    relationship_signals: western.relationship_signals,
-    western_months: western.months,
-    western_detail_days: western.detail_days,
-    western_key_dates: western.key_dates,
-    western_daily_scores: western.daily_scores,
-    saju_engine: saju.engine,
-    saju_annual: saju.annual,
-    saju_monthly: saju.monthly,
-    thai_engine: thai.engine,
-    thai_mahathaksa: thai.mahathaksa,
-    thai_taksajorn: thai.taksajorn,
-    thai_suriyayat: thai.suriyayat,
+    precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
+    precision: calculation.precision ?? null,
+    model, request,
+    api_version: calculation.api_version, engine: calculation.engine, period,
+    western_engine: western.engine, overall: western.overall, relationship_signals: western.relationship_signals,
+    western_months: western.months, western_detail_days: western.detail_days, western_key_dates: western.key_dates, western_daily_scores: western.daily_scores,
+    saju_engine: saju.engine, saju_annual: saju.annual, saju_monthly: saju.monthly,
+    thai_engine: thai.engine, thai_mahathaksa: thai.mahathaksa, thai_taksajorn: thai.taksajorn, thai_suriyayat: thai.suriyayat,
   }
   return `fortune-ai:${hashText(stableStringify(signature))}`
 }

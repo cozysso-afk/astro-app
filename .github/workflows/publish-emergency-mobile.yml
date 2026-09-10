@@ -1,10 +1,13 @@
 name: Publish Emergency Mobile Build
 
-# republish 2026-08-28T15:16Z
 on:
   push:
+    branches:
+      - main
     paths:
+      - 'web/**'
       - '.github/workflows/publish-emergency-mobile.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,6 +37,10 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f mobile
-          git commit -m 'deploy: emergency mobile frontend on GitHub Pages'
+          if git diff --cached --quiet; then
+            echo 'Mobile build is already current.'
+            exit 0
+          fi
+          git commit -m 'deploy: refresh mobile frontend on GitHub Pages'
           git pull --rebase origin main
-          git push
+          git push origin HEAD:main

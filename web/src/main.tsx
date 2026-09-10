@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './AppNext'
+import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
 import './styles.css'
 import './relationship.css'
 import './birthplace.css'
@@ -23,6 +24,8 @@ import './ux-readability-v22.css'
 import './mobile-design-v27.css'
 import './mobile-type-v28.css'
 import './mobile-density-v29.css'
+
+installIntegratedPrecisionFetch()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
