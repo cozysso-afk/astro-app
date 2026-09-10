@@ -64,7 +64,7 @@ function walk(value:any,path:string,visit:(value:any,path:string)=>void) {
 }
 
 function isSafeWesternReference(value:string) {
-  return /^W:(?:daily|date):\d{4}-\d{2}-\d{2}:[^:\s]+(?::(?:best|\d+))?$/.test(value)
+  return /^W:daily:\d{4}-\d{2}-\d{2}:\d+$/.test(value)
 }
 
 export function auditProvisionalResidue(value:any) {
