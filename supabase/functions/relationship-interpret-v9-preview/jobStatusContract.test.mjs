@@ -10,3 +10,6 @@ test('relationship cost-guard job states match ai_interpret_jobs database contra
   assert.doesNotMatch(source, /status:\"pending\"/)
   assert.doesNotMatch(source, /cached\?\.status===\"pending\"/)
 })
+
+// Keep executable boundary coverage in the existing natural CI entrypoint.
+import './publicError.test.mjs'
