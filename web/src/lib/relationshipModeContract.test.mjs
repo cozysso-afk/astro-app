@@ -72,7 +72,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)
-  assert.match(relationshipFn, /server_cache:true/)
+  assert.match(readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts', import.meta.url),'utf8'), /server_cache:true/)
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
@@ -91,3 +91,6 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.6-reunion-compact-evidence/)
 })
+
+// Run the executable browser boundary suite through the existing CI entrypoint.
+import './relationshipAiPublicError.test.mjs'

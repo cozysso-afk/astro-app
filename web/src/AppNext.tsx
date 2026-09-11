@@ -1,3 +1,4 @@
+import { relationshipAiSuccess, relationshipAiInvokeErrorMessage, relationshipAiCatchMessage, RelationshipAiPublicError } from './lib/relationshipAiPublicError'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
@@ -1085,7 +1086,7 @@ export default function AppNext() {
     const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, reunionTiming)
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
-      const cached = await readReadingCache<RelationshipAiResponse>(relationshipCacheId)
+      const cached = relationshipAiSuccess(await readReadingCache<RelationshipAiResponse>(relationshipCacheId))
       if (cached?.ok && cached.data) {
         if (revision !== relationshipRevisionRef.current) return
         setRelationshipAi(annotatePayload(cached))
@@ -1094,26 +1095,16 @@ export default function AppNext() {
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
-      if (error) {
-        let detail = ''
-        const context = (error as { context?: Response }).context
-        if (context) {
-          try {
-            const body = await context.clone().json() as { error?: string }
-            detail = body?.error ?? ''
-          } catch { /* fall back to SDK message */ }
-        }
-        throw new Error(detail || error.message)
-      }
-      const payload = data as RelationshipAiResponse
-      if (!payload?.ok || !payload.data) throw new Error(payload?.error || '관계 AI 해설 응답이 비어 있어.')
+      if (error) throw new RelationshipAiPublicError({error:await relationshipAiInvokeErrorMessage(error)})
+      const payload = relationshipAiSuccess(data)
+      if (!payload) throw new RelationshipAiPublicError(data)
       if (revision !== relationshipRevisionRef.current) return
       const annotated = annotatePayload(payload)
       await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
       setRelationshipAi(annotated)
       setRelationshipAiCacheSource('fresh')
     } catch (error) {
-      if (revision === relationshipRevisionRef.current) setRelationshipAiError(error instanceof Error ? error.message : '관계 AI 해설을 불러오지 못했어.')
+      if (revision === relationshipRevisionRef.current) setRelationshipAiError(relationshipAiCatchMessage(error))
     } finally {
       if (revision === relationshipRevisionRef.current) setRelationshipAiLoading(false)
     }
