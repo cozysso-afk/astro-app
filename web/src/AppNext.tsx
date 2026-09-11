@@ -9,6 +9,7 @@ import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
 import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'
+import { fortuneAiStartErrorMessage } from './lib/fortuneAiStartError'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
@@ -715,6 +716,7 @@ export default function AppNext() {
     if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
+    let startPayload: unknown = null
     try {
       const cached = await readReadingCache<AiInterpretationResponse>(cacheId)
       if (cached?.ok && cached.data) {
@@ -735,6 +737,7 @@ export default function AppNext() {
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
         body: { action: 'start', calculation, model: aiModel },
       })
+      startPayload = data
       if (error) throw error
       if (!data?.ok || !data?.job_id) {
         if (data?.missing_key) setAiConfigured(false)
@@ -754,8 +757,7 @@ export default function AppNext() {
       setAiLoading(false)
       setAiActiveJobId(null)
       aiRequestRef.current = ''
-      const message = error instanceof Error ? error.message : 'AI 해설 요청에 실패했어.'
-      setAiError(message.includes('non-2xx') ? 'AI 해설 서버에서 오류가 발생했어. 설정의 AI 해설 연결 상태를 확인해줘.' : message)
+      setAiError(await fortuneAiStartErrorMessage(error, startPayload))
     }
   }
 
