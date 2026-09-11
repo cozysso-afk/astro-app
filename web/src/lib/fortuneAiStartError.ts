@@ -8,6 +8,9 @@ function normalizedSecurityText(text: string) {
     .replace(/\\u003d/gi, '=')
     .replace(/\\u0026/gi, '&')
     .replace(/\\u003f/gi, '?')
+    .replace(/%3f/gi, '?')
+    .replace(/%26/gi, '&')
+    .replace(/%3d/gi, '=')
 }
 
 export function fortuneAiErrorLooksUnsafe(text: string) {
