@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildLocalQualityFallbackCore, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from './costGuardV21.ts';
 import { TOPICS, REL, validateOutput } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts';
 import { inspectInterpretationQuality } from '../fortune-interpret-v6-preview/qualityV2.ts';
+import { normalizeProxiedFortuneResponse, publicCallTrace, publicFortuneError, publicJobUsage, storedFortuneJobError } from '../_shared/fortuneAiPublicError.ts';
 
 function packet(){
   const overall={},digest={};
@@ -231,6 +232,38 @@ test('V21/V11 runtime preserves paid usage and exposes local fallback instead of
   assert.match(src,/local_quality_fallback:true/);
   assert.match(src,/criticalQualityPassed/);
   assert.match(src,/usage:\{\.\.\.combined,quality_validation:/);
+});
+
+test('V21 public failures and stored failed jobs never retain raw internal error text',()=>{
+  const secret='Authorization: Bearer TEST_SECRET_DO_NOT_EXPOSE';
+  const response=publicFortuneError('JOB_CREATE_FAILED',new Error(secret));
+  const serialized=JSON.stringify(response);
+  assert.equal(response.error_code,'JOB_CREATE_FAILED');
+  assert.equal(response.stage,'db_write');
+  assert.doesNotMatch(serialized,/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
+  assert.equal(storedFortuneJobError('JOB_GENERATION_FAILED'),'AI 해설 생성에 실패했어.');
+
+  const proxied=normalizeProxiedFortuneResponse({ok:true,status:'failed',error:secret,job_id:'job-test',usage:{total_tokens:21,call_trace:[{error:secret}]}},200);
+  assert.equal(proxied.body.error_code,'JOB_GENERATION_FAILED');
+  assert.deepEqual(proxied.body.usage,{total_tokens:21});
+  assert.doesNotMatch(JSON.stringify(proxied),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
+
+  const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+  assert.doesNotMatch(src,/const failed=\{[^\n;]*error:r\.error/);
+  assert.doesNotMatch(src,/status:"failed",error:e instanceof Error/);
+  assert.match(src,/storedFortuneJobError\("JOB_GENERATION_FAILED"\)/);
+  assert.match(src,/data\.status==="failed"\?publicFailedUsage\(data\.usage_json\)/);
+});
+
+test('V21 stored call trace preserves accounting metadata without internal errors',()=>{
+  const secret='Authorization: Bearer TEST_SECRET_DO_NOT_EXPOSE';
+  const trace=publicCallTrace([{call:1,model:'gemini-2.5-flash',kind:'http_error',prompt_bytes:123,elapsed_ms:45,http_status:500,usage:{total_tokens:7},error:secret}]);
+  assert.equal(trace[0].http_status,500);
+  assert.equal(trace[0].usage.total_tokens,7);
+  assert.doesNotMatch(JSON.stringify(trace),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
+  const historical=publicJobUsage({total_tokens:7,call_trace:[{call:1,error:secret}]});
+  assert.equal(historical.total_tokens,7);
+  assert.doesNotMatch(JSON.stringify(historical),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
 });
 
 

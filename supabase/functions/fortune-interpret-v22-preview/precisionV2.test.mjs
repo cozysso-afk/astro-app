@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import fs from 'node:fs'
 import { precisionGateFromPayload, sanitizeProvisionalCalculation, auditProvisionalResidue, attachPrecisionPacketMetadata, sanitizeProvisionalInterpretationOutput } from './precisionV2.ts'
+import { normalizeProxiedFortuneResponse, publicFortuneError } from '../_shared/fortuneAiPublicError.ts'
 
 const exact={contract_version:'integrated-precision-v2',time_available:true,time_exact:true,status:'exact',time_source:'official_record',time_confidence:'exact',scoring_mode:'full_exact',allow_natal_moon_scoring:true,allow_angles_houses_scoring:true,allow_house_ruler_bonus:true,allow_intraday_timing:true,allow_saju_ai:true,allow_thai_ai:true,layer_policy:{natal_moon:'allow',angles_houses:'allow',house_ruler_bonus:'allow',intraday_timing:'allow',saju_ai:'allow',thai_ai:'allow'}}
 const provisional={contract_version:'integrated-precision-v2',time_available:true,time_exact:false,status:'provisional',time_source:'family_memory',time_confidence:'medium',scoring_mode:'planet_only_provisional',allow_natal_moon_scoring:false,allow_angles_houses_scoring:false,allow_house_ruler_bonus:false,allow_intraday_timing:false,allow_saju_ai:false,allow_thai_ai:false,layer_policy:{natal_moon:'exclude',angles_houses:'exclude',house_ruler_bonus:'exclude',intraday_timing:'exclude',saju_ai:'exclude',thai_ai:'exclude'}}
@@ -18,4 +20,30 @@ test('date-scoped western reference IDs are not mistaken for HH:MM clock evidenc
   assert.equal(auditProvisionalResidue(packet).ok,true)
   assert.equal(auditProvisionalResidue({text:'정확한 시각 10:10'}).ok,false)
   assert.equal(auditProvisionalResidue({ref:'W:daily:2026-09-10:ASC'}).ok,false)
+})
+
+test('V22 fixed public failures omit raw exception and residue diagnostics',()=>{
+  const dbFailure=publicFortuneError('PROVISIONAL_DB_WRITE_FAILED',new Error('client_secret=TEST_SECRET_DO_NOT_EXPOSE'),{gemini_paid_call:false})
+  assert.equal(dbFailure.error_code,'PROVISIONAL_DB_WRITE_FAILED')
+  assert.equal(dbFailure.stage,'db_write')
+  assert.equal(dbFailure.error,'AI 해설 저장에 실패했어.')
+  assert.doesNotMatch(JSON.stringify(dbFailure),/TEST_SECRET_DO_NOT_EXPOSE|client_secret/)
+
+  const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8')
+  assert.doesNotMatch(src,/precision_residue/)
+  assert.doesNotMatch(src,/error:\x60[^\x60]*\$\{[^}]*\.message/)
+})
+
+test('V22 proxy boundary normalizes raw V21 errors and failed job payloads',()=>{
+  const raw='Authorization: Bearer TEST_SECRET_DO_NOT_EXPOSE'
+  const non2xx=normalizeProxiedFortuneResponse({ok:false,error:raw},500)
+  assert.equal(non2xx.body.error_code,'UPSTREAM_FAILED')
+  assert.equal(non2xx.body.stage,'upstream')
+  assert.doesNotMatch(JSON.stringify(non2xx),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/)
+
+  const failed=normalizeProxiedFortuneResponse({ok:true,status:'failed',error:raw,job_id:'job-test',usage:{total_tokens:12,call_trace:[{error:raw}]}},200)
+  assert.equal(failed.body.status,'failed')
+  assert.equal(failed.body.error_code,'JOB_GENERATION_FAILED')
+  assert.deepEqual(failed.body.usage,{total_tokens:12})
+  assert.doesNotMatch(JSON.stringify(failed),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/)
 })

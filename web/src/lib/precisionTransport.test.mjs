@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyIntegratedPrecisionToRequest, fortuneAiPrecisionReadiness, precisionModeFromProvenance, sanitizeCalculationForExternalAi, sanitizeExternalFortuneText } from './precisionTransport.ts'
+import { applyIntegratedPrecisionToRequest, fortuneAiPrecisionReadiness, installIntegratedPrecisionFetch, precisionModeFromProvenance, sanitizeCalculationForExternalAi, sanitizeExternalFortuneText } from './precisionTransport.ts'
 
 function exactPrecision(){return {contract_version:'integrated-precision-v2',time_available:true,time_exact:true,status:'exact',time_source:'official_record',time_confidence:'exact',scoring_mode:'full_exact',allow_natal_moon_scoring:true,allow_angles_houses_scoring:true,allow_house_ruler_bonus:true,allow_intraday_timing:true,allow_saju_ai:true,allow_thai_ai:true,layer_policy:{natal_moon:'allow',angles_houses:'allow',house_ruler_bonus:'allow',intraday_timing:'allow',saju_ai:'allow',thai_ai:'allow'}}}
 function provisionalPrecision(){return {contract_version:'integrated-precision-v2',time_available:true,time_exact:false,status:'provisional',time_source:'family_memory',time_confidence:'medium',scoring_mode:'planet_only_provisional',allow_natal_moon_scoring:false,allow_angles_houses_scoring:false,allow_house_ruler_bonus:false,allow_intraday_timing:false,allow_saju_ai:false,allow_thai_ai:false,layer_policy:{natal_moon:'exclude',angles_houses:'exclude',house_ruler_bonus:'exclude',intraday_timing:'exclude',saju_ai:'exclude',thai_ai:'exclude'}}}
@@ -51,4 +51,44 @@ test('provisional clipboard text becomes Western-only and parse failure blocks o
   assert.doesNotMatch(safe,/庚辰|Thursday/)
   const malformed='header\n"contract_version": "integrated-precision-v2"\n"status": "provisional"\n[원본 계산 JSON]\n{oops'
   assert.match(sanitizeExternalFortuneText(malformed),/차단/)
+})
+
+test('active Fortune AI transport rewrites start status and cancel to V22 only', { concurrency:false }, async()=>{
+  const originalWindow=globalThis.window
+  const originalLocation=globalThis.location
+  const originalFetch=globalThis.fetch
+  const calls=[]
+  try{
+    Object.defineProperty(globalThis,'window',{configurable:true,value:globalThis})
+    Object.defineProperty(globalThis,'location',{configurable:true,value:{href:'https://astro-app.test/'}})
+    delete globalThis.__starlightIntegratedPrecisionFetchV2__
+    globalThis.fetch=async(input,init)=>{
+      calls.push({url:typeof input==='string'?input:input.toString(),body:init?.body})
+      return new Response(JSON.stringify({ok:true}),{status:200,headers:{'content-type':'application/json'}})
+    }
+    const dynamicFetch=(input,init)=>globalThis.fetch(input,init)
+    installIntegratedPrecisionFetch()
+    const v21='https://project.supabase.co/functions/v1/fortune-interpret-v21-preview'
+    for(const action of ['start','status','cancel']){
+      const body=action==='start'
+        ? {action,calculation:{precision:provisionalPrecision()}}
+        : {action,job_id:'job-test'}
+      await dynamicFetch(v21,{method:'POST',body:JSON.stringify(body)})
+    }
+    await dynamicFetch('https://project.supabase.co/rest/v1/readings',{method:'GET'})
+    assert.deepEqual(calls.slice(0,3).map(x=>x.url),Array(3).fill('https://project.supabase.co/functions/v1/fortune-interpret-v22-preview'))
+    assert.equal(calls[3].url,'https://project.supabase.co/rest/v1/readings')
+
+    const malformed={url:v21,clone(){throw new Error('cannot clone')}}
+    const blocked=await dynamicFetch(malformed,{method:'POST',body:JSON.stringify({action:'status',job_id:'job-test'})})
+    assert.equal(blocked.status,409)
+    assert.equal(calls.length,4)
+  }finally{
+    globalThis.fetch=originalFetch
+    delete globalThis.__starlightIntegratedPrecisionFetchV2__
+    if(originalWindow===undefined)delete globalThis.window
+    else Object.defineProperty(globalThis,'window',{configurable:true,value:originalWindow})
+    if(originalLocation===undefined)delete globalThis.location
+    else Object.defineProperty(globalThis,'location',{configurable:true,value:originalLocation})
+  }
 })
