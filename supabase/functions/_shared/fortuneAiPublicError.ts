@@ -104,8 +104,26 @@ export function publicCallTrace(value: unknown) {
 }
 
 export function publicJobUsage(value: unknown) {
-  if (!isRecord(value)) return value
-  return { ...value, call_trace: publicCallTrace(value.call_trace) }
+  if (!isRecord(value)) return undefined
+  const out: Record<string, unknown> = {}
+  for (const key of ['prompt_tokens','candidate_tokens','thought_tokens','total_tokens','attempt_count'] as const) {
+    if (Number.isFinite(value[key])) out[key] = Math.max(0, Number(value[key]))
+  }
+  for (const key of ['gemini_paid_call','local_thai_scrub','degraded_quality','local_quality_fallback'] as const) {
+    if (typeof value[key] === 'boolean') out[key] = value[key]
+  }
+  if (typeof value.cost_guard_version === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(value.cost_guard_version)) {
+    out.cost_guard_version = value.cost_guard_version
+  }
+  if (isRecord(value.prompt_budget)) {
+    const budget: Record<string, number> = {}
+    for (const key of ['bytes','max_bytes','estimated_input_tokens'] as const) {
+      if (Number.isFinite(value.prompt_budget[key])) budget[key] = Math.max(0, Number(value.prompt_budget[key]))
+    }
+    if (Object.keys(budget).length) out.prompt_budget = budget
+  }
+  out.call_trace = publicCallTrace(value.call_trace)
+  return out
 }
 
 function failedJobPayload(payload: Record<string, unknown>) {

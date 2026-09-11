@@ -32,8 +32,9 @@ const PUBLIC_MESSAGES: Record<string, string> = {
 }
 
 function decodeEscapesOnce(value: string) {
-  let decoded = value
-  try { decoded = decodeURIComponent(decoded) } catch { /* malformed encoding stays untrusted */ }
+  let decoded = value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (encoded) => {
+    try { return decodeURIComponent(encoded) } catch { return encoded }
+  })
   decoded = decoded
     .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (_, hex) => {
       try { return String.fromCodePoint(Number.parseInt(hex, 16)) } catch { return '' }
@@ -41,7 +42,7 @@ function decodeEscapesOnce(value: string) {
     .replace(/\\u([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
     .replace(/\\x([0-9a-f]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
     .replace(/\\(["'\\])/g, '$1')
-  return decoded.normalize('NFKC').replace(/[\u200B-\u200F\u2060\uFEFF]/g, '')
+  return decoded.normalize('NFKC').replace(/\p{Cf}/gu, '')
 }
 
 function classificationText(text: string) {

@@ -266,6 +266,29 @@ test('V21 stored call trace preserves accounting metadata without internal error
   assert.doesNotMatch(JSON.stringify(historical),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
 });
 
+test('V21 public job usage fails closed for non-object and corrupt historical values',()=>{
+  const secret='Authorization: Bearer TEST_SECRET_DO_NOT_EXPOSE';
+  assert.equal(publicJobUsage(secret),undefined);
+  assert.equal(publicJobUsage(['client_secret=TEST_SECRET_DO_NOT_EXPOSE']),undefined);
+  assert.equal(publicJobUsage(null),undefined);
+
+  const valid=publicJobUsage({
+    prompt_tokens:11,candidate_tokens:7,total_tokens:18,attempt_count:2,
+    local_thai_scrub:true,cost_guard_version:'supabase-ai-v21.4-e2e-evidence',
+    prompt_budget:{bytes:123,max_bytes:456,estimated_input_tokens:31},
+    call_trace:[{call:1,model:'gemini-2.5-flash',kind:'http_error',error:secret}],
+    unexpected_secret:secret,
+  });
+  assert.equal(valid.total_tokens,18);
+  assert.equal(valid.local_thai_scrub,true);
+  assert.equal(valid.cost_guard_version,'supabase-ai-v21.4-e2e-evidence');
+  assert.deepEqual(valid.prompt_budget,{bytes:123,max_bytes:456,estimated_input_tokens:31});
+  assert.doesNotMatch(JSON.stringify({ok:true,status:'done',usage:valid}),/TEST_SECRET_DO_NOT_EXPOSE|Authorization|client_secret/);
+
+  const src=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+  assert.match(src,/data\.status==="failed"\?publicFailedUsage\(data\.usage_json\):publicJobUsage\(data\.usage_json\)/);
+});
+
 
 test('V11 E2E prompt keeps complete bounded Saju baseline/months and Thai limitations',()=>{
   const p=packet();

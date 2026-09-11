@@ -172,6 +172,35 @@ test('fortune start error fails closed for serialized credentials and secret URL
   }
 })
 
+test('fortune percent decoding cannot be poisoned by malformed escapes', async () => {
+  const unsafeErrors = [
+    'client_secret%3Dsecret%ZZ',
+    'authorization%3ABearer%20secret%ZZ',
+    '%ZZauthorization%3ABearer%20secret',
+    'cookie%3Dsession-secret%Q1',
+    '%253Fclient_secret%253Dsecret%ZZ',
+  ]
+  for (const backendError of unsafeErrors) {
+    assert.equal(fortuneAiErrorLooksUnsafe(backendError), true, backendError)
+    const error = functionsError(
+      'FunctionsHttpError',
+      'Edge Function returned a non-2xx status code',
+      functionsResponse(409, { error: backendError }),
+    )
+    assert.equal(await fortuneAiStartErrorMessage(error, null), FORTUNE_AI_START_ERROR_FALLBACK, backendError)
+  }
+  assert.equal(fortuneAiErrorLooksUnsafe('일반 안내의 잘못된 퍼센트 표기 %ZZ는 비밀값이 아니야.'), false)
+})
+
+test('fortune classification strips all Unicode format characters', () => {
+  for (const backendError of [
+    'coo\u2063kie: session=secret',
+    'client\u2063_secret=secret',
+    'auth\u2063orization: Bearer secret',
+    'coo\u200Bkie: session=secret',
+  ]) assert.equal(fortuneAiErrorLooksUnsafe(backendError), true, backendError)
+})
+
 test('fortune public error detector allows harmless security vocabulary without a credential value', () => {
   for (const safe of [
     '인증 세션이 필요해.',
