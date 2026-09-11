@@ -8,6 +8,7 @@ import {
   encodePendingFortuneAiJob,
 } from './fortuneAiJob.ts'
 import { buildInterpretationBrief } from './interpretationSummary.ts'
+import { FORTUNE_AI_START_ERROR_FALLBACK, fortuneAiStartErrorMessage } from './fortuneAiStartError.ts'
 
 function exactRequest() {
   return { profile: { birth_time:'07:26', time_known:true, time_source:'official_record', time_confidence:'exact' }, period:'today' }
@@ -92,4 +93,84 @@ test('brief falls back to headline when all summary candidates are metric-dense'
     priorities: [],
   }))
   assert.equal(brief.flow, '속도를 낮추고 현실 반응을 확인하는 기간')
+})
+
+
+function functionsError(name, message, context) {
+  const error = new Error(message)
+  error.name = name
+  error.context = context
+  return error
+}
+
+function functionsResponse(status, payload, bodyUsed = false) {
+  return {
+    status,
+    bodyUsed,
+    clone() {
+      return { json: async () => payload }
+    },
+    json: async () => payload,
+  }
+}
+
+test('fortune start FunctionsHttpError surfaces a safe V22 message', async () => {
+  const error = functionsError(
+    'FunctionsHttpError',
+    'Edge Function returned a non-2xx status code',
+    functionsResponse(409, { error: '잠정 해설 최종 검사를 통과하지 못했어.' }),
+  )
+  assert.equal(await fortuneAiStartErrorMessage(error, null), '잠정 해설 최종 검사를 통과하지 못했어.')
+})
+
+test('fortune start error fails closed for serialized credentials and secret URLs', async () => {
+  const unsafeErrors = [
+    'authorization: Bearer secret-value',
+    '{"authorization":"Basic abcdefgh"}',
+    '{"cookie":"session=secret"}',
+    '{"apikey":"secret"}',
+    '{"x-api-key":"secret"}',
+    '{"client_secret":"secret"}',
+    '{"password":"secret"}',
+    '{"headers":{"authorization":"Bearer secret"}}',
+    '{\\"authorization\\":\\"Bearer escaped-secret\\"}',
+    'eyJabcdefghijklmnopqrstuvwxyz.ABCDEFGHIJKLMNOPQRST.UVWXYZabcdefghijklmnop',
+    'https://example.test/callback?access_token=secret',
+    'https://example.test/callback%3Fclient_secret%3Dsecret',
+    'sk-secretvalue',
+    'sb_secret_secretvalue',
+    'sb_publishable_secretvalue',
+  ]
+  for (const backendError of unsafeErrors) {
+    const error = functionsError(
+      'FunctionsHttpError',
+      'Edge Function returned a non-2xx status code',
+      functionsResponse(409, { error: backendError }),
+    )
+    assert.equal(
+      await fortuneAiStartErrorMessage(error, null),
+      FORTUNE_AI_START_ERROR_FALLBACK,
+      backendError,
+    )
+  }
+})
+
+test('fortune start uses already-parsed safe invoke data for FunctionsHttpError', async () => {
+  const error = functionsError(
+    'FunctionsHttpError',
+    'Edge Function returned a non-2xx status code',
+    functionsResponse(409, null, true),
+  )
+  assert.equal(
+    await fortuneAiStartErrorMessage(error, { error: '인증이 필요해.' }),
+    '인증이 필요해.',
+  )
+})
+
+test('fortune start does not classify fetch or relay errors with context as HTTP errors', async () => {
+  const context = functionsResponse(409, { error: '이 문구는 노출되면 안 돼.' })
+  const fetchError = functionsError('FunctionsFetchError', 'Edge Function 요청 전송에 실패했어.', context)
+  const relayError = functionsError('FunctionsRelayError', 'Edge Function relay 연결에 실패했어.', context)
+  assert.equal(await fortuneAiStartErrorMessage(fetchError, null), fetchError.message)
+  assert.equal(await fortuneAiStartErrorMessage(relayError, null), relayError.message)
 })
