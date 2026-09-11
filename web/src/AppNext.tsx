@@ -9,7 +9,7 @@ import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
 import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'
-import { fortuneAiStartErrorMessage } from './lib/fortuneAiStartError'
+import { fortuneAiFailedJobMessage, fortuneAiPublicErrorMessage, fortuneAiStartErrorMessage, fortuneAiStatusErrorMessage } from './lib/fortuneAiPublicError'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
 
@@ -676,7 +676,7 @@ export default function AppNext() {
         if (data?.status === 'failed') {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
-          const failedPayload: AiInterpretationResponse = { ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:data?.error || 'AI 해설 서버 작업이 실패했어.' }
+          const failedPayload: AiInterpretationResponse = { ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
           setAiInterpretation(failedPayload)
           throw new Error(failedPayload.error)
         }
@@ -685,8 +685,7 @@ export default function AppNext() {
       setAiError('AI 해석은 서버에서 계속 진행 중이야. 앱을 다시 열면 자동으로 완료 여부를 확인해.')
     } catch (error) {
       if (document.visibilityState === 'hidden') return
-      const message = error instanceof Error ? error.message : 'AI 해설 상태 확인에 실패했어.'
-      setAiError(message.includes('non-2xx') ? 'AI 해설 상태 확인이 잠시 끊겼어. 앱을 다시 열면 이어서 확인해.' : message)
+      setAiError(await fortuneAiStatusErrorMessage(error))
     } finally {
       aiPollRef.current = null
       setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
@@ -741,7 +740,7 @@ export default function AppNext() {
       if (error) throw error
       if (!data?.ok || !data?.job_id) {
         if (data?.missing_key) setAiConfigured(false)
-        throw new Error(data?.error || 'AI 해설 서버 작업을 시작하지 못했어.')
+        throw new Error(fortuneAiPublicErrorMessage(data, 'AI 해설 서버 작업을 시작하지 못했어.'))
       }
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
       setAiActiveJobId(pending.jobId)

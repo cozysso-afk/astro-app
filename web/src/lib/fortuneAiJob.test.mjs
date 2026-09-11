@@ -8,7 +8,16 @@ import {
   encodePendingFortuneAiJob,
 } from './fortuneAiJob.ts'
 import { buildInterpretationBrief } from './interpretationSummary.ts'
-import { FORTUNE_AI_START_ERROR_FALLBACK, fortuneAiStartErrorMessage } from './fortuneAiStartError.ts'
+import {
+  FORTUNE_AI_FAILED_JOB_FALLBACK,
+  FORTUNE_AI_START_ERROR_FALLBACK,
+  FORTUNE_AI_STATUS_ERROR_FALLBACK,
+  fortuneAiErrorLooksUnsafe,
+  fortuneAiFailedJobMessage,
+  fortuneAiPublicErrorMessage,
+  fortuneAiStartErrorMessage,
+  fortuneAiStatusErrorMessage,
+} from './fortuneAiPublicError.ts'
 
 function exactRequest() {
   return { profile: { birth_time:'07:26', time_known:true, time_source:'official_record', time_confidence:'exact' }, period:'today' }
@@ -128,12 +137,20 @@ test('fortune start error fails closed for serialized credentials and secret URL
     'authorization: Bearer secret-value',
     '{"authorization":"Basic abcdefgh"}',
     '{"cookie":"session=secret"}',
+    '{"set-cookie":"sid=secret"}',
     '{"apikey":"secret"}',
     '{"x-api-key":"secret"}',
     '{"client_secret":"secret"}',
     '{"password":"secret"}',
     '{"headers":{"authorization":"Bearer secret"}}',
     '{\\"authorization\\":\\"Bearer escaped-secret\\"}',
+    'authorization%3ABearer%20secret',
+    '%257B%2522headers%2522%253A%257B%2522authorization%2522%253A%2522Bearer%2520secret%2522%257D%257D',
+    '%253Fclient_secret%253Dsecret',
+    '\\u0063ookie: session=secret',
+    '\\u0061uthorization%3ABearer%20secret',
+    'coo\u200Bkie: session=secret',
+    'ａｕｔｈｏｒｉｚａｔｉｏｎ：Bearer secret',
     'eyJabcdefghijklmnopqrstuvwxyz.ABCDEFGHIJKLMNOPQRST.UVWXYZabcdefghijklmnop',
     'https://example.test/callback?access_token=secret',
     'https://example.test/callback%3Fclient_secret%3Dsecret',
@@ -155,6 +172,62 @@ test('fortune start error fails closed for serialized credentials and secret URL
   }
 })
 
+test('fortune percent decoding cannot be poisoned by malformed escapes', async () => {
+  const unsafeErrors = [
+    'client_secret%3Dsecret%ZZ',
+    'authorization%3ABearer%20secret%ZZ',
+    '%ZZauthorization%3ABearer%20secret',
+    'cookie%3Dsession-secret%Q1',
+    '%253Fclient_secret%253Dsecret%ZZ',
+  ]
+  for (const backendError of unsafeErrors) {
+    assert.equal(fortuneAiErrorLooksUnsafe(backendError), true, backendError)
+    const error = functionsError(
+      'FunctionsHttpError',
+      'Edge Function returned a non-2xx status code',
+      functionsResponse(409, { error: backendError }),
+    )
+    assert.equal(await fortuneAiStartErrorMessage(error, null), FORTUNE_AI_START_ERROR_FALLBACK, backendError)
+  }
+  assert.equal(fortuneAiErrorLooksUnsafe('일반 안내의 잘못된 퍼센트 표기 %ZZ는 비밀값이 아니야.'), false)
+})
+
+test('fortune classification strips all Unicode format characters', () => {
+  for (const backendError of [
+    'coo\u2063kie: session=secret',
+    'client\u2063_secret=secret',
+    'auth\u2063orization: Bearer secret',
+    'coo\u200Bkie: session=secret',
+  ]) assert.equal(fortuneAiErrorLooksUnsafe(backendError), true, backendError)
+})
+
+test('fortune public error detector allows harmless security vocabulary without a credential value', () => {
+  for (const safe of [
+    '인증 세션이 필요해.',
+    'API key 설정이 필요해.',
+    'authorization failed',
+    'cookie parsing failed',
+    'AI 해설 서버에서 오류가 발생했어.',
+  ]) assert.equal(fortuneAiErrorLooksUnsafe(safe), false, safe)
+})
+
+test('fortune known public error code maps to a local fixed message', () => {
+  assert.equal(
+    fortuneAiPublicErrorMessage(
+      { error_code: 'PROVISIONAL_DB_WRITE_FAILED', error: 'client_secret=must-not-render' },
+      FORTUNE_AI_START_ERROR_FALLBACK,
+    ),
+    'AI 해설 저장에 실패했어.',
+  )
+  assert.equal(
+    fortuneAiPublicErrorMessage(
+      { error_code: 'UNKNOWN_INTERNAL_CODE', error: 'authorization: Bearer secret' },
+      FORTUNE_AI_START_ERROR_FALLBACK,
+    ),
+    FORTUNE_AI_START_ERROR_FALLBACK,
+  )
+})
+
 test('fortune start uses already-parsed safe invoke data for FunctionsHttpError', async () => {
   const error = functionsError(
     'FunctionsHttpError',
@@ -173,4 +246,70 @@ test('fortune start does not classify fetch or relay errors with context as HTTP
   const relayError = functionsError('FunctionsRelayError', 'Edge Function relay 연결에 실패했어.', context)
   assert.equal(await fortuneAiStartErrorMessage(fetchError, null), fetchError.message)
   assert.equal(await fortuneAiStartErrorMessage(relayError, null), relayError.message)
+})
+
+test('fortune malformed FunctionsHttpError body falls back safely', async () => {
+  const context = {
+    status: 500,
+    bodyUsed: false,
+    clone() { return { json: async () => { throw new Error('malformed') } } },
+    json: async () => null,
+  }
+  const error = functionsError('FunctionsHttpError', 'non-2xx', context)
+  assert.equal(await fortuneAiStartErrorMessage(error, null), FORTUNE_AI_START_ERROR_FALLBACK)
+})
+
+test('fortune failed job payload uses known codes, safe legacy text, and blocks encoded secrets', () => {
+  assert.equal(
+    fortuneAiFailedJobMessage({ status:'failed', error_code:'JOB_TIMEOUT', error:'ignored' }),
+    'AI 해설 작업이 제한시간을 넘겨 자동 종료됐어.',
+  )
+  assert.equal(
+    fortuneAiFailedJobMessage({ status:'failed', error:'안전한 이전 버전 오류 문구야.' }),
+    '안전한 이전 버전 오류 문구야.',
+  )
+  assert.equal(
+    fortuneAiFailedJobMessage({ status:'failed', error:'%253Fclient_secret%253Dsecret' }),
+    FORTUNE_AI_FAILED_JOB_FALLBACK,
+  )
+})
+
+test('fortune status HTTP errors block encoded secrets and network errors keep reconnect fallback', async () => {
+  const httpError = functionsError(
+    'FunctionsHttpError',
+    'non-2xx',
+    functionsResponse(500, { error:'authorization%3ABearer%20secret' }),
+  )
+  assert.equal(await fortuneAiStatusErrorMessage(httpError), FORTUNE_AI_STATUS_ERROR_FALLBACK)
+  const fetchError = functionsError('FunctionsFetchError', 'Failed to send a request', functionsResponse(500, { error:'safe but unreachable' }))
+  assert.equal(await fortuneAiStatusErrorMessage(fetchError), FORTUNE_AI_STATUS_ERROR_FALLBACK)
+})
+
+test('fragment semicolon and invalid UTF percent poisoning fail closed within two rounds', () => {
+  const cases = [
+    'https://upstream.test/#access_token=TEST_CANARY_7788',
+    '%FF%61%70%69%6B%65%79%3DTEST_CANARY_7788',
+    'upstream;client_secret=TEST_CANARY_7788',
+    '%25FF%2561%2570%2569%256B%2565%2579%253DTEST_CANARY_7788',
+    '%ZZ%FF%61%70%69%6B%65%79%3DTEST_CANARY_7788',
+    '%FF%61%70%69%E2%80%8B%6B%65%79%3DTEST_CANARY_7788',
+    'upstream%253Bclient%255Fsecret%253DTEST_CANARY_7788%ZZ',
+    'https://upstream.test/#access_\u200b\u2060token%3DTEST_CANARY_7788%ZZ',
+    '%FF%61%70%69%6B%65%79%3D%ZZTEST_CANARY_7788',
+  ]
+  for (const error of cases) {
+    assert.equal(fortuneAiFailedJobMessage({ error }), FORTUNE_AI_FAILED_JOB_FALLBACK, error)
+  }
+  for (const error of ['authorization failed','cookie parsing failed','ordinary malformed %ZZ text']) {
+    assert.equal(fortuneAiFailedJobMessage({ error }), error)
+  }
+})
+
+test('prototype-looking error codes cannot resolve inherited values', () => {
+  for (const error_code of ['proto','__proto__','constructor','toString']) {
+    assert.equal(fortuneAiFailedJobMessage({ error_code }), FORTUNE_AI_FAILED_JOB_FALLBACK)
+    assert.equal(fortuneAiFailedJobMessage({ error_code, error:'안전한 오류' }), '안전한 오류')
+    assert.equal(typeof fortuneAiFailedJobMessage({ error_code }), 'string')
+    assert.equal(fortuneAiFailedJobMessage({ error_code, error:'client_secret=TEST_CANARY_7788' }), FORTUNE_AI_FAILED_JOB_FALLBACK)
+  }
 })

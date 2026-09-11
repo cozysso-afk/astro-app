@@ -5,6 +5,7 @@ import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstru
 import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { classifyQualityRepair } from "../fortune-interpret-v6-preview/repairV19.ts";
 import { buildDeterministicTopicAnalysis, buildExternalPrompt, buildLocalQualityFallbackCore, buildPromptPacket, promptBudget, stabilizeCoreForQuality } from "./costGuardV21.ts";
+import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 
 const VERSION="supabase-ai-v21.4-e2e-evidence";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -185,15 +186,15 @@ async function checkRollingJobBudget(a:any,userId:string){
   const now=Date.now(),since10=new Date(now-10*60*1000).toISOString(),since24=new Date(now-24*60*60*1000).toISOString();
   try{
     const user10=await recentV21JobCount(a,since10,userId);
-    if(user10>=MAX_USER_NEW_JOBS_10M)return {ok:false,error:`10분 내 새 AI 해설 작업이 ${MAX_USER_NEW_JOBS_10M}건에 도달해서 비용 보호가 작동했어. 잠시 뒤 다시 시도해.`,retry_after_seconds:600};
+    if(user10>=MAX_USER_NEW_JOBS_10M)return publicFortuneError("COST_GUARD_BLOCKED",undefined,{retry_after_seconds:600});
     const user24=await recentV21JobCount(a,since24,userId);
-    if(user24>=MAX_USER_NEW_JOBS_24H)return {ok:false,error:`24시간 내 새 AI 해설 작업이 ${MAX_USER_NEW_JOBS_24H}건에 도달해서 오늘의 비용 보호가 작동했어. 저장된 해설과 프롬프트 복사는 계속 사용할 수 있어.`,retry_after_seconds:3600};
+    if(user24>=MAX_USER_NEW_JOBS_24H)return publicFortuneError("COST_GUARD_BLOCKED",undefined,{retry_after_seconds:3600});
     const global10=await recentV21JobCount(a,since10);
-    if(global10>=MAX_GLOBAL_NEW_JOBS_10M)return {ok:false,error:"서비스 전체의 단시간 AI 비용 보호 상한에 도달했어. 잠시 뒤 다시 시도해.",retry_after_seconds:600};
+    if(global10>=MAX_GLOBAL_NEW_JOBS_10M)return publicFortuneError("COST_GUARD_BLOCKED",undefined,{retry_after_seconds:600});
     const global24=await recentV21JobCount(a,since24);
-    if(global24>=MAX_GLOBAL_NEW_JOBS_24H)return {ok:false,error:"서비스 전체의 24시간 AI 비용 보호 상한에 도달했어. 저장된 해설과 프롬프트 복사는 계속 사용할 수 있어.",retry_after_seconds:3600};
+    if(global24>=MAX_GLOBAL_NEW_JOBS_24H)return publicFortuneError("COST_GUARD_BLOCKED",undefined,{retry_after_seconds:3600});
     return {ok:true,user10,user24,global10,global24};
-  }catch(e){return {ok:false,error:`AI 비용 보호 카운터를 확인하지 못해서 새 Gemini 호출을 안전하게 차단했어: ${e instanceof Error?e.message:String(e)}`,retry_after_seconds:60};}
+  }catch(e){return publicFortuneError("COST_GUARD_CHECK_FAILED",e,{retry_after_seconds:60});}
 }
 async function user(req:Request){const auth=req.headers.get("Authorization")??"";if(!auth)return null;const c=createClient(SUPABASE_URL,ANON,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false}});const {data,error}=await c.auth.getUser();return error?null:data.user??null;}
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
@@ -202,7 +203,7 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:r.call_trace??[],prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),degraded_quality:Boolean(r.degraded_quality),local_quality_fallback:Boolean(r.local_quality_fallback),quality_warning:r.quality_warning??null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:publicCallTrace(r.call_trace),prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),degraded_quality:Boolean(r.degraded_quality),local_quality_fallback:Boolean(r.local_quality_fallback),quality_warning:r.quality_warning??null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
     if(!(await jobActive(id))){
       // A cancel request can mark the row failed while the already-sent first network call is still in flight.
       // Never resurrect that job, but attach the real usage/trace once the call returns so spent tokens are observable.
@@ -210,45 +211,46 @@ async function job(id:string,payload:any,model:string,key:string){
       return;
     }
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
-    const failed={status:"failed",model,error:r.error,usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
+    const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     await a.from("ai_interpret_jobs").update(r.ok?done:failed).eq("id",id);
-  }catch(e){await a.from("ai_interpret_jobs").update({status:"failed",error:e instanceof Error?e.message:String(e),updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}).eq("id",id);}
+  }catch(e){publicFortuneError("JOB_GENERATION_FAILED",e);await a.from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_GENERATION_FAILED"),updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}).eq("id",id);}
 }
 
 Deno.serve(async(req)=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
-  if(req.method!=="POST")return res({ok:false,error:"POST만 지원해."},405);
-  let b:any;try{b=await req.json();}catch{return res({ok:false,error:"JSON 요청이 필요해."},400);}
+  if(req.method!=="POST")return res(publicFortuneError("METHOD_NOT_ALLOWED"),405);
+  let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
   if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:PACKET_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,max_user_new_jobs_10m:MAX_USER_NEW_JOBS_10M,max_user_new_jobs_24h:MAX_USER_NEW_JOBS_24H,max_global_new_jobs_10m:MAX_GLOBAL_NEW_JOBS_10M,max_global_new_jobs_24h:MAX_GLOBAL_NEW_JOBS_24H,local_thai_scrub:true,prompt_budget_guard:true,prompt_copy:true,safe_wording:true,local_quality_stabilizer:true,quality_failure_observability:true,thai_contract:THAI_CONTRACT_VERSION});
-  const u=await user(req);if(!u)return res({ok:false,error:"인증 세션이 필요해."},401);
+  const u=await user(req);if(!u)return res(publicFortuneError("AUTH_REQUIRED"),401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();
-    if(error)return res({ok:false,error:error.message},500);if(!data)return res({ok:false,error:"해설 작업을 찾지 못했어."},404);
-    if(["queued","running"].includes(String(data.status))&&Date.now()-Date.parse(String(data.updated_at??data.created_at))>MAX_JOB_MS+30000){await a.from("ai_interpret_jobs").update({status:"failed",error:"AI 해설 작업이 제한시간을 넘겨 자동 종료됐어.",completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);data.status="failed";data.error="AI 해설 작업이 제한시간을 넘겨 자동 종료됐어.";}
-    return res({ok:true,job_id:data.id,status:data.status,model:data.model,fallback_from:data.fallback_from,data:data.result_json,usage:data.usage_json,error:data.error,created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:VERSION});
+    if(error)return res(publicFortuneError("JOB_STATUS_READ_FAILED",error),500);if(!data)return res(publicFortuneError("JOB_NOT_FOUND"),404);
+    if(["queued","running"].includes(String(data.status))&&Date.now()-Date.parse(String(data.updated_at??data.created_at))>MAX_JOB_MS+30000){await a.from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_TIMEOUT"),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);data.status="failed";data.error=storedFortuneJobError("JOB_TIMEOUT");}
+    const failureFields=data.status==="failed"?publicFortuneFailureFields(storedFortuneJobErrorCode(data.error)):null;
+    return res({ok:true,job_id:data.id,status:data.status,model:data.model,fallback_from:data.fallback_from,data:data.result_json,usage:data.status==="failed"?publicFailedUsage(data.usage_json):publicJobUsage(data.usage_json),error:failureFields?.error??null,...(failureFields??{}),created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:VERSION});
   }
   if(b?.action==="cancel"){
-    const id=txt(b.job_id,100);const now=new Date().toISOString();const {data,error}=await admin().from("ai_interpret_jobs").update({status:"failed",error:"AI 해설 생성이 사용자 요청으로 취소됐어.",updated_at:now,completed_at:now}).eq("id",id).eq("user_id",u.id).in("status",["queued","running"]).select("id,status").maybeSingle();
-    if(error)return res({ok:false,error:error.message},500);return res({ok:true,job_id:id,canceled:Boolean(data?.id)});
+    const id=txt(b.job_id,100);const now=new Date().toISOString();const {data,error}=await admin().from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_CANCELED"),updated_at:now,completed_at:now}).eq("id",id).eq("user_id",u.id).in("status",["queued","running"]).select("id,status").maybeSingle();
+    if(error)return res(publicFortuneError("JOB_CANCEL_FAILED",error),500);return res({ok:true,job_id:id,canceled:Boolean(data?.id)});
   }
-  if(!b?.calculation)return res({ok:false,error:"calculation이 필요해."},400);
+  if(!b?.calculation)return res(publicFortuneError("CALCULATION_REQUIRED"),400);
   const preferred=MODELS[b.model]?b.model:DEFAULT_MODEL;const payload=compactCalculation(b.calculation);const pb=promptBudget(payload);
   if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0});
   if(b?.action==="prompt"){const p=buildExternalPrompt(payload);return res({ok:true,interpreter_version:VERSION,prompt:p.text,prompt_bytes:p.bytes,estimated_input_tokens:p.estimated_input_tokens,prompt_budget_bytes:p.max_bytes});}
-  if(b?.action!=="start")return res({ok:false,error:"지원하지 않는 action이야. 유료 AI 호출은 action=start에서만 시작할 수 있어."},400);
-  if(!key)return res({ok:false,missing_key:true,error:"GEMINI_API_KEY가 설정되지 않았어."},503);
+  if(b?.action!=="start")return res(publicFortuneError("UNSUPPORTED_ACTION"),400);
+  if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);
   if(b?.action==="start"){
-    if(!pb.ok)return res({ok:false,cost_guard_blocked:true,error:`AI 입력 근거가 비용 상한을 넘었어(${pb.bytes}/${pb.max_bytes} bytes). 계산 결과와 프롬프트 복사는 그대로 사용할 수 있어.`},413);
+    if(!pb.ok)return res(publicFortuneError("PROMPT_BUDGET_EXCEEDED",undefined,{cost_guard_blocked:true}),413);
     const hash=await payloadHash(payload);const kind=`${VERSION}:${hash.slice(0,32)}`;const a=admin();const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
     const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,result_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
     if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
     const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(!pendingError&&pending?.id)return res({ok:true,job_id:pending.id,status:pending.status,interpreter_version:VERSION,reused:true,inflight:true},202);
-    const rolling=await checkRollingJobBudget(a,u.id);if(!rolling.ok)return res({ok:false,cost_guard_blocked:true,rolling_job_guard:true,error:rolling.error,retry_after_seconds:rolling.retry_after_seconds},200);
+    const rolling=await checkRollingJobBudget(a,u.id);if(!rolling.ok)return res({...rolling,cost_guard_blocked:true,rolling_job_guard:true},200);
     const {data,error}=await a.from("ai_interpret_jobs").insert({user_id:u.id,kind,status:"queued",model:preferred,period_start:payload?.period?.start||null,period_end:payload?.period?.end||null}).select("id").single();
-    if(error||!data?.id)return res({ok:false,error:`해설 작업 생성 실패: ${error?.message??"unknown"}`},500);
+    if(error||!data?.id)return res(publicFortuneError("JOB_CREATE_FAILED",error),500);
     const task=job(data.id,payload,preferred,key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);return res({ok:true,job_id:data.id,status:"queued",interpreter_version:VERSION,reused:false,inflight:false,prompt_budget:{bytes:pb.bytes,estimated_input_tokens:pb.estimated_input_tokens,max_bytes:pb.max_bytes}},202);
   }
-  return res({ok:false,error:"지원하지 않는 action이야."},400);
+  return res(publicFortuneError("UNSUPPORTED_ACTION"),400);
 });

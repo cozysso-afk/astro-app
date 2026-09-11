@@ -207,14 +207,15 @@ export function installIntegratedPrecisionFetch() {
     try {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       rawUrl = url
-      if (/\/v1\/fortune\/integrated(?:\/start)?$/.test(new URL(url, window.location.href).pathname) && typeof init?.body === 'string') {
+      const parsedUrl = new URL(url, window.location.href)
+      if (/\/v1\/fortune\/integrated(?:\/start)?$/.test(parsedUrl.pathname) && typeof init?.body === 'string') {
         const body = safeParse(init.body)
         if (body && typeof body === 'object') {
           applyIntegratedPrecisionToRequest(body)
           init = { ...init, body: JSON.stringify(body) }
         }
       }
-      if (/\/functions\/v1\/fortune-interpret-v21-preview$/.test(new URL(url, window.location.href).pathname)) {
+      if (/\/functions\/v1\/fortune-interpret-v21-preview$/.test(parsedUrl.pathname)) {
         if (typeof init?.body === 'string') {
           const body = safeParse(init.body)
           if (body?.calculation && ['start','prompt','inspect'].includes(String(body?.action ?? ''))) {
@@ -226,27 +227,15 @@ export function installIntegratedPrecisionFetch() {
             }
           }
         }
-        const rewritten = url.replace(/fortune-interpret-v21-preview$/, 'fortune-interpret-v22-preview')
+        parsedUrl.pathname = parsedUrl.pathname.replace(/fortune-interpret-v21-preview$/, 'fortune-interpret-v22-preview')
+        const rewritten = parsedUrl.toString()
         if (typeof input === 'string') {
           input = rewritten
         } else if (input instanceof URL) {
-          input = new URL(rewritten)
+          input = parsedUrl
         } else {
-          const source = input.clone()
-          input = new Request(rewritten, {
-            method: source.method,
-            headers: source.headers,
-            body: source.method === 'GET' || source.method === 'HEAD' ? undefined : source.body,
-            mode: source.mode,
-            credentials: source.credentials,
-            cache: source.cache,
-            redirect: source.redirect,
-            referrer: source.referrer,
-            referrerPolicy: source.referrerPolicy,
-            integrity: source.integrity,
-            keepalive: source.keepalive,
-            signal: source.signal,
-          })
+          // Preserve Request body/headers and let the original init override normally.
+          input = new Request(rewritten, input.clone())
         }
       }
     } catch {
