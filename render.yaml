@@ -5,5 +5,5 @@ services:
     plan: free
     buildCommand: pip install -r api/requirements.txt
     startCommand: uvicorn api.private_app:app --host 0.0.0.0 --port $PORT
-    autoDeploy: true
+    autoDeploy: false
     healthCheckPath: /health
