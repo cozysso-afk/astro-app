@@ -103,6 +103,25 @@ export function publicCallTrace(value: unknown) {
   })
 }
 
+// Fixed labels are produced by qualitySummary; never echo historical diagnostic names.
+const QUALITY_STAGE_NAMES = ['구조 완전성','근거 추적성','의미 방향 검증','내부 일관성','깊이·실용성'] as const
+
+export function publicQualityValidation(value: unknown) {
+  if (!isRecord(value) || typeof value.version !== 'string'
+    || value.version.length > 80 || !/^fortune-interpretation-quality-v[0-9]+(?:-[a-z]+)*$/.test(value.version)
+    || !Number.isFinite(value.score) || Number(value.score) < 0 || Number(value.score) > 100
+    || !Array.isArray(value.stages) || value.stages.length !== 5) return undefined
+  const stages = []
+  for (let i = 0; i < value.stages.length; i += 1) {
+    const row = value.stages[i]
+    // Reject malformed summaries as a whole: dropping a failed stage could forge a passed badge.
+    if (!isRecord(row) || row.stage !== i + 1 || row.name !== QUALITY_STAGE_NAMES[i]
+      || typeof row.passed !== 'boolean') return undefined
+    stages.push({ stage: row.stage, name: row.name, passed: row.passed })
+  }
+  return { version: value.version, score: value.score as number, stages }
+}
+
 export function publicJobUsage(value: unknown) {
   if (!isRecord(value)) return undefined
   const out: Record<string, unknown> = {}
@@ -123,39 +142,111 @@ export function publicJobUsage(value: unknown) {
     if (Object.keys(budget).length) out.prompt_budget = budget
   }
   out.call_trace = publicCallTrace(value.call_trace)
+  const quality = publicQualityValidation(value.quality_validation)
+  if (quality) out.quality_validation = quality
   return out
 }
 
-function failedJobPayload(payload: Record<string, unknown>) {
-  const code = isFortunePublicErrorCode(payload.error_code)
-    ? payload.error_code
-    : storedFortuneJobErrorCode(payload.error)
-  const fields = publicFortuneFailureFields(code)
-  return {
-    ok: true,
-    job_id: payload.job_id,
-    status: 'failed',
-    model: payload.model,
-    fallback_from: payload.fallback_from,
-    usage: publicFailedUsage(payload.usage),
-    created_at: payload.created_at,
-    updated_at: payload.updated_at,
-    completed_at: payload.completed_at,
-    period_start: payload.period_start,
-    period_end: payload.period_end,
-    interpreter_version: payload.interpreter_version,
-    ...fields,
+type ProxyAction = 'meta' | 'start' | 'status' | 'cancel' | 'prompt' | 'inspect'
+const JOB_STATES = ['queued','running','done','failed']
+function safeIdentifier(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(value)
+}
+function jobMetadata(payload: Record<string, unknown>) {
+  const out: Record<string, unknown> = { job_id: payload.job_id }
+  for (const key of ['model','fallback_from','interpreter_version']) {
+    if (payload[key] === null || safeIdentifier(payload[key])) out[key] = payload[key]
   }
+  for (const key of ['created_at','updated_at','completed_at','period_start','period_end']) {
+    const value = payload[key]
+    if (value === null || (typeof value === 'string' && value.length <= 40
+      && /^\d{4}-\d{2}-\d{2}(?:T[0-9:.+Z-]+)?$/.test(value))) out[key] = value
+  }
+  return out
+}
+function failedJobPayload(payload: Record<string, unknown>) {
+  const code = isFortunePublicErrorCode(payload.error_code) && ['JOB_TIMEOUT','JOB_CANCELED','JOB_GENERATION_FAILED'].includes(payload.error_code)
+    ? payload.error_code as 'JOB_TIMEOUT' | 'JOB_CANCELED' | 'JOB_GENERATION_FAILED'
+    : storedFortuneJobErrorCode(payload.error)
+  return { ok: true, ...jobMetadata(payload), status: 'failed',
+    usage: publicFailedUsage(payload.usage), ...publicFortuneFailureFields(code) }
 }
 
-export function normalizeProxiedFortuneResponse(payload: unknown, status: number) {
+// Accept only the action's actual V21 envelope; opaque reading/prompt text remains intact.
+function publicProxySuccess(payload: Record<string, unknown>, action: ProxyAction) {
+  const out: Record<string, unknown> = {}
+  const pick = (keys: string[], valid: (value: unknown) => boolean) => {
+    for (const key of keys) if (valid(payload[key])) out[key] = payload[key]
+  }
+  const boolean = (x: unknown) => typeof x === 'boolean'
+  const number = (x: unknown) => typeof x === 'number' && Number.isFinite(x) && x >= 0
+  if (action === 'meta') {
+    if (typeof payload.configured !== 'boolean') return null
+    pick(['configured','background_jobs','payload_hash_cache','inflight_dedupe','five_stage_validation',
+      'single_core_generation','deterministic_topic_analysis','rolling_job_guard','local_thai_scrub',
+      'prompt_budget_guard','prompt_copy','safe_wording','local_quality_stabilizer','quality_failure_observability'], boolean)
+    pick(['interpreter_version','packet_version','quality_version','thai_contract'], safeIdentifier)
+    pick(['max_gemini_calls_per_job','max_job_ms','max_user_new_jobs_10m','max_user_new_jobs_24h',
+      'max_global_new_jobs_10m','max_global_new_jobs_24h'], number)
+    if (isRecord(payload.models)) {
+      out.models = Object.fromEntries(Object.entries(payload.models).slice(0, 10).filter(([key, label]) =>
+        /^gemini-[0-9.]+-(?:flash|pro)(?:-[a-z0-9-]+)?$/.test(key) && typeof label === 'string'
+        && label.length <= 80 && /^Gemini [0-9.]+ (?:Flash|Pro) · [가-힣 ]+$/.test(label)))
+    }
+    if (payload.ok === true) out.ok = true
+    return out
+  }
+  if (payload.ok !== true) return null
+  if (['start','status','cancel'].includes(action)) {
+    if (!safeIdentifier(payload.job_id)) return null
+    if (action === 'cancel') {
+      if (typeof payload.canceled !== 'boolean') return null
+      return { ok: true, job_id: payload.job_id, canceled: payload.canceled }
+    }
+    if (typeof payload.status !== 'string' || !JOB_STATES.includes(payload.status)) return null
+    if (action === 'start' && payload.status === 'failed') return null
+    if (action === 'status' && payload.status === 'failed') return failedJobPayload(payload)
+    if (action === 'status' && payload.status === 'done' && !isRecord(payload.data) && !isRecord(payload.result_json)) return null
+    Object.assign(out, { ok: true, ...jobMetadata(payload), status: payload.status })
+    if (action === 'start') {
+      pick(['reused','inflight','gemini_paid_call'], boolean)
+      const budget = publicJobUsage({ prompt_budget: payload.prompt_budget })?.prompt_budget
+      if (budget) out.prompt_budget = budget
+    } else {
+      // V21 calls result_json "data". Preserve both supported success representations.
+      if (payload.status === 'done') {
+        if (isRecord(payload.data)) out.data = payload.data
+        if (isRecord(payload.result_json)) out.result_json = payload.result_json
+      } else if (payload.data === null) out.data = null
+      out.error = null
+      out.usage = publicJobUsage(payload.usage)
+    }
+    return out
+  }
+  if (action === 'prompt') {
+    if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return null
+    Object.assign(out, { ok: true, prompt: payload.prompt })
+    pick(['prompt_bytes','estimated_input_tokens','prompt_budget_bytes'], number)
+  } else if (action === 'inspect') {
+    if (!number(payload.full_payload_bytes) || !number(payload.prompt_payload_bytes)
+      || typeof payload.prompt_budget_ok !== 'boolean') return null
+    out.ok = true
+    pick(['full_payload_bytes','prompt_payload_bytes','prompt_budget_bytes','estimated_input_tokens',
+      'max_gemini_calls_per_job','deterministic_topics','key_dates','evidence_ledger','prompt_evidence_ledger'], number)
+    pick(['prompt_budget_ok'], boolean)
+  } else return null
+  pick(['interpreter_version'], safeIdentifier)
+  return out
+}
+
+export function normalizeProxiedFortuneResponse(payload: unknown, status: number, action: unknown) {
   if (!isRecord(payload)) {
     return { status: status >= 400 ? status : 502, body: publicFortuneError('UPSTREAM_INVALID_RESPONSE') }
   }
-  if (payload.status === 'failed') return { status, body: failedJobPayload(payload) }
   if (status >= 400 || payload.ok === false) {
     const code = isFortunePublicErrorCode(payload.error_code) ? payload.error_code : 'UPSTREAM_FAILED'
     return { status, body: publicFortuneError(code, undefined, safeExtras(payload)) }
   }
-  return { status, body: payload }
+  const body = status >= 200 && status < 300 ? publicProxySuccess(payload, action as ProxyAction) : null
+  return body ? { status, body } : { status: 502, body: publicFortuneError('UPSTREAM_INVALID_RESPONSE') }
 }

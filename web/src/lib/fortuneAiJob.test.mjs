@@ -284,3 +284,32 @@ test('fortune status HTTP errors block encoded secrets and network errors keep r
   const fetchError = functionsError('FunctionsFetchError', 'Failed to send a request', functionsResponse(500, { error:'safe but unreachable' }))
   assert.equal(await fortuneAiStatusErrorMessage(fetchError), FORTUNE_AI_STATUS_ERROR_FALLBACK)
 })
+
+test('fragment semicolon and invalid UTF percent poisoning fail closed within two rounds', () => {
+  const cases = [
+    'https://upstream.test/#access_token=TEST_CANARY_7788',
+    '%FF%61%70%69%6B%65%79%3DTEST_CANARY_7788',
+    'upstream;client_secret=TEST_CANARY_7788',
+    '%25FF%2561%2570%2569%256B%2565%2579%253DTEST_CANARY_7788',
+    '%ZZ%FF%61%70%69%6B%65%79%3DTEST_CANARY_7788',
+    '%FF%61%70%69%E2%80%8B%6B%65%79%3DTEST_CANARY_7788',
+    'upstream%253Bclient%255Fsecret%253DTEST_CANARY_7788%ZZ',
+    'https://upstream.test/#access_\u200b\u2060token%3DTEST_CANARY_7788%ZZ',
+    '%FF%61%70%69%6B%65%79%3D%ZZTEST_CANARY_7788',
+  ]
+  for (const error of cases) {
+    assert.equal(fortuneAiFailedJobMessage({ error }), FORTUNE_AI_FAILED_JOB_FALLBACK, error)
+  }
+  for (const error of ['authorization failed','cookie parsing failed','ordinary malformed %ZZ text']) {
+    assert.equal(fortuneAiFailedJobMessage({ error }), error)
+  }
+})
+
+test('prototype-looking error codes cannot resolve inherited values', () => {
+  for (const error_code of ['proto','__proto__','constructor','toString']) {
+    assert.equal(fortuneAiFailedJobMessage({ error_code }), FORTUNE_AI_FAILED_JOB_FALLBACK)
+    assert.equal(fortuneAiFailedJobMessage({ error_code, error:'안전한 오류' }), '안전한 오류')
+    assert.equal(typeof fortuneAiFailedJobMessage({ error_code }), 'string')
+    assert.equal(fortuneAiFailedJobMessage({ error_code, error:'client_secret=TEST_CANARY_7788' }), FORTUNE_AI_FAILED_JOB_FALLBACK)
+  }
+})

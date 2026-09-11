@@ -243,7 +243,7 @@ test('V21 public failures and stored failed jobs never retain raw internal error
   assert.doesNotMatch(serialized,/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
   assert.equal(storedFortuneJobError('JOB_GENERATION_FAILED'),'AI 해설 생성에 실패했어.');
 
-  const proxied=normalizeProxiedFortuneResponse({ok:true,status:'failed',error:secret,job_id:'job-test',usage:{total_tokens:21,call_trace:[{error:secret}]}},200);
+  const proxied=normalizeProxiedFortuneResponse({ok:true,status:'failed',error:secret,job_id:'job-test',usage:{total_tokens:21,call_trace:[{error:secret}]}},200,'status');
   assert.equal(proxied.body.error_code,'JOB_GENERATION_FAILED');
   assert.deepEqual(proxied.body.usage,{total_tokens:21});
   assert.doesNotMatch(JSON.stringify(proxied),/TEST_SECRET_DO_NOT_EXPOSE|Authorization/);
@@ -389,4 +389,45 @@ test('V11.1 cross-check mode is derived from the final capped evidence refs',()=
   const report=inspectInterpretationQuality(validated,p);
   const stage4=report.stages.find(row=>row.stage===4);
   assert.equal(stage4?.passed,true,`stage 4 failed: ${(stage4?.issues??[]).join(' / ')}`);
+});
+
+test('quality_validation preserves real UI summary and excludes arbitrary diagnostics',()=>{
+  const p=packet();
+  const report=inspectInterpretationQuality(validateOutput(stabilizeCoreForQuality(buildLocalQualityFallbackCore(p),p)),p);
+  const expected={version:report.version,score:report.score,stages:report.stages.map(({stage,name,passed})=>({stage,name,passed}))};
+  const polluted={...report,secret:'TEST_CANARY_7788',stages:report.stages.map(s=>({...s,headers:{authorization:'TEST_CANARY_7788'}}))};
+  const usage=publicJobUsage({total_tokens:42,quality_validation:polluted,quality_report:polluted,first_quality_report:polluted});
+  assert.deepEqual(usage.quality_validation,expected);
+  assert.doesNotMatch(JSON.stringify(usage),/TEST_CANARY_7788|headers|issues|quality_report/);
+  const badge=q=>q.score===100||Boolean(q.stages.length)&&q.stages.every(s=>s.passed);
+  assert.equal(badge(usage.quality_validation),badge(expected));
+  for(const bad of [null,[],{...expected,score:Infinity},{...expected,version:'client_secret=TEST_CANARY_7788'},
+    {...expected,stages:[...expected.stages,...expected.stages]},
+    {...expected,stages:expected.stages.map((s,i)=>i===0?{...s,name:'TEST_CANARY_7788'}:s)},
+    {...expected,stages:expected.stages.map((s,i)=>i===0?{...s,stage:NaN}:s)},
+    {...expected,stages:expected.stages.map((s,i)=>i===0?{...s,passed:'true'}:s)}]) {
+    assert.equal(publicJobUsage({quality_validation:bad}).quality_validation,undefined);
+  }
+});
+
+test('job-table migration removes client grants and policy without changing server access',()=>{
+  const migrationDir=new URL('../../migrations/',import.meta.url);
+  const filenames=fs.readdirSync(migrationDir).filter(n=>/^\d{14}_lock_down_ai_interpret_jobs_client_access\.sql$/.test(n));
+  assert.equal(filenames.length,1);
+  const sql=fs.readFileSync(new URL(filenames[0],migrationDir),'utf8').replace(/--[^\n]*/g,'');
+  assert.match(sql,/REVOKE ALL ON TABLE public\.ai_interpret_jobs FROM anon, authenticated;/i);
+  assert.match(sql,/DROP POLICY IF EXISTS ai_interpret_jobs_select_own ON public\.ai_interpret_jobs;/i);
+  assert.doesNotMatch(sql,/service_role|DISABLE ROW LEVEL SECURITY|DROP TABLE|DELETE FROM|UPDATE public|CREATE (?:VIEW|FUNCTION)/i);
+  const root=new URL('../../../',import.meta.url);
+  const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(new URL(d.name+'/',dir)):[new URL(d.name,dir)]);
+  const clientFiles=[...walk(new URL('web/src/',root)),...walk(new URL('mobile/',root))]
+    .filter(p=>/\.(?:tsx?|jsx?|html)$/.test(p.pathname)&&!p.pathname.includes('.test.'));
+  for(const file of clientFiles)assert.doesNotMatch(fs.readFileSync(file,'utf8'),/ai_interpret_jobs/,file.pathname);
+  for(const name of ['fortune-interpret-v21-preview','fortune-interpret-v22-preview','relationship-interpret-v9-preview']) {
+    const src=fs.readFileSync(new URL(`../${name}/index.ts`,import.meta.url),'utf8');
+    assert.match(src,/SERVICE=\(Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/);
+    assert.match(src,/createClient\(SUPABASE_URL,SERVICE,\{auth:\{persistSession:false,autoRefreshToken:false\}\}\)/);
+    assert.match(src,/\.from\("ai_interpret_jobs"\)/);
+    assert.doesNotMatch(src,/createClient\(SUPABASE_URL,SERVICE,\{global:/);
+  }
 });

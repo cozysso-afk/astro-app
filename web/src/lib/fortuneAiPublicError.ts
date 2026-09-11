@@ -33,7 +33,13 @@ const PUBLIC_MESSAGES: Record<string, string> = {
 
 function decodeEscapesOnce(value: string) {
   let decoded = value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (encoded) => {
-    try { return decodeURIComponent(encoded) } catch { return encoded }
+    try { return decodeURIComponent(encoded) } catch {
+      // Invalid UTF bytes must not poison neighboring ASCII credential keys.
+      return encoded.replace(/%[0-7][0-9a-f]|(?:%[89a-f][0-9a-f])+/gi, (bytes) => {
+        // Keep valid UTF runs (including Cf) classifiable; invalid runs are separators.
+        try { return decodeURIComponent(bytes) } catch { return ' ' }
+      })
+    }
   })
   decoded = decoded
     .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (_, hex) => {
@@ -54,12 +60,12 @@ function classificationText(text: string) {
 export function fortuneAiErrorLooksUnsafe(text: string) {
   if (text.length > 4096) return true
   const normalized = classificationText(text)
-  const credentialKey = /(?:^|[?&\s"'“”‘’[{,(])(?:authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|api[\s_-]?key|x-api-key|apikey|client[_-]?secret|password|passwd|cookie|set-cookie|service[-_ ]?role|(?:request[_ -]?)?headers?)\s*["'“”‘’]?\s*[:=]\s*["'“”‘’]?\s*\S/i
+  const credentialKey = /(?:^|[?&#;\s"'“”‘’[{,(])(?:authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|api[\s_-]?key|x-api-key|apikey|client[_-]?secret|password|passwd|cookie|set-cookie|service[-_ ]?role|(?:request[_ -]?)?headers?)\s*["'“”‘’]?\s*[:=]\s*["'“”‘’]?\s*\S/i
   const authorizationValue = /\b(?:bearer|basic)\s+(?!auth(?:entication)?\b)[a-z0-9._~+\/-]{4,}={0,2}/i
   const jwt = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/
   const uuid = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
   const credentialPrefix = /\b(?:sk-|sb_secret_|sb_publishable_)[A-Za-z0-9_-]+/i
-  const secretQuery = /https?:\/\/[^\s"'<>]*(?:[?&])[^#\s"'&=]*(?:token|key|secret|password|passwd|signature|credential|code)[^#\s"'&=]*=/i
+  const secretQuery = /https?:\/\/[^\s"'<>]*(?:[?&#])[^#\s"'&=]*(?:token|key|secret|password|passwd|signature|credential|code)[^#\s"'&=]*=/i
   return credentialKey.test(normalized)
     || authorizationValue.test(normalized)
     || jwt.test(normalized)
@@ -82,7 +88,7 @@ export function fortuneAiPublicErrorMessage(payload: unknown, fallback: string) 
   const data = recordFromUnknown(payload)
   if (!data) return fallback
   const code = typeof data.error_code === 'string' ? data.error_code : ''
-  if (PUBLIC_MESSAGES[code]) return PUBLIC_MESSAGES[code]
+  if (Object.prototype.hasOwnProperty.call(PUBLIC_MESSAGES, code)) return PUBLIC_MESSAGES[code]
   return safeLegacyMessage(data.error) || fallback
 }
 

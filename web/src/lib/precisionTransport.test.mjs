@@ -92,3 +92,77 @@ test('active Fortune AI transport rewrites start status and cancel to V22 only',
     else Object.defineProperty(globalThis,'location',{configurable:true,value:originalLocation})
   }
 })
+
+async function withTransport(run) {
+  const before = { window:globalThis.window, location:globalThis.location, fetch:globalThis.fetch }
+  const calls=[]
+  try {
+    Object.defineProperty(globalThis,'window',{configurable:true,value:globalThis})
+    Object.defineProperty(globalThis,'location',{configurable:true,value:{href:'https://astro-app.test/'}})
+    delete globalThis.__starlightIntegratedPrecisionFetchV2__
+    globalThis.fetch=async(input,init)=>{
+      const request=new Request(input,init)
+      calls.push({url:request.url,body:await request.text(),headers:Object.fromEntries(request.headers)})
+      return new Response('{"ok":true}',{headers:{'content-type':'application/json'}})
+    }
+    installIntegratedPrecisionFetch()
+    await run(calls)
+  } finally {
+    globalThis.fetch=before.fetch
+    delete globalThis.__starlightIntegratedPrecisionFetchV2__
+    for(const key of ['window','location']) {
+      if(before[key]===undefined)delete globalThis[key]
+      else Object.defineProperty(globalThis,key,{configurable:true,value:before[key]})
+    }
+  }
+}
+
+test('query/hash rewrite preserves string URL and POST Request body headers and init overrides', async()=>{
+  await withTransport(async(calls)=>{
+    for(const suffix of ['?forceFunctionRegion=ap-northeast-2','#status','?forceFunctionRegion=ap-northeast-2#status']) {
+      for(const kind of ['string','URL','Request']) {
+        const url='https://project.supabase.co/functions/v1/fortune-interpret-v21-preview'+suffix
+        const body=JSON.stringify({action:'status',job_id:'job-test'})
+        const init={method:'POST',body,headers:{Authorization:'Bearer synthetic-token',apikey:'synthetic-key'}}
+        const input=kind==='string'?url:kind==='URL'?new URL(url):new Request(url,init)
+        const response=await globalThis.fetch(input,kind==='Request'?undefined:init)
+        assert.equal(response.status,200,kind+suffix)
+        const last=calls.at(-1)
+        assert.equal(last.url,url.replace('/fortune-interpret-v21-preview','/fortune-interpret-v22-preview'))
+        assert.equal(last.body,body)
+        assert.equal(last.headers.authorization,'Bearer synthetic-token')
+        assert.equal(last.headers.apikey,'synthetic-key')
+      }
+    }
+    const req=new Request('https://project.supabase.co/functions/v1/fortune-interpret-v21-preview?x=1',{
+      method:'POST',body:'original',headers:{Authorization:'original',apikey:'original'},
+    })
+    await globalThis.fetch(req,{body:'override',headers:{Authorization:'override',apikey:'override'}})
+    assert.equal(calls.at(-1).body,'override')
+    assert.equal(calls.at(-1).headers.authorization,'override')
+    assert.equal(calls.at(-1).headers.apikey,'override')
+    const unrelated='https://project.supabase.co/rest/v1/readings?select=*#other'
+    await globalThis.fetch(unrelated)
+    assert.equal(calls.at(-1).url,unrelated)
+  })
+})
+
+test('installed Supabase SDK region invoke uses dynamic fetch and reaches V22', async()=>{
+  const { createClient }=await import('@supabase/supabase-js')
+  const client=createClient('https://project.supabase.co','synthetic-key',{
+    global:{fetch:(...args)=>globalThis.fetch(...args)},auth:{persistSession:false,autoRefreshToken:false},
+  })
+  await withTransport(async(calls)=>{
+    const {error}=await client.functions.invoke('fortune-interpret-v21-preview',{
+      region:'ap-northeast-2',body:{action:'status',job_id:'job-test'},headers:{Authorization:'Bearer synthetic-token'},
+    })
+    assert.equal(error,null)
+    assert.equal(calls.length,1)
+    const url=new URL(calls[0].url)
+    assert.equal(url.pathname,'/functions/v1/fortune-interpret-v22-preview')
+    assert.equal(url.searchParams.get('forceFunctionRegion'),'ap-northeast-2')
+    assert.equal(calls[0].headers.authorization,'Bearer synthetic-token')
+    assert.equal(calls[0].headers.apikey,'synthetic-key')
+    assert.equal(JSON.parse(calls[0].body).action,'status')
+  })
+})
