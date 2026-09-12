@@ -15,3 +15,9 @@ export const aspects = [
   {a:'Mars',b:'Pluto',aspect:'opposition',orb:1,tone:'challenging'},
 ]
 export const timing = {period:{start:'2026-09-12',end:'2026-09-30'},incoming:stat(30,15),outgoing:stat(70,15),reconnection:stat(63,15),months:[]}
+export function personalMarriageFixture() {
+  return { ok:true,api_version:'fixture',engine:'synthetic',period:{start:'2026-09-12',end:'2026-09-30',day_count:19},result:{
+    mode:'personal_unmarried',policy:{},relationship_houses:{},relationship_planets:{Venus:{sign:'Taurus',degree:2,whole_house:1,placidus_house:1}},natal_aspects:[],
+    forecast:{marriage_probability_percent:62,label:'fixture',supportive_component:3,pressure_component:1,commitment_component:2,probability_note:'통계 확률 아님',strong_windows:[{date:'2026-09-14',score:65,themes:[],supportive_load:3,pressure_load:1,strongest_hit:{transit:'Jupiter',target:'7th_ruler',aspect:'trine',orb:.4,tone:'supportive',strength:3}}]},
+    spouse_archetype:{summary:'익숙한 태도와 꾸준한 약속에서 편안함을 느끼는 유형이야.',appearance_hints:['차분한 인상','정돈된 스타일'],personality_hints:['작은 약속을 꾸준히 지키는 태도에 마음이 갈 수 있어.'],career_clusters:[],meeting_route:'',identity_clues:[],precision_note:''},timing:{average_activation:60,spread:10,top_days:[],pressure_days:[],top_months:[]},limits:['실제 미래를 확정하지 않음']}}
+}

@@ -142,3 +142,109 @@
 }
 :root[data-celestial-motion="off"] .fortune-experience *, :root[data-celestial-motion="off"] .relationship-experience * { animation: none !important; transition: none !important; }
 summary:focus-visible, button:focus-visible { outline: 2px solid var(--reading-indigo); outline-offset: 4px; }
+
+/* Moonlit reading layer: a single palette shared by every result mode. */
+:root {
+  --reading-pearl: #f8f5fc;
+  --reading-surface: rgba(255, 253, 255, .88);
+  --reading-lavender: #eee8fa;
+  --reading-indigo: #594473;
+  --reading-mint: #e9f4f0;
+  --reading-warning: #faeceb;
+  --reading-text: #302839;
+  --reading-secondary: #6b6078;
+  --reading-border: rgba(128, 106, 154, .18);
+  --reading-shadow: 0 8px 24px rgba(89, 66, 118, .065), inset 0 1px 0 rgba(255,255,255,.94);
+  --reading-radius: 20px;
+  --reading-gap: 28px;
+  --reading-display: 'AppleMyungjo', 'Nanum Myeongjo', 'Batang', Georgia, serif;
+}
+body:has(.reading-experience), body:has(.fortune-experience) {
+  background: radial-gradient(ellipse at 5% 0, #eee6f8 0, transparent 48%), radial-gradient(ellipse at 100% 45%, #eaf4f0 0, transparent 48%), #f8f6fb;
+}
+.fortune-experience .period-ai-head, .reading-hero {
+  background: radial-gradient(ellipse at 100% 0, rgba(209,190,237,.48), transparent 65%), radial-gradient(ellipse at 0 100%, rgba(225,245,239,.7), transparent 60%), linear-gradient(135deg, rgba(255,255,255,.98), rgba(248,243,255,.87));
+  border: 1px solid rgba(255,255,255,.94); border-radius: 24px; box-shadow: var(--reading-shadow);
+}
+.fortune-experience .period-ai-head { padding: 22px 18px !important; gap: 8px; }
+.fortune-experience .period-ai-head h3, .reading-hero h3 {
+  font-family: var(--reading-display); font-size: clamp(22px, 5.6vw, 26px) !important;
+  line-height: 1.6 !important; font-weight: 600 !important; letter-spacing: -.04em; text-wrap: pretty;
+}
+.reading-hero .eyebrow, .fortune-experience .period-ai-kicker { font-size: 11px !important; font-weight: 700; letter-spacing: .06em; color: #6a507f !important; }
+.reading-period-date { display: block; font-size: 11px; letter-spacing: .015em; color: var(--reading-secondary); margin: 6px 0 10px; }
+.reading-hero-subtitle { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif; font-size: 13px !important; line-height: 1.8 !important; font-weight: 400; color: var(--reading-secondary); margin: 14px 0 0 !important; }
+.reading-flows { gap: 16px; }
+.reading-section-heading, .reading-section > h3, .fortune-experience .period-ai-section-title > span {
+  font-size: 18px; font-weight: 700; letter-spacing: -.035em; color: #4c3d60; margin: 0 0 12px;
+}
+.reading-section-heading { margin: 0; }
+.flow-section h4 { font-size: 12px; letter-spacing: .025em; color: #4f6a60; margin-bottom: 9px; }
+.flow-section.is-caution h4 { color: #8d5960; }
+.flow-grid { align-items: stretch; }
+.flow-tile {
+  padding: 12px 13px; border: 1px solid rgba(255,255,255,.88); border-radius: 17px;
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(222,239,232,.8));
+  box-shadow: 0 5px 15px rgba(75,104,90,.05), inset 0 1px 0 white;
+}
+.is-caution .flow-tile { background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(243,224,229,.85)); box-shadow: 0 5px 15px rgba(117,68,90,.05), inset 0 1px 0 white; }
+.flow-tile-heading strong { font-size: 14px; letter-spacing: -.04em; }
+.flow-score { font-size: 16px; font-weight: 600; letter-spacing: -.03em; }
+.flow-band { color: #655b70; font-size: 11px; }
+.flow-tile p { font-size: 12px; line-height: 1.6; color: #4c4756; }
+.flow-more { margin-top: 4px; }
+.fortune-experience .period-ai-user-focus .period-ai-topic {
+  padding: 18px !important; border: 1px solid rgba(255,255,255,.96) !important; border-radius: 22px !important;
+  background: linear-gradient(155deg, rgba(255,255,255,.96), rgba(246,241,251,.85)) !important; box-shadow: var(--reading-shadow) !important; gap: 14px;
+}
+.fortune-experience .period-ai-user-focus .period-ai-topic-list { gap: 18px; }
+.fortune-experience .period-ai-user-focus .period-ai-topic > strong { font-size: 20px !important; font-weight: 700; letter-spacing: -.04em; color: #56416e; }
+.fortune-experience .period-ai-user-focus .period-ai-topic > b, .reading-conclusion {
+  display: block; font-size: 15px !important; line-height: 1.9 !important; font-weight: 500; letter-spacing: -.025em; color: var(--reading-text); margin: 0;
+}
+.reading-explanation { padding: 12px 13px; border-radius: 13px; margin-top: 12px; }
+.reading-explanation.is-reason { background: linear-gradient(115deg, #eee8f8, rgba(242,236,249,.35)); color: #4e3e66; }
+.reading-explanation.is-practice { background: linear-gradient(115deg, #e7f1ed, rgba(239,246,242,.4)); color: #3f5d52; }
+.reading-explanation.is-caution { background: linear-gradient(115deg, #f6e9e9, rgba(252,240,237,.45)); color: #81535c; }
+.reading-explanation.is-timing { background: #f4f0e8; color: #715e45; }
+.reading-explanation-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .015em; }
+.reading-explanation-label svg { flex: 0 0 14px; }
+.reading-explanation p, .fortune-experience .period-ai-user-focus .reading-explanation p {
+  font-size: 14px !important; line-height: 1.85 !important; font-weight: 400; margin: 7px 0 0 !important; color: var(--reading-text); word-break: keep-all; overflow-wrap: anywhere;
+}
+.fortune-experience .period-ai-quick-date-list, .reading-timeline { border: 0; padding: 0; gap: 10px; }
+.fortune-experience .period-ai-quick-date, .reading-timeline li {
+  padding: 14px 16px !important; border: 1px solid rgba(255,255,255,.9) !important; border-radius: 16px !important;
+  background: linear-gradient(110deg, #eee9f7, rgba(255,255,255,.94)) !important; box-shadow: inset 0 1px 0 white; gap: 6px;
+}
+.reading-timeline time, .fortune-experience .period-ai-quick-date > b { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .025em; }
+.fortune-experience .period-ai-quick-date strong { display: block; font-size: 13px; font-weight: 500; line-height: 1.65; }
+.reading-timeline li p { font-size: 13px; line-height: 1.8; margin: 4px 0 0; }
+.relationship-pattern { border: 0; padding: 0; margin: 14px 0 20px; }
+.relationship-pattern h4 { font-size: 17px; letter-spacing: -.04em; color: #56416e; margin-bottom: 10px; }
+.relationship-pattern .reading-conclusion { font-size: 15px; }
+.relationship-balance > section { background: linear-gradient(145deg, rgba(255,255,255,.92), #e5f1ec); border: 1px solid white; box-shadow: var(--reading-shadow); }
+.relationship-balance > section + section { background: linear-gradient(145deg, rgba(255,255,255,.92), #f4e5e9); }
+.relationship-balance h3 { line-height: 1.6; }
+.relationship-balance li + li { margin-top: 5px; }
+.contact-row, .fortune-experience .period-ai-direction-item {
+  background: linear-gradient(120deg, rgba(238,230,249,.9), rgba(255,255,255,.92)); border: 1px solid white; box-shadow: var(--reading-shadow);
+}
+.contact-row p { line-height: 1.8; }
+.contact-timing { display: block; font-size: 11px; color: var(--reading-secondary); margin-top: 8px; }
+.direction-band { color: #624575; border: 1px solid rgba(128,106,154,.14); background: #fffcff; border-radius: 8px; }
+.relationship-technical, .fortune-experience .period-ai-details { margin-top: 4px; }
+.relationship-technical[open], .fortune-experience .period-ai-details[open] { padding-bottom: 16px; }
+.relationship-technical pre { max-height: 420px; overflow: auto; padding: 12px; background: rgba(231,227,238,.5); border-radius: 12px; }
+.portrait-concept { padding: 4px 16px 12px; border-radius: 20px; border: 1px solid white; background: radial-gradient(ellipse at top right, #e7dbf3, transparent 70%), linear-gradient(120deg,#fff9fb,#eef4f3); box-shadow: var(--reading-shadow); }
+.portrait-concept > summary { font-weight: 700; }
+.portrait-concept > summary svg { vertical-align: middle; margin-right: 7px; }
+.portrait-hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.portrait-hints span { border-radius: 10px; padding: 8px 10px; background: rgba(255,255,255,.78); font-size: 13px; line-height: 1.7; }
+.portrait-concept button { background: #66517f; color: white; border: 0; display: inline-flex; align-items: center; gap: 8px; width: 100%; justify-content: center; font-size: 13px; }
+.portrait-concept pre { white-space: pre-wrap; font-size: 12px; line-height: 1.8; }
+.personal-marriage-card { padding: 0 !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .fortune-experience .flow-tile, .relationship-experience .contact-row { transition: box-shadow 180ms ease, transform 180ms ease; }
+  .portrait-concept button:active { transform: scale(.98); }
+}

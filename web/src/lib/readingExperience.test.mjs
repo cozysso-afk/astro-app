@@ -131,3 +131,33 @@ test('every mode is restrained with missing relationship evidence', () => {
     assert.match(view.headline,/부족/)
   }
 })
+
+test('topic depth adds distinct scope to actual direction and keeps all scores immutable',()=>{
+  const fixture=fortuneFixture();const before=JSON.stringify(fixture)
+  const view=buildFortuneUserSummary(fixture.data,fixture.context)
+  for(const topic of view.focusTopics) {
+    assert.ok(topic.conclusion.split(/[.!?]/).filter(s=>s.trim()).length>=2)
+    assert.ok(topic.reason.length>35)
+    assert.doesNotMatch(topic.conclusion+topic.reason,/orb|W:|S:|T:|상대활성도|경계 압력/)
+  }
+  assert.equal(new Set(view.focusTopics.map(t=>t.conclusion)).size,view.focusTopics.length)
+  assert.equal(JSON.stringify(fixture),before)
+})
+test('repeated relationship roles merge without losing raw aspect traceability',()=>{
+  const input=[...aspects,{a:'Mercury',b:'Jupiter',aspect:'trine',orb:1.2,tone:'supportive'}]
+  const view=buildRelationshipUserSummary({aspects:input,partnerExact:false,mode:'compatibility'})
+  const communication=view.sections.find(s=>s.id==='communication').rows
+  assert.equal(communication.length,1)
+  assert.match(communication[0].reason,/천왕성/)
+  assert.match(communication[0].reason,/목성/)
+  assert.match(communication[0].conclusion,/함께/)
+  assert.equal(view.ranked.length,input.length)
+  const displayed=view.sections.flatMap(s=>s.rows)
+  assert.equal(new Set(displayed.map(p=>p.title)).size,displayed.length)
+})
+test('relationship reasons distinguish Mercury/Uranus, Venus/Mars, and Saturn rather than swapping names',()=>{
+  const view=relationship('compatibility')
+  assert.match(view.sections.find(s=>s.id==='communication').rows[0].reason,/예측하기 어려운 속도/)
+  assert.match(view.sections.find(s=>s.id==='attraction').rows[0].reason,/애정 표현.*다가가는 힘/)
+  assert.match(view.sections.find(s=>s.id==='stability').rows[0].reason,/오래 이어지는 것과 편안하게 유지되는 것/)
+})

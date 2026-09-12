@@ -25,7 +25,7 @@ test('unmarried marriage splits no-counterpart forecast from specific-partner ma
   assert.doesNotMatch(personalPanel, /supabase\.functions\.invoke|GEMINI_API_KEY|generateContent/)
 })
 
-test('no-counterpart personal marriage actively provides fun probability timing and spouse archetype', () => {
+test('personal marriage preserves computed data with non-prophetic creative presentation', () => {
   assert.match(api, /@app\.post\("\/v1\/marriage\/personal"\)/)
   assert.match(api, /counterpart_required["']:\s*False/)
   assert.match(personalEngine, /"counterpart_required": False/)
@@ -37,11 +37,14 @@ test('no-counterpart personal marriage actively provides fun probability timing 
   assert.match(personalEngine, /appearance_hints/)
   assert.match(personalEngine, /career_clusters/)
   assert.match(personalEngine, /meeting_route/)
-  assert.match(personalPanel, /결혼 가능성 지수/)
-  assert.match(personalPanel, /외모 · 분위기/)
-  assert.match(personalPanel, /직업 · 분야/)
-  assert.match(personalPanel, /어디서 만날 가능성이 큰지/)
-  assert.match(personalPanel, /0~100은 실제 통계 확률이 아니/)
+  assert.match(personalPanel, /forecast\.marriage_probability_percent/)
+  assert.match(personalPanel, /나의 취향을 그려본다면/)
+  assert.match(personalPanel, /spouse\.appearance_hints/)
+  assert.match(personalPanel, /JSON\.stringify\(result, null, 2\)/)
+  assert.match(personalPanel, /통계 확률 아님/)
+  assert.match(personalPanel, /기술 근거 자세히 보기/)
+  assert.match(personalPanel, /AI 초상 콘셉트 프롬프트 복사/)
+
 })
 
 test('relationship AI keeps compatibility reunion unmarried-partner and married semantics separate', () => {
