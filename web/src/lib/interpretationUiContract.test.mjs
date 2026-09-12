@@ -75,3 +75,33 @@ test('relationship focus appears once and follows timing detail', () => {
   assert.match(period, /!showRelationshipFocus&&data\.clusters\.relationship/)
   assert.match(period, /className="period-ai-relationship-more"/)
 })
+
+test('period topic detail separates primary explanations from compact reference topics', () => {
+  assert.match(period, /const topicEntries = Object\.entries\(data\.topic_analysis \?\? \{\}\)\.sort/)
+  assert.match(period, /const primaryTopicEntries = topicEntries\.filter\(\(\[,item\]\)=>item\.importance === '핵심' \|\| item\.importance === '주목'\)/)
+  assert.match(period, /const referenceTopicEntries = topicEntries\.filter\(\(\[,item\]\)=>item\.importance === '참고'\)/)
+  assert.doesNotMatch(period, /15개 분야별 해석 펼치기/)
+
+  const primaryStart = period.indexOf('<summary>핵심 · 주목 분야 해설</summary>')
+  const referenceStart = period.indexOf('<summary>참고 분야 {referenceTopicEntries.length}개</summary>')
+  const detailEnd = period.indexOf('<div className="period-ai-section"><strong>체계별 계산 해설</strong>', referenceStart)
+  assert.ok(primaryStart >= 0 && referenceStart > primaryStart, 'primary disclosure must precede reference topics')
+  assert.ok(detailEnd > referenceStart, 'reference disclosure must stay inside detailed interpretation')
+
+  const primary = period.slice(primaryStart, referenceStart)
+  assert.match(primary, /primaryTopicEntries\.map/)
+  assert.match(primary, /item\.timing&&/)
+  assert.match(primary, /item\.action&&/)
+  assert.match(primary, /item\.avoid&&/)
+
+  const reference = period.slice(referenceStart, detailEnd)
+  assert.match(reference, /referenceTopicEntries\.map/)
+  assert.match(reference, /item\.verdict/)
+  assert.match(reference, /item\.reason/)
+  assert.doesNotMatch(reference, /item\.timing|item\.action|item\.avoid/, 'reference cards should stay compact')
+})
+
+test('period result labels deterministic output from reliable existing metadata', () => {
+  assert.match(period, /result\.model === 'deterministic-provisional-v2' \|\| localQualityFallback/)
+  assert.match(period, /계산근거 기반 자동 해설/)
+})

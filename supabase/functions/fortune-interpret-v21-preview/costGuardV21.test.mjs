@@ -42,6 +42,51 @@ function packet(){
   };
 }
 
+function singleDayPacket(){
+  const p=structuredClone(packet());
+  const date='2026-09-12';
+  const emphasized=new Set(['연애','연락','직장']);
+  p.period={start:date,end:date,day_count:1};
+  p.period_kind='day';
+  p.ranking={strongest:['연애','연락','직장'].map(topic=>({topic,average:37})),weakest:[]};
+  p.western.months=[];
+  p.western.detail_days=[];
+  p.western.daily_score_matrix={topic_order:[...TOPICS,...REL],rows:[[date,...Array(TOPICS.length+REL.length).fill(37)]]};
+  p.western.daily_evidence_coverage={days:1,days_with_evidence:1};
+  p.evidence_ledger=[];
+  const dateRefs=[];
+  for(const topic of TOPICS){
+    const average=emphasized.has(topic)?37:50;
+    p.western.overall[topic]={average,band:average<40?'약함':'보통',spread:0,best_days:[{date,score:average}],caution_days:[{date,score:average}]};
+    p.western.daily_pattern_digest[topic]={days:1,mean:average,min:{date,score:average},max:{date,score:average},volatility:0,peak_7d:{start:date,end:date,average},low_7d:{start:date,end:date,average}};
+    p.evidence_ledger.push({id:`W:overall:${topic}`,system:'western',scope:'period_average',topic,direction:'neutral',score:average,text:`${topic} 기간 평균 ${average.toFixed(1)} · 변동폭 0.0`});
+    if(emphasized.has(topic)){
+      const id=`W:date:${date}:${topic}:best`;
+      dateRefs.push(id);
+      p.evidence_ledger.push({id,system:'western',scope:'best_day',topic,direction:'supportive',date,score:average,text:`${date} ${topic} 단일일 상대지수 ${average.toFixed(1)}`});
+    }
+  }
+  const direct=[
+    {id:`W:daily:${date}:1`,topic:'연애',text:'금성과 화성의 조화 각이 감정 표현 축에 연결됨 · 관련분야 연애'},
+    {id:`W:daily:${date}:2`,topic:'연애',text:'달과 금성의 접점이 만남 반응 축에 연결됨 · 관련분야 연애'},
+    {id:`W:daily:${date}:3`,topic:'연락',text:'수성의 조화 각이 대화 지속 축에 연결됨 · 관련분야 연락'},
+    {id:`W:daily:${date}:4`,topic:'연락',text:'수성과 목성의 접점이 응답 흐름 축에 연결됨 · 관련분야 연락'},
+    {id:`W:daily:${date}:5`,topic:'직장',text:'태양과 토성의 접점이 업무 책임 축에 연결됨 · 관련분야 직장'},
+    {id:`W:daily:${date}:6`,topic:'직장',text:'수성의 각이 일정 조율 축에 연결됨 · 관련분야 직장'},
+  ];
+  for(const row of direct)p.evidence_ledger.push({id:row.id,system:'western',scope:'daily_actual_aspect_house',direction:'context',date,text:row.text});
+  for(const [index,topic] of REL.entries()){
+    const average=41+index*4;
+    p.western.relationship_signals[topic]={average,band:'보통',spread:0,best_days:[{date,score:average}],caution_days:[{date,score:average}]};
+    p.evidence_ledger.push({id:`W:overall:${topic}`,system:'western',scope:'relationship_average',topic,direction:'neutral',score:average,text:`${topic} 기간 평균 ${average.toFixed(1)}`});
+    const id=`W:date:${date}:${topic}:best`;
+    p.evidence_ledger.push({id,system:'western',scope:'relationship_best_day',topic,direction:'supportive',date,score:average,text:`${date} ${topic} 방향 계산근거`});
+  }
+  p.key_dates=[{date,topics:['연애','연락','직장'],western_refs:[...direct.map(row=>row.id),...dateRefs]}];
+  p.cross_system_timeline=[];
+  return p;
+}
+
 test('V21 prompt packet removes 365-row matrix and keeps evidence-backed summary',()=>{
   const full=packet(); const compact=buildPromptPacket(full);
   assert.equal(compact.western.daily_score_matrix,undefined);
@@ -77,6 +122,70 @@ test('V21 deterministic topics cover all 15 without a second Gemini call',()=>{
   assert.deepEqual(new Set(rows.map(x=>x.topic)),new Set(TOPICS));
   assert.ok(rows.filter(x=>x.importance==='핵심').length<=4);
   for(const row of rows){assert.ok(row.reason.length>=25);assert.ok(row.evidence_refs.length>=1);}
+});
+
+test('V21 single-day synthesis uses point-in-time semantics and never emits zero-variation filler',()=>{
+  const p=singleDayPacket();
+  const direct=buildLocalQualityFallbackCore(p);
+  const stabilized=stabilizeCoreForQuality(direct,p);
+  const validated=validateOutput(stabilized);
+  const forbidden=/기간 평균|변동폭(?:은)?\s*0(?:\.0)?|37(?:\.0)?점에서\s*37(?:\.0)?점 사이|일별 변동성(?:은)?\s*0|(?:상승|하락)\s*추세/;
+  assert.equal(Array.isArray(direct.topic_analysis),false,'direct provisional output must use the public topic map shape');
+  assert.deepEqual(Object.keys(direct.topic_analysis),[...TOPICS]);
+  assert.ok(validated,'single-day result must preserve the complete backend schema');
+  assert.equal(Object.keys(validated.topic_analysis).length,TOPICS.length);
+  const report=inspectInterpretationQuality(validated,p);
+  for(const stage of [1,2,3,4])assert.equal(report.stages.find(row=>row.stage===stage)?.passed,true,`single-day critical quality stage ${stage} must pass`);
+  assert.doesNotMatch(JSON.stringify(direct),forbidden);
+  assert.doesNotMatch(JSON.stringify(stabilized),forbidden);
+  assert.match(direct.headline,/확인하는 날/);
+  assert.match(direct.overall.summary,/직접 근거|세부 계산근거/);
+  assert.ok(direct.priorities.length>=1,'direct provisional output must retain a practical next check');
+  assert.equal(direct.overall.best_phase,'');
+  assert.equal(direct.overall.caution_phase,'');
+});
+
+test('V21 single-day core topics explain actual evidence without exposing opaque refs',()=>{
+  const p=singleDayPacket();
+  const rows=buildDeterministicTopicAnalysis(p);
+  const love=rows.find(row=>row.topic==='연애');
+  const contact=rows.find(row=>row.topic==='연락');
+  assert.equal(rows.length,TOPICS.length);
+  assert.equal(love.importance,'핵심');
+  assert.equal(contact.importance,'핵심');
+  assert.ok(love.evidence_refs.some(ref=>ref.startsWith('W:daily:')),'readable evidence must keep its trace ref');
+  assert.match(love.reason,/서양점성술/);
+  assert.match(love.reason,/금성과 화성의 조화 각|달과 금성의 접점/);
+  assert.match(contact.reason,/수성의 조화 각|수성과 목성의 접점/);
+  assert.doesNotMatch([love.verdict,love.reason,love.timing,love.action,love.avoid,love.confidence_reason].join(' '),/\b(?:W|S|T):/);
+  assert.doesNotMatch(love.reason,/사주|태국점성술/,'visible source labels must come from the linked Western rows');
+  assert.notEqual(love.reason,contact.reason,'연애 and 연락 must reflect their distinct evidence and real-world checks');
+});
+
+test('V21 single-day reference topics remain present but restrained',()=>{
+  const rows=buildDeterministicTopicAnalysis(singleDayPacket());
+  const reference=rows.find(row=>row.topic==='컨디션');
+  assert.equal(rows.length,TOPICS.length);
+  assert.equal(reference.importance,'참고');
+  assert.ok(reference.reason.length>=18&&reference.reason.length<160);
+  assert.equal(reference.timing,'');
+  assert.equal(reference.action,'');
+  assert.equal(reference.avoid,'');
+  assert.equal(reference.confidence,'낮음');
+  assert.match(reference.confidence_reason,/제한된 근거|확신도를 낮게/);
+  assert.ok(reference.evidence_refs.length>=1,'reference topic traceability must remain intact');
+});
+
+test('V21 multi-day synthesis retains useful period statistics and distinct dates',()=>{
+  const p=packet();
+  p.evidence_ledger.push({id:'W:date:2026-11-19:연애:caution',system:'western',scope:'caution_day',topic:'연애',direction:'caution',date:'2026-11-19',score:34,text:'2026-11-19 연애 하위 날짜 · 상대지수 34.0'});
+  const rows=buildDeterministicTopicAnalysis(p);
+  const love=rows.find(row=>row.topic==='연애');
+  assert.match(love.reason,/기간 평균/);
+  assert.match(love.reason,/변동폭/);
+  assert.match(love.reason,/2026-11-19 .*점에서 2027-04-11 .*점 사이/);
+  assert.match(love.reason,/변동성/);
+  assert.ok(['2026-11-19','2027-04-11'].includes(love.timing),'timing must remain one of the directly backed distinct dates');
 });
 
 test('V21 prompt budget and external prompt work without Gemini',()=>{

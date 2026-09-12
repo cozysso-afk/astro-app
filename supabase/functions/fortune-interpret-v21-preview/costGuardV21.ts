@@ -8,8 +8,20 @@ const INVESTMENT_TOPICS = new Set(["투자심리","수익실현","신규진입",
 function num(v: unknown){ const n=Number(v??0); return Number.isFinite(n)?n:0; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
 function scoreText(v:unknown){ return Number.isFinite(Number(v)) ? Number(v).toFixed(1) : "-"; }
+function pointScoreText(v:unknown){ const n=Number(v); return Number.isFinite(n)?n.toFixed(1).replace(/\.0$/,""):"-"; }
 function jsonBytes(v:any){ return enc.encode(JSON.stringify(v)).byteLength; }
 function periodLimit(kind:string){ return kind==="annual"?8:kind==="month"?6:kind==="week"?5:2; }
+function calendarDate(v:unknown){ return String(v??"").match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]??""; }
+
+function isSingleDayPeriod(payload:any){
+  const start=calendarDate(payload?.period?.start),end=calendarDate(payload?.period?.end);
+  if(start&&end)return start===end;
+  if(Number(payload?.period?.day_count)===1)return true;
+  const dates=new Set<string>();
+  if(start)dates.add(start);if(end)dates.add(end);
+  for(const row of payload?.western?.daily_score_matrix?.rows??[]){const date=calendarDate(Array.isArray(row)?row[0]:row?.date);if(date)dates.add(date);}
+  return dates.size===1;
+}
 
 function topicSubject(topic:string){
   const last=topic.charCodeAt(Math.max(0,topic.length-1));
@@ -58,6 +70,55 @@ function topicEvidence(payload:any, topic:string){
     return 9;
   };
   return [...direct].sort((a,b)=>priority(a)-priority(b)).slice(0,8);
+}
+
+function relatedTopicsFromEvidence(row:any){
+  const match=String(row?.text??"").match(/관련분야\s+(.+)$/);
+  return match?match[1].split(/[,·/]/).map((value:string)=>value.trim()).filter(Boolean):[];
+}
+
+function readableTopicEvidence(payload:any,topic:string,singleDay:boolean){
+  const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[];
+  const unambiguousLinkedIds=new Set<string>();
+  for(const keyDate of Array.isArray(payload?.key_dates)?payload.key_dates:[]){
+    const topics=kdTopics(keyDate);
+    if(topics.length!==1||topics[0]!==topic)continue;
+    for(const ref of keyDate?.western_refs??[])unambiguousLinkedIds.add(String(ref));
+  }
+  const periodDate=calendarDate(payload?.period?.start);
+  const supportsTopic=(row:any)=>{
+    if(String(row?.topic??"")===topic)return true;
+    const related=relatedTopicsFromEvidence(row);
+    if(related.length)return related.includes(topic);
+    return !row?.topic&&unambiguousLinkedIds.has(String(row?.id??""));
+  };
+  const aggregate=(row:any)=>/(?:period_average|month_average|best_day|caution_day|relationship_average)/.test(String(row?.scope??""));
+  const priority=(row:any)=>{const scope=String(row?.scope??"");const id=String(row?.id??"");if(/intraday_evidence/.test(scope)||id.startsWith("W:detail:"))return 0;if(/daily_actual/.test(scope)||id.startsWith("W:daily:"))return 1;if(/intraday_window/.test(scope)||id.startsWith("W:window:"))return 2;if(id.startsWith("W:date:"))return 4;if(id.startsWith("W:month:"))return 5;if(id.startsWith("W:overall:"))return 6;return 3;};
+  const candidates=rows.filter(supportsTopic).filter((row:any)=>{
+    if(!singleDay)return true;
+    const date=calendarDate(row?.date);
+    if(date&&periodDate&&date!==periodDate)return false;
+    return !aggregate(row);
+  }).sort((a:any,b:any)=>priority(a)-priority(b));
+  const summaries:string[]=[];const usedRows:any[]=[];
+  for(const row of candidates){
+    let detail=String(row?.text??row?.label??"")
+      .replace(/\b(?:W|S|T):[^\s),;\]}]+/g,"")
+      .replace(/\s*·\s*관련분야\s+.+$/,"")
+      .replace(/\s{2,}/g," ").trim();
+    if(singleDay&&periodDate)detail=detail.replace(new RegExp(`^${periodDate}\\s*[·:–—-]?\\s*`),"").trim();
+    detail=detail.replace(/^[·,;:\s]+|[·,;:\s]+$/g,"");
+    if(!detail)continue;
+    if(detail.length>120)detail=`${detail.slice(0,117).trim()}…`;
+    const system=String(row?.system??"")==="western"?"서양점성술":String(row?.system??"")==="saju"?"사주":String(row?.system??"")==="thai"?"태국점성술":"";
+    const direction=row?.direction==="supportive"?"활성 방향":row?.direction==="caution"?"주의 방향":"";
+    const date=!singleDay?calendarDate(row?.date):"";
+    const summary=uniq([system,detail,date,`${topic} 연결`,direction].filter(Boolean)).join(" · ");
+    if(!summary||summaries.includes(summary))continue;
+    summaries.push(summary);usedRows.push(row);
+    if(summaries.length>=3)break;
+  }
+  return {rows:usedRows,summaries};
 }
 
 function topicSalience(payload:any,topic:string){
@@ -110,34 +171,73 @@ function topicVerb(topic:string){
   return {action:"체감보다 수면·일정·회복 같은 확인 가능한 상태를 기준으로 강도를 조절해.",avoid:"하루의 컨디션 변화를 장기 상태로 단정하지 마."};
 }
 
+function topicRealityCheck(topic:string){
+  if(topic==="연애")return "이날은 호감 표현, 만남의 지속성, 관계를 구체화하는 행동이 실제로 이어지는지 확인해.";
+  if(topic==="연락")return "이날은 연락 횟수보다 답변의 구체성, 대화의 지속, 다음 약속으로 이어지는지를 확인해.";
+  if(topic==="재회")return "이날은 과거 인연의 실제 재접촉이나 대화 재개가 있는지를 확인하되 재회 결과로 단정하지 마.";
+  if(topic==="대인관계")return "이날은 상대별 반응과 약속 이행처럼 관찰 가능한 관계 행동을 구분해서 확인해.";
+  if(topic==="직장")return "이날은 업무 요청, 협의, 일정 진행처럼 실제로 확인되는 직장 흐름을 기준으로 봐.";
+  if(topic==="이직")return "이날은 제안, 공고, 면담, 조건 확인처럼 구체적인 이직 움직임이 있는지를 확인해.";
+  if(topic==="학업")return "이날은 집중 지속 시간과 과제 진척처럼 확인 가능한 학업 반응을 기준으로 봐.";
+  if(topic==="시험")return "이날은 준비도와 실수 점검처럼 실제 시험 대응에 필요한 신호를 확인해.";
+  if(topic==="금전")return "이날은 입금, 지출, 계약처럼 확인 가능한 금전 변화를 먼저 점검해.";
+  if(topic==="소식")return "이날은 안내의 출처, 전달 내용, 후속 일정이 구체적인지를 확인해.";
+  if(topic==="컨디션")return "이날은 수면, 회복, 일정 소화처럼 확인 가능한 몸 상태를 기준으로 봐.";
+  if(INVESTMENT_TOPICS.has(topic))return "이날은 실제 가격·거래량·손익 기준을 우선하고, 이 상대지수를 매매 신호로 사용하지 마.";
+  return "이날 실제로 확인되는 변화가 계산 흐름과 함께 나타나는지를 살펴봐.";
+}
+
 export function buildDeterministicTopicAnalysis(payload:any){
   const {core,watch}=topicImportance(payload);
+  const singleDay=isSingleDayPeriod(payload);
   return TOPICS.map(topic=>{
     const stat=payload?.western?.overall?.[topic]??{};
     const digest=payload?.western?.daily_pattern_digest?.[topic]??{};
     const avg=num(stat?.average), spread=num(stat?.spread);
-    const refs=topicEvidence(payload,topic).map((row:any)=>String(row?.id??"")).filter(Boolean);
+    const baseEvidence=topicEvidence(payload,topic);
     const importance=core.has(topic)?"핵심":watch.has(topic)?"주목":"참고";
+    const readable=readableTopicEvidence(payload,topic,singleDay);
+    const traceRows=[...readable.rows,...baseEvidence].filter((row:any,index:number,all:any[])=>String(row?.id??"")&&all.findIndex((x:any)=>String(x?.id??"")===String(row?.id??""))===index);
+    const evidenceLimit=importance==="핵심"?5:importance==="주목"?3:2;
+    const refs=traceRows.map((row:any)=>String(row.id)).slice(0,evidenceLimit);
     const risk=topic===INVESTMENT_RISK;
     const direction=risk?(avg>=60?"경계 압력이 상대적으로 높은 편":avg<40?"경계 압력이 상대적으로 낮은 편":"경계 압력이 중간권"):(avg>=60?"상대적으로 강한 편":avg<40?"상대적으로 약한 편":"중간권");
+    if(importance==="참고")return {
+      topic,importance,
+      verdict:`${topicSubject(topic)} ${singleDay?"이날":"이번 기간"} 우선순위로 볼 직접 근거가 상대적으로 약해.`,
+      reason:readable.summaries.length?`참고 가능한 직접 근거: ${readable.summaries[0]}. 다른 분야보다 우선순위는 낮게 봐.`:"직접 연결된 세부 계산근거가 제한적이라 핵심 판단에는 사용하지 않아.",
+      timing:"",action:"",avoid:"",confidence:"낮음",
+      confidence_reason:"핵심 판단이 아닌 제한된 근거만 확인해 확신도를 낮게 두었어.",
+      evidence_refs:refs,
+    };
     const min=digest?.min, max=digest?.max;
-    const backedDateSet=new Set(topicEvidence(payload,topic).flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
-    const reasonParts=[`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`];
-    if(min?.date&&max?.date&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`직접 근거가 연결된 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
-    else reasonParts.push(`일별 변동성은 ${scoreText(digest?.volatility)}점이며, 날짜를 특정할 때는 evidence ledger에 직접 연결된 날짜만 사용해.`);
-    const timing=bestTopicDate(payload,topic);
+    const backedDateSet=new Set(baseEvidence.flatMap((row:any)=>[row?.date,row?.start,row?.end]).map((value:any)=>String(value??"").slice(0,10)).filter((value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)));
+    const reasonParts:string[]=[];
+    if(readable.summaries.length)reasonParts.push(`직접 근거: ${readable.summaries.join("; ")}.`);
+    else reasonParts.push("점수와 연결해 설명할 세부 계산근거가 충분하지 않아 사건 의미를 덧붙이지 않아.");
+    if(singleDay)reasonParts.push(topicRealityCheck(topic));
+    else{
+      reasonParts.push(`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`);
+      if(min?.date&&max?.date&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`직접 근거가 연결된 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
+      else reasonParts.push(`일별 변동성은 ${scoreText(digest?.volatility)}점이며, 날짜를 특정할 때는 계산근거에 직접 연결된 날짜만 사용해.`);
+      reasonParts.push(topicRealityCheck(topic).replace(/^이날은/,"현실에서는"));
+    }
+    const timing=singleDay?"":bestTopicDate(payload,topic);
     if(timing)reasonParts.push(`판단할 때는 ${timing} 전후의 직접 계산근거와 기간 평균을 함께 보는 게 좋아.`);
     const va=topicVerb(topic);
+    const confidence=readable.rows.length>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
     return {
       topic,importance,
-      verdict:`${topicSubject(topic)} 이번 기간에서 ${direction}으로 읽혀.`,
+      verdict:singleDay?`${topicSubject(topic)} 이날 활성도가 ${pointScoreText(avg)}점으로 ${direction}이야.`:`${topicSubject(topic)} 이번 기간에서 ${direction}으로 읽혀.`,
       reason:reasonParts.join(" "),
       timing,
       action:va.action,
       avoid:va.avoid,
-      confidence:refs.length>=3?"높음":refs.length>=1?"보통":"낮음",
-      confidence_reason:`직접 연결된 계산 근거 ${refs.length}개와 기간 통계를 함께 사용했어.`,
-      evidence_refs:refs.slice(0,importance==="핵심"?5:3),
+      confidence,
+      confidence_reason:singleDay
+        ? readable.summaries.length?`이날 계산에 연결된 근거 ${refs.length}개 중 읽을 수 있는 세부 근거 ${readable.summaries.length}개를 확인했어. 확신도는 사건 가능성이 아니라 근거 연결의 선명도야.`:"세부 계산근거를 내용으로 확인할 수 없어 확신도를 낮게 두었어."
+        : `직접 연결된 계산 근거 ${refs.length}개와 여러 날짜의 통계를 함께 확인했어. 확신도는 사건 가능성이 아니라 근거 연결의 선명도야.`,
+      evidence_refs:refs,
     };
   });
 }
@@ -266,6 +366,7 @@ function sanitizeInvestmentGuidance(data:any,map:Map<string,any>){
 
 export function stabilizeCoreForQuality(core:any,payload:any){
   const data=structuredClone(core??{});
+  const singleDay=isSingleDayPeriod(payload);
   const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[];
   const map=new Map<string,any>(rows.map((row:any)=>[String(row?.id??""),row]));
   const valid=(values:any)=>uniq(refs(values).filter(ref=>map.has(ref)));
@@ -286,7 +387,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
   const overallRefs=(topics:string[]=[])=>uniq(rows.filter((row:any)=>String(row?.id??"").startsWith("W:overall:")&&(!topics.length||topics.includes(String(row?.topic??"")))).map((row:any)=>String(row.id)));
   const topicsFromRefs=(values:string[])=>uniq(values.map(ref=>String(map.get(ref)?.topic??"")).filter(Boolean));
   const directionSignal=(values:string[])=>{const linked=values.map(ref=>map.get(ref)).filter(Boolean);const pos=linked.some((r:any)=>r?.direction==="supportive"),neg=linked.some((r:any)=>r?.direction==="caution");return pos&&neg?"혼합":neg?"주의":pos?"활용":"배경";};
-  const evidenceSentence=(values:string[])=>values.map(ref=>String(map.get(ref)?.text??"").trim()).filter(Boolean).slice(0,2).join(" ");
+  const evidenceSentence=(values:string[])=>values.map(ref=>map.get(ref)).filter((row:any)=>!singleDay||!/(?:period_average|month_average|relationship_average)/.test(String(row?.scope??""))).map((row:any)=>String(row?.text??"").trim()).filter(Boolean).slice(0,2).join(" ");
   const windowTopics=(w:any)=>{const direct=Array.isArray(w?.topics)?w.topics.map(String):[];return uniq([...direct,...topicsFromRefs(valid(w?.evidence_refs))]);};
   const firstTopic=(topics:string[])=>topics.find(topic=>TOPICS.includes(topic as any))??topics[0]??String(coreTopics[0]?.topic??TOPICS[0]);
   const enrichWindow=(w:any)=>{
@@ -299,7 +400,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     out.summary=ensureMinText(out?.summary,45,`${ev||`${topic} 계산근거가 이 시기에 모여 있어.`} 사건 확정이 아니라 상대활성도 변화로 보고 실제 일정과 반응을 함께 확인해.`);
     out.action=ensureMinText(out?.action,18,verb.action);out.avoid=ensureMinText(out?.avoid,18,verb.avoid);return out;
   };
-  const makeWindow=(kd:any)=>{const date=iso(kd?.date);const topics=kdTopics(kd);let linked=valid(kd?.western_refs);linked=uniq([...linked,...refsForDate(date,topics).slice(0,4)]);if(linked.length<2)linked=uniq([...linked,...overallRefs(topics).slice(0,2-linked.length)]);const topic=firstTopic(topics.length?topics:topicsFromRefs(linked)),verb=topicVerb(topic),ev=evidenceSentence(linked);return enrichWindow({label:`${date} ${topic} 주목 구간`,start:date,end:date,signal:directionSignal(linked),topics:topics.length?topics:[topic],summary:`${ev||`${topic} 직접 계산근거가 잡힌 날짜야.`} 이 날짜 자체를 사건 보장으로 보지 말고 전후의 실제 변화와 함께 확인해.`,action:verb.action,avoid:verb.avoid,evidence_refs:linked});};
+  const makeWindow=(kd:any)=>{const date=iso(kd?.date);const topics=kdTopics(kd);let linked=valid(kd?.western_refs);linked=uniq([...linked,...refsForDate(date,topics).slice(0,4)]);if(linked.length<2)linked=uniq([...linked,...overallRefs(topics).slice(0,2-linked.length)]);const topic=firstTopic(topics.length?topics:topicsFromRefs(linked)),verb=topicVerb(topic),ev=evidenceSentence(linked);return enrichWindow({label:`${date} ${topic} 주목 구간`,start:date,end:date,signal:directionSignal(linked),topics:topics.length?topics:[topic],summary:`${ev||`${topic} 직접 계산근거가 잡힌 날짜야.`} 이 날짜 자체를 사건 보장으로 보지 말고 ${singleDay?"이날의 실제 반응과":"전후의 실제 변화와"} 함께 확인해.`,action:verb.action,avoid:verb.avoid,evidence_refs:linked});};
   data.key_windows=(Array.isArray(data?.key_windows)?data.key_windows:[]).map(enrichWindow);
   const usedWindowDates=new Set(data.key_windows.flatMap((w:any)=>[iso(w?.start),iso(w?.end)]).filter(Boolean));
   for(const kd of Array.isArray(payload?.key_dates)?payload.key_dates:[]){if(data.key_windows.length>=minimumWindows)break;const date=iso(kd?.date);if(!date||usedWindowDates.has(date))continue;const built=makeWindow(kd);if(!built.evidence_refs.length)continue;data.key_windows.push(built);usedWindowDates.add(date);}
@@ -308,7 +409,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
   data.decisions=data.decisions.map((d:any,index:number)=>{const out={...d};let linked=valid(out?.evidence_refs);const timingDate=iso(out?.timing);let target=data.key_windows.find((w:any)=>timingDate&&iso(w?.start)<=timingDate&&timingDate<=iso(w?.end));if(!target)target=data.key_windows.find((w:any)=>refs(w?.evidence_refs).some((ref:string)=>linked.includes(ref)))??data.key_windows[index%Math.max(1,data.key_windows.length)];if(target&&!linked.some(ref=>windowRefs.has(ref)))linked=uniq([...linked,...refs(target?.evidence_refs).slice(0,1)]);const topic=firstTopic(target?windowTopics(target):[]),verb=topicVerb(topic);out.evidence_refs=linked.slice(0,5);out.action=ensureMinText(out?.action,12,verb.action);out.timing=String(out?.timing??"").trim()||(target?(iso(target.start)===iso(target.end)?iso(target.start):`${iso(target.start)} ~ ${iso(target.end)}`):String(payload?.period?.start??""));out.reason=ensureMinText(out?.reason,24,target?.summary??`${topic} 계산근거와 직접 연결한 행동 가이드야.`);out.watch=ensureMinText(out?.watch,14,"실제 답변·일정·수치처럼 확인 가능한 변화를 먼저 확인해.");out.avoid=ensureMinText(out?.avoid,14,verb.avoid);return out;});
   for(let i=data.decisions.length;i<minimumDecisions&&i<data.key_windows.length;i++){const w=data.key_windows[i],topic=firstTopic(windowTopics(w)),verb=topicVerb(topic);data.decisions.push({action:verb.action,timing:iso(w.start)===iso(w.end)?iso(w.start):`${iso(w.start)} ~ ${iso(w.end)}`,reason:w.summary,watch:"실제 답변·일정·수치처럼 확인 가능한 변화가 계산 흐름과 맞는지 확인해.",avoid:verb.avoid,evidence_refs:refs(w.evidence_refs).slice(0,3)});}
   data.priorities=Array.isArray(data?.priorities)?data.priorities.map(String).filter(Boolean):[];for(const row of [...coreTopics,...important]){if(data.priorities.length>=minimumPriorities)break;const text=`${row.topic}: ${row.action}`;if(!data.priorities.includes(text))data.priorities.push(text);}
-  data.overall=data?.overall&&typeof data.overall==="object"?data.overall:{};let overallEvidence=valid(data.overall.evidence_refs);overallEvidence=uniq([...overallEvidence,...data.key_windows.flatMap((w:any)=>refs(w?.evidence_refs)),...coreTopics.flatMap((x:any)=>refs(x?.evidence_refs))]).filter(ref=>map.has(ref));data.overall.evidence_refs=overallEvidence.slice(0,8);const minSummary=kind==="annual"?240:kind==="month"?170:110;const groundedAppend=coreTopics.slice(0,3).map((x:any)=>String(x.reason??x.verdict??"")).filter(Boolean).join(" ");data.overall.summary=ensureMinText(data.overall.summary,minSummary,`${groundedAppend} 이 점수들은 사건 확률이 아니라 기간 내 상대활성도이므로 실제 일정·반응·수치와 대조해서 판단해.`);
+  data.overall=data?.overall&&typeof data.overall==="object"?data.overall:{};let overallEvidence=valid(data.overall.evidence_refs);overallEvidence=uniq([...overallEvidence,...data.key_windows.flatMap((w:any)=>refs(w?.evidence_refs)),...coreTopics.flatMap((x:any)=>refs(x?.evidence_refs))]).filter(ref=>map.has(ref));data.overall.evidence_refs=overallEvidence.slice(0,8);const minSummary=kind==="annual"?240:kind==="month"?170:110;const groundedAppend=coreTopics.slice(0,3).map((x:any)=>String(x.reason??x.verdict??"")).filter(Boolean).join(" ");data.overall.summary=ensureMinText(data.overall.summary,minSummary,`${groundedAppend} 이 점수들은 사건 확률이 아니라 ${singleDay?"이날의":"기간 내"} 상대활성도이므로 실제 일정·반응·수치와 대조해서 판단해.`);
   const timeline=Array.isArray(payload?.cross_system_timeline)?payload.cross_system_timeline:[];const timelineFor=(start:string,end:string)=>timeline.find((x:any)=>{const d=iso(x?.date);return d&&start&&end&&start<=d&&d<=end;});
   const balanceCrossRefs=(values:string[])=>{const linked=uniq(values.filter(ref=>map.has(ref)));const firstFor=(system:string)=>linked.find(ref=>String(map.get(ref)?.system??"")===system);return uniq([firstFor("western"),firstFor("saju"),firstFor("thai"),...linked].filter(Boolean) as string[]).slice(0,8);};
   const enrichCross=(x:any)=>{const out={...x};const start=iso(out?.start),end=iso(out?.end)||start,t=timelineFor(start,end);let linked=valid(out?.evidence_refs);if(t)linked=uniq([...linked,...valid(t?.western_refs),...valid(t?.saju_context_refs),...valid(t?.thai_context_refs)]);if(start&&!linked.some(ref=>String(map.get(ref)?.system??"")==="western")){linked=uniq([...linked,...refsForDate(start,[]).filter(ref=>String(map.get(ref)?.system??"")==="western").slice(0,1)]);}linked=balanceCrossRefs(linked);const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean),systems=new Set(linkedRows.map((r:any)=>String(r?.system??"")));out.evidence_refs=linked;out.mode=systems.has("western")&&systems.size>=2?(out?.mode==="상반맥락"?"상반맥락":"복수체계"):"Western단독";const western=linkedRows.filter((r:any)=>r?.system==="western").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),saju=linkedRows.filter((r:any)=>r?.system==="saju").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" "),thai=linkedRows.filter((r:any)=>r?.system==="thai").map((r:any)=>String(r?.text??"")).filter(Boolean).slice(0,2).join(" ");out.western=ensureMinText(western?out?.western:"",25,western||"Western 계산은 해당 시기의 상대활성도 변화를 직접 추적해.");out.saju=saju?ensureMinText(out?.saju,25,`${saju} 사주는 Western 점수에 합산하지 않고 독립 맥락으로만 참고해.`):"";out.thai=thai?ensureMinText(out?.thai,25,`${thai} Thai는 위치·기간 맥락만 독립적으로 참고해.`):"";const otherNames=[out.saju?"사주":"",out.thai?"Thai":""].filter(Boolean).join("·");out.synthesis=out.mode==="Western단독"?"다른 체계의 독립 근거가 충분하지 않아 Western 직접 계산을 중심으로 보고, 실제 변화가 나타나는지 확인해.":out.mode==="상반맥락"?`Western 직접 시기 근거와 ${otherNames||"비Western"}의 독립 맥락이 같은 기간에 서로 다르게 나타나는지 비교해. 서로 점수나 인과를 합산하지 말고 실제 관찰에서 어느 맥락이 더 두드러지는지만 확인해.`:`Western 직접 시기 근거와 ${otherNames||"비Western"}의 독립 맥락이 같은 기간에 함께 나타나는지 비교해. 서로 점수나 인과를 합산하지 말고 실제 변화가 각 체계의 맥락과 동시에 관찰되는지만 확인해.`;return out;};
@@ -341,12 +442,12 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     const ranked=[...axes].sort((a,b)=>b.avg-a.avg);
     const gap=Math.abs((ranked[0]?.avg??0)-(ranked[ranked.length-1]?.avg??0));
     const compare=gap<4
-      ? `세 방향의 평균 차이가 ${scoreText(gap)}점으로 크지 않아 한 방향만 앞세우기보다 실제 반응을 함께 확인하는 편이 좋아.`
-      : `${ranked[0]?.label??"관계"} 축이 ${ranked[ranked.length-1]?.label??"다른 관계"} 축보다 ${scoreText(gap)}점 높아, 이번 기간에는 세 방향의 활성도가 같은 강도로 움직이지 않아.`;
+      ? `세 방향의 ${singleDay?"점수":"평균"} 차이가 ${scoreText(gap)}점으로 크지 않아 한 방향만 앞세우기보다 실제 반응을 함께 확인하는 편이 좋아.`
+      : `${ranked[0]?.label??"관계"} 축이 ${ranked[ranked.length-1]?.label??"다른 관계"} 축보다 ${scoreText(gap)}점 높아, ${singleDay?"이날은":"이번 기간에는"} 세 방향의 활성도가 같은 강도로 움직이지 않아.`;
     rr.context=`관계 계산은 상대 → 나 ${scoreText(axes[0].avg)}점, 나 → 상대 ${scoreText(axes[1].avg)}점, 과거 인연 재접점 ${scoreText(axes[2].avg)}점을 서로 다른 축으로 분리해 읽어.`;
     rr.flow=`${compare} 상대 → 나, 나 → 상대, 재접점은 의미가 서로 다르므로 한 축의 상승을 다른 축의 결과로 옮겨 읽지 마.`;
     const timingParts=axes.filter((a:any)=>a.best).map((a:any)=>`${a.label} ${a.best}`);
-    rr.focus_timing=timingParts.length?`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`:"직접 관계 날짜 근거가 있는 구간에서 실제 답변·약속·만남 제안이 뒤따르는지 확인해.";
+    rr.focus_timing=timingParts.length?(singleDay?"선택한 날에 세 방향의 직접 계산근거가 연결돼 있어. 실제 답변·약속·만남 제안이 뒤따르는지 확인해.":`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`):`${singleDay?"이날":"직접 관계 날짜 근거가 있는 구간에서"} 실제 답변·약속·만남 제안이 뒤따르는지 확인해.`;
     const timingDirectRefs=axes.flatMap((axis:any)=>[axis.best,axis.caution].filter(Boolean).flatMap((date:string)=>relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))));
     linked=uniq([...timingDirectRefs,...linked]);
     rr.evidence_refs=linked.slice(0,10);
@@ -354,6 +455,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     rr.avoid=ensureMinText(rr?.avoid,20,"상대활성도 점수만으로 상대의 속마음이나 연애·재회 결과를 미리 확정하지 마.");
 
     const axisText=(axis:any,meaning:string)=>{
+      if(singleDay)return `${axis.label} 축은 이날 ${pointScoreText(axis.avg)}점(${tone(axis.avg)})이야. ${axis.best?"선택한 날의 직접 계산근거가 연결돼 있어.":"직접 세부 근거가 충분하지 않아."} ${meaning}`;
       const peak=axis.best?`${axis.best} 전후가 이 방향의 직접 계산상 두드러지는 시기야.`:"직접 최고일 근거가 충분하지 않아.";
       const low=axis.caution&&axis.caution!==axis.best?` ${axis.caution} 전후는 상대적으로 낮은 구간이야.`:"";
       return `${axis.label} 축은 기간 평균 ${scoreText(axis.avg)}점(${tone(axis.avg)})이야. ${peak}${low} ${meaning}`;
@@ -368,16 +470,18 @@ export function stabilizeCoreForQuality(core:any,payload:any){
   if(investmentSalient){
     data.investment_reading=data?.investment_reading&&typeof data.investment_reading==="object"?data.investment_reading:{};
     const ir=data.investment_reading,overall=payload?.western?.overall??{};
-    ir.psychology=`투자심리 상대활성도 평균 ${scoreText(overall?.투자심리?.average)}점이야. 심리적 과열·위축을 점검하는 보조지표이며 시장 가격 방향 예측은 아니야.`;
-    ir.realization=`수익실현 상대활성도 평균 ${scoreText(overall?.수익실현?.average)}점이야. 실제 수익 가능성이나 매도 적기를 뜻하지 않으므로 보유 종목의 시장 데이터와 손익 기준을 우선해.`;
-    ir.entry=`신규진입 상대활성도 평균 ${scoreText(overall?.신규진입?.average)}점이야. 매수 신호가 아니며 실제 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.`;
-    ir.risk=`투자주의 상대활성도 평균 ${scoreText(overall?.투자주의?.average)}점이야. 높을수록 판단 오류와 변동성 대응을 더 보수적으로 점검하되 실제 투자 결정은 시장 데이터가 우선이야.`;
+    const metric=(topic:string)=>singleDay?`이날 ${pointScoreText(overall?.[topic]?.average)}점`:`기간 평균 ${scoreText(overall?.[topic]?.average)}점`;
+    ir.psychology=`투자심리 상대활성도는 ${metric("투자심리")}이야. 심리적 과열·위축을 점검하는 보조지표이며 시장 가격 방향 예측은 아니야.`;
+    ir.realization=`수익실현 상대활성도는 ${metric("수익실현")}이야. 실제 수익 가능성이나 매도 적기를 뜻하지 않으므로 보유 종목의 시장 데이터와 손익 기준을 우선해.`;
+    ir.entry=`신규진입 상대활성도는 ${metric("신규진입")}이야. 매수 신호가 아니며 실제 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.`;
+    ir.risk=`투자주의 상대활성도는 ${metric("투자주의")}이야. 높을수록 판단 오류와 변동성 대응을 더 보수적으로 점검하되 실제 투자 결정은 시장 데이터가 우선이야.`;
   }
   return softenObject(sanitizeInvestmentGuidance(data,map));
 }
 
 export function buildLocalQualityFallbackCore(payload:any){
   const topics=buildDeterministicTopicAnalysis(payload);
+  const singleDay=isSingleDayPeriod(payload);
   const important=topics.filter((x:any)=>x.importance!=="참고");
   const core=topics.filter((x:any)=>x.importance==="핵심");
   const names=(core.length?core:important).slice(0,3).map((x:any)=>String(x.topic));
@@ -385,9 +489,13 @@ export function buildLocalQualityFallbackCore(payload:any){
   const periodEnd=String(payload?.period?.end??"");
   const periodLabel=periodStart&&periodEnd&&periodStart!==periodEnd?`${periodStart}~${periodEnd}`:periodStart||"선택 기간";
   const focus=names.length?names.join(" · "):"핵심 분야";
+  const summaryRows=(core.length?core:important).slice(0,3);
+  const dayLead=summaryRows[0];
+  const daySummary=dayLead?`${dayLead.verdict} ${dayLead.reason}${summaryRows.length>1?` 함께 볼 분야는 ${summaryRows.slice(1).map((row:any)=>row.topic).join(" · ")}야.`:""} 점수는 사건 가능성이 아니라 이날의 상대활성도야.`:"선택한 날은 직접 계산근거와 실제 반응을 함께 확인해.";
+  const localPriorities=(core.length?core:important).slice(0,payload?.period_kind==="annual"?3:2).map((row:any)=>`${row.topic}: ${row.action}`).filter((value:string)=>!value.endsWith(": "));
   const topicLine=(wanted:string[])=>{
     const rows=topics.filter((x:any)=>wanted.includes(String(x.topic))).filter((x:any)=>x.importance!=="참고").slice(0,3);
-    return rows.length?rows.map((x:any)=>`${x.topic}: ${x.verdict}`).join(" "):"이번 기간에 해당 분야가 최우선으로 두드러진다는 직접 근거는 강하지 않아.";
+    return rows.length?rows.map((x:any)=>`${x.topic}: ${x.verdict}`).join(" "):`${singleDay?"이날은":"이번 기간에는"} 해당 분야를 우선순위로 볼 직접 근거가 강하지 않아.`;
   };
   const sajuText=payload?.saju?.day_master
     ? `사주는 일간 ${String(payload.saju.day_master)}과 실제 계산된 세운·월운 구간만 Western과 합산하지 않고 독립 맥락으로 참고해.`
@@ -395,13 +503,14 @@ export function buildLocalQualityFallbackCore(payload:any){
   const thaiText=payload?.thai?.thai_day
     ? `Thai는 ${String(payload.thai.thai_day)} 출생요일과 실제 계산된 Mahathaksa·Taksajorn·Suriyayat 범위만 독립 맥락으로 참고해.`
     : "Thai는 실제 계산된 범위만 독립 맥락으로 참고해.";
+  const topicMap=Object.fromEntries(topics.map(({topic,...row}:any)=>[topic,row]));
   return {
-    headline:`${periodLabel}은 ${focus} 흐름을 계산근거 중심으로 확인하는 기간이야.`,
+    headline:singleDay?`${periodLabel} ${focus} 흐름을 계산근거 중심으로 확인하는 날이야.`:`${periodLabel}은 ${focus} 흐름을 계산근거 중심으로 확인하는 기간이야.`,
     overall:{
-      summary:"",
-      dominant_pattern:`${focus}의 상대활성도 변화가 이번 기간의 우선 확인 대상이야. 한 날짜나 점수 하나를 사건 결과로 바꾸지 않고 기간 평균·직접 날짜 근거·실제 반응을 함께 봐.`,
-      best_phase:"직접 계산근거가 연결된 상위 날짜·구간에서 실제 일정과 반응이 함께 좋아지는지 확인해.",
-      caution_phase:"하위 날짜·구간에서는 체감만으로 결론을 확대하지 말고 실제 일정·반응·수치를 다시 확인해.",
+      summary:singleDay?daySummary:"",
+      dominant_pattern:singleDay?`${focus}의 이날 상대활성도가 우선 확인 대상이야. 점수 하나를 사건 결과로 바꾸지 않고 직접 계산근거와 실제 반응을 함께 봐.`:`${focus}의 상대활성도 변화가 이번 기간의 우선 확인 대상이야. 한 날짜나 점수 하나를 사건 결과로 바꾸지 않고 기간 평균·직접 날짜 근거·실제 반응을 함께 봐.`,
+      best_phase:singleDay?"":"직접 계산근거가 연결된 상위 날짜·구간에서 실제 일정과 반응이 함께 좋아지는지 확인해.",
+      caution_phase:singleDay?"":"하위 날짜·구간에서는 체감만으로 결론을 확대하지 말고 실제 일정·반응·수치를 다시 확인해.",
       evidence_refs:[],
     },
     key_windows:[],
@@ -417,8 +526,8 @@ export function buildLocalQualityFallbackCore(payload:any){
     },
     relationship_reading:{
       context:"관계가 중요 분야일 때 상대 → 나, 나 → 상대, 과거 인연 재접점을 서로 다른 축으로 분리해 확인해.",
-      flow:"한 방향의 상대활성도가 올라가도 다른 방향의 결과까지 자동으로 뜻하지 않아. 실제 연락·답변·약속·만남 제안이 뒤따르는지 확인해.",
-      focus_timing:"직접 관계 날짜 근거가 연결된 구간만 주목하고, 실제 반응이 함께 나타나는지 확인해.",
+      flow:singleDay?"한 방향의 상대활성도가 높아도 다른 방향의 결과까지 자동으로 뜻하지 않아. 실제 연락·답변·약속·만남 제안이 있는지 확인해.":"한 방향의 상대활성도가 올라가도 다른 방향의 결과까지 자동으로 뜻하지 않아. 실제 연락·답변·약속·만남 제안이 뒤따르는지 확인해.",
+      focus_timing:singleDay?"선택한 날의 직접 관계 근거와 실제 연락·답변·약속이 함께 나타나는지 확인해.":"직접 관계 날짜 근거가 연결된 구간만 주목하고, 실제 반응이 함께 나타나는지 확인해.",
       watch:"실제 연락 빈도, 답변의 구체성, 약속 이행, 만남 제안처럼 관찰 가능한 신호를 확인해.",
       avoid:"상대활성도만으로 상대의 속마음이나 연애·재회 결과를 미리 확정하지 마.",
       evidence_refs:[],
@@ -435,12 +544,12 @@ export function buildLocalQualityFallbackCore(payload:any){
       risk:"투자주의 상대활성도는 판단 오류와 변동성 대응을 더 보수적으로 점검하는 참고값이야.",
     },
     systems:{
-      western:"Western 계산은 기간 평균·일별 궤적·직접 날짜 근거의 상대활성도 변화를 중심으로 읽어. 점수는 사건 확률이 아니야.",
+      western:singleDay?"Western 계산은 선택한 날의 점수와 직접 연결된 계산근거를 중심으로 읽어. 점수는 사건 확률이 아니야.":"Western 계산은 기간 평균·일별 궤적·직접 날짜 근거의 상대활성도 변화를 중심으로 읽어. 점수는 사건 확률이 아니야.",
       saju:sajuText,
       thai:thaiText,
     },
-    priorities:[],
-    topic_analysis:topics,
+    priorities:localPriorities,
+    topic_analysis:topicMap,
     limits:"Gemini 유료 호출이 끝난 뒤에도 5단계 품질검증을 완전히 통과하지 못한 경우 계산근거만으로 만든 안전 보정본이야. 구조·근거 추적·의미 방향·내부 일관성은 통과해야 표시하고, 깊이·실용성 일부 항목만 부족하면 결과를 숨기지 않고 보정본으로 보여줘. 사건 결과·상대 속마음·가격방향을 미리 확정하지 않아.",
   };
 }
