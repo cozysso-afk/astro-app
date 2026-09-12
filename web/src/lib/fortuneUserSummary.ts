@@ -252,6 +252,28 @@ function topicCopy(topic: string, level: FlowLevel, when: string): TopicCopy {
   }
 }
 
+// The second sentence explains the scope of the existing band, not a new prediction.
+function depthFor(topic: string, level: FlowLevel): string {
+  const copy: Record<string, [string, string, string]> = {
+    금전: ['들어올 돈을 미리 쓸 여유로 잡기보다, 이미 정해진 지출을 감당할 순서를 세워봐.', '돈을 늘릴 기회보다 현재 예산을 얼마나 편하게 운영하는지가 중심이야.', '새 수입을 보장하는 흐름은 아니지만, 미뤄둔 정산이나 예산 조정에 집중할 만해.'],
+    학업: ['한꺼번에 이해하려고 붙들기보다 막힌 부분을 좁혀야 진척을 느끼기 쉬워.', '새로운 공부법을 찾기보다 익숙한 방식으로 끝낼 분량을 만드는 데 의미가 있어.', '공부량을 무작정 늘리기보다, 어려워서 미뤄둔 단원 하나를 풀어내는 데 이 힘을 써봐.'],
+    시험: ['아는 내용도 급하게 꺼내면 놓칠 수 있으니, 정확도를 먼저 챙겨.', '실전 감각은 풀이 속도와 정답을 함께 보면서 다듬는 편이 좋아.', '합격을 예고하는 점수는 아니야. 배운 내용을 시간 안에 꺼내 쓰는 연습에 활용해.'],
+    직장: ['성과를 더 내려고 일을 늘리면 요청과 책임이 뒤섞일 수 있어.', '새 일을 벌이기보다 진행 중인 업무를 마무리하는 쪽에 무게를 둬.', '바로 성과가 확정된다는 뜻보다는, 필요한 협의와 다음 단계를 구체화할 여지가 있다는 쪽이야.'],
+    이직: ['이동 자체보다 지금 제안에서 빠진 조건이 무엇인지 살피는 단계로 봐.', '이직 여부를 한 번에 결정하기보다 비교할 조건을 확보하는 데 초점을 둬.', '합격이나 이동 확정과는 달라. 관심이 실제 직무와 보상 이야기로 발전하는지 볼 때야.'],
+    대인관계: ['의견이 다를 때는 상대의 의도보다 서로 이해한 내용부터 맞추는 게 중요해.', '많은 사람에게 맞추기보다 필요한 관계에 적당한 힘을 쓰는 쪽이야.', '누구와도 잘 맞는다는 뜻은 아니야. 서로 원하는 조건을 말로 꺼내고 접점을 찾는 데 활용해.'],
+    연애: ['감정이 없다는 결론보다는, 호감이 관계를 바꾸는 행동까지 이어지는지 더 천천히 볼 때야.', '관계의 이름을 정하기보다 서로 편안한 만남의 속도를 알아가는 쪽에 가까워.', '표현할 여지가 커져도 상대의 마음까지 확정되지는 않아. 함께 시간을 쓰려는 의지가 중요한 구분점이야.'],
+    연락: ['연락 횟수를 늘려 분위기를 바꾸려 하기보다, 한 번 주고받은 대화의 내용을 살펴봐.', '답장이 왔다는 사실과 대화를 더 이어가려는 의지는 따로 볼 필요가 있어.', '대화의 문을 여는 데 힘이 있어도, 먼저 보내기와 먼저 받기는 다를 수 있어. 아래 두 방향을 나눠 봐.'],
+    재회: ['지난 감정이 남아 있는 것과 다시 관계를 책임질 준비가 된 것은 달라.', '다시 닿는 계기가 생겨도 이전 문제가 달라졌는지는 별도로 봐야 해.', '재접촉의 계기와 관계 회복은 다른 단계야. 이번에는 무엇을 다르게 할 수 있는지가 중요해.'],
+    소식: ['기다리는 일이 전부 멈췄다는 뜻은 아니야. 답을 받을 기한과 다음 절차를 나눠서 봐.', '확정된 정보와 아직 검토 중인 말을 구분해두면 기다림에 덜 흔들릴 수 있어.', '좋은 결과를 보장하기보다, 새로운 정보가 들어왔을 때 다음 판단을 준비하는 흐름으로 봐.'],
+    컨디션: ['건강 상태를 진단하는 해석은 아니야. 실제 몸이 보내는 피로 신호에 맞춰 일정의 강도를 낮춰.', '처음부터 끝까지 같은 속도를 내기보다 집중과 휴식을 번갈아 배치해.', '해야 할 일을 모두 몰아넣기보다는 가장 힘이 드는 일에 체력을 먼저 배분해.'],
+    투자심리: ['관심이 식거나 불안해지는 감정과 실제 보유 조건의 변화를 분리해서 봐.', '매매 욕구보다 기존 판단이 유지되는지를 살필 때야.', '관심이 커지는 흐름이지 가격 상승을 뜻하지 않아. 마음이 급해질수록 선택 근거는 따로 적어둬.'],
+    신규진입: ['기회를 놓친다는 생각보다 진입 조건을 충족했는지가 먼저야.', '진입 여부는 이 해설이 아니라 실제 조건과 감당할 손실로 결정해야 해.', '새 기회에 눈이 가는 때로 읽되, 종목이나 가격의 유리함을 보장하지는 않아.'],
+    수익실현: ['정리하고 싶은 마음과 실제 청산 조건을 나눠 살펴봐.', '수익 여부와 청산 결정의 적절함을 같은 뜻으로 읽지 마.', '청산을 검토할 주제가 두드러질 뿐, 수익이 난다거나 팔아야 한다는 신호는 아니야.'],
+    투자주의: ['경계 표시가 약해도 시장 위험이 줄었다고 볼 수는 없어.', '손익 기대보다 위험을 얼마나 감당할 수 있는지 돌아보는 쪽이야.', '가격 하락을 예고하는 해석은 아니야. 불확실한 조건과 감정적인 결정에 더 여유를 둘 때로 봐.'],
+  }
+  return copy[topic]?.[level === 'low' ? 0 : level === 'high' ? 2 : 1] ?? ''
+}
+
 function unique(items: string[], limit: number) {
   const seen = new Set<string>()
   return items.filter((item) => {
@@ -343,12 +365,14 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     if (!names.length) return ''
     const subject = names.length === 2 ? `${names[0]}${particle(names[0], '과', '와')} ${names[1]}` : names[0]
     const aspect = evidence.aspect ? ASPECT_WORDING[evidence.aspect] : undefined
-    const source = aspect && names.length === 2 ? `${subject}이 ${aspect}` : `${subject}의 움직임`
+    const source = aspect && names.length === 2 ? `${subject}${particle(subject, '이', '가')} ${aspect}` : `${subject}의 움직임`
     const contribution = evidence.contribution
     const direction = typeof contribution === 'number' && Number.isFinite(contribution)
       ? contribution > 0 ? '힘을 보태는 쪽으로' : contribution < 0 ? '부담을 더하는 쪽으로' : '뚜렷한 가감 없이'
       : ''
-    return direction ? `${source}${particle(source, '이', '가')} ${topic}에 ${direction} 반영됐어.` : `${source}${particle(source, '이', '가')} ${topic} 계산에 연결돼 있어.`
+    const meaning: Record<string, string> = { 학업: '이해하고 집중하는 과정', 시험: '배운 것을 꺼내 쓰는 과정', 직장: '일을 협의하고 처리하는 과정', 이직: '변화를 검토하고 조건을 조율하는 과정', 대인관계: '서로 의견을 주고받는 과정', 연애: '호감을 나누고 거리를 좁히는 과정', 연락: '말을 꺼내고 답을 이어가는 과정', 재회: '다시 접점을 찾는 과정', 컨디션: '힘을 쓰고 회복하는 균형', 금전: '돈의 흐름을 정리하는 과정', 소식: '정보를 받아 다음 단계를 정하는 과정' }
+    const area = meaning[topic] ?? `${topic}을 판단하는 과정`
+    return direction ? `${source}${particle(source, '은', '는')} ${area}에 ${direction} 읽혀.` : `${source}${particle(source, '이', '가')} 잡혀 있지만, 이것만으로 유리하거나 불리하다고 정하지는 않을게.`
   }).filter(Boolean), 2)
   // A shared reference is required: never attach a whole-period system statement to an unrelated topic.
   const refs = new Set(row.evidence_refs ?? [])
@@ -434,7 +458,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     : `${when}${particle(when, '은', '는')} 좋거나 조심할 분야가 뚜렷하게 갈리지 않아. 평소 계획을 유지하면서 변화를 지켜봐.`
   const focusTopics = selected.map(({ topic, interpretation, level, score }) => {
     const copy = topicCopy(topic, level, when)
-    return { topic, conclusion: score === null ? `${topic}은 계산 정보가 부족해 방향을 정하기 어려워.` : copy.conclusion, reason: reasonFor(data, context, topic, interpretation, level),
+    return { topic, conclusion: score === null ? `${topic}은 계산 정보가 부족해 방향을 정하기 어려워.` : `${copy.conclusion} ${depthFor(topic, level)}`, reason: reasonFor(data, context, topic, interpretation, level),
       timing: topicTiming(context, topic, level, frame.kind), action: copy.practice, observe: copy.observe,
       caution: interpretation.avoid ? copy.caution : undefined }
   })
@@ -457,7 +481,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     .filter(window => window.signal !== '배경' && window.start >= context.calculation.period.start && (window.end || window.start) <= context.calculation.period.end && window.topics?.length)
     .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 3)
   return {
-    periodKind: frame.kind, when, headline, summary: '',
+    periodKind: frame.kind, when, headline, summary: frame.kind === 'day' ? '하루 안의 선택에 초점을 맞춰 읽어봐. 다른 날까지 같은 흐름으로 이어진다고 보지는 않아.' : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.',
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
     bestFlow, cautionFlow,
     favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: topicStat(context, row.topic)?.band ?? '보통', meaning: FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),

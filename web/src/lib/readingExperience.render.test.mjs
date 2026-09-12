@@ -4,14 +4,15 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
-import { fortuneFixture, aspects, timing } from './readingExperience.fixtures.mjs'
+import { fortuneFixture, personalMarriageFixture, aspects, timing } from './readingExperience.fixtures.mjs'
 
-let server, Fortune, Relationship, Account
+let server, Fortune, Relationship, Account, Personal, portraitConcept
 before(async () => {
   server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true},appType:'custom'})
   Fortune=(await server.ssrLoadModule('/src/PeriodAiInterpretationPanel.tsx')).PeriodAiInterpretationPanel
   Relationship=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
   Account=await server.ssrLoadModule('/src/AccountActions.tsx')
+  const personal=await server.ssrLoadModule('/src/PersonalMarriagePanel.tsx'); Personal=personal.PersonalMarriagePanel; portraitConcept=personal.buildPortraitConcept
 })
 after(async()=>{await server?.close()})
 const noAction=()=>{throw new Error('Rendering must never call a provider or account action')}
@@ -52,4 +53,31 @@ test('settings account action renders without executing sign-out',()=>{
   const html=renderToStaticMarkup(createElement(Account.AccountActionsContext.Provider,{value:{logout:noAction,busy:false}},createElement(Account.AccountActions)))
   assert.match(html,/로그아웃/)
   assert.doesNotMatch(html,/private-auth-logout/)
+})
+
+test('personal marriage renders creative hints with no future certainty or generated metrics',()=>{
+  const fixture=personalMarriageFixture();const before=JSON.stringify(fixture)
+  const html=renderToStaticMarkup(createElement(Personal,{data:fixture}))
+  const visible=html.split('<details class="relationship-technical"')[0].replace(/<[^>]*>/g,'')
+  assert.match(visible,/나의 관계 성향/);assert.match(visible,/목성/)
+  assert.match(visible,/AI 초상 콘셉트 프롬프트 복사/)
+  assert.doesNotMatch(visible,/62|orb|Taurus|결혼 가능성 지수|178|181/)
+  assert.match(html,/<details class="portrait-concept">/)
+  assert.equal(JSON.stringify(fixture),before)
+})
+test('portrait prompt is only existing hints plus explicit creative art direction',()=>{
+  const fixture=personalMarriageFixture()
+  const prompt=portraitConcept(fixture.result.spouse_archetype)
+  assert.match(prompt,/차분한 인상/);assert.match(prompt,/정돈된 스타일/)
+  assert.match(prompt,/미래 배우자 예측이 아니라/)
+  assert.doesNotMatch(prompt,/178|181|동양인 남성|계란형|고양이상/)
+  fixture.result.spouse_archetype.appearance_hints=[]
+  assert.equal(portraitConcept(fixture.result.spouse_archetype),'')
+})
+test('reason action and caution render as separately labelled accessible layers',()=>{
+  const f=fortuneFixture()
+  const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  for(const kind of ['reason','practice','caution']) assert.match(html,new RegExp('reading-explanation is-'+kind))
+  assert.match(html,/reading-hero-subtitle/)
+  assert.match(html,/reading-period-date/)
 })

@@ -1,4 +1,6 @@
-import { AlertTriangle, CalendarDays, Gem, Home, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Copy, Moon, Sparkles } from 'lucide-react'
+import { ReadingExplanation } from './ReadingExplanation'
 
 export type PersonalMarriageResponse = {
   ok: boolean
@@ -88,51 +90,57 @@ function hitText(hit?: { transit: string; aspect: string; target: string; orb: n
   return `${hit.transit}(${planetKo[hit.transit] ?? hit.transit}) ${aspectKo[hit.aspect] ?? hit.aspect} ${pointKo[hit.target] ?? hit.target} · 오브 ${hit.orb.toFixed(2)}°`
 }
 
+export function buildPortraitConcept(spouse: PersonalMarriageResponse['result']['spouse_archetype']) {
+  const hints = spouse.appearance_hints.map(h => h.trim()).filter(Boolean)
+  if (!hints.length) return ''
+  return ['실존 인물을 특정하지 않는 성인 인물의 창작 초상.',
+    '이 이미지는 미래 배우자 예측이 아니라 취향을 상상하는 무드보드다.',
+    `제공된 분위기 단서: ${hints.join('; ')}`,
+    '단서에 없는 키, 체형, 나이, 인종, 유명인 닮은꼴은 지정하지 않는다.',
+    '스타일: 차분하고 정돈된 옷차림. 색감: 펄 아이보리와 흐린 라벤더.',
+    '촬영 톤: 부드러운 창가 자연광, 자연스러운 피부 질감, 과한 미화 없이 편안한 표정.'].join('\n')
+}
+
 export function PersonalMarriagePanel({ data }: { data: PersonalMarriageResponse }) {
   const result = data.result
-  const forecast = result.forecast
   const spouse = result.spouse_archetype
-  const houses = ['7','4','8','5'].map((key)=>[key,result.relationship_houses[key]] as const).filter(([,row])=>!!row)
-  const planets = ['Moon','Venus','Mars','Jupiter','Saturn'].map((key)=>[key,result.relationship_planets[key]] as const).filter(([,row])=>!!row)
-  const windows = forecast.strong_windows.slice(0,3)
-  const pressureDays = result.timing.pressure_days.filter((row)=>row.pressure_load>0).slice(0,3)
-  const quadrantLabel = (system?: string) => system === 'Porphyry' ? '포르피리' : '플라시두스'
-
-  return <section className="relationship-ai-card personal-marriage-card">
-    <span className="eyebrow">상대 없이 보는 미혼 결혼운</span>
-    <h3>결혼 가능성 · 시기 · 미래 배우자상</h3>
-
-    <div className="status-banner marriage-intro"><Gem size={16}/><span><b>결혼 가능성 지수 {forecast.marriage_probability_percent.toFixed(1)}/100 · {forecast.label}</b> · {forecast.probability_note}</span></div>
-
-    <section className="relationship-key-aspects">
-      <strong><CalendarDays size={15}/> 결혼·공식화가 강해지는 시기 TOP 3</strong>
-      {windows.length ? windows.map((row)=><div key={row.date}><b>{row.date} · {row.score.toFixed(1)} · {row.themes.join(' · ')}</b><p>{hitText(row.strongest_hit ?? undefined)}</p></div>) : <p>선택 기간에서는 결혼·공식화 신호가 크게 솟는 구간이 적어.</p>}
-    </section>
-
-    <section className="marriage-ai-deep">
-      <strong>미래 배우자상 · 차트 단서</strong>
-      <p className="marriage-ai-bottom">{spouse.summary}</p>
-      <div className="marriage-ai-grid">
-        <article><b>외모 · 분위기</b>{spouse.appearance_hints.map((x,i)=><p key={`appearance-${i}`}>{x}</p>)}</article>
-        <article><b>성격 · 관계 방식</b>{spouse.personality_hints.map((x,i)=><p key={`personality-${i}`}>{x}</p>)}</article>
-        <article><b>직업 · 분야</b><p>{spouse.career_clusters.join(' · ')}</p></article>
-        <article><b>어디서 만날 가능성이 큰지</b><p>{spouse.meeting_route}</p></article>
-        <article><b>신원 단서</b>{spouse.identity_clues.map((x,i)=><p key={`identity-${i}`}>{x}</p>)}</article>
-        <article><b>해석 정밀도</b><p>{spouse.precision_note}</p></article>
-      </div>
-    </section>
-
-    {!!result.timing.top_months.length && <section className="relationship-key-aspects"><strong><Home size={15}/> 월별 결혼운 활성 상위</strong>{result.timing.top_months.slice(0,6).map((row)=><div key={row.calendar_month}><b>{row.calendar_month} · {row.activation.toFixed(1)}</b><p>{row.top_dates.slice(0,3).join(' · ')}</p></div>)}</section>}
-
-    {pressureDays.length ? <section className="relationship-key-aspects"><strong><AlertTriangle size={15}/> 관계 결정 압력이 커지는 시기</strong>{pressureDays.map((row)=><div key={row.date}><b>{row.date} · 압력 {row.pressure_load.toFixed(1)}</b><p>{hitText(row.hits.find((hit)=>hit.tone==='challenging') ?? row.hits[0])}</p></div>)}</section> : null}
-
-    <details className="ai-system-note"><summary>왜 이런 배우자상·결혼운이 나오는지 · 원차트 근거</summary>
-      <div className="relationship-ai-grid">{houses.map(([key,row])=><article key={key}><strong>{row.house}하우스 · {houseMeaning[key]}</strong><p>{rulerLine(row)}</p></article>)}</div>
-      <div className="relationship-key-aspects"><strong>관계 행성의 기본 배치</strong>{planets.map(([key,row])=><div key={key}><b>{key}({planetKo[key]}) · {row.sign} {row.degree.toFixed(1)}°</b><p>홀사인 {row.whole_house}하우스 · {quadrantLabel(row.quadrant_system ?? result.house_system?.used)} {row.quadrant_house ?? row.placidus_house}하우스</p></div>)}</div>
-      {!!result.natal_aspects.length && <div className="relationship-key-aspects"><strong>주요 애스펙트</strong>{result.natal_aspects.slice(0,10).map((row,index)=><p key={`${row.a}-${row.b}-${index}`}><b>{row.a} {aspectKo[row.aspect] ?? row.aspect} {row.b}</b> · 오브 {row.orb.toFixed(2)}° · {row.tone==='supportive'?'조화':row.tone==='challenging'?'긴장':'혼합'}</p>)}</div>}
+  const forecast = result.forecast
+  const [copyStatus, setCopyStatus] = useState('')
+  const portrait = buildPortraitConcept(spouse)
+  const houses = ['7','4','8','5'].map(key => [key, result.relationship_houses[key]] as const).filter(([, row]) => !!row)
+  const planets = Object.entries(result.relationship_planets)
+  const windows = forecast.strong_windows.filter(w => w.date >= data.period.start && w.date <= data.period.end).slice(0, 3)
+  const pressureDays = result.timing.pressure_days.filter(w => w.pressure_load > 0 && w.date >= data.period.start && w.date <= data.period.end).slice(0, 2)
+  const hasCommitment = forecast.commitment_component > 0
+  const hasPressure = forecast.pressure_component > 0
+  const hitMeaning = (hit: { transit: string; target: string; tone: string } | null) => {
+    if (!hit || !planetKo[hit.transit]) return '이 날짜를 구체적인 사건으로 설명할 세부 정보는 부족해.'
+    const focus = ['Saturn','7th_ruler','DSC'].includes(hit.target) ? '관계의 약속과 책임' : ['Moon','IC','4th_ruler'].includes(hit.target) ? '정서적 편안함과 함께하는 생활' : '애정 표현과 서로의 거리'
+    return `${planetKo[hit.transit]}의 움직임이 ${focus}에 연결돼 있어. ${hit.tone === 'challenging' ? '결정을 재촉하기보다 서로 부담스러운 조건을 이야기해볼 때로 읽어봐.' : hit.tone === 'supportive' ? '서로 원하는 관계를 구체적으로 이야기하는 데 활용해봐.' : '좋거나 나쁜 사건을 정하기보다 이 주제가 실제로 떠오르는지 살펴봐.'}`
+  }
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(portrait); setCopyStatus('프롬프트를 복사했어.') }
+    catch { setCopyStatus('자동 복사가 안 됐어. 아래 프롬프트를 펼쳐 직접 복사해줘.') }
+  }
+  return <section className="relationship-experience reading-experience personal-marriage-card">
+    <header className="reading-hero"><Moon className="celestial-mark" size={26} aria-hidden="true"/><p className="eyebrow">나의 관계 성향 · 미혼 결혼</p><span className="reading-period-date">{data.period.start} — {data.period.end}</span>
+      <h3>{hasCommitment ? '끌리는 마음에서 함께하는 생활로, 어떤 약속이 필요한지 살펴볼 때야.' : '누가 나타날지보다, 어떤 관계에서 편안한 나인지 먼저 읽어봐.'}</h3>
+      <p className="reading-hero-subtitle">{hasPressure ? '관계에 대한 관심과 현실적인 부담을 따로 살펴봐. 결혼이 이루어질 확률을 말하는 화면은 아니야.' : '본인 차트에서 관계의 취향과 선택을 읽는 해설이야. 특정 상대와의 궁합은 별도로 봐야 해.'}</p>
+    </header>
+    <section className="reading-section"><h3>내가 편안해지는 관계</h3><p className="reading-conclusion">{spouse.summary}</p><ReadingExplanation kind="practice">{spouse.personality_hints.length ? spouse.personality_hints.join(' ') : '관계 성향을 구체적으로 풀 단서가 부족해.'} 서로 원하는 연락 빈도와 혼자 쉴 시간부터 이야기해봐.</ReadingExplanation></section>
+    <section className="reading-section"><h3>생활에서 맞춰야 할 것</h3><p>설레는 마음과 같이 살기 편한 조건은 따로 봐야 해. 돈을 쓰는 방식과 쉬는 시간, 맡을 책임을 구체적으로 나누는 과정이 중요해.</p><ReadingExplanation kind="caution">{hasPressure ? '이번 계산에는 관계 결정의 부담도 잡혀 있어. 불안해서 약속을 서두르거나, 한 사람이 생활을 전부 맞추는 방향은 피하는 편이 좋아.' : '부담이 두드러지지 않아도 모든 생활 조건이 맞는다는 뜻은 아니야. 아직 이야기하지 않은 부분까지 합의됐다고 생각하지 마.'}</ReadingExplanation></section>
+    <section className="reading-section"><h3>관계를 생각해볼 시기</h3>{windows.length ? <ol className="reading-timeline">{windows.map(w => <li key={w.date}><time>{w.date}</time><strong>{w.pressure_load > w.supportive_load ? '서로 감당할 조건을 맞출 때' : '관계의 다음 단계를 이야기할 때'}</strong><p>{hitMeaning(w.strongest_hit)}</p></li>)}</ol> : <p className="reading-muted">다른 날과 구별할 만한 시기는 뚜렷하지 않아.</p>}</section>
+    {!!pressureDays.length && <details className="relationship-enrichment"><summary>여유를 두고 볼 날짜</summary>{pressureDays.map(w => <ReadingExplanation kind="caution" key={w.date}>{w.date} · {hitMeaning(w.hits.find(h => h.tone === 'challenging') ?? null)}</ReadingExplanation>)}</details>}
+    <details className="portrait-concept"><summary><Sparkles size={16} aria-hidden="true"/> 나의 취향을 그려본다면</summary><p className="reading-muted">미래 사람의 외모를 맞히는 기능이 아니야. 아래 단서를 바탕으로 만든 창작 이미지 콘셉트야.</p>
+      {portrait ? <><div className="portrait-hints">{spouse.appearance_hints.map((h,i) => <span key={i}>{h}</span>)}</div><button type="button" onClick={() => void copy()}><Copy size={16}/>AI 초상 콘셉트 프롬프트 복사</button><p role="status" aria-live="polite">{copyStatus}</p><details><summary>프롬프트 펼쳐 보기</summary><pre>{portrait}</pre></details></> : <p>외모 분위기를 만들 단서가 없어. 닮은꼴이나 체형을 임의로 덧붙이지 않을게.</p>}
     </details>
-
-    <details className="ai-system-note"><summary>해석 한계</summary>{result.limits.map((line,index)=><p key={`${index}-${line}`}>{line}</p>)}</details>
-    <p className="ai-limits"><Sparkles size={13}/> 재미로 보는 예측은 적극적으로 보여주되, 0~100은 실제 통계 확률이 아니고 실제 미래 사람의 이름·주소·회사를 만들어내지는 않아.</p>
+    <details className="relationship-technical"><summary>기술 근거 자세히 보기</summary>
+      <p>{forecast.probability_note} · 원자료 지수 {forecast.marriage_probability_percent.toFixed(1)}/100 — 통계 확률 아님</p>
+      {houses.map(([key,row]) => <div key={key}><h4>{houseMeaning[key]}</h4><p>{rulerLine(row)}</p></div>)}
+      {planets.map(([name,row]) => <p key={name}>{planetKo[name] ?? name} · {row.sign} {row.degree.toFixed(1)}°</p>)}
+      {windows.map(w => <p key={w.date}>{w.date} · {hitText(w.strongest_hit ?? undefined)}</p>)}
+      <pre>{JSON.stringify(result, null, 2)}</pre>
+    </details>
+    <p className="reading-safety-note">출생 정보에 따라 읽을 수 있는 범위가 달라져. 미래의 사람이나 결혼 성사를 확정하지 않아.</p>
   </section>
 }

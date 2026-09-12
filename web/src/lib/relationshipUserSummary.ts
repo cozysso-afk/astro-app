@@ -5,7 +5,7 @@ const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
 const SENSITIVE = new Set(['Moon', 'ASC', 'DSC', 'MC', 'IC', 'Vertex'])
 const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
-export type RelationshipPattern = { key: string; role: Role; title: string; reason: string; action: string; challenging: boolean; supportive: boolean }
+export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
 
 export function aspectRole(aspect: Aspect): Role {
   const pair = [aspect.a, aspect.b]
@@ -53,17 +53,48 @@ function pattern(a: Aspect): RelationshipPattern {
     stability: { title: tense ? '책임과 거리의 부담' : '꾸준함을 만드는 약속', reason: tense ? '책임이나 기대가 압박으로 느껴질 수 있어. 부담을 한 사람만 떠안지 않는지가 중요해.' : positive ? '약속을 지키고 관계에 꾸준히 시간을 쓰는 데 힘을 보태.' : '관계를 진지하게 대하는 마음과 의무감이 함께 작용할 수 있어.', action: '연락 빈도와 서로 감당할 수 있는 약속부터 구체적으로 맞춰봐.' },
     perspective: { title: '기대와 현실 사이', reason: tense ? '서로 기대하는 방향이 달라 이해가 엇갈릴 수 있어.' : positive ? '서로의 관점을 넓히는 데 도움을 줄 수 있어.' : '서로에게 의미를 느껴도 그 자체가 관계의 미래를 보장하지는 않아.', action: '같은 미래를 원하는지 말뿐 아니라 선택과 행동을 함께 봐.' },
   }[role]
-  return { key: aspectKey(a), role, title: copy.title, reason: `${names}의 ${geometry}는 ${copy.reason}`, action: copy.action, challenging: tense, supportive: positive }
+  const pair = new Set([a.a, a.b])
+  const detail = role === 'communication'
+    ? pair.has('Uranus') ? '수성은 말과 이해를, 천왕성은 익숙한 방식을 벗어나려는 움직임을 읽는 단서야. 대화가 새로워지는 힘과 예측하기 어려운 속도를 함께 봐야 해.'
+      : pair.has('Neptune') ? '수성이 다루는 구체적인 말에 해왕성의 상상과 기대가 겹쳐 있어. 말하지 않은 뜻을 서로 다르게 받아들이는지를 살펴봐.'
+      : '수성은 말을 주고받고 상황을 이해하는 방식과 연결돼. 대화가 잘 통한다는 느낌뿐 아니라 서로 같은 뜻으로 이해했는지가 중요해.'
+    : role === 'attraction'
+    ? pair.has('Venus') && pair.has('Mars') ? '금성은 편안하게 느끼는 애정 표현을, 화성은 먼저 다가가는 힘을 읽는 단서야. 끌림의 크기와 서로 편안한 속도는 따로 살펴봐.'
+      : pair.has('Moon') ? '달은 정서적인 반응과 안심하고 싶은 마음에 연결돼. 즐거운 순간뿐 아니라 피곤하거나 예민할 때 서로를 어떻게 대하는지도 중요해.'
+      : '애정을 표현하는 방식과 상대에게 다가가는 리듬이 맞물리는 지점이야. 호감이 있어도 필요한 거리와 표현의 양은 다를 수 있어.'
+    : role === 'stability' ? '토성은 시간을 들여 지키는 책임과 관계 안에서 느끼는 부담을 함께 읽는 단서야. 오래 이어지는 것과 편안하게 유지되는 것은 같은 뜻이 아니야.'
+    : role === 'power' ? '명왕성은 서로에게 강하게 영향을 주는 지점을 읽는 단서야. 몰입이 깊어져도 상대의 선택을 대신하거나 거절을 압박하는 행동은 구분해야 해.'
+    : pair.has('Jupiter') ? '목성은 기대를 넓히고 가능성을 보는 방식과 연결돼. 함께 그리고 싶은 미래가 실제 선택에서도 같은 방향인지 살펴봐.'
+    : '서로 자극받는 관점이 있다는 뜻이야. 같은 감정을 느끼거나 같은 미래를 원한다는 결론까지 확대하지는 마.'
+  const caution = role === 'communication' ? '답이 늦거나 표현이 낯설다는 이유만으로 속마음을 결론 내리지 마. 합의가 필요한 말은 서로 이해한 뜻을 다시 말해봐.'
+    : role === 'attraction' ? '강한 끌림을 관계에 대한 약속으로 받아들이지는 마. 말과 만남 이후의 태도가 함께 이어지는지가 중요해.'
+    : role === 'stability' ? '참는 사람이 늘 같은 쪽이라면 오래 버틴다는 이유만으로 안정적이라고 보지는 마.'
+    : role === 'power' ? '질투나 집착을 애정의 크기로 받아들이지 마. 거절과 사생활을 존중하는지가 먼저야.'
+    : '좋은 기대만으로 생활 조건의 차이를 넘기지 마. 바꿀 수 있는 것과 양보하기 어려운 것을 나눠봐.'
+  return { key: aspectKey(a), role, title: copy.title, conclusion: `${copy.reason} ${{ communication: '대화가 어긋난 뒤 서로 설명할 여유를 주는지가 관계의 차이를 만들어.', attraction: '좋았던 만남 하나보다 그 뒤에도 서로 편안한 태도가 이어지는지를 봐.', stability: '작은 약속을 지속적으로 지키는 과정에서 이 차이가 드러나기 쉬워.', power: '한쪽만 관계의 속도와 규칙을 정하지 않는지가 중요한 기준이야.', perspective: '서로 원하는 방향을 구체적인 생활 선택에 놓고 비교해봐.' }[role]}`, caution, reason: `${names}의 ${geometry}가 잡혀 있어. ${detail}`, action: copy.action, challenging: tense, supportive: positive }
 }
 
 export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
   const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive)
-  const patterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).slice(0, 6).map(pattern).map(p => {
+  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).slice(0, 6).map(pattern).map(p => {
     if (!input.mode.startsWith('marriage_')) return p
-    if (p.role === 'attraction') return { ...p, action: input.mode === 'marriage_married' ? '익숙함에 기대지 말고 서로 편안하게 느끼는 애정 표현과 혼자 쉴 시간을 이야기해봐.' : '호감뿐 아니라 함께 지낼 때 필요한 거리와 애정 표현을 이야기해봐.' }
+    if (p.role === 'attraction') return { ...p, conclusion: input.mode === 'marriage_married' ? `${p.challenging ? '애정이 있어도 편안함을 느끼는 방식은 다를 수 있어.' : '익숙한 사이에서도 애정을 주고받는 방식이 관계의 온도를 바꿔.'} 함께 있을 때의 거리와 혼자 회복할 시간을 같이 살펴봐.` : p.conclusion, action: input.mode === 'marriage_married' ? '익숙함에 기대지 말고 서로 편안하게 느끼는 애정 표현과 혼자 쉴 시간을 이야기해봐.' : '호감뿐 아니라 함께 지낼 때 필요한 거리와 애정 표현을 이야기해봐.' }
     if (p.role === 'stability') return { ...p, action: '생활비와 집안일, 돌봄을 누가 얼마나 맡을지 구체적으로 나눠봐.' }
     return p
   })
+  // One visible pattern per semantic role; retain every aspect in the raw disclosure.
+  const patterns: RelationshipPattern[] = []
+  for (const p of individualPatterns) {
+    const prior = patterns.find(row => row.role === p.role)
+    if (!prior) { patterns.push({ ...p }); continue }
+    prior.reason += ` ${p.reason.split('. ')[0]}.`
+    if (prior.challenging !== p.challenging || prior.supportive !== p.supportive) {
+      prior.title = { communication: '말이 통하는 순간과 엇갈리는 순간', attraction: '끌림 속에서 맞춰야 할 거리', stability: '이어갈 힘과 감당할 부담', power: '몰입과 선택권 사이', perspective: '함께 기대하는 것의 차이' }[p.role]
+      prior.conclusion = '이 부분은 편해지는 힘과 부담이 함께 보여. 잘 맞는 순간이 있더라도 불편한 반응이 반복되는 상황은 따로 다뤄야 해.'
+    }
+    prior.challenging ||= p.challenging
+    prior.supportive ||= p.supportive
+  }
   const stability = patterns.filter(p => p.role === 'stability')
   const friction = patterns.filter(p => p.challenging)
   const positiveStructure = ranked.some(a => aspectRole(a) === 'stability' && a.tone === 'supportive')
