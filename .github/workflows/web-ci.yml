@@ -55,6 +55,9 @@ jobs:
       - name: Verify private email frontend contract
         run: node src/lib/authContract.test.mjs
 
+      - name: Verify email code and account identity handling
+        run: node src/lib/emailCode.test.mjs
+
       - name: Verify private API and DB contract
         run: |
           python -m py_compile ../api/private_app.py
