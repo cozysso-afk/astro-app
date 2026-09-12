@@ -96,3 +96,8 @@
 .single-love-scenarios details{border-bottom:1px solid #dcd4e4;padding:12px 0}
 .single-love-scenarios summary{font-size:15px;font-weight:700;cursor:pointer}
 .single-love-scenarios details p{font-size:14px;line-height:1.75;margin:10px 0 0}
+
+.app-shell .home-specialist-tools{padding:0!important;border:0!important;background:none!important;box-shadow:none!important}
+.home-specialist-tools>summary{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;color:#5b466c;font-size:14px;font-weight:700;cursor:pointer;list-style:none}
+.home-specialist-tools>summary::-webkit-details-marker{display:none}
+.home-specialist-tools[open]>summary{margin-bottom:10px}
