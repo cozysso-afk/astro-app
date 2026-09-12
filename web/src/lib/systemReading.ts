@@ -49,7 +49,7 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const natalWheel = thai?.mahathaksa?.available ? thai.mahathaksa.wheel.filter(r=>BHUMI_LENSES[r.bhumi_key]) : []
   const wheels = segments.map(r=>({...r,wheel:r.wheel.filter(w=>BHUMI_LENSES[w.bhumi_key])}))
   const sajuSummary = contexts.length ? `${contexts[0].layer}의 ${contexts[0].stem_ten_god}은 ${tenGodLens(contexts[0].stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.${contexts.length>1?' 아래에서 다른 운 구간과 함께 읽어볼 수 있어.':''}` : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
-  const thaiSummary = wheels.length ? `이 기간의 Taksajorn은 ${wheels.length}개 구간이야. 연간 Boriwan은 ${wheels.map(r=>r.annual_boriwan.label).join(' → ')}로 기록돼 있어. 주변 사람과 환경을 살피는 배치이며 사건 예측은 아니야.` : natalWheel.length ? '출생 Mahathaksa의 8영역을 생활 맥락으로 읽을 수 있어. 이 배치만으로 선택 기간의 길흉을 정하지 않아.' : '이 기간에 읽을 수 있는 Thai 배치가 없어.'
+  const thaiSummary = wheels.length ? `이 기간에는 주변 사람과 도움을 주고받는 방식을 살펴볼 수 있어. ${wheels.length>1?'생일을 기준으로 연간 배치가 바뀌므로 구간을 나눠 읽어.':'선택 기간은 하나의 연간 배치 안에 있어.'} 아래 생활 영역에서 관계망, 실행, 자원, 마찰을 각각 살펴봐.` : natalWheel.length ? '출생 때의 배치를 관계망·생활력·자원 등 여덟 생활 영역으로 나눠 읽어. 지금 잘되고 못되는 일을 예측하기보다 각 영역을 돌아보는 질문으로 활용할 수 있어.' : '이 기간에 읽을 수 있는 태국점성술 배치가 없어.'
   const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
   return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
 }
@@ -64,4 +64,15 @@ export function compactSystemPrompt(packet: Record<string,unknown>) {
     if(text.length<=7500)return text
   }
   throw new Error('핵심 근거가 7,500자를 넘어 복사하지 못했어. 더 좁은 기간을 선택해줘.')
+}
+
+/** Display-only translation; preserve original packet labels and engine values. */
+export function thaiPlanetLabel(value:string) {
+ const names:Record<string,string>={Sun:'태양',Moon:'달',Mercury:'수성',Venus:'금성',Mars:'화성',Jupiter:'목성',Saturn:'토성',Rahu:'라후'}
+ const name=Object.keys(names).find(k=>value.toLowerCase().includes(k.toLowerCase()))
+ return name?names[name]:value
+}
+export function thaiLifeSummary(keys:string[]) {
+ const meanings:Record<string,string>={boriwan:'주변 사람과 어떤 도움을 주고받는지',ayu:'무리 없이 이어갈 생활 리듬은 무엇인지',det:'내가 결정할 일과 협의할 일은 무엇인지',sri:'현재 잘 유지되는 조건은 무엇인지',mula:'시간과 돈을 어디에 배분하고 있는지',utsaha:'계획이 실제 실행으로 이어지는지',montri:'필요한 도움을 누구에게 요청할 수 있는지',kalakini:'반복해서 막히는 조건은 무엇인지'}
+ return keys.filter(k=>meanings[k]).slice(0,3).map(k=>meanings[k]).join(', ')+' 살펴보는 관점이야. 아래에서 각 영역의 배치와 읽는 방법을 함께 볼 수 있어.'
 }
