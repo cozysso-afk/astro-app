@@ -57,6 +57,7 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityPeriods.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityV2Hardening.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/groundedSplitPrompt.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/splitStructuredOutput.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/v18Reliability.test.mjs
