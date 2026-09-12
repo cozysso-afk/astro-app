@@ -1,3 +1,4 @@
+import { lovePromptContext, type LoveStatus } from './lib/loveReadingContext'
 import { SystemReadingViews } from './SystemReadingViews'
 import { fortuneField } from './lib/fortuneFields'
 import { THREE_SYSTEM_INSTRUCTIONS } from './lib/systemReading'
@@ -378,6 +379,7 @@ export default function AppNext() {
   const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
+  const [loveStatus, setLoveStatus] = useState<LoveStatus>('single')
   const [fortuneFieldId, setFortuneFieldId] = useState<string | undefined>()
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
@@ -1158,14 +1160,14 @@ export default function AppNext() {
     if (!calculation) return
     try {
       if (mode === 'compact') {
-        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics), mode)
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics, fortuneFieldId==='love'?lovePromptContext(loveStatus):''), mode)
         return
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      await copyExternalPrompt(THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
+      await copyExternalPrompt((fortuneFieldId==='love'?lovePromptContext(loveStatus):'') + THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
     } catch (error) {
       setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
@@ -1537,6 +1539,7 @@ export default function AppNext() {
 
         {mainView === 'home' && <>
           <HomeControls
+            fieldHub={<FortuneFieldHub selected={fortuneFieldId} onSelect={(id)=>{setFortuneFieldId(id);setSelectedTool(null);requestAnimationFrame(()=>document.querySelector('.period-fortune-report')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}))}}/>}
             birthProfile={birthProfile}
             hasProfile={hasProfile}
             queryDate={queryDate}
@@ -1550,7 +1553,7 @@ export default function AppNext() {
             onToolSelect={selectHomeTool}
           />
 
-          <FortuneFieldHub selected={fortuneFieldId} onSelect={(id)=>{setFortuneFieldId(id);setSelectedTool(null)}}/>
+
 
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
@@ -1731,6 +1734,8 @@ export default function AppNext() {
               datingProfile={integratedRequestSnapshot?.profile as Record<string,unknown>|undefined}
               datingApiBase={API_BASE}
               profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
+              loveStatus={loveStatus}
+              onLoveStatusChange={setLoveStatus}
               fieldId={fortuneFieldId}
               period={period}
               periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}

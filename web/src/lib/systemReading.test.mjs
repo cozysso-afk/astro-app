@@ -122,3 +122,30 @@ test('dating default follows the calculation profile, not a fixed male subject',
  assert.match(dating.datingPortraitPromptV2(model,options,'ko'),/성인 여성/)
  assert.match(dating.datingPortraitPromptV2(model,options,'en'),/adult woman/)
 })
+
+for(const period of ['today','week','month','year'])test(`${period}: single/couple context preserves evidence and neutral contact does not presume replies`,async()=>{
+ const f=fixture(period),before=JSON.stringify(f.calculation)
+ const v=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['연애','연락'],topicEntries:Object.entries(f.data.topic_analysis).filter(([t])=>['연애','연락'].includes(t))})
+ const contact=v.focusTopics.find(t=>t.topic==='연락')
+ assert.ok(contact)
+ assert.match(contact.conclusion,/문의|주고받|전달/)
+ assert.doesNotMatch(JSON.stringify([...v.favorableCards,...v.cautionCards]),/답장을 재촉/)
+ const {applyLoveContext,lovePromptContext}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
+ for(const status of ['single','couple']){
+  const lens=applyLoveContext(v,f.calculation,status)
+  assert.ok(lens.focusTopics.every(t=>['연애','연락'].includes(t.topic)))
+  if(status==='single'){assert.match(lens.focusTopics.find(t=>t.topic==='연애').action,/소개팅 제의/);assert.doesNotMatch(lens.summary,/현재 연인과|답장을 재촉/)}
+  for(const t of lens.focusTopics)assert.equal(t.reason,v.focusTopics.find(x=>x.topic===t.topic).reason)
+  assert.match(lovePromptContext(status),status==='single'?/현재 연인이 있다고 전제하지 말고/:/현재 연인/)
+  const text=compact.buildExternalCompactPrompt(f.calculation,f.data,false,['연애','연락'],lovePromptContext(status))
+  assert.ok(text.length<=7500);assert.match(text,new RegExp('LOVE_STATUS='+status))
+ }
+ assert.equal(JSON.stringify(f.calculation),before)
+})
+test('field hub exposes all ten choices without opening a disclosure',async()=>{
+ const Hub=(await server.ssrLoadModule('/src/FortuneFieldHub.tsx')).FortuneFieldHub
+ const html=renderToStaticMarkup(h(Hub,{onSelect:()=>{}}))
+ assert.doesNotMatch(html,/<details|<summary/)
+ for(const f of fields)assert.ok(html.includes(f.label))
+ assert.match(html,/오늘·주간·월간·연간/)
+})

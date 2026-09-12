@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Gem, Heart, MapPin, Moon, Orbit, Search, Sparkles, Sun } from 'lucide-react'
 
 import type { ApiStatus, BirthProfile, PeriodKey, ToolKey } from './appTypes'
@@ -10,14 +11,15 @@ export const fortunePeriods = [
 ]
 
 export const analysisTools = [
-  { key: 'integrated' as const, label: '통합운세', desc: '연도를 골라 서양·사주·태국 한 해 흐름을 분리 비교', icon: Sparkles, tone: 'gold' },
-  { key: 'compatibility' as const, label: '궁합운', desc: '두 사람의 기본 관계 구조와 선택 기간의 시기 흐름', icon: Heart, tone: 'rose' },
-  { key: 'marriage' as const, label: '결혼운', desc: '개인 결혼운 · 특정 상대 결혼궁합 · 기혼 부부운을 분리 분석', icon: Gem, tone: 'champagne' },
+  { key: 'integrated' as const, label: '통합운세', desc: '서양·사주·태국점성술로 읽는 한 해', icon: Sparkles, tone: 'gold' },
+  { key: 'compatibility' as const, label: '궁합운', desc: '궁합과 재회 · 두 사람의 관계 흐름', icon: Heart, tone: 'rose' },
+  { key: 'marriage' as const, label: '결혼운', desc: '개인 결혼운부터 현재 부부 관계까지', icon: Gem, tone: 'champagne' },
   { key: 'location' as const, label: '지역·국가운', desc: '나와 잘 맞는 국가·도시를 목적별로 비교', icon: MapPin, tone: 'sage' },
   { key: 'precision' as const, label: '정밀분석', desc: '세부 계산과 고급 점성 레이어', icon: Search, tone: 'sage' },
 ]
 
 type HomeControlsProps = {
+  fieldHub?: ReactNode
   birthProfile: BirthProfile
   hasProfile: boolean
   queryDate: string
@@ -60,7 +62,7 @@ function displayRange(value: string, period: PeriodKey) {
   return `${value.slice(0,4)}년 · 1월 1일 → 12월 31일`
 }
 
-export function HomeControls({ birthProfile, hasProfile, queryDate, period, selectedTool, apiStatus, apiLabel, onOpenProfile, onQueryDateChange, onPeriodSelect, onToolSelect }: HomeControlsProps) {
+export function HomeControls({ fieldHub, birthProfile, hasProfile, queryDate, period, selectedTool, apiStatus, apiLabel, onOpenProfile, onQueryDateChange, onPeriodSelect, onToolSelect }: HomeControlsProps) {
   const periodDriven = selectedTool === null || selectedTool === 'precision'
   const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location'
   const effectivePeriod: PeriodKey = periodDriven ? period : 'today'
@@ -70,9 +72,9 @@ export function HomeControls({ birthProfile, hasProfile, queryDate, period, sele
   const yearOptions = Array.from({length:16},(_,i)=>year-5+i)
   const pickerLabel = periodDriven ? (effectivePeriod === 'today' ? '운세 날짜' : effectivePeriod === 'week' ? '주간 선택 · 월요일~일요일' : effectivePeriod === 'month' ? '월간 선택 · 달력 월' : '연간 선택 · 달력 연도') : '관계 분석 기준 날짜'
   const resetDate = effectivePeriod === 'month' ? `${now.slice(0,7)}-01` : effectivePeriod === 'year' ? `${now.slice(0,4)}-01-01` : now
-  return <>
+  return <div className="moonlit-home-controls">
     <button className="profile-card" type="button" onClick={onOpenProfile}>
-      <div className="profile-copy"><span className="eyebrow">MY BIRTH PROFILE</span><strong>{hasProfile ? `${birthProfile.name || '나'}의 출생 프로필` : '나의 출생 프로필'}</strong><span>{hasProfile ? `${birthProfile.birthDate} · ${birthProfile.birthTime} · 이 기기에 저장됨` : '정밀 계산에 사용할 출생정보를 먼저 저장해'}</span></div><ChevronDown size={20}/>
+      <div className="profile-copy"><span className="eyebrow">나의 별빛 기록</span><strong>{hasProfile ? `${birthProfile.name || '나'}의 출생 프로필` : '나의 출생 프로필'}</strong><span>{hasProfile ? `${birthProfile.birthDate} · ${birthProfile.birthTime} · 이 기기에 저장됨` : '정밀 계산에 사용할 출생정보를 먼저 저장해'}</span></div><ChevronDown size={20}/>
     </button>
 
     {dateControlVisible && <section className="date-card period-date-picker">
@@ -92,6 +94,15 @@ export function HomeControls({ birthProfile, hasProfile, queryDate, period, sele
 
     {selectedTool === 'precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid" role="tablist" aria-label="정밀분석 기간">{fortunePeriods.map(({key,label,icon:Icon})=><button aria-selected={period===key} className={`period-button ${period===key?'is-active':''}`} key={key} role="tab" type="button" onClick={()=>onPeriodSelect(key,false)}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
 
-    <section className="section-block tools-section"><div className="section-heading-row"><div className="section-label">분석 도구</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div><div className="tool-grid">{analysisTools.map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`tool-icon tone-${tone}`}><Icon size={24}/></span><strong>{label}</strong><span>{desc}</span></button>)}</div></section>
-  </>
+    {fieldHub}
+    <section className="section-block tools-section">
+      <div className="section-heading-row"><div className="section-label">별빛으로 살펴보기</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div>
+      <div className="home-tool-groups">{[
+        {label:'세 체계의 흐름',keys:['integrated']},
+        {label:'관계',keys:['compatibility','marriage']},
+      ].map(group=><div className="home-tool-group" key={group.label}><h3>{group.label}</h3><div className="home-tool-grid">{analysisTools.filter(t=>group.keys.includes(t.key)).map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={23} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div></div>)}
+      <details className="home-advanced" open={selectedTool==='location'||selectedTool==='precision'?true:undefined}><summary>고급 분석 <ChevronDown size={16} aria-hidden="true"/></summary><div className="home-tool-grid">{analysisTools.filter(t=>['location','precision'].includes(t.key)).map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={23} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div></details>
+      </div>
+    </section>
+  </div>
 }

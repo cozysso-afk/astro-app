@@ -102,8 +102,8 @@ export function buildCompactDeepPacket(input: Row, level = 0, analysis?: Row, fo
   }
 }
 
-export function buildExternalCompactPrompt(calculation: Row, analysis?: Row, precision = false, focusTopics?: string[]) {
-  const instructions=externalFortuneInstructions(externalPeriodKind(calculation)) + '\n' + THREE_SYSTEM_INSTRUCTIONS + (precision ? '\n[정밀분석] 동일 계산의 정밀 근거를 우선 설명한다. 새 점수 생성 금지, 미계산 항목 추정 금지.' : '')
+export function buildExternalCompactPrompt(calculation: Row, analysis?: Row, precision = false, focusTopics?: string[], readingContext = '') {
+  const instructions=readingContext + externalFortuneInstructions(externalPeriodKind(calculation)) + '\n' + THREE_SYSTEM_INSTRUCTIONS + (precision ? '\n[정밀분석] 동일 계산의 정밀 근거를 우선 설명한다. 새 점수 생성 금지, 미계산 항목 추정 금지.' : '')
   return fit(instructions,level=>buildCompactDeepPacket(calculation,level,analysis,focusTopics))
 }
 
