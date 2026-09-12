@@ -10,6 +10,10 @@ const precision = fs.readFileSync(new URL('./precisionTransport.ts', import.meta
 
 assert.equal(supabase.includes('signInAnonymously'), false, 'web auth must not create new anonymous users')
 assert.equal(supabase.includes('shouldCreateUser: false'), true, 'magic-link login must not auto-create arbitrary users')
+assert.equal(supabase.includes('requestEmailMagicLink'), true, 'private login must use the default email magic-link flow')
+assert.equal(supabase.includes('emailRedirectTo'), true, 'normal magic-link login must explicitly return to the current app origin')
+assert.equal(supabase.includes('window.location.origin'), true, 'magic-link redirect must follow the current deployed app origin')
+assert.equal(supabase.includes('verifyOtp({'), false, 'custom six-digit OTP verification must not be required')
 assert.equal(supabase.includes('updateUser({ email:'), true, 'existing anonymous session must be converted by linking its email identity')
 assert.equal(supabase.includes('rememberPendingAnonymousLink'), true, 'pre-link anonymous user id must survive the email redirect')
 assert.equal(supabase.includes('window.localStorage.setItem'), true, 'pending UUID marker must survive a new browser tab')
@@ -24,6 +28,8 @@ assert.equal(gate.includes('readPendingAnonymousLink'), true, 'redirect completi
 assert.equal(gate.includes('nextSession.user.id !== pending.userId'), true, 'mismatched user ids must block app entry')
 assert.equal(gate.includes('authenticatedEmail !== pending.email'), true, 'redirected email must match the requested owner email')
 assert.equal(gate.includes('cloudRecordCount > 0'), true, 'cloud-bearing anonymous accounts must never be silently abandoned')
+assert.equal(gate.includes('6자리 인증 코드'), false, 'UI must not require a custom OTP template')
+assert.equal(gate.includes('로그인 링크 받기'), true, 'UI must describe the actual magic-link flow')
 assert.equal(gate.includes('onAuthStateChange'), false, 'auth-state callbacks must not bypass explicit boot-time UUID checks')
 assert.equal(main.includes('<AuthGate>'), true, 'AppNext must stay behind the authorization gate')
 assert.equal(main.indexOf('installIntegratedPrecisionFetch()') < main.indexOf('ReactDOM.createRoot'), true, 'precision transport must install before React/auth bootstrap')
@@ -52,6 +58,3 @@ for (const legacy of [
 }
 
 console.log('private email auth contract: ok')
-assert.ok(supabase.includes('requestEmailCode') && supabase.includes('verifyEmailCode'))
-assert.ok(gate.includes('one-time-code') && gate.includes('인증번호 받기'))
-assert.ok(!gate.includes('인증 링크 붙여넣기'))
