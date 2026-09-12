@@ -131,12 +131,14 @@ for(const period of ['today','week','month','year'])test(`${period}: single/coup
  assert.match(contact.conclusion,/문의|주고받|전달/)
  assert.doesNotMatch(JSON.stringify([...v.favorableCards,...v.cautionCards]),/답장을 재촉/)
  const {applyLoveContext,lovePromptContext}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
- for(const status of ['single','couple']){
+ for(const status of ['single','flirting','intimate_uncommitted','couple']){
   const lens=applyLoveContext(v,f.calculation,status)
   assert.ok(lens.focusTopics.every(t=>['연애','연락'].includes(t.topic)))
+  if(status==='flirting'){assert.match(lens.summary,/썸|연인으로 합의/);assert.doesNotMatch(lens.focusTopics[0].action,/소개를 부탁/)}
+  if(status==='intimate_uncommitted'){assert.match(lens.summary,/신체적 친밀감/);assert.match(lens.focusTopics[0].action,/원하는 관계/);assert.doesNotMatch(lens.summary,/커플의 현재/)}
   if(status==='single'){assert.match(lens.focusTopics.find(t=>t.topic==='연애').action,/소개팅 제의/);assert.doesNotMatch(lens.summary,/현재 연인과|답장을 재촉/)}
   for(const t of lens.focusTopics)assert.equal(t.reason,v.focusTopics.find(x=>x.topic===t.topic).reason)
-  assert.match(lovePromptContext(status),status==='single'?/현재 연인이 있다고 전제하지 말고/:/현재 연인/)
+  assert.match(lovePromptContext(status),status==='single'?/현재 연인이 있다고 전제하지 말고/:status==='flirting'?/썸·알아가는/:status==='intimate_uncommitted'?/신체적 친밀감/:/현재 연인/)
   const text=compact.buildExternalCompactPrompt(f.calculation,f.data,false,['연애','연락'],lovePromptContext(status))
   assert.ok(text.length<=7500);assert.match(text,new RegExp('LOVE_STATUS='+status))
  }
