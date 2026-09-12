@@ -327,3 +327,44 @@ test('historical canceled timeout and genuine failures retain identity and spent
     assert.doesNotMatch(JSON.stringify(actual),/TEST_CANARY_7788|client_secret/)
   }
 })
+
+for(const [name,text] of [
+  ['headline','상승궁으로 관계 성립을 읽어.'],
+  ['topic reason','출생차트의 달이 보여주는 감정 반응이야.'],
+  ['decision','오후 3시에 연락해.'],
+  ['cluster','7하우스의 배우자 흐름이야.'],
+  ['future nested field','사주로 확정된 결론이야.'],
+])test(`provisional prose exclusion covers ${name}`,()=>{
+  const input={headline:text,topic_analysis:{연애:{reason:text,action:text,evidence_refs:['W:daily:2026-09-10:10','S:month:1','T:taksajorn:1','W:window:1']}},decisions:[{reason:text,timing:text}],clusters:{relationship:text},future:{nested:[{body:text}]}};
+  const before=structuredClone(input),out=sanitizeProvisionalInterpretationOutput(input);
+  assert.equal(out.headline,'');
+  assert.equal(out.topic_analysis.연애.reason,'');
+  assert.equal(out.decisions[0].timing,'');
+  assert.equal(out.clusters.relationship,'');
+  assert.equal(out.future.nested[0].body,'');
+  assert.deepEqual(out.topic_analysis.연애.evidence_refs,['W:daily:2026-09-10:10']);
+  assert.equal(auditProvisionalResidue(out).ok,true);
+  assert.deepEqual(input,before);
+});
+test('provisional scrub preserves robust transit Moon prose and ordinary scores',()=>{
+  const text='현재 운행 중인 달이 출생차트의 금성과 연결돼. 평균은 45.2점이야.';
+  const out=sanitizeProvisionalInterpretationOutput({topic_analysis:{연애:{reason:text}}});
+  assert.equal(out.topic_analysis.연애.reason,text);
+});
+test('new structured natal-target observations cannot bypass provisional audit',()=>{
+  for(const target of ['Moon','ASC','MC'])assert.equal(auditProvisionalResidue({western:{observed_transit_context:[{transit:'Venus',natal_target:target}]}}).ok,false);
+  assert.equal(auditProvisionalResidue({western:{observed_transit_context:[{transit:'Moon',natal_target:'Venus'}]}}).ok,true);
+});
+test('provisional packet filters opaque S/T IDs and nested birth-sensitive observations',()=>{
+  const packet={evidence_ledger:[
+    {id:'S:month:1',text:'독립 맥락'},
+    {id:'T:annual:1',text:'독립 맥락'},
+    {id:'W:daily:2026-09-10:10',system:'western',observation:{transit:'Moon',target:'Venus'}},
+    {id:'W:daily:2026-09-10:11',system:'western',observation:{transit:'Venus',target:'Moon'}},
+    {id:'W:daily:2026-09-10:12',system:'saju'},
+    {id:'W:daily:2026-09-10:13',text:'7하우스 활성'},
+  ]};
+  const out=attachPrecisionPacketMetadata(packet,{precision:provisional});
+  assert.deepEqual(out.evidence_ledger,[packet.evidence_ledger[2]]);
+  assert.equal(auditProvisionalResidue(out).ok,true);
+});
