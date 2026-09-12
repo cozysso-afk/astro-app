@@ -253,3 +253,7 @@ test('provisional full-prompt sanitizer retains V2 depth while ordinary raw-copy
   assert.doesNotMatch(plain,/EXTERNAL_AI_PROMPT_V2/)
   assert.equal(prompt.split('[CALCULATED_DATA · Western-only]\n')[1],plain.split('[CALCULATED_DATA · Western-only]\n')[1])
 })
+
+test('external fallback period boundaries match the existing calculation packet classifier',()=>{
+  for(const [days,kind] of [[1,'day'],[8,'week'],[9,'week'],[10,'month'],[32,'month'],[45,'month'],[46,'annual']]) assert.equal(externalPeriodKind({period:{day_count:days}}),kind)
+})

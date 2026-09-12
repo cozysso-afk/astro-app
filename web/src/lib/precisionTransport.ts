@@ -294,7 +294,7 @@ export function externalPeriodKind(calculation: any, requested?: unknown): strin
   const count = Number(calculation?.period?.day_count)
   if (count === 1) return 'day'
   if (['day','today','week','month','year','annual'].includes(String(declared))) return declared === 'today' ? 'day' : String(declared)
-  return count > 0 && count <= 7 ? 'week' : count > 0 && count <= 31 ? 'month' : 'annual'
+  return count > 0 && count <= 9 ? 'week' : count > 0 && count <= 45 ? 'month' : 'annual'
 }
 export function upgradeCopiedFortunePrompt(text: string, calculation: unknown) {
   if (text.includes('[EXTERNAL_AI_PROMPT_V2')) return text
