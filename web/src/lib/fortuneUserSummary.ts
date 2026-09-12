@@ -360,20 +360,28 @@ function topicTiming(context: FortuneUserSummaryContext, topic: string, level: F
 }
 function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext, topic: string, row: AiTopicInterpretation, level: FlowLevel) {
   const linked = linkedEvidence(context, topic)
-  const readable = unique(linked.map(({ evidence }) => {
+  // Explain the strongest existing signals once per direction, not one repeated
+  // template per planet. Keep conflicting directions separate and leave raw data intact.
+  const signals = linked.map(({ evidence }) => {
     const names = unique([planetName(evidence.transit), planetName(evidence.target)].filter(Boolean), 2)
-    if (!names.length) return ''
+    if (!names.length) return null
     const subject = names.length === 2 ? `${names[0]}${particle(names[0], '과', '와')} ${names[1]}` : names[0]
     const aspect = evidence.aspect ? ASPECT_WORDING[evidence.aspect] : undefined
     const source = aspect && names.length === 2 ? `${subject}${particle(subject, '이', '가')} ${aspect}` : `${subject}의 움직임`
-    const contribution = evidence.contribution
-    const direction = typeof contribution === 'number' && Number.isFinite(contribution)
-      ? contribution > 0 ? '힘을 보태는 쪽으로' : contribution < 0 ? '부담을 더하는 쪽으로' : '뚜렷한 가감 없이'
-      : ''
-    const meaning: Record<string, string> = { 학업: '이해하고 집중하는 과정', 시험: '배운 것을 꺼내 쓰는 과정', 직장: '일을 협의하고 처리하는 과정', 이직: '변화를 검토하고 조건을 조율하는 과정', 대인관계: '서로 의견을 주고받는 과정', 연애: '호감을 나누고 거리를 좁히는 과정', 연락: '말을 꺼내고 답을 이어가는 과정', 재회: '다시 접점을 찾는 과정', 컨디션: '힘을 쓰고 회복하는 균형', 금전: '돈의 흐름을 정리하는 과정', 소식: '정보를 받아 다음 단계를 정하는 과정' }
-    const area = meaning[topic] ?? `${topic}을 판단하는 과정`
-    return direction ? `${source}${particle(source, '은', '는')} ${area}에 ${direction} 읽혀.` : `${source}${particle(source, '이', '가')} 잡혀 있지만, 이것만으로 유리하거나 불리하다고 정하지는 않을게.`
-  }).filter(Boolean), 2)
+    const value = evidence.contribution
+    const signed = typeof value === 'number' && Number.isFinite(value) ? Math.sign(value) : null
+    return { source, signed, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
+  }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.strength - a.strength)
+  const meaning: Record<string, string> = { 학업: '새 내용을 이해하고 집중하는 데', 시험: '배운 것을 꺼내 쓰는 데', 직장: '업무를 협의하고 처리하는 데', 이직: '변화를 검토하고 조건을 조율하는 데', 대인관계: '서로 의견을 주고받는 데', 연애: '호감을 나누고 거리를 좁히는 데', 연락: '말을 꺼내고 대화를 이어가는 데', 재회: '끊겼던 대화의 접점을 찾는 데', 컨디션: '힘을 쓰고 회복하는 데', 금전: '돈의 흐름을 정리하는 데', 소식: '새 정보를 받아 판단하는 데' }
+  const area = meaning[topic] ?? `${topic}을 판단하는 데`
+  const readable: string[] = []
+  for (const sign of Array.from(new Set(signals.map(s => s.signed))).slice(0, 2)) {
+    const sources = unique(signals.filter(s => s.signed === sign).map(s => s.source), 2)
+    const source = sources.length > 1 ? `${sources[0]}에 ${sources[1]}도 겹쳐` : `${sources[0]} 때문에`
+    readable.push(sign === 1 ? `${source} ${area} 힘이 실려.`
+      : sign === -1 ? `${source} ${area} 마찰이나 부담이 생기기 쉬워.`
+      : `${sources.join(', ')} 신호는 보이지만, 이 신호만으로 유리하거나 불리하다고 단정하기는 어려워.`)
+  }
   // A shared reference is required: never attach a whole-period system statement to an unrelated topic.
   const refs = new Set(row.evidence_refs ?? [])
   const cross = (data.cross_checks ?? []).find(check => check.evidence_refs?.some(ref => refs.has(ref)) && check.western && (check.saju || check.thai))

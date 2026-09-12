@@ -330,9 +330,9 @@ test('F: actual topic-linked planets and contribution are translated, unrelated 
   const summary=buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})
   const study=summary.focusTopics.find(t=>t.topic==='학업')
   assert.match(study.reason,/수성과 목성/)
-  assert.match(study.reason,/이해하고 집중하는 과정에 힘을 보태는/)
+  assert.match(study.reason,/이해하고 집중하는 데 힘이 실려/)
   assert.doesNotMatch(study.reason,/금성|토성|orb|1\.42|W:|trine/)
-  assert.match(summary.focusTopics.find(t=>t.topic==='연락').reason,/부담을 더하는/)
+  assert.match(summary.focusTopics.find(t=>t.topic==='연락').reason,/마찰이나 부담/)
   assert.equal(JSON.stringify({data,calculation}),input,'view model must not mutate payload or scores')
 })
 

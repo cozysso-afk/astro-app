@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500&display=swap");
+
 /* One shared reading surface. Raw-data components remain inside their disclosure. */
 :root {
   --reading-pearl: #faf8f4;
@@ -157,7 +159,7 @@ summary:focus-visible, button:focus-visible { outline: 2px solid var(--reading-i
   --reading-shadow: 0 8px 24px rgba(89, 66, 118, .065), inset 0 1px 0 rgba(255,255,255,.94);
   --reading-radius: 20px;
   --reading-gap: 28px;
-  --reading-display: 'AppleMyungjo', 'Nanum Myeongjo', 'Batang', Georgia, serif;
+  --reading-display: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
 }
 body:has(.reading-experience), body:has(.fortune-experience) {
   background: radial-gradient(ellipse at 5% 0, #eee6f8 0, transparent 48%), radial-gradient(ellipse at 100% 45%, #eaf4f0 0, transparent 48%), #f8f6fb;
@@ -168,8 +170,8 @@ body:has(.reading-experience), body:has(.fortune-experience) {
 }
 .fortune-experience .period-ai-head { padding: 22px 18px !important; gap: 8px; }
 .fortune-experience .period-ai-head h3, .reading-hero h3 {
-  font-family: var(--reading-display); font-size: clamp(22px, 5.6vw, 26px) !important;
-  line-height: 1.6 !important; font-weight: 600 !important; letter-spacing: -.04em; text-wrap: pretty;
+  font-family: var(--reading-display) !important; font-size: 19px !important;
+  line-height: 1.75 !important; font-weight: 500 !important; letter-spacing: -.04em; text-wrap: pretty;
 }
 .reading-hero .eyebrow, .fortune-experience .period-ai-kicker { font-size: 11px !important; font-weight: 700; letter-spacing: .06em; color: #6a507f !important; }
 .reading-period-date { display: block; font-size: 11px; letter-spacing: .015em; color: var(--reading-secondary); margin: 6px 0 10px; }
@@ -247,4 +249,78 @@ body:has(.reading-experience), body:has(.fortune-experience) {
 @media (prefers-reduced-motion: no-preference) {
   .fortune-experience .flow-tile, .relationship-experience .contact-row { transition: box-shadow 180ms ease, transform 180ms ease; }
   .portrait-concept button:active { transform: scale(.98); }
+}
+
+/* iPhone QA: reading hierarchy must win over the legacy mobile !important rules. */
+.fortune-experience .period-ai-head { display: block !important; padding: 22px 20px !important; }
+.fortune-experience .period-ai-orb { display: none !important; }
+.fortune-experience .period-ai-head h3, .relationship-experience .reading-hero h3 {
+  margin: 18px 0 0 !important; font-family: var(--reading-display) !important;
+  font-size: 19px !important; font-weight: 500 !important; line-height: 1.75 !important;
+  letter-spacing: -.015em !important; word-break: keep-all; overflow-wrap: break-word;
+}
+.fortune-experience .reading-hero-subtitle, .relationship-experience .reading-hero-subtitle {
+  padding-top: 16px; margin-top: 18px !important; border-top: 1px solid rgba(112,88,144,.14);
+  font-size: 13px !important; line-height: 1.75 !important;
+}
+.reading-period-date { margin: 8px 0 0; line-height: 1.5; }
+.fortune-experience .period-ai-section-title {
+  display: block !important; margin: 0 0 16px !important; padding: 0 !important;
+}
+.fortune-experience .period-ai-section-title > span, .relationship-experience .reading-section > h3 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif !important;
+  font-size: 17px !important; line-height: 1.5 !important; color: #554366 !important;
+  font-weight: 700 !important; letter-spacing: -.01em !important;
+}
+.fortune-experience .period-ai-user-windows, .fortune-experience .period-ai-user-focus { padding: 0 !important; }
+.fortune-experience .result-headline {
+  display: flex !important; align-items: center; gap: 10px !important;
+  padding: 12px 14px !important; margin: 0 0 20px !important;
+  background: rgba(230,240,235,.5) !important; border-radius: 14px !important;
+}
+.fortune-experience .result-headline strong { font-size: 13px !important; }
+.fortune-experience .result-headline span { font-size: 12px !important; }
+.tool-panel:has(.fortune-experience) .period-report-kicker-row { gap: 10px !important; margin-bottom: 12px !important; }
+.tool-panel:has(.fortune-experience) .period-report-heading { align-items: flex-start !important; gap: 14px !important; margin-bottom: 22px !important; }
+.tool-panel:has(.fortune-experience) .period-report-range { margin-top: 12px !important; }
+.fortune-experience .period-ai-details .result-note { margin-top: 16px !important; }
+.fortune-experience .period-date-source > summary {
+  display: grid !important; grid-template-columns: minmax(0, 1fr) 20px !important; gap: 8px 12px !important;
+  padding: 14px 0 !important; align-items: center !important;
+}
+.fortune-experience .period-date-source > summary > span,
+.fortune-experience .period-date-source > summary > strong,
+.fortune-experience .period-date-source > summary > small { grid-column: 1; }
+.fortune-experience .period-date-source > summary::after { grid-column: 2; grid-row: 1 / 4; }
+.fortune-experience .period-time-evidence > summary { padding: 16px 0 !important; line-height: 1.6 !important; }
+:root {
+  --reading-shadow: 0 12px 26px -14px rgba(75,51,112,.26), 0 3px 8px rgba(91,70,117,.06), inset 0 1px 1px rgba(255,255,255,.98), inset 0 -1px 2px rgba(149,119,179,.1);
+}
+.fortune-experience .period-ai-head, .relationship-experience .reading-hero {
+  background: radial-gradient(ellipse at 95% 4%, rgba(205,178,234,.48), transparent 58%), radial-gradient(ellipse at 5% 95%, rgba(182,229,215,.38), transparent 58%), linear-gradient(135deg,rgba(255,255,255,.86),rgba(245,235,253,.62)) !important;
+  box-shadow: var(--reading-shadow) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(115%); backdrop-filter: blur(8px) saturate(115%);
+}
+.flow-tile, .is-caution .flow-tile, .contact-row, .relationship-balance > section {
+  box-shadow: var(--reading-shadow); border-color: rgba(255,255,255,.95);
+}
+.reading-explanation { border: 1px solid rgba(255,255,255,.65); box-shadow: inset 0 1px 1px rgba(255,255,255,.9), 0 5px 12px -10px rgba(84,57,119,.22); }
+.fortune-experience .period-ai-user-focus .period-ai-topic { gap: 16px !important; }
+.fortune-experience .period-ai-user-focus .period-ai-topic > .reading-explanation { margin-top: 0; }
+.relationship-experience .reading-section { min-width: 0; }
+.relationship-experience .reading-section > h3 { margin-bottom: 16px; }
+.relationship-experience .relationship-pattern + .relationship-pattern { margin-top: 24px; }
+.relationship-experience .reading-conclusion { line-height: 1.8 !important; }
+@keyframes reading-glint { from { opacity: .35; transform: rotate(-8deg); } to { opacity: .8; transform: rotate(8deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-celestial-motion="off"]) .fortune-experience .period-ai-head,
+  :root:not([data-celestial-motion="off"]) .relationship-experience .reading-hero { animation: reading-rise 240ms ease-out both !important; }
+  :root:not([data-celestial-motion="off"]) .reading-hero::after,
+  :root:not([data-celestial-motion="off"]) .fortune-experience .period-ai-head::after { animation: reading-glint 6s ease-in-out 2 alternate; }
+  :root:not([data-celestial-motion="off"]) .fortune-experience details[open] > :not(summary),
+  :root:not([data-celestial-motion="off"]) .relationship-experience details[open] > :not(summary) { animation: reading-rise 220ms ease-out !important; }
+  :root:not([data-celestial-motion="off"]) .fortune-experience summary,
+  :root:not([data-celestial-motion="off"]) .relationship-experience summary { transition: background-color 180ms ease, transform 180ms ease; }
+  :root:not([data-celestial-motion="off"]) .fortune-experience summary:active,
+  :root:not([data-celestial-motion="off"]) .relationship-experience summary:active { transform: scale(.99); background-color: rgba(226,212,240,.25); }
 }

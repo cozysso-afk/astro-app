@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import postcss from 'postcss'
 import { buildFortuneUserSummary } from './fortuneUserSummary.ts'
 import { buildRelationshipUserSummary, rankRelationshipAspects, aspectRole } from './relationshipUserSummary.ts'
 
@@ -160,4 +161,51 @@ test('relationship reasons distinguish Mercury/Uranus, Venus/Mars, and Saturn ra
   assert.match(view.sections.find(s=>s.id==='communication').rows[0].reason,/예측하기 어려운 속도/)
   assert.match(view.sections.find(s=>s.id==='attraction').rows[0].reason,/애정 표현.*다가가는 힘/)
   assert.match(view.sections.find(s=>s.id==='stability').rows[0].reason,/오래 이어지는 것과 편안하게 유지되는 것/)
+})
+
+
+test('same-direction evidence is grouped once; opposing evidence and raw payload survive',()=>{
+  const f=fortuneFixture()
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Moon',contribution:2})
+  const before=JSON.stringify(f)
+  let reason=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').reason
+  assert.match(reason,/수성과 목성/); assert.match(reason,/달/)
+  assert.equal((reason.match(/힘이 실려/g)||[]).length,1)
+  assert.doesNotMatch(reason,/과정에 힘을 보태는|orb|W:/)
+  assert.equal(JSON.stringify(f),before)
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Saturn',contribution:-4})
+  reason=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').reason
+  assert.match(reason,/토성/); assert.match(reason,/마찰이나 부담/); assert.match(reason,/힘이 실려/)
+})
+for(const period of ['today','week','month','year']) test(`repeated ${period} presentation never increases scores or mutates calculation`,()=>{
+  const f=fortuneFixture(period), original=JSON.stringify(f)
+  const first=buildFortuneUserSummary(f.data,f.context)
+  for(let i=0;i<5;i++) {
+    const next=buildFortuneUserSummary(f.data,f.context)
+    assert.deepEqual(next.favorableCards,first.favorableCards)
+    assert.deepEqual(next.cautionCards,first.cautionCards)
+    for(const card of [...next.favorableCards,...next.cautionCards]) assert.equal(card.score,f.calculation.western.overall[card.topic].average)
+    assert.equal(JSON.stringify(f),original)
+  }
+})
+
+test('reading headline declarations override legacy important Gothic and billboard size',()=>{
+  const main=readFileSync(new URL('../main.tsx',import.meta.url),'utf8')
+  const imports=[...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(m=>m[1])
+  assert.equal(imports.at(-1),'reading-experience.css')
+  const css=postcss.parse(readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8'))
+  const declarations={}
+  css.walkRules(rule=>{
+    if(rule.selector.split(',').map(x=>x.trim()).includes('.fortune-experience .period-ai-head h3')) {
+      rule.walkDecls(d=>{declarations[d.prop]={value:d.value,important:Boolean(d.important)}})
+    }
+  })
+  assert.deepEqual(declarations['font-family'],{value:'var(--reading-display)',important:true})
+  assert.deepEqual(declarations['font-size'],{value:'19px',important:true})
+  assert.deepEqual(declarations['font-weight'],{value:'500',important:true})
+  assert.deepEqual(declarations['line-height'],{value:'1.75',important:true})
+  const source=css.toString()
+  assert.match(source,/family=Noto\+Serif\+KR:wght@500&display=swap/)
+  assert.match(source,/--reading-display: 'Noto Serif KR'/)
+  assert.doesNotMatch(source,/body[^{}]*\{[^}]*font-family:\s*var\(--reading-display\)/)
 })

@@ -41,7 +41,7 @@ export function PeriodFortunePanel({
       <div className="period-report-copy">
         <div className="period-report-kicker-row"><span className="eyebrow">기간 운세</span><span className="period-report-badge">{badge}</span></div>
         <h2>{title}</h2>
-        <div className="period-report-range"><CalendarDays size={15}/><strong>{startDate}</strong><span>→</span><strong>{endDate}</strong></div>
+        <div className="period-report-range"><CalendarDays size={15}/><strong>{startDate}</strong>{startDate !== endDate && <><span>→</span><strong>{endDate}</strong></>}</div>
         <p>선택한 기간의 흐름과 중요한 시기를 정리해서 보여줘.</p>
       </div>
     </div>
