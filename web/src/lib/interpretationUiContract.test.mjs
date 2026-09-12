@@ -101,10 +101,10 @@ function defaultVisibleText(summary) {
   return [
     summary.headline,
     summary.summary,
-    ...summary.doItems,
-    ...summary.cautionItems,
+    ...summary.bestFlow,
+    ...summary.cautionFlow,
     ...summary.importantWindows.flatMap((item)=>[item.date,item.guidance]),
-    ...summary.focusTopics.flatMap((item)=>[item.topic,item.conclusion,item.observe,item.caution].filter(Boolean)),
+    ...summary.focusTopics.flatMap((item)=>[item.topic,item.conclusion,item.reason,item.timing,item.action,item.observe,item.caution].filter(Boolean)),
     summary.relationship?.summary,
     summary.relationship?.incoming,
     summary.relationship?.outgoing,
@@ -138,12 +138,12 @@ test('period default view uses the natural view model and keeps raw prose in one
   const technicalMarkup = period.slice(technicalStart)
 
   assert.match(defaultMarkup, /userSummary\.headline/)
-  assert.match(defaultMarkup, /userSummary\.summary/)
-  assert.match(defaultMarkup, /userSummary\.doItems/)
-  assert.match(defaultMarkup, /userSummary\.cautionItems/)
+  assert.match(defaultMarkup, /userSummary\.bestFlow/)
+  assert.match(defaultMarkup, /userSummary\.cautionFlow/)
   assert.match(defaultMarkup, /userSummary\.focusTopics/)
   assert.match(defaultMarkup, /userSummary\.importantWindows/)
-  assert.doesNotMatch(defaultMarkup, /data\.(?:headline|overall|clusters|systems|priorities)|item\.(?:verdict|reason|confidence)|technicalEvidence/)
+  assert.doesNotMatch(defaultMarkup, /data\.(?:headline|overall|clusters|systems|priorities)|item\.(?:verdict|confidence)|technicalEvidence/)
+  assert.match(defaultMarkup, /왜 이렇게 보냐면/)
 
   assert.equal((period.match(/<summary>계산 근거 자세히 보기<\/summary>/g) || []).length, 1)
   assert.match(technicalMarkup, /data\.overall\.summary/)
@@ -161,10 +161,10 @@ test('relationship focus uses plain labels and only renders useful structured di
   assert.equal((annual.match(/className="ai-relationship-section"/g) || []).length, 1)
   assert.equal((annual.match(/className="ai-direction-grid ai-relationship-direction"/g) || []).length, 1)
 
-  assert.match(period, />관계에서 볼 것</)
-  assert.match(period, />상대의 반응</)
-  assert.match(period, />내가 먼저 움직일 때</)
-  assert.match(period, />과거 인연의 재접촉</)
+  assert.match(period, />연락 흐름</)
+  assert.match(period, />상대가 먼저 오는 흐름 · /)
+  assert.match(period, />내가 먼저 연락하기 · /)
+  assert.match(period, />과거 인연 재접촉</)
   assert.match(period, /userSummary\.relationship\.(?:incoming|outgoing|reconnection)/)
   assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'), period.indexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
 })
@@ -180,7 +180,10 @@ test('primary topics stay concise and reference topics are one-line collapsed it
   assert.match(focus, /item\.conclusion/)
   assert.match(focus, /item\.observe/)
   assert.match(focus, /item\.caution/)
-  assert.doesNotMatch(focus, /item\.(?:verdict|reason|timing|action|avoid|confidence)/)
+  assert.match(focus, /item\.reason/)
+  assert.match(focus, /item\.timing/)
+  assert.match(focus, /item\.action/)
+  assert.doesNotMatch(focus, /item\.(?:verdict|avoid|confidence)/)
 
   const reference = period.slice(referenceStart, technicalStart)
   assert.match(reference, /<summary>다른 분야 보기<\/summary>/)
@@ -210,8 +213,8 @@ test('period topic normalization supports legacy arrays without exposing numeric
 test('daily QA fixture becomes concise natural Korean without default technical language', () => {
   const { summary } = fixture()
   const visible = defaultVisibleText(summary)
-  assert.equal(summary.headline, '오늘은 관계에서 기대를 크게 하기보다 실제 연락과 약속이 이어지는지를 보는 편이 좋아.')
-  assert.equal(summary.doItems.length, 2)
+  assert.match(summary.headline, /^오늘은/)
+  assert.equal(summary.bestFlow.length, 0)
   assert.equal(summary.cautionItems.length, 2)
   assert.equal(summary.focusTopics.length, 3)
   assert.match(summary.focusTopics.find((item)=>item.topic === '연애').conclusion, /오늘 연애는 서두르지 않는 편이 좋아/)
@@ -221,7 +224,7 @@ test('daily QA fixture becomes concise natural Korean without default technical 
   assert.doesNotMatch(visible, /(?:[가-힣A-Za-z]+\s*·\s*){2,}[가-힣A-Za-z]+/)
   assert.ok((visible.match(/확인해/g) || []).length <= 1)
 
-  const sentences = [summary.headline,summary.summary,...summary.doItems,...summary.cautionItems,...summary.focusTopics.flatMap((item)=>[item.conclusion,item.observe,item.caution].filter(Boolean))]
+  const sentences = [summary.headline,...summary.focusTopics.flatMap((item)=>[item.conclusion,item.observe,item.caution].filter(Boolean))]
   assert.equal(new Set(sentences).size,sentences.length,'default advice should not be duplicated verbatim')
   const love = summary.focusTopics.find((item)=>item.topic === '연애')
   const contact = summary.focusTopics.find((item)=>item.topic === '연락')
@@ -237,7 +240,9 @@ test('weekly QA fixture states a real priority and keeps meaningful dates natura
     scores: { 학업: 68, 연애: 37, 연락: 37 },
     keyWindows: [{ label:'내부 계산 라벨', start:'2026-09-14', end:'2026-09-15', signal:'활용', topics:['학업'], summary:'원문', action:'원문', avoid:'', evidence_refs:['W:x'] }],
   })
-  assert.equal(summary.headline, '이번 주는 공부와 일정 정리가 우선이고, 관계는 상대 반응을 보면서 서두르지 않는 편이 좋아.')
+  assert.match(summary.headline, /^이번 주는 공부/)
+  assert.deepEqual(summary.bestFlow, ['학업'])
+  assert.deepEqual(new Set(summary.cautionFlow), new Set(['연애','연락']))
   assert.equal(summary.importantWindows.length,1)
   assert.equal(summary.importantWindows[0].guidance,'공부에 힘을 써보기 좋아.')
   const visible = defaultVisibleText(summary)
@@ -251,9 +256,10 @@ test('directional relationship wording separates my initiative from the other pe
     scores: { 연락: 65, 연애: 50 },
     relationshipScores: { 수신신호: 32, 발신적합: 70, 과거인연접점: 50 },
   })
-  assert.equal(summary.relationship.summary,'내가 먼저 연락하기 좋은 편이라고 해서 상대도 같은 마음이라는 뜻은 아니야.')
-  assert.match(summary.relationship.incoming,/상대 반응은 늦거나 애매할 수 있으니/)
-  assert.match(summary.relationship.outgoing,/내가 먼저 가볍게 말을 꺼내기에는 괜찮은 편/)
+  assert.equal(summary.relationship.incomingBand,'약함')
+  assert.equal(summary.relationship.outgoingBand,'강함')
+  assert.match(summary.relationship.incoming,/먼저 연락이 오길 크게 기대하기보다는/)
+  assert.match(summary.relationship.outgoing,/내가 먼저 가볍게 말을 꺼내보기 좋은/)
   assert.equal(summary.relationship.reconnection,undefined)
   assert.doesNotMatch(defaultVisibleText(summary),/한 방향의 상대활성도|세 축 기준/)
 })
@@ -286,4 +292,103 @@ test('period result labels natural presentation without claiming deterministic t
   assert.match(period, /맞춤 운세 해설/)
   const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'),period.indexOf('<summary>계산 근거 자세히 보기</summary>'))
   assert.doesNotMatch(defaultMarkup,/계산근거 기반 자동 해설|AI\(인공지능\) 기간 해설/)
+})
+
+test('A/B: study leads favorable flow while relationship weakness stays in caution', () => {
+  const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 } })
+  assert.deepEqual(summary.bestFlow,['학업','직장'])
+  assert.deepEqual(summary.cautionFlow,['연애','컨디션'])
+  assert.match(summary.headline,/^오늘은 공부와 업무/)
+  assert.ok(summary.headline.indexOf('공부') < summary.headline.indexOf('연애'))
+  assert.equal(summary.relationship,undefined)
+})
+
+test('C: important contact always shows both directions, even at identical bands or outside top three', () => {
+  const { summary } = fixture({focus:{학업:'핵심',직장:'핵심',시험:'핵심',연락:'주목'}, scores:{학업:80,직장:75,시험:70,연락:50}})
+  assert.equal(summary.focusTopics.some(t=>t.topic==='연락'),false)
+  assert.equal(summary.relationship.incomingBand,'약함')
+  assert.equal(summary.relationship.outgoingBand,'약함')
+  assert.ok(summary.relationship.incoming)
+  assert.ok(summary.relationship.outgoing)
+  assert.notEqual(summary.relationship.incoming,summary.relationship.outgoing)
+})
+
+test('E: reference-only relationships never create a large contact/relationship section', () => {
+  const { summary } = fixture({focus:{학업:'핵심',직장:'주목'},scores:{학업:75,직장:65,연애:5,연락:5,재회:5}})
+  assert.equal(summary.relationship,undefined)
+  assert.doesNotMatch(summary.headline,/연애|연락|재회|관계/)
+  assert.deepEqual(summary.cautionFlow,[])
+})
+
+test('F: actual topic-linked planets and contribution are translated, unrelated evidence is excluded', () => {
+  const { data, calculation } = fixture({focus:{학업:'핵심',연락:'주목'},scores:{학업:80,연락:35}})
+  calculation.western.daily_scores=[{date:'2026-09-12',evidence:[
+    {transit:'Mercury',target:'Jupiter',aspect:'trine',orb:1.42,contribution:3,text:'opaque W:internal orb 1.42',source_topics:['학업']},
+    {transit:'Venus',target:'Saturn',contribution:-2,text:'unrelated',source_topics:['연락']},
+  ]}]
+  const input=JSON.stringify({data,calculation})
+  const summary=buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})
+  const study=summary.focusTopics.find(t=>t.topic==='학업')
+  assert.match(study.reason,/수성과 목성/)
+  assert.match(study.reason,/학업에 힘을 보태는/)
+  assert.doesNotMatch(study.reason,/금성|토성|orb|1\.42|W:|trine/)
+  assert.match(summary.focusTopics.find(t=>t.topic==='연락').reason,/부담을 더하는/)
+  assert.equal(JSON.stringify({data,calculation}),input,'view model must not mutate payload or scores')
+})
+
+test('neutral ranking uses deviation then support then backend order, not array order', () => {
+  const {data,calculation}=fixture({focus:{연애:'핵심',학업:'핵심',직장:'핵심'},scores:{연애:61,학업:80,직장:80}})
+  data.topic_analysis.직장.evidence_refs.push('W:second')
+  const entries=normalizeTopicEntries(data.topic_analysis,topicOrder)
+  const view=(topicEntries)=>buildFortuneUserSummary(data,{period:'today',calculation,topicEntries})
+  assert.deepEqual(view(entries).bestFlow,['직장','학업'])
+  assert.deepEqual(view([...entries].reverse()).bestFlow,['직장','학업'])
+  data.topic_analysis.직장.evidence_refs.pop()
+  data.priorities=['학업 우선','직장 다음']
+  assert.deepEqual(view(entries).bestFlow,['학업','직장'])
+})
+
+test('week/month/year timing uses actual distinct high/low dates and day never invents a trend', () => {
+  for(const [periodKey,days,label] of [['week',7,'이번 주 안에서도'],['month',30,'이번 달에는'],['year',365,'올해 주요 시기']]) {
+    const {data,calculation}=fixture({periodKey,dayCount:days,focus:{학업:'핵심'},scores:{학업:70}})
+    calculation.period.end=periodKey==='week'?'2026-09-18':periodKey==='month'?'2026-10-11':'2027-09-11'
+    calculation.western.overall.학업={...stat(70),spread:35,best_days:[{date:'2026-09-14',score:85}],caution_days:[{date:'2026-09-17',score:40}]}
+    const context={period:periodKey,calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)}
+    const summary=buildFortuneUserSummary(data,context)
+    assert.ok(summary.focusTopics[0].timing.includes(label))
+    assert.match(summary.focusTopics[0].timing,/2026-09-14.*2026-09-17/)
+    assert.equal(buildFortuneUserSummary(data,{...context,period:'today'}).focusTopics[0].timing,undefined)
+  }
+})
+
+test('cross-system context requires shared evidence refs and never invents agreement', () => {
+  const {data,calculation}=fixture({focus:{학업:'핵심'},scores:{학업:75}})
+  const check={start:'2026-09-12',end:'2026-09-12',western:'supported',saju:'supported',thai:'',mode:'상반맥락',evidence_refs:['unrelated']}
+  data.cross_checks=[check]
+  const context={period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)}
+  assert.doesNotMatch(buildFortuneUserSummary(data,context).focusTopics[0].reason,/사주/)
+  check.evidence_refs=[...data.topic_analysis.학업.evidence_refs]
+  assert.match(buildFortuneUserSummary(data,context).focusTopics[0].reason,/사주.*엇갈려/)
+  check.mode='복수체계'
+  assert.match(buildFortuneUserSummary(data,context).focusTopics[0].reason,/같은 결론이라고 보진 않아/)
+})
+
+test('missing statistics do not create favorable/caution signals; investment risk is not upside', () => {
+  const {data,calculation}=fixture({focus:{학업:'핵심',투자주의:'주목'},scores:{투자주의:90}})
+  calculation.western.overall.학업=null
+  const summary=buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})
+  assert.deepEqual(summary.bestFlow,[])
+  assert.deepEqual(summary.cautionFlow,['투자주의'])
+  assert.match(summary.focusTopics.find(t=>t.topic==='학업').conclusion,/정보가 부족/)
+})
+
+test('year uses real monthly phases when available instead of repeating a daily date', () => {
+  const {data,calculation}=fixture({periodKey:'year',dayCount:365,focus:{학업:'핵심'},scores:{학업:70}})
+  calculation.period.end='2027-09-11'
+  calculation.western.months=[
+    {start:'2026-10-01',end:'2026-10-31',topics:{학업:stat(85)}},
+    {start:'2027-02-01',end:'2027-02-28',topics:{학업:stat(30)}},
+  ]
+  const result=buildFortuneUserSummary(data,{period:'year',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})
+  assert.match(result.focusTopics[0].timing,/올해는 2026-10-01~2026-10-31.*2027-02-01~2027-02-28/)
 })
