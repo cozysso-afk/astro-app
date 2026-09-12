@@ -1,0 +1,8 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {buildDeterministicTopicAnalysis as build} from './costGuardV21.ts'
+const packet=()=>({period_kind:'week',period:{start:'2026-09-14',end:'2026-09-20',day_count:7},western:{overall:{학업:{average:35,spread:10}},daily_pattern_digest:{}},evidence_ledger:[{id:'W:overall:학업',topic:'학업',system:'western',scope:'period_average',text:'학업 평균'},{id:'W:daily:1',topic:'학업',date:'2026-09-15',system:'western',scope:'daily_actual',text:'Jupiter Mercury trine orb 0.20°'}]})
+test('absent/null statistics remain unknown instead of weak zero',()=>{const p=packet();p.western.overall.학업.average=null;const r=build(p).find(r=>r.topic==='학업');assert.match(r.verdict,/정보가 부족/);assert.equal(r.timing,'');assert.equal(r.confidence,'낮음')})
+test('period start is not invented as timing when no dated evidence exists',()=>{const p=packet();delete p.evidence_ledger[1].date;assert.equal(build(p).find(r=>r.topic==='학업').timing,'')})
+test('outside-period detail cannot explain current period or supply timing',()=>{const p=packet();p.evidence_ledger[1].date='2025-01-01';p.evidence_ledger[1].text='OUTSIDE_PERIOD';const r=build(p).find(r=>r.topic==='학업');assert.doesNotMatch(r.reason,/OUTSIDE_PERIOD/);assert.ok(!r.evidence_refs.includes('W:daily:1'));assert.equal(r.timing,'')})
+test('repeated configuration at different times does not yield high confidence',()=>{const p=packet();p.evidence_ledger.push({...p.evidence_ledger[1],id:'W:daily:2',date:'2026-09-16',text:'Jupiter Mercury trine orb 0.40°'});const r=build(p).find(r=>r.topic==='학업');assert.equal(r.confidence,'보통');assert.match(r.confidence_reason,/설명 유형은 1개/)})

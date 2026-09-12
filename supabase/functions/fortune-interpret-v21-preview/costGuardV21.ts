@@ -58,7 +58,11 @@ function softenObject<T>(value:T):T{
 
 function topicEvidence(payload:any, topic:string){
   const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[];
-  const direct=rows.filter((row:any)=>String(row?.topic??"")===topic);
+  const direct=rows.filter((row:any)=>{
+    if(String(row?.topic??"")!==topic)return false;
+    const date=calendarDate(row?.date),start=calendarDate(payload?.period?.start),end=calendarDate(payload?.period?.end);
+    return !date||(!start||date>=start)&&(!end||date<=end);
+  });
   const priority=(row:any)=>{
     const id=String(row?.id??"");
     if(id.startsWith(`W:overall:${topic}`))return 0;
@@ -95,7 +99,7 @@ function readableTopicEvidence(payload:any,topic:string,singleDay:boolean){
   const aggregate=(row:any)=>/(?:period_average|month_average|best_day|caution_day|relationship_average)/.test(String(row?.scope??""));
   const priority=(row:any)=>{const scope=String(row?.scope??"");const id=String(row?.id??"");if(/intraday_evidence/.test(scope)||id.startsWith("W:detail:"))return 0;if(/daily_actual/.test(scope)||id.startsWith("W:daily:"))return 1;if(/intraday_window/.test(scope)||id.startsWith("W:window:"))return 2;if(id.startsWith("W:date:"))return 4;if(id.startsWith("W:month:"))return 5;if(id.startsWith("W:overall:"))return 6;return 3;};
   const candidates=rows.filter(supportsTopic).filter((row:any)=>{
-    if(!singleDay)return true;
+    if(!singleDay){const date=calendarDate(row?.date),start=calendarDate(payload?.period?.start),end=calendarDate(payload?.period?.end);return !date||(!start||date>=start)&&(!end||date<=end);}
     const date=calendarDate(row?.date);
     if(date&&periodDate&&date!==periodDate)return false;
     return !aggregate(row);
@@ -125,6 +129,7 @@ function topicSalience(payload:any,topic:string){
   const stat=payload?.western?.overall?.[topic]??{};
   const digest=payload?.western?.daily_pattern_digest?.[topic]??{};
   const keyHits=(payload?.key_dates??[]).filter((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic)).length;
+  if(typeof stat?.average!=="number"||!Number.isFinite(stat.average))return -1;
   const avg=num(stat?.average), spread=num(stat?.spread), volatility=num(digest?.volatility);
   const extreme=Math.abs(avg-50);
   const rankBonus=(payload?.ranking?.strongest??[]).some((x:any)=>x?.topic===topic)?8:(payload?.ranking?.weakest??[]).some((x:any)=>x?.topic===topic)?7:0;
@@ -146,7 +151,7 @@ function bestTopicDate(payload:any,topic:string){
   for(const row of evidence){
     for(const value of [row?.date,row?.start,row?.end]){
       const date=String(value??"").slice(0,10);
-      if(/^\d{4}-\d{2}-\d{2}$/.test(date))backedDates.add(date);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(date)&&date>=String(payload?.period?.start??"").slice(0,10)&&date<=String(payload?.period?.end??"9999-12-31").slice(0,10))backedDates.add(date);
     }
   }
   const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&Number.isFinite(Number(x?.score))&&backedDates.has(String(x.date).slice(0,10)));
@@ -156,12 +161,14 @@ function bestTopicDate(payload:any,topic:string){
   if(key?.date)return String(key.date).slice(0,10);
   const direct=evidence.find((row:any)=>row?.date&&backedDates.has(String(row.date).slice(0,10)));
   if(direct?.date)return String(direct.date).slice(0,10);
-  return String(payload?.period?.start??"").slice(0,10);
+  return "";
 }
 
 function topicVerb(topic:string){
-  if(["직장","이직"].includes(topic))return {action:"조건·일정·문서를 실제 기준과 대조해 우선순위를 정리해.",avoid:"한 번의 고점이나 저점만 보고 커리어 결론을 즉시 확정하지 마."};
-  if(["학업","시험"].includes(topic))return {action:"집중력이 상대적으로 나은 구간에 핵심 과제와 점검을 먼저 배치해.",avoid:"낮은 구간의 체감만으로 전체 학습 성과를 단정하지 마."};
+  if(topic==="이직")return {action:"제안이 있다면 직무·보상·입사일을 따로 확인하고 현재 조건과 비교해.",avoid:"관심 표현을 채용 확정으로 받아들이거나 답답함만으로 퇴사를 결정하지 마."};
+  if(topic==="직장")return {action:"조건·일정·문서를 실제 기준과 대조해 우선순위를 정리해.",avoid:"한 번의 고점이나 저점만 보고 커리어 결론을 즉시 확정하지 마."};
+  if(topic==="시험")return {action:"시간을 재고 문제를 푼 뒤 지식 부족, 조건 누락, 시간 부족을 구분해서 오답을 정리해.",avoid:"공부한 시간이나 익숙한 느낌을 실전 정답률과 같다고 보지 마."};
+  if(topic==="학업")return {action:"집중력이 상대적으로 나은 구간에 핵심 과제와 점검을 먼저 배치해.",avoid:"낮은 구간의 체감만으로 전체 학습 성과를 단정하지 마."};
   if(topic==="대인관계")return {action:"상대별 실제 반응과 약속 이행 여부를 구분해 관계의 우선순위를 조절해.",avoid:"한 사람과의 긴장이나 호의를 전체 인간관계 흐름으로 확대하지 마."};
   if(topic==="연애")return {action:"호감 표현·만남의 지속성·관계 정의처럼 실제로 확인되는 연애 행동을 기준으로 속도를 조절해.",avoid:"연애 상대활성도만 보고 상대의 감정이나 관계 성립을 미리 확정하지 마."};
   if(topic==="연락")return {action:"상대가 먼저 보낸 연락과 내가 먼저 보내기 좋은 흐름을 구분하고, 답변의 구체성과 지속성을 확인해.",avoid:"발신 적합도가 높다는 이유로 상대의 수신 의향까지 높다고 해석하지 마."};
@@ -193,6 +200,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
   return TOPICS.map(topic=>{
     const stat=payload?.western?.overall?.[topic]??{};
     const digest=payload?.western?.daily_pattern_digest?.[topic]??{};
+    if(typeof stat?.average!=="number"||!Number.isFinite(stat.average))return {topic,importance:"참고",verdict:`${topicSubject(topic)} 계산 정보가 부족해 강약을 정하기 어려워.`,reason:"평균값이 없어 약함이나 보통으로 대신 해석하지 않아. 계산을 확인한 뒤 이 분야의 방향을 읽을 수 있어.",timing:"",action:"",avoid:"정보가 없다는 것을 나쁜 흐름으로 받아들이지 마.",confidence:"낮음",confidence_reason:"유효한 분야 통계가 없음",evidence_refs:[]};
     const avg=num(stat?.average), spread=num(stat?.spread);
     const baseEvidence=topicEvidence(payload,topic);
     const importance=core.has(topic)?"핵심":watch.has(topic)?"주목":"참고";
@@ -225,7 +233,9 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const timing=singleDay?"":bestTopicDate(payload,topic);
     if(timing)reasonParts.push(`판단할 때는 ${timing} 전후의 직접 계산근거와 기간 평균을 함께 보는 게 좋아.`);
     const va=topicVerb(topic);
-    const confidence=readable.rows.length>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
+    // Repeated observations of one configuration are not independent corroboration.
+    const independent=new Set(readable.rows.filter((row:any)=>/daily_actual|intraday_evidence/.test(String(row?.scope??""))||/^W:(daily|detail):/.test(String(row?.id??""))).map((row:any)=>String(row?.text??row?.label??"").replace(/\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|orb\s*[\d.]+°?/gi,"").replace(/\s+/g," ").trim()).filter(Boolean));
+    const confidence=independent.size>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
     return {
       topic,importance,
       verdict:singleDay?`${topicSubject(topic)} 이날 활성도가 ${pointScoreText(avg)}점으로 ${direction}이야.`:`${topicSubject(topic)} 이번 기간에서 ${direction}으로 읽혀.`,
@@ -236,7 +246,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
       confidence,
       confidence_reason:singleDay
         ? readable.summaries.length?`이날 계산에 연결된 근거 ${refs.length}개 중 읽을 수 있는 세부 근거 ${readable.summaries.length}개를 확인했어. 확신도는 사건 가능성이 아니라 근거 연결의 선명도야.`:"세부 계산근거를 내용으로 확인할 수 없어 확신도를 낮게 두었어."
-        : `직접 연결된 계산 근거 ${refs.length}개와 여러 날짜의 통계를 함께 확인했어. 확신도는 사건 가능성이 아니라 근거 연결의 선명도야.`,
+        : `직접 연결된 계산 근거 ${refs.length}개를 확인했고, 반복 관측을 제외한 설명 유형은 ${independent.size}개야. 확신도는 사건 가능성이 아니라 근거 연결의 선명도야.`,
       evidence_refs:refs,
     };
   });
