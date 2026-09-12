@@ -1,7 +1,9 @@
 import { CheckCircle2, CircleStop, Copy, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
 import { estimateGeminiUsage } from './lib/aiUsage'
+import { topicOrder } from './lib/fortuneTopics'
 import { buildInterpretationBrief } from './lib/interpretationSummary'
+import { normalizeTopicEntries } from './lib/interpretationTopics'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -60,10 +62,11 @@ export function PeriodAiInterpretationPanel({ result, loading, error, cacheSourc
   const keyWindows = data.key_windows ?? []
   const crossChecks = data.cross_checks ?? []
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
-  const topicEntries = Object.entries(data.topic_analysis ?? {}).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
+  const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const primaryTopicEntries = topicEntries.filter(([,item])=>item.importance === '핵심' || item.importance === '주목')
   const referenceTopicEntries = topicEntries.filter(([,item])=>item.importance === '참고')
-  const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(data.topic_analysis?.[topic]?.importance ?? ''))
+  const normalizedTopics = new Map(topicEntries)
+  const showRelationshipFocus = ['연애','연락','재회'].some((topic)=>['핵심','주목'].includes(normalizedTopics.get(topic)?.importance ?? ''))
   const relationshipReading = data.relationship_reading
   const brief = buildInterpretationBrief(data)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback

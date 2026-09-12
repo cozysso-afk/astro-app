@@ -3,6 +3,7 @@ import test from 'node:test'
 import fs from 'node:fs'
 import { precisionGateFromPayload, sanitizeProvisionalCalculation, auditProvisionalResidue, attachPrecisionPacketMetadata, sanitizeProvisionalInterpretationOutput } from './precisionV2.ts'
 import { normalizeProxiedFortuneResponse, publicFortuneError } from '../_shared/fortuneAiPublicError.ts'
+import { TOPICS, REL } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 
 const exact={contract_version:'integrated-precision-v2',time_available:true,time_exact:true,status:'exact',time_source:'official_record',time_confidence:'exact',scoring_mode:'full_exact',allow_natal_moon_scoring:true,allow_angles_houses_scoring:true,allow_house_ruler_bonus:true,allow_intraday_timing:true,allow_saju_ai:true,allow_thai_ai:true,layer_policy:{natal_moon:'allow',angles_houses:'allow',house_ruler_bonus:'allow',intraday_timing:'allow',saju_ai:'allow',thai_ai:'allow'}}
 const provisional={contract_version:'integrated-precision-v2',time_available:true,time_exact:false,status:'provisional',time_source:'family_memory',time_confidence:'medium',scoring_mode:'planet_only_provisional',allow_natal_moon_scoring:false,allow_angles_houses_scoring:false,allow_house_ruler_bonus:false,allow_intraday_timing:false,allow_saju_ai:false,allow_thai_ai:false,layer_policy:{natal_moon:'exclude',angles_houses:'exclude',house_ruler_bonus:'exclude',intraday_timing:'exclude',saju_ai:'exclude',thai_ai:'exclude'}}
@@ -136,6 +137,57 @@ function fakeClients(row, seen=[]) {
 }
 const exactCalculation={precision:exact,period:{start:'2026-09-11',end:'2026-09-11'},western:{daily_scores:[],key_dates:[]}}
 
+function observedSingleDayCalculation(){
+  const date='2026-09-12'
+  const emphasized=new Set(['연애','연락','직장'])
+  const overall=Object.fromEntries(TOPICS.map(topic=>{
+    const score=emphasized.has(topic)?37:50
+    return [topic,{average:score,band:score<40?'약함':'보통',spread:0,best_days:[{date,score}],caution_days:[{date,score}]}]
+  }))
+  const relationship_signals=Object.fromEntries(REL.map((topic,index)=>{
+    const score=41+index*4
+    return [topic,{average:score,band:'보통',spread:0,best_days:[{date,score}],caution_days:[{date,score}]}]
+  }))
+  const scores=Object.fromEntries([...TOPICS,...REL].map(topic=>[topic,overall[topic]?.average??relationship_signals[topic]?.average??37]))
+  return {
+    api_version:'synthetic-cache-regression',engine:'synthetic',period:{start:date,end:date,day_count:1},precision:provisional,
+    western:{
+      engine:'synthetic',overall,relationship_signals,months:[],detail_days:[],key_dates:[],
+      daily_scores:[{date,scores,evidence:[
+        {kind:'aspect',transit:'Venus',target:'Mars',text:'금성과 화성의 조화 각이 감정 표현 축에 연결됨',source_topics:['연애']},
+        {kind:'aspect',transit:'Mercury',target:'Jupiter',text:'수성의 조화 각이 대화 지속 축에 연결됨',source_topics:['연락']},
+        {kind:'aspect',transit:'Sun',target:'Saturn',text:'태양과 토성의 접점이 업무 책임 축에 연결됨',source_topics:['직장']},
+      ]}],
+    },
+    saju:{},thai:{},
+  }
+}
+
+function versionedCacheClients(seen){
+  return (_url,key)=>{
+    if(key==='test-anon')return {auth:{getUser:async()=>({data:{user:{id:'synthetic-user'}},error:null})}}
+    assert.equal(key,'test-service')
+    return {from(table){
+      assert.equal(table,'ai_interpret_jobs')
+      let selectedKind=''
+      const query={
+        select(){return query},
+        eq(column,value){if(column==='kind')selectedKind=value;return query},
+        order(){return query},
+        limit(){return query},
+        async maybeSingle(){
+          seen.selectedKind=selectedKind
+          seen.historicalRow={id:'old-provisional-job',kind:selectedKind.replace('precision-v2.1:','precision-v2:'),result_json:{overall:{summary:'기간 평균은 37.0점이고 변동폭은 0.0점'}}}
+          return {data:seen.historicalRow.kind===selectedKind?structuredClone(seen.historicalRow):null,error:null}
+        },
+        insert(payload){seen.inserted=structuredClone(payload);return query},
+        async single(){return {data:{id:'new-provisional-job'},error:null}},
+      }
+      return query
+    }}
+  }
+}
+
 test('actual V21 success envelopes survive V22 for meta start status cancel prompt inspect',async()=>{
   const now=new Date().toISOString()
   const result={headline:'원문 그대로',overall:{summary:'본문; authorization failed'},nested:{text:'result_json is opaque'}}
@@ -205,6 +257,37 @@ test('provisional deterministic completion and reuse remain local with zero fetc
   const cached=await loadHandler('fortune-interpret-v22-preview',{createClient:fakeClients({id:'provisional-job',result_json:inserted.result_json}),fetch:()=>{throw new Error('no fetch')}})
   const reused=await (await cached(request('start',{calculation}))).json()
   assert.equal(reused.reused,true);assert.equal(reused.gemini_paid_call,false)
+})
+
+test('V22 cache version ignores the old same-packet provisional row and regenerates without Gemini',async()=>{
+  const seen={fetchCalls:0}
+  const handler=await loadHandler('fortune-interpret-v22-preview',{
+    createClient:versionedCacheClients(seen),
+    fetch:()=>{seen.fetchCalls+=1;throw new Error('provisional must never call a provider')},
+  })
+  const response=await handler(request('start',{calculation:observedSingleDayCalculation()}))
+  const body=await response.json()
+  assert.equal(response.status,200)
+  assert.equal(body.status,'done')
+  assert.equal(body.reused,false)
+  assert.equal(body.gemini_paid_call,false)
+  assert.equal(seen.fetchCalls,0)
+  assert.match(seen.selectedKind,/^supabase-ai-v22-integrated-precision-v2\.1:[a-f0-9]{32}$/)
+  assert.match(seen.historicalRow.kind,/^supabase-ai-v22-integrated-precision-v2:[a-f0-9]{32}$/)
+  assert.equal(seen.historicalRow.kind.split(':').at(-1),seen.selectedKind.split(':').at(-1),'only the cache version may change for the same packet')
+  assert.equal(seen.inserted.kind,seen.selectedKind)
+  assert.equal(seen.inserted.usage_json.gemini_paid_call,false)
+  assert.equal(seen.inserted.usage_json.total_tokens,0)
+
+  const result=seen.inserted.result_json
+  assert.equal(Object.keys(result.topic_analysis).length,TOPICS.length)
+  assert.deepEqual(Object.keys(result.topic_analysis),[...TOPICS])
+  const visible=JSON.stringify(result)
+  assert.doesNotMatch(visible,/기간 평균|변동폭(?:은)?\s*0(?:\.0)?|37(?:\.0)?점에서\s*37(?:\.0)?점 사이|일별 변동성(?:은)?\s*0/)
+  assert.doesNotMatch(Object.values(result.topic_analysis).map(row=>[row.verdict,row.reason,row.confidence_reason].join(' ')).join(' '),/\b(?:W|S|T):/)
+  assert.match(result.topic_analysis.연애.reason,/금성과 화성의 조화 각/)
+  assert.match(result.topic_analysis.연락.reason,/수성의 조화 각/)
+  assert.equal(auditProvisionalResidue(result).ok,true)
 })
 
 test('V22 preserves accepted starts and HTTP-200 cost guard semantics',async()=>{

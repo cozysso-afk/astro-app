@@ -1,4 +1,5 @@
 import { applyIntegratedPrecisionToRequest, fortuneAiPrecisionReadiness } from './precisionTransport'
+import { fortuneProvisionalSynthesisSignature } from './fortuneAiCacheContract'
 
 export type CacheKind = 'fortune-calculation' | 'fortune-ai' | 'relationship-ai'
 
@@ -113,9 +114,11 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const western = calculation.western && typeof calculation.western === 'object' ? calculation.western as Record<string, unknown> : {}
   const saju = calculation.saju && typeof calculation.saju === 'object' ? calculation.saju as Record<string, unknown> : {}
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
+  const precision = fortuneAiPrecisionReadiness(calculation)
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
     precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
+    ...fortuneProvisionalSynthesisSignature(precision.ok ? precision.mode : 'invalid'),
     precision: calculation.precision ?? null,
     model, request,
     api_version: calculation.api_version, engine: calculation.engine, period,

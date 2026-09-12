@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { normalizeTopicEntries } from './interpretationTopics.ts'
 
 const annual = readFileSync(new URL('../AiInterpretationPanel.tsx', import.meta.url), 'utf8')
 const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')
+const topicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']
 
 function sectionFrom(source, marker) {
   const start = source.indexOf(marker)
@@ -77,7 +79,7 @@ test('relationship focus appears once and follows timing detail', () => {
 })
 
 test('period topic detail separates primary explanations from compact reference topics', () => {
-  assert.match(period, /const topicEntries = Object\.entries\(data\.topic_analysis \?\? \{\}\)\.sort/)
+  assert.match(period, /const topicEntries = normalizeTopicEntries\(data\.topic_analysis, topicOrder\)\.sort/)
   assert.match(period, /const primaryTopicEntries = topicEntries\.filter\(\(\[,item\]\)=>item\.importance === '핵심' \|\| item\.importance === '주목'\)/)
   assert.match(period, /const referenceTopicEntries = topicEntries\.filter\(\(\[,item\]\)=>item\.importance === '참고'\)/)
   assert.doesNotMatch(period, /15개 분야별 해석 펼치기/)
@@ -99,6 +101,24 @@ test('period topic detail separates primary explanations from compact reference 
   assert.match(reference, /item\.verdict/)
   assert.match(reference, /item\.reason/)
   assert.doesNotMatch(reference, /item\.timing|item\.action|item\.avoid/, 'reference cards should stay compact')
+})
+
+test('period topic normalization supports legacy arrays without exposing numeric indexes', () => {
+  const topic = (importance, verdict) => ({importance,verdict,reason:'근거',timing:'',action:'',avoid:'',confidence:'보통',confidence_reason:'근거 연결'})
+  const legacy = [
+    {topic:'연애',...topic('핵심','연애 해설')},
+    {topic:'연락',...topic('핵심','연락 해설')},
+  ]
+  const legacyEntries = normalizeTopicEntries(legacy,topicOrder)
+  assert.deepEqual(legacyEntries.map(([name])=>name),['연애','연락'])
+  const headings = legacyEntries.map(([name,item])=>`${name} · ${item.importance}`).join('\n')
+  assert.match(headings,/연애 · 핵심/)
+  assert.match(headings,/연락 · 핵심/)
+  assert.doesNotMatch(headings,/(?:0|1) · 핵심/)
+
+  const current = {연애:topic('핵심','연애 해설'),연락:topic('주목','연락 해설')}
+  assert.deepEqual(normalizeTopicEntries(current,topicOrder).map(([name])=>name),['연애','연락'])
+  assert.deepEqual(normalizeTopicEntries([null,{}, {topic:'0',...topic('핵심','잘못된 해설')}, {topic:'미등록',...topic('핵심','잘못된 해설')}],topicOrder),[])
 })
 
 test('period result labels deterministic output from reliable existing metadata', () => {

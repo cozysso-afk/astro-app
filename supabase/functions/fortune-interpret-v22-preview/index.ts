@@ -5,7 +5,7 @@ import { buildLocalQualityFallbackCore } from "../fortune-interpret-v21-preview/
 import { normalizeProxiedFortuneResponse, publicFortuneError } from "../_shared/fortuneAiPublicError.ts";
 import { auditProvisionalResidue, attachPrecisionPacketMetadata, buildProvisionalExternalPrompt, precisionGateFromPayload, sanitizeProvisionalCalculation, sanitizeProvisionalInterpretationOutput } from "./precisionV2.ts";
 
-const VERSION="supabase-ai-v22-integrated-precision-v2";
+const VERSION="supabase-ai-v22-integrated-precision-v2.1";
 const UPSTREAM="fortune-interpret-v21-preview";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();

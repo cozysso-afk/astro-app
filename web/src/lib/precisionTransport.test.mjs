@@ -1,9 +1,50 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { applyIntegratedPrecisionToRequest, fortuneAiPrecisionReadiness, installIntegratedPrecisionFetch, precisionModeFromProvenance, sanitizeCalculationForExternalAi, sanitizeExternalFortuneText } from './precisionTransport.ts'
+import { FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT, fortuneProvisionalSynthesisSignature } from './fortuneAiCacheContract.ts'
 
 function exactPrecision(){return {contract_version:'integrated-precision-v2',time_available:true,time_exact:true,status:'exact',time_source:'official_record',time_confidence:'exact',scoring_mode:'full_exact',allow_natal_moon_scoring:true,allow_angles_houses_scoring:true,allow_house_ruler_bonus:true,allow_intraday_timing:true,allow_saju_ai:true,allow_thai_ai:true,layer_policy:{natal_moon:'allow',angles_houses:'allow',house_ruler_bonus:'allow',intraday_timing:'allow',saju_ai:'allow',thai_ai:'allow'}}}
 function provisionalPrecision(){return {contract_version:'integrated-precision-v2',time_available:true,time_exact:false,status:'provisional',time_source:'family_memory',time_confidence:'medium',scoring_mode:'planet_only_provisional',allow_natal_moon_scoring:false,allow_angles_houses_scoring:false,allow_house_ruler_bonus:false,allow_intraday_timing:false,allow_saju_ai:false,allow_thai_ai:false,layer_policy:{natal_moon:'exclude',angles_houses:'exclude',house_ruler_bonus:'exclude',intraday_timing:'exclude',saju_ai:'exclude',thai_ai:'exclude'}}}
+
+function legacyStableStringify(value){
+  if(value===null||typeof value!=='object')return JSON.stringify(value)
+  if(Array.isArray(value))return `[${value.map(legacyStableStringify).join(',')}]`
+  return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${legacyStableStringify(value[key])}`).join(',')}}`
+}
+
+function legacyHashText(text){
+  let h1=0x811c9dc5,h2=0x9e3779b9
+  for(let i=0;i<text.length;i+=1){
+    const code=text.charCodeAt(i)
+    h1^=code;h1=Math.imul(h1,0x01000193)
+    h2^=code+((i+1)*131);h2=Math.imul(h2,0x85ebca6b)
+  }
+  return `${(h1>>>0).toString(16).padStart(8,'0')}${(h2>>>0).toString(16).padStart(8,'0')}`
+}
+
+function fortuneAiCacheIdForContract(request,calculation,model,extraContract={}){
+  const period=calculation.period&&typeof calculation.period==='object'?calculation.period:{}
+  const western=calculation.western&&typeof calculation.western==='object'?calculation.western:{}
+  const saju=calculation.saju&&typeof calculation.saju==='object'?calculation.saju:{}
+  const thai=calculation.thai&&typeof calculation.thai==='object'?calculation.thai:{}
+  const signature={
+    interpretation_contract:'supabase-ai-v21.4-e2e-evidence',precision_contract:'integrated-precision-v2',...extraContract,
+    precision:calculation.precision??null,model,request,
+    api_version:calculation.api_version,engine:calculation.engine,period,
+    western_engine:western.engine,overall:western.overall,relationship_signals:western.relationship_signals,
+    western_months:western.months,western_detail_days:western.detail_days,western_key_dates:western.key_dates,western_daily_scores:western.daily_scores,
+    saju_engine:saju.engine,saju_annual:saju.annual,saju_monthly:saju.monthly,
+    thai_engine:thai.engine,thai_mahathaksa:thai.mahathaksa,thai_taksajorn:thai.taksajorn,thai_suriyayat:thai.suriyayat,
+  }
+  return `fortune-ai:${legacyHashText(legacyStableStringify(signature))}`
+}
+
+function legacyFortuneAiCacheId(request,calculation,model){return fortuneAiCacheIdForContract(request,calculation,model)}
+function currentFortuneAiCacheId(request,calculation,model){
+  const precision=fortuneAiPrecisionReadiness(calculation)
+  return fortuneAiCacheIdForContract(request,calculation,model,fortuneProvisionalSynthesisSignature(precision.ok?precision.mode:'invalid'))
+}
 
 test('provenance classifier keeps entered time distinct from exact',()=>{
   assert.equal(precisionModeFromProvenance('official_record','exact',true,'07:26'),'exact')
@@ -17,6 +58,27 @@ test('AI readiness fails closed on legacy and inconsistent contracts',()=>{
   assert.deepEqual(fortuneAiPrecisionReadiness({precision:exactPrecision()}).mode,'exact')
   assert.deepEqual(fortuneAiPrecisionReadiness({precision:provisionalPrecision()}).mode,'provisional')
   assert.equal(fortuneAiPrecisionReadiness({precision:{...exactPrecision(),time_source:'family_memory'}}).ok,false)
+})
+
+test('provisional synthesis cache refresh leaves exact paid cache IDs unchanged',()=>{
+  const request={start_date:'2026-09-12',end_date:'2026-09-12'}
+  const calculation={
+    api_version:'test',engine:'synthetic',period:{start:'2026-09-12',end:'2026-09-12',day_count:1},
+    precision:provisionalPrecision(),western:{engine:'synthetic',overall:{연애:{average:37,spread:0}},daily_scores:[]},saju:{},thai:{},
+  }
+  const oldCachedResult={
+    model:'deterministic-provisional-v2',interpreter_version:'supabase-ai-v22-integrated-precision-v2',
+    data:{overall:{summary:'기간 평균은 37.0점이고 변동폭은 0.0점'},topic_analysis:[{topic:'연애',importance:'핵심'}]},
+  }
+  assert.match(JSON.stringify(oldCachedResult),/기간 평균은 37\.0점/)
+  assert.match(JSON.stringify(oldCachedResult),/변동폭은 0\.0점/)
+  assert.notEqual(currentFortuneAiCacheId(request,calculation,'deterministic-provisional-v2'),legacyFortuneAiCacheId(request,calculation,'deterministic-provisional-v2'))
+  assert.equal(FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT,'deterministic-provisional-single-day-evidence-v2')
+
+  const exactCalculation={...calculation,precision:exactPrecision()}
+  assert.equal(currentFortuneAiCacheId(request,exactCalculation,'gemini-3.7-flash'),legacyFortuneAiCacheId(request,exactCalculation,'gemini-3.7-flash'))
+  const readingCacheSource=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
+  assert.match(readingCacheSource,/fortuneProvisionalSynthesisSignature\(precision\.ok \? precision\.mode : 'invalid'\)/)
 })
 
 test('request transport writes explicit unknown provenance when no snapshot is available',()=>{
