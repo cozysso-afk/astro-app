@@ -19,11 +19,11 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
     const band = stat?.band ?? '정보 부족'
     const low = /약|낮/.test(band) || (Number.isFinite(score) && score! < 40)
     const high = !low && (/강|높/.test(band) || (Number.isFinite(score) && score! >= 60))
-    const title = flirting ? (topic==='연애'?'썸과 관계 탐색':'알아가는 상대와 연락') : intimate ? (topic==='연애'?'친밀감과 관계 기대':'친밀한 상대와 연락·만남') : topic === '연애' ? single ? '만남과 호감' : '현재 연인과의 교류' : single ? '대화와 연락' : '연인과의 연락'
+    const title = flirting ? (topic==='연애'?'썸과 관계 탐색':'알아가는 상대와 연락') : intimate ? (topic==='연애'?'친밀감과 관계 기대':'친밀한 상대와 연락·만남') : topic === '연애' ? single ? '만남과 호감' : '현재 연인과의 교류' : single ? '첫 인사와 이어가는 대화' : '연인과의 연락'
     const direction = !Number.isFinite(score) ? '방향을 판단할 계산 정보가 부족해.' : low ? '활성도가 약하게 잡혀 있어.' : high ? '활성도가 상대적으로 높게 잡혀 있어.' : '활성도는 중간 범위에 있어.'
     const action = flirting ? (topic==='연애'?'서로 질문을 주고받는지, 다음 만남을 실제 일정으로 잡는지 살펴. 관계를 확인하고 싶다면 내 기대를 말하고 상대가 원하는 방식도 들어봐.':'답장 속도 하나보다 서로 먼저 연락하는지와 약속을 지키는지를 함께 봐. 대화가 편안해도 연인으로 합의한 사이인지는 별도로 확인할 일이야.') : intimate ? (topic==='연애'?'몸이 가까웠다는 사실과 서로 원하는 관계는 따로 확인해. 연애를 원하는지, 부담 없는 만남을 원하는지, 지금 방식이 편안한지를 말로 맞춰볼 수 있어.':'만남 전후의 연락과 약속이 내가 원하는 방식에 맞는지 살펴. 친밀한 만남의 유무로 애정을 단정하지 말고, 연락 빈도·만남 방식·경계에서 불편한 점을 구체적으로 이야기해.') : topic === '연애'
       ? single ? '만날 사람이 아직 없다면 믿는 지인에게 소개를 부탁하거나 부담 없는 모임에 시간을 낼지 검토해. 소개팅 제의가 들어온 경우에는 상대 조건보다 내가 만남을 원하는지, 일정과 방식이 편안한지부터 확인해.' : '함께 보낼 시간과 각자 쉴 시간을 구체적으로 맞춰. 서로 원하는 데이트 방식이 같은지도 이야기해.'
-      : single ? '소개를 부탁하는 메시지, 모임 참여 문의, 첫 인사를 서로 다른 출발점으로 볼 수 있어. 새 접점이 생기면 공통 관심사로 짧게 말을 꺼내고, 아직 없다면 기다리는 답장을 만들어 해석하지 않아.' : '연락 빈도나 답장 속도에 대한 기대를 말로 확인해. 바쁜 일정과 무관심을 같은 뜻으로 읽지 않는 게 중요해.'
+      : single ? '새 사람을 만나고 싶다면 지인에게 소개를 부탁하거나 첫 인사를 건네봐. 알아가는 사람이 있다면 안부나 다음 약속을 꺼낼 수 있어. 과거 인연에게 연락하고 싶다면 재접점 해설도 함께 읽어. 지금 연락할 일이 없다면 이 항목은 넘겨도 돼.' : '연락 빈도나 답장 속도에 대한 기대를 말로 확인해. 바쁜 일정과 무관심을 같은 뜻으로 읽지 않는 게 중요해.'
     return {title,conclusion:`${title}의 ${direction} ${flirting?'호감이나 대화가 있어도 아직 연인으로 합의한 상태는 아니야.':intimate?'신체적 친밀감이 정서적 약속이나 독점적 관계를 뜻하지는 않아.':single ? '지금 특정 상대가 있다는 뜻도, 새 인연이 반드시 나타난다는 뜻도 아니야.' : '내가 관계를 대하는 흐름이며 연인의 감정이나 두 사람의 궁합을 계산한 점수는 아니야.'}`,action,
       caution: flirting ? '친절이나 끌림을 상호 연애 의사로 확정하지 않아. 답을 끌어내기 위한 밀고 당기기보다 서로의 말과 행동을 함께 봐.' : intimate ? '다시 만난다는 이유만으로 사랑이나 관계 발전을 약속받았다고 여기지 않아. 불편한 접촉과 기대는 언제든 거절하거나 조정할 수 있어.' : single ? '소개나 모임 경로는 행동 예시이며, 제의가 들어온다는 계산 결과는 아니야. 호감이 생겨도 첫인상만으로 상호 관심을 확정하지 않아. 실제로 다음 대화나 만남이 이어지는지 확인해.' : '한 번의 답장이나 표정으로 관계 전체를 판단하지 않아. 반복되는 불편은 서로의 상황을 듣고 조율할 문제야.'}
   }
@@ -37,7 +37,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
       ? `다른 쪽에서 접점이 생기는 흐름은 ${band}으로 잡혀 있어. ${low?'소개팅 제의나 먼저 오는 연락을 당연하게 기대하기보다 실제 제안이 있는지 확인해.':high?'지인의 소개 제의나 새 사람의 첫 인사가 실제로 있다면 내용과 일정을 살펴볼 수 있어.':'소개나 첫 인사가 실제로 생겼을 때 구체적인 만남으로 이어지는지 확인해.'} 누가 소개를 해주거나 연락한다는 예측은 아니야.`
       : `내가 접점을 만드는 흐름은 ${band}이야. ${low?'소개를 무리하게 부탁하거나 만남 일정을 몰기보다 원하는 만남의 조건부터 정리해.':'믿는 지인에게 소개를 부탁하거나 관심 있는 모임에 문의하는 작은 행동을 검토해.'} 먼저 움직이는 것과 실제 소개·만남이 성사되는 것은 별개야.`
   }
-  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows.filter(r=>['연애','연락',...(single?['재회']:[])].includes(r.topic)).map(r=>({...r,meaning: r.topic==='재회' ? '재접촉과 관계 회복을 구분해' : r.topic==='연애' ? caution ? '관계의 속도와 서로의 기대를 확인해' : '만남과 관계 탐색에 시간을 써봐' : caution ? '연락의 양보다 내용과 상황을 확인해' : '첫 인사부터 이어가는 대화까지 살펴봐'}))
+  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows.filter(r=>['연애','연락',...(single?['재회']:[])].includes(r.topic)).map(r=>({...r,meaning: r.topic==='재회' ? '재접촉과 관계 회복을 구분해' : r.topic==='연애' ? caution ? '관계의 속도와 서로의 기대를 확인해' : '만남과 관계 탐색에 시간을 써봐' : caution ? '먼저 연락한다면 짧고 구체적으로' : '안부·질문·약속을 먼저 꺼내보기'}))
   const relationship = summary.relationship ? {...summary.relationship,
     summary: flirting?'썸·알아가는 사이의 수신과 발신이야. 아직 연인이라고 전제하지 않아.':intimate?'친밀감이 있는 미정 관계의 수신과 발신이야. 연락을 애정이나 관계 약속으로 바로 바꾸지 않아.':single ? '대화할 사람이 생겼을 때의 수신·발신 흐름을 따로 읽어. 특정 상대가 이미 있다고 전제하지 않아.' : '연인과 주고받는 연락의 두 방향을 구분해. 상대의 속마음을 확정하는 값은 아니야.',
     incoming:status!=='couple'?directionCopy('incoming',summary.relationship.incomingBand):summary.relationship.incoming,

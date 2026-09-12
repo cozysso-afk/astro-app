@@ -490,3 +490,46 @@ body:has(.reading-experience), body:has(.fortune-experience) {
 .thai-map-intro{font-size:12px!important;color:#637f7c;margin-bottom:12px!important}
 .system-reading .system-hero{background:radial-gradient(ellipse at 90% 5%,var(--bloom),transparent 65%),linear-gradient(135deg,#ffffffe0,#ffffff80);box-shadow:inset 0 1px 2px #fff,inset 0 -2px 8px #ffffffce,0 12px 30px #7662831a,0 2px 5px #7662830d}
 @media(prefers-reduced-motion:no-preference){.bhumi-grid>details[open] .thai-lens-reading{animation:reading-glass-reveal .22s ease-out both}}
+
+/* Opal glass: static light fields and brief motion. */
+body:has(.app-shell){background:#f7f8fb!important}
+.app-shell{--reading-text:#303748;--reading-secondary:#626c7b;--reading-indigo:#46516b;--reading-gap:18px;--reading-border:#b8c9d94a;background:radial-gradient(ellipse at 0 8%,#c5eaf16b,transparent 37%),radial-gradient(ellipse at 100% 30%,#efd5e970,transparent 38%),radial-gradient(ellipse at 12% 70%,#cdeee37a,transparent 40%),#f7f8fb!important;color:var(--reading-text)}
+.app-shell .page-content{background:transparent!important}
+.app-shell .hero-card,.app-shell .profile-card,.app-shell .date-card,.app-shell .fortune-field-hub,.app-shell .home-tool-card,.app-shell .reading-entry-grid>button,.app-shell .flow-tile,.app-shell .system-overview-grid>article,.app-shell .fortune-field-grid>button{--opal-tint:#e1eaf5;background:linear-gradient(135deg,#fffffff0 0%,#ffffffa8 44%,var(--opal-tint) 100%)!important;border:1px solid #fffffff2!important;box-shadow:inset 0 2px 1px #fff,inset 0 -2px 5px #ffffffb3,0 6px 18px #52688612,0 1px 3px #5268860c!important;color:#303748!important}
+.app-shell .hero-card{--opal-tint:#dcece9;position:relative;overflow:hidden}
+.app-shell .hero-card::after{content:'';position:absolute;pointer-events:none;inset:0;background:linear-gradient(115deg,transparent 30%,#ffffff80 48%,transparent 65%);opacity:.6}
+.app-shell .reading-entry-grid>button:nth-child(4n+1),.app-shell .home-tool-card:nth-child(4n+1),.app-shell .fortune-field-grid>button:nth-child(5n+1){--opal-tint:#f4d9e7}
+.app-shell .reading-entry-grid>button:nth-child(4n+2),.app-shell .home-tool-card:nth-child(4n+2),.app-shell .fortune-field-grid>button:nth-child(5n+2){--opal-tint:#d7e9fa}
+.app-shell .reading-entry-grid>button:nth-child(4n+3),.app-shell .fortune-field-grid>button:nth-child(5n+3){--opal-tint:#fae7ca}
+.app-shell .reading-entry-grid>button:nth-child(4n+4),.app-shell .fortune-field-grid>button:nth-child(5n+4){--opal-tint:#d0eee5}
+.app-shell .fortune-field-grid>button:nth-child(5n){--opal-tint:#e5ddf6}
+.app-shell .reading-entry-grid>button:nth-child(1)>svg:first-child{color:#a2557b}
+.app-shell .reading-entry-grid>button:nth-child(2)>svg:first-child{color:#426e9d}
+.app-shell .reading-entry-grid>button:nth-child(3)>svg:first-child{color:#8c6829}
+.app-shell .reading-entry-grid>button:nth-child(4)>svg:first-child{color:#2e786a}
+.app-shell .reading-entry-grid small{color:#626c7b}
+.app-shell .period-button{background:linear-gradient(140deg,#ffffffed,#eef2f9a6)!important;color:#556176!important}
+.app-shell .period-button.is-active{background:linear-gradient(135deg,#d4ecea,#dfe4f9 58%,#f3dce9)!important;border-color:#9bb5c8!important;color:#354969!important;box-shadow:inset 0 2px 1px white,0 5px 14px #62819824!important}
+.app-shell .fortune-field-grid>button[aria-pressed=true]{border-color:#7597b3!important;box-shadow:inset 0 0 0 1px #7597b3,0 5px 12px #62819820!important}
+.app-shell .flow-tile{--opal-tint:#d7eee4;padding:14px!important}
+.app-shell .is-caution .flow-tile{--opal-tint:#fae2d5}
+.app-shell .system-overview-grid>.system-western{--opal-tint:#dce9f8}
+.app-shell .system-overview-grid>.system-saju{--opal-tint:#f8e9cc}
+.app-shell .system-overview-grid>.system-thai{--opal-tint:#d9eee7}
+.app-shell .system-overview-grid>article{padding:15px!important;border-radius:20px!important}
+.app-shell .system-overview-grid{gap:10px!important}
+.app-shell .fortune-experience .period-ai-head{background:linear-gradient(125deg,#ffffffeb,#dcefeaaa 60%,#e7ddf5aa)!important}
+.app-shell .fortune-experience .period-ai-user-focus .period-ai-topic{background:#ffffffb8!important;border-radius:20px!important;padding:16px!important}
+.app-shell .reading-explanation.is-reason{background:#eaf2f9;color:#3f6180}
+.app-shell .reading-explanation.is-practice{background:#eaf4ee;color:#426454}
+.app-shell .reading-explanation.is-caution{background:#fff0e6;color:#805743}
+.app-shell .reading-flows,.app-shell .period-ai-user-focus,.app-shell .period-ai-relationship-section{margin-top:12px!important}
+.app-shell .flow-section{margin-top:0!important}
+.app-shell .flow-section h4,.app-shell .reading-section>h3{margin-bottom:8px!important}
+.app-shell .bottom-nav{background:#fdfdffeb!important;border-top:1px solid #fff!important;box-shadow:0 -3px 16px #586a8310}
+.app-shell .nav-item.is-active .nav-icon-shell{background:linear-gradient(130deg,#dcefe8,#e6dff5)!important;color:#4d6280!important}
+.app-shell button:focus-visible,.app-shell summary:focus-visible{outline:2px solid #527f9e!important;outline-offset:3px}
+@supports (backdrop-filter:blur(8px)){.app-shell .hero-card,.app-shell .bottom-nav{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}}
+@keyframes opal-arrive{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:no-preference){.app-shell .reading-entry-grid>button,.app-shell .period-button,.app-shell .fortune-field-grid>button{transition:transform .18s ease,box-shadow .18s ease}.app-shell .reading-entry-grid>button:active,.app-shell .period-button:active,.app-shell .fortune-field-grid>button:active{transform:scale(.97)}.app-shell .system-overview,.app-shell .reading-flows{animation:opal-arrive .28s ease-out both}}
+@media(prefers-reduced-motion:reduce){.app-shell *,.app-shell *::before,.app-shell *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

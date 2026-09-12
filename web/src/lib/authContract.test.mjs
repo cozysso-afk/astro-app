@@ -13,7 +13,7 @@ assert.equal(supabase.includes('shouldCreateUser: false'), true, 'magic-link log
 assert.equal(supabase.includes('requestEmailMagicLink'), true, 'private login must use the default email magic-link flow')
 assert.equal(supabase.includes('emailRedirectTo'), true, 'normal magic-link login must explicitly return to the current app origin')
 assert.equal(supabase.includes('window.location.origin'), true, 'magic-link redirect must follow the current deployed app origin')
-assert.equal(supabase.includes('verifyOtp({'), false, 'custom six-digit OTP verification must not be required')
+assert.equal(supabase.includes('verifyOtp(verification)'), true, 'installed app can complete a validated email link without navigation or a custom email template')
 assert.equal(supabase.includes('updateUser({ email:'), true, 'existing anonymous session must be converted by linking its email identity')
 assert.equal(supabase.includes('rememberPendingAnonymousLink'), true, 'pre-link anonymous user id must survive the email redirect')
 assert.equal(supabase.includes('window.localStorage.setItem'), true, 'pending UUID marker must survive a new browser tab')

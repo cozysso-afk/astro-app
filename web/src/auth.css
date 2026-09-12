@@ -41,6 +41,7 @@
 .private-auth-notice,.private-auth-error{margin:14px 0 0;padding:11px 12px;border-radius:12px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 .private-auth-notice{background:#e5f1ed;color:#3e685d}.private-auth-error{background:#f6e6eb;color:#874958}
 .private-auth-footnote{margin:20px 0 0;padding-top:14px;border-top:1px solid #b8a1c32b;font-size:11px;line-height:1.6;color:var(--auth-muted);word-break:keep-all}
+.private-auth-instructions{margin:0;font-size:13px;line-height:1.65;color:var(--auth-muted);word-break:keep-all}
 @keyframes auth-orbit{to{transform:rotate(360deg)}}
 @keyframes auth-appear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:no-preference){.private-auth-card{animation:auth-appear .24s ease-out both}.private-auth-orbit{animation:auth-orbit 1.3s linear infinite}.private-auth-form button{transition:transform .16s ease,box-shadow .2s ease}.private-auth-form button:active{transform:scale(.98)}}

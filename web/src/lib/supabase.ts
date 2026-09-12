@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js'
+import { parseEmailVerificationLink } from './emailLink'
 
 const DEFAULT_SUPABASE_URL = 'https://dbynfabwfcakxayyggzi.supabase.co'
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
@@ -139,6 +140,24 @@ export async function requestEmailMagicLink(email: string) {
 export async function signOutSupabase() {
   const result = await supabase.auth.signOut()
   if (result.error) throw result.error
+}
+
+// Complete the same one-time email verification inside the installed app's
+// storage context. No email-template change, navigation, or token persistence.
+export async function verifyEmailLinkInApp(raw: string, expectedEmail: string) {
+  const verification = parseEmailVerificationLink(raw, supabaseUrl)
+  if (verification.type === 'email_change' && !readPendingAnonymousLink()) {
+    throw new Error('이 앱에서 시작한 이메일 연결이 아니야. 이메일 입력부터 다시 진행해줘.')
+  }
+  const result = await supabase.auth.verifyOtp(verification)
+  if (result.error) throw new Error('인증 링크가 만료됐거나 이미 사용됐어. 새 메일의 링크를 열지 말고 복사해줘.')
+  const session = result.data.session
+  if (!session) throw new Error('이메일 확인이 더 필요해. 가장 최근 인증 메일을 확인해줘.')
+  if ((session.user.email ?? '').trim().toLowerCase() !== expectedEmail.trim().toLowerCase()) {
+    await signOutSupabase()
+    throw new Error('입력한 이메일과 인증된 계정이 달라. 해당 이메일로 받은 링크를 사용해줘.')
+  }
+  return session
 }
 
 export async function ensureSupabaseSession(): Promise<Session> {

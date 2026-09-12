@@ -13,6 +13,7 @@ import {
   rememberPendingAnonymousLink,
   requestEmailMagicLink,
   signOutSupabase,
+  verifyEmailLinkInApp,
 } from './lib/supabase'
 
 type GateStage = 'booting' | 'email' | 'sent' | 'allowed'
@@ -36,6 +37,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [verificationLink, setVerificationLink] = useState('')
 
   async function authorize(nextSession: Session) {
     if (!isPermanentEmailSession(nextSession)) {
@@ -142,7 +144,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } else {
         clearPendingAnonymousLink()
         await requestEmailMagicLink(normalized)
-        setNotice('로그인 링크를 이메일로 보냈어. 메일 안의 Sign in 링크를 눌러줘.')
+        setNotice('로그인 메일을 보냈어. 홈화면 앱에서는 아래 방법으로 인증을 완료해줘.')
       }
       setEmail(normalized)
       setStage('sent')
@@ -161,6 +163,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setSession(null)
       setNotice('로그아웃했어.')
       setStage('email')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function finishInApp(event: FormEvent) {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    const link = verificationLink
+    setVerificationLink('')
+    try {
+      await authorize(await verifyEmailLinkInApp(link, email))
+    } catch (err) {
+      setError(authMessage(err))
     } finally {
       setBusy(false)
     }
@@ -202,12 +219,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <button type="submit" disabled={busy}>{busy ? '전송 중…' : '로그인 링크 받기'}</button>
           </form>
         ) : (
-          <div className="private-auth-form">
-            <div className="private-auth-loading">메일 확인을 기다리고 있어.</div>
-            <button className="private-auth-secondary" type="button" onClick={() => { setStage('email'); setError(''); setNotice('') }} disabled={busy}>
+          <form className="private-auth-form" onSubmit={finishInApp}>
+            <strong>홈화면 앱에서 로그인하기</strong>
+            <p className="private-auth-instructions">메일의 로그인·인증 버튼을 길게 눌러 링크를 복사하고, 홈화면의 별빛의 운명으로 돌아와 붙여넣어줘. 링크를 먼저 열면 사파리에서 인증될 수 있어.</p>
+            <label htmlFor="private-auth-link">메일에서 복사한 인증 링크</label>
+            <input id="private-auth-link" type="password" autoComplete="off" spellCheck={false} value={verificationLink} onChange={event => setVerificationLink(event.target.value)} placeholder="인증 링크 붙여넣기" disabled={busy}/>
+            <button type="submit" disabled={busy || !verificationLink.trim()}>{busy ? '인증 중…' : '이 앱에서 로그인 완료'}</button>
+            <button className="private-auth-secondary" type="button" onClick={() => { setStage('email'); setError(''); setNotice(''); setVerificationLink('') }} disabled={busy}>
               이메일 다시 입력
             </button>
-          </div>
+          </form>
         )}
 
         {notice && <p className="private-auth-notice">{notice}</p>}
