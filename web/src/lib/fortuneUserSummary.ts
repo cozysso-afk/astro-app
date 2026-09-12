@@ -51,7 +51,7 @@ export type FortuneUserSummary = {
   favorableCards: FortuneFlowCard[]
   cautionCards: FortuneFlowCard[]
   focusTopics: FortuneUserTopic[]
-  referenceTopics: Array<{ topic: string; band: string; summary: string }>
+  referenceTopics: Array<{ topic: string; band: string; summary: string; detail?: FortuneUserTopic }>
   importantWindows: FortuneUserWindow[]
   relationship?: FortuneUserRelationship
 }
@@ -368,7 +368,7 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
   const linked = linkedEvidence(context, topic)
   // Explain the strongest existing signals once per direction, not one repeated
   // template per planet. Keep conflicting directions separate and leave raw data intact.
-  const signals = linked.map(({ evidence }) => {
+  const signals = linked.map(({ date, evidence }) => {
     const names = unique([planetName(evidence.transit), planetName(evidence.target)].filter(Boolean), 2)
     if (!names.length) return null
     const subject = names.length === 2 ? `${names[0]}${particle(names[0], '과', '와')} ${names[1]}` : names[0]
@@ -377,14 +377,16 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     const value = evidence.contribution
     // contribution is unsigned activation; polarity alone carries direction.
     const signed = typeof evidence.polarity === 'number' && Number.isFinite(evidence.polarity) ? Math.sign(evidence.polarity) : null
-    return { source, signed, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
+    return { source, signed, date, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
   }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.strength - a.strength)
   const meaning: Record<string, string> = { 학업: '새 내용을 이해하고 집중하는 데', 시험: '배운 것을 꺼내 쓰는 데', 직장: '업무를 협의하고 처리하는 데', 이직: '변화를 검토하고 조건을 조율하는 데', 대인관계: '서로 의견을 주고받는 데', 연애: '호감을 나누고 거리를 좁히는 데', 연락: '말을 꺼내고 대화를 이어가는 데', 재회: '끊겼던 대화의 접점을 찾는 데', 컨디션: '힘을 쓰고 회복하는 데', 금전: '돈의 흐름을 정리하는 데', 소식: '새 정보를 받아 판단하는 데' }
   const area = meaning[topic] ?? `${topic}을 판단하는 데`
   const readable: string[] = []
   for (const sign of Array.from(new Set(signals.map(s => s.signed)))) {
     const sources = unique(signals.filter(s => s.signed === sign).map(s => s.source), 2)
-    const source = sources.length > 1 ? `${sources[0]}와 ${sources[1]}가 선택 기간에 관찰돼` : `${sources[0]} 때문에`
+    const dates = [...new Set(signals.filter(s => s.signed === sign).map(s => s.date))].sort()
+    const dateNote = context.calculation.period.day_count > 1 ? `확인된 ${dates.length === 1 ? dates[0] : dates[0] + '·' + dates.at(-1)} 근거에서 ` : ''
+    const source = dateNote + (sources.length > 1 ? `${sources[0]}와 ${sources[1]}가 선택 기간에 관찰돼` : `${sources[0]} 때문에`)
     readable.push(sign === 1 ? `${source} ${area} 힘이 실려.`
       : sign === -1 ? `${source} ${area} 마찰이나 부담이 생기기 쉬워.`
       : `${sources.join(', ')} 신호는 보이지만, 이 신호만으로 유리하거나 불리하다고 단정하기는 어려워.`)
@@ -405,8 +407,21 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
         : `${topic} 계산은 중간 수준이야. 어느 쪽으로 움직일지 뚜렷하지 않아 큰 기대나 경계를 더하지 않을게.`
   }
   const signs = new Set(signals.map(s=>s.signed))
-  if(signs.has(1)&&signs.has(-1)) readable.push(`선택 기간에는 ${topic}에 힘을 보태는 움직임과 제동을 거는 움직임이 모두 있어. 수월해지는 부분이 있어도 곧바로 결과까지 이어진다고 읽지 않고, 진행 중 어디서 조건을 맞춰야 하는지 구분하는 게 중요해.`)
-  const depth = evidenceDepth(linked.map(row => row.evidence), topic)
+  if (signs.has(1) && signs.has(-1)) {
+    const conflicts: Record<string,string> = {
+      학업:'이해가 이어지는 대목과 집중이 끊기는 대목을 나눠 봐. 같은 분량을 오래 붙드는 것보다 막힌 단계를 찾아 다시 푸는 방식이 이 혼합 흐름에 맞아.',
+      시험:'내용을 아는 것과 제한 시간 안에 정확히 꺼내 쓰는 과정이 다르게 움직일 수 있어. 풀이 뒤에는 지식 부족과 시간·조건 누락을 구분해봐.',
+      연락:'말을 시작할 여지와 대화가 이어지는 조건은 별개야. 총점으로 수신과 발신을 묶지 말고 아래 두 방향을 기준으로 판단해.',
+      연애:'호감을 표현하는 과정과 만남의 속도·기대를 맞추는 과정에 서로 다른 조건이 붙어. 관심 표현 하나보다 실제 약속으로 이어지는지를 읽는 이유야.',
+      재회:'다시 대화할 접점과 예전 문제를 풀 조건이 함께 갖춰졌다는 뜻은 아니야. 연락이 닿더라도 관계 회복은 이후 대화와 합의로 확인할 단계야.',
+      직장:'협의가 원만한 부분과 책임·마감이 부담스러운 부분을 나눠 봐. 대화가 잘됐다는 이유로 업무 범위까지 합의됐다고 넘기지 않는 게 핵심이야.',
+      이직:'변화를 검토하는 여지와 실제 조건을 받아들이는 판단은 별개야. 제안이 있다면 역할·보상·시작 일정을 각각 확인할 필요가 있어.',
+    }
+    readable.push(`선택 기간에는 ${topic}에 힘을 보태는 움직임과 제동을 거는 움직임이 모두 있어. ${conflicts[topic] ?? '수월한 부분과 부담이 큰 부분을 구분해서 읽어. 어느 한 근거만으로 전체 결과를 정하지 않아.'}`)
+  }
+  if (level === 'low' && signs.has(1)) readable.push('도움을 주는 개별 근거가 있어도 이 분야 전체 흐름은 약한 편이야. 부분적인 호전을 기간 전체의 강세로 확대하지 않는 게 중요해.')
+  if (level === 'high' && signs.has(-1)) readable.push('부담을 주는 개별 근거가 있어도 이 분야 전체 흐름은 강한 편이야. 주의할 조건을 확인하되 전체가 불리하다는 뜻으로 읽지는 않아.')
+  const depth = evidenceDepth(linked.map(row => row.evidence), topic, false)
   return [...readable, depth].filter(Boolean).join(' ')
 }
 function relationshipSummary(context: FortuneUserSummaryContext, important: Set<string>, kind: PeriodKind): FortuneUserRelationship | undefined {
@@ -481,21 +496,23 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     : caution.length ? `${when}${particle(when, '은', '는')} ${joinTopics(cautionFlow)} 쪽의 기대를 낮추는 편이 좋아. 그 밖에 크게 밀어줄 분야는 뚜렷하지 않아.`
     : `${when}${particle(when, '은', '는')} 좋거나 조심할 분야가 뚜렷하게 갈리지 않아. 평소 계획을 유지하면서 변화를 지켜봐.`
   const directions = relationshipSummary(context, new Set(normalized.map(row => row.topic)), frame.kind)
-  const focusTopics = selected.map(({ topic, interpretation, level, score }) => {
+  const explainTopic = ({ topic, interpretation, level, score }: typeof normalized[number]): FortuneUserTopic => {
     const copy = topicCopy(topic, level, when)
     const narrative = score !== null && context.verifiedNarrative && interpretation.evidence_refs?.length ? interpretation : undefined
     const clean = (value?: string) => value && value.trim().length >= 12 && !/\b[WST]:|\borb\b|evidence_refs|CALCULATED_DATA/.test(value) ? value.trim() : undefined
     return { topic, conclusion: score === null ? `${topic}은 계산 정보가 부족해 방향을 정하기 어려워.` : topic === '연락' && directions ? contactReading(directions) : clean(narrative?.verdict) ?? `${copy.conclusion} ${depthFor(topic, level)}`, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level),
       timing: periodProgression(context.calculation, topic, frame.kind) ?? topicTiming(context, topic, level, frame.kind), action: topic === '연락' && directions ? (directions.outgoingBand === '강함' ? '먼저 전할 말이 있다면 용건과 질문을 분명히 해봐. 기다리는 연락이라면 수신 흐름을 기준으로 읽어.' : directions.outgoingBand === '약함' ? '답을 재촉하거나 여러 번 보내기보다 필요한 말만 정리해. 기다리는 동안의 무응답을 관계의 최종 결론으로 단정하지는 마.' : '기다리는 연락과 내가 보낼 연락을 나눠 생각해. 먼저 보낼 필요가 있을 때만 짧고 명확하게 전해.') : clean(narrative?.action) ?? copy.practice, observe: realLifeDepth(topic) || copy.observe,
       caution: clean(narrative?.avoid) ?? copy.caution }
-  })
+  }
+  const focusTopics = selected.map(explainTopic)
   const referenceTopics = normalized.filter(row => !selected.some(selectedRow => selectedRow.topic === row.topic))
-    .sort(rank('salience')).map(({ topic, level, interpretation }) => ({
+    .sort(rank('salience')).map(row => { const {topic,level,interpretation} = row; return ({
+      detail: explainTopic(row),
       topic, band: Number.isFinite(topicStat(context, topic)?.average) ? topicStat(context, topic)?.band ?? '정보 부족' : '정보 부족',
       summary: !Number.isFinite(topicStat(context, topic)?.average) ? '계산 정보가 부족해 강약을 판단할 수 없어.' : importance(interpretation.importance) === 2 && !normalized.find(row => row.topic === topic)?.support
         ? topic === '투자주의' ? '뚜렷한 신호가 적어도 안전을 보장하진 않아.' : '별도로 참고할 신호가 뚜렷하지 않아.'
         : (FLOW_COPY[topic]?.[level === 'low' ? 1 : 0] ?? '평소 계획 유지'),
-    }))
+    })})
   const windowTopics = [...new Map([...selected, ...best, ...caution].map(row => [row.topic, row])).values()]
   const importantWindows: FortuneUserWindow[] = frame.kind === 'day' ? context.allowIntraday ? (context.calculation.western.detail_days ?? [])
     .filter(day => day.date === context.calculation.period.start)
@@ -550,13 +567,13 @@ const LIFE: Record<string, [string,string]> = {
   신규진입:['관심이 생겨도 진입 조건과 감당할 손실을 먼저 문장으로 정리해.','새 기회처럼 보여도 이 점수만으로 매수를 결정하지는 마.'],
   투자주의:['손실을 감당할 범위와 포지션이 한쪽에 몰려 있는지를 먼저 점검해.','주의 점수가 낮아도 손실 위험이 사라지는 것은 아니야.'],
 }
-export function evidenceDepth(evidence: FortuneDailyEvidence[], topic: string): string {
+export function evidenceDepth(evidence: FortuneDailyEvidence[], topic: string, includeLimit = true): string {
   const ordered = [...evidence].sort((a,b)=>Math.abs(b.contribution ?? 0)-Math.abs(a.contribution ?? 0))
   const keys = [...new Set(ordered.flatMap(e=>[e.transit,e.target]).filter((key):key is string=>Boolean(key && (SYMBOLS[key] || Object.values(SYMBOLS).some(([ko])=>ko===key)))))].slice(0,2)
   const meanings=keys.map(key=>SYMBOLS[key] ?? Object.values(SYMBOLS).find(([ko])=>ko===key)!)
   if(!meanings.length) return ''
   const translation=meanings.map(([name,meaning])=>`${name}${particle(name, '은', '는')} ${meaning}`).join(', ')
-  return `${translation}을 읽는 단서야. ${LIFE[topic]?.[1] ?? '이 신호만으로 실제 사건이나 결과를 확정하지는 않아.'}`
+  return `${translation}을 읽는 단서야.${includeLimit ? ' ' + (LIFE[topic]?.[1] ?? '이 신호만으로 실제 사건이나 결과를 확정하지는 않아.') : ''}`
 }
 export function realLifeDepth(topic:string):string { return LIFE[topic]?.[0] ?? '' }
 
