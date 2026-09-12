@@ -6,9 +6,10 @@ import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { fortuneFixture, personalMarriageFixture, aspects, timing } from './readingExperience.fixtures.mjs'
 
-let server, Fortune, Relationship, Account, Personal, portraitConcept
+let server, Fortune, Relationship, Account, Personal, portraitConcept, Formatters
 before(async () => {
   server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true},appType:'custom'})
+  Formatters=await server.ssrLoadModule('/src/lib/resultFormatters.ts')
   Fortune=(await server.ssrLoadModule('/src/PeriodAiInterpretationPanel.tsx')).PeriodAiInterpretationPanel
   Relationship=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
   Account=await server.ssrLoadModule('/src/AccountActions.tsx')
@@ -106,4 +107,25 @@ test('same date groups utilization and caution without losing either meaning',()
   assert.equal((visible.match(/class="period-ai-quick-date"/g)||[]).length,1)
   assert.match(visible,/reading-window-line is-favorable/)
   assert.match(visible,/reading-window-line is-caution/)
+})
+
+for(const [period,title] of [['today','오늘 한눈에'],['week','이번 주 전체 흐름'],['month','이번 달 큰 흐름'],['year','올해 큰 흐름']]) test(`external integrated and precision ${period} instructions preserve raw calculation`,()=>{
+  const f=fortuneFixture(period); const request={period_kind:period}; const original=JSON.stringify(f.calculation,null,2)
+  for(const build of [Formatters.integratedPromptText,Formatters.precisionPromptText]) {
+    const prompt=build(request,f.calculation)
+    assert.match(prompt,/EXTERNAL_AI_PROMPT_V2/);assert.ok(prompt.includes(title))
+    assert.equal(prompt.split('[CALCULATED_DATA · 원본 계산 JSON]\n')[1],original)
+  }
+})
+for(const [kind,mode,title] of [['compatibility','compatibility','궁합 한눈에'],['reunion','reunion','재접촉 vs 관계 회복'],['marriage','marriage_unmarried','결혼 전에 확인할 현실 조건'],['marriage','marriage_married','현재 부부 흐름']]) test(`external relationship ${mode} has its own consultation structure and keeps birth-time limits`,()=>{
+  const calculation={engine:'synthetic',period:{start:'2026-09-12',end:'2026-09-30'},result:{natal_synastry:{aspects},months:[],limitations:[]}}
+  const before=JSON.stringify(calculation)
+  const prompt=Formatters.relationshipPromptText(kind,{analysis_mode:mode,relationship_status:mode==='marriage_married'?'married':'single'},calculation,kind==='reunion'?timing:null)
+  assert.ok(prompt.includes(title));assert.match(prompt,/결론 2~4문장/);assert.match(prompt,/생시 제한.*Davison.*Marks/)
+  assert.ok(prompt.length<=28000)
+  assert.equal(JSON.stringify(calculation),before)
+  assert.doesNotThrow(()=>JSON.parse(prompt.split(/\[COMPACT_CALCULATED_DATA · 압축단계 \d\]\n/)[1]))
+  if(kind==='reunion') for(const label of ['상대 → 나','나 → 상대','과거 인연 재접점','유지력','reunion_dimensions','reunion_directional_context','reunion_transits','secondary support']) assert.ok(prompt.includes(label))
+  else assert.ok(!prompt.includes('[재회 흐름 한눈에]'))
+  if(mode==='marriage_married') {assert.ok(!prompt.includes('[결혼 전에 확인할 현실 조건]'));assert.match(prompt,/미래 결혼 가능성을 예측하지 않는다/)}
 })

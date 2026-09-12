@@ -228,3 +228,28 @@ test('installed Supabase SDK region invoke uses dynamic fetch and reaches V22', 
     assert.equal(JSON.parse(calls[0].body).action,'status')
   })
 })
+
+// The V21 export and browser overlay must retain identical instruction semantics.
+import { externalFortuneInstructions, externalPeriodKind, upgradeCopiedFortunePrompt } from './precisionTransport.ts'
+import { buildExternalPrompt } from '../../../supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts'
+for(const kind of ['day','week','month','annual']) test(`external instructions agree across Edge and browser for ${kind}`,()=>{
+  const p={period_kind:kind,period:{start:'2026-09-12',end:'2026-09-12'},western:{overall:{},months:[]},evidence_ledger:[]}
+  assert.equal(buildExternalPrompt(p).text.split('\n\nCALCULATED_DATA=')[0],externalFortuneInstructions(kind))
+})
+test('V22 safe-copy overlay changes only instructions, preserving JSON and precision exclusions',()=>{
+  const text='Western planet-only. 출생 Moon·하우스·사주·Thai 복원 금지.\n[CALCULATED_DATA]\n{"sentinel":"unchanged"}'
+  const upgraded=upgradeCopiedFortunePrompt(text,{period:{day_count:7}})
+  assert.equal(upgraded.split('[CALCULATED_DATA]\n')[1],text.split('[CALCULATED_DATA]\n')[1])
+  assert.match(upgraded,/이번 주 전체 흐름/);assert.match(upgraded,/사주·Thai 복원 금지/)
+  assert.equal(upgradeCopiedFortunePrompt(upgraded,{}),upgraded)
+  assert.equal(externalPeriodKind({period:{day_count:1}},'annual'),'day')
+})
+test('provisional full-prompt sanitizer retains V2 depth while ordinary raw-copy output is unchanged',()=>{
+  const calculation={precision:provisionalPrecision(),western:{overall:{},natal:{},daily_scores:[]}}
+  const raw='[원본 계산 JSON]\n'+JSON.stringify(calculation,null,2)
+  const plain=sanitizeExternalFortuneText(raw)
+  const prompt=sanitizeExternalFortuneText(externalFortuneInstructions('day')+'\n[CALCULATED_DATA · 원본 계산 JSON]\n'+JSON.stringify(calculation,null,2))
+  assert.match(prompt,/EXTERNAL_AI_PROMPT_V2/);assert.match(prompt,/Western-only/)
+  assert.doesNotMatch(plain,/EXTERNAL_AI_PROMPT_V2/)
+  assert.equal(prompt.split('[CALCULATED_DATA · Western-only]\n')[1],plain.split('[CALCULATED_DATA · Western-only]\n')[1])
+})

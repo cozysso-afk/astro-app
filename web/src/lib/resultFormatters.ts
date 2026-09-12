@@ -1,3 +1,4 @@
+import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
 import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext } from '../appTypes'
 import { topicOrder } from './fortuneTopics'
 
@@ -34,6 +35,7 @@ export function integratedPromptText(request: Record<string, unknown>, calculati
     JSON.stringify(request, null, 2),
     '',
     '[외부 AI 해석 지시]',
+    externalFortuneInstructions(externalPeriodKind(calculation, request.period_kind)),
     '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 값이다. 행성 위치·하우스·점수·사주를 다시 계산하거나 임의 수정하지 말고 이 값만 근거로 해석한다.',
     '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',
     '- Thai(태국점성술)는 CALCULATED_DATA.thai의 실제 값만 사용한다. ai_safe_packet_product가 제품 계약을 만족할 때만 Lagna와 source house → lord → destination house 연결을 비예측형으로 설명한다. 학파 예외·최종 길흉·사건·정확한 미래 시기·확률·점수는 만들지 않으며 not_calculated 항목은 추정하지 않는다.',
@@ -335,6 +337,11 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     : kind === 'reunion'
       ? '- 재회는 ① 연락/재접촉 활성화 ② 감정 재활성화 ③ 실제 관계 재구축 가능성을 서로 다른 층으로 분리한다. 수신(상대→나)·발신(나→상대)·과거인연 재접점도 섞지 않는다.'
       : '- 궁합의 정적 구조와 선택 기간의 시기 활성도를 구분한다.'
+  const married = request.analysis_mode === 'marriage_married' || (kind === 'marriage' && request.relationship_status === 'married')
+  const structure = married ? '[현재 부부 흐름] [정서적 거리] [대화] [생활 역할] [반복 갈등] [회복력] [장기 안정성] [현실적인 조정 포인트]'
+    : kind === 'reunion' ? '[재회 흐름 한눈에] [상대 → 나] [나 → 상대] [과거 인연 재접점] [재접촉 vs 관계 회복] [다시 붙었을 때 유지력] [반복 가능성이 높은 문제] [주요 시기] [현실적으로 확인해야 할 행동]'
+    : kind === 'marriage' ? '[결혼궁합 한눈에] [함께 살 때 강점] [감정과 친밀감] [대화와 갈등 해결] [책임 / 역할] [생활 리듬] [장기 유지력] [결혼 전에 확인할 현실 조건]'
+    : '[궁합 한눈에] 3~5문장 [자연스럽게 잘 맞는 점] [부딪히기 쉬운 점] [대화와 사고방식] [감정과 친밀감] [끌림] [경계 / 힘의 균형] [장기 유지력] [현실적으로 맞춰야 할 것]'
   const intro = [
     `[별빛의 운명 · ${label} 외부 AI용 초압축 해석 요청]`,
     `관계 상태: ${String(request.relationship_status ?? '')} / 분석 모드: ${String(request.analysis_mode ?? kind)} / 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
@@ -342,16 +349,31 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     `상대: ${String(cp.name ?? '상대')} · ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
     '※ 좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다. 아래 계산값을 다시 천문/사주 계산하지 마라.',
     '',
+    '[EXTERNAL_AI_PROMPT_V2 · 관계 심층 상담]',
+    '너는 아래 계산값만 근거로 읽는 숙련된 관계 점성술 분석가다. 실제 상담 수준의 연결된 한국어 문단으로 해설하라.',
+    '계산 권위는 별빛의 운명 엔진에 있다. 외부 LLM은 해석자이며 두 번째 계산기가 아니다.',
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
-    '- 재회운은 reunion_dimensions의 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 분리하고, 각 축의 incoming/outgoing/reconnection도 합치지 않는다. reunion_secondary_support는 daily transit 점수와 합산하지 않는다.',
-    '- 좁은 오브의 실제 접점과 서로 독립된 레이어에서 반복되는 근거를 우선한다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
+    kind === 'reunion' ? '- 재회운은 reunion_dimensions의 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 분리하고, 각 축의 incoming/outgoing/reconnection도 합치지 않는다. reunion_secondary_support는 daily transit 점수와 합산하지 않는다.' : '',
+    '- 개인행성·수성의 소통·금성/화성의 끌림·토성의 책임·교점의 관계 관련성을 우선하고 반복 주제와 애스펙트 성격, 오브를 함께 본다. 외행성끼리의 세대 접점을 작은 오브만으로 최우선에 놓지 않는다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
     '- 사주는 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고 없는 천간합·신강/신약·용신·배우자성은 만들지 않는다.',
     modeRule,
     kind === 'reunion' ? '- 수신(상대→나)·발신(나→상대)·재접점을 따로 읽고, directional 날짜와 reunion_transits의 실제 날짜가 겹치는지 교차검증한다.' : '',
-    '- 답변 순서: 한줄 결론 → 가장 강한 계산근거 5~8개 → 관계에서 체감되는 패턴 → 강한 시기/약한 시기 → 내가 취할 현실적 행동 → 한계.',
+    '[필수 답변 구조]',
+    structure,
+    married ? '이미 존재하는 부부관계로 읽는다. 미래 배우자·미래 결혼 가능성을 예측하지 않는다.' : '결혼하거나 재회할 것이라고 예언하지 않는다.',
+    '[심층 종합 방법]',
+    '중요 섹션은 결론 2~4문장, 근거 2~4문장, 현실 발현 1~3문장, 주의 1~2문장을 목표로 한다.',
+    '실제 aspect/house/composite 등 허용된 근거만 종합한다. 애스펙트 목록을 나열하지 말고 방향→근거의 결합/충돌→현실 패턴→과해석의 한계→행동으로 연결하라.',
+    '같은 접점은 대화·끌림·유지력·주도권 중 하나의 주 역할에서 설명하고 다른 섹션에 같은 문단을 반복하지 않는다.',
+    '근거가 적으면 점수 방향만 보이며 구체적인 근거가 부족하다고 밝히고 분량을 억지로 채우지 않는다.',
+    '서로 독립된 레이어 점수를 합산하지 않는다. 실제로 같은 시기에 맥락이 겹칠 때만 비교하고 충돌도 설명한다.',
+    '생시 제한으로 제외된 ASC/DSC·MC/IC·하우스·Davison·Marks·시간 민감 진행을 복원하지 않는다.',
+    kind === 'reunion' ? '재회에서는 reunion_dimensions, reunion_directional_context, reunion_transits, secondary support를 다른 층으로 읽는다. 재접촉 활성도는 재회 성공 확률이 아니다.' : '',
+    '실제로 있는 날짜만 쓰고 상대 속마음·사건 확률·새 점수·없는 애스펙트를 만들지 않는다.',
+    '한국어 상담형 문단으로 전문용어를 풀어라. 한줄 나열·의미 없는 장황함·같은 결론과 어미 반복·evidence ID·JSON 필드명 낭독을 피한다.',
   ].filter(Boolean)
   let prompt = ''
   for (let level=0; level<=2; level++) {
@@ -416,7 +438,7 @@ export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marr
 export function precisionPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null) {
   return integratedPromptText(request, calculation)
     .replace('[별빛의 운명 · 통합운세 분석 요청]', '[별빛의 운명 · 정밀분석 요청]')
-    .concat('\n\n[정밀분석 표시 원칙]\n- 요약 점수를 새로 만들지 않고 동일 실계산의 원자료를 더 자세히 펼쳐본다.\n- 엔진이 계산하지 않은 항목은 추정하지 않는다.')
+    .replace('[외부 AI 해석 지시]', '[외부 AI 해석 지시]\n[정밀분석 표시 원칙]\n- 요약 점수를 새로 만들지 않고 동일 실계산의 원자료를 더 자세히 펼쳐본다.\n- 엔진이 계산하지 않은 항목은 추정하지 않는다.')
 }
 
 export function precisionResultText(result: IntegratedApiResponse) {
