@@ -247,6 +247,13 @@ export function inspectInterpretationQuality(data:any,payload:any){
       if(detailLength>650)s5.push(`${topic} 참고 분야 부가설명이 지나치게 김(${detailLength}/650)`);
     }
   }
+  const synthesisSeen=new Set<string>();
+  for(const x of data?.cross_checks??[]){
+    const normalized=String(x?.synthesis??"").replace(/\s+/g," ").trim();
+    if(normalized.length<45)continue;
+    if(synthesisSeen.has(normalized))s5.push("서로 다른 교차해설에 동일한 종합 문장 반복");
+    synthesisSeen.add(normalized);
+  }
   const generic=/좋은\s*기운|긍정적으로|마음을\s*열|천천히\s*해보|자신을\s*믿|잘\s*해낼/g;
   if((prose.match(generic)??[]).length>=3)s5.push("일반론 조언 반복이 많음");
   stages.push(qualityStage(5,"깊이·실용성",uniq(s5).slice(0,45)));

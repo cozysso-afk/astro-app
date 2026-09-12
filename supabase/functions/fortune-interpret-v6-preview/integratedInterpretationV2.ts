@@ -26,7 +26,15 @@ type Evidence = {
   score?: number;
   band?: string;
   text: string;
+  observation?: Record<string,string|number>;
 };
+
+export function compactObservation(ev:any):Record<string,string|number>{
+  const out:Record<string,string|number>={};
+  for(const key of ["transit","target","aspect","motion","direction","quadrant_system"]){if(typeof ev?.[key]==="string"&&ev[key])out[key]=ev[key];}
+  for(const key of ["orb","polarity","whole_house","quadrant_house"]){if(typeof ev?.[key]==="number"&&Number.isFinite(ev[key]))out[key]=ev[key];}
+  return out;
+}
 
 function num(v: unknown){ const n=Number(v??0); return Number.isFinite(n)?n:0; }
 export function txt(v: unknown,n:number){ return String(v??"").trim().slice(0,n); }
@@ -172,7 +180,7 @@ export function compactCalculation(calc:any){
   }
   for(const kd of keyDates){
     const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
-    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",direction:"context",date:kd.date,text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
+    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",direction:"context",date:kd.date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
     kd.western_refs=uniq(kd.western_refs);
   }
 

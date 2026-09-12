@@ -183,7 +183,7 @@ test('V21 multi-day synthesis retains useful period statistics and distinct date
   const love=rows.find(row=>row.topic==='연애');
   assert.match(love.reason,/기간 평균/);
   assert.match(love.reason,/변동폭/);
-  assert.match(love.reason,/2026-11-19 .*점에서 2027-04-11 .*점 사이/);
+  assert.match(love.reason,/최저점은 2026-11-19 .*점, 최고점은 2027-04-11 .*점/);
   assert.match(love.reason,/변동성/);
   assert.ok(['2026-11-19','2027-04-11'].includes(love.timing),'timing must remain one of the directly backed distinct dates');
 });

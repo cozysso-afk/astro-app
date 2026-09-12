@@ -325,8 +325,8 @@ test('E: reference-only relationships never create a large contact/relationship 
 test('F: actual topic-linked planets and contribution are translated, unrelated evidence is excluded', () => {
   const { data, calculation } = fixture({focus:{학업:'핵심',연락:'주목'},scores:{학업:80,연락:35}})
   calculation.western.daily_scores=[{date:'2026-09-12',evidence:[
-    {transit:'Mercury',target:'Jupiter',aspect:'trine',orb:1.42,contribution:3,text:'opaque W:internal orb 1.42',source_topics:['학업']},
-    {transit:'Venus',target:'Saturn',contribution:-2,text:'unrelated',source_topics:['연락']},
+    {transit:'Mercury',target:'Jupiter',aspect:'trine',orb:1.42,contribution:3,polarity:0.65,text:'opaque W:internal orb 1.42',source_topics:['학업']},
+    {transit:'Venus',target:'Saturn',contribution:2,polarity:-0.55,text:'unrelated',source_topics:['연락']},
   ]}]
   const input=JSON.stringify({data,calculation})
   const summary=buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})

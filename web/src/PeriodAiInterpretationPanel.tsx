@@ -9,7 +9,7 @@ import type { AiInterpretationResponse, IntegratedApiResponse, PeriodKey } from 
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { topicOrder } from './lib/fortuneTopics'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
-import { normalizeTopicEntries } from './lib/interpretationTopics'
+import { normalizeTopicEntries, interpretationQualityPassed } from './lib/interpretationTopics'
 import { FortuneFlowCards } from './FortuneFlowCards'
 import type { ReactNode } from 'react'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
@@ -73,12 +73,14 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
-  const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
+  const narrativeValidation = result.usage?.quality_validation
+  const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && !result.usage?.degraded_quality && interpretationQualityPassed(narrativeValidation)
+  const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
-  const validationPassed = validation?.score === 100 || (!!validation?.stages?.length && validation.stages.every((stage)=>stage.passed))
+  const validationPassed = interpretationQualityPassed(validation)
   const localQualityFallback = Boolean(result.usage?.local_quality_fallback)
   const degradedQuality = Boolean(result.usage?.degraded_quality)
   const decisions = data.decisions ?? []
@@ -122,7 +124,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
       <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><details className="reading-topic-depth" open={userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</details></article>)}</div>
     </section>}
 
-    {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.summary}</p></article>)}</div></details>}
+    {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion ?? item.summary}</p>{item.detail && <details><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.detail.reason}</ReadingExplanation>{item.detail.timing && <ReadingExplanation kind="timing">{item.detail.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.detail.action}</ReadingExplanation>{item.detail.caution && <ReadingExplanation kind="caution">{item.detail.caution}</ReadingExplanation>}</details>}</article>)}</div></details>}
 
     <details className="period-ai-details">
       <summary>계산 근거 자세히 보기</summary>

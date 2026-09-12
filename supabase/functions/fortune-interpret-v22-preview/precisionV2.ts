@@ -28,6 +28,10 @@ export function precisionGateFromPayload(calculation:any): PrecisionReadiness {
   return {ok:false,mode:'invalid',reason:'internally_inconsistent_precision_contract'}
 }
 
+function hasSensitiveProse(value:string) {
+  return /(?:\b(?:Whole Sign|Placidus|Porphyry|ASC|MC)\b|\b\d{1,2}H\b|\b\d{1,2}:\d{2}\b|하우스|상승궁|천정점|(?:출생|네이탈|natal)\s*(?:차트)?\s*(?:의)?\s*(?:달|Moon)|→\s*(?:Moon|ASC|MC)\b|(?:오전|오후)\s*\d{1,2}시|\d{1,2}시\s*\d{1,2}분)/i.test(value)
+}
+
 function cloneJson<T>(value:T):T { return JSON.parse(JSON.stringify(value)) as T }
 function sanitizeEvidence(rows:any):any[] {
   if (!Array.isArray(rows)) return []
@@ -72,16 +76,12 @@ export function auditProvisionalResidue(value:any) {
   walk(value,'',(node,path)=>{
     const leaf=path.split('.').pop() ?? ''
     if (['asc','mc','house_system','whole_house','placidus_house','quadrant_house','quadrant_system','sample_time'].includes(leaf) && node != null) violations.push(path)
-    if (leaf === 'target' && SENSITIVE_TARGETS.has(String(node ?? ''))) violations.push(path)
+    if (['target','natal_target'].includes(leaf) && SENSITIVE_TARGETS.has(String(node ?? ''))) violations.push(path)
     if (typeof node === 'string') {
       // These are opaque, date-scoped evidence IDs. In particular,
       // W:daily:2026-09-10:10 contains the substring "10:10", but no clock time.
       if (isSafeWesternReference(node)) return
-      if (/\b(?:Whole Sign|Placidus|Porphyry)\b/i.test(node)) violations.push(path)
-      if (/\b(?:ASC|MC)\b/.test(node)) violations.push(path)
-      if (/\b\d{1,2}H\b/.test(node)) violations.push(path)
-      if (/\b\d{1,2}:\d{2}\b/.test(node)) violations.push(path)
-      if (/→\s*(?:Moon|ASC|MC)\b/.test(node)) violations.push(path)
+      if (hasSensitiveProse(node)) violations.push(path)
     }
   })
   return {ok:violations.length===0,violations:[...new Set(violations)].slice(0,50)}
@@ -100,28 +100,33 @@ export function attachPrecisionPacketMetadata(packet:any, calculation:any) {
     if (Array.isArray(out.cross_system_refs)) out.cross_system_refs=[]
     if (Array.isArray(out.evidence_ledger)) out.evidence_ledger=out.evidence_ledger.filter((row:any)=>{
       const ref=String(row?.ref ?? row?.id ?? '')
-      const text=JSON.stringify(row ?? {})
-      return !/^W:(?:window|detail)/i.test(ref) && !/(?:saju|thai)/i.test(ref) && !/(?:Whole Sign|Placidus|Porphyry|\bASC\b|\bMC\b|\b\d{1,2}H\b|\b\d{1,2}:\d{2}\b)/i.test(text)
+      return ref.startsWith('W:') && (!row?.system || row.system==='western')
+        && !/^W:(?:window|detail)/i.test(ref) && auditProvisionalResidue(row).ok
     })
   }
   return out
 }
 
-function stripSensitiveText(text:unknown) { return String(text ?? '').split(/(?<=[.!?])\s+|\n+/).filter((s)=>!/(?:사주|Thai|태국|Whole Sign|Placidus|Porphyry|\bASC\b|\bMC\b|\b\d{1,2}:\d{2}\b)/i.test(s)).join(' ').trim() }
+function stripSensitiveText(text:unknown) {
+  return String(text ?? '').split(/(?<=[.!?])\s+|\n+/)
+    .filter(s=>!hasSensitiveProse(s)&&!/(?:사주|Thai|태국)/i.test(s)).join(' ').trim()
+}
 
 export function sanitizeProvisionalInterpretationOutput(data:any) {
-  const out=cloneJson(data ?? {})
-  if (out.overall && typeof out.overall==='object') {
-    out.overall.summary=stripSensitiveText(out.overall.summary); out.overall.dominant_pattern=stripSensitiveText(out.overall.dominant_pattern)
-    out.overall.best_phase=stripSensitiveText(out.overall.best_phase); out.overall.caution_phase=stripSensitiveText(out.overall.caution_phase)
+  // All prose fields, including future nested fields, share the same exclusion rules.
+  // Evidence IDs are opaque identifiers: never parse their date/index as a clock.
+  const scrub=(value:any,key=''):any=>{
+    if(key==='evidence_refs')return Array.isArray(value)?value.filter(ref=>typeof ref==='string'&&ref.startsWith('W:')&&!/^W:(?:window|detail)/i.test(ref)):[]
+    if(typeof value==='string')return stripSensitiveText(value)
+    if(Array.isArray(value))return value.map(item=>scrub(item))
+    if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,scrub(v,k)]))
+    return value
   }
+  const out=scrub(data ?? {})
   if (!out.systems || typeof out.systems!=='object') out.systems={}
-  out.systems.western=stripSensitiveText(out.systems.western || 'Western planet-only provisional interpretation'); out.systems.saju=''; out.systems.thai=''
-  if (Array.isArray(out.cross_checks)) out.cross_checks=out.cross_checks.map((x:any)=>({...x,mode:'Western단독',saju:'',thai:'',synthesis:stripSensitiveText(x?.synthesis)}))
+  out.systems.saju=''; out.systems.thai=''
+  if (Array.isArray(out.cross_checks)) out.cross_checks=out.cross_checks.map((x:any)=>({...x,mode:'Western단독',saju:'',thai:''}))
   if (Array.isArray(out.key_windows)) out.key_windows=[]
-  if (Array.isArray(out.year_phases)) out.year_phases=out.year_phases.map((x:any)=>({...x,theme:stripSensitiveText(x?.theme),change:stripSensitiveText(x?.change)}))
-  if (out.relationship_reading && typeof out.relationship_reading==='object') for (const k of ['context','flow','focus_timing','watch','avoid']) out.relationship_reading[k]=stripSensitiveText(out.relationship_reading[k])
-  if (out.contact_flow && typeof out.contact_flow==='object') for (const k of Object.keys(out.contact_flow)) out.contact_flow[k]=stripSensitiveText(out.contact_flow[k])
   out.limits='출생시간이 검증되지 않아 시간민감 출생 요소와 교차체계 해석을 제외한 잠정 해설이야.'
   return out
 }
