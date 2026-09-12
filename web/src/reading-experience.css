@@ -353,3 +353,10 @@ body:has(.reading-experience), body:has(.fortune-experience) {
 }
 
 .reading-explanation.is-timing { background: linear-gradient(115deg, #e7eaf7, rgba(242,243,251,.5)); color: #4c5277; }
+
+/* External copy modes share one compact, keyboard-accessible control. */
+.external-prompt-copy { display:grid; gap:6px; width:100%; min-width:0; }
+.external-prompt-copy small { font-size:12px; line-height:1.5; color:var(--reading-text-secondary,#655d70); }
+.external-prompt-copy button { min-height:44px; white-space:normal; }
+.external-prompt-copy summary { min-height:44px; padding:12px 0; cursor:pointer; font-size:13px; }
+.external-prompt-copy details[open] { display:grid; gap:6px; }

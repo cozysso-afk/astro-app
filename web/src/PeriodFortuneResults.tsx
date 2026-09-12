@@ -1,3 +1,4 @@
+import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { CheckCircle2 } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
@@ -26,7 +27,7 @@ type PeriodFortuneResultsProps = {
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
   onRetryAi: () => void
-  onCopyAiPrompt: () => void
+  onCopyAiPrompt: (mode?: ExternalCopyMode) => void
   onCancelAi: () => void
   aiCanCancel: boolean
   onOutcomeChange: (draft: DailyOutcomeRecord) => void

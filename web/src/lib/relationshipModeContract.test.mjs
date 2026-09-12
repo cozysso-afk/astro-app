@@ -91,7 +91,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(formatters, /for \(let level=0; level<=2; level\+\+\)/)
   assert.match(formatters, /prompt\.slice\(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS - 180\)/)
   assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
-  assert.match(app, /외부 AI용 압축 프롬프트/)
+  assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.6-reunion-compact-evidence/)
 })
