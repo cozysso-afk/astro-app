@@ -76,7 +76,7 @@ function pattern(a: Aspect): RelationshipPattern {
 
 export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
   const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive)
-  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).slice(0, 6).map(pattern).map(p => {
+  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).map(pattern).map(p => {
     if (!input.mode.startsWith('marriage_')) return p
     if (p.role === 'attraction') return { ...p, conclusion: input.mode === 'marriage_married' ? `${p.challenging ? '애정이 있어도 편안함을 느끼는 방식은 다를 수 있어.' : '익숙한 사이에서도 애정을 주고받는 방식이 관계의 온도를 바꿔.'} 함께 있을 때의 거리와 혼자 회복할 시간을 같이 살펴봐.` : p.conclusion, action: input.mode === 'marriage_married' ? '익숙함에 기대지 말고 서로 편안하게 느끼는 애정 표현과 혼자 쉴 시간을 이야기해봐.' : '호감뿐 아니라 함께 지낼 때 필요한 거리와 애정 표현을 이야기해봐.' }
     if (p.role === 'stability') return { ...p, action: '생활비와 집안일, 돌봄을 누가 얼마나 맡을지 구체적으로 나눠봐.' }
@@ -84,13 +84,16 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
   })
   // One visible pattern per semantic role; retain every aspect in the raw disclosure.
   const patterns: RelationshipPattern[] = []
+  const roleCounts = new Map<Role, number>()
   for (const p of individualPatterns) {
+    const count = roleCounts.get(p.role) ?? 0
+    roleCounts.set(p.role, count + 1)
     const prior = patterns.find(row => row.role === p.role)
     if (!prior) { patterns.push({ ...p }); continue }
-    prior.reason += ` ${p.reason.split('. ')[0]}.`
+    if (count < 2) prior.reason += ` ${p.reason.split('. ')[0]}.`
     if (prior.challenging !== p.challenging || prior.supportive !== p.supportive) {
       prior.title = { communication: '말이 통하는 순간과 엇갈리는 순간', attraction: '끌림 속에서 맞춰야 할 거리', stability: '이어갈 힘과 감당할 부담', power: '몰입과 선택권 사이', perspective: '함께 기대하는 것의 차이' }[p.role]
-      prior.conclusion = '이 부분은 편해지는 힘과 부담이 함께 보여. 잘 맞는 순간이 있더라도 불편한 반응이 반복되는 상황은 따로 다뤄야 해.'
+      prior.conclusion = { communication: '생각을 나누는 힘과 말이 어긋나는 부담이 함께 있어. 즐겁게 이야기할 때보다 의견이 다를 때 서로 설명할 여유를 주는지가 더 중요해.', attraction: '서로 끌리는 힘과 원하는 거리의 차이가 함께 보여. 한쪽의 표현이 다른 쪽에는 부담으로 느껴지는 순간을 놓치지 않는 게 중요해.', stability: '약속을 지키려는 힘과 책임이 무거워지는 부담이 함께 있어. 오래 참는 것보다 서로 감당할 조건으로 약속을 고쳐 나가는지가 유지력의 기준이야.', power: '깊이 관여하는 힘과 선택권이 좁아지는 부담이 함께 보여. 친밀해질수록 거절할 자유와 혼자만의 영역이 남아 있는지가 중요해.', perspective: '서로 시야를 넓혀주는 부분과 기대가 엇갈리는 부분이 공존해. 같은 미래를 말해도 실제 선택에서 무엇을 우선하는지는 다를 수 있어.' }[p.role]
     }
     prior.challenging ||= p.challenging
     prior.supportive ||= p.supportive
@@ -131,6 +134,13 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
       : reconnection.band === '정보 부족' ? '재접촉 시기는 판단할 정보가 부족해. 두 사람 사이에서 반복되기 쉬운 패턴부터 살펴볼게.'
       : '다시 대화할 여지는 열려 있지만, 관계 회복은 그 뒤의 행동을 보고 판단하는 편이 좋아.'
     : friction.length ? '서로 자극하는 힘이 있어도 편안함과는 다를 수 있어. 반복해서 부딪히는 부분을 어떻게 조율하는지가 중요해.' : patterns.length ? '서로 맞물리는 부분을 살릴 수 있어. 호감보다 약속과 대화가 꾸준히 이어지는지를 봐.' : '확정할 수 있는 접점이 적어 관계 전체를 단정하기 어려워.'
+  const roleLabel: Record<Role, string> = { communication: '서로 말을 이해하는 방식', attraction: '애정을 주고받는 방식', stability: '약속과 책임의 분담', power: '서로의 선택권', perspective: '함께 기대하는 방향' }
+  const supportive = patterns.find(p => p.supportive)
+  const difficult = friction[0]
+  const orientation = supportive && difficult && supportive.role !== difficult.role
+    ? `${roleLabel[supportive.role]}에는 도움을 주는 접점이 있고, ${roleLabel[difficult.role]}에는 조정이 필요해.`
+    : difficult ? `${roleLabel[difficult.role]}에서 생기는 부담을 먼저 다뤄야 해.`
+    : supportive ? `${roleLabel[supportive.role]}에서 서로를 돕는 접점부터 살려봐.` : ''
   const marriage = input.mode.startsWith('marriage_')
   const married = input.mode === 'marriage_married'
   const sections = [
@@ -148,6 +158,6 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     stabilityTitle: reunion ? '다시 붙었을 때 유지력' : married ? '관계 회복력 · 장기 안정성' : marriage ? '결혼 유지력' : '장기 유지력',
     practicalTitle: married ? '지금 함께 바꿔볼 것' : marriage ? '결혼 전 확인할 것' : '현실에서 맞춰야 할 것',
     practical, sections, strengths: patterns.filter(p => p.supportive).map(p => p.title),
-    headline, incoming, outgoing, reconnection, sustainability, sustainabilityText, windows,
+    headline: [headline, orientation].filter(Boolean).join(' '), incoming, outgoing, reconnection, sustainability, sustainabilityText, windows,
     friction: friction.slice(0, 2), patterns: patterns.filter(p => !friction.slice(0, 2).some(f => f.key === p.key)), ranked }
 }

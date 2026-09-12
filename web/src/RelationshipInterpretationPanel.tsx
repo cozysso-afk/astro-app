@@ -11,6 +11,7 @@ export function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiL
 }) {
   const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: analysisMode === 'reunion' ? timing : null })
   const reunion = analysisMode === 'reunion'
+  const timingGroups = [...new Set(view.windows.map(w => w.date))].map(date => ({ date, windows: view.windows.filter(w => w.date === date) }))
   const interpretation = (p: RelationshipPattern) => <article className="relationship-pattern" key={p.key}><h4>{p.title}</h4><p className="reading-conclusion">{p.conclusion}</p><ReadingExplanation kind="reason">{p.reason}</ReadingExplanation><ReadingExplanation kind="practice">{p.action}</ReadingExplanation>{p.challenging&&<ReadingExplanation kind="caution">{p.caution}</ReadingExplanation>}</article>
   const direction = (label: string, item: typeof view.incoming) => <div className="contact-row" key={label}><div><h4>{label}</h4><span className="direction-band">{item.band}</span></div><p>{item.text}</p>{item.timing&&<time className="contact-timing">{item.timing}</time>}</div>
   return <section className="relationship-experience reading-experience" data-mode={analysisMode}>
@@ -19,7 +20,7 @@ export function RelationshipInterpretationPanel({ aspects, partnerExact, ai, aiL
       <section className="reading-section"><h3>재접촉 흐름</h3><div className="contact-directions">{direction('상대 → 나', view.incoming)}{direction('나 → 상대', view.outgoing)}{direction('과거 인연 재접점', view.reconnection)}</div></section>
       <section className="reading-section"><h3>{view.stabilityTitle}<span className="direction-band">{view.sustainability}</span></h3><p>{view.sustainabilityText}</p></section>
       <section className="reading-section"><h3>반복될 가능성이 높은 문제</h3>{view.friction.length ? view.friction.map(interpretation) : <p>반복 갈등을 뚜렷하게 짚을 접점이 부족해. 문제가 없다는 뜻은 아니야.</p>}</section>
-      <section className="reading-section"><h3>주요 시기</h3>{view.windows.length ? <ol className="reading-timeline">{view.windows.map((w, i) => <li key={`${w.date}-${i}`}><time>{w.date}</time><span>{w.label} · {w.band}</span></li>)}</ol> : <p>다른 날과 구별할 만큼 뚜렷한 시기는 없어.</p>}</section>
+      <section className="reading-section"><h3>주요 시기</h3>{view.windows.length ? <ol className="reading-timeline">{timingGroups.map(group => <li key={group.date}><time>{group.date}</time>{group.windows.map(w => <span className={`reading-window-line is-${w.band === '약함' ? 'caution' : w.band === '강함' ? 'favorable' : 'mixed'}`} key={w.label}><small>{w.band === '약함' ? '주의' : w.band === '강함' ? '활용' : '혼합'}</small>{w.label} · {w.band}</span>)}</li>)}</ol> : <p>다른 날과 구별할 만큼 뚜렷한 시기는 없어.</p>}</section>
       {!!view.patterns.length && <section className="reading-section"><h3>관계의 핵심 패턴</h3>{view.patterns.map(interpretation)}</section>}
     </> : <>
       <div className="relationship-balance"><section><h3>{view.strengthsTitle}</h3>{view.strengths.length ? <ul>{view.strengths.slice(0, 2).map(p => <li key={p}>{p}</li>)}</ul> : <p>뚜렷하게 잘 맞는 접점은 적어.</p>}</section><section><h3>{view.frictionTitle}</h3>{view.friction.length ? <ul>{view.friction.map(p => <li key={p.key}>{p.title}</li>)}</ul> : <p>강한 충돌 접점은 적지만, 문제가 없다는 뜻은 아니야.</p>}</section></div>
