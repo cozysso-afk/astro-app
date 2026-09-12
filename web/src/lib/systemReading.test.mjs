@@ -5,6 +5,7 @@ import {createElement as h} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
 import {fileURLToPath} from 'node:url'
 import {fortuneFixture} from './readingExperience.fixtures.mjs'
+import {archetypeFixtures,archetypeContext,visualSettings} from './datingArchetype.fixtures.mjs'
 let server,systems,Views,fields,summary,compact,dating
 before(async()=>{
  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
@@ -74,24 +75,12 @@ test('Thai birthday segments remain separate; Saju solar-term segments are not c
  const compactPacket=JSON.parse(compact.buildExternalCompactPrompt(f.calculation,f.data).split('\nCALCULATED_DATA=')[1])
  assert.ok(compactPacket.saju.length);assert.ok(compactPacket.thai.segments.length)
 })
-test('dating and spouse models remain separate; portrait options never accept names or exact measurements',()=>{
- const f=fixture('today',true),v=dating.buildDatingArchetype(f.calculation)
- assert.equal(v.kind,'dating_partner');assert.equal(v.appearanceSupported,false)
- assert.match(v.precision,/제한/)
+test('dating V2 is separate from spouse and excludes names and exact measurements from image copy',()=>{
+ const model=dating.buildDatingArchetypeV2(archetypeFixtures[0].natal,archetypeContext)
+ assert.equal(model.kind,'dating_partner');assert.equal(model.version,'dating-appearance-v2')
  for(const language of ['ko','en'])for(const style of ['real','dream','illustration']){
-  const text=dating.datingPortraitPrompt({style,frame:'full',outfit:'date',celebrity:'FORBIDDEN_NAME'},language)
-  assert.doesNotMatch(text,/FORBIDDEN_NAME|\d+\s*cm/);assert.ok(text.length>80)
- }
-})
-test('dating visual crosswalk is explicitly creative and celebrity references never reach either image prompt',()=>{
- const f=fixture('today')
- f.calculation.western.daily_scores[0].evidence.push({source_topics:['연애'],transit:'Venus',target:'Mars',aspect:'trine',contribution:2})
- const v=dating.buildDatingArchetype(f.calculation)
- assert.equal(v.style,'Venus');assert.ok(v.visual);assert.equal(v.appearanceSupported,false)
- assert.match(v.visualPolicy,/오락용 연출/)
- for(const language of ['ko','en'])for(const style of ['Venus','Mars']){
-  const text=dating.datingPortraitPrompt({style:'dream',frame:'full',outfit:'date'},language,style)
-  assert.doesNotMatch(text,/정유미|공유|Gong Yoo|Jung Yu|\d+\s*cm/)
+  const text=dating.datingPortraitPromptV2(model,{...visualSettings,style,celebrity:'FORBIDDEN_NAME'},language)
+  assert.doesNotMatch(text,/FORBIDDEN_NAME|정유미|공유|Gong Yoo|Jung Yu|\d+\s*cm/)
  }
 })
 test('solar-term end is exclusive at midnight and intraday transitions remain visible',()=>{
@@ -106,14 +95,13 @@ test('Thai routes and numeric Lagna use the existing product validator, never el
  assert.equal(v.suriyayat.ai_safe_descriptive_packet,undefined)
 })
 
-test('portrait copy respects explicit subject and ordinary unretouched appearance in both languages',()=>{
- const options={style:'real',frame:'half',outfit:'daily'}
+test('V2 portrait copy respects explicit subject and natural skin texture in both languages',()=>{
+ const model=dating.buildDatingArchetypeV2(archetypeFixtures[0].natal,archetypeContext)
  for(const [gender,ko,en] of [['male','성인 남성','adult man'],['female','성인 여성','adult woman'],['neutral','성인 인물','adult person']]){
-  const kr=dating.datingPortraitPrompt({...options,gender},'ko','Venus')
-  const english=dating.datingPortraitPrompt({...options,gender},'en','Venus')
+  const kr=dating.datingPortraitPromptV2(model,{...visualSettings,gender},'ko')
+  const english=dating.datingPortraitPromptV2(model,{...visualSettings,gender},'en')
   assert.ok(kr.includes(ko));assert.ok(english.includes(en))
-  assert.match(kr,/무보정/);assert.match(kr,/좌우 비대칭/)
-  assert.match(english,/unretouched/);assert.match(english,/No idol or fashion-model idealization/)
+  assert.match(kr,/좌우 비대칭/);assert.match(english,/Natural skin texture/)
   assert.doesNotMatch(kr+english,/정유미|공유|Jung Yu|Gong Yoo/)
  }
 })
@@ -129,7 +117,8 @@ test('dating default follows the calculation profile, not a fixed male subject',
  assert.equal(dating.defaultDatingPartnerGender('female'),'male')
  assert.equal(dating.defaultDatingPartnerGender('male'),'female')
  for(const missing of [undefined,null,'unknown',''])assert.equal(dating.defaultDatingPartnerGender(missing),'neutral')
- const options={style:'real',frame:'half',outfit:'daily',gender:dating.defaultDatingPartnerGender('male')}
- assert.match(dating.datingPortraitPrompt(options,'ko'),/성인 여성/)
- assert.match(dating.datingPortraitPrompt(options,'en'),/adult woman/)
+ const options={...visualSettings,gender:dating.defaultDatingPartnerGender('male')}
+ const model=dating.buildDatingArchetypeV2(archetypeFixtures[0].natal,archetypeContext)
+ assert.match(dating.datingPortraitPromptV2(model,options,'ko'),/성인 여성/)
+ assert.match(dating.datingPortraitPromptV2(model,options,'en'),/adult woman/)
 })

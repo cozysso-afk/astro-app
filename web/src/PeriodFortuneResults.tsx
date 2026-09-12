@@ -12,6 +12,8 @@ type HighlightPoint = FortunePoint & { topic: string }
 type ActiveDayun = NonNullable<IntegratedApiResponse['saju']['dayun']>[number]
 
 type PeriodFortuneResultsProps = {
+  datingProfile?: Record<string,unknown>
+  datingApiBase?: string
   profileGender?: unknown
   fieldId?: string
   period: PeriodKey
@@ -40,6 +42,8 @@ type PeriodFortuneResultsProps = {
 }
 
 export function PeriodFortuneResults({
+  datingProfile,
+  datingApiBase,
   profileGender,
   fieldId,
   period,
@@ -101,7 +105,7 @@ export function PeriodFortuneResults({
   return <div className="fortune-experience">
     <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
     <SystemReadingViews key={fieldId} calculation={result} field={field}><PeriodAiInterpretationPanel field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/></SystemReadingViews>
-    {field?.id==='love'&&<DatingArchetypePanel key={`${String(profileGender)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender}/>}
+    {field?.id==='love'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
     {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
       draft={outcomeDraft}
