@@ -1,4 +1,4 @@
-import { applyLoveContext, type LoveStatus } from './lib/loveReadingContext'
+import { singleLoveScenarios, applyLoveContext, type LoveStatus } from './lib/loveReadingContext'
 import type { FortuneField } from './lib/fortuneFields'
 import { ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
@@ -97,6 +97,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/><FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
 
+    {field?.id==='love' && (loveStatus??'single')==='single' && <section className="single-love-scenarios"><h4>내 상황에 맞춰 읽기</h4><p>여러 상황이 함께 있어도 돼. 해당하는 해설을 함께 읽어봐.</p>{singleLoveScenarios(calculation).map(item=><details key={item.title}><summary>{item.title}</summary><p>{item.text}</p></details>)}</section>}
     {!westernOnly&&systemOverview}
 
     {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
