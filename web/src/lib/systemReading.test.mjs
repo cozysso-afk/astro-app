@@ -151,3 +151,33 @@ test('field hub exposes all ten choices without opening a disclosure',async()=>{
  for(const f of fields)assert.ok(html.includes(f.label))
  assert.match(html,/오늘·주간·월간·연간/)
 })
+
+for(const period of ['today','week','month','year'])test(`${period}: single contexts coexist, preserve timing and gate past evidence`,async()=>{
+ const f=fixture(period), mod=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
+ const base=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['연애','연락','재회']})
+ const before=JSON.stringify(f.calculation)
+ const lens=mod.applyLoveContext(base,f.calculation,'single')
+ assert.deepEqual(lens.importantWindows,base.importantWindows)
+ assert.deepEqual(lens.focusTopics.map(t=>[t.topic,t.reason,t.timing]),base.focusTopics.filter(t=>['연애','연락','재회'].includes(t.topic)).map(t=>[t.topic,t.reason,t.timing]))
+ assert.equal(mod.singleLoveScenarios(f.calculation).length,4)
+ assert.match(mod.lovePromptContext('single'),/동시에|여러 상황/)
+ for(const c of [...lens.favorableCards,...lens.cautionCards])assert.ok(c.meaning.length<50)
+ assert.equal(JSON.stringify(f.calculation),before)
+ const missing=structuredClone(f.calculation);missing.western.relationship_signals={}
+ assert.match(mod.singleLoveScenarios(missing)[3].text,/정보가 부족/)
+ assert.equal(mod.applyLoveContext({...base,relationship:{...base.relationship,reconnection:'stale'}},missing,'single').relationship.reconnection,undefined)
+ const actual=structuredClone(f.calculation);actual.western.relationship_signals={'과거인연접점':{average:64,band:'보통 이상'}}
+ const withPast={...base,relationship:{...base.relationship,reconnection:'실제 근거',reconnectionTiming:'2026-09-12'}}
+ assert.equal(mod.applyLoveContext(withPast,actual,'single').relationship.reconnection,'실제 근거')
+ assert.equal(mod.applyLoveContext(withPast,actual,'single').relationship.reconnectionTiming,'2026-09-12')
+})
+test('period home and independent field navigation are separate',async()=>{
+ const Home=(await server.ssrLoadModule('/src/HomeControls.tsx')).HomeControls
+ const props={birthProfile:{},hasProfile:false,queryDate:'2026-09-12',period:'today',selectedTool:null,apiStatus:'ready',apiLabel:'',fieldHub:h('div',null,'FIELD_ONLY'),onOpenProfile(){},onQueryDateChange(){},onPeriodSelect(){},onToolSelect(){}}
+ const home=renderToStaticMarkup(h(Home,{...props,workspace:'period'}))
+ assert.doesNotMatch(home,/FIELD_ONLY/)
+ for(const label of ['전체 기간운세','분야별 운세','사주','태국점성술'])assert.ok(home.includes(label))
+ const field=renderToStaticMarkup(h(Home,{...props,workspace:'field'}))
+ assert.match(field,/FIELD_ONLY/);assert.match(field,/전체 기간운세로 돌아가기/)
+ assert.doesNotMatch(field,/독립 운세 선택/)
+})

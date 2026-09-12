@@ -1,6 +1,6 @@
 import type { LifeTopic } from './systemReading'
 export const FORTUNE_FIELDS = [
-  {id:'love',label:'연애운',desc:'호감과 만남의 흐름',topics:['연애','연락'],lens:'애정'},
+  {id:'love',label:'연애운',desc:'호감과 만남의 흐름',topics:['연애','연락','재회'],lens:'애정'},
   {id:'money',label:'금전운',desc:'수입·지출과 현실 조건',topics:['금전'],lens:'금전'},
   {id:'investment',label:'주식·투자운',desc:'판단과 위험 관리',topics:['투자심리','신규진입','수익실현','투자주의'],lens:'금전'},
   {id:'study',label:'학업운',desc:'집중·이해·복습',topics:['학업'],lens:'학업'},

@@ -380,6 +380,8 @@ export default function AppNext() {
   const [mainView, setMainView] = useState<MainView>('home')
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
   const [loveStatus, setLoveStatus] = useState<LoveStatus>('single')
+  const [readingWorkspace,setReadingWorkspace] = useState<'period'|'field'|'saju'|'thai'|'western'>('period')
+  const workspaceSelections = useRef<Record<string,{period:PeriodKey;date:string;field?:string}>>({})
   const [fortuneFieldId, setFortuneFieldId] = useState<string | undefined>()
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
@@ -594,17 +596,26 @@ export default function AppNext() {
     : []
 
   const switchMainView = (view: MainView) => { setMainView(view); if (view !== 'home') setSelectedTool(null) }
+  const openReadingWorkspace = (next: 'period'|'field'|'saju'|'thai'|'western') => {
+    if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
+    workspaceSelections.current[readingWorkspace]={period,date:queryDate,field:fortuneFieldId}
+    const saved=workspaceSelections.current[next]
+    setReadingWorkspace(next);setSelectedTool(null);setIntegratedCalendarYear(null)
+    setFortuneFieldId(next==='field'?saved?.field:undefined)
+    if(saved){setPeriod(saved.period);setQueryDate(saved.date)}
+    window.scrollTo({top:0,behavior:'auto'})
+  }
   const selectHomePeriod = (nextPeriod: PeriodKey, clearTool: boolean) => {
     if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
     setPeriod(nextPeriod)
-    if (clearTool) setSelectedTool(null)
+    if (clearTool) {setSelectedTool(null);setFortuneFieldId(undefined);setReadingWorkspace('period')}
     setIntegratedCalendarYear(null)
     setIntegratedError('')
     setIntegratedProgress(null)
   }
   const selectHomeTool = (tool: ToolKey) => {
     if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true)
-    setSelectedTool(tool)
+    setSelectedTool(tool);setFortuneFieldId(undefined);setReadingWorkspace('period')
     if (tool === 'compatibility' || tool === 'marriage') {
       setRelationshipDays(365)
       setRelationshipCalendarYear(null)
@@ -1539,6 +1550,8 @@ export default function AppNext() {
 
         {mainView === 'home' && <>
           <HomeControls
+            workspace={readingWorkspace}
+            onWorkspace={openReadingWorkspace}
             fieldHub={<FortuneFieldHub selected={fortuneFieldId} onSelect={(id)=>{setFortuneFieldId(id);setSelectedTool(null);requestAnimationFrame(()=>document.querySelector('.period-fortune-report')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}))}}/>}
             birthProfile={birthProfile}
             hasProfile={hasProfile}
@@ -1719,8 +1732,8 @@ export default function AppNext() {
             />}
           </section>}
 
-          {selectedTool===null && <PeriodFortunePanel
-            title={period==='today'?'오늘의 운세':`${periods.find((item)=>item.key===period)?.label}운세`}
+          {selectedTool===null && (readingWorkspace!=='field'||Boolean(fortuneFieldId)) && <PeriodFortunePanel
+            title={readingWorkspace==='field'?`${fortuneField(fortuneFieldId)?.label} · ${periods.find(item=>item.key===period)?.label}`:readingWorkspace==='saju'?'사주 · '+periods.find(item=>item.key===period)?.label:readingWorkspace==='thai'?'태국점성술 · '+periods.find(item=>item.key===period)?.label:readingWorkspace==='western'?'서양점성술 · '+periods.find(item=>item.key===period)?.label:period==='today'?'오늘의 전체 운세':`${periods.find((item)=>item.key===period)?.label} 전체 운세`}
             startDate={periodSelectionStart}
             endDate={integratedSelectionEnd}
             ready={integratedMatchesSelection}
@@ -1736,7 +1749,8 @@ export default function AppNext() {
               profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
               loveStatus={loveStatus}
               onLoveStatusChange={setLoveStatus}
-              fieldId={fortuneFieldId}
+              initialSystem={['saju','thai','western'].includes(readingWorkspace)?readingWorkspace as 'saju'|'thai'|'western':'integrated'}
+              fieldId={readingWorkspace==='field'?fortuneFieldId:undefined}
               period={period}
               periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}
               result={integratedResult}
