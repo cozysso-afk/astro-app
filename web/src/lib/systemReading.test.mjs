@@ -124,3 +124,12 @@ test('Thai overview translates placement labels without adding planetary predict
  assert.match(text,/도움/);assert.match(text,/막히는 조건/)
  assert.doesNotMatch(text,/Taksajorn|Boriwan|Saturn|확률|반드시/)
 })
+
+test('dating default follows the calculation profile, not a fixed male subject',()=>{
+ assert.equal(dating.defaultDatingPartnerGender('female'),'male')
+ assert.equal(dating.defaultDatingPartnerGender('male'),'female')
+ for(const missing of [undefined,null,'unknown',''])assert.equal(dating.defaultDatingPartnerGender(missing),'neutral')
+ const options={style:'real',frame:'half',outfit:'daily',gender:dating.defaultDatingPartnerGender('male')}
+ assert.match(dating.datingPortraitPrompt(options,'ko'),/성인 여성/)
+ assert.match(dating.datingPortraitPrompt(options,'en'),/adult woman/)
+})

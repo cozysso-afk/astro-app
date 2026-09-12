@@ -1728,6 +1728,7 @@ export default function AppNext() {
             onCalculate={runIntegrated}
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
+              profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
               fieldId={fortuneFieldId}
               period={period}
               periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}

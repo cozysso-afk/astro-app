@@ -20,10 +20,13 @@ export function buildDatingArchetype(input: IntegratedApiResponse) {
     appearanceSupported:false,visual,style,visualPolicy:'실제 금성/화성 연결을 그림의 부드러움/활동성에 대응한 오락용 연출 규칙이야. 신체 측정이나 미래 인물의 외모를 계산한 결과는 아니야.',fields:['키 범위','체형','얼굴형','눈매','코','입매','헤어','동물상','연예인 무드','매력 포인트 TOP 3','내가 끌릴 포인트'],
     limit:'외모는 실제 미래 인물을 맞히는 예측이 아니라, 관계·취향을 재미로 시각화하는 영역이야. 이 모델은 배우자상과 별개야.'}
 }
+export function defaultDatingPartnerGender(profileGender:unknown):'male'|'female'|'neutral' {
+ return profileGender==='female'?'male':profileGender==='male'?'female':'neutral'
+}
 export type PortraitOptions={gender?:'male'|'female'|'neutral';style:'real'|'dream'|'illustration';frame:'face'|'half'|'full';outfit:'daily'|'date'|'meeting'}
 // Closed vocabulary: no name or free-form appearance field enters the image prompt.
 export function datingPortraitPrompt(options:PortraitOptions,language:'ko'|'en',style?:keyof typeof DATING_VISUAL_STYLES) {
- const person=options.gender ?? 'male'
+ const person=options.gender ?? 'neutral'
  const subjectKo={male:'성인 남성',female:'성인 여성',neutral:'성인 인물'}[person]
  const subjectEn={male:'adult man',female:'adult woman',neutral:'adult person'}[person]
  const visual=style ? DATING_VISUAL_STYLES[style] : undefined
