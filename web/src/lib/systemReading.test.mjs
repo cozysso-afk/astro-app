@@ -94,3 +94,14 @@ test('dating visual crosswalk is explicitly creative and celebrity references ne
   assert.doesNotMatch(text,/정유미|공유|Gong Yoo|Jung Yu|\d+\s*cm/)
  }
 })
+test('solar-term end is exclusive at midnight and intraday transitions remain visible',()=>{
+ const p={start:'2026-09-12',end:'2026-09-12'}
+ assert.equal(systems.overlapsSegment({segment_start:'2026-08-01T00:00:00+09:00',segment_end_exclusive:'2026-09-12T00:00:00+09:00'},p),false)
+ assert.equal(systems.overlapsSegment({segment_start:'2026-08-01T00:00:00+09:00',segment_end_exclusive:'2026-09-12T12:00:00+09:00'},p),true)
+})
+test('Thai routes and numeric Lagna use the existing product validator, never eligibility labels alone',()=>{
+ const f=fixture();f.calculation.thai.suriyayat={available:true,lagna:{available:true,display:'UNSAFE_LAGNA'},ai_safe_packet_product:{eligible_for_gemini:true,research_only:false,routes:[{route_key:'UNSAFE_ROUTE'}]}}
+ const v=systems.buildSystemReading(f.calculation)
+ assert.equal(v.suriyayat.lagna.available,false)
+ assert.equal(v.suriyayat.ai_safe_descriptive_packet,undefined)
+})

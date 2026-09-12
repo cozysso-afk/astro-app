@@ -1,3 +1,4 @@
+import { compactThaiProductSuriyayat } from '../../../supabase/functions/fortune-interpret-v6-preview/thaiContract'
 import type { IntegratedApiResponse } from '../appTypes'
 import { fortuneAiPrecisionReadiness } from './precisionTransport'
 
@@ -28,7 +29,11 @@ export const BHUMI_LENSES: Record<string,Lens> = {
 type Segment = { segment_start?:string; segment_end_exclusive?:string }
 // Retain exact solar-term boundaries; never select by calendar_month alone.
 export function overlapsSegment(row: Segment, period: IntegratedApiResponse['period']) {
-  return !!row.segment_start && !!row.segment_end_exclusive && row.segment_start.slice(0,10) <= period.end && row.segment_end_exclusive.slice(0,10) >= period.start && row.segment_end_exclusive > period.start
+  if (!row.segment_start || !row.segment_end_exclusive) return false
+  // Segment timestamps use the calculation's local time. Compare against local
+  // midnight, retaining an intraday solar-term boundary on the selected date.
+  const local = (value: string) => value.length === 10 ? value+'T00:00:00' : value.slice(0,19)
+  return local(row.segment_start) <= period.end+'T23:59:59' && local(row.segment_end_exclusive) > period.start+'T00:00:00'
 }
 export function buildSystemReading(c: IntegratedApiResponse) {
   const readiness = fortuneAiPrecisionReadiness(c)
@@ -45,7 +50,8 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const wheels = segments.map(r=>({...r,wheel:r.wheel.filter(w=>BHUMI_LENSES[w.bhumi_key])}))
   const sajuSummary = contexts.length ? `${contexts[0].layer}의 ${contexts[0].stem_ten_god}은 ${tenGodLens(contexts[0].stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.${contexts.length>1?' 아래에서 다른 운 구간과 함께 읽어볼 수 있어.':''}` : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
   const thaiSummary = wheels.length ? `이 기간의 Taksajorn은 ${wheels.length}개 구간이야. 연간 Boriwan은 ${wheels.map(r=>r.annual_boriwan.label).join(' → ')}로 기록돼 있어. 주변 사람과 환경을 살피는 배치이며 사건 예측은 아니야.` : natalWheel.length ? '출생 Mahathaksa의 8영역을 생활 맥락으로 읽을 수 있어. 이 배치만으로 선택 기간의 길흉을 정하지 않아.' : '이 기간에 읽을 수 있는 Thai 배치가 없어.'
-  return { allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
+  const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
+  return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
 }
 export const THREE_SYSTEM_INSTRUCTIONS = '계산 권위는 별빛의 운명 엔진이며 너는 해석자다. 재계산·새 점수·데이터 밖 근거 생성 금지. 점수는 확률이 아니다. 실제 자료가 있는 Western·Saju·Thai를 각각 설명하고 근거의 결합과 충돌, 현실 발현·행동·주의·과해석 한계를 종합하라. 사주·Thai를 한 줄 부록으로 축소하지 말라. 세 체계는 독립적이며 합산하거나 강제로 일치시키지 않는다. 미계산 신강·용신·배우자성, Thai 최종 길흉·사건 확률·정확한 예측 시각을 만들지 말라. 연락 수신/발신은 분리한다. 투자 가격·수익 예측 금지. 일간은 실제 하루, 주간은 실제 구간 변화, 월간은 실제 월운/절 경계, 연간은 실제 대운/세운/월 구간을 사용하라.'
 
