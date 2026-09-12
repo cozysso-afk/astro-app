@@ -100,17 +100,9 @@ export async function countCurrentCloudRecords(): Promise<number> {
   return Number(readingResult.count ?? 0) + Number(relationshipResult.count ?? 0)
 }
 
-function currentAppRedirectUrl(): string | undefined {
-  if (typeof window === 'undefined') return undefined
-  return `${window.location.origin}/`
-}
-
 // Existing anonymous sessions are intentionally preserved so the current device can
 // link its email identity without changing user_id. New anonymous sessions are never created.
-// Supabase's default email-change template contains a confirmation link, so custom SMTP
-// or a custom six-digit OTP template is not required for this private-app flow.
-// The first anonymous-email conversion still relies on Supabase Site URL because updateUser
-// owns that confirmation redirect; post-conversion Magic Link sign-ins are pinned below.
+// The Change Email template also includes {{ .Token }} for in-app verification.
 export async function linkAnonymousSessionToEmail(email: string) {
   const session = await getSupabaseSession()
   if (!session?.user?.is_anonymous) throw new Error('연결할 기존 익명 세션이 없어.')
@@ -119,18 +111,11 @@ export async function linkAnonymousSessionToEmail(email: string) {
   return result.data
 }
 
-// signInWithOtp sends the project's default Magic Link email when the template still
-// uses {{ .ConfirmationURL }}. shouldCreateUser=false prevents arbitrary sign-up.
-// Explicit emailRedirectTo prevents a stale/default Site URL from hijacking normal logins.
-export async function requestEmailMagicLink(email: string) {
-  const normalized = email.trim().toLowerCase()
-  const emailRedirectTo = currentAppRedirectUrl()
+// OTP delivery uses the project's Magic Link template containing {{ .Token }}.
+// No redirect is used: verification creates the session in this app context.
+export async function requestEmailCode(email: string) {
   const result = await supabase.auth.signInWithOtp({
-    email: normalized,
-    options: {
-      shouldCreateUser: false,
-      ...(emailRedirectTo ? { emailRedirectTo } : {}),
-    },
+    email: email.trim().toLowerCase(), options: { shouldCreateUser: false },
   })
   if (result.error) throw result.error
   return result.data
@@ -139,6 +124,29 @@ export async function requestEmailMagicLink(email: string) {
 export async function signOutSupabase() {
   const result = await supabase.auth.signOut()
   if (result.error) throw result.error
+}
+
+export async function verifyEmailCode(email: string, token: string) {
+  const normalized = email.trim().toLowerCase()
+  const code = token.trim()
+  if (!/^\d{6,10}$/.test(code)) throw new Error('메일에 적힌 숫자 인증번호를 확인해줘.')
+  const pending = readPendingAnonymousLink()
+  if (pending && pending.email !== normalized) throw new Error('이메일 연결을 시작한 주소와 달라. 원래 주소를 확인해줘.')
+  const result = await supabase.auth.verifyOtp({
+    email: normalized, token: code, type: pending ? 'email_change' : 'email',
+  })
+  if (result.error) {
+    const status = result.error.status
+    if (status === 429) throw new Error('인증을 너무 자주 시도했어. 잠시 후 다시 입력해줘.')
+    throw new Error('인증번호가 맞지 않거나 만료됐어. 가장 최근 메일의 번호를 확인해줘.')
+  }
+  const session = result.data.session ?? await getSupabaseSession()
+  if (!session || !isPermanentEmailSession(session)) throw new Error('이메일 확인이 더 필요해. 가장 최근 메일의 번호를 확인해줘.')
+  if ((session.user.email ?? '').trim().toLowerCase() !== normalized || (pending && session.user.id !== pending.userId)) {
+    await signOutSupabase()
+    throw new Error('인증된 계정이 기존 기록 계정과 달라 로그인을 중단했어.')
+  }
+  return session
 }
 
 export async function ensureSupabaseSession(): Promise<Session> {
