@@ -154,7 +154,7 @@ function bestTopicDate(payload:any,topic:string){
       if(/^\d{4}-\d{2}-\d{2}$/.test(date)&&date>=String(payload?.period?.start??"").slice(0,10)&&date<=String(payload?.period?.end??"9999-12-31").slice(0,10))backedDates.add(date);
     }
   }
-  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&Number.isFinite(Number(x?.score))&&backedDates.has(String(x.date).slice(0,10)));
+  const candidates=[...(stat?.best_days??[]),...(stat?.caution_days??[])].filter((x:any)=>x?.date&&typeof x?.score==="number"&&Number.isFinite(x.score)&&backedDates.has(String(x.date).slice(0,10)));
   candidates.sort((a:any,b:any)=>Math.abs(num(b?.score)-avg)-Math.abs(num(a?.score)-avg));
   if(candidates[0]?.date)return String(candidates[0].date).slice(0,10);
   const key=(payload?.key_dates??[]).find((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic)&&backedDates.has(String(row?.date??"").slice(0,10)));
@@ -225,13 +225,29 @@ export function buildDeterministicTopicAnalysis(payload:any){
     else reasonParts.push("점수와 연결해 설명할 세부 계산근거가 충분하지 않아 사건 의미를 덧붙이지 않아.");
     if(singleDay)reasonParts.push(topicRealityCheck(topic));
     else{
-      reasonParts.push(`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}이고 변동폭은 ${scoreText(spread)}점이라 ${direction}이야.`);
-      if(min?.date&&max?.date&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`직접 근거가 연결된 일별 궤적은 ${min.date} ${scoreText(min.score)}점에서 ${max.date} ${scoreText(max.score)}점 사이를 움직였고 변동성은 ${scoreText(digest?.volatility)}점이야.`);
-      else reasonParts.push(`일별 변동성은 ${scoreText(digest?.volatility)}점이며, 날짜를 특정할 때는 계산근거에 직접 연결된 날짜만 사용해.`);
+      reasonParts.push(`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}으로 ${direction}이야.${typeof stat?.spread==="number"&&Number.isFinite(stat.spread)?` 확인된 변동폭은 ${scoreText(spread)}점이야.`:" 변동폭은 계산 정보가 없어 판단하지 않아."}`);
+      if(min?.date&&max?.date&&typeof min.score==="number"&&Number.isFinite(min.score)&&typeof max.score==="number"&&Number.isFinite(max.score)&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`확인된 최저점은 ${min.date} ${scoreText(min.score)}점, 최고점은 ${max.date} ${scoreText(max.score)}점이야. 두 날짜는 강약 비교이며 그 사이가 계속 상승하거나 하락했다는 뜻은 아니야.`);
+      if(typeof digest?.volatility==="number"&&Number.isFinite(digest.volatility))reasonParts.push(`일별 변동성은 ${scoreText(digest.volatility)}점이야.`);
+      else reasonParts.push("일별 변동성 정보가 없어 흐름이 일정하다고 판단하지 않아.");
       reasonParts.push(topicRealityCheck(topic).replace(/^이날은/,"현실에서는"));
     }
     const timing=singleDay?"":bestTopicDate(payload,topic);
-    if(timing)reasonParts.push(`판단할 때는 ${timing} 전후의 직접 계산근거와 기간 평균을 함께 보는 게 좋아.`);
+    if(timing){
+      const inBest=(stat?.best_days??[]).some((x:any)=>x.date===timing&&typeof x.score==="number"&&Number.isFinite(x.score));
+      const inCaution=(stat?.caution_days??[]).some((x:any)=>x.date===timing&&typeof x.score==="number"&&Number.isFinite(x.score));
+      const meaning=inBest&&inCaution?"강약 목록이 겹치는 날짜라 추천 방향을 하나로 정하지 않아":inBest?(risk?"주의 지수가 높은 날짜이므로 위험 노출을 점검할 때야":"이 분야가 상대적으로 수월한 날짜로 읽어"):inCaution?(risk?"주의 지수가 상대적으로 낮은 날짜이지만 안전을 보장하지 않아":"이 분야의 부담을 점검할 날짜이며 무조건 추진할 추천일은 아니야"):"직접 근거가 관측된 날짜이며 좋은 날이라고 별도 판정된 것은 아니야";
+      reasonParts.push(`${timing} · ${meaning}.`);
+    }
+    if(!singleDay&&(payload?.period_kind==="annual"||payload?.period_kind==="year")){
+      const months=(payload?.western?.months??[]).filter((m:any)=>m.start>=payload.period.start&&m.end<=payload.period.end&&m.start<=m.end&&typeof m.topics?.[topic]?.average==="number"&&Number.isFinite(m.topics[topic].average)&&(payload.evidence_ledger??[]).some((r:any)=>r.topic===topic&&r.scope==="month_average"&&r.start===m.start&&r.end===m.end));
+      if(months.length>=2){
+        const ordered=[...months].sort((a:any,b:any)=>(risk?-1:1)*(b.topics[topic].average-a.topics[topic].average));
+        const good=ordered[0],weak=ordered.at(-1);
+        for(const m of [good,weak]){const r=(payload.evidence_ledger??[]).find((r:any)=>r.topic===topic&&r.scope==="month_average"&&r.start===m.start&&r.end===m.end);if(r?.id&&!refs.includes(r.id))refs.push(r.id);}
+        if(Math.abs(good.topics[topic].average-weak.topics[topic].average)>=5)reasonParts.push(`월별로 비교하면 ${good.start}~${good.end}은 ${risk?"주의 부담이 상대적으로 낮고":"상대적으로 수월하고"}, ${weak.start}~${weak.end}은 ${risk?"주의 부담이 높아":"부담을 조절할 구간이야"}. 하루의 고점·저점과 이 월별 평균은 구분해서 읽어.`);
+        else reasonParts.push("확인된 월별 평균 차이가 작아서 특정 달을 큰 전환점으로 강조하지 않아.");
+      }
+    }
     const va=topicVerb(topic);
     // Repeated observations of one configuration are not independent corroboration.
     const independent=new Set(readable.rows.filter((row:any)=>/daily_actual|intraday_evidence/.test(String(row?.scope??""))||/^W:(daily|detail):/.test(String(row?.id??""))).map((row:any)=>String(row?.text??row?.label??"").replace(/\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|orb\s*[\d.]+°?/gi,"").replace(/\s+/g," ").trim()).filter(Boolean));
