@@ -474,3 +474,19 @@ body:has(.reading-experience), body:has(.fortune-experience) {
  .system-reading details[open]>p,.system-reading details[open]>article{animation:reading-glass-reveal .2s ease-out}
 }
 @media(prefers-reduced-motion:reduce){.system-reading *,.reading-copy-access *{animation:none!important;transition:none!important}}
+/* System menu has two explicit rows, never content-dependent wrapping. */
+.system-reading .system-switcher button{display:grid;grid-template-rows:20px auto;justify-items:center;align-content:center;gap:7px;min-height:64px;padding:8px 3px}
+.system-switcher button>span{display:block;white-space:nowrap;font-size:11px;line-height:1.3}
+.system-switcher{border:1px solid #fffffff0;background:linear-gradient(115deg,#ffffffba,#ede6f6a1,#e6f3f0a6);box-shadow:inset 0 1px 2px #fff,inset 0 -1px 3px #ffffffb8,0 7px 18px #79618912}
+.system-reading .bhumi-grid>details{background:radial-gradient(ellipse at top left,#ffffffed,transparent 65%),linear-gradient(140deg,#ffffffa6,#cfece5a6);border:1px solid #ffffffeb;box-shadow:inset 0 1px 2px #fff,inset 0 -2px 6px #ffffffbf,0 7px 18px #427a7412;border-radius:18px;padding:13px 14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.bhumi-grid summary{min-height:54px;align-content:center;gap:8px;cursor:pointer}
+.bhumi-grid summary strong{font-size:13px;line-height:1.45;color:#315e5d}
+.thai-placement{display:flex;justify-content:space-between;gap:4px;font-size:12px;color:#537b78}
+.bhumi-grid>details[open]{grid-column:1/-1}
+.bhumi-grid>details[open] .thai-placement>span{transform:rotate(45deg)}
+.thai-lens-reading{padding-top:8px;border-top:1px solid #8dafaa2e;margin-top:10px}
+.thai-lens-reading p{font-size:14px;line-height:1.65}
+.thai-lens-reading>small{display:block;margin-top:10px;font-size:11px;color:#567773;line-height:1.6}
+.thai-map-intro{font-size:12px!important;color:#637f7c;margin-bottom:12px!important}
+.system-reading .system-hero{background:radial-gradient(ellipse at 90% 5%,var(--bloom),transparent 65%),linear-gradient(135deg,#ffffffe0,#ffffff80);box-shadow:inset 0 1px 2px #fff,inset 0 -2px 8px #ffffffce,0 12px 30px #7662831a,0 2px 5px #7662830d}
+@media(prefers-reduced-motion:no-preference){.bhumi-grid>details[open] .thai-lens-reading{animation:reading-glass-reveal .22s ease-out both}}

@@ -177,15 +177,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return (
     <main className="private-auth-shell">
       <section className="private-auth-card" aria-live="polite">
-        <div className="private-auth-mark">✦</div>
-        <p className="private-auth-eyebrow">PRIVATE ACCESS</p>
+        <div className="private-auth-mark" aria-hidden="true">☾<span>✦</span></div>
+        <p className="private-auth-eyebrow">나만의 별빛 기록</p>
         <h1>별빛의 운명</h1>
         <p className="private-auth-copy">
-          개인용으로 보호된 공간이야. 허용된 이메일 계정으로 인증해야 들어갈 수 있어.
+          허용된 이메일로 로그인하고, 나의 운세와 저장한 기록을 이어서 만나봐.
         </p>
 
         {stage === 'booting' ? (
-          <div className="private-auth-loading">로그인 상태 확인 중…</div>
+          <div className="private-auth-loading" role="status"><span className="private-auth-orbit" aria-hidden="true"/>로그인 상태를 확인하고 있어…</div>
         ) : stage === 'email' ? (
           <form className="private-auth-form" onSubmit={sendLink}>
             <label htmlFor="private-auth-email">이메일</label>
@@ -212,7 +212,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
         {notice && <p className="private-auth-notice">{notice}</p>}
         {error && <p className="private-auth-error">{error}</p>}
-        <p className="private-auth-footnote">비밀번호는 저장하지 않아. Supabase의 일회용 이메일 링크와 세션만 사용해.</p>
+        <p className="private-auth-footnote">비밀번호 없이, 이메일로 받은 로그인 링크로 안전하게 접속해.</p>
       </section>
     </main>
   )
