@@ -1728,6 +1728,8 @@ export default function AppNext() {
             onCalculate={runIntegrated}
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
+              datingProfile={integratedRequestSnapshot?.profile as Record<string,unknown>|undefined}
+              datingApiBase={API_BASE}
               profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
               fieldId={fortuneFieldId}
               period={period}
