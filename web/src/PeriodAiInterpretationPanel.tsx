@@ -72,17 +72,16 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
 
   return <section className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설'}</span><h3>{userSummary.headline}</h3></div></div>
-    <section className="period-ai-overall-brief"><span>{userSummary.when} 한줄</span><p><b>핵심</b><strong>{userSummary.summary}</strong></p></section>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설'} · {userSummary.when} 핵심</span><h3>{userSummary.headline}</h3></div></div>
 
     <section className="period-ai-action-section period-ai-user-do">
-      <div className="period-ai-section-title"><span>{userSummary.doTitle}</span><strong>해볼 것</strong></div>
-      <div className="period-ai-actions">{userSummary.doItems.map((item,index)=><article key={`do-${index}-${item}`}><span className="period-ai-action-index">{index+1}</span><div><strong>{item}</strong></div></article>)}</div>
+      <div className="period-ai-section-title"><span>{userSummary.doTitle}</span></div>
+      <div className="period-ai-actions">{userSummary.bestFlow.map((topic)=><article key={`best-${topic}`}><strong>{topic}</strong></article>)}{!userSummary.bestFlow.length&&<p>뚜렷하게 밀어줄 분야는 없어.</p>}</div>
     </section>
 
     <section className="period-ai-action-section period-ai-user-caution">
-      <div className="period-ai-section-title"><span>{userSummary.cautionTitle}</span><strong>서두르지 말 것</strong></div>
-      <div className="period-ai-actions">{userSummary.cautionItems.map((item,index)=><article key={`caution-${index}-${item}`}><span className="period-ai-action-index">{index+1}</span><div><strong>{item}</strong></div></article>)}</div>
+      <div className="period-ai-section-title"><span>{userSummary.cautionTitle}</span></div>
+      <div className="period-ai-actions">{userSummary.cautionFlow.map((topic)=><article key={`caution-${topic}`}><strong>{topic}</strong></article>)}{!userSummary.cautionFlow.length&&<p>특별히 더 조심할 분야는 뚜렷하지 않아.</p>}</div>
     </section>
 
     {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
@@ -92,10 +91,19 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
 
     {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b>{item.observe&&<p><b>현실에서 볼 것</b> {item.observe}</p>}{item.caution&&<p><b>주의</b> {item.caution}</p>}</article>)}</div>
+      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><p><b>왜 이렇게 보냐면</b> {item.reason}</p>{item.timing&&<p><b>시기</b> {item.timing}</p>}<p><b>현실에서</b> {item.action} {item.observe}</p>{item.caution&&<p><b>주의</b> {item.caution}</p>}</article>)}</div>
     </section>}
 
-    {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section"><div className="period-ai-section-title"><span>관계에서 볼 것</span><strong>말보다 이어지는 행동을 봐</strong></div><article className="period-ai-window is-mixed period-ai-relationship-summary"><p>{userSummary.relationship.summary}</p>{userSummary.relationship.incoming||userSummary.relationship.outgoing||userSummary.relationship.reconnection ? <div className="period-ai-relationship-directions">{userSummary.relationship.incoming&&<details className="period-ai-direction-item" open><summary><strong>상대의 반응</strong></summary><p>{userSummary.relationship.incoming}</p></details>}{userSummary.relationship.outgoing&&<details className="period-ai-direction-item" open><summary><strong>내가 먼저 움직일 때</strong></summary><p>{userSummary.relationship.outgoing}</p></details>}{userSummary.relationship.reconnection&&<details className="period-ai-direction-item" open><summary><strong>과거 인연의 재접촉</strong></summary><p>{userSummary.relationship.reconnection}</p></details>}</div> : null}</article></section> : null}
+    {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section">
+      <div className="period-ai-section-title"><span>연락 흐름</span></div>
+      <article className="period-ai-window period-ai-relationship-summary"><p>{userSummary.relationship.summary}</p>
+        <div className="period-ai-relationship-directions">
+          <div className="period-ai-direction-item"><strong>상대가 먼저 오는 흐름 · {userSummary.relationship.incomingBand}</strong><p>{userSummary.relationship.incoming}</p>{userSummary.relationship.incomingTiming&&<p>{userSummary.relationship.incomingTiming}</p>}</div>
+          <div className="period-ai-direction-item"><strong>내가 먼저 연락하기 · {userSummary.relationship.outgoingBand}</strong><p>{userSummary.relationship.outgoing}</p>{userSummary.relationship.outgoingTiming&&<p>{userSummary.relationship.outgoingTiming}</p>}</div>
+          {userSummary.relationship.reconnection&&<div className="period-ai-direction-item"><strong>과거 인연 재접촉</strong><p>{userSummary.relationship.reconnection}</p></div>}
+        </div>
+      </article>
+    </section> : null}
 
     {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic}</strong><p>{item.summary}</p></article>)}</div></details>}
 
