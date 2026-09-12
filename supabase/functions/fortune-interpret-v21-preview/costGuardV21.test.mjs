@@ -540,3 +540,16 @@ test('job-table migration removes client grants and policy without changing serv
     assert.doesNotMatch(src,/createClient\(SUPABASE_URL,SERVICE,\{global:/);
   }
 });
+
+for (const [kind, section] of [['day','오늘 한눈에'],['week','초반 → 중반 → 후반'],['month','분야별 핵심 변화'],['annual','주요 phase']]) test(`external V2 ${kind} instruction preserves exact calculated packet and budget`,()=>{
+  const p=packet();p.period_kind=kind
+  const before=JSON.stringify(p);const budget=promptBudget(p);const result=buildExternalPrompt(p)
+  assert.equal(result.text.split('CALCULATED_DATA=')[1],JSON.stringify(buildPromptPacket(p)))
+  assert.equal(result.bytes,budget.bytes);assert.equal(result.max_bytes,budget.max_bytes);assert.equal(result.estimated_input_tokens,budget.estimated_input_tokens)
+  assert.equal(JSON.stringify(p),before)
+  const instruction=result.text.split('CALCULATED_DATA=')[0]
+  for(const phrase of [section,'사건 확률이 아니라','결합/충돌','분량을 채우지','상대→나','나→상대','독립된 체계','가격 방향','두 번째 계산기가 아니다']) assert.ok(instruction.includes(phrase),phrase)
+  if(kind==='day') assert.ok(!instruction.includes('[올해 큰 흐름]'))
+  if(kind==='week') assert.ok(instruction.includes('일간 해설 7개를 붙이지'))
+  assert.ok(Buffer.byteLength(instruction)<9000)
+})

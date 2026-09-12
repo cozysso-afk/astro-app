@@ -1,3 +1,4 @@
+import { upgradeCopiedFortunePrompt } from './lib/precisionTransport'
 import { relationshipAiSuccess, relationshipAiInvokeErrorMessage, relationshipAiCatchMessage, RelationshipAiPublicError } from './lib/relationshipAiPublicError'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -1141,7 +1142,7 @@ export default function AppNext() {
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      const ok = await copyToClipboard(String(data.prompt))
+      const ok = await copyToClipboard(upgradeCopiedFortunePrompt(String(data.prompt), calculation))
       const estimated = Number(data.estimated_input_tokens ?? 0)
       setActionNotice(ok ? `AI용 압축 프롬프트 복사 완료${estimated > 0 ? ` · 예상 입력 약 ${estimated.toLocaleString()} tokens` : ''}` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
       window.setTimeout(() => setActionNotice(''), 3200)
