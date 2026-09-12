@@ -18,6 +18,7 @@ export type FortuneUserWindow = {
   date: string
   guidance: string
   kind?: 'favorable' | 'caution' | 'mixed'
+  semantic?: 'reconnection'
 }
 
 export type FortuneFlowCard = { topic: string; score: number; band: string; meaning: string }
@@ -31,6 +32,8 @@ export type FortuneUserRelationship = {
   outgoingBand?: string
   incomingTiming?: string
   outgoingTiming?: string
+  reconnectionBand?: string
+  reconnectionTiming?: string
 }
 
 export type FortuneUserSummary = {
@@ -54,6 +57,7 @@ export type FortuneUserSummary = {
 }
 
 export type FortuneUserSummaryContext = {
+  focusTopics?: string[]
   allowIntraday?: boolean
   period: PeriodKey
   calculation: Pick<IntegratedApiResponse, 'period' | 'western'>
@@ -398,6 +402,8 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
       : level === 'high' ? `${topic} 계산은 강한 쪽에 놓여 있어. 다만 특정 사건이나 행성의 영향까지 단정할 세부 정보는 부족해.`
         : `${topic} 계산은 중간 수준이야. 어느 쪽으로 움직일지 뚜렷하지 않아 큰 기대나 경계를 더하지 않을게.`
   }
+  const signs = new Set(signals.map(s=>s.signed))
+  if(signs.has(1)&&signs.has(-1)) readable.push(`${topic}에 힘을 보태는 움직임과 제동을 거는 움직임이 함께 있는 셈이야. 수월해지는 부분이 있어도 곧바로 결과까지 이어진다고 읽지 않고, 진행 중 어디서 조건을 맞춰야 하는지 구분하는 게 중요해.`)
   const depth = evidenceDepth(linked.map(row => row.evidence), topic)
   return [...readable, depth].filter(Boolean).join(' ')
 }
@@ -417,6 +423,7 @@ function relationshipSummary(context: FortuneUserSummaryContext, important: Set<
   return {
     summary: '먼저 연락이 오는 흐름과 내가 말을 꺼내는 흐름은 나눠서 봐.',
     incomingBand: band(incoming), outgoingBand: band(outgoing),
+    reconnectionBand: band(stats['과거인연접점']), reconnectionTiming: timing(stats['과거인연접점']),
     incomingTiming: timing(incoming), outgoingTiming: timing(outgoing),
     incoming: !incoming ? '상대가 먼저 연락할 흐름을 판단할 계산 정보가 없어.'
       : incomingLevel === 'high' ? '먼저 연락이 오는 쪽에 힘이 실려 있어. 연락이 오면 내용과 다음 약속이 구체적인지 봐.'
@@ -457,7 +464,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   const cautionCandidates = eligible.filter(row => row.favorable !== null && row.favorable <= 45).sort(rank('caution'))
   const best = bestCandidates.slice(0, 2)
   const caution = cautionCandidates.slice(0, 2)
-  const selected = [...eligible].sort(rank('salience')).slice(0, 3)
+  const selected = context.focusTopics ? normalized.filter(r=>context.focusTopics!.includes(r.topic)).sort((a,b)=>context.focusTopics!.indexOf(a.topic)-context.focusTopics!.indexOf(b.topic)) : [...eligible].sort(rank('salience')).slice(0, 3)
   const bestFlow = best.map(row => row.topic)
   const cautionFlow = caution.map(row => row.topic)
   const when = frame.when
@@ -489,11 +496,11 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
         const point = (kind === 'caution') !== inverse ? detail?.caution_window : detail?.best_window
         if (!point || !/^\d{2}:\d{2}$/.test(point.start) || !/^\d{2}:\d{2}$/.test(point.end) || point.start >= point.end) return []
         if (kind === 'favorable' && inverse) return []
-        return [{ date: `${point.start}–${point.end}`, kind, guidance: `${row.topic} · ${FLOW_COPY[row.topic]?.[kind === 'caution' ? 1 : 0] ?? '흐름 살펴보기'}` }]
+        return [{ date: `${point.start}–${point.end}`, kind, semantic: row.topic === '재회' ? 'reconnection' as const : undefined, guidance: `${row.topic} · ${FLOW_COPY[row.topic]?.[kind === 'caution' ? 1 : 0] ?? '흐름 살펴보기'}` }]
       })
     })).slice(0, 8) : [] : (data.key_windows ?? [])
     .filter(window => window.signal !== '배경' && window.start >= context.calculation.period.start && (window.end || window.start) <= context.calculation.period.end && window.topics?.length)
-    .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, kind: window.signal === '활용' ? 'favorable' as const : window.signal === '주의' ? 'caution' as const : 'mixed' as const, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 6)
+    .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, kind: window.signal === '활용' ? 'favorable' as const : window.signal === '주의' ? 'caution' as const : 'mixed' as const, semantic: window.topics.length === 1 && window.topics[0] === '재회' ? 'reconnection' as const : undefined, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 6)
   return {
     periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? '하루 안의 선택에 초점을 맞춰 읽어봐. 다른 날까지 같은 흐름으로 이어진다고 보지는 않아.' : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',

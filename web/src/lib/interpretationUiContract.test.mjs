@@ -1,3 +1,4 @@
+import './systemReading.test.mjs'
 import './compactDeepPrompt.test.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -163,9 +164,9 @@ test('relationship focus uses plain labels and only renders useful structured di
   assert.equal((annual.match(/className="ai-direction-grid ai-relationship-direction"/g) || []).length, 1)
 
   assert.match(period, />연락 흐름</)
-  assert.match(period, />상대가 먼저 오는 흐름 · /)
-  assert.match(period, />내가 먼저 연락하기 · /)
-  assert.match(period, />과거 인연 재접촉</)
+  assert.match(period, /kind:'incoming',label:'상대가 먼저 오는 흐름'/)
+  assert.match(period, /kind:'outgoing',label:'내가 먼저 연락하기'/)
+  assert.match(period, /kind:'reconnection' as const,label:'과거 인연 재접점'/)
   assert.match(period, /userSummary\.relationship\.(?:incoming|outgoing|reconnection)/)
   assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'), period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
 })

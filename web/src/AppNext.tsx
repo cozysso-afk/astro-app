@@ -1,3 +1,7 @@
+import { SystemReadingViews } from './SystemReadingViews'
+import { fortuneField } from './lib/fortuneFields'
+import { THREE_SYSTEM_INSTRUCTIONS } from './lib/systemReading'
+import { FortuneFieldHub } from './FortuneFieldHub'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import { buildExternalCompactPrompt, promptCopyNotice, type ExternalCopyMode } from './lib/compactDeepPrompt'
 import { upgradeCopiedFortunePrompt, sanitizeExternalFortuneText } from './lib/precisionTransport'
@@ -374,6 +378,7 @@ export default function AppNext() {
   const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
+  const [fortuneFieldId, setFortuneFieldId] = useState<string | undefined>()
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
   const [marriageMode, setMarriageMode] = useState<MarriageMode>('unmarried')
@@ -1153,14 +1158,14 @@ export default function AppNext() {
     if (!calculation) return
     try {
       if (mode === 'compact') {
-        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data), mode)
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics), mode)
         return
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      await copyExternalPrompt(upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
+      await copyExternalPrompt(THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
     } catch (error) {
       setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
@@ -1545,6 +1550,8 @@ export default function AppNext() {
             onToolSelect={selectHomeTool}
           />
 
+          <FortuneFieldHub selected={fortuneFieldId} onSelect={(id)=>{setFortuneFieldId(id);setSelectedTool(null)}}/>
+
           {selectedTool === 'integrated' && <section className="tool-panel integrated-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-gold"><Sparkles size={22}/></span><div><span className="eyebrow">연간 통합 흐름</span><h2>통합운세</h2><p>한 해의 연애·재회·연락·금전·학업·시험·직장·컨디션을 Western(서양점성술)·사주·Thai(태국점성술)로 각각 계산한 뒤, 같은 연도에서 겹치는 흐름과 차이를 종합해서 비교해.</p></div></div>
             <section className="annual-fortune-range"><div className="section-heading-row"><div className="section-label">연간 통합운세</div><span className="annual-range-badge">1월 1일 → 12월 31일</span></div><div className="calendar-year-selector annual-year-selector"><div><strong>{annualFortuneYear}년 전체 흐름</strong><span>여러 분야 × 서양점성술 · 사주 · 태국점성술 종합</span></div><select aria-label="연간 통합운세 연도 선택" value={annualFortuneYear} onChange={(e)=>{ if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) void cancelAiInterpretation(true); setIntegratedCalendarYear(Number(e.target.value)) }}>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div></section>
@@ -1554,7 +1561,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
-              <PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <SystemReadingViews calculation={integratedResult}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
               <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
@@ -1605,7 +1612,7 @@ export default function AppNext() {
                   return <div className="month-card" key={month.calendar_month}><div className="month-title"><strong>{month.calendar_month}</strong><span>{month.start}~{month.end}</span></div>{ranked.map(({topic,stat})=><div className="tight-row" key={topic}><span>{topic} · {stat.band}</span><b>{stat.average.toFixed(1)}</b></div>)}</div>
                 })}</div></div>
               </details>}
-              </>}/>
+              </>}/></SystemReadingViews>
               <div className="result-actions">
                 <ExternalPromptCopy onCopy={mode=>{if(integratedRequestSnapshot) void copyExternalPrompt(()=>integratedPromptText(integratedRequestSnapshot,integratedResult,mode),mode)}}/>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1670,6 +1677,7 @@ export default function AppNext() {
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
               <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
+                sajuContext={relationshipResult.result.saju_relationship}
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 technicalDetails={<>
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
@@ -1720,6 +1728,7 @@ export default function AppNext() {
             onCalculate={runIntegrated}
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
+              fieldId={fortuneFieldId}
               period={period}
               periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}
               result={integratedResult}

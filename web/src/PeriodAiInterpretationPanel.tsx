@@ -1,3 +1,5 @@
+import type { FortuneField } from './lib/fortuneFields'
+import { ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { ReadingExplanation } from './ReadingExplanation'
@@ -35,7 +37,11 @@ function signalClass(signal: string) {
   return 'is-mixed'
 }
 
-export function PeriodAiInterpretationPanel({ period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel, technicalDetails }: {
+export function PeriodAiInterpretationPanel({ systemOverview, systemSummary, westernOnly=false, field, period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel, technicalDetails }: {
+  systemOverview?: ReactNode
+  systemSummary?: string
+  westernOnly?: boolean
+  field?: FortuneField
   technicalDetails?: ReactNode
   period: PeriodKey
   calculation: IntegratedApiResponse
@@ -61,11 +67,11 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   }
   if (!result?.ok || !result.data) return technicalFallback
 
-  const data = result.data
+  const data = westernOnly ? {...result.data,cross_checks:[],systems:{western:result.data.systems?.western,saju:'',thai:''}} : result.data
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
-  const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
+  const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
-  const userSummary = buildFortuneUserSummary(data, { period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
+  const userSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
@@ -80,31 +86,35 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   ).slice(0, 16)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
 
-  const windowGroups = Array.from(new Set(userSummary.importantWindows.map(w => w.date))).map(date => ({ date, lines: [...new Map(userSummary.importantWindows.filter(w => w.date === date).map(w => [`${w.kind}:${w.guidance}`, w])).values()] }))
-  return <section className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설'} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{userSummary.headline}</h3><p className="reading-hero-subtitle">{userSummary.summary}</p></div></div>
 
+  return <section className="period-ai-card period-ai-v18">
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{userSummary.headline}</h3><p className="reading-hero-subtitle">{!westernOnly&&systemSummary ? systemSummary : userSummary.summary}</p></div></div>
+
+    {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/><FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
+
+    {!westernOnly&&systemOverview}
 
     {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
       <div className="period-ai-section-title"><span>중요한 시기</span><strong>활용 시기와 주의 시기</strong></div>
-      <div className="period-ai-quick-date-list">{windowGroups.map((item,index)=><article className="period-ai-quick-date" key={`user-window-${item.date}-${index}`}><b>{item.date}</b><div>{item.lines.map(line=><strong className={`reading-window-line is-${line.kind}`} key={`${line.kind}:${line.guidance}`}><small>{line.kind === 'favorable' ? '활용' : line.kind === 'caution' ? '주의' : '혼합'}</small>{line.guidance}</strong>)}</div></article>)}</div>
+      <ReadingTimeline events={userSummary.importantWindows.map(w=>({date:w.date,kind:w.semantic ?? w.kind ?? 'mixed',label:w.guidance,status:w.kind==='caution'?'주의':w.kind==='favorable'?'활용':'혼합'}))}/>
     </section>}
 
     {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section">
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
       <article className="period-ai-window period-ai-relationship-summary"><p>{userSummary.relationship.summary}</p>
-        <div className="period-ai-relationship-directions">
-          <div className="period-ai-direction-item"><strong>상대가 먼저 오는 흐름 · {userSummary.relationship.incomingBand}</strong><p>{userSummary.relationship.incoming}</p>{userSummary.relationship.incomingTiming&&<p>{userSummary.relationship.incomingTiming}</p>}</div>
-          <div className="period-ai-direction-item"><strong>내가 먼저 연락하기 · {userSummary.relationship.outgoingBand}</strong><p>{userSummary.relationship.outgoing}</p>{userSummary.relationship.outgoingTiming&&<p>{userSummary.relationship.outgoingTiming}</p>}</div>
-          {userSummary.relationship.reconnection&&<div className="period-ai-direction-item"><strong>과거 인연 재접촉</strong><p>{userSummary.relationship.reconnection}</p></div>}
-        </div>
+        <ReadingDirections rows={[
+          {kind:'incoming',label:'상대가 먼저 오는 흐름',band:userSummary.relationship.incomingBand,text:userSummary.relationship.incoming,timing:userSummary.relationship.incomingTiming},
+          {kind:'outgoing',label:'내가 먼저 연락하기',band:userSummary.relationship.outgoingBand,text:userSummary.relationship.outgoing,timing:userSummary.relationship.outgoingTiming},
+          ...(userSummary.relationship.reconnection?[{kind:'reconnection' as const,label:'과거 인연 재접점',band:userSummary.relationship.reconnectionBand,text:userSummary.relationship.reconnection,timing:userSummary.relationship.reconnectionTiming}]:[]),
+        ]}/>
+
       </article>
     </section> : null}
 
     {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</article>)}</div>
+      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><details className="reading-topic-depth" open={userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</details></article>)}</div>
     </section>}
 
     {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.summary}</p></article>)}</div></details>}
