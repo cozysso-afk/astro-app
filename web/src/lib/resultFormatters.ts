@@ -1,3 +1,4 @@
+import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
 import { buildExternalCompactPrompt, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
 import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
 import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext } from '../appTypes'
@@ -37,6 +38,7 @@ export function integratedPromptText(request: Record<string, unknown>, calculati
     JSON.stringify(request, null, 2),
     '',
     '[외부 AI 해석 지시]',
+    THREE_SYSTEM_INSTRUCTIONS,
     externalFortuneInstructions(externalPeriodKind(calculation, request.period_kind)),
     '- 아래 CALCULATED_DATA는 별빛의 운명 계산엔진이 이미 산출한 값이다. 행성 위치·하우스·점수·사주를 다시 계산하거나 임의 수정하지 말고 이 값만 근거로 해석한다.',
     '- 데이터에 없는 점성술/사주 요소, 사건 확률, 상대의 속마음은 만들지 않는다.',

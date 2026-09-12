@@ -1,3 +1,4 @@
+import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
 import { externalFortuneInstructions, externalPeriodKind, fortuneAiPrecisionReadiness, sanitizeCalculationForExternalAi } from './precisionTransport'
 import { aspectRole, rankRelationshipAspects } from './relationshipUserSummary'
 import type { Aspect } from '../appTypes'
@@ -36,14 +37,14 @@ export function promptCopyNotice(text: string, mode: ExternalCopyMode = 'compact
   return `${mode === 'compact' ? '심층 프롬프트' : '전체 근거 프롬프트'} 복사 완료 · ${text.length.toLocaleString()}자 · 예상 약 ${tokens.toLocaleString()} tokens`
 }
 
-export function buildCompactDeepPacket(input: Row, level = 0, analysis?: Row): Row {
+export function buildCompactDeepPacket(input: Row, level = 0, analysis?: Row, focusTopics?: string[]): Row {
   if (!fortuneAiPrecisionReadiness(input).ok) throw new Error('출생시간 검증 정보가 없는 이전 계산이야. 다시 계산한 뒤 심층 프롬프트를 복사해줘.')
   const c = sanitizeCalculationForExternalAi(input), w = c.western ?? {}, p = c.period ?? {}
   const kind = externalPeriodKind(c), day = kind === 'day'
   const inPeriod = (date: string) => typeof date === 'string' && date >= p.start && date <= p.end
   const daily = list(w.daily_scores).filter(d => inPeriod(d.date))
   const topicAnalysis = Array.isArray(analysis?.topic_analysis) ? Object.fromEntries(analysis.topic_analysis.map((x: Row) => [x.topic,x])) : analysis?.topic_analysis ?? {}
-  const rows = Object.entries(w.overall ?? {}).filter(([topic,s]) => TOPICS.has(topic) && finite((s as Row)?.average)).map(([topic,s]) => {
+  const rows = Object.entries(w.overall ?? {}).filter(([topic,s]) => TOPICS.has(topic) && (!focusTopics || focusTopics.includes(topic)) && finite((s as Row)?.average)).map(([topic,s]) => {
     const candidates = daily.flatMap(d => list(d.evidence).filter(e => e.source_topics?.includes(topic)).map(e => evidence({...e,date:d.date,system:'Western'})))
     const seen = new Set<string>()
     const deduped = candidates.filter(({date: _date,...e}) => {const key=JSON.stringify(e);if(seen.has(key))return false;seen.add(key);return true})
@@ -88,22 +89,22 @@ export function buildCompactDeepPacket(input: Row, level = 0, analysis?: Row): R
   const overlaps=(r:Row)=> typeof r.segment_start==='string' && typeof r.segment_end_exclusive==='string' && r.segment_start<=p.end+'T23:59:59' && r.segment_end_exclusive>p.start
   const auxiliaryLimit=level>=2?1:2
   return {
-    period:pick(p,['start','end','day_count']),period_kind:kind,
+    focus_topics:focusTopics,period:pick(p,['start','end','day_count']),period_kind:kind,
     precision:pick(c.precision,['status','scoring_mode','allow_natal_moon_scoring','allow_angles_houses_scoring','allow_intraday_timing','allow_saju_ai','allow_thai_ai']),
     favorable:good.map(x=>({topic:x.topic,...pick(x.s,['average','band'])})),caution:caution.map(x=>({topic:x.topic,...pick(x.s,['average','band'])})),
     topics:selected.map(x=>({topic:x.topic,...stat({...x.s,best_days:list(x.s.best_days).filter(d=>inPeriod(d.date)),caution_days:list(x.s.caution_days).filter(d=>inPeriod(d.date))},day),importance:x.importance,evidence:x.linked.slice(0,evidenceLimit)})),
     relationship_signals:[...good,...caution,...selected].some(x=>['연애','연락','재회'].includes(x.topic)) ? directions(w.relationship_signals) : undefined,
     key_dates:dates,windows,phase_digest:phases,
     saju:c.saju?.ok ? [...list(c.saju.annual),...list(c.saju.monthly)].filter(overlaps).slice(0,auxiliaryLimit).map(x=>({...pick(x,['segment_start','segment_end_exclusive','ganzhi','stem_ten_god','jie_name_ko']),branch_links:(x.branch_links??[]).filter((s:unknown)=>typeof s==='string'&&s.length<120).slice(0,2)})) : undefined,
-    thai:c.thai?.ok ? list(c.thai.taksajorn?.segments).filter(x=>x.start<=p.end&&x.end>=p.start).slice(0,auxiliaryLimit).map(x=>({...pick(x,['start','end']),annual_boriwan:pick(x.annual_boriwan,['label','key'])})) : undefined,
+    thai:c.thai?.ok ? {segments:list(c.thai.taksajorn?.segments).filter(x=>x.start<=p.end&&x.end>=p.start).slice(0,auxiliaryLimit).map(x=>({...pick(x,['start','end']),annual_boriwan:pick(x.annual_boriwan,['label','key'])})),bhumi:list(c.thai.mahathaksa?.wheel).filter(x=>['boriwan','mula','utsaha'].includes(x.bhumi_key)).slice(0,level>=2?1:3).map(x=>({bhumi:x.bhumi_label,planet:x.planet?.label}))} : undefined,
     cross_system:list(c.cross_system_timeline).filter(x=>dates.some(d=>d.date===x.date) && (names.includes(x.topic)||x.topics?.some((t:string)=>names.includes(t)))).slice(0,level>=2?1:3).map(x=>pick(x,['date','topic','system','text','label'])),
     limits:'집계는 관측된 날짜만 포함하며 누락 구간을 추정하지 않는다. 생략은 근거 부재나 중립을 뜻하지 않는다. 체계별 맥락은 별도이며 일치로 단정하지 않는다.',
   }
 }
 
-export function buildExternalCompactPrompt(calculation: Row, analysis?: Row, precision = false) {
-  const instructions=externalFortuneInstructions(externalPeriodKind(calculation)) + (precision ? '\n[정밀분석] 동일 계산의 정밀 근거를 우선 설명한다. 새 점수 생성 금지, 미계산 항목 추정 금지.' : '')
-  return fit(instructions,level=>buildCompactDeepPacket(calculation,level,analysis))
+export function buildExternalCompactPrompt(calculation: Row, analysis?: Row, precision = false, focusTopics?: string[]) {
+  const instructions=externalFortuneInstructions(externalPeriodKind(calculation)) + '\n' + THREE_SYSTEM_INSTRUCTIONS + (precision ? '\n[정밀분석] 동일 계산의 정밀 근거를 우선 설명한다. 새 점수 생성 금지, 미계산 항목 추정 금지.' : '')
+  return fit(instructions,level=>buildCompactDeepPacket(calculation,level,analysis,focusTopics))
 }
 
 export function buildRelationshipCompactPrompt(instructions: string, kind: string, request: Row, calculation?: Row | null, timing?: Row | null) {
@@ -122,6 +123,7 @@ export function buildRelationshipCompactPrompt(instructions: string, kind: strin
     reunion_directional_context:kind==='reunion'?directions(timing):undefined,
     reunion_dimensions:kind==='reunion'?Object.fromEntries(['contact_recontact','emotional_reactivation','relationship_rebuilding'].map(k=>[k,axis(r.reunion_dimensions?.[k])])):undefined,
     timing:list(r.reunion_transits?.top_days).slice(0,level>=2?2:4).map(d=>({...pick(d,['date','score','user_score','counterpart_score']),hits:list(d.hits).slice(0,1).map(h=>pick(h,['person','transit','target','aspect','tone']))})),
+    saju_relationship:r.saju_relationship?.available ? {day_master_relation:r.saju_relationship.day_master_relation,policy:r.saju_relationship.policy,limitations:r.saju_relationship.limitations} : undefined,
     limitations:(r.limitations??[]).filter((s:unknown)=>typeof s==='string'&&s.length<=240).slice(0,3),
     compression_policy:'원자료를 다시 계산하지 않은 선택 뷰. 생략된 층은 전체 근거 모드에서 확인한다. 구조상의 유지력과 시기 활성도는 다르며 합산하지 않는다.',
   }))

@@ -1,3 +1,6 @@
+import { DatingArchetypePanel } from './DatingArchetypePanel'
+import { fortuneField } from './lib/fortuneFields'
+import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { CheckCircle2 } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
@@ -9,6 +12,7 @@ type HighlightPoint = FortunePoint & { topic: string }
 type ActiveDayun = NonNullable<IntegratedApiResponse['saju']['dayun']>[number]
 
 type PeriodFortuneResultsProps = {
+  fieldId?: string
   period: PeriodKey
   periodLabel?: string
   result: IntegratedApiResponse
@@ -35,6 +39,7 @@ type PeriodFortuneResultsProps = {
 }
 
 export function PeriodFortuneResults({
+  fieldId,
   period,
   periodLabel,
   result,
@@ -59,6 +64,7 @@ export function PeriodFortuneResults({
   onOutcomeChange,
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
+  const field = fortuneField(fieldId)
   const technicalDetails = <>
     <section className="result-card">
       <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>
@@ -92,7 +98,8 @@ export function PeriodFortuneResults({
   </>
   return <div className="fortune-experience">
     <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
-    <PeriodAiInterpretationPanel period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
+    <SystemReadingViews key={fieldId} calculation={result} field={field}><PeriodAiInterpretationPanel field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/></SystemReadingViews>
+    {field?.id==='love'&&<DatingArchetypePanel calculation={result}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
     {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
       draft={outcomeDraft}

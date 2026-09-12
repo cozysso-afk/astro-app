@@ -203,7 +203,7 @@ test('reading headline declarations override legacy important Gothic and billboa
   assert.deepEqual(declarations['font-family'],{value:'var(--reading-display)',important:true})
   assert.deepEqual(declarations['font-size'],{value:'19px',important:true})
   assert.deepEqual(declarations['font-weight'],{value:'600',important:true})
-  assert.deepEqual(declarations['line-height'],{value:'1.75',important:true})
+  assert.deepEqual(declarations['line-height'],{value:'1.6',important:true})
   const source=css.toString()
   assert.match(source,/family=Noto\+Serif\+KR:wght@600&display=swap/)
   assert.match(source,/--reading-display: 'Noto Serif KR'/)
