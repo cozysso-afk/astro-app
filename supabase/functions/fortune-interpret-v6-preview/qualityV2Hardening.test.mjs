@@ -55,8 +55,8 @@ test("semantic hardening rejects unsupported outcome and mind-reading claims",()
 
 test("semantic hardening requires windows and phases to overlap their cited dates",()=>{
   const p=payload(),o=output(p);
-  o.key_windows[0].evidence_refs=["W:overall:직장"];
-  o.year_phases[1].evidence_refs=["W:overall:연애"];
+  o.key_windows[0].evidence_refs=["W:date:2026-04-12:연애:best"];
+  o.year_phases[1].evidence_refs=["W:date:2026-02-10:직장:best"];
   const report=inspectInterpretationQuality(o,p);
   const issues=report.stages.find(x=>x.stage===4).issues.join(" ");
   assert.match(issues,/key_window 기간을 덮는 직접 근거 없음/);
