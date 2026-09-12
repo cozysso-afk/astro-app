@@ -8,8 +8,11 @@ def test_web_auth_does_not_create_new_anonymous_users():
     gate_source = (ROOT / "web/src/AuthGate.tsx").read_text(encoding="utf-8")
     assert "signInAnonymously" not in supabase_source
     assert "shouldCreateUser: false" in supabase_source
-    assert "requestEmailMagicLink" in supabase_source
-    assert "verifyOtp({" not in supabase_source
+    assert "requestEmailCode" in supabase_source
+    assert "verifyEmailCode" in supabase_source
+    assert "supabase.auth.verifyOtp({" in supabase_source
+    assert "type: pending ? 'email_change' : 'email'" in supabase_source
+    assert "pending && session.user.id !== pending.userId" in supabase_source
     assert "linkAnonymousSessionToEmail" in supabase_source
     assert "isPermanentEmailSession" in supabase_source
     assert "countCurrentCloudRecords" in supabase_source

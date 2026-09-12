@@ -1,16 +1,15 @@
-# In-app email code rollout
+# In-app email code rollout — staged transition
 
-Project: `dbynfabwfcakxayyggzi` (astro-app).
+Project: dbynfabwfcakxayyggzi. Production currently retains magic-link login.
 
-These files are prepared, **not applied** to production. Keep the application change in draft until email delivery is verified.
+1. Save current Magic Link and Change Email Address templates for rollback.
+2. Add `<p>인증번호: {{ .Token }}</p>` to BOTH existing template bodies, keeping the existing ConfirmationURL links. Alternatively apply the two bundled HTML templates and the four-field management API patch. Both delivery methods coexist so current production login continues to work.
+3. Confirm the saved templates contain Token and ConfirmationURL. Verify a received authentication email includes a numeric code.
+4. Merge/deploy the dedicated OTP UI PR after that verification. Enter the code in the installed app; do not follow the compatibility link when the code field is present.
+5. Verify the same user UUID/archives, resend cooldown, expired code handling, and anonymous-email linking. Existing security/allowlist, SMTP, expiry, and redirects remain unchanged.
 
-1. In Supabase Authentication → Email Templates, save the existing **Magic Link** and **Change Email Address** templates for rollback.
-2. Replace Magic Link body with `email-code.html`, and Change Email Address body with `email-change-code.html`. Use the Korean subjects in `email-code-auth-patch.json`.
-3. Alternatively, an authorized Management API client can PATCH `/v1/projects/dbynfabwfcakxayyggzi/config/auth` with `email-code-auth-patch.json`. Modify only its four template/subject fields; do not change SMTP, redirects, signup policy, or OTP expiration. Do not commit tokens or full Auth configuration dumps.
-4. Verify a real allowed account receives a numeric code. The existing link login UI will not support code-only emails, so coordinate template change with application deployment; do not leave only one side changed. If the release cannot follow immediately, restore the saved template.
-5. On an installed iPhone app, request and enter the code, confirm the same standalone window remains open, allowlist passes, and existing records remain. Check resend, expired code, reload while waiting, and logout/login. Validate existing anonymous-account email conversion without changing its UUID.
-6. If verification fails, restore both previous application release and saved email templates together.
+Only the hosted Auth template update is blocked: the connected Supabase tools do not expose Auth configuration updates and no Management API access token is available. These files do not configure hosted Auth by themselves. Do not merge the OTP UI before template verification. No credentials should be pasted into chat.
 
-The connector available in this session cannot update Auth email templates, and the authenticated browser could not connect. No real authentication email was sent by automated tests.
+The retained ConfirmationURL is a transition fallback, not the normal OTP app flow. Browser handoff cannot be used to work around a missing plugin capability under the control-browser skill.
 
 Reference: https://supabase.com/docs/guides/auth/auth-email-templates
