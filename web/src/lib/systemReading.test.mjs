@@ -105,3 +105,31 @@ test('Thai routes and numeric Lagna use the existing product validator, never el
  assert.equal(v.suriyayat.lagna.available,false)
  assert.equal(v.suriyayat.ai_safe_descriptive_packet,undefined)
 })
+
+test('portrait copy respects explicit subject and ordinary unretouched appearance in both languages',()=>{
+ const options={style:'real',frame:'half',outfit:'daily'}
+ for(const [gender,ko,en] of [['male','성인 남성','adult man'],['female','성인 여성','adult woman'],['neutral','성인 인물','adult person']]){
+  const kr=dating.datingPortraitPrompt({...options,gender},'ko','Venus')
+  const english=dating.datingPortraitPrompt({...options,gender},'en','Venus')
+  assert.ok(kr.includes(ko));assert.ok(english.includes(en))
+  assert.match(kr,/무보정/);assert.match(kr,/좌우 비대칭/)
+  assert.match(english,/unretouched/);assert.match(english,/No idol or fashion-model idealization/)
+  assert.doesNotMatch(kr+english,/정유미|공유|Jung Yu|Gong Yoo/)
+ }
+})
+test('Thai overview translates placement labels without adding planetary predictions',()=>{
+ assert.equal(systems.thaiPlanetLabel('Saturn(토성)'),'토성')
+ assert.equal(systems.thaiPlanetLabel('Jupiter'),'목성')
+ const text=systems.thaiLifeSummary(['boriwan','montri','kalakini'])
+ assert.match(text,/도움/);assert.match(text,/막히는 조건/)
+ assert.doesNotMatch(text,/Taksajorn|Boriwan|Saturn|확률|반드시/)
+})
+
+test('dating default follows the calculation profile, not a fixed male subject',()=>{
+ assert.equal(dating.defaultDatingPartnerGender('female'),'male')
+ assert.equal(dating.defaultDatingPartnerGender('male'),'female')
+ for(const missing of [undefined,null,'unknown',''])assert.equal(dating.defaultDatingPartnerGender(missing),'neutral')
+ const options={style:'real',frame:'half',outfit:'daily',gender:dating.defaultDatingPartnerGender('male')}
+ assert.match(dating.datingPortraitPrompt(options,'ko'),/성인 여성/)
+ assert.match(dating.datingPortraitPrompt(options,'en'),/adult woman/)
+})

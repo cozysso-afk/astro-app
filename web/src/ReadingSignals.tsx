@@ -30,7 +30,7 @@ export function ReadingTimeline({ events }: { events: ReadingEvent[] }) {
   const distinct=[...new Map(events.map(e=>[`${e.date}:${e.kind}:${e.label}:${e.status}`,e])).values()]
   const dates=[...new Set(distinct.map(e=>e.date))].sort()
   const group=(date:string)=><li key={date}><time>{date}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=><div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
-    <div className="reading-event-heading"><ReadingBadge kind={e.kind}/>{e.status&&<span className={`reading-state ${e.status==='주의'?'is-caution':''}`}>{e.status}</span>}</div>
+    <div className="reading-event-heading"><ReadingBadge kind={e.kind}/>{e.status && e.status!==SIGNALS[e.kind][1]&&<span className={`reading-state ${e.status==='주의'?'is-caution':''}`}>{e.status}</span>}</div>
     <p>{e.label}</p>{e.detail&&<details><summary>이 시기를 읽는 이유</summary><p>{e.detail}</p></details>}
   </div>)}</div></li>
   return <div className="reading-event-list"><ol>{dates.slice(0,2).map(group)}</ol>{dates.length>2&&<details className="reading-more"><summary>시기 {dates.length-2}개 더 보기</summary><ol>{dates.slice(2).map(group)}</ol></details>}</div>

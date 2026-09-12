@@ -16,14 +16,14 @@ export const TEN_GOD_LENSES: Record<string, Lens> = {
 const GODS: Record<string,string> = {'比肩(비견)':'비겁','劫財(겁재)':'비겁','食神(식신)':'식상','傷官(상관)':'식상','偏財(편재)':'재성','正財(정재)':'재성','七殺(칠살·편관)':'관성','正官(정관)':'관성','偏印(편인)':'인성','正印(정인)':'인성'}
 export function tenGodLens(value: string): Lens | undefined { return TEN_GOD_LENSES[GODS[value]] }
 export const BHUMI_LENSES: Record<string,Lens> = {
-  boriwan:{key:'boriwan',topic:'대인',title:'주변 사람 · 관계망',meaning:'Boriwan은 주변 사람과 관계망을 살피는 영역이야. 배치된 행성은 이 체계 안의 위치를 보여주며, 상대의 마음이나 연락 여부를 알려주는 점수는 아니야.',action:'누구와 연결돼 있고 어떤 도움이나 요청을 주고받는지 살펴봐.',limit:'애정 성립이나 상대의 접근을 예측하지 않아.'},
-  ayu:{key:'ayu',topic:'컨디션',title:'생활력 · 지속',meaning:'Ayu는 생활을 지속하는 힘을 돌아보는 영역이야. 몸 상태를 진단하기보다 일상에서 유지할 수 있는 리듬을 살피는 맥락으로 읽어.',action:'수면과 일정, 회복 시간을 함께 돌아보고 지속 가능한 강도를 정해.',limit:'건강 상태나 질병을 판단하는 자료는 아니야.'},
-  det:{key:'det',topic:'직업',title:'권한 · 추진력',meaning:'Det는 권한과 추진을 다루는 영역이야. 일을 움직일 책임과 결정 범위를 생각하는 데 사용할 수 있어.',action:'혼자 결정할 수 있는 일과 협의가 필요한 일을 나눠봐.',limit:'승진이나 성공 가능성을 나타내지 않아.'},
-  sri:{key:'sri',topic:'전체',title:'번영 · 호조의 맥락',meaning:'Sri는 이 체계에서 번영과 호조를 뜻하는 영역 이름이야. 여기에 행성이 배치됐다는 사실만으로 이번 기간이 좋다고 판정하지는 않아.',action:'지금 잘 유지되는 자원과 관계를 살피는 질문으로 활용해.',limit:'최종 길흉 판단은 계산되지 않았어.'},
-  mula:{key:'mula',topic:'금전',title:'기반 · 자원',meaning:'Mula는 생활의 기반과 자원을 다루는 영역이야. 자원이 들어온다는 예측보다 무엇을 기반으로 움직이는지 살펴보는 맥락이야.',action:'계획을 지탱하는 예산, 시간과 생활 조건을 함께 점검해.',limit:'수입이나 투자 가격을 예측하지 않아.'},
-  utsaha:{key:'utsaha',topic:'학업',title:'노력 · 실행',meaning:'Utsaha는 노력을 실제 행동으로 이어가는 영역이야. 공부나 업무의 지속을 돌아볼 수 있지만, 노력의 결과를 보장하지는 않아.',action:'큰 목표를 반복 가능한 작업 단위로 나누고 실제 진행 상황을 기록해.',limit:'시험 합격이나 업무 성과를 확정하지 않아.'},
-  montri:{key:'montri',topic:'대인',title:'지원 · 조력',meaning:'Montri는 도움과 조력을 다루는 영역이야. 도움을 받을 사람이 나타난다고 단정하기보다 이미 이용할 수 있는 지원을 살피는 맥락으로 읽어.',action:'혼자 해결하기 어려운 부분은 질문을 구체화해 협력자에게 전달해.',limit:'특정 인물의 등장이나 호의를 예언하지 않아.'},
-  kalakini:{key:'kalakini',topic:'전체',title:'마찰 · 주의',meaning:'Kalakini는 마찰과 주의를 다루는 영역 이름이야. 배치 자체를 불운으로 읽지 않고, 진행을 어렵게 만드는 조건을 따로 살피는 데 사용해.',action:'막히는 부분이 시간, 자원, 의견 차이 중 어디에서 생기는지 구분해.',limit:'사고나 실패를 예측하는 자료가 아니야.'},
+  boriwan:{key:'boriwan',topic:'대인',title:'주변 사람 · 관계망',meaning:'주변 사람과 맺고 있는 연결을 읽는 영역이야. 일상에서는 누구와 자주 이야기하고, 어떤 부탁과 도움을 주고받는지로 구체화할 수 있어.',action:'누구와 연결돼 있고 어떤 도움이나 요청을 주고받는지 살펴봐.',limit:'애정 성립이나 상대의 접근을 예측하지 않아.'},
+  ayu:{key:'ayu',topic:'컨디션',title:'생활력 · 지속',meaning:'생활을 꾸준히 이어가는 리듬을 읽는 영역이야. 하루를 버티는 강도보다 며칠이고 유지할 수 있는 일정과 회복 시간을 돌아보는 데 써.',action:'수면과 일정, 회복 시간을 함께 돌아보고 지속 가능한 강도를 정해.',limit:'건강 상태나 질병을 판단하는 자료는 아니야.'},
+  det:{key:'det',topic:'직업',title:'권한 · 추진력',meaning:'일을 움직일 권한과 책임을 읽는 영역이야. 내가 결정할 범위가 분명한지, 다른 사람과 조율해야 하는 부분은 어디인지 구분해 볼 수 있어.',action:'혼자 결정할 수 있는 일과 협의가 필요한 일을 나눠봐.',limit:'승진이나 성공 가능성을 나타내지 않아.'},
+  sri:{key:'sri',topic:'전체',title:'번영 · 호조의 맥락',meaning:'번영과 호조라는 주제를 다루는 영역이야. 지금 잘 유지되는 생활 조건과 관계를 찾아, 무엇을 지키고 키울지 생각하는 관점으로 읽어.',action:'지금 잘 유지되는 자원과 관계를 살피는 질문으로 활용해.',limit:'최종 길흉 판단은 계산되지 않았어.'},
+  mula:{key:'mula',topic:'금전',title:'기반 · 자원',meaning:'생활을 지탱하는 기반과 자원을 읽는 영역이야. 돈뿐 아니라 쓸 수 있는 시간과 공간, 이미 갖춘 조건까지 함께 돌아볼 수 있어.',action:'계획을 지탱하는 예산, 시간과 생활 조건을 함께 점검해.',limit:'수입이나 투자 가격을 예측하지 않아.'},
+  utsaha:{key:'utsaha',topic:'학업',title:'노력 · 실행',meaning:'계획을 행동으로 옮기고 이어가는 과정을 읽는 영역이야. 공부나 업무에서는 얼마나 크게 시작하느냐보다 반복할 수 있는 작업 단위를 찾는 질문으로 연결돼.',action:'큰 목표를 반복 가능한 작업 단위로 나누고 실제 진행 상황을 기록해.',limit:'시험 합격이나 업무 성과를 확정하지 않아.'},
+  montri:{key:'montri',topic:'대인',title:'지원 · 조력',meaning:'도움과 협력을 읽는 영역이야. 필요한 조언을 누구에게 구할 수 있는지, 혼자 하던 일을 어떻게 나눌 수 있는지 돌아볼 수 있어.',action:'혼자 해결하기 어려운 부분은 질문을 구체화해 협력자에게 전달해.',limit:'특정 인물의 등장이나 호의를 예언하지 않아.'},
+  kalakini:{key:'kalakini',topic:'전체',title:'마찰 · 주의',meaning:'진행을 막는 마찰과 부담을 살피는 영역이야. 같은 곳에서 자꾸 막힌다면 시간 부족인지, 자원 문제인지, 의견 차이인지 나눠서 생각해볼 수 있어.',action:'막히는 부분이 시간, 자원, 의견 차이 중 어디에서 생기는지 구분해.',limit:'사고나 실패를 예측하는 자료가 아니야.'},
 }
 
 type Segment = { segment_start?:string; segment_end_exclusive?:string }
@@ -49,7 +49,7 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const natalWheel = thai?.mahathaksa?.available ? thai.mahathaksa.wheel.filter(r=>BHUMI_LENSES[r.bhumi_key]) : []
   const wheels = segments.map(r=>({...r,wheel:r.wheel.filter(w=>BHUMI_LENSES[w.bhumi_key])}))
   const sajuSummary = contexts.length ? `${contexts[0].layer}의 ${contexts[0].stem_ten_god}은 ${tenGodLens(contexts[0].stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.${contexts.length>1?' 아래에서 다른 운 구간과 함께 읽어볼 수 있어.':''}` : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
-  const thaiSummary = wheels.length ? `이 기간의 Taksajorn은 ${wheels.length}개 구간이야. 연간 Boriwan은 ${wheels.map(r=>r.annual_boriwan.label).join(' → ')}로 기록돼 있어. 주변 사람과 환경을 살피는 배치이며 사건 예측은 아니야.` : natalWheel.length ? '출생 Mahathaksa의 8영역을 생활 맥락으로 읽을 수 있어. 이 배치만으로 선택 기간의 길흉을 정하지 않아.' : '이 기간에 읽을 수 있는 Thai 배치가 없어.'
+  const thaiSummary = wheels.length ? `이 기간에는 주변 사람과 도움을 주고받는 방식을 살펴볼 수 있어. ${wheels.length>1?'생일을 기준으로 연간 배치가 바뀌므로 구간을 나눠 읽어.':'선택 기간은 하나의 연간 배치 안에 있어.'} 아래 생활 영역에서 관계망, 실행, 자원, 마찰을 각각 살펴봐.` : natalWheel.length ? '출생 때의 배치를 관계망·생활력·자원 등 여덟 생활 영역으로 나눠 읽어. 지금 잘되고 못되는 일을 예측하기보다 각 영역을 돌아보는 질문으로 활용할 수 있어.' : '이 기간에 읽을 수 있는 태국점성술 배치가 없어.'
   const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
   return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
 }
@@ -64,4 +64,15 @@ export function compactSystemPrompt(packet: Record<string,unknown>) {
     if(text.length<=7500)return text
   }
   throw new Error('핵심 근거가 7,500자를 넘어 복사하지 못했어. 더 좁은 기간을 선택해줘.')
+}
+
+/** Display-only translation; preserve original packet labels and engine values. */
+export function thaiPlanetLabel(value:string) {
+ const names:Record<string,string>={Sun:'태양',Moon:'달',Mercury:'수성',Venus:'금성',Mars:'화성',Jupiter:'목성',Saturn:'토성',Rahu:'라후'}
+ const name=Object.keys(names).find(k=>value.toLowerCase().includes(k.toLowerCase()))
+ return name?names[name]:value
+}
+export function thaiLifeSummary(keys:string[]) {
+ const meanings:Record<string,string>={boriwan:'주변 사람과 어떤 도움을 주고받는지',ayu:'무리 없이 이어갈 생활 리듬은 무엇인지',det:'내가 결정할 일과 협의할 일은 무엇인지',sri:'현재 잘 유지되는 조건은 무엇인지',mula:'시간과 돈을 어디에 배분하고 있는지',utsaha:'계획이 실제 실행으로 이어지는지',montri:'필요한 도움을 누구에게 요청할 수 있는지',kalakini:'반복해서 막히는 조건은 무엇인지'}
+ return keys.filter(k=>meanings[k]).slice(0,3).map(k=>meanings[k]).join(', ')+' 살펴보는 관점이야. 아래에서 각 영역의 배치와 읽는 방법을 함께 볼 수 있어.'
 }
