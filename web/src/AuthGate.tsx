@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { AccountActionsContext } from './AccountActions'
 import { checkAppAccess, installAuthenticatedApiFetch } from './lib/auth'
 import {
   clearPendingAnonymousLink,
@@ -167,12 +168,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (stage === 'allowed') {
     return (
-      <>
+      <AccountActionsContext.Provider value={{ logout, busy }}>
         {children}
-        <button className="private-auth-logout" type="button" onClick={() => void logout()} disabled={busy} aria-label="로그아웃">
-          로그아웃
-        </button>
-      </>
+      </AccountActionsContext.Provider>
     )
   }
 

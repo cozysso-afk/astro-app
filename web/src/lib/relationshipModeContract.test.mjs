@@ -58,12 +58,13 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
-test('marriage UI makes marriage-specific reading primary and keeps generic compatibility evidence secondary', () => {
-  assert.match(panel, /isMarriage&&ai\.data\.marriage_reading\?\.bottom_line/)
-  assert.match(panel, /친밀감 · 공유자원/)
-  assert.match(panel, /className="marriage-base-evidence"/)
-  assert.match(panel, /<summary>기본 궁합 근거 보기<\/summary>/)
-  assert.match(panel, /\{!isMarriage\?<><div className="relationship-ai-grid"/)
+test('marriage UI uses mode-specific deterministic view and preserves validated enrichment', () => {
+  assert.match(panel, /buildRelationshipUserSummary/)
+  assert.match(panel, /data-mode=\{analysisMode\}/)
+  assert.match(panel, /analysisMode\.startsWith\('marriage_'\)/)
+  assert.match(panel, /ai\.data\.marriage_reading\?\.bottom_line/)
+  assert.match(panel, /<summary>기술 근거 자세히 보기<\/summary>/)
+  assert.match(panel, /JSON\.stringify\(ai\.data/)
 })
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {

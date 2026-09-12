@@ -19,6 +19,8 @@ export type FortuneUserWindow = {
   guidance: string
 }
 
+export type FortuneFlowCard = { topic: string; score: number; band: string; meaning: string }
+
 export type FortuneUserRelationship = {
   summary: string
   incoming?: string
@@ -42,13 +44,16 @@ export type FortuneUserSummary = {
   cautionItems: string[]
   bestFlow: string[]
   cautionFlow: string[]
+  favorableCards: FortuneFlowCard[]
+  cautionCards: FortuneFlowCard[]
   focusTopics: FortuneUserTopic[]
-  referenceTopics: Array<{ topic: string; summary: string }>
+  referenceTopics: Array<{ topic: string; band: string; summary: string }>
   importantWindows: FortuneUserWindow[]
   relationship?: FortuneUserRelationship
 }
 
 export type FortuneUserSummaryContext = {
+  allowIntraday?: boolean
   period: PeriodKey
   calculation: Pick<IntegratedApiResponse, 'period' | 'western'>
   topicEntries: Array<[topic: string, interpretation: AiTopicInterpretation]>
@@ -63,6 +68,24 @@ type TopicCopy = {
 }
 
 const INVESTMENT_TOPICS = new Set(['투자심리', '수익실현', '신규진입', '투자주의'])
+
+const FLOW_COPY: Record<string, [string, string]> = {
+  금전: ['수입·지출 계획을 정리하기 좋음', '예상 밖 지출에 여유를 둘 것'],
+  학업: ['집중해서 진도 내기 좋음', '새 진도보다 복습부터'],
+  시험: ['배운 것을 꺼내 쓰기 수월함', '실수하기 쉬운 부분부터 점검'],
+  직장: ['업무 요청과 협의에 힘이 실림', '일정과 책임 범위를 분명히'],
+  이직: ['조건 검토와 대화에 유리', '조건이 불분명하면 결정 보류'],
+  대인관계: ['대화와 조율에 힘이 실림', '의견 차이를 급히 결론 내지 말 것'],
+  연애: ['호감과 만남을 이어가기 수월함', '관계 진전을 서두르지 말 것'],
+  연락: ['대화를 이어가기 수월함', '답장을 재촉하지 말 것'],
+  재회: ['대화 재개의 움직임에 주목', '추억과 지금 행동을 구분할 것'],
+  소식: ['새 소식과 제안을 살펴볼 때', '전해 들은 말은 원문부터'],
+  컨디션: ['일정에 힘을 쓰기 좋은 편', '일정 사이에 쉴 틈을 둘 것'],
+  투자심리: ['관심이 커질 때, 매수 근거는 별도', '불안 때문에 판단을 바꾸지 말 것'],
+  수익실현: ['청산 조건을 검토할 때, 수익 보장 아님', '목표와 손실 한도를 먼저 점검'],
+  신규진입: ['진입 조건을 검토할 때, 매수 권유 아님', '급한 진입보다 조건 점검'],
+  투자주의: ['뚜렷한 경계가 적어도 안전 보장 아님', '위험 노출과 손실 한도를 점검'],
+}
 
 function frameFor(period: PeriodKey, dayCount: number) {
   const kind: PeriodKind = period === 'today' || dayCount <= 1
@@ -388,14 +411,19 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   })
   const rank = (mode: 'best' | 'caution' | 'salience') => (a: typeof normalized[number], b: typeof normalized[number]) => {
     const strength = (row: typeof a) => row.favorable === null ? -Infinity : mode === 'best' ? row.favorable - 50 : mode === 'caution' ? 50 - row.favorable : Math.abs(row.favorable - 50)
-    return importance(a.interpretation.importance) - importance(b.interpretation.importance)
-      || strength(b) - strength(a) || b.support - a.support || a.priority - b.priority || a.topic.localeCompare(b.topic, 'ko')
+    const weighted = (row: typeof a) => strength(row)
+      + (2 - importance(row.interpretation.importance)) * 3
+      + Math.min(row.support, 4)
+    return weighted(b) - weighted(a) || b.support - a.support || a.priority - b.priority || a.topic.localeCompare(b.topic, 'ko')
   }
   const primary = normalized.filter(row => importance(row.interpretation.importance) < 2)
   // Positive and weak signals are independent lists. A neutral score is not invented into a favorable signal.
-  const best = primary.filter(row => row.favorable !== null && row.favorable > 50 && row.topic !== '투자주의').sort(rank('best')).slice(0, 2)
-  const caution = primary.filter(row => row.favorable !== null && row.favorable < 50).sort(rank('caution')).slice(0, 2)
-  const selected = [...primary].sort(rank('salience')).slice(0, 3)
+  const eligible = normalized.filter(row => importance(row.interpretation.importance) < 2 || row.support > 0)
+  const bestCandidates = eligible.filter(row => row.favorable !== null && row.favorable >= 55 && row.topic !== '투자주의').sort(rank('best'))
+  const cautionCandidates = eligible.filter(row => row.favorable !== null && row.favorable <= 45).sort(rank('caution'))
+  const best = bestCandidates.slice(0, 2)
+  const caution = cautionCandidates.slice(0, 2)
+  const selected = [...eligible].sort(rank('salience')).slice(0, 3)
   const bestFlow = best.map(row => row.topic)
   const cautionFlow = caution.map(row => row.topic)
   const when = frame.when
@@ -412,18 +440,31 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   })
   const referenceTopics = normalized.filter(row => !selected.some(selectedRow => selectedRow.topic === row.topic))
     .sort(rank('salience')).map(({ topic, level, interpretation }) => ({
-      topic, summary: importance(interpretation.importance) === 2 ? topicCopy(topic, level, when).reference : topicCopy(topic, level, when).conclusion,
+      topic, band: topicStat(context, topic)?.band ?? '정보 부족',
+      summary: importance(interpretation.importance) === 2 && !normalized.find(row => row.topic === topic)?.support
+        ? topic === '투자주의' ? '뚜렷한 신호가 적어도 안전을 보장하진 않아.' : '별도로 참고할 신호가 뚜렷하지 않아.'
+        : (FLOW_COPY[topic]?.[level === 'low' ? 1 : 0] ?? '평소 계획 유지'),
     }))
-  const importantWindows = frame.kind === 'day' ? [] : (data.key_windows ?? [])
+  const importantWindows = frame.kind === 'day' ? context.allowIntraday ? (context.calculation.western.detail_days ?? [])
+    .filter(day => day.date === context.calculation.period.start)
+    .flatMap(day => selected.flatMap(row => {
+      const detail = day.topics[row.topic]
+      const caution = row.favorable !== null && row.favorable <= 45
+      const point = caution ? detail?.caution_window : detail?.best_window
+      if (!point || !/^\d{2}:\d{2}$/.test(point.start) || !/^\d{2}:\d{2}$/.test(point.end) || point.start === point.end) return []
+      return [{ date: `${point.start}–${point.end}`, guidance: `${row.topic} · ${FLOW_COPY[row.topic]?.[caution ? 1 : 0] ?? '흐름 살펴보기'}` }]
+    })).slice(0, 3) : [] : (data.key_windows ?? [])
     .filter(window => window.signal !== '배경' && window.start >= context.calculation.period.start && (window.end || window.start) <= context.calculation.period.end && window.topics?.length)
     .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 3)
   return {
     periodKind: frame.kind, when, headline, summary: '',
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
     bestFlow, cautionFlow,
+    favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: topicStat(context, row.topic)?.band ?? '보통', meaning: FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),
+    cautionCards: cautionCandidates.map(row => ({ topic: row.topic, score: row.score!, band: row.topic === '투자주의' ? '주의' : topicStat(context, row.topic)?.band ?? '약함', meaning: FLOW_COPY[row.topic]?.[1] ?? '속도를 낮추는 편이 좋아' })),
     doItems: best.map(row => topicCopy(row.topic, row.level, when).conclusion),
     cautionItems: caution.map(row => topicCopy(row.topic, row.level, when).conclusion),
     focusTopics, referenceTopics, importantWindows,
-    relationship: relationshipSummary(context, new Set(primary.map(row => row.topic)), frame.kind),
+    relationship: relationshipSummary(context, new Set([...primary, ...selected].map(row => row.topic)), frame.kind),
   }
 }
