@@ -39,7 +39,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
   return {...summary,headline:`${summary.when} · ${contextLabel} 흐름`,summary:summary.summary+' '+(flirting?'썸·알아가는 관계의 맥락이야. ':intimate?'신체적 친밀감이 있어도 관계의 약속은 별도로 확인할 부분이야. ':'')+(single?'새 인연·썸·친밀한 관계·과거 인연 중 내 상황에 해당하는 해설을 함께 읽어봐.':status!=='couple'?periodAction:'현재 관계의 일정과 대화 방식을 조율하는 관점으로 읽어.'),
     doItems:[love.action],cautionItems:[love.caution],
     favorableCards:cards(summary.favorableCards,false),cautionCards:cards(summary.cautionCards,true),relationship,
-    focusTopics:summary.focusTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>{if(t.topic==='재회')return t;const c=copy(t.topic,calculation.western.overall[t.topic]);return {...t,conclusion:t.conclusion,action:t.topic==='연락'?t.action:c.action,observe:t.observe,caution:c.caution}}),
+    focusTopics:summary.focusTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>{if(t.topic==='재회')return t;const c=copy(t.topic,calculation.western.overall[t.topic]);return {...t,conclusion:t.conclusion,action:t.topic==='연락'?t.action:c.action,observe:t.observe,caution:[t.caution,c.caution].filter(Boolean).join(' ')}}),
     referenceTopics:summary.referenceTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>t.topic==='재회'?t:({...t,summary:t.summary})),
     importantWindows:summary.importantWindows,
   }

@@ -26,3 +26,9 @@ export function normalizeTopicEntries(topicAnalysis: unknown, allowedTopics: rea
   }
   return entries
 }
+
+/** A total score must never override an explicitly failed stage. */
+export function interpretationQualityPassed(validation?: {score?:number; stages?:Array<{passed?:boolean}>} | null): boolean {
+  if (!validation || validation.stages?.some(stage => stage.passed !== true)) return false
+  return validation.score === 100 || Boolean(validation.stages?.length && validation.stages.every(stage => stage.passed === true))
+}
