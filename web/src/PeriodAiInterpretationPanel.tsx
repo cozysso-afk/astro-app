@@ -4,6 +4,9 @@ import { estimateGeminiUsage } from './lib/aiUsage'
 import { topicOrder } from './lib/fortuneTopics'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
 import { normalizeTopicEntries } from './lib/interpretationTopics'
+import { FortuneFlowCards } from './FortuneFlowCards'
+import type { ReactNode } from 'react'
+import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -29,7 +32,8 @@ function signalClass(signal: string) {
   return 'is-mixed'
 }
 
-export function PeriodAiInterpretationPanel({ period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel }: {
+export function PeriodAiInterpretationPanel({ period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel, technicalDetails }: {
+  technicalDetails?: ReactNode
   period: PeriodKey
   calculation: IntegratedApiResponse
   result: AiInterpretationResponse | null
@@ -41,22 +45,24 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   onCancel: () => void
   canCancel: boolean
 }) {
-  if (!loading && !error && (!result || !result.data)) return <section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>
-  if (loading && !result) return <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+  const technicalFallback = technicalDetails ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details> : null
+  if (!loading && !error && (!result || !result.data)) return <><section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>{technicalFallback}</>
+  if (loading && !result) return <><section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><div className="period-ai-v21-controls"><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>{technicalFallback}</>
   const failedUsage = estimateGeminiUsage(result?.usage)
   if (error && !result?.data) {
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
     const message = quotaLimited
       ? '운세 계산은 정상 완료됐어. 지금은 해설 서버의 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 한도가 복구된 뒤 다시 불러오면 계산 결과는 그대로 이어서 해설할 수 있어.'
       : error
-    return <section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>
+    return <><section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>프롬프트 복사</button></div></section>{technicalFallback}</>
   }
-  if (!result?.ok || !result.data) return null
+  if (!result?.ok || !result.data) return technicalFallback
 
   const data = result.data
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
-  const userSummary = buildFortuneUserSummary(data, { period, calculation, topicEntries })
+  const readiness = fortuneAiPrecisionReadiness(calculation)
+  const userSummary = buildFortuneUserSummary(data, { period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
@@ -74,15 +80,7 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   return <section className="period-ai-card period-ai-v18">
     <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설'} · {userSummary.when} 핵심</span><h3>{userSummary.headline}</h3></div></div>
 
-    <section className="period-ai-action-section period-ai-user-do">
-      <div className="period-ai-section-title"><span>{userSummary.doTitle}</span></div>
-      <div className="period-ai-actions">{userSummary.bestFlow.map((topic)=><article key={`best-${topic}`}><strong>{topic}</strong></article>)}{!userSummary.bestFlow.length&&<p>뚜렷하게 밀어줄 분야는 없어.</p>}</div>
-    </section>
-
-    <section className="period-ai-action-section period-ai-user-caution">
-      <div className="period-ai-section-title"><span>{userSummary.cautionTitle}</span></div>
-      <div className="period-ai-actions">{userSummary.cautionFlow.map((topic)=><article key={`caution-${topic}`}><strong>{topic}</strong></article>)}{!userSummary.cautionFlow.length&&<p>특별히 더 조심할 분야는 뚜렷하지 않아.</p>}</div>
-    </section>
+    <div className="reading-flows"><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/><FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
 
     {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
       <div className="period-ai-section-title"><span>중요한 시기</span><strong>날짜별로 다르게 움직일 때</strong></div>
@@ -91,7 +89,7 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
 
     {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><p><b>왜 이렇게 보냐면</b> {item.reason}</p>{item.timing&&<p><b>시기</b> {item.timing}</p>}<p><b>현실에서</b> {item.action} {item.observe}</p>{item.caution&&<p><b>주의</b> {item.caution}</p>}</article>)}</div>
+      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><p><b>왜 이렇게 보냐면</b> {item.reason}</p>{item.timing&&<p><b>시기</b> {item.timing}</p>}<p><b>현실에서</b> {item.observe || item.action}</p>{item.caution&&<p><b>주의</b> {item.caution}</p>}</article>)}</div>
     </section>}
 
     {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section">
@@ -105,11 +103,12 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
       </article>
     </section> : null}
 
-    {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic}</strong><p>{item.summary}</p></article>)}</div></details>}
+    {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.summary}</p></article>)}</div></details>}
 
     <details className="period-ai-details">
       <summary>계산 근거 자세히 보기</summary>
       <div className="period-ai-detail-body">
+        {technicalDetails}
         {(localQualityFallback || degradedQuality) ? <div className="period-ai-quality-fallback"><CheckCircle2 size={15}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산 근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 근거를 기준으로 표시했어.')}</span></div></div> : null}
         {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
         <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 검증 해설 조회 · 이번 Gemini API 재호출 0회' : '최초 검증 해설 자동 저장 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>

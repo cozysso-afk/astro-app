@@ -138,14 +138,14 @@ test('period default view uses the natural view model and keeps raw prose in one
   const technicalMarkup = period.slice(technicalStart)
 
   assert.match(defaultMarkup, /userSummary\.headline/)
-  assert.match(defaultMarkup, /userSummary\.bestFlow/)
-  assert.match(defaultMarkup, /userSummary\.cautionFlow/)
+  assert.match(defaultMarkup, /userSummary\.favorableCards/)
+  assert.match(defaultMarkup, /userSummary\.cautionCards/)
   assert.match(defaultMarkup, /userSummary\.focusTopics/)
   assert.match(defaultMarkup, /userSummary\.importantWindows/)
   assert.doesNotMatch(defaultMarkup, /data\.(?:headline|overall|clusters|systems|priorities)|item\.(?:verdict|confidence)|technicalEvidence/)
   assert.match(defaultMarkup, /왜 이렇게 보냐면/)
 
-  assert.equal((period.match(/<summary>계산 근거 자세히 보기<\/summary>/g) || []).length, 1)
+  assert.equal((period.slice(renderStart).match(/<summary>계산 근거 자세히 보기<\/summary>/g) || []).length, 1)
   assert.match(technicalMarkup, /data\.overall\.summary/)
   assert.match(technicalMarkup, /calculation\.western\.overall/)
   assert.match(technicalMarkup, /technicalEvidence\.map/)
@@ -166,13 +166,13 @@ test('relationship focus uses plain labels and only renders useful structured di
   assert.match(period, />내가 먼저 연락하기 · /)
   assert.match(period, />과거 인연 재접촉</)
   assert.match(period, /userSummary\.relationship\.(?:incoming|outgoing|reconnection)/)
-  assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'), period.indexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
+  assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'), period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
 })
 
 test('primary topics stay concise and reference topics are one-line collapsed items', () => {
   const focusStart = period.indexOf('className="period-ai-window-section period-ai-user-focus"')
   const referenceStart = period.indexOf('className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"')
-  const technicalStart = period.indexOf('<summary>계산 근거 자세히 보기</summary>')
+  const technicalStart = period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')
   assert.ok(focusStart >= 0 && referenceStart > focusStart && technicalStart > referenceStart)
 
   const focus = period.slice(focusStart, referenceStart)
@@ -290,7 +290,7 @@ test('period result labels natural presentation without claiming deterministic t
   assert.match(period, /result\.model === 'deterministic-provisional-v2' \|\| localQualityFallback/)
   assert.match(period, /자동 운세 해설/)
   assert.match(period, /맞춤 운세 해설/)
-  const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'),period.indexOf('<summary>계산 근거 자세히 보기</summary>'))
+  const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'),period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>'))
   assert.doesNotMatch(defaultMarkup,/계산근거 기반 자동 해설|AI\(인공지능\) 기간 해설/)
 })
 
@@ -392,3 +392,7 @@ test('year uses real monthly phases when available instead of repeating a daily 
   const result=buildFortuneUserSummary(data,{period:'year',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)})
   assert.match(result.focusTopics[0].timing,/올해는 2026-10-01~2026-10-31.*2027-02-01~2027-02-28/)
 })
+
+// Exercise the redesigned view models and real component rendering through the existing CI entrypoint.
+import './readingExperience.test.mjs'
+import './readingExperience.render.test.mjs'

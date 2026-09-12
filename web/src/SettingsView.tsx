@@ -2,6 +2,7 @@ import { Cloud, History, Orbit, Settings, Sparkles, User } from 'lucide-react'
 
 import type { ApiStatus } from './appTypes'
 import type { PushSnapshot } from './lib/push'
+import { AccountActions } from './AccountActions'
 
 type UiSettings = { glow: boolean; motion: boolean }
 
@@ -96,7 +97,8 @@ export function SettingsView({
       <div><span>출생 프로필</span><strong>{hasProfile?'저장됨':'미저장'}</strong><small>{hasProfile?'이 브라우저 기기 보관':'내정보에서 먼저 저장'}</small></div>
     </div>
 
-    <div className="privacy-note settings-note"><Cloud size={16}/><span>클라우드 기록은 현재 익명 로그인 세션 기준이야. Safari와 홈화면 웹앱이 서로 다른 익명 세션을 만들면 기록이 따로 보일 수 있어. 장기적으로 기기 간 동일 기록이 필요하면 Apple/Google 로그인이 필요해.</span></div>
+    <div className="privacy-note settings-note"><Cloud size={16}/><span>클라우드 기록은 허용된 이메일 계정에 보관돼. 기기에만 저장된 기록은 해당 브라우저에서 볼 수 있어.</span></div>
     <div className="settings-actions"><button type="button" onClick={onOpenHistory}><History size={16}/>기록함 열기</button><button type="button" onClick={onOpenProfile}><User size={16}/>출생 프로필 열기</button></div>
+    <AccountActions/>
   </section>
 }

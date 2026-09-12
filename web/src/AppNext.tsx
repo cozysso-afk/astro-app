@@ -40,7 +40,7 @@ import type {
   AiInterpretationResponse
 } from './appTypes'
 
-import { AiInterpretationPanel } from './AiInterpretationPanel'
+import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
 import { RelationshipInterpretationPanel } from './RelationshipInterpretationPanel'
 import { PersonalMarriagePanel, type PersonalMarriageResponse } from './PersonalMarriagePanel'
@@ -1537,23 +1537,9 @@ export default function AppNext() {
             {integratedError && <div className="status-banner error"><AlertTriangle size={17}/><span>{integratedError}</span></div>}
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
-            {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results">
-              <div className="result-headline"><CheckCircle2 size={20}/><div><strong>연간 통합 계산 완료</strong><span>{integratedResult.period.day_count}일 분석 · {integratedResult.period.month_segments}개 월 구간</span></div></div>
-              <div className="relationship-ai-toolbar ai-cost-guard-toolbar">
-                {!aiInterpretation&&!aiLoading&&!aiError&&<button type="button" onClick={()=>void runAiInterpretation()}><Sparkles size={17}/><span>Gemini(제미나이) 통합 정밀해설</span></button>}
-                <button type="button" onClick={()=>void copyAiInterpretationPrompt(integratedResult)}><Copy size={15}/><span>AI용 압축 프롬프트 복사</span></button>
-                {aiLoading&&aiActiveJobId&&<button type="button" onClick={()=>void cancelAiInterpretation(false)}><Trash2 size={15}/><span>AI 해설 생성 취소</span></button>}
-                <small>계산 자체 Gemini 0회 · 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회 · 약 2분 제한</small>
-              </div>
-              <AiInterpretationPanel result={aiInterpretation} loading={aiLoading} error={aiError} onRetry={()=>void runAiInterpretation()} onCopyPrompt={()=>void copyAiInterpretationPrompt(integratedResult)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} topics={topicOrder}/>
-              <div className="result-actions">
-                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
-                <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
-                <button className="save-action" type="button" onClick={saveIntegratedRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
-              </div>
-              {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
-              {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-
+            {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
+              <PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={()=>void copyAiInterpretationPrompt(integratedResult)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
               <section className="result-card">
@@ -1603,6 +1589,14 @@ export default function AppNext() {
                   return <div className="month-card" key={month.calendar_month}><div className="month-title"><strong>{month.calendar_month}</strong><span>{month.start}~{month.end}</span></div>{ranked.map(({topic,stat})=><div className="tight-row" key={topic}><span>{topic} · {stat.band}</span><b>{stat.average.toFixed(1)}</b></div>)}</div>
                 })}</div></div>
               </details>}
+              </>}/>
+              <div className="result-actions">
+                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
+                <button className="save-action" type="button" onClick={saveIntegratedRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
+              </div>
+              {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
+              {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
             </div>}
           </section>}
 
@@ -1659,10 +1653,13 @@ export default function AppNext() {
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-              {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
-              {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText} />
-              <RelationshipPrecisionDetails result={relationshipResult} partnerTimeExact={partnerTimeExact} aspects={natalAspects} formatLimit={relationshipLimitKo} />
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
+                timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
+                technicalDetails={<>
+                  {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
+                  {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
+                  <RelationshipPrecisionDetails result={relationshipResult} partnerTimeExact={partnerTimeExact} aspects={natalAspects} formatLimit={relationshipLimitKo}/>
+                </>}/>
             </div>}
           </section>}
 
