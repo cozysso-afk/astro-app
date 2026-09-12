@@ -202,10 +202,85 @@ test('reading headline declarations override legacy important Gothic and billboa
   })
   assert.deepEqual(declarations['font-family'],{value:'var(--reading-display)',important:true})
   assert.deepEqual(declarations['font-size'],{value:'19px',important:true})
-  assert.deepEqual(declarations['font-weight'],{value:'500',important:true})
+  assert.deepEqual(declarations['font-weight'],{value:'600',important:true})
   assert.deepEqual(declarations['line-height'],{value:'1.75',important:true})
   const source=css.toString()
-  assert.match(source,/family=Noto\+Serif\+KR:wght@500&display=swap/)
+  assert.match(source,/family=Noto\+Serif\+KR:wght@600&display=swap/)
   assert.match(source,/--reading-display: 'Noto Serif KR'/)
   assert.doesNotMatch(source,/body[^{}]*\{[^}]*font-family:\s*var\(--reading-display\)/)
+})
+
+for (const period of ['today','week','month','year']) test(`observed contact reference in caution flow is split for ${period}`,()=>{
+  const f=fortuneFixture(period)
+  f.calculation.western.overall.연락=stat(44)
+  f.data.topic_analysis.연락.evidence_refs=['W:contact']
+  // Stronger salience keeps contact out of the three detailed topics.
+  f.calculation.western.overall.재회=stat(83)
+  f.data.topic_analysis.재회.evidence_refs=['W:reconnection']
+  const before=JSON.stringify(f)
+  const v=buildFortuneUserSummary(f.data,f.context)
+  assert.ok(v.cautionFlow.includes('연락'))
+  assert.ok(!v.focusTopics.some(t=>t.topic==='연락'))
+  assert.equal(v.relationship.incomingBand,'약함')
+  assert.equal(v.relationship.outgoingBand,'강함')
+  assert.notEqual(v.relationship.incoming,v.relationship.outgoing)
+  assert.equal(JSON.stringify(f),before)
+  f.calculation.western.relationship_signals.수신신호=null
+  const absent=buildFortuneUserSummary(f.data,f.context)
+  assert.equal(absent.relationship.incomingBand,'정보 부족')
+  assert.equal(absent.relationship.outgoingBand,'강함')
+})
+
+test('evidence depth names only linked symbols and explains meaning, not raw identifiers',()=>{
+  const f=fortuneFixture(); const v=buildFortuneUserSummary(f.data,f.context)
+  const topic=v.focusTopics.find(t=>t.topic==='대인관계')
+  assert.match(topic.reason,/수성.*생각을 정리/)
+  assert.match(topic.reason,/목성.*기대/)
+  assert.doesNotMatch(topic.reason,/해왕성|orb|W:|S:|T:/)
+  assert.ok(topic.conclusion.split('.').filter(Boolean).length>=2)
+  assert.ok(topic.action && topic.observe && topic.caution)
+  f.calculation.western.daily_scores=[]
+  const missing=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계')
+  assert.match(missing.reason,/부족|적어|없어/)
+  assert.doesNotMatch(missing.reason,/수성|목성/)
+})
+
+test('actual week, month and year progressions differ and never fill missing dates',()=>{
+  const views={}
+  for(const period of ['today','week','month','year']) {
+    const f=fortuneFixture(period)
+    const n=f.calculation.period.day_count
+    const start=Date.parse(f.calculation.period.start+'T00:00:00Z')
+    f.calculation.western.daily_scores=Array.from({length:n},(_,i)=>({date:new Date(start+i*86400000).toISOString().slice(0,10),scores:{대인관계:i<n/2?35:78},evidence:[]}))
+    if(period==='year') f.calculation.western.months=[{start:'2026-10-01',end:'2026-10-31',calendar_month:'2026-10',topics:{대인관계:stat(80)}},{start:'2026-11-01',end:'2026-11-30',calendar_month:'2026-11',topics:{대인관계:stat(30)}}]
+    const original=JSON.stringify(f)
+    views[period]=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').timing
+    assert.equal(JSON.stringify(f),original)
+  }
+  assert.equal(views.today,undefined)
+  assert.match(views.week,/후반.*초반/)
+  assert.match(views.month,/이번 달.*구간.*주별/)
+  assert.match(views.year,/2026-10-01~2026-10-31.*2026-11-01~2026-11-30.*장기/)
+  const f=fortuneFixture('month');f.calculation.western.daily_scores=[];f.calculation.western.overall.대인관계=stat(67)
+  assert.equal(buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').timing,undefined)
+})
+
+test('daily utilization and caution windows both survive, investment risk never becomes upside',()=>{
+  const f=fortuneFixture();f.context.allowIntraday=true
+  f.calculation.western.detail_days=[{date:'2026-09-12',topics:{대인관계:{best_window:{start:'07:00',end:'08:30'},caution_window:{start:'21:00',end:'22:00'}}}}]
+  const v=buildFortuneUserSummary(f.data,f.context)
+  assert.ok(v.importantWindows.some(w=>w.kind==='favorable'&&w.date==='07:00–08:30'))
+  assert.ok(v.importantWindows.some(w=>w.kind==='caution'&&w.date==='21:00–22:00'))
+  f.context.allowIntraday=false
+  assert.deepEqual(buildFortuneUserSummary(f.data,f.context).importantWindows,[])
+})
+
+test('many communication aspects cannot crowd out stability and mixed role copy is specific',()=>{
+  const input=[...['Sun','Venus','Mars','Jupiter','Uranus','Neptune','Pluto'].map((b,i)=>({a:'Mercury',b,aspect:'trine',orb:.1+i/10,tone:'supportive'})),{a:'Mercury',b:'Sun',aspect:'square',orb:1,tone:'challenging'},{a:'Saturn',b:'Jupiter',aspect:'square',orb:4,tone:'challenging'}]
+  const v=buildRelationshipUserSummary({aspects:input,partnerExact:false,mode:'compatibility'})
+  const rows=[...v.patterns,...v.friction]
+  assert.ok(rows.some(p=>p.role==='stability'))
+  assert.equal(rows.filter(p=>p.role==='communication').length,1)
+  assert.match(rows.find(p=>p.role==='communication').conclusion,/말이 어긋나는/)
+  assert.equal(new Set(rows.map(p=>p.title)).size,rows.length)
 })

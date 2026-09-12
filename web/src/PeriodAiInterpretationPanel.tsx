@@ -78,20 +78,15 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
   ).slice(0, 16)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
 
-  const windowGroups = Array.from(new Set(userSummary.importantWindows.map(w => w.date))).map(date => ({ date, lines: Array.from(new Set(userSummary.importantWindows.filter(w => w.date === date).map(w => w.guidance))) }))
+  const windowGroups = Array.from(new Set(userSummary.importantWindows.map(w => w.date))).map(date => ({ date, lines: [...new Map(userSummary.importantWindows.filter(w => w.date === date).map(w => [`${w.kind}:${w.guidance}`, w])).values()] }))
   return <section className="period-ai-card period-ai-v18">
     <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설'} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{userSummary.headline}</h3><p className="reading-hero-subtitle">{userSummary.summary}</p></div></div>
 
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/><FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
 
     {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
-      <div className="period-ai-section-title"><span>중요한 시기</span><strong>날짜별로 다르게 움직일 때</strong></div>
-      <div className="period-ai-quick-date-list">{windowGroups.map((item,index)=><article className="period-ai-quick-date" key={`user-window-${item.date}-${index}`}><b>{item.date}</b><div>{item.lines.map(line=><strong key={line}>{line}</strong>)}</div><span>주목</span></article>)}</div>
-    </section>}
-
-    {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
-      <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</article>)}</div>
+      <div className="period-ai-section-title"><span>중요한 시기</span><strong>활용 시기와 주의 시기</strong></div>
+      <div className="period-ai-quick-date-list">{windowGroups.map((item,index)=><article className="period-ai-quick-date" key={`user-window-${item.date}-${index}`}><b>{item.date}</b><div>{item.lines.map(line=><strong className={`reading-window-line is-${line.kind}`} key={`${line.kind}:${line.guidance}`}><small>{line.kind === 'favorable' ? '활용' : line.kind === 'caution' ? '주의' : '혼합'}</small>{line.guidance}</strong>)}</div></article>)}</div>
     </section>}
 
     {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section">
@@ -104,6 +99,11 @@ export function PeriodAiInterpretationPanel({ period, calculation, result, loadi
         </div>
       </article>
     </section> : null}
+
+    {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
+      <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
+      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</article>)}</div>
+    </section>}
 
     {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.summary}</p></article>)}</div></details>}
 

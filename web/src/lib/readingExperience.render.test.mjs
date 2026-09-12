@@ -81,3 +81,29 @@ test('reason action and caution render as separately labelled accessible layers'
   assert.match(html,/reading-hero-subtitle/)
   assert.match(html,/reading-period-date/)
 })
+
+for(const period of ['today','week','month','year']) test(`rendered ${period} caution contact directions precede long interpretation`,()=>{
+  const f=fortuneFixture(period)
+  f.calculation.western.overall.연락={...f.calculation.western.overall.연락,average:44}
+  f.data.topic_analysis.연락.evidence_refs=['W:contact']
+  const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const visible=html.split('<details class="period-ai-details"')[0]
+  assert.match(visible,/상대가 먼저 오는 흐름 · 약함/)
+  assert.match(visible,/내가 먼저 연락하기 · 강함/)
+  assert.ok(visible.indexOf('상대가 먼저 오는 흐름')<visible.indexOf('period-ai-user-focus'))
+})
+test('personal spouse route uses existing hints without manufacturing a meeting or a person',()=>{
+  const f=personalMarriageFixture();f.result.spouse_archetype.meeting_route='반복해서 참여하는 모임에서 천천히 알아가는 방식';f.result.spouse_archetype.identity_clues=['생활 리듬을 맞추는 관계']
+  const html=renderToStaticMarkup(createElement(Personal,{data:f})).split('<details class="relationship-technical"')[0]
+  assert.match(html,/반복해서 참여하는 모임/);assert.match(html,/배우자로 정해진 건 아니야/)
+  assert.doesNotMatch(html,/178|181|연예인|고양이상/)
+})
+
+test('same date groups utilization and caution without losing either meaning',()=>{
+  const f=fortuneFixture('week');f.data.key_windows=[{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용'},{start:'2026-09-14',end:'2026-09-14',topics:['컨디션'],signal:'주의'}]
+  const html=renderToStaticMarkup(createElement(Fortune,{period:'week',calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const visible=html.split('<details class="period-ai-details"')[0]
+  assert.equal((visible.match(/class="period-ai-quick-date"/g)||[]).length,1)
+  assert.match(visible,/reading-window-line is-favorable/)
+  assert.match(visible,/reading-window-line is-caution/)
+})
