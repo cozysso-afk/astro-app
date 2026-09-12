@@ -580,6 +580,20 @@ export function buildLocalQualityFallbackCore(payload:any){
   };
 }
 
+export function observedTransitContext(ledger:any[]){
+  const groups=new Map<string,any>();
+  for(const row of ledger){
+    const o=row?.observation;
+    if(row?.system!=="western"||!o?.transit||!o?.target||!o?.aspect)continue;
+    const key=JSON.stringify([o.transit,o.target,o.aspect]);
+    if(!groups.has(key))groups.set(key,{transit:o.transit,natal_target:o.target,aspect:o.aspect,observations:[],evidence_refs:[],timing_scope:"sampled_observations_not_start_peak_end"});
+    const g=groups.get(key),date=calendarDate(row.date);
+    if(date&&!g.observations.some((x:any)=>x.date===date&&x.motion===o.motion))g.observations.push({date,...(o.motion?{motion:o.motion}:{})});
+    if(row.id&&!g.evidence_refs.includes(row.id))g.evidence_refs.push(row.id);
+  }
+  return [...groups.values()].slice(0,24).map(g=>({...g,observations:g.observations.sort((a:any,b:any)=>a.date.localeCompare(b.date))}));
+}
+
 export function buildPromptPacket(payload:any){
   const topics=salientTopics(payload);
   const maxDates=periodLimit(String(payload?.period_kind??"annual"));
@@ -591,6 +605,7 @@ export function buildPromptPacket(payload:any){
   const digest=Object.fromEntries(topics.filter(t=>payload?.western?.daily_pattern_digest?.[t]).map(t=>[t,payload.western.daily_pattern_digest[t]]));
   const detail=(payload?.western?.detail_days??[]).filter((d:any)=>selectedDates.has(String(d?.date??""))).map((d:any)=>({date:d.date,market_status:d.market_status,topics:Object.fromEntries(Object.entries(d?.topics??{}).filter(([topic])=>topics.includes(topic)).map(([topic,x]:any)=>[topic,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:(x?.evidence??[]).slice(0,2)}]))}));
   const cross=(payload?.cross_system_timeline??[]).filter((x:any)=>selectedDates.has(String(x?.date??"")));
+  const selectedEvidence=promptEvidence(payload,topics,keyDates);
   const packet={
     packet_version:"fortune-ai-prompt-v21-cost-guard",
     source_packet_version:payload?.packet_version,
@@ -599,13 +614,14 @@ export function buildPromptPacket(payload:any){
     deterministic_topic_summary:topicRows.map(x=>({topic:x.topic,importance:x.importance,verdict:x.verdict,timing:x.timing,evidence_refs:x.evidence_refs.slice(0,3)})),
     western:{
       engine:payload?.western?.engine,overall,relationship_signals:relation,
+      observed_transit_context:observedTransitContext(selectedEvidence),
       months:compactMonths(payload,topics),daily_pattern_digest:digest,detail_days:detail,
       daily_evidence_coverage:payload?.western?.daily_evidence_coverage,market:payload?.western?.market,
     },
     key_dates:keyDates,cross_system_timeline:cross,
     saju:compactSaju(payload?.saju),
     thai:compactThai(payload?.thai),
-    evidence_ledger:promptEvidence(payload,topics,keyDates),
+    evidence_ledger:selectedEvidence,
   };
   return packet;
 }

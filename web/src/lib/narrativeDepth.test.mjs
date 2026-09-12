@@ -21,3 +21,4 @@ test('mixed study and exam explanations describe different practical bottlenecks
  assert.match(v.focusTopics[0].reason,/막힌 단계/)
  assert.match(v.focusTopics[1].reason,/시간·조건 누락/)
 })
+test('personal explanation distinguishes natal target and separating motion from relationship outcome',()=>{const f=fortuneFixture();f.calculation.western.daily_scores[0].evidence[0].motion='분리(Separating)';const r=build(f.data,{...f.context,focusTopics:['대인관계']}).focusTopics[0].reason;assert.match(r,/현재 운행 중인 수성.*출생차트의 목성/);assert.match(r,/각도에서 멀어지고/);assert.doesNotMatch(r,/상대가 멀어|관계가 끝나/)})

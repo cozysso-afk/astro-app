@@ -421,6 +421,13 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
   }
   if (level === 'low' && signs.has(1)) readable.push('도움을 주는 개별 근거가 있어도 이 분야 전체 흐름은 약한 편이야. 부분적인 호전을 기간 전체의 강세로 확대하지 않는 게 중요해.')
   if (level === 'high' && signs.has(-1)) readable.push('부담을 주는 개별 근거가 있어도 이 분야 전체 흐름은 강한 편이야. 주의할 조건을 확인하되 전체가 불리하다는 뜻으로 읽지는 않아.')
+  const strongest = [...linked].sort((a,b)=>Math.abs(b.evidence.contribution??0)-Math.abs(a.evidence.contribution??0)).find(r=>planetName(r.evidence.transit)&&planetName(r.evidence.target))
+  if(strongest){
+    const e=strongest.evidence
+    readable.push(`이 근거는 현재 운행 중인 ${planetName(e.transit)}의 위치를 출생차트의 ${planetName(e.target)}과 비교한 것이야.`)
+    const stage = /Applying|적용/i.test(e.motion??'') ? '그 관측 시점에는 두 위치가 정확한 각도에 가까워지고 있어.' : /Separating|분리/i.test(e.motion??'') ? '그 관측 시점에는 두 위치가 정확한 각도에서 멀어지고 있어.' : /Exact|정확/i.test(e.motion??'') ? '그 관측 시점에는 엔진이 정한 정확한 각도의 허용범위 안에 있어.' : ''
+    if(stage)readable.push(`${stage} 접촉의 단계이며 사건 발생 시점이나 상대의 행동을 뜻하지는 않아.`)
+  }
   const depth = evidenceDepth(linked.map(row => row.evidence), topic, false)
   return [...readable, depth].filter(Boolean).join(' ')
 }
