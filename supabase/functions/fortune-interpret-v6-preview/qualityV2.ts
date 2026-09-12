@@ -20,7 +20,9 @@ function overlaps(row:any,start:string,end:string){
 }
 function topicSupported(row:any,topic:string){
   if(!row)return false;
-  if(String(row.topic??"")===topic)return true;
+  const explicit=String(row.topic??"").trim();
+  if(!explicit)return true;
+  if(explicit===topic)return true;
   const text=String(row.text??"");
   const related=text.match(/관련분야\s+(.+)$/)?.[1]??"";
   return related.split(/[,·/]/).map(x=>x.trim()).includes(topic);
