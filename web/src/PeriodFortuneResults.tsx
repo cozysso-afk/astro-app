@@ -1,3 +1,4 @@
+import type { LoveStatus } from './lib/loveReadingContext'
 import { DatingArchetypePanel } from './DatingArchetypePanel'
 import { fortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
@@ -12,6 +13,8 @@ type HighlightPoint = FortunePoint & { topic: string }
 type ActiveDayun = NonNullable<IntegratedApiResponse['saju']['dayun']>[number]
 
 type PeriodFortuneResultsProps = {
+  loveStatus?: LoveStatus
+  onLoveStatusChange?: (value: LoveStatus) => void
   profileGender?: unknown
   fieldId?: string
   period: PeriodKey
@@ -40,6 +43,8 @@ type PeriodFortuneResultsProps = {
 }
 
 export function PeriodFortuneResults({
+  loveStatus = 'single',
+  onLoveStatusChange,
   profileGender,
   fieldId,
   period,
@@ -100,8 +105,9 @@ export function PeriodFortuneResults({
   </>
   return <div className="fortune-experience">
     <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
-    <SystemReadingViews key={fieldId} calculation={result} field={field}><PeriodAiInterpretationPanel field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/></SystemReadingViews>
-    {field?.id==='love'&&<DatingArchetypePanel key={`${String(profileGender)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender}/>}
+    {field?.id==='love'&&<div className="system-context-chips" role="group" aria-label="미혼 연애 상태"><button type="button" aria-pressed={loveStatus==='single'} onClick={()=>onLoveStatusChange?.('single')}>싱글 · 새로운 만남</button><button type="button" aria-pressed={loveStatus==='couple'} onClick={()=>onLoveStatusChange?.('couple')}>커플 · 현재 관계</button></div>}
+    <SystemReadingViews loveStatus={field?.id==='love'?loveStatus:undefined} key={fieldId} calculation={result} field={field}><PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/></SystemReadingViews>
+    {field?.id==='love'&&loveStatus==='single'&&<DatingArchetypePanel key={`${String(profileGender)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
     {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
       draft={outcomeDraft}

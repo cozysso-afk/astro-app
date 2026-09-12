@@ -24,6 +24,14 @@ export function defaultDatingPartnerGender(profileGender:unknown):'male'|'female
  return profileGender==='female'?'male':profileGender==='male'?'female':'neutral'
 }
 export type PortraitOptions={gender?:'male'|'female'|'neutral';style:'real'|'dream'|'illustration';frame:'face'|'half'|'full';outfit:'daily'|'date'|'meeting'}
+// Editorial mood references, never evidence of a future person's identity or attractiveness.
+export function datingCelebrityReference(style: keyof typeof DATING_VISUAL_STYLES, gender: PortraitOptions['gender']) {
+ const references = {
+  Venus: {male:'정해인의 부드러운 미소 · 공유의 편안하고 단정한 스타일',female:'정유미의 편안한 미소 · 김고은의 담백한 분위기'},
+  Mars: {male:'박서준의 활동적인 캐주얼 · 이제훈의 또렷한 인상',female:'한소희의 선명한 눈매 · 김세정의 생동감 있는 표정'},
+ }
+ return gender==='male'||gender==='female' ? references[style][gender] : '상대 성별을 고르면 그에 맞는 연예인 분위기 참고를 볼 수 있어.'
+}
 // Closed vocabulary: no name or free-form appearance field enters the image prompt.
 export function datingPortraitPrompt(options:PortraitOptions,language:'ko'|'en',style?:keyof typeof DATING_VISUAL_STYLES) {
  const person=options.gender ?? 'neutral'
@@ -31,7 +39,7 @@ export function datingPortraitPrompt(options:PortraitOptions,language:'ko'|'en',
  const subjectEn={male:'adult man',female:'adult woman',neutral:'adult person'}[person]
  const visual=style ? DATING_VISUAL_STYLES[style] : undefined
  const features=visual ? [visual.face,visual.eyes,visual.nose,visual.mouth,visual.hair,visual.fashion].join(', ') : ''
- const ko={style:{real:'일상에서 만날 법한 사람의 무보정 사진',dream:'달빛처럼 은은한 몽환적 실사',illustration:'섬세한 일러스트'},frame:{face:'얼굴 중심',half:'상반신',full:'전신'},outfit:{daily:'편안한 일상복',date:'단정한 데이트룩',meeting:'첫 만남의 자연스러운 옷차림'}}
- const en={style:{real:'unretouched everyday candid photograph of an ordinary-looking person',dream:'soft moonlit dreamy photorealism',illustration:'delicate illustration'},frame:{face:'face portrait',half:'half-body composition',full:'full-body composition'},outfit:{daily:'relaxed everyday outfit',date:'neat date outfit',meeting:'natural first-meeting outfit'}}
- return language==='ko'?`실존 인물이나 미래 배우자가 아닌 가상의 ${subjectKo}. ${ko.style[options.style]}, ${ko.frame[options.frame]}, ${ko.outfit[options.outfit]}. ${features}. 일상적인 배경과 평범한 창가 조명. 실제 피부결과 잔주름, 약한 좌우 비대칭을 유지. 아이돌·패션모델 같은 이상화, 조각 같은 턱선, 과장된 눈과 콧대, 비현실적인 신체 비율, 피부 보정과 뷰티 필터 금지. 특정 연예인을 닮게 하지 말 것. 얼굴과 신체는 창작 모델의 연출이며 계산된 예측이 아니다.`:`A fictional ${subjectEn}, not a real person or a predicted future spouse. ${en.style[options.style]}, ${en.frame[options.frame]}, ${en.outfit[options.outfit]}. ${visual?.en ?? ''}. Everyday surroundings and ordinary window light. Preserve natural skin texture, fine lines and mild facial asymmetry. No idol or fashion-model idealization, sculpted jawline, exaggerated eyes or nose, unrealistic body proportions, skin retouching or beauty filters. Do not resemble a particular celebrity. Face and body are artistic choices, not calculated predictions.`
+ const ko={style:{real:'자연스러운 매력이 있는 사람의 일상 실사 · 과한 보정 없음',dream:'달빛처럼 은은한 몽환적 실사',illustration:'섬세한 일러스트'},frame:{face:'얼굴 중심',half:'상반신',full:'전신'},outfit:{daily:'편안한 일상복',date:'단정한 데이트룩',meeting:'첫 만남의 자연스러운 옷차림'}}
+ const en={style:{real:'unretouched everyday candid photograph with natural, approachable charm',dream:'soft moonlit dreamy photorealism',illustration:'delicate illustration'},frame:{face:'face portrait',half:'half-body composition',full:'full-body composition'},outfit:{daily:'relaxed everyday outfit',date:'neat date outfit',meeting:'natural first-meeting outfit'}}
+ return language==='ko'?`실존 인물이나 미래 배우자가 아닌 가상의 한국인 ${subjectKo}. ${ko.style[options.style]}, ${ko.frame[options.frame]}, ${ko.outfit[options.outfit]}. ${features}. ${person==='male'?'깔끔하게 면도한 얼굴. ':''}편안한 일상 배경과 부드러운 자연광. 자연스러운 피부결. 현실적인 비율 안에서 깔끔하고 호감 가는 분위기. 주름이나 피로감을 일부러 더하지 않고 피부를 플라스틱처럼 매끈하게 만들지 않는다. 특정 연예인을 닮게 하지 말 것. 얼굴과 신체는 창작 모델의 연출이며 계산된 예측이 아니다.`:`A fictional Korean ${subjectEn}, not a real person or a predicted future spouse. ${en.style[options.style]}, ${en.frame[options.frame]}, ${en.outfit[options.outfit]}. ${visual?.en ?? ''}. ${person==='male'?'Clean-shaven face. ':''}Relaxed everyday surroundings and soft daylight. Natural skin texture, realistic proportions with neat, approachable charm. Do not add wrinkles, tiredness or artificially aged features. No plastic-smooth skin or beauty filters. Do not resemble a particular celebrity. Face and body are artistic choices, not calculated predictions.`
 }

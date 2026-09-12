@@ -1,3 +1,4 @@
+import { lovePromptContext, type LoveStatus } from './lib/loveReadingContext'
 import { SystemReadingViews } from './SystemReadingViews'
 import { fortuneField } from './lib/fortuneFields'
 import { THREE_SYSTEM_INSTRUCTIONS } from './lib/systemReading'
@@ -378,6 +379,7 @@ export default function AppNext() {
   const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
   const [selectedTool, setSelectedTool] = useState<ToolKey | null>(null)
+  const [loveStatus, setLoveStatus] = useState<LoveStatus>('single')
   const [fortuneFieldId, setFortuneFieldId] = useState<string | undefined>()
   const [relationshipMode, setRelationshipMode] = useState<RelationshipStatus>('dating')
   const [relationshipPurpose, setRelationshipPurpose] = useState<RelationshipPurpose>('compatibility')
@@ -1158,14 +1160,14 @@ export default function AppNext() {
     if (!calculation) return
     try {
       if (mode === 'compact') {
-        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics), mode)
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics, fortuneFieldId==='love'?lovePromptContext(loveStatus):''), mode)
         return
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      await copyExternalPrompt(THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
+      await copyExternalPrompt((fortuneFieldId==='love'?lovePromptContext(loveStatus):'') + THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
     } catch (error) {
       setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
@@ -1729,6 +1731,8 @@ export default function AppNext() {
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
               profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
+              loveStatus={loveStatus}
+              onLoveStatusChange={setLoveStatus}
               fieldId={fortuneFieldId}
               period={period}
               periodLabel={period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}

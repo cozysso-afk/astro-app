@@ -5,7 +5,7 @@ import {createElement as h} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
 import {fileURLToPath} from 'node:url'
 import {fortuneFixture} from './readingExperience.fixtures.mjs'
-let server,systems,Views,fields,summary,compact,dating
+let server,systems,Views,fields,summary,compact,dating,love
 before(async()=>{
  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
  systems=await server.ssrLoadModule('/src/lib/systemReading.ts')
@@ -14,6 +14,7 @@ before(async()=>{
  summary=await server.ssrLoadModule('/src/lib/fortuneUserSummary.ts')
  compact=await server.ssrLoadModule('/src/lib/compactDeepPrompt.ts')
  dating=await server.ssrLoadModule('/src/lib/datingArchetype.ts')
+ love=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
 })
 after(async()=>server?.close())
 function fixture(period='today',provisional=false){
@@ -112,8 +113,8 @@ test('portrait copy respects explicit subject and ordinary unretouched appearanc
   const kr=dating.datingPortraitPrompt({...options,gender},'ko','Venus')
   const english=dating.datingPortraitPrompt({...options,gender},'en','Venus')
   assert.ok(kr.includes(ko));assert.ok(english.includes(en))
-  assert.match(kr,/무보정/);assert.match(kr,/좌우 비대칭/)
-  assert.match(english,/unretouched/);assert.match(english,/No idol or fashion-model idealization/)
+  assert.match(kr,/한국인/);assert.match(kr,/주름이나 피로감을 일부러 더하지/)
+  assert.match(english,/unretouched/);assert.match(english,/Korean/);assert.doesNotMatch(kr+english,/30대|thirties|fine lines and mild facial asymmetry/)
   assert.doesNotMatch(kr+english,/정유미|공유|Jung Yu|Gong Yoo/)
  }
 })
@@ -132,4 +133,36 @@ test('dating default follows the calculation profile, not a fixed male subject',
  const options={style:'real',frame:'half',outfit:'daily',gender:dating.defaultDatingPartnerGender('male')}
  assert.match(dating.datingPortraitPrompt(options,'ko'),/성인 여성/)
  assert.match(dating.datingPortraitPrompt(options,'en'),/adult woman/)
+})
+
+for (const period of ['today','week','month','year']) test(`love ${period}: single/couple preserve calculations, evidence and timing`,()=>{
+ const f=fixture(period), before=JSON.stringify(f.calculation)
+ const base=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['연애','연락']})
+ const single=love.applyLoveContext(base,f.calculation,'single'),couple=love.applyLoveContext(base,f.calculation,'couple')
+ assert.match(single.headline,/싱글/);assert.match(couple.headline,/커플/)
+ assert.match(single.focusTopics[0].action,/새로운 사람/);assert.match(couple.focusTopics[0].action,/함께 보낼 시간/)
+ assert.notEqual(single.focusTopics[0].conclusion,couple.focusTopics[0].conclusion)
+ for(const view of [single,couple]){
+  assert.equal(view.periodKind,base.periodKind)
+  assert.deepEqual(view.focusTopics.map(t=>t.reason),base.focusTopics.map(t=>t.reason))
+  assert.deepEqual(view.focusTopics.map(t=>t.timing),base.focusTopics.map(t=>t.timing))
+  assert.equal(view.relationship.incomingBand,base.relationship.incomingBand)
+  assert.equal(view.relationship.outgoingBand,base.relationship.outgoingBand)
+  assert.equal(view.relationship.reconnection,undefined)
+ }
+ for(const mode of ['single','couple']){
+  const prompt=compact.buildExternalCompactPrompt(f.calculation,f.data,false,['연애','연락'],love.lovePromptContext(mode))
+  assert.ok(prompt.length<=7500);assert.ok(prompt.includes('LOVE_STATUS='+mode))
+ }
+ assert.equal(JSON.stringify(f.calculation),before)
+})
+test('celebrity mood references follow selected partner gender but never enter portrait copy',()=>{
+ for(const style of ['Venus','Mars']){
+  assert.notEqual(dating.datingCelebrityReference(style,'male'),dating.datingCelebrityReference(style,'female'))
+  for(const gender of ['male','female'])for(const language of ['ko','en']){
+   const prompt=dating.datingPortraitPrompt({gender,style:'real',frame:'half',outfit:'daily'},language,style)
+   assert.doesNotMatch(prompt,/정해인|공유|정유미|김고은|박서준|이제훈|한소희|김세정/)
+   assert.doesNotMatch(prompt,/20대|30대|40대|무쌍|속쌍|쌍꺼풀/)
+  }
+ }
 })
