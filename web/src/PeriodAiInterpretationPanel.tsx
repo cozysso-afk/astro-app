@@ -73,7 +73,9 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
-  const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
+  const narrativeValidation = result.usage?.quality_validation
+  const verifiedNarrative = !westernOnly && !narrativeValidation?.stages?.some(stage=>!stage.passed) && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && !result.usage?.degraded_quality && (narrativeValidation?.score === 100 || Boolean(narrativeValidation?.stages?.length && narrativeValidation.stages.every(stage=>stage.passed)))
+  const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'

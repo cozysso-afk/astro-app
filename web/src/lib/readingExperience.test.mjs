@@ -166,14 +166,14 @@ test('relationship reasons distinguish Mercury/Uranus, Venus/Mars, and Saturn ra
 
 test('same-direction evidence is grouped once; opposing evidence and raw payload survive',()=>{
   const f=fortuneFixture()
-  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Moon',contribution:2})
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Moon',contribution:2,polarity:0.3})
   const before=JSON.stringify(f)
   let reason=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').reason
   assert.match(reason,/수성과 목성/); assert.match(reason,/달/)
   assert.equal((reason.match(/힘이 실려/g)||[]).length,1)
   assert.doesNotMatch(reason,/과정에 힘을 보태는|orb|W:/)
   assert.equal(JSON.stringify(f),before)
-  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Saturn',contribution:-4})
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['대인관계'],transit:'Saturn',contribution:4,polarity:-0.55})
   reason=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').reason
   assert.match(reason,/토성/); assert.match(reason,/마찰이나 부담/); assert.match(reason,/힘이 실려/)
 })

@@ -29,26 +29,18 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
   }
   const love = copy('연애',calculation.western.overall['연애'])
   const periodAction = flirting ? (summary.periodKind==='day'?'오늘의 한 번의 대화보다 다음 약속이 구체화되는지 살펴.':summary.periodKind==='week'?'이번 주 여러 번의 교류에서 관심과 행동이 일관되는지 살펴.':summary.periodKind==='month'?'이번 달은 대화가 이어지는 단계와 관계 기대를 확인하는 단계를 구분해.':'올해는 반복되는 교류 방식과 내가 원하는 관계가 맞는지를 긴 흐름으로 살펴.') : intimate ? (summary.periodKind==='day'?'오늘 만남의 분위기와 내가 원하는 관계를 구분해 생각해.':summary.periodKind==='week'?'이번 주 만남 전후의 소통과 경계가 일관되게 존중되는지 살펴.':summary.periodKind==='month'?'이번 달 반복되는 만남 방식이 서로의 기대에 맞는지 돌아볼 수 있어.':'올해는 친밀감의 강도보다 원하는 관계와 생활 방식이 지속적으로 맞는지 살펴.') : summary.periodKind==='day' ? '오늘은 소개를 부탁할지, 초대를 수락할지처럼 한 가지 작은 선택부터 정리해.' : summary.periodKind==='week' ? '이번 주에는 만남에 쓸 수 있는 날을 먼저 정하고, 실제로 잡힌 제의나 일정에 맞춰 움직여.' : summary.periodKind==='month' ? '이번 달은 소개·모임의 접점을 만드는 단계와 첫 만남 뒤 다시 만날지 확인하는 단계를 나눠 생각해.' : '올해는 생활 반경과 사람을 만나는 경로부터 살피고, 실제 제의가 생긴 시기에 맞춰 만남의 속도를 정해.'
-  const directionCopy = (direction:'incoming'|'outgoing',band?:string) => {
-    if(!band||band==='정보 부족')return '이 방향을 읽을 독립 계산 근거가 부족해. 소개팅 제의나 먼저 연락할 시점을 단정하지 않아.'
-    const low=band==='약함',high=band==='강함'
-    if(flirting||intimate)return direction==='incoming'?`수신 흐름은 ${band}이야. 실제로 먼저 안부를 묻거나 다음 약속을 제안하는지 관찰해. 이것만으로 ${intimate?'친밀한 만남 이후의 애정이나 독점적 관계':'연애 감정이나 교제 의사'}를 확정하지 않아.`:`발신 흐름은 ${band}이야. ${low?'확답을 서두르기보다 내가 원하는 연락·만남 방식을 정리해.':'안부나 만남 제안, 원하는 관계에 대한 대화를 구체적으로 꺼낼지 검토해.'} ${intimate?'신체적 친밀감에 대한 동의와 연애 관계에 대한 합의는 별개야.':'내가 먼저 움직이는 것과 상호 호감은 별개야.'}`
-    return direction==='incoming'
-      ? `다른 쪽에서 접점이 생기는 흐름은 ${band}으로 잡혀 있어. ${low?'소개팅 제의나 먼저 오는 연락을 당연하게 기대하기보다 실제 제안이 있는지 확인해.':high?'지인의 소개 제의나 새 사람의 첫 인사가 실제로 있다면 내용과 일정을 살펴볼 수 있어.':'소개나 첫 인사가 실제로 생겼을 때 구체적인 만남으로 이어지는지 확인해.'} 누가 소개를 해주거나 연락한다는 예측은 아니야.`
-      : `내가 접점을 만드는 흐름은 ${band}이야. ${low?'소개를 무리하게 부탁하거나 만남 일정을 몰기보다 원하는 만남의 조건부터 정리해.':'믿는 지인에게 소개를 부탁하거나 관심 있는 모임에 문의하는 작은 행동을 검토해.'} 먼저 움직이는 것과 실제 소개·만남이 성사되는 것은 별개야.`
-  }
-  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows.filter(r=>['연애','연락',...(single?['재회']:[])].includes(r.topic)).map(r=>({...r,meaning: r.topic==='재회' ? '재접촉과 관계 회복을 구분해' : r.topic==='연애' ? caution ? '관계의 속도와 서로의 기대를 확인해' : '만남과 관계 탐색에 시간을 써봐' : caution ? '먼저 연락한다면 짧고 구체적으로' : '안부·질문·약속을 먼저 꺼내보기'}))
+  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows.filter(r=>['연애','연락',...(single?['재회']:[])].includes(r.topic)).map(r=>({...r,meaning: r.topic==='재회' ? '재접촉과 관계 회복을 구분해' : r.topic==='연애' ? caution ? '관계의 속도와 서로의 기대를 확인해' : '만남과 관계 탐색의 흐름을 살펴봐' : '받는 연락과 먼저 보내는 연락을 나눠 읽어'}))
   const relationship = summary.relationship ? {...summary.relationship,
     summary: flirting?'썸·알아가는 사이의 수신과 발신이야. 아직 연인이라고 전제하지 않아.':intimate?'친밀감이 있는 미정 관계의 수신과 발신이야. 연락을 애정이나 관계 약속으로 바로 바꾸지 않아.':single ? '대화할 사람이 생겼을 때의 수신·발신 흐름을 따로 읽어. 특정 상대가 이미 있다고 전제하지 않아.' : '연인과 주고받는 연락의 두 방향을 구분해. 상대의 속마음을 확정하는 값은 아니야.',
-    incoming:status!=='couple'?directionCopy('incoming',summary.relationship.incomingBand):summary.relationship.incoming,
-    outgoing:status!=='couple'?directionCopy('outgoing',summary.relationship.outgoingBand):summary.relationship.outgoing,
+    incoming:summary.relationship.incoming,
+    outgoing:summary.relationship.outgoing,
     ...(single && Number.isFinite(calculation.western.relationship_signals?.['과거인연접점']?.average) ? {} : {reconnection:undefined,reconnectionBand:undefined,reconnectionTiming:undefined}),
   } : undefined
-  return {...summary,headline:`${summary.when} · ${contextLabel} 흐름`,summary:love.conclusion+' '+(single?'새 인연·썸·친밀한 관계·과거 인연 중 내 상황에 해당하는 해설을 함께 읽어봐.':status!=='couple'?periodAction:'현재 관계의 일정과 대화 방식을 조율하는 관점으로 읽어.'),
+  return {...summary,headline:`${summary.when} · ${contextLabel} 흐름`,summary:summary.summary+' '+(flirting?'썸·알아가는 관계의 맥락이야. ':intimate?'신체적 친밀감이 있어도 관계의 약속은 별도로 확인할 부분이야. ':'')+(single?'새 인연·썸·친밀한 관계·과거 인연 중 내 상황에 해당하는 해설을 함께 읽어봐.':status!=='couple'?periodAction:'현재 관계의 일정과 대화 방식을 조율하는 관점으로 읽어.'),
     doItems:[love.action],cautionItems:[love.caution],
     favorableCards:cards(summary.favorableCards,false),cautionCards:cards(summary.cautionCards,true),relationship,
-    focusTopics:summary.focusTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>{if(t.topic==='재회')return t;const c=copy(t.topic,calculation.western.overall[t.topic]);return {...t,conclusion:c.conclusion,action:c.action,observe:undefined,caution:c.caution}}),
-    referenceTopics:summary.referenceTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>t.topic==='재회'?t:({...t,summary:copy(t.topic,calculation.western.overall[t.topic]).conclusion})),
+    focusTopics:summary.focusTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>{if(t.topic==='재회')return t;const c=copy(t.topic,calculation.western.overall[t.topic]);return {...t,conclusion:t.conclusion,action:t.topic==='연락'?t.action:c.action,observe:t.observe,caution:c.caution}}),
+    referenceTopics:summary.referenceTopics.filter(t=>['연애','연락',...(single?['재회']:[])].includes(t.topic)).map(t=>t.topic==='재회'?t:({...t,summary:t.summary})),
     importantWindows:summary.importantWindows,
   }
 }
