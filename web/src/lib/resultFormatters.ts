@@ -1,3 +1,4 @@
+import { buildExternalCompactPrompt, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
 import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
 import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext } from '../appTypes'
 import { topicOrder } from './fortuneTopics'
@@ -14,7 +15,8 @@ export function aspectText(aspect: Aspect) {
   return `${planetLabels[aspect.a] ?? aspect.a} · ${planetLabels[aspect.b] ?? aspect.b} ${aspectLabels[aspect.aspect] ?? aspect.aspect}`
 }
 
-export function integratedPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null) {
+export function integratedPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null, mode: ExternalCopyMode = 'full') {
+  if (mode === 'compact' && calculation) return buildExternalCompactPrompt(calculation)
   const profile = (request.profile ?? {}) as Record<string, unknown>
   return [
     '[별빛의 운명 · 통합운세 분석 요청]',
@@ -328,7 +330,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
   }
 }
 
-export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null) {
+export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null, mode: ExternalCopyMode = 'full') {
   const user = (request.user ?? {}) as Record<string, unknown>
   const cp = (request.counterpart ?? {}) as Record<string, unknown>
   const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
@@ -375,6 +377,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '실제로 있는 날짜만 쓰고 상대 속마음·사건 확률·새 점수·없는 애스펙트를 만들지 않는다.',
     '한국어 상담형 문단으로 전문용어를 풀어라. 한줄 나열·의미 없는 장황함·같은 결론과 어미 반복·evidence ID·JSON 필드명 낭독을 피한다.',
   ].filter(Boolean)
+  if (mode === 'compact') return buildRelationshipCompactPrompt(intro.join('\n'),kind,request,calculation,reunionContext)
   let prompt = ''
   for (let level=0; level<=2; level++) {
     const packet = compactRelationshipExternalPacket(calculation,reunionContext,level)
@@ -435,7 +438,8 @@ export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marr
   return lines.join('\n')
 }
 
-export function precisionPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null) {
+export function precisionPromptText(request: Record<string, unknown>, calculation?: IntegratedApiResponse | null, mode: ExternalCopyMode = 'full') {
+  if (mode === 'compact' && calculation) return buildExternalCompactPrompt(calculation,undefined,true)
   return integratedPromptText(request, calculation)
     .replace('[별빛의 운명 · 통합운세 분석 요청]', '[별빛의 운명 · 정밀분석 요청]')
     .replace('[외부 AI 해석 지시]', '[외부 AI 해석 지시]\n[정밀분석 표시 원칙]\n- 요약 점수를 새로 만들지 않고 동일 실계산의 원자료를 더 자세히 펼쳐본다.\n- 엔진이 계산하지 않은 항목은 추정하지 않는다.')

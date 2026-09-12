@@ -1,3 +1,5 @@
+import { ExternalPromptCopy } from './ExternalPromptCopy'
+import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { AlertTriangle, CheckCircle2, Cloud, Copy, Save, Sun } from 'lucide-react'
 import type { FortuneStat, IntegratedApiResponse } from './appTypes'
 
@@ -13,7 +15,7 @@ type PrecisionResultsProps = {
   actionNotice: string
   archiveStatus: string
   archiveSaving: boolean
-  onCopyPrompt: () => void
+  onCopyPrompt: (mode?: ExternalCopyMode) => void
   onCopyResult: () => void
   onSave: () => void
 }
@@ -27,7 +29,7 @@ export function PrecisionResults({ result, topTopics, relationshipSignals, topic
     <div className="result-headline"><CheckCircle2 size={20}/><div><strong>정밀 실계산 준비 완료</strong><span>{result.period.day_count}일 분석 · 원자료 확장 보기</span></div></div>
     {precision && <div className={`status-banner ${provisional?'subtle':''}`}><AlertTriangle size={16}/><span>{provisional?'출생시간 잠정 모드 · 출생 Moon·ASC/MC·하우스·정확 시간대는 계산/AI 근거에서 제외했어.':'출생시간 검증 모드 · 전체 정밀 레이어 사용 가능'}</span></div>}
     <div className="result-actions">
-      <button type="button" onClick={onCopyPrompt}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+      <ExternalPromptCopy onCopy={onCopyPrompt}/>
       <button type="button" onClick={onCopyResult}><Copy size={15}/><span>결과 전체복사</span></button>
       <button className="save-action" type="button" onClick={onSave} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'정밀 기록 저장'}</span></button>
     </div>

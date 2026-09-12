@@ -1,4 +1,6 @@
-import { upgradeCopiedFortunePrompt } from './lib/precisionTransport'
+import { ExternalPromptCopy } from './ExternalPromptCopy'
+import { buildExternalCompactPrompt, promptCopyNotice, type ExternalCopyMode } from './lib/compactDeepPrompt'
+import { upgradeCopiedFortunePrompt, sanitizeExternalFortuneText } from './lib/precisionTransport'
 import { relationshipAiSuccess, relationshipAiInvokeErrorMessage, relationshipAiCatchMessage, RelationshipAiPublicError } from './lib/relationshipAiPublicError'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -1135,17 +1137,30 @@ export default function AppNext() {
   }
 
 
-  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult) {
+  async function copyExternalPrompt(build: string | (() => string), mode: ExternalCopyMode) {
+    try {
+      const text = sanitizeExternalFortuneText(typeof build === 'function' ? build() : build)
+      const ok = await copyToClipboard(text)
+      setActionNotice(ok ? promptCopyNotice(text,mode) : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : '프롬프트를 만들지 못했어. 다시 시도해줘.')
+    }
+    window.setTimeout(()=>setActionNotice(''),4200)
+  }
+
+
+  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult, mode: ExternalCopyMode = 'compact') {
     if (!calculation) return
     try {
+      if (mode === 'compact') {
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data), mode)
+        return
+      }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      const ok = await copyToClipboard(upgradeCopiedFortunePrompt(String(data.prompt), calculation))
-      const estimated = Number(data.estimated_input_tokens ?? 0)
-      setActionNotice(ok ? `AI용 압축 프롬프트 복사 완료${estimated > 0 ? ` · 예상 입력 약 ${estimated.toLocaleString()} tokens` : ''}` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
-      window.setTimeout(() => setActionNotice(''), 3200)
+      await copyExternalPrompt(upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
     } catch (error) {
       setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
@@ -1539,7 +1554,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
-              <PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={()=>void copyAiInterpretationPrompt(integratedResult)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
               <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
@@ -1592,7 +1607,7 @@ export default function AppNext() {
               </details>}
               </>}/>
               <div className="result-actions">
-                <button type="button" onClick={()=>integratedRequestSnapshot && handleCopy('요청/프롬프트 전체복사', integratedPromptText(integratedRequestSnapshot, integratedResult))}><Copy size={15}/><span>요청/프롬프트 전체복사</span></button>
+                <ExternalPromptCopy onCopy={mode=>{if(integratedRequestSnapshot) void copyExternalPrompt(()=>integratedPromptText(integratedRequestSnapshot,integratedResult,mode),mode)}}/>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', integratedResultText(integratedResult))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveIntegratedRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
@@ -1648,7 +1663,7 @@ export default function AppNext() {
             {!isPersonalMarriage&&relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
               <div className="result-actions">
-                <button type="button" onClick={()=>relationshipRequestSnapshot && handleCopy('외부 AI용 압축 프롬프트 복사', relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipRequestSnapshot, relationshipResult, reunionTiming))}><Copy size={15}/><span>외부 AI용 압축 프롬프트</span></button>
+                <ExternalPromptCopy onCopy={mode=>{if(relationshipRequestSnapshot) void copyExternalPrompt(()=>relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose,relationshipRequestSnapshot,relationshipResult,reunionTiming,mode),mode)}}/>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveRelationshipRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>
@@ -1687,7 +1702,7 @@ export default function AppNext() {
               actionNotice={actionNotice}
               archiveStatus={archiveStatus}
               archiveSaving={archiveSaving}
-              onCopyPrompt={()=>{ if (integratedRequestSnapshot) void handleCopy('정밀 요청/프롬프트 전체복사', precisionPromptText(integratedRequestSnapshot, integratedResult)) }}
+              onCopyPrompt={(mode='compact')=>{ if (integratedRequestSnapshot) void copyExternalPrompt(()=>precisionPromptText(integratedRequestSnapshot, integratedResult,mode),mode) }}
               onCopyResult={()=>void handleCopy('정밀 결과 전체복사', precisionResultText(integratedResult))}
               onSave={()=>void savePrecisionRecord()}
             />}
@@ -1723,7 +1738,7 @@ export default function AppNext() {
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
               onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
-              onCopyAiPrompt={()=>void copyAiInterpretationPrompt(integratedResult)}
+              onCopyAiPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}
               onOutcomeChange={setOutcomeDraft}
