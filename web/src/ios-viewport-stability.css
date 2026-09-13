@@ -1,0 +1,51 @@
+/* iOS/PWA viewport stability
+   Keep the document itself from rubber-banding or panning sideways while
+   preserving intentional horizontal scrollers inside the app. */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+  html,
+  body,
+  #root {
+    overflow-x: clip;
+  }
+}
+
+html,
+body {
+  overscroll-behavior-x: none;
+}
+
+#root {
+  min-width: 0;
+}
+
+/* AuthGate renders outside .app-shell, so it needs its own iOS touch guard. */
+.private-auth-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
+@supports (overflow: clip) {
+  .private-auth-shell {
+    overflow-x: clip;
+  }
+}
+
+/* The authenticated app already clips decorative overflow; keep it bounded
+   without disabling horizontal scrolling on nested carousels/selectors. */
+.app-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}

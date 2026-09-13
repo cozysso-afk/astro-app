@@ -27,6 +27,7 @@ import './mobile-type-v28.css'
 import './mobile-density-v29.css'
 import './auth.css'
 import './home-moonlit.css'
+import './ios-viewport-stability.css'
 import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
