@@ -6,7 +6,7 @@ const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.
 try {
  const {buildFortuneUserSummary:build}=await server.ssrLoadModule('/src/lib/fortuneUserSummary.ts')
  const {applyLoveContext}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
- const {lensForTopic,TEN_GOD_LENSES,thaiPlacementComparison}=await server.ssrLoadModule('/src/lib/systemReading.ts')
+ const {lensForTopic,TEN_GOD_LENSES,thaiPlacementComparison,thaiPeriodLabel,BHUMI_LENSES}=await server.ssrLoadModule('/src/lib/systemReading.ts')
  for(const period of ['today','week','month','year']) {
   const f=fortuneFixture(period)
   const context={...f.context,focusTopics:['대인관계','연락']}
@@ -48,9 +48,18 @@ try {
   assert.notEqual(relational.meaning,lens.meaning)
   assert.match(relational.limit,/판정한 결과는 아니야/)
  }
+ assert.equal(Object.keys(BHUMI_LENSES).length,8)
+ for(const lens of Object.values(BHUMI_LENSES)) {
+  assert.ok(lens.meaning.length>30)
+  assert.ok(lens.action.length>20)
+  assert.doesNotMatch(lens.meaning+lens.action,/사건의 발생 시각|호전·악화/)
+ }
  const natal=[{bhumi_key:'boriwan',planet:{label:'Sun'}}]
- assert.match(thaiPlacementComparison({bhumi_key:'boriwan',planet:{label:'Moon'}},natal,false),/태양.*달.*바뀌어/)
- assert.match(thaiPlacementComparison(natal[0],natal,false),/출생 배치와 같아/)
- assert.match(thaiPlacementComparison(natal[0],natal,true),/같은 출생 배경/)
- console.log('Reading regression: four periods, unsigned contribution, mixed/missing polarity, directional separation, context preservation, validated narrative and Saju/Thai evidence passed.')
+ assert.match(thaiPlacementComparison({bhumi_key:'boriwan',planet:{label:'Moon'}},natal,false),/계산 근거.*태양.*달/)
+ assert.doesNotMatch(thaiPlacementComparison({bhumi_key:'boriwan',planet:{label:'Moon'}},natal,false),/호전|악화|좋은 운|나쁜 운/)
+ assert.match(thaiPlacementComparison(natal[0],natal,false),/같은 행성/)
+ assert.match(thaiPlacementComparison(natal[0],natal,true),/출생 배치/)
+ assert.equal(thaiPeriodLabel('2026-09-16','2026-09-16'),'선택 날짜의 연간 배치 · 2026-09-16')
+ assert.equal(thaiPeriodLabel('2026-09-16','2026-09-20'),'선택 기간의 연간 배치 · 2026-09-16–2026-09-20')
+ console.log('Reading regression: four periods, unsigned contribution, mixed/missing polarity, directional separation, context preservation, validated narrative and plain-language Saju/Thai evidence passed.')
 } finally {await server.close()}
