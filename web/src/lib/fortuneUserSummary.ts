@@ -373,6 +373,8 @@ function topicTiming(context: FortuneUserSummaryContext, topic: string, level: F
 }
 function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext, topic: string, row: AiTopicInterpretation, level: FlowLevel) {
   const linked = linkedEvidence(context, topic)
+  // Explain the strongest existing signals once per direction, not one repeated
+  // template per planet. Keep conflicting directions separate and leave raw data intact.
   const signals = linked.map(({ date, evidence }) => {
     const names = unique([planetName(evidence.transit), planetName(evidence.target)].filter(Boolean), 2)
     if (!names.length) return null
@@ -380,6 +382,7 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     const aspect = evidence.aspect ? ASPECT_WORDING[evidence.aspect] : undefined
     const source = aspect && names.length === 2 ? `${subject}${particle(subject, '이', '가')} ${aspect}` : `${subject}의 움직임`
     const value = evidence.contribution
+    // contribution is unsigned activation; polarity alone carries direction.
     const signed = typeof evidence.polarity === 'number' && Number.isFinite(evidence.polarity) ? Math.sign(evidence.polarity) : null
     return { source, signed, date, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
   }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.strength - a.strength)
@@ -395,6 +398,7 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
       : sign === -1 ? `${source} ${area} 마찰이나 부담이 생기기 쉬워.`
       : `${sources.join(', ')} 신호는 보이지만, 이 신호만으로 유리하거나 불리하다고 단정하기는 어려워.`)
   }
+  // A shared reference is required: never attach a whole-period system statement to an unrelated topic.
   const refs = new Set(row.evidence_refs ?? [])
   const cross = (data.cross_checks ?? []).find(check => check.start >= context.calculation.period.start && (check.end || check.start) >= check.start && (check.end || check.start) <= context.calculation.period.end && check.evidence_refs?.some(ref => refs.has(ref)) && check.western && (check.saju || check.thai))
   if (cross) {
@@ -563,6 +567,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   const frame = frameFor(context.period, context.calculation.period.day_count)
   const importance = (value: AiTopicInterpretation['importance']) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
   const entries = new Map(context.topicEntries)
+  // A missing AI paragraph must not remove a requested/calculated domain.
   for (const topic of context.focusTopics ?? Object.keys(context.calculation.western.overall).filter(topic => topic in FLOW_COPY)) {
     if (!entries.has(topic)) entries.set(topic, {importance:'참고',verdict:'',reason:'',timing:'',action:'',avoid:'',confidence:'낮음',confidence_reason:'해설 누락으로 계산 기반 요약 표시',evidence_refs:[]})
   }
@@ -570,6 +575,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     const stat = topicStat(context, topic)
     const score = stat && Number.isFinite(stat.average) ? stat.average : null
     const position = (data.priorities ?? []).findIndex(text => text.includes(topic))
+    // Risk intensity is not a favorable score. This changes polarity, never domain priority.
     const favorable = score === null ? null : topic === '투자주의' ? 100 - score : score
     return { topic, interpretation, score, favorable, level: flowLevel(stat), support: linkedEvidence(context, topic).length + (interpretation.evidence_refs?.length ?? 0), priority: position < 0 ? Infinity : position }
   })
@@ -581,8 +587,10 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     return weighted(b) - weighted(a) || b.support - a.support || a.priority - b.priority || a.topic.localeCompare(b.topic, 'ko')
   }
   const primary = normalized.filter(row => importance(row.interpretation.importance) < 2)
+  // Positive and weak signals are independent lists. A neutral score is not invented into a favorable signal.
   const eligible = normalized.filter(row => importance(row.interpretation.importance) < 2 || row.support > 0)
-  const bestCandidates = eligible.filter(row => row.favorable !== null && row.favorable >= 55 && row.topic !== '투자주의').sort(rank('best'))
+  const consistency = relationshipConsistency(context)
+  const bestCandidates = eligible.filter(row => row.favorable !== null && row.favorable >= 55 && row.topic !== '투자주의' && !(row.topic === '재회' && consistency.blockReconnectionAction)).sort(rank('best'))
   const cautionCandidates = eligible.filter(row => row.favorable !== null && row.favorable <= 45).sort(rank('caution'))
   const best = bestCandidates.slice(0, 2)
   const caution = cautionCandidates.slice(0, 2)
@@ -590,7 +598,6 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   const bestFlow = best.map(row => row.topic)
   const cautionFlow = caution.map(row => row.topic)
   const when = frame.when
-  const consistency = relationshipConsistency(context)
   const headline = buildHeadline(when, bestFlow, cautionFlow, consistency)
   const directions = relationshipSummary(context, new Set(normalized.map(row => row.topic)), frame.kind)
   const explainTopic = ({ topic, interpretation, level, score }: typeof normalized[number]): FortuneUserTopic => {
