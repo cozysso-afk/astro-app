@@ -15,6 +15,14 @@ export const TEN_GOD_LENSES: Record<string, Lens> = {
 }
 const GODS: Record<string,string> = {'比肩(비견)':'비겁','劫財(겁재)':'비겁','食神(식신)':'식상','傷官(상관)':'식상','偏財(편재)':'재성','正財(정재)':'재성','七殺(칠살·편관)':'관성','正官(정관)':'관성','偏印(편인)':'인성','正印(정인)':'인성'}
 export function tenGodLens(value: string): Lens | undefined { return TEN_GOD_LENSES[GODS[value]] }
+const GANZHI_READINGS: Record<string,string> = {甲:'갑',乙:'을',丙:'병',丁:'정',戊:'무',己:'기',庚:'경',辛:'신',壬:'임',癸:'계',子:'자',丑:'축',寅:'인',卯:'묘',辰:'진',巳:'사',午:'오',未:'미',申:'신',酉:'유',戌:'술',亥:'해'}
+export function ganzhiWithReading(value: string) {
+  const text = String(value ?? '').trim()
+  if (!text || text.includes('(')) return text
+  const chars = [...text]
+  const readings = chars.map(char=>GANZHI_READINGS[char])
+  return readings.every(Boolean) ? `${text}(${readings.join('')})` : text
+}
 export const BHUMI_LENSES: Record<string,Lens> = {
   boriwan:{key:'boriwan',topic:'대인',title:'주변 사람 · 관계망',meaning:'주변 사람과 맺고 있는 연결을 읽는 영역이야. 일상에서는 누구와 자주 이야기하고, 어떤 부탁과 도움을 주고받는지로 구체화할 수 있어.',action:'누구와 연결돼 있고 어떤 도움이나 요청을 주고받는지 살펴봐.',limit:'애정 성립이나 상대의 접근을 예측하지 않아.'},
   ayu:{key:'ayu',topic:'컨디션',title:'생활력 · 지속',meaning:'생활을 꾸준히 이어가는 리듬을 읽는 영역이야. 하루를 버티는 강도보다 며칠이고 유지할 수 있는 일정과 회복 시간을 돌아보는 데 써.',action:'수면과 일정, 회복 시간을 함께 돌아보고 지속 가능한 강도를 정해.',limit:'건강 상태나 질병을 판단하는 자료는 아니야.'},
@@ -48,7 +56,7 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const segments = thai?.taksajorn?.available ? thai.taksajorn.segments.filter(r=>r.start.slice(0,10)<=c.period.end && r.end.slice(0,10)>=c.period.start) : []
   const natalWheel = thai?.mahathaksa?.available ? thai.mahathaksa.wheel.filter(r=>BHUMI_LENSES[r.bhumi_key]) : []
   const wheels = segments.map(r=>({...r,wheel:r.wheel.filter(w=>BHUMI_LENSES[w.bhumi_key])}))
-  const sajuSummary = contexts.length ? [...new Set(contexts.map(row=>`${row.layer} ${row.ganzhi}의 ${row.stem_ten_god}은 ${tenGodLens(row.stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.`))].slice(0, 3).join(' ') + (contexts.length > 3 ? ' 나머지 절기 구간은 아래에서 날짜별로 이어서 볼 수 있어.' : '') : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
+  const sajuSummary = contexts.length ? [...new Set(contexts.map(row=>`${row.layer} ${ganzhiWithReading(row.ganzhi)}의 ${row.stem_ten_god}은 ${tenGodLens(row.stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.`))].slice(0, 3).join(' ') + (contexts.length > 3 ? ' 나머지 절기 구간은 아래에서 날짜별로 이어서 볼 수 있어.' : '') : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
   const thaiSummary = wheels.length ? `이 기간에는 주변 사람과 도움을 주고받는 방식을 살펴볼 수 있어. ${wheels.length>1?'생일을 기준으로 연간 배치가 바뀌므로 구간을 나눠 읽어.':'선택 기간은 하나의 연간 배치 안에 있어.'} 아래 생활 영역에서 관계망, 실행, 자원, 마찰을 각각 살펴봐.` : natalWheel.length ? '출생 때의 배치를 관계망·생활력·자원 등 여덟 생활 영역으로 나눠 읽어. 지금 잘되고 못되는 일을 예측하기보다 각 영역을 돌아보는 질문으로 활용할 수 있어.' : '이 기간에 읽을 수 있는 태국점성술 배치가 없어.'
   const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
   return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
