@@ -1,0 +1,107 @@
+/* V31 · mobile viewport hardening
+ * Keep the app and reading cards locked to the visible viewport on iOS/PWA.
+ * Intentional horizontal selectors remain scrollable inside their own box.
+ */
+
+html,
+body,
+#root,
+.app-shell,
+.page-content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+html,
+body,
+#root,
+.app-shell,
+.page-content {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+@supports (overflow: clip) {
+  html,
+  body,
+  #root,
+  .app-shell,
+  .page-content {
+    overflow-x: clip;
+  }
+}
+
+/* Cards and reading surfaces may contain long dates, technical labels or flex/grid children.
+   They must shrink with the viewport instead of increasing document width. */
+.tool-panel,
+.form-card,
+.results-wrap,
+.fortune-experience,
+.relationship-experience,
+.reading-experience,
+.system-overview,
+.system-section,
+.system-segment,
+.period-fortune-report,
+.period-ai-v18,
+.period-ai-card,
+.period-ai-user-focus,
+.period-ai-user-windows,
+.period-ai-details,
+.relationship-pattern,
+.reading-section,
+.reading-explanation,
+.result-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tool-panel-heading > div,
+.form-card-heading > div,
+.result-headline > div,
+.reading-hero > *,
+.flow-grid > *,
+.relationship-balance > *,
+.system-overview-grid > *,
+.fortune-field-grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Long machine-readable tokens must wrap inside cards instead of pushing the page sideways. */
+.tool-panel-heading p,
+.form-card-heading p,
+.coordinate-note,
+.result-note,
+.reading-experience p,
+.reading-explanation p,
+.system-segment,
+.period-date-source,
+.period-time-evidence,
+.relationship-technical,
+.relationship-enrichment {
+  overflow-wrap: anywhere;
+}
+
+.reading-experience pre,
+.relationship-experience pre,
+.fortune-experience pre,
+.tool-panel pre {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Only these controls are intentionally horizontal. Keep their scroll behavior local. */
+.system-topic-selector,
+.relationship-mode-row,
+.period-field-chips,
+.topic-chip-row {
+  max-width: 100%;
+  min-width: 0;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
