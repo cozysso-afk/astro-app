@@ -13,6 +13,7 @@ import { normalizeTopicEntries, interpretationQualityPassed } from './lib/interp
 import { FortuneFlowCards } from './FortuneFlowCards'
 import type { ReactNode } from 'react'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
+import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -77,6 +78,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && !result.usage?.degraded_quality && interpretationQualityPassed(narrativeValidation)
   const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
+  const referenceFlowCards = relationshipReferenceFlowCards(userSummary, calculation)
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'
   const validation = result.usage?.quality_validation
@@ -97,7 +99,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{userSummary.headline}</h3><p className="reading-hero-subtitle">{field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary}</p></div></div>
 
     {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
-    <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/><FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
+    <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/>{!!referenceFlowCards.length&&<FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>}<FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
 
     {field?.id==='love' && (loveStatus??'single')==='single' && <section className="single-love-scenarios"><h4>내 상황에 맞춰 읽기</h4><p>여러 상황이 함께 있어도 돼. 해당하는 해설을 함께 읽어봐.</p>{singleLoveScenarios(calculation).map(item=><details key={item.title}><summary>{item.title}</summary><p>{item.text}</p></details>)}</section>}
     {!westernOnly&&systemOverview}
