@@ -72,11 +72,13 @@ test('11 strong reconnection with weak contact never becomes a push-to-reconnect
  const f=fortuneFixture();f.calculation.western.overall.재회=stat(70);f.calculation.western.overall.연락=stat(30)
  f.calculation.western.relationship_signals.수신신호=stat(30);f.calculation.western.relationship_signals.발신적합=stat(30);f.calculation.western.relationship_signals.과거인연접점=stat(70)
  f.data.topic_analysis.재회.importance='핵심';f.data.topic_analysis.연락.importance='핵심'
- const v=render(f,{focusTopics:['재회','연락']})
- assert.match(v.favorableCards.find(t=>t.topic==='재회').meaning,/실제 연락 흐름은 약함/)
+ const before=JSON.stringify(f);const v=render(f,{focusTopics:['재회','연락']})
+ assert.ok(!v.favorableCards.some(t=>t.topic==='재회'))
+ assert.ok(!v.bestFlow.includes('재회'))
  assert.match(v.focusTopics.find(t=>t.topic==='재회').conclusion,/실제 연락 움직임은 약/)
  assert.doesNotMatch(v.headline,/재회(?: 문제)?에 힘/)
  assert.match(v.relationship.reconnection,/연락 전체 흐름이 약/)
+ assert.equal(JSON.stringify(f),before)
 })
 test('12 strong contact with weak reconnection does not convert contact into reunion',()=>{
  const f=fortuneFixture();f.calculation.western.overall.재회=stat(30);f.calculation.western.overall.연락=stat(75)
