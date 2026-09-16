@@ -6,12 +6,27 @@
   html body .app-shell .fortune-experience .period-ai-head h3,
   html body .app-shell .relationship-experience .reading-hero h3,
   html body .app-shell .system-reading .system-hero h3 {
-    font-family: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-family: 'AppleMyungjo', 'Noto Serif KR', 'NanumMyeongjo', 'Batang', serif !important;
     font-synthesis: none;
     font-weight: 600 !important;
     line-height: 1.72 !important;
     letter-spacing: -.025em !important;
     word-break: keep-all;
+  }
+
+  /* The sentence directly under the integrated headline is reading prose too. */
+  html body .app-shell .fortune-experience .period-ai-head .reading-hero-subtitle {
+    font-family: 'AppleMyungjo', 'Noto Serif KR', 'NanumMyeongjo', 'Batang', serif !important;
+    font-synthesis: none;
+    font-weight: 500 !important;
+    line-height: 1.82 !important;
+    letter-spacing: -.018em !important;
+    word-break: keep-all !important;
+  }
+
+  /* Independent Western view owns its result surface; never append the integrated panel again. */
+  html body .app-shell .system-reading.system-western > .period-ai-card {
+    display: none !important;
   }
 
   html body .app-shell .western-score-overview-note {
