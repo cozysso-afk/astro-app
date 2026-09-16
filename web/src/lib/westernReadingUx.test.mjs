@@ -28,8 +28,8 @@ test('top-level life topics use a fixed two-row mobile grid instead of horizonta
   assert.doesNotMatch(css, /system-topic-selector\.system-topic-selector-fixed[\s\S]*overflow-x:\s*auto/)
 })
 
-test('system reading UX layer loads after the shared reading owner so its scoped fixes are final', () => {
-  const owner = main.indexOf("import './reading-experience.css'")
+test('scoped system UX loads before the shared reading owner, which stays the final stylesheet owner', () => {
   const western = main.indexOf("import './system-reading-ux-v40.css'")
-  assert.ok(owner >= 0 && western > owner)
+  const owner = main.indexOf("import './reading-experience.css'")
+  assert.ok(western >= 0 && owner > western)
 })
