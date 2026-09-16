@@ -3,9 +3,22 @@
  * Keep this before reading-experience.css; higher specificity owns only these reading targets.
  */
 @media (max-width: 600px) {
-  /* Use the downloaded Nanum Myeongjo first so iOS/PWA cannot silently fall back to Gothic. */
+  /*
+   * iOS/PWA renders the heavy Nanum Myeongjo face close to the surrounding Gothic UI.
+   * Keep the main editorial headline on the same regular Myeongjo face as the lead prose;
+   * hierarchy comes from size/spacing, not a faux-Gothic-looking heavy weight.
+   */
   html body .app-shell .fortune-experience .period-ai-head h3,
-  html body .app-shell .relationship-experience .reading-hero h3,
+  html body .app-shell .relationship-experience .reading-hero h3 {
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 400 !important;
+    line-height: 1.78 !important;
+    letter-spacing: -.018em !important;
+    word-break: keep-all !important;
+  }
+
+  /* Independent system headlines can stay stronger while remaining true Myeongjo. */
   html body .app-shell .system-reading .system-hero h3 {
     font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
     font-synthesis: none !important;
