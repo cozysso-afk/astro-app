@@ -28,14 +28,22 @@ test('compatibility marriage and location are peers in relationship and life', (
   assert.doesNotMatch(home, /home-compatibility-cta/)
 })
 
-test('system choices are compact and separate from annual and precision tools', () => {
+test('relationship and life cards prioritize text width over a cramped two-column layout', () => {
+  assert.match(css, /home-section-heading[\s\S]*flex-direction:\s*column/)
+  assert.match(css, /home-section-heading > p[\s\S]*text-align:\s*left/)
+  assert.match(css, /home-life-grid[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/)
+  assert.match(css, /home-life-card,[\s\S]*grid-template-columns:\s*44px minmax\(0, 1fr\) 16px/)
+  assert.match(css, /home-life-card \.home-tool-symbol[\s\S]*width:\s*44px/)
+  assert.match(css, /home-life-card \.home-tool-copy[\s\S]*gap:\s*4px/)
+})
+
+test('system choices stay compact and separate from annual and precision tools', () => {
   assert.match(home, /className="home-system-grid"/)
   for (const label of ['통합','서양점성술','사주','태국점성술']) assert.ok(home.includes(`>${label}</span>`))
   assert.match(home, /onPeriodSelect\(period,true\)/)
   assert.match(home, /<summary>연간·정밀 분석/)
   assert.match(home, /\['integrated','precision'\]/)
   assert.match(css, /home-system-grid[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/)
-  assert.match(css, /home-life-grid[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/)
 })
 
 test('home information architecture layer loads before the shared reading owner stylesheet', () => {
