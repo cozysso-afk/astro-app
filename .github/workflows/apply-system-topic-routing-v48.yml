@@ -32,43 +32,17 @@ jobs:
                   raise SystemExit('anchor missing: ' + label)
               return text.replace(old, new, 1)
 
-          source = replace_once(source,
-              "import { useState, cloneElement, isValidElement, type ReactNode } from 'react'\n",
-              "import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'\n",
-              'react import')
-
+          source = replace_once(source, "import { useState, cloneElement, isValidElement, type ReactNode } from 'react'\n", "import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'\n", 'react import')
           anchor = "const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const\n"
-          helper = anchor + """
-type ReadingChildContext = { field?: FortuneField; systemOverview?: ReactNode; systemSummary?: string; westernOnly?: boolean; technicalDetails?: ReactNode }
-function injectReadingContext(children: ReactNode, props: ReadingChildContext): ReactNode {
-  return Children.map(children, child => {
-    if (!isValidElement(child)) return child
-    const element = child as ReactElement<{children?:ReactNode} & ReadingChildContext>
-    if (child.type === Fragment || typeof child.type === 'string') {
-      if (element.props.children == null) return child
-      return cloneElement(element, {}, injectReadingContext(element.props.children, props))
-    }
-    return cloneElement(element, props)
-  })
-}
-"""
+          helper = anchor + "\ntype ReadingChildContext = { field?: FortuneField; systemOverview?: ReactNode; systemSummary?: string; westernOnly?: boolean; technicalDetails?: ReactNode }\nfunction injectReadingContext(children: ReactNode, props: ReadingChildContext): ReactNode {\n  return Children.map(children, child => {\n    if (!isValidElement(child)) return child\n    const element = child as ReactElement<{children?:ReactNode} & ReadingChildContext>\n    if (child.type === Fragment || typeof child.type === 'string') {\n      if (element.props.children == null) return child\n      return cloneElement(element, {}, injectReadingContext(element.props.children, props))\n    }\n    return cloneElement(element, props)\n  })\n}\n"
           source = replace_once(source, anchor, helper, 'system helper')
-          source = replace_once(source,
-              "{isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}",
-              "{injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}",
-              'integrated child')
-          source = replace_once(source,
-              "{isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}",
-              "{injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}",
-              'western child')
+          source = replace_once(source, "{isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}", "{injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}", 'integrated child')
+          source = replace_once(source, "{isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}", "{injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}", 'western child')
           system_path.write_text(source)
 
           result_path = Path('web/src/PeriodFortuneResults.tsx')
           result = result_path.read_text()
-          result = replace_once(result,
-              "<summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>",
-              "<summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>",
-              'fallback copy')
+          result = replace_once(result, "<summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>", "<summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>", 'fallback copy')
           result_path.write_text(result)
           PY
       - name: Run focused routing tests
