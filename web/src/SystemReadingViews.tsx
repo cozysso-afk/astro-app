@@ -9,6 +9,49 @@ import { ReadingExplanation } from './ReadingExplanation'
 const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
 const TOPICS: LifeTopic[] = ['전체','애정','대인','학업','직업','금전','컨디션']
 const WESTERN: Record<LifeTopic,string[]> = {전체:[],애정:['연애','연락','재회'],대인:['대인관계','소식'],학업:['학업','시험'],직업:['직장','이직'],금전:['금전','투자심리','수익실현','신규진입','투자주의'],컨디션:['컨디션']}
+const WESTERN_FLOW_COPY: Record<string,[string,string]> = {
+  금전:['수입·지출 계획을 정리하고 예산 안에서 움직여.','예상 밖 지출에 여유를 두고 꼭 필요한 돈부터 챙겨.'],
+  학업:['공부할 순서를 정해 차근차근 따라가면 무난해.','새 진도보다 복습부터 잡고 목표를 작게 나눠.'],
+  시험:['배운 내용을 꺼내 쓰는 연습과 실수 점검을 같이 해.','새 내용을 늘리기보다 자주 틀리는 부분부터 확인해.'],
+  직장:['업무 요청과 협의는 일정과 책임 범위를 분명히 해.','일정과 책임 범위가 모호하면 바로 확정하지 말고 다시 맞춰.'],
+  이직:['조건을 비교하고 필요한 대화를 이어가기 괜찮아.','조건이 불분명하면 결정을 서두르지 말고 확인부터 해.'],
+  대인관계:['대화와 조율은 상대의 반응을 보면서 이어가.','의견 차이를 급히 결론 내지 말고 사실관계부터 맞춰.'],
+  연애:['호감과 만남은 상대의 실제 반응을 보면서 이어가.','관계 진전을 서두르기보다 서로 원하는 속도를 확인해.'],
+  연락:['안부·질문·약속처럼 목적이 분명한 연락이 나아.','먼저 연락한다면 짧고 구체적으로 하고 답을 재촉하지 마.'],
+  재회:['관계 회복 여지는 실제 연락과 이후 태도로 확인해.','추억과 지금의 행동을 구분하고 관계 회복을 미리 단정하지 마.'],
+  소식:['새 소식과 제안은 원문과 조건을 확인해.','전해 들은 말만으로 결론 내리지 말고 출처부터 확인해.'],
+  컨디션:['일정 사이에 쉴 틈을 남기면서 움직여.','무리해서 끌고 가기보다 쉬는 시간을 먼저 확보해.'],
+  투자심리:['관심이 커져도 매수 근거와 감정은 따로 확인해.','불안이나 조급함 때문에 기준을 바꾸지 마.'],
+  수익실현:['청산 조건과 목표를 점검해. 수익을 보장하는 신호는 아니야.','목표와 손실 한도를 먼저 확인하고 급한 결정을 피해야 해.'],
+  신규진입:['진입 조건을 비교해. 매수 권유를 뜻하는 점수는 아니야.','급하게 들어가기보다 조건과 손실 한도를 먼저 점검해.'],
+  투자주의:['뚜렷한 경계가 적어도 안전을 뜻하진 않아.','위험 노출과 손실 한도를 우선 점검해야 해.'],
+}
+const WESTERN_HEADLINE_LABEL: Record<string,string> = {
+  금전:'금전 관리',학업:'학업',시험:'시험 준비',직장:'직장 업무',이직:'이직 조건',대인관계:'대인관계',연애:'연애 흐름',연락:'연락 흐름',재회:'재회 흐름',소식:'소식 확인',컨디션:'컨디션',투자심리:'투자 판단',수익실현:'수익 실현 조건',신규진입:'신규 진입 조건',투자주의:'위험 관리',
+}
+function westernCaution(name:string, stat:FortuneStat) {
+  if (name === '투자주의') return stat.average >= 60 || /강|높/.test(String(stat.band ?? ''))
+  return stat.average < 40 || /약|낮/.test(String(stat.band ?? ''))
+}
+function westernGuidance(name:string, stat:FortuneStat) {
+  const pair = WESTERN_FLOW_COPY[name] ?? ['조건을 확인하면서 움직여.','무리해서 밀어붙이지 말고 조건부터 확인해.']
+  return pair[westernCaution(name,stat) ? 1 : 0]
+}
+function westernWhen(dayCount:number) {
+  if (dayCount <= 1) return '오늘'
+  if (dayCount <= 9) return '이번 주'
+  if (dayCount <= 45) return '이번 달'
+  return '올해'
+}
+function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
+  if (!rows.length) return `${when}은 비교할 수 있는 서양점성술 분야 점수가 없어.`
+  const sorted = rows.slice().sort((a,b)=>b[1].average-a[1].average)
+  const lead = sorted.filter(([name,stat])=>name!=='투자주의'&&!westernCaution(name,stat)).slice(0,2).map(([name])=>WESTERN_HEADLINE_LABEL[name]??name)
+  const caution = sorted.filter(([name,stat])=>westernCaution(name,stat)).slice(0,2).map(([name])=>WESTERN_HEADLINE_LABEL[name]??name)
+  const leadCopy = lead.length ? `${when}은 ${lead.join('·')} 쪽을 살펴보기엔 무난해.` : `${when}은 전체적으로 속도를 낮추고 조건부터 확인하는 편이 좋아.`
+  const cautionCopy = caution.length ? `${caution.join('·')}은 무리해서 밀어붙이기보다 실수와 부담을 줄이는 데 집중해.` : '크게 밀어붙이기보다 조건을 확인하면서 움직여.'
+  return `${leadCopy} ${cautionCopy}`
+}
 function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens"><h4>{lens.title}</h4><p>{lens.meaning}</p><ReadingExplanation kind="reason">{evidence}</ReadingExplanation><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><ReadingExplanation kind="caution">{lens.limit}</ReadingExplanation></article> }
 function shortKoreanDate(value?: string) {
   const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
@@ -41,6 +84,8 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     ? '이번 기간에는 사람 관계에서 부탁과 책임의 균형, 수면·회복 같은 생활 리듬, 일에서 내가 결정할 범위, 돈·시간 같은 생활 기반을 각각 따로 점검해봐.'
     : selectedBhumi.length ? thaiLifeSummary(selectedBhumi.map(r=>r.bhumi_key)) : '이 분야와 연결된 생활 영역 자료가 없어.'
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
+  const westernPeriod = westernWhen(c.period.day_count)
+  const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod)
   const focusedField = field ?? (topic==='전체' ? undefined : {id:topic,label:topic+'운',desc:'선택 분야',topics:WESTERN[topic],lens:topic})
   const overview = <section className="system-overview"><h3>세 체계 한눈에</h3><div className="system-overview-grid">
         <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{selectedWestern.slice().sort((a,b)=>b[1].average-a[1].average).slice(0,2).map(([name,s])=>`${name} · ${s.band}`).join(', ') || '해당 분야의 계산값이 없어.'}</p><small>선택 기간의 강약과 날짜를 읽는 층</small></article>
@@ -50,13 +95,13 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   return <section className={`system-reading system-${system}`}>
     <span className="reading-period-date">{period}</span>
     <div className="system-switcher" role="group" aria-label="해석 체계 선택">{SYSTEMS.map(({id,label,Icon})=><button type="button" aria-pressed={system===id} key={id} onClick={()=>{setSystem(id);setTopic(field?.lens ?? '전체')}}><Icon size={18} aria-hidden="true"/><span>{label}</span></button>)}</div>
-    {!field&&<div className="system-topic-selector" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!available(t)} title={!available(t)?'이 체계에서 연결된 근거가 부족해':undefined} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
+    {!field&&<div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!available(t)} title={!available(t)?'이 체계에서 연결된 근거가 부족해':undefined} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
     {field&&<h3>{field.label} · {period}</h3>}
     {system==='integrated' ? <>
       {isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}
     </> : system==='western' ? <>
-      <header className="system-hero"><span>서양점성술 · {period}</span><h3>분야의 강약과 날짜를 나눠 읽어봐.</h3><p>높은 점수는 사건 확률이 아니야. 낮은 점수도 주의할 분야를 찾는 데 의미가 있어. 투자주의의 높은 값은 유리함이 아니라 위험 관리에 주목할 강도야.</p></header>
-      <div className="system-score-grid">{selectedWestern.map(([name,s])=><details key={name}><summary><strong>{name}</strong><b>{s.average}</b><span>{s.band}</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 최고·최저 날짜는 아래 계산 근거에서 비교할 수 있어.</p>}<p>좋은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p><p>주의할 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p></details>)}</div>
+      <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>점수는 사건 확률이 아니야. 특히 연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니 조건과 위험을 같이 확인해.</p></header>
+      <div className="system-score-grid western-score-grid">{selectedWestern.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 최고·최저 날짜는 아래 계산 근거에서 비교할 수 있어.</p>}<p>좋은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p><p>주의할 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p></details>)}</div>
       {isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}
     </> : !view.allowed ? <p className="system-unavailable">출생시간 검증 정책에 따라 이 계산에서는 {system==='saju'?'사주':'태국점성술'} 해석이 제외돼 있어. 탭 전환으로 정밀도 제한을 바꾸지 않아.</p> : system==='saju' ? <>
       <header className="system-hero"><span>사주 · {period}</span><h3>{view.sajuSummary}</h3><p>{c.period.start===c.period.end?'선택한 날이 속한 운 구간을 배경으로 읽어. 계산되지 않은 일진은 만들지 않아.':view.monthly.length>1?'선택 기간이 여러 절기 구간에 걸쳐 있어. 달력의 월 이름으로 합치지 않고 각 경계와 십성을 나눠 읽어.':'선택 기간에 적용되는 실제 운 구간을 배경으로 읽어. 구간 안에서 매일 같은 사건이 생긴다는 뜻은 아니야.'}</p></header>
