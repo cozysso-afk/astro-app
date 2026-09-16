@@ -1,31 +1,34 @@
 /* V50 · mobile reading polish
- * Core reading conclusions use a real serif face; UI labels remain sans-serif.
+ * Core reading conclusions use a real Korean Myeongjo webfont; UI labels remain sans-serif.
  * Keep this before reading-experience.css; higher specificity owns only these reading targets.
  */
 @media (max-width: 600px) {
+  /* Use the downloaded Nanum Myeongjo first so iOS/PWA cannot silently fall back to Gothic. */
   html body .app-shell .fortune-experience .period-ai-head h3,
   html body .app-shell .relationship-experience .reading-hero h3,
   html body .app-shell .system-reading .system-hero h3 {
-    font-family: 'AppleMyungjo', 'Noto Serif KR', 'NanumMyeongjo', 'Batang', serif !important;
-    font-synthesis: none;
-    font-weight: 600 !important;
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 700 !important;
     line-height: 1.72 !important;
     letter-spacing: -.025em !important;
-    word-break: keep-all;
+    word-break: keep-all !important;
   }
 
   /* The sentence directly under the integrated headline is reading prose too. */
   html body .app-shell .fortune-experience .period-ai-head .reading-hero-subtitle {
-    font-family: 'AppleMyungjo', 'Noto Serif KR', 'NanumMyeongjo', 'Batang', serif !important;
-    font-synthesis: none;
-    font-weight: 500 !important;
-    line-height: 1.82 !important;
-    letter-spacing: -.018em !important;
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 400 !important;
+    line-height: 1.88 !important;
+    letter-spacing: -.012em !important;
     word-break: keep-all !important;
   }
 
   /* Independent Western view owns its result surface; never append the integrated panel again. */
-  html body .app-shell .system-reading.system-western > .period-ai-card {
+  html body .app-shell .system-reading.system-western > .period-ai-card,
+  html body .app-shell .system-reading.system-western > .fortune-experience,
+  html body .app-shell .system-reading.system-western > .period-deep-reading {
     display: none !important;
   }
 

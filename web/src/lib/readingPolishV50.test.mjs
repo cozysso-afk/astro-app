@@ -7,14 +7,22 @@ const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
 
-test('iOS/PWA gets an explicit serif font request and core reading conclusions own it', () => {
-  assert.match(index, /fonts\.googleapis\.com\/css2\?family=Noto\+Serif\+KR:wght@500;600;700&display=swap/)
-  assert.match(polish, /font-family:\s*'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
+test('iOS/PWA downloads a distinct Korean Myeongjo face and reading prose owns it', () => {
+  assert.match(index, /family=Nanum\+Myeongjo:wght@400;700&family=Noto\+Serif\+KR:wght@500;600;700&display=swap/)
+  assert.match(polish, /font-family:\s*'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
   assert.match(polish, /\.fortune-experience \.period-ai-head h3/)
-  assert.match(polish, /\.system-reading \.system-hero h3/)
+  assert.match(polish, /\.fortune-experience \.period-ai-head \.reading-hero-subtitle/)
+  assert.match(polish, /font-weight:\s*700\s*!important/)
+  assert.match(polish, /font-weight:\s*400\s*!important/)
   const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(match => match[1])
   assert.ok(imports.indexOf('reading-polish-v50.css') < imports.indexOf('reading-experience.css'))
   assert.equal(imports.at(-1), 'reading-experience.css')
+})
+
+test('Western independent surface suppresses every integrated period panel wrapper', () => {
+  assert.match(polish, /system-reading\.system-western > \.period-ai-card/)
+  assert.match(polish, /system-reading\.system-western > \.fortune-experience/)
+  assert.match(polish, /system-reading\.system-western > \.period-deep-reading/)
 })
 
 test('Western overall reading is summarized instead of dumping every subtopic', () => {
