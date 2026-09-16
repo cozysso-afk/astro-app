@@ -60,7 +60,13 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const segments = thai?.taksajorn?.available ? thai.taksajorn.segments.filter(r=>r.start.slice(0,10)<=c.period.end && r.end.slice(0,10)>=c.period.start) : []
   const natalWheel = thai?.mahathaksa?.available ? thai.mahathaksa.wheel.filter(r=>BHUMI_LENSES[r.bhumi_key]) : []
   const wheels = segments.map(r=>({...r,wheel:r.wheel.filter(w=>BHUMI_LENSES[w.bhumi_key])}))
-  const sajuSummary = contexts.length ? [...new Set(contexts.map(row=>`${row.layer} ${ganzhiWithReading(row.ganzhi)}의 ${row.stem_ten_god}은 ${tenGodLens(row.stem_ten_god)?.title ?? '계산된 십성'} 맥락이야.`))].slice(0, 3).join(' ') + (contexts.length > 3 ? ' 나머지 절기 구간은 아래에서 날짜별로 이어서 볼 수 있어.' : '') : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
+  const sajuSummary = contexts.length ? (() => {
+    const active = lenses.slice(0, 3)
+    if (!active.length) return '선택 기간에 계산된 십성은 있지만 생활 언어로 연결할 수 있는 주제가 부족해. 아래 계산 구간만 확인해줘.'
+    const topics = active.map(lens=>lens.title).join(' · ')
+    const guidance = active.slice(0, 2).map(lens=>lens.action).join(' ')
+    return `선택 기간의 핵심 생활 주제는 ${topics} 쪽이야. ${guidance}`
+  })() : '선택 기간과 연결된 운 구간이 없어 해석을 확장하지 않았어.'
   const thaiSummary = wheels.length ? `선택한 기간에 적용되는 타크사 연간 배치를 여덟 생활 영역으로 나눠 볼 수 있어. 주변 사람과 관계망, 생활 리듬, 일, 자원, 실행, 도움, 걸림돌 중 필요한 부분부터 펼쳐봐.` : natalWheel.length ? '출생 때의 타크사 배치를 여덟 생활 영역으로 나눠 볼 수 있어. 각 영역은 생활에서 무엇을 확인하면 되는지 먼저 보여줘.' : '이 기간에 읽을 수 있는 태국점성술 배치가 없어.'
   const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
   return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
