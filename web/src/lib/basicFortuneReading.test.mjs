@@ -43,5 +43,6 @@ test('investment caution is never promoted as a favorable high score',()=>{
 test('period UI keeps Gemini natural language primary and deterministic reading as fallback',()=>{
   const source=readFileSync(new URL('../PeriodFortuneResults.tsx',import.meta.url),'utf8')
   assert.ok(source.indexOf('<PeriodAiInterpretationPanel') < source.indexOf('period-fallback-reading'))
-  assert.match(source,/계산 기반 보조 해설/)
+  assert.match(source,/기본 해설 보기/)
+  assert.doesNotMatch(source,/계산 기반 보조 해설/)
 })
