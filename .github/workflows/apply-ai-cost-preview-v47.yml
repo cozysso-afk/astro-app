@@ -1,0 +1,124 @@
+name: Apply AI cost preview v47
+
+on:
+  push:
+    branches:
+      - feat/ai-cost-preview-v47
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ai-cost-preview-v47
+          fetch-depth: 0
+
+      - name: Add pre-call cost preview and relationship usage receipt
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f'missing patch anchor: {label}')
+              if text.count(old) != 1:
+                  raise SystemExit(f'non-unique patch anchor: {label} ({text.count(old)})')
+              return text.replace(old, new, 1)
+
+          usage_path = Path('web/src/lib/aiUsage.ts')
+          usage = usage_path.read_text(encoding='utf-8')
+          usage = replace_once(
+              usage,
+              "const GEMINI_USD_KRW_ESTIMATE = 1384\n",
+              """const GEMINI_USD_KRW_ESTIMATE = 1384
+const GEMINI_JOB_SAFE_CAP_KRW = 300
+const GEMINI_INTRO_END = new Date('2026-12-31T23:59:59Z')
+
+export type GeminiCostPreviewKind = 'today' | 'week' | 'month' | 'year' | 'relationship'
+
+const INTRO_COST_PREVIEW_KRW: Record<GeminiCostPreviewKind, { first: number; retry: number }> = {
+  today: { first: 40, retry: 75 },
+  week: { first: 40, retry: 80 },
+  month: { first: 55, retry: 90 },
+  year: { first: 70, retry: 120 },
+  relationship: { first: 125, retry: 230 },
+}
+
+export function geminiCostPreview(kind: GeminiCostPreviewKind) {
+  const factor = new Date() <= GEMINI_INTRO_END ? 1 : 2
+  const base = INTRO_COST_PREVIEW_KRW[kind]
+  const first = Math.min(GEMINI_JOB_SAFE_CAP_KRW, Math.round(base.first * factor))
+  const retry = Math.min(GEMINI_JOB_SAFE_CAP_KRW, Math.round(base.retry * factor))
+  return {
+    first,
+    retry,
+    cap: GEMINI_JOB_SAFE_CAP_KRW,
+    label: `예상 비용 · 1회 생성 약 ${first.toLocaleString()}원 안팎 · 재시도 시 약 ${retry.toLocaleString()}원 안팎 · 작업 안전상한 ${GEMINI_JOB_SAFE_CAP_KRW.toLocaleString()}원`,
+  }
+}
+""",
+              'ai usage cost preview helper',
+          )
+          usage_path.write_text(usage, encoding='utf-8')
+
+          period_path = Path('web/src/PeriodAiInterpretationPanel.tsx')
+          period = period_path.read_text(encoding='utf-8')
+          period = replace_once(period, "import { estimateGeminiUsage } from './lib/aiUsage'", "import { estimateGeminiUsage, geminiCostPreview } from './lib/aiUsage'", 'period cost preview import')
+          period = replace_once(period, "}) {\n  const technicalFallback =", "}) {\n  const costPreview = geminiCostPreview(period)\n  const technicalFallback =", 'period preview state')
+          period = replace_once(period, "계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><div className=\"period-ai-v21-controls period-ai-ready-controls\">", "계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><p className=\"result-note\">{costPreview.label}</p><div className=\"period-ai-v21-controls period-ai-ready-controls\">", 'period ready cost preview')
+          period = replace_once(period, "잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><div className=\"period-ai-v21-controls\">", "잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className=\"result-note\">{costPreview.label}</p><div className=\"period-ai-v21-controls\">", 'period loading cost preview')
+          period = replace_once(period, "<p className=\"period-ai-summary\">{message}</p>{failedUsage?.total_tokens ?", "<p className=\"period-ai-summary\">{message}</p><p className=\"result-note\">{costPreview.label}</p>{failedUsage?.total_tokens ?", 'period retry cost preview')
+          period_path.write_text(period, encoding='utf-8')
+
+          relation_path = Path('web/src/RelationshipInterpretationPanel.tsx')
+          relation = relation_path.read_text(encoding='utf-8')
+          relation = replace_once(relation, "import { buildRelationshipUserSummary, type RelationshipPattern } from './lib/relationshipUserSummary'", "import { buildRelationshipUserSummary, type RelationshipPattern } from './lib/relationshipUserSummary'\nimport { estimateGeminiUsage, geminiCostPreview } from './lib/aiUsage'", 'relationship cost import')
+          relation = replace_once(relation, "  const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: analysisMode === 'reunion' ? timing : null })\n", "  const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: analysisMode === 'reunion' ? timing : null })\n  const usage = estimateGeminiUsage(ai?.usage)\n  const costPreview = geminiCostPreview('relationship')\n", 'relationship usage preview state')
+          relation = replace_once(relation, "계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><button type=\"button\" onClick={onAi}", "계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><p className=\"reading-muted\">{costPreview.label}</p><button type=\"button\" onClick={onAi}", 'relationship pre-call cost preview')
+          relation = replace_once(
+              relation,
+              "</section>}\n    <details className=\"relationship-calculated-fallback\"",
+              """</section>}
+    {ai?.ok && ai.data && usage?.total_tokens ? <details className=\"ai-meta-details\"><summary>해설 생성 정보</summary><div className=\"ai-usage-card\"><strong>Gemini API 사용량 · 예상 비용</strong><span>입력 {(usage.prompt_tokens ?? 0).toLocaleString()} · 본문 출력 {(usage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(usage.thought_tokens ?? 0).toLocaleString()} token(토큰)</span><b>누적 예상비용 ${Number(usage.estimated_usd ?? 0).toFixed(4)} ≈ {Math.round(usage.estimated_krw ?? 0).toLocaleString()}원</b><small>실제 Gemini 호출 {usage.attempt_count ?? 1}회 · 최대 2회 · 저장본 재열람은 재호출이 없으면 0원</small></div></details> : null}
+    <details className=\"relationship-calculated-fallback\"""",
+              'relationship actual usage receipt',
+          )
+          relation_path.write_text(relation, encoding='utf-8')
+
+          test_path = Path('web/src/lib/interpretationUiContract.test.mjs')
+          test = test_path.read_text(encoding='utf-8')
+          test = replace_once(test, "const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')\n", "const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')\nconst relationship = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')\n", 'relationship UI contract source')
+          test += """
+
+test('AI generation shows a pre-call cost preview and relationship usage receipt', () => {
+  assert.match(period, /geminiCostPreview\(period\)/)
+  assert.match(period, /costPreview\.label/)
+  assert.match(relationship, /geminiCostPreview\('relationship'\)/)
+  assert.match(relationship, /Gemini API 사용량 · 예상 비용/)
+  assert.match(relationship, /usage\.estimated_krw/)
+  assert.match(relationship, /저장본 재열람은 재호출이 없으면 0원/)
+})
+"""
+          test_path.write_text(test, encoding='utf-8')
+          PY
+
+      - name: Verify UI contract and production build
+        run: |
+          cd web
+          npm ci
+          node --test src/lib/interpretationUiContract.test.mjs
+          npm run build
+
+      - name: Commit verified changes
+        run: |
+          rm .github/workflows/apply-ai-cost-preview-v47.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add web/src/lib/aiUsage.ts web/src/PeriodAiInterpretationPanel.tsx web/src/RelationshipInterpretationPanel.tsx web/src/lib/interpretationUiContract.test.mjs .github/workflows/apply-ai-cost-preview-v47.yml
+          git commit -m "Show AI cost estimate before generation"
+          git push origin HEAD:feat/ai-cost-preview-v47
