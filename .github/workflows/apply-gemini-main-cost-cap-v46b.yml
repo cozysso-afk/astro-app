@@ -1,0 +1,160 @@
+name: Apply Gemini-first cost cap v46b
+
+on:
+  push:
+    branches: [fix/gemini-main-cost-cap-v46]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply focused source patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def rep(path, old, new):
+              p=Path(path); s=p.read_text(encoding='utf-8')
+              if old not in s: raise SystemExit(f'anchor missing: {path}: {old[:140]}')
+              p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          # Period/annual Gemini: stop treating the old 52–95 KB thresholds as a cost ceiling.
+          path='supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts'
+          old='''export function promptBudget(payload:any){
+            const packet=buildPromptPacket(payload);
+            const bytes=jsonBytes(packet);
+            const kind=String(payload?.period_kind??"annual");
+            const max_bytes=kind==="annual"?95000:kind==="month"?76000:kind==="week"?62000:52000;
+            return {packet,bytes,max_bytes,ok:bytes<=max_bytes,estimated_input_tokens:Math.ceil(bytes/2.6)};
+          }
+          '''
+          new='''const MAX_AI_JOB_ESTIMATED_KRW=300;
+          const HARD_PROMPT_BYTES=180000;
+          const GEMINI_USD_KRW_ESTIMATE=1384;
+          const GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");
+          function fortuneOutputCaps(kind:string){if(kind==="annual")return [7200,6200];if(kind==="month")return [5600,4800];if(kind==="week")return [4700,4000];return [4000,3400];}
+          function estimatedGeminiJobKrw(inputTokens:number,kind:string){
+            const intro=Date.now()<=GEMINI_INTRO_END;
+            const inputRate=intro ? .75 : 1.5, outputRate=intro ? 3.75 : 7.5;
+            const [firstOutput,retryOutput]=fortuneOutputCaps(kind),thoughtReserve=3000;
+            const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;
+            return one(firstOutput)+one(retryOutput);
+          }
+          export function promptBudget(payload:any){
+            const packet=buildPromptPacket(payload);
+            const bytes=jsonBytes(packet),kind=String(payload?.period_kind??"annual");
+            const estimated_input_tokens=Math.ceil(bytes/2.6),estimated_max_job_krw=estimatedGeminiJobKrw(estimated_input_tokens,kind);
+            return {packet,bytes,max_bytes:HARD_PROMPT_BYTES,estimated_input_tokens,estimated_max_job_krw,max_job_krw:MAX_AI_JOB_ESTIMATED_KRW,ok:bytes<=HARD_PROMPT_BYTES&&estimated_max_job_krw<=MAX_AI_JOB_ESTIMATED_KRW};
+          }
+          '''
+          rep(path,old,new)
+
+          path='supabase/functions/fortune-interpret-v21-preview/index.ts'
+          rep(path,
+            '''  if(!pb.ok)return {ok:false,error:`AI 입력 근거가 비용 상한을 넘었어(${pb.bytes}/${pb.max_bytes} bytes). Gemini를 호출하지 않았어.`,model,cost_guard_blocked:true,prompt_budget:pb};''',
+            '''  if(!pb.ok)return {ok:false,error:`AI 해설 예상 최대 비용이 약 ${Math.round(pb.estimated_max_job_krw)}원으로 작업 상한 ${pb.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,model,cost_guard_blocked:true,prompt_budget:pb};''')
+
+          # Relationship/reunion already has 3-stage compression. Let it compress against a 300 KRW whole-job estimate.
+          path='supabase/functions/relationship-interpret-v9-preview/index.ts'
+          rep(path,'const MAX_GEMINI_CALLS=2,MAX_PROMPT_BYTES=110000;',
+                   'const MAX_GEMINI_CALLS=2,MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300;\nconst GEMINI_USD_KRW_ESTIMATE=1384,GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");')
+          rep(path,
+            '''function promptBudget(payload:any,purpose:Purpose){const bytes=enc.encode(SYSTEM+promptText(payload,purpose,false)).length;return {bytes,max_bytes:MAX_PROMPT_BYTES,ok:bytes<=MAX_PROMPT_BYTES,estimated_input_tokens:Math.ceil(bytes/2.6)};}''',
+            '''function relationshipEstimatedJobKrw(inputTokens:number){const intro=Date.now()<=GEMINI_INTRO_END,inputRate=intro ? .75 : 1.5,outputRate=intro ? 3.75 : 7.5,thoughtReserve=3000;const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;return one(16000)+one(12000);}\nfunction promptBudget(payload:any,purpose:Purpose){const bytes=enc.encode(SYSTEM+promptText(payload,purpose,false)).length,estimated_input_tokens=Math.ceil(bytes/2.6),estimated_max_job_krw=relationshipEstimatedJobKrw(estimated_input_tokens);return {bytes,max_bytes:MAX_PROMPT_BYTES,estimated_input_tokens,estimated_max_job_krw,max_job_krw:MAX_AI_JOB_ESTIMATED_KRW,ok:bytes<=MAX_PROMPT_BYTES&&estimated_max_job_krw<=MAX_AI_JOB_ESTIMATED_KRW};}''')
+          rep(path,
+            '''if(!budget.ok)return respond({...publicRelationshipError("REL_COST_GUARD_BLOCKED",{cost_guard_blocked:true}),prompt_budget:true,error:`관계 해설 근거를 3단계로 압축했지만 안전 상한 ${budget.max_bytes.toLocaleString()} bytes를 넘어 Gemini 호출을 막았어.`,prompt_bytes:budget.bytes,max_prompt_bytes:budget.max_bytes,prompt_compression_level:pack.compression_level,original_prompt_bytes:pack.original_prompt_bytes},200);''',
+            '''if(!budget.ok)return respond({...publicRelationshipError("REL_COST_GUARD_BLOCKED",{cost_guard_blocked:true}),prompt_budget:true,error:`관계 해설을 3단계로 압축했지만 예상 최대 비용 약 ${Math.round(budget.estimated_max_job_krw)}원이 작업 상한 ${budget.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,prompt_bytes:budget.bytes,max_prompt_bytes:budget.max_bytes,estimated_max_job_krw:budget.estimated_max_job_krw,max_job_krw:budget.max_job_krw,prompt_compression_level:pack.compression_level,original_prompt_bytes:pack.original_prompt_bytes},200);''')
+          rep(path,
+            '''const result:any={...generated,prompt_bytes:budget.bytes,max_prompt_bytes:budget.max_bytes,prompt_compression_level:pack.compression_level,original_prompt_bytes:pack.original_prompt_bytes};''',
+            '''const result:any={...generated,prompt_bytes:budget.bytes,max_prompt_bytes:budget.max_bytes,estimated_max_job_krw:budget.estimated_max_job_krw,max_job_krw:budget.max_job_krw,prompt_compression_level:pack.compression_level,original_prompt_bytes:pack.original_prompt_bytes};''')
+
+          # Period fortune UI: Gemini is the reading; deterministic prose is a fallback/reference layer.
+          path='web/src/PeriodFortuneResults.tsx'
+          rep(path,'  const aiOpen = Boolean(aiInterpretation?.data || aiLoading)\n','  const hasNaturalReading = Boolean(aiInterpretation?.ok && aiInterpretation.data)\n')
+          rep(path,
+            '''    <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
+              <BasicFortuneReading calculation={result} period={period} field={field}/>
+              <details className="period-deep-reading" open={aiOpen}>
+                <summary><span>AI 심층해설</span><small>선택 기능 · 기본 해설은 위에서 항상 제공</small></summary>
+                <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
+              </details>
+            </></SystemReadingViews>''',
+            '''    <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
+              <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
+              <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>
+                <summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>
+                <BasicFortuneReading calculation={result} period={period} field={field}/>
+              </details>
+            </></SystemReadingViews>''')
+
+          # Relationship/reunion UI: render all existing Gemini fields prominently, then collapse deterministic prose.
+          path='web/src/RelationshipInterpretationPanel.tsx'
+          marker='''    <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>'''
+          natural='''    {ai?.ok && ai.data ? <section className="reading-section relationship-natural-reading"><h3>{ai.data.headline}</h3><p className="reading-conclusion">{analysisMode === 'reunion' ? ai.data.reunion_reading?.bottom_line || ai.data.overview : analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview}</p>{analysisMode==='reunion' ? <><ReadingExplanation kind="reason">{[ai.data.reunion_reading?.incoming_contact,ai.data.reunion_reading?.outgoing_contact].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.reunion_reading?.reconnection_windows,ai.data.reunion_reading?.low_windows].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.reunion_reading?.relationship_filter,ai.data.reunion_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : analysisMode.startsWith('marriage_') ? <><ReadingExplanation kind="reason">{[ai.data.marriage_reading?.bond,ai.data.marriage_reading?.emotional_home].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.marriage_reading?.daily_life,ai.data.marriage_reading?.intimacy_resources,ai.data.marriage_reading?.conflict_repair].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.marriage_reading?.commitment_or_current_cycle,ai.data.marriage_reading?.timing].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.marriage_reading?.caution,ai.data.marriage_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : <><ReadingExplanation kind="reason">{[ai.data.chemistry,ai.data.emotional_dynamic,ai.data.communication].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.long_term,...(ai.data.practical_advice??[])].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{ai.data.timing}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.conflict_pattern,ai.data.power_boundaries].filter(Boolean).join(' ')}</ReadingExplanation></>}</section> : <section className="reading-section relationship-natural-reading is-ready"><h3>Gemini 자연어 해설</h3><p>계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section>}
+            <details className="relationship-calculated-fallback" open={!(ai?.ok && ai.data)}><summary>계산 기반 보조 해설</summary>
+          '''+marker
+          rep(path,marker,natural)
+          safety='''    <p className="reading-safety-note">{partnerExact ? '계산된 관계 패턴이야. 실제 감정이나 관계의 결과를 확정하지 않아.' : '출생시간이 검증되지 않은 요소는 제외했어. 실제 감정이나 관계의 결과를 확정하지 않아.'}</p>'''
+          rep(path,safety,'    </details>\n'+safety)
+          old_enrich='''    <details className="relationship-enrichment"><summary>추가 맞춤 해설</summary>
+              {ai?.ok && ai.data ? <><p>{ai.data.headline}</p><p>{analysisMode === 'reunion' ? ai.data.reunion_reading?.bottom_line || ai.data.overview : analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview}</p></> : <><p>기본 해설은 위에서 볼 수 있어. 추가 해설은 별도로 요청할 수 있어.</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '추가 해설 요청'}</button></>}
+              {aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}
+            </details>
+          '''
+          rep(path,old_enrich,'')
+
+          # Fresh relationship/reunion Gemini output: cache AND archive automatically.
+          path='web/src/AppNext.tsx'
+          anchor="""      setRelationshipAi(annotated)\n      setRelationshipAiCacheSource('fresh')\n"""
+          add="""      setRelationshipAi(annotated)\n      setRelationshipAiCacheSource('fresh')\n      if (relationshipRequestSnapshot) {\n        const autoKind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'\n        const autoIsReunion = selectedTool === 'compatibility' && analysisMode === 'reunion'\n        const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }\n        const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>\n        const autoLabel = autoKind === 'marriage' ? '결혼운' : autoIsReunion ? '재회운' : '궁합운'\n        void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)\n      }\n"""
+          rep(path,anchor,add)
+
+          # Tests: lock the intended policy.
+          path='web/src/lib/basicFortuneReading.test.mjs'
+          p=Path(path); s=p.read_text(encoding='utf-8')
+          s=re.sub(r"test\('period UI renders substantial in-app reading before optional AI depth',[\s\S]*?\n\}\)\n",'''test('period UI keeps Gemini natural language primary and deterministic reading as fallback',()=>{\n  const source=readFileSync(new URL('../PeriodFortuneResults.tsx',import.meta.url),'utf8')\n  const natural=source.indexOf('<PeriodAiInterpretationPanel')\n  const fallback=source.indexOf('className="period-fallback-reading"')\n  assert.ok(natural>=0 && fallback>natural)\n  assert.match(source,/계산 기반 보조 해설/)\n  assert.match(source,/open={!hasNaturalReading && !aiLoading}/)\n})\n''',s,count=1)
+          p.write_text(s,encoding='utf-8')
+
+          path='web/src/lib/relationshipModeContract.test.mjs'
+          p=Path(path); s=p.read_text(encoding='utf-8')
+          s=s.replace('assert.match(relationshipFn, /MAX_PROMPT_BYTES=110000/)','assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300/)')
+          s=re.sub(r"test\('relationship modes expose a substantial deterministic reading before optional AI',[\s\S]*?\n\}\)\n",'''test('relationship modes keep Gemini natural language primary and deterministic prose as fallback', () => {\n  assert.match(panel, /relationship-natural-reading/)\n  assert.match(panel, /Gemini 자연어 해설/)\n  assert.match(panel, /relationship-calculated-fallback/)\n  assert.ok(panel.indexOf('relationship-natural-reading') < panel.indexOf('relationship-calculated-fallback'))\n})\n''',s,count=1)
+          p.write_text(s,encoding='utf-8')
+
+          path='web/src/lib/relationshipAiPublicError.test.mjs'
+          p=Path(path); s=p.read_text(encoding='utf-8').replace("'MAX_PROMPT_BYTES=110000'","'MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300'")
+          p.write_text(s,encoding='utf-8')
+
+          Path('web/src/lib/geminiNaturalReadingPolicy.test.mjs').write_text('''import assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\nimport test from 'node:test'\nconst fortune=readFileSync(new URL('../../../supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts',import.meta.url),'utf8')\nconst relation=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')\nconst period=readFileSync(new URL('../PeriodFortuneResults.tsx',import.meta.url),'utf8')\nconst panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')\nconst app=readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8')\ntest('whole-job estimated cost cap replaces the old small prompt byte thresholds',()=>{\n  assert.match(fortune,/MAX_AI_JOB_ESTIMATED_KRW=300/)\n  assert.match(fortune,/HARD_PROMPT_BYTES=180000/)\n  assert.match(fortune,/estimated_max_job_krw/)\n  assert.match(relation,/MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300/)\n  assert.match(relation,/relationshipEstimatedJobKrw/)\n})\ntest('Gemini is the primary reading and relationship AI is auto archived',()=>{\n  assert.ok(period.indexOf('<PeriodAiInterpretationPanel') < period.indexOf('period-fallback-reading'))\n  assert.ok(panel.indexOf('relationship-natural-reading') < panel.indexOf('relationship-calculated-fallback'))\n  assert.match(app,/archive_mode:'relationship_ai_auto_v1'/)\n  assert.match(app,/interpretation:annotated/)\n})\n''',encoding='utf-8')
+          PY
+      - name: Install and verify
+        working-directory: web
+        run: |
+          npm ci
+          node --test src/lib/basicFortuneReading.test.mjs src/lib/relationshipModeContract.test.mjs src/lib/geminiNaturalReadingPolicy.test.mjs
+          npm run build
+      - name: Commit verified changes and remove one-shot workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/apply-gemini-main-cost-cap-v46b.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts \
+                  supabase/functions/fortune-interpret-v21-preview/index.ts \
+                  supabase/functions/relationship-interpret-v9-preview/index.ts \
+                  web/src/PeriodFortuneResults.tsx web/src/RelationshipInterpretationPanel.tsx web/src/AppNext.tsx \
+                  web/src/lib/basicFortuneReading.test.mjs web/src/lib/relationshipModeContract.test.mjs \
+                  web/src/lib/relationshipAiPublicError.test.mjs web/src/lib/geminiNaturalReadingPolicy.test.mjs
+          git commit -m "Restore Gemini-first readings with a 300 KRW job cap"
+          git push origin HEAD:${GITHUB_REF_NAME}
