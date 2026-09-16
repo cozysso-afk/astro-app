@@ -1,0 +1,207 @@
+/* V33 · reading typography hierarchy only
+ * Give conclusions, section titles, body copy, and evidence visibly different weight.
+ * No spacing, copy, calculation, or CTA changes belong in this layer.
+ */
+
+@media (max-width: 600px) {
+  /* Primary fortune / relationship headline: strongest reading voice. */
+  html body .app-shell .fortune-experience .period-ai-head h3,
+  html body .app-shell .relationship-experience .reading-hero h3 {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    line-height: 1.62 !important;
+    color: #303748 !important;
+  }
+
+  /* Major section headings. */
+  html body .app-shell .fortune-experience .period-ai-section-title > span,
+  html body .app-shell .relationship-experience .reading-section > h3,
+  html body .app-shell .system-reading > h3,
+  html body .app-shell .system-reading section > h3,
+  html body .app-shell .thai-life-map > h3 {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    line-height: 1.45 !important;
+    color: #46516b !important;
+    letter-spacing: -.015em !important;
+  }
+
+  /* Fortune topic title > conclusion > body/evidence. */
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > strong {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    line-height: 1.45 !important;
+    color: #4d3d62 !important;
+    letter-spacing: -.02em !important;
+  }
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > b,
+  html body .app-shell .relationship-experience .reading-conclusion {
+    font-size: 15px !important;
+    font-weight: 650 !important;
+    line-height: 1.78 !important;
+    color: #303748 !important;
+  }
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > p,
+  html body .app-shell .relationship-experience .relationship-pattern > p:not(.reading-conclusion) {
+    font-size: 14px !important;
+    font-weight: 450 !important;
+    line-height: 1.7 !important;
+    color: #4b5362 !important;
+  }
+
+  /* Explanation cards: label is a signpost, explanation stays secondary to conclusion. */
+  html body .app-shell .reading-explanation .reading-explanation-label {
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    letter-spacing: .01em !important;
+  }
+  html body .app-shell .reading-explanation > p {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.68 !important;
+  }
+
+  /* Flow cards: name/score first, band next, short guidance last. */
+  html body .app-shell .fortune-experience .flow-tile-heading strong {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+  html body .app-shell .fortune-experience .flow-score {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+  html body .app-shell .fortune-experience .flow-band {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #687283 !important;
+  }
+  html body .app-shell .fortune-experience .flow-tile > p {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.58 !important;
+    color: #454e5e !important;
+  }
+
+  /* Relationship cards. */
+  html body .app-shell .relationship-experience .relationship-pattern h4 {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.45 !important;
+    color: #554366 !important;
+  }
+  html body .app-shell .relationship-experience .contact-row h4,
+  html body .app-shell .fortune-experience .period-ai-direction-item strong {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+  html body .app-shell .relationship-experience .contact-row p,
+  html body .app-shell .fortune-experience .period-ai-direction-item p {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.65 !important;
+  }
+
+  /* Independent Western / Saju / Thai: title, plain-language meaning, then evidence. */
+  html body .app-shell .system-reading .system-hero > span {
+    font-size: 11px !important;
+    font-weight: 750 !important;
+    color: #687283 !important;
+  }
+  html body .app-shell .system-reading .system-hero h3 {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    line-height: 1.55 !important;
+    color: #374256 !important;
+  }
+  html body .app-shell .system-reading .system-hero > p {
+    font-size: 13.5px !important;
+    font-weight: 450 !important;
+    line-height: 1.65 !important;
+    color: #657080 !important;
+  }
+  html body .app-shell .system-reading .system-lens h4 {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.45 !important;
+  }
+  html body .app-shell .system-reading .system-lens > p {
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    line-height: 1.68 !important;
+    color: #394454 !important;
+  }
+  html body .app-shell .system-overview-grid > article > strong {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.4 !important;
+  }
+  html body .app-shell .system-overview-grid > article > p {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.6 !important;
+    color: #414b5a !important;
+  }
+  html body .app-shell .system-overview-grid > article > small {
+    font-size: 11px !important;
+    font-weight: 450 !important;
+    line-height: 1.5 !important;
+    color: #6f7887 !important;
+  }
+
+  /* Saju / Thai period segments: calculation labels must not compete with the interpretation. */
+  html body .app-shell .system-reading .system-segment > summary > b,
+  html body .app-shell .system-reading .system-segment > summary:not(:has(> b)) {
+    font-weight: 750 !important;
+    color: #46516b !important;
+  }
+  html body .app-shell .system-reading .system-segment > summary small,
+  html body .app-shell .system-reading .system-context-chips,
+  html body .app-shell .system-reading .thai-placement {
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    color: #738091 !important;
+  }
+  html body .app-shell .system-reading .system-segment > p {
+    font-size: 13.5px !important;
+    font-weight: 450 !important;
+    line-height: 1.65 !important;
+    color: #555f6d !important;
+  }
+
+  /* Thai eight-life-area hierarchy. */
+  html body .app-shell .system-reading .bhumi-grid summary strong {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    line-height: 1.4 !important;
+    color: #315e5d !important;
+  }
+  html body .app-shell .system-reading .thai-lens-reading > p:first-child {
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    line-height: 1.68 !important;
+    color: #394f4d !important;
+  }
+  html body .app-shell .system-reading .thai-map-intro {
+    font-size: 12px !important;
+    font-weight: 450 !important;
+    color: #6b7e7c !important;
+  }
+
+  /* Raw/technical disclosure is intentionally quiet. */
+  html body .app-shell .system-reading .system-raw > summary,
+  html body .app-shell .fortune-experience .period-ai-details > summary,
+  html body .app-shell .relationship-experience .relationship-technical > summary {
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+    color: #6b7483 !important;
+  }
+  html body .app-shell .system-reading .system-raw > p,
+  html body .app-shell .reading-muted,
+  html body .app-shell .reading-safety-note {
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 1.6 !important;
+    color: #78818e !important;
+  }
+}

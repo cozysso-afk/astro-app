@@ -30,6 +30,7 @@ import './home-moonlit.css'
 import './ios-viewport-stability.css'
 import './mobile-viewport-v31.css'
 import './vertical-density-v32.css'
+import './reading-type-hierarchy-v33.css'
 import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
