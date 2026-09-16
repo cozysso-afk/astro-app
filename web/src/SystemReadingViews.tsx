@@ -3,7 +3,7 @@ import type { FortuneField } from './lib/fortuneFields'
 import { useState, cloneElement, isValidElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
 import type { IntegratedApiResponse, FortuneStat } from './appTypes'
-import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
+import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, ganzhiWithReading, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
 import { ReadingExplanation } from './ReadingExplanation'
 
 const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
@@ -29,6 +29,20 @@ const WESTERN_FLOW_COPY: Record<string,[string,string]> = {
 const WESTERN_HEADLINE_LABEL: Record<string,string> = {
   금전:'금전 관리',학업:'학업',시험:'시험 준비',직장:'직장 업무',이직:'이직 조건',대인관계:'대인관계',연애:'연애 흐름',연락:'연락 흐름',재회:'재회 흐름',소식:'소식 확인',컨디션:'컨디션',투자심리:'투자 판단',수익실현:'수익 실현 조건',신규진입:'신규 진입 조건',투자주의:'위험 관리',
 }
+const SAJU_LEAD_COPY: Record<string,string> = {
+  관성:'맡은 역할과 책임을 정리하는 데 먼저 무게를 둬. 새 일을 크게 벌이기보다 이미 맡은 일을 정확히 끝내고, 평가받는 부분을 점검하는 편이 좋아.',
+  인성:'새 자료를 많이 늘리기보다 이미 배운 내용을 정리하고 이해가 빈 곳을 메우는 데 집중해.',
+  재성:'돈과 시간을 어디에 쓸지 우선순위를 먼저 정해. 기대보다 지금 확실한 예산과 의무를 기준으로 움직이는 편이 좋아.',
+  식상:'생각을 말이나 결과물로 구체화하는 데 무게가 실려. 길게 설명하기보다 상대가 이해할 수 있는 형태로 보여주는 편이 좋아.',
+  비겁:'내 기준과 역할 분담을 분명히 하는 게 중요해. 혼자 밀어붙이거나 무조건 맞추기보다 조율할 부분을 나눠봐.',
+}
+const SAJU_SECONDARY_COPY: Record<string,string> = {
+  관성:'맡은 일의 완료 기준과 책임 범위',
+  인성:'배운 내용과 문서 정리',
+  재성:'돈·시간의 우선순위',
+  식상:'말과 결과물로 표현하는 방식',
+  비겁:'내 기준과 역할 분담',
+}
 function westernCaution(name:string, stat:FortuneStat) {
   if (name === '투자주의') return stat.average >= 60 || /강|높/.test(String(stat.band ?? ''))
   return stat.average < 40 || /약|낮/.test(String(stat.band ?? ''))
@@ -52,7 +66,13 @@ function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
   const cautionCopy = caution.length ? `${caution.join('·')}은 무리해서 밀어붙이기보다 실수와 부담을 줄이는 데 집중해.` : '크게 밀어붙이기보다 조건을 확인하면서 움직여.'
   return `${leadCopy} ${cautionCopy}`
 }
-function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens"><h4>{lens.title}</h4><p>{lens.meaning}</p><ReadingExplanation kind="reason">{evidence}</ReadingExplanation><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><ReadingExplanation kind="caution">{lens.limit}</ReadingExplanation></article> }
+function sajuHeadline(lenses:Lens[], when:string) {
+  if (!lenses.length) return `${when}은 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`
+  const lead = SAJU_LEAD_COPY[lenses[0].key] ?? lenses[0].action
+  const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
+  return `${when}은 ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`
+}
+function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens saju-lens-card"><h4>{lens.title}</h4><p className="system-lens-meaning">{lens.meaning}</p><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><p className="system-lens-evidence"><b>근거</b><span>{evidence || '연결된 운 구간 근거가 없어.'}</span></p><details className="system-lens-limit"><summary>해석 범위</summary><p>{lens.limit}</p></details></article> }
 function shortKoreanDate(value?: string) {
   const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
   return match ? `${Number(match[2])}월 ${Number(match[3])}일` : String(value ?? '')
@@ -86,6 +106,8 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
   const westernPeriod = westernWhen(c.period.day_count)
   const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod)
+  const sajuPeriod = westernWhen(c.period.day_count)
+  const sajuReaderHeadline = sajuHeadline(selectedLenses,sajuPeriod)
   const focusedField = field ?? (topic==='전체' ? undefined : {id:topic,label:topic+'운',desc:'선택 분야',topics:WESTERN[topic],lens:topic})
   const overview = <section className="system-overview"><h3>세 체계 한눈에</h3><div className="system-overview-grid">
         <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{selectedWestern.slice().sort((a,b)=>b[1].average-a[1].average).slice(0,2).map(([name,s])=>`${name} · ${s.band}`).join(', ') || '해당 분야의 계산값이 없어.'}</p><small>선택 기간의 강약과 날짜를 읽는 층</small></article>
@@ -104,11 +126,9 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
       <div className="system-score-grid western-score-grid">{selectedWestern.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 최고·최저 날짜는 아래 계산 근거에서 비교할 수 있어.</p>}<p>좋은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p><p>주의할 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p></details>)}</div>
       {isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}
     </> : !view.allowed ? <p className="system-unavailable">출생시간 검증 정책에 따라 이 계산에서는 {system==='saju'?'사주':'태국점성술'} 해석이 제외돼 있어. 탭 전환으로 정밀도 제한을 바꾸지 않아.</p> : system==='saju' ? <>
-      <header className="system-hero"><span>사주 · {period}</span><h3>{view.sajuSummary}</h3><p>{c.period.start===c.period.end?'선택한 날이 속한 운 구간을 배경으로 읽어. 계산되지 않은 일진은 만들지 않아.':view.monthly.length>1?'선택 기간이 여러 절기 구간에 걸쳐 있어. 달력의 월 이름으로 합치지 않고 각 경계와 십성을 나눠 읽어.':'선택 기간에 적용되는 실제 운 구간을 배경으로 읽어. 구간 안에서 매일 같은 사건이 생긴다는 뜻은 아니야.'}</p></header>
-      <div className="system-context-chips">{view.dayun.map(r=><span key={r.start_year}>대운 <b>{r.ganzhi}</b> {r.start_year}–{r.end_year}</span>)}</div>
-      <section><h3>운 구간을 따라 읽기</h3>{view.contexts.map((r,i)=><details className="system-segment" key={`${r.layer}-${r.segment_start}`} open={i<2}><summary><b>{r.layer} · {r.ganzhi} · {r.stem_ten_god}</b><small>{sajuSegmentHint(c.period.start,c.period.end)}</small></summary><p>{tenGodLens(r.stem_ten_god)?.meaning??'이 십성 값의 생활 분야 번역은 아직 정의돼 있지 않아.'}</p>{r.branch_links.length>0&&<ReadingExplanation kind="reason">{r.branch_links.join(' / ')}. 지지 사이의 연결을 표시한 계산이야. 특정 관계의 성립이나 충돌 사건을 단정하지 않아.</ReadingExplanation>}<details className="system-segment-technical"><summary>계산 상세</summary><p>정확 구간 · {r.segment_start} → {r.segment_end_exclusive} 미만</p>{r.boundary_note&&<p>{r.boundary_note}</p>}</details></details>)}</section>
-      <section><h3>생활 분야로 읽기</h3>{topic==='애정'&&<p>표현과 관계 경계를 읽는 맥락이야. 배우자성이나 특정 상대의 마음을 계산한 결과는 아니야.</p>}{selectedLenses.map(l=><LensCard key={l.key} lens={l} evidence={view.contexts.filter(r=>tenGodLens(r.stem_ten_god)?.key===l.key).map(r=>`${r.layer} ${r.ganzhi} · ${r.stem_ten_god}`).join(' / ')}/>)}{!selectedLenses.length&&<p>연결된 십성이 없어 이 분야의 설명을 만들지 않았어.</p>}</section>
-      <details className="system-raw"><summary>사주 원국과 계산 범위</summary><p>일간 · {view.saju?.day_master}</p><p>원국 · {Object.entries(view.saju?.pillars??{}).map(([k,v])=>`${{year:'년주',month:'월주',day:'일주',hour:'시주'}[k]} ${v}`).join(' / ')}</p><p>오행 · {Object.entries(view.saju?.elements??{}).map(([k,v])=>`${k} ${v}`).join(' / ')}</p><p>진태양시 · {view.saju?.true_solar?.true_solar_time} · 보정 {view.saju?.true_solar?.total_correction_minutes}분</p><p>미계산: {view.saju?.not_calculated?.join(', ')}</p></details>
+      <header className="system-hero saju-reader-hero"><span>사주 · {sajuPeriod}</span><h3>{sajuReaderHeadline}</h3><p>이 기간에 계산된 운 구간을 생활 주제로 번역해 보여줘. 특정 사건이 반드시 생긴다는 뜻은 아니고, 간지·십성·절기 경계는 아래 계산 근거에서 따로 확인할 수 있어.</p></header>
+      <section className="saju-reader-topics"><h3>{topic==='전체'?'지금 먼저 볼 것':`${topic}에서 먼저 볼 것`}</h3>{topic==='애정'&&<p className="saju-topic-note">표현과 관계 경계를 읽는 맥락이야. 배우자성이나 특정 상대의 마음을 계산한 결과는 아니야.</p>}{selectedLenses.map(l=><LensCard key={l.key} lens={l} evidence={view.contexts.filter(r=>tenGodLens(r.stem_ten_god)?.key===l.key).map(r=>`${r.layer} ${ganzhiWithReading(r.ganzhi)} · ${r.stem_ten_god}`).join(' / ')}/>)}{!selectedLenses.length&&<p>연결된 십성이 없어 이 분야의 설명을 만들지 않았어.</p>}</section>
+      <details className="system-raw saju-calculation-detail"><summary>사주 계산 근거 자세히 보기</summary><p className="saju-calculation-intro">생활 해설에 실제로 사용한 운 구간과 원국·보정값이야. 기본 화면에서는 읽기 쉬운 해설만 먼저 보여줘.</p>{view.dayun.length>0&&<div className="system-context-chips">{view.dayun.map(r=><span key={r.start_year}>대운 <b>{ganzhiWithReading(r.ganzhi)}</b> {r.start_year}–{r.end_year}</span>)}</div>}<section className="saju-segments"><h4>적용 운 구간</h4>{view.contexts.map(r=><details className="system-segment" key={`${r.layer}-${r.segment_start}`}><summary><b>{r.layer} · {ganzhiWithReading(r.ganzhi)} · {r.stem_ten_god}</b><small>{sajuSegmentHint(c.period.start,c.period.end)}</small></summary><p>생활 번역 · {tenGodLens(r.stem_ten_god)?.title??'정의되지 않음'}</p>{r.branch_links.length>0&&<p>지지 연결 · {r.branch_links.join(' / ')}. 특정 관계의 성립이나 충돌 사건을 단정하지 않아.</p>}<p>정확 구간 · {r.segment_start} → {r.segment_end_exclusive} 미만</p>{r.boundary_note&&<p>{r.boundary_note}</p>}</details>)}</section><section className="saju-origin-data"><h4>원국과 보정값</h4><p>일간 · {view.saju?.day_master}</p><p>원국 · {Object.entries(view.saju?.pillars??{}).map(([k,v])=>`${{year:'년주',month:'월주',day:'일주',hour:'시주'}[k]} ${v}`).join(' / ')}</p><p>오행 · {Object.entries(view.saju?.elements??{}).map(([k,v])=>`${k} ${v}`).join(' / ')}</p><p>진태양시 · {view.saju?.true_solar?.true_solar_time} · 보정 {view.saju?.true_solar?.total_correction_minutes}분</p><p>미계산: {view.saju?.not_calculated?.join(', ')}</p></section></details>
       <BoundedCopy packet={{system:'saju',love_status:loveStatus,focus_topic:field?.label??topic,period:c.period,dayun:view.dayun,contexts:view.contexts.filter(r=>SAJU_LIFE_KEYS[topic].includes(tenGodLens(r.stem_ten_god)?.key??'')),pillars:view.saju?.pillars,day_master:view.saju?.day_master,not_calculated:view.saju?.not_calculated}}/>
     </> : <>
       <header className="system-hero"><span>태국점성술 · {period}</span><h3>{thaiReaderSummary}</h3><p>좋고 나쁨을 한 줄로 단정하기보다, 지금 생활에서 확인할 부분을 먼저 보고 행성 배치는 계산 근거로 내려서 읽어.</p></header>
