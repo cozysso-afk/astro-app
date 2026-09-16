@@ -1,6 +1,5 @@
 import type { FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
-import { topicOrder } from './fortuneTopics.ts'
 
 export type BasicFortuneTone = 'good' | 'steady' | 'caution'
 export type BasicFortuneRow = {
@@ -19,6 +18,8 @@ export type BasicFortuneReading = {
   caution: BasicFortuneRow[]
   steady: BasicFortuneRow[]
 }
+
+const TOPIC_ORDER = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']
 
 const ACTION_COPY: Record<string, [string, string, string]> = {
   금전: ['예산과 수입·지출 계획을 정리하기 좋아.', '계획한 범위 안에서 돈을 쓰고 우선순위를 확인해.', '예상 밖 지출에 여유를 두고 큰 결제는 한 번 더 확인해.'],
@@ -70,7 +71,7 @@ function rowFor(calculation: IntegratedApiResponse, topic: string): BasicFortune
 }
 
 function topicList(calculation: IntegratedApiResponse, field?: FortuneField) {
-  const source = field?.topics?.length ? field.topics : topicOrder
+  const source = field?.topics?.length ? field.topics : TOPIC_ORDER
   return source.map((topic)=>rowFor(calculation, topic)).filter((row): row is BasicFortuneRow => Boolean(row))
 }
 
