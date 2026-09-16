@@ -39,6 +39,14 @@ function signalClass(signal: string) {
   return 'is-mixed'
 }
 
+export function visibleTopicDepth(conclusion: string, observe?: string) {
+  const base = String(conclusion ?? '').trim()
+  const detail = String(observe ?? '').trim()
+  if (!detail || detail === base) return ''
+  const sentenceCount = (base.match(/[.!?](?=\s|$)/g) ?? []).length
+  return base.length < 120 && sentenceCount < 2 ? detail : ''
+}
+
 export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, systemSummary, westernOnly=false, field, period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel, technicalDetails }: {
   loveStatus?: LoveStatus
   systemOverview?: ReactNode
@@ -123,7 +131,10 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
 
     {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=><article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b><details className="reading-topic-depth" open={userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</details></article>)}</div>
+      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=>{
+        const visibleDepth = visibleTopicDepth(item.conclusion, item.observe)
+        return <article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b>{visibleDepth&&<p>{visibleDepth}</p>}<details className="reading-topic-depth" open={userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action && item.observe !== visibleDepth ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</details></article>
+      })}</div>
     </section>}
 
     {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion ?? item.summary}</p>{item.detail && <details><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.detail.reason}</ReadingExplanation>{item.detail.timing && <ReadingExplanation kind="timing">{item.detail.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.detail.action}</ReadingExplanation>{item.detail.caution && <ReadingExplanation kind="caution">{item.detail.caution}</ReadingExplanation>}</details>}</article>)}</div></details>}
