@@ -32,8 +32,8 @@ import './mobile-viewport-v31.css'
 import './vertical-density-v32.css'
 import './reading-type-hierarchy-v33.css'
 import './home-information-architecture-v35.css'
-import './reading-experience.css'
 import './system-reading-ux-v40.css'
+import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
 
