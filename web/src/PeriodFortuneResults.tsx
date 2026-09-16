@@ -117,7 +117,7 @@ export function PeriodFortuneResults({
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
       <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>
-        <summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>
+        <summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>
         <BasicFortuneReading calculation={result} period={period} field={field}/>
       </details>
     </></SystemReadingViews>
