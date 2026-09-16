@@ -1,0 +1,81 @@
+/* V49 · reading legibility pass
+ * Keep the final reading-experience owner intact while making reader-facing
+ * conclusions visually distinct from UI labels and calculation evidence.
+ */
+@media (max-width: 600px) {
+  /* Only the actual reading conclusion uses the serif reading voice. */
+  html body .app-shell .fortune-experience .period-ai-head h3,
+  html body .app-shell .relationship-experience .reading-hero h3,
+  html body .app-shell .system-reading .system-hero h3,
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > b,
+  html body .app-shell .relationship-experience .reading-conclusion {
+    font-family: var(--reading-display, 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif) !important;
+    font-weight: 600 !important;
+    letter-spacing: -.025em !important;
+    word-break: keep-all !important;
+  }
+
+  html body .app-shell .fortune-experience .period-ai-head h3,
+  html body .app-shell .relationship-experience .reading-hero h3,
+  html body .app-shell .system-reading .system-hero h3 {
+    font-size: 19px !important;
+    line-height: 1.78 !important;
+  }
+
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > b,
+  html body .app-shell .relationship-experience .reading-conclusion {
+    font-size: 15px !important;
+    line-height: 1.9 !important;
+  }
+
+  /* Navigation, topic names, section labels and scores stay in the UI sans face. */
+  html body .app-shell .system-reading .system-switcher,
+  html body .app-shell .system-reading .system-topic-selector,
+  html body .app-shell .system-reading h3:not(.system-hero h3),
+  html body .app-shell .system-reading h4,
+  html body .app-shell .fortune-experience .period-ai-section-title,
+  html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > strong,
+  html body .app-shell .reading-explanation-label,
+  html body .app-shell .flow-tile-heading,
+  html body .app-shell .flow-score,
+  html body .app-shell .flow-band {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+  }
+
+  html body .app-shell .fortune-experience .period-ai-section-title > span,
+  html body .app-shell .relationship-experience .reading-section > h3,
+  html body .app-shell .system-reading section > h3,
+  html body .app-shell .system-reading > h3 {
+    font-weight: 700 !important;
+    line-height: 1.5 !important;
+    letter-spacing: -.01em !important;
+  }
+
+  /* Supporting prose gets more air without becoming headline-sized. */
+  html body .app-shell .fortune-experience .reading-explanation > p,
+  html body .app-shell .relationship-experience .reading-explanation > p,
+  html body .app-shell .system-reading .system-lens > p,
+  html body .app-shell .system-reading .system-overview-grid > article > p,
+  html body .app-shell .system-reading .thai-lens-reading > p,
+  html body .app-shell .fortune-experience .period-ai-direction-item p,
+  html body .app-shell .relationship-experience .contact-row p {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 450 !important;
+    line-height: 1.78 !important;
+    letter-spacing: -.005em !important;
+    word-break: keep-all !important;
+    overflow-wrap: anywhere;
+  }
+
+  /* Raw evidence stays visually quiet so it cannot compete with the reading. */
+  html body .app-shell .system-reading .system-raw,
+  html body .app-shell .system-reading .system-lens-evidence,
+  html body .app-shell .fortune-experience .period-ai-details,
+  html body .app-shell .relationship-experience .relationship-technical,
+  html body .app-shell .reading-muted,
+  html body .app-shell .reading-safety-note {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+    line-height: 1.65 !important;
+  }
+}
