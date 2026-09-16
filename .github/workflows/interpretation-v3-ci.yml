@@ -70,6 +70,7 @@ jobs:
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
           node --test web/src/lib/sajuTechnicalDisclosure.test.mjs
+          node --test web/src/lib/compatibilityCta.ui-contract.test.mjs
           node --test web/src/lib/interpretationUiContract.test.mjs
           node --test web/src/lib/relationshipModeContract.test.mjs
           node --test web/src/lib/relationshipEvidencePipeline.test.mjs
