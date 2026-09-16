@@ -12,6 +12,20 @@ test('location results have a scoped mobile owner', () => {
   assert.match(css, /\.location-results \.location-rank-row > div > small[\s\S]*white-space:\s*normal\s*!important/)
 })
 
+test('location results explain the ranking before raw lists', () => {
+  assert.match(location, /지역·국가운 해설/)
+  assert.match(location, /locationEvidenceText/)
+  assert.match(location, /출생 순간의 행성과 각도 축/)
+  assert.match(location, /비자, 직업시장, 생활비, 치안, 언어/)
+  assert.match(location, /location-purpose-reading/)
+  assert.match(location, /ReadingExplanation kind="reason"/)
+  assert.match(location, /ReadingExplanation kind="practice"/)
+  assert.match(location, /ReadingExplanation kind="caution"/)
+  const explanation = location.indexOf('location-reading-card')
+  const ranking = location.indexOf('국가 순위')
+  assert.ok(explanation >= 0 && ranking > explanation)
+})
+
 test('location mobile filters no longer require sideways scrolling', () => {
   assert.match(css, /@media \(max-width: 560px\)[\s\S]*\.location-results \.astro-purpose-tabs[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[\s\S]*overflow:\s*visible\s*!important/)
   assert.match(css, /\.location-results \.astro-angle-filter,[\s\S]*\.location-results \.astro-planet-filter[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[\s\S]*overflow:\s*visible\s*!important/)
