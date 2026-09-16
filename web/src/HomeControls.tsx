@@ -102,6 +102,8 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
       {workspace==='period'&&<button className="home-field-entry" type="button" onClick={()=>onWorkspace?.('field')}><Heart size={20}/><span><strong>분야별 운세</strong><small>선택한 기간의 연애·금전·학업 등 10개 분야</small></span><ChevronRight size={16}/></button>}
     </section>
 
+    {workspace==='period'&&selectedTool===null&&<div id="home-period-result-slot" className="home-period-result-slot" data-home-result-slot />}
+
     {selectedTool === 'precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid" role="tablist" aria-label="정밀분석 기간">{fortunePeriods.map(({key,label,icon:Icon})=><button aria-selected={period===key} className={`period-button ${period===key?'is-active':''}`} key={key} role="tab" type="button" onClick={()=>onPeriodSelect(key,false)}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
 
     {workspace==='period'&&<section className="section-block home-life-section" aria-label="관계와 인생">
