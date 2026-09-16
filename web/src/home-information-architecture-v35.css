@@ -1,6 +1,6 @@
-/* V35.2 · Home information architecture and mobile card balance
+/* V35.3 · Home information architecture and mobile card balance
  * Group period, relationship/life, and system entries by user intent.
- * The default period result is surfaced immediately after period controls.
+ * Keep long reading results below primary navigation so tools never disappear.
  */
 .app-shell .moonlit-home-controls .home-section-heading {
   display: flex;
@@ -60,49 +60,6 @@
   font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  gap: 0;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot:empty {
-  display: none;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot > .period-fortune-report {
-  width: 100%;
-  min-width: 0;
-  margin: 0 !important;
-}
-
-/* The first answer should read like a result, not another oversized landing card. */
-.app-shell .moonlit-home-controls .home-period-result-slot .period-fortune-report .period-report-heading {
-  padding: 10px 12px !important;
-  gap: 9px !important;
-  margin-bottom: 8px !important;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot .period-fortune-report .period-report-icon {
-  width: 40px !important;
-  min-width: 40px !important;
-  height: 40px !important;
-  min-height: 40px !important;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot .period-report-copy h2 {
-  font-size: clamp(21px, 5.6vw, 25px) !important;
-  line-height: 1.22 !important;
-  margin: 5px 0 7px !important;
-}
-
-.app-shell .moonlit-home-controls .home-period-result-slot .period-report-copy > p {
-  font-size: 12.5px !important;
-  line-height: 1.45 !important;
-  margin-top: 7px !important;
 }
 
 /* AI-copy is a secondary tool. Keep the user's result and guidance first. */
