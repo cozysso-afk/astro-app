@@ -1,0 +1,72 @@
+name: Apply system topic routing V48
+
+on:
+  push:
+    branches: [fix/system-topic-routing-v48]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[system-topic-routing-v48-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/system-topic-routing-v48
+          fetch-depth: 0
+      - name: Patch system/topic routing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'anchor missing: {path}: {old[:100]!r}')
+              p.write_text(s.replace(old,new,1))
+
+          path='web/src/SystemReadingViews.tsx'
+          replace_once(path,
+              "import { useState, cloneElement, isValidElement, type ReactNode } from 'react'\n",
+              "import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'\n")
+          anchor="const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const\n"
+          helper="""const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
+
+type ReadingChildContext = { field?: FortuneField; systemOverview?: ReactNode; systemSummary?: string; westernOnly?: boolean; technicalDetails?: ReactNode }
+function injectReadingContext(children: ReactNode, props: ReadingChildContext): ReactNode {
+  return Children.map(children, child => {
+    if (!isValidElement(child)) return child
+    const element = child as ReactElement<{children?:ReactNode} & ReadingChildContext>
+    if (child.type === Fragment || typeof child.type === 'string') {
+      if (element.props.children == null) return child
+      return cloneElement(element, {}, injectReadingContext(element.props.children, props))
+    }
+    return cloneElement(element, props)
+  })
+}
+"""
+          replace_once(path, anchor, helper)
+          old_integrated="{isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}"
+          new_integrated="{injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}"
+          replace_once(path, old_integrated, new_integrated)
+          old_western="{isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}"
+          new_western="{injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}"
+          replace_once(path, old_western, new_western)
+
+          replace_once('web/src/PeriodFortuneResults.tsx',
+              "<summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>",
+              "<summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>")
+          PY
+      - name: Run focused routing tests
+        run: |
+          cd web
+          node --test src/lib/systemTopicRouting.test.mjs
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/SystemReadingViews.tsx web/src/PeriodFortuneResults.tsx
+          git commit -m "fix: scope readings to selected system and topic [system-topic-routing-v48-applied]"
+          git push origin HEAD:fix/system-topic-routing-v48
