@@ -23,12 +23,14 @@ test('western score cards expose plain guidance before date detail', () => {
 })
 
 test('western independent view never shows the integrated period panel again', () => {
-  assert.match(polish, /system-reading\.system-western > \.period-ai-card\s*\{[\s\S]*?display:\s*none\s*!important/)
+  assert.match(polish, /system-reading\.system-western > \.period-ai-card,/)
+  assert.match(polish, /system-reading\.system-western > \.fortune-experience,/)
+  assert.match(polish, /system-reading\.system-western > \.period-deep-reading\s*\{[\s\S]*?display:\s*none\s*!important/)
 })
 
-test('mobile integrated reading uses an explicit native Korean serif for headline and lead prose', () => {
-  assert.match(polish, /period-ai-head h3,[\s\S]*?font-family:\s*'AppleMyungjo'/)
-  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*'AppleMyungjo'/)
+test('mobile integrated reading uses a downloaded Korean Myeongjo for headline and lead prose', () => {
+  assert.match(polish, /period-ai-head h3,[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
+  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
 })
 
 test('top-level life topics use a fixed two-row mobile grid instead of horizontal clipping', () => {
