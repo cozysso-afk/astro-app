@@ -1124,6 +1124,14 @@ export default function AppNext() {
       await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
       setRelationshipAi(annotated)
       setRelationshipAiCacheSource('fresh')
+      if (relationshipRequestSnapshot) {
+        const autoKind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
+        const autoIsReunion = selectedTool === 'compatibility' && analysisMode === 'reunion'
+        const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }
+        const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
+        const autoLabel = autoKind === 'marriage' ? '결혼운' : autoIsReunion ? '재회운' : '궁합운'
+        void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)
+      }
     } catch (error) {
       if (revision === relationshipRevisionRef.current) setRelationshipAiError(relationshipAiCatchMessage(error))
     } finally {
