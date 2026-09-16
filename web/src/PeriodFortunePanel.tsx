@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, CalendarDays, LoaderCircle, Moon, Sparkles } from 'lucide-react'
 
 type PeriodFortunePanelProps = {
@@ -35,7 +36,14 @@ export function PeriodFortunePanel({
   children,
 }: PeriodFortunePanelProps) {
   const badge = periodBadge(title)
-  return <section className={`tool-panel period-fortune-report period-fortune-${badge}`}>
+  const [homeResultSlot, setHomeResultSlot] = useState<HTMLElement | null>(null)
+
+  useLayoutEffect(() => {
+    const nextSlot = typeof document === 'undefined' ? null : document.getElementById('home-period-result-slot')
+    setHomeResultSlot((current) => current === nextSlot ? current : nextSlot)
+  })
+
+  const panel = <section className={`tool-panel period-fortune-report period-fortune-${badge}`}>
     <div className="tool-panel-heading period-report-heading">
       <span className="tool-icon tone-gold period-report-icon"><Moon size={22}/></span>
       <div className="period-report-copy">
@@ -54,4 +62,6 @@ export function PeriodFortunePanel({
       </button>
     </> : children}
   </section>
+
+  return homeResultSlot ? createPortal(panel, homeResultSlot) : panel
 }
