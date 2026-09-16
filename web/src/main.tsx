@@ -34,6 +34,7 @@ import './reading-type-hierarchy-v33.css'
 import './home-information-architecture-v35.css'
 import './system-reading-ux-v40.css'
 import './reunion-location-mobile-v42.css'
+import './basic-fortune-v43.css'
 import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
