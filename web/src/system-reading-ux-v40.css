@@ -137,6 +137,195 @@ html body .app-shell .system-western .western-score-card > p:last-child {
   padding-bottom: 12px !important;
 }
 
+/* V41 · Saju reader-first layer
+ * Put plain-language meaning and action above technical Ganzhi/ten-god boundaries.
+ */
+html body .app-shell .system-saju .saju-reader-hero > span {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+html body .app-shell .system-saju .saju-reader-hero > h3 {
+  font-size: clamp(19px, 5vw, 23px) !important;
+  line-height: 1.55 !important;
+  margin-top: 8px !important;
+  word-break: keep-all !important;
+}
+
+html body .app-shell .system-saju .saju-reader-hero > p {
+  margin-top: 10px !important;
+  font-size: 12.5px !important;
+  line-height: 1.55 !important;
+  color: var(--reading-secondary) !important;
+  word-break: keep-all !important;
+}
+
+html body .app-shell .system-saju .saju-reader-topics {
+  display: grid !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+html body .app-shell .system-saju .saju-reader-topics > h3 {
+  margin: 0 !important;
+  font-size: 17px !important;
+  line-height: 1.4 !important;
+  font-weight: 760 !important;
+  color: var(--reading-indigo) !important;
+}
+
+html body .app-shell .system-saju .saju-topic-note {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  background: var(--reading-lavender) !important;
+  font-size: 12.5px !important;
+  line-height: 1.55 !important;
+  color: var(--reading-secondary) !important;
+}
+
+html body .app-shell .system-saju .saju-lens-card {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  border: 1px solid var(--reading-border) !important;
+  border-radius: 16px !important;
+  background: var(--reading-surface) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+html body .app-shell .system-saju .saju-lens-card > h4 {
+  margin: 0 !important;
+  font-size: 17px !important;
+  line-height: 1.4 !important;
+  font-weight: 760 !important;
+  color: var(--reading-text) !important;
+}
+
+html body .app-shell .system-saju .saju-lens-card > .system-lens-meaning {
+  margin: 8px 0 0 !important;
+  font-size: 14px !important;
+  line-height: 1.7 !important;
+  color: var(--reading-text) !important;
+  word-break: keep-all !important;
+}
+
+html body .app-shell .system-saju .saju-lens-card .reading-explanation.is-practice {
+  margin-top: 12px !important;
+  padding: 11px 12px !important;
+  border-radius: 12px !important;
+  background: var(--reading-mint) !important;
+}
+
+html body .app-shell .system-saju .saju-lens-card .reading-explanation.is-practice p {
+  margin: 4px 0 0 !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  font-weight: 560 !important;
+  color: var(--reading-text) !important;
+  word-break: keep-all !important;
+}
+
+html body .app-shell .system-saju .system-lens-evidence {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 6px !important;
+  margin: 12px 0 0 !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--reading-border) !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+  color: var(--reading-secondary) !important;
+  overflow-wrap: anywhere !important;
+}
+
+html body .app-shell .system-saju .system-lens-evidence > b {
+  color: var(--reading-indigo) !important;
+  font-weight: 700 !important;
+}
+
+html body .app-shell .system-saju .system-lens-limit {
+  margin-top: 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html body .app-shell .system-saju .system-lens-limit > summary {
+  min-height: 36px !important;
+  padding: 8px 0 0 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  color: var(--reading-secondary) !important;
+}
+
+html body .app-shell .system-saju .system-lens-limit > p {
+  margin: 4px 0 0 !important;
+  font-size: 11.5px !important;
+  line-height: 1.55 !important;
+  color: var(--reading-secondary) !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail > summary {
+  font-size: 12.5px !important;
+  font-weight: 650 !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-intro,
+html body .app-shell .system-saju .saju-calculation-detail p {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-intro {
+  margin: 0 0 12px !important;
+  font-size: 11.5px !important;
+  line-height: 1.55 !important;
+  color: var(--reading-secondary) !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail h4 {
+  margin: 14px 0 8px !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  font-weight: 700 !important;
+  color: var(--reading-indigo) !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail .system-context-chips {
+  margin: 0 0 10px !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail .system-segment {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail .system-segment > summary {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 3px !important;
+}
+
+html body .app-shell .system-saju .saju-calculation-detail .system-segment > summary > b,
+html body .app-shell .system-saju .saju-calculation-detail .system-segment > summary > small {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+}
+
+html body .app-shell .system-saju .saju-origin-data {
+  margin-top: 10px !important;
+  padding-top: 4px !important;
+  border-top: 1px solid var(--reading-border) !important;
+}
+
 @media (max-width: 360px) {
   html body .app-shell .system-reading > .system-topic-selector.system-topic-selector-fixed {
     gap: 6px !important;
@@ -148,5 +337,8 @@ html body .app-shell .system-western .western-score-card > p:last-child {
   html body .app-shell .system-western .western-score-grid > .western-score-card > summary {
     padding: 11px !important;
     min-height: 122px !important;
+  }
+  html body .app-shell .system-saju .saju-lens-card {
+    padding: 14px !important;
   }
 }
