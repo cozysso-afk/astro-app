@@ -10,9 +10,10 @@ test('period fortune and field fortune live in one primary home group', () => {
   const fortune = home.indexOf('home-fortune-group')
   const life = home.indexOf('home-life-section')
   assert.ok(fortune >= 0 && life > fortune)
-  assert.match(home, />내 운세</)
+  assert.ok(home.includes("'내 운세'"))
   assert.match(home, /오늘·주간·월간·연간 전체 기간운세/)
-  assert.match(home, /className="home-field-entry"[\s\S]*>분야별 운세</)
+  assert.match(home, /className="home-field-entry"/)
+  assert.match(home, /<strong>분야별 운세<\/strong>/)
   assert.match(home, /onWorkspace\?\.\('field'\)/)
 })
 
