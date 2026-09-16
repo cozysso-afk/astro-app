@@ -10,6 +10,13 @@ const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',lab
 const TOPICS: LifeTopic[] = ['전체','애정','대인','학업','직업','금전','컨디션']
 const WESTERN: Record<LifeTopic,string[]> = {전체:[],애정:['연애','연락','재회'],대인:['대인관계','소식'],학업:['학업','시험'],직업:['직장','이직'],금전:['금전','투자심리','수익실현','신규진입','투자주의'],컨디션:['컨디션']}
 function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens"><h4>{lens.title}</h4><p>{lens.meaning}</p><ReadingExplanation kind="reason">{evidence}</ReadingExplanation><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><ReadingExplanation kind="caution">{lens.limit}</ReadingExplanation></article> }
+function shortKoreanDate(value?: string) {
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return match ? `${Number(match[2])}월 ${Number(match[3])}일` : String(value ?? '')
+}
+function sajuSegmentHint(selectedStart:string, selectedEnd:string) {
+  return selectedStart===selectedEnd ? `${shortKoreanDate(selectedStart)} 적용` : '선택 기간에 적용'
+}
 function BoundedCopy({packet}:{packet:Record<string,unknown>}) {
   const [notice,setNotice] = useState('')
   async function copy() {
@@ -51,8 +58,8 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     </> : !view.allowed ? <p className="system-unavailable">출생시간 검증 정책에 따라 이 계산에서는 {system==='saju'?'사주':'태국점성술'} 해석이 제외돼 있어. 탭 전환으로 정밀도 제한을 바꾸지 않아.</p> : system==='saju' ? <>
       <header className="system-hero"><span>사주 · {period}</span><h3>{view.sajuSummary}</h3><p>{c.period.start===c.period.end?'선택한 날이 속한 운 구간을 배경으로 읽어. 계산되지 않은 일진은 만들지 않아.':view.monthly.length>1?'선택 기간이 여러 절기 구간에 걸쳐 있어. 달력의 월 이름으로 합치지 않고 각 경계와 십성을 나눠 읽어.':'선택 기간에 적용되는 실제 운 구간을 배경으로 읽어. 구간 안에서 매일 같은 사건이 생긴다는 뜻은 아니야.'}</p></header>
       <div className="system-context-chips">{view.dayun.map(r=><span key={r.start_year}>대운 <b>{r.ganzhi}</b> {r.start_year}–{r.end_year}</span>)}</div>
-      <section><h3>운 구간을 따라 읽기</h3>{view.contexts.map((r,i)=><details className="system-segment" key={`${r.layer}-${r.segment_start}`} open={i<2}><summary><b>{r.layer} · {r.ganzhi} · {r.stem_ten_god}</b><small>{r.segment_start} → {r.segment_end_exclusive} 미만</small></summary><p>{tenGodLens(r.stem_ten_god)?.meaning??'이 십성 값의 생활 분야 번역은 아직 정의돼 있지 않아.'}</p>{r.branch_links.length>0&&<ReadingExplanation kind="reason">{r.branch_links.join(' / ')}. 지지 사이의 연결을 표시한 계산이야. 특정 관계의 성립이나 충돌 사건을 단정하지 않아.</ReadingExplanation>}<p>{r.boundary_note}</p></details>)}</section>
-      <section><h3>생활 분야로 읽기</h3>{topic==='애정'&&<p>표현과 관계 경계를 읽는 맥락이야. 배우자성이나 특정 상대의 마음을 계산한 결과는 아니야.</p>}{selectedLenses.map(l=><LensCard key={l.key} lens={l} evidence={view.contexts.filter(r=>tenGodLens(r.stem_ten_god)?.key===l.key).map(r=>`${r.layer} ${r.ganzhi} · ${r.stem_ten_god} (${r.segment_start}부터 ${r.segment_end_exclusive} 미만)`).join(' / ')}/>)}{!selectedLenses.length&&<p>연결된 십성이 없어 이 분야의 설명을 만들지 않았어.</p>}</section>
+      <section><h3>운 구간을 따라 읽기</h3>{view.contexts.map((r,i)=><details className="system-segment" key={`${r.layer}-${r.segment_start}`} open={i<2}><summary><b>{r.layer} · {r.ganzhi} · {r.stem_ten_god}</b><small>{sajuSegmentHint(c.period.start,c.period.end)}</small></summary><p>{tenGodLens(r.stem_ten_god)?.meaning??'이 십성 값의 생활 분야 번역은 아직 정의돼 있지 않아.'}</p>{r.branch_links.length>0&&<ReadingExplanation kind="reason">{r.branch_links.join(' / ')}. 지지 사이의 연결을 표시한 계산이야. 특정 관계의 성립이나 충돌 사건을 단정하지 않아.</ReadingExplanation>}<details className="system-segment-technical"><summary>계산 상세</summary><p>정확 구간 · {r.segment_start} → {r.segment_end_exclusive} 미만</p>{r.boundary_note&&<p>{r.boundary_note}</p>}</details></details>)}</section>
+      <section><h3>생활 분야로 읽기</h3>{topic==='애정'&&<p>표현과 관계 경계를 읽는 맥락이야. 배우자성이나 특정 상대의 마음을 계산한 결과는 아니야.</p>}{selectedLenses.map(l=><LensCard key={l.key} lens={l} evidence={view.contexts.filter(r=>tenGodLens(r.stem_ten_god)?.key===l.key).map(r=>`${r.layer} ${r.ganzhi} · ${r.stem_ten_god}`).join(' / ')}/>)}{!selectedLenses.length&&<p>연결된 십성이 없어 이 분야의 설명을 만들지 않았어.</p>}</section>
       <details className="system-raw"><summary>사주 원국과 계산 범위</summary><p>일간 · {view.saju?.day_master}</p><p>원국 · {Object.entries(view.saju?.pillars??{}).map(([k,v])=>`${{year:'년주',month:'월주',day:'일주',hour:'시주'}[k]} ${v}`).join(' / ')}</p><p>오행 · {Object.entries(view.saju?.elements??{}).map(([k,v])=>`${k} ${v}`).join(' / ')}</p><p>진태양시 · {view.saju?.true_solar?.true_solar_time} · 보정 {view.saju?.true_solar?.total_correction_minutes}분</p><p>미계산: {view.saju?.not_calculated?.join(', ')}</p></details>
       <BoundedCopy packet={{system:'saju',love_status:loveStatus,focus_topic:field?.label??topic,period:c.period,dayun:view.dayun,contexts:view.contexts.filter(r=>SAJU_LIFE_KEYS[topic].includes(tenGodLens(r.stem_ten_god)?.key??'')),pillars:view.saju?.pillars,day_master:view.saju?.day_master,not_calculated:view.saju?.not_calculated}}/>
     </> : <>
