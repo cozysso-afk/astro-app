@@ -7,6 +7,7 @@ import { ReadingExplanation } from './ReadingExplanation'
 import { CheckCircle2, CircleStop, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { estimateGeminiUsage } from './lib/aiUsage'
+import { periodAiCostPreview } from './lib/aiCostPreview'
 import { topicOrder } from './lib/fortuneTopics'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
 import { normalizeTopicEntries, interpretationQualityPassed } from './lib/interpretationTopics'
@@ -65,9 +66,10 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   onCancel: () => void
   canCancel: boolean
 }) {
+  const costPreview = periodAiCostPreview(period)
   const technicalFallback = technicalDetails ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details> : null
-  if (!loading && !error && (!result || !result.data)) return <><section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>{technicalFallback}</>
-  if (loading && !result) return <><section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><div className="period-ai-v21-controls"><ExternalPromptCopy onCopy={onCopyPrompt}/>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>{technicalFallback}</>
+  if (!loading && !error && (!result || !result.data)) return <><section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>{technicalFallback}</>
+  if (loading && !result) return <><section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls"><ExternalPromptCopy onCopy={onCopyPrompt}/>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>{technicalFallback}</>
   const failedUsage = estimateGeminiUsage(result?.usage)
   if (error && !result?.data) {
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
