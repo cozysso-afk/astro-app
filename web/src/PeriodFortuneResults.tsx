@@ -7,6 +7,7 @@ import { CheckCircle2 } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
+import { BasicFortuneReading } from './BasicFortuneReading'
 
 type TopicRow = { topic: string; stat: FortuneStat }
 type HighlightPoint = FortunePoint & { topic: string }
@@ -108,11 +109,18 @@ export function PeriodFortuneResults({
     </section>
 
   </>
+  const aiOpen = Boolean(aiInterpretation?.data || aiLoading)
   return <div className="fortune-experience">
     <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
     {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="미혼 연애 상태"><button type="button" aria-pressed={loveStatus==='single'} onClick={()=>onLoveStatusChange?.('single')}>싱글 · 새 인연·썸·과거 인연</button><button type="button" aria-pressed={loveStatus==='couple'} onClick={()=>onLoveStatusChange?.('couple')}>커플 · 현재 관계</button></div>}
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 점수만으로 누가 어떤 소식을 보낼지는 알 수 없어. 기다리는 연락이 없다면 답장을 기다리라는 뜻으로 받아들이지 않아도 돼. 수신·발신은 관계 방향성의 참고값이며, 공식 발표 여부는 알려주지 않아.</p></aside>}
-    <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/></SystemReadingViews>
+    <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
+      <BasicFortuneReading calculation={result} period={period} field={field}/>
+      <details className="period-deep-reading" open={aiOpen}>
+        <summary><span>AI 심층해설</span><small>선택 기능 · 기본 해설은 위에서 항상 제공</small></summary>
+        <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
+      </details>
+    </></SystemReadingViews>
     {field?.id==='love'&&loveStatus!=='couple'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
     {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
