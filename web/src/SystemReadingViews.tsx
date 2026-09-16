@@ -42,6 +42,14 @@ const WESTERN_FLOW_COPY: Record<string,[string,string]> = {
 const WESTERN_HEADLINE_LABEL: Record<string,string> = {
   금전:'금전 관리',학업:'학업',시험:'시험 준비',직장:'직장 업무',이직:'이직 조건',대인관계:'대인관계',연애:'연애 흐름',연락:'연락 흐름',재회:'재회 흐름',소식:'소식 확인',컨디션:'컨디션',투자심리:'투자 판단',수익실현:'수익 실현 조건',신규진입:'신규 진입 조건',투자주의:'위험 관리',
 }
+const WESTERN_OVERVIEW_GROUPS = [
+  ['금전','투자심리','수익실현','신규진입','투자주의'],
+  ['학업','시험'],
+  ['직장','이직'],
+  ['대인관계','소식'],
+  ['연애','연락','재회'],
+  ['컨디션'],
+]
 const SAJU_LEAD_COPY: Record<string,string> = {
   관성:'맡은 역할과 책임을 정리하는 데 먼저 무게를 둬. 새 일을 크게 벌이기보다 이미 맡은 일을 정확히 끝내고, 평가받는 부분을 점검하는 편이 좋아.',
   인성:'새 자료를 많이 늘리기보다 이미 배운 내용을 정리하고 이해가 빈 곳을 메우는 데 집중해.',
@@ -71,13 +79,34 @@ function westernWhen(dayCount:number) {
   return '올해'
 }
 function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
-  if (!rows.length) return `${when}은 비교할 수 있는 서양점성술 분야 점수가 없어.`
-  const sorted = rows.slice().sort((a,b)=>b[1].average-a[1].average)
-  const lead = sorted.filter(([name,stat])=>name!=='투자주의'&&!westernCaution(name,stat)).slice(0,2).map(([name])=>WESTERN_HEADLINE_LABEL[name]??name)
-  const caution = sorted.filter(([name,stat])=>westernCaution(name,stat)).slice(0,2).map(([name])=>WESTERN_HEADLINE_LABEL[name]??name)
-  const leadCopy = lead.length ? `${when}은 ${lead.join('·')} 쪽을 살펴보기엔 무난해.` : `${when}은 전체적으로 속도를 낮추고 조건부터 확인하는 편이 좋아.`
-  const cautionCopy = caution.length ? `${caution.join('·')}은 무리해서 밀어붙이기보다 실수와 부담을 줄이는 데 집중해.` : '크게 밀어붙이기보다 조건을 확인하면서 움직여.'
-  return `${leadCopy} ${cautionCopy}`
+  const readable = rows.filter(([name])=>name!=='투자주의')
+  if (!readable.length) return `${when}은 비교할 수 있는 서양점성술 분야 점수가 없어.`
+  const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
+  const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
+  const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]] ?? strongest[0]
+  const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]] ?? weakest[0]
+  if (weakest[0]!==strongest[0] && strongest[1].average-weakest[1].average>=8) {
+    return `${when}은 ${strongLabel} 쪽이 상대적으로 더 살아 있어. 반대로 ${weakLabel}은 힘이 덜 실리니, ${westernGuidance(weakest[0],weakest[1])}`
+  }
+  return `${when}은 ${strongLabel}이 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`
+}
+function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string) {
+  const readable = rows.filter(([name])=>name!=='투자주의')
+  if (!readable.length) return '이 분야의 서양점성술 계산값이 충분하지 않아.'
+  const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
+  const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
+  if (strongest[0]===weakest[0]) return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`
+  return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]}이 상대적으로 강하고, ${WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]}은 약한 편이야.`
+}
+function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
+  const picked:Array<[string,FortuneStat]> = []
+  for (const group of WESTERN_OVERVIEW_GROUPS) {
+    const candidates = rows.filter(([name])=>group.includes(name))
+    if (!candidates.length) continue
+    candidates.sort((a,b)=>Math.abs(b[1].average-50)-Math.abs(a[1].average-50))
+    picked.push(candidates[0])
+  }
+  return picked
 }
 function sajuHeadline(lenses:Lens[], when:string) {
   if (!lenses.length) return `${when}은 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`
@@ -119,11 +148,13 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
   const westernPeriod = westernWhen(c.period.day_count)
   const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod)
+  const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod)
+  const westernDisplayRows = field || topic!=='전체' ? selectedWestern : representativeWesternRows(selectedWestern)
   const sajuPeriod = westernWhen(c.period.day_count)
   const sajuReaderHeadline = sajuHeadline(selectedLenses,sajuPeriod)
   const focusedField = field ?? (topic==='전체' ? undefined : {id:topic,label:topic+'운',desc:'선택 분야',topics:WESTERN[topic],lens:topic})
   const overview = <section className="system-overview"><h3>세 체계 한눈에</h3><div className="system-overview-grid">
-        <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{selectedWestern.slice().sort((a,b)=>b[1].average-a[1].average).slice(0,2).map(([name,s])=>`${name} · ${s.band}`).join(', ') || '해당 분야의 계산값이 없어.'}</p><small>선택 기간의 강약과 날짜를 읽는 층</small></article>
+        <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{westernOverviewSummary}</p><small>점수는 사건 확률이 아니라 같은 기간 안에서의 상대적 강약이야.</small></article>
         {view.saju&&view.contexts.length ? <article className="system-saju"><strong><Columns3 size={16}/>사주</strong><p>{topic==='전체'?view.sajuSummary:selectedLenses.length?selectedLenses.map(l=>l.title).join(', '):'사주 운 구간은 계산됐지만 이 분야를 구체적으로 설명할 연결 근거는 부족해. 아래 사주 탭에서 계산된 구간을 확인할 수 있어.'}</p></article>:<p className="system-unavailable">사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어.</p>}
         {view.thai&&(view.natalWheel.length||view.wheels.length)>0 ? <article className="system-thai"><strong><Sparkles size={16}/>태국점성술</strong><p>{thaiReaderSummary}</p><small>생활 영역을 읽는 기준표이며 길흉 점수는 아니야.</small></article>:<p className="system-unavailable">태국점성술 · 현재 정밀도 또는 사용 가능한 배치가 부족해.</p>}
       </div><details className="system-synthesis"><summary>세 체계를 같이 보면 · {view.state}</summary><p>서양점성술의 분야 강약과 사주의 운 구간, 태국점성술의 생활 영역 배치는 서로 다른 질문에 답해. 숫자를 더하거나 같은 결론으로 맞추지 않고, 선택한 분야에서 실제로 겹치는 맥락이 있는지 비교해.</p>{selectedLenses.map(l=><p key={l.key}>{l.title} 맥락에서는 {l.action}</p>)}</details></section>
@@ -136,7 +167,8 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
       {injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>점수는 사건 확률이 아니야. 특히 연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니 조건과 위험을 같이 확인해.</p></header>
-      <div className="system-score-grid western-score-grid">{selectedWestern.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 최고·최저 날짜는 아래 계산 근거에서 비교할 수 있어.</p>}<p>좋은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p><p>주의할 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p></details>)}</div>
+      {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}
+      <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 최고·최저 날짜는 아래 계산 근거에서 비교할 수 있어.</p>}<p>좋은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p><p>주의할 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'}</p></details>)}</div>
       {injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}
     </> : !view.allowed ? <p className="system-unavailable">출생시간 검증 정책에 따라 이 계산에서는 {system==='saju'?'사주':'태국점성술'} 해석이 제외돼 있어. 탭 전환으로 정밀도 제한을 바꾸지 않아.</p> : system==='saju' ? <>
       <header className="system-hero saju-reader-hero"><span>사주 · {sajuPeriod}</span><h3>{sajuReaderHeadline}</h3><p>이 기간에 계산된 운 구간을 생활 주제로 번역해 보여줘. 특정 사건이 반드시 생긴다는 뜻은 아니고, 간지·십성·절기 경계는 아래 계산 근거에서 따로 확인할 수 있어.</p></header>
