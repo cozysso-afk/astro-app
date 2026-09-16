@@ -34,7 +34,7 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
 
 for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']) test(`actual ${mode} markup has only its own question structure`,()=>{
   const html=renderToStaticMarkup(createElement(Relationship,{aspects,partnerExact:false,analysisMode:mode,timing,ai:null,aiLoading:false,aiError:'',onAi:noAction,timeSensitivePoints:new Set(['Moon','ASC']),formatAspect:a=>`${a.a} ${a.aspect} ${a.b}`}))
-  const visible=html.split('<details class="relationship-enrichment"')[0]
+  const visible=html.split('<details class="relationship-technical"')[0]
   assert.match(html,/<details class="relationship-technical"><summary>기술 근거 자세히 보기/)
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|Neptune|Uranus|W:|S:|T:/)
   if(mode==='reunion') {
