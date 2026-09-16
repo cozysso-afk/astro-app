@@ -142,7 +142,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
 
 async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"="initial",compact=false,qualityRetry=""){
   const pb=promptBudget(payload);
-  if(!pb.ok)return {ok:false,error:`AI 입력 근거가 비용 상한을 넘었어(${pb.bytes}/${pb.max_bytes} bytes). Gemini를 호출하지 않았어.`,model,cost_guard_blocked:true,prompt_budget:pb};
+  if(!pb.ok)return {ok:false,error:`AI 해설 예상 최대 비용이 약 ${Math.round(pb.estimated_max_job_krw)}원으로 작업 상한 ${pb.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,model,cost_guard_blocked:true,prompt_budget:pb};
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   return {...finalizeCandidate(core.partial,payload,model,core.usage,{single_core_generation:true}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};

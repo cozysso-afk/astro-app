@@ -40,16 +40,8 @@ test('investment caution is never promoted as a favorable high score',()=>{
   assert.equal(reading.caution[0]?.topic,'투자주의')
 })
 
-test('period UI renders substantial in-app reading before optional AI depth',()=>{
+test('period UI keeps Gemini natural language primary and deterministic reading as fallback',()=>{
   const source=readFileSync(new URL('../PeriodFortuneResults.tsx',import.meta.url),'utf8')
-  const component=readFileSync(new URL('../BasicFortuneReading.tsx',import.meta.url),'utf8')
-  const basic=source.indexOf('<BasicFortuneReading')
-  const deep=source.indexOf('className="period-deep-reading"')
-  assert.ok(basic>=0 && deep>basic)
-  assert.match(component,/앱 기본 해설/)
-  assert.match(component,/왜 이렇게 보냐면/)
-  assert.match(component,/현실에서는/)
-  assert.match(component,/주의할 점/)
-  assert.doesNotMatch(component,/추가 AI 호출 없음/)
-  assert.match(source,/AI 심층해설/)
+  assert.ok(source.indexOf('<PeriodAiInterpretationPanel') < source.indexOf('period-fallback-reading'))
+  assert.match(source,/계산 기반 보조 해설/)
 })

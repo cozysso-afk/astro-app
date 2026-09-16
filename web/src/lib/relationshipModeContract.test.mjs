@@ -70,23 +70,16 @@ test('marriage UI uses mode-specific deterministic view and preserves validated 
   assert.match(panel, /JSON\.stringify\(ai\.data/)
 })
 
-test('relationship modes expose a substantial deterministic reading before optional AI', () => {
-  assert.match(panel, /className="reading-section relationship-full-reading"/)
-  assert.match(panel, /궁합 전체 해설/)
-  assert.match(panel, /재회 흐름 전체 해설/)
-  assert.match(panel, /결혼궁합 전체 해설/)
-  assert.match(panel, /결혼생활 전체 해설/)
-  assert.match(panel, /ReadingExplanation kind="reason"/)
-  assert.match(panel, /ReadingExplanation kind="practice"/)
-  assert.match(panel, /ReadingExplanation kind="caution"/)
-  const rich = panel.indexOf('relationship-full-reading')
-  const enrichment = panel.indexOf('relationship-enrichment')
-  assert.ok(rich >= 0 && enrichment > rich)
+test('relationship modes keep Gemini natural language primary and deterministic prose as fallback', () => {
+  assert.match(panel, /relationship-natural-reading/)
+  assert.match(panel, /Gemini 자연어 해설/)
+  assert.match(panel, /relationship-calculated-fallback/)
+  assert.ok(panel.indexOf('relationship-natural-reading') < panel.indexOf('relationship-calculated-fallback'))
 })
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
   assert.match(relationshipFn, /MAX_GEMINI_CALLS=2/)
-  assert.match(relationshipFn, /MAX_PROMPT_BYTES=110000/)
+  assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300/)
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)

@@ -639,12 +639,23 @@ export function buildPromptPacket(payload:any){
   return packet;
 }
 
+const MAX_AI_JOB_ESTIMATED_KRW=300;
+const HARD_PROMPT_BYTES=180000;
+const GEMINI_USD_KRW_ESTIMATE=1384;
+const GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");
+function fortuneOutputCaps(kind:string){if(kind==="annual")return [7200,6200];if(kind==="month")return [5600,4800];if(kind==="week")return [4700,4000];return [4000,3400];}
+function estimatedGeminiJobKrw(inputTokens:number,kind:string){
+  const intro=Date.now()<=GEMINI_INTRO_END;
+  const inputRate=intro ? .75 : 1.5, outputRate=intro ? 3.75 : 7.5;
+  const [firstOutput,retryOutput]=fortuneOutputCaps(kind),thoughtReserve=3000;
+  const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;
+  return one(firstOutput)+one(retryOutput);
+}
 export function promptBudget(payload:any){
   const packet=buildPromptPacket(payload);
-  const bytes=jsonBytes(packet);
-  const kind=String(payload?.period_kind??"annual");
-  const max_bytes=kind==="annual"?95000:kind==="month"?76000:kind==="week"?62000:52000;
-  return {packet,bytes,max_bytes,ok:bytes<=max_bytes,estimated_input_tokens:Math.ceil(bytes/2.6)};
+  const bytes=jsonBytes(packet),kind=String(payload?.period_kind??"annual");
+  const estimated_input_tokens=Math.ceil(bytes/2.6),estimated_max_job_krw=estimatedGeminiJobKrw(estimated_input_tokens,kind);
+  return {packet,bytes,max_bytes:HARD_PROMPT_BYTES,estimated_input_tokens,estimated_max_job_krw,max_job_krw:MAX_AI_JOB_ESTIMATED_KRW,ok:bytes<=HARD_PROMPT_BYTES&&estimated_max_job_krw<=MAX_AI_JOB_ESTIMATED_KRW};
 }
 
 export function buildExternalPrompt(payload:any){

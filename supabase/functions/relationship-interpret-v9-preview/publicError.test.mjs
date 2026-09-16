@@ -60,9 +60,9 @@ test('cached metadata and usage projection strip unknown nested diagnostics with
 test('fallback keeps model/fallback_from and cumulative usage',async()=>{
   const h=harness({fetch:n=>n===1?provider({}):provider()}),r=await h.run();assert.equal(r.body.ok,true);assert.equal(r.body.model,'gemini-3.6-flash');assert.equal(r.body.fallback_from,'gemini-3.7-flash');assert.equal(r.body.usage.total_tokens,66);assert.equal(r.body.usage.attempt_count,2);
 });
-test('cost guard blocks new generation with unchanged limits',async()=>{
+test('rolling cost guard blocks new generation with current limits',async()=>{
   const h=harness({count:6}),r=await h.run();assert.equal(r.body.cost_guard_blocked,true);assert.equal(r.body.rolling_job_guard,true);assert.equal(h.requests.length,0);assert.equal(h.inserts,0);
-  for(const literal of ['MAX_USER_NEW_JOBS_10M=6','MAX_USER_NEW_JOBS_24H=20','MAX_GLOBAL_NEW_JOBS_10M=18','MAX_GLOBAL_NEW_JOBS_24H=60','MAX_GEMINI_CALLS=2','MAX_PROMPT_BYTES=110000'])assert(source.includes(literal));
+  for(const literal of ['MAX_USER_NEW_JOBS_10M=6','MAX_USER_NEW_JOBS_24H=20','MAX_GLOBAL_NEW_JOBS_10M=18','MAX_GLOBAL_NEW_JOBS_24H=60','MAX_GEMINI_CALLS=2','MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300'])assert(source.includes(literal));
 });
 for(const success of [true,false])test(`${success?'done':'failed'} final update errors and rejections never claim success or leak`,async()=>{
   for(const flag of ['finalizeError','finalizeThrows','finalizeEmpty']){
