@@ -36,6 +36,7 @@ import './system-reading-ux-v40.css'
 import './reunion-location-mobile-v42.css'
 import './basic-fortune-v43.css'
 import './ai-cost-preview-v47.css'
+import './reading-legibility-v49.css'
 import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
