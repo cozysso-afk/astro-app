@@ -9,9 +9,8 @@ const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 
 test('period fortune and field fortune live in one primary home group', () => {
   const fortune = home.indexOf('home-fortune-group')
-  const resultSlot = home.indexOf('home-period-result-slot')
   const life = home.indexOf('home-life-section')
-  assert.ok(fortune >= 0 && resultSlot > fortune && life > resultSlot)
+  assert.ok(fortune >= 0 && life > fortune)
   assert.ok(home.includes("'내 운세'"))
   assert.match(home, /오늘·주간·월간·연간 전체 기간운세/)
   assert.match(home, /className="home-field-entry"/)
@@ -19,13 +18,14 @@ test('period fortune and field fortune live in one primary home group', () => {
   assert.match(home, /onWorkspace\?\.\('field'\)/)
 })
 
-test('default period result portals into the home slot instead of waiting below secondary tools', () => {
-  assert.match(home, /id="home-period-result-slot"/)
-  assert.match(home, /workspace==='period'&&selectedTool===null/)
-  assert.match(panel, /createPortal/)
-  assert.match(panel, /getElementById\('home-period-result-slot'\)/)
-  assert.match(panel, /return homeResultSlot \? createPortal\(panel, homeResultSlot\) : panel/)
-  assert.match(css, /home-period-result-slot[\s\S]*period-fortune-report/)
+test('long period results never portal ahead of relationship and system navigation', () => {
+  assert.doesNotMatch(home, /home-period-result-slot/)
+  assert.doesNotMatch(panel, /createPortal/)
+  assert.doesNotMatch(panel, /getElementById\('home-period-result-slot'\)/)
+  const life = home.indexOf('home-life-section')
+  const systems = home.indexOf('home-system-section')
+  const advanced = home.indexOf('home-specialist-tools')
+  assert.ok(life >= 0 && systems > life && advanced > systems)
 })
 
 test('AI prompt copy is visually secondary to the reading result', () => {
