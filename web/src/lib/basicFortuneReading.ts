@@ -1,6 +1,6 @@
 import type { FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
-import { topicOrder } from './fortuneTopics'
+import { topicOrder } from './fortuneTopics.ts'
 
 export type BasicFortuneTone = 'good' | 'steady' | 'caution'
 export type BasicFortuneRow = {
