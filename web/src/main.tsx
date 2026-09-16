@@ -31,6 +31,7 @@ import './ios-viewport-stability.css'
 import './mobile-viewport-v31.css'
 import './vertical-density-v32.css'
 import './reading-type-hierarchy-v33.css'
+import './compatibility-cta-v34.css'
 import './reading-experience.css'
 
 installIntegratedPrecisionFetch()
