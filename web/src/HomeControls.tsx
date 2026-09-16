@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Gem, Heart, MapPin, Moon, Orbit, Search, Sparkles, Sun } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Gem, Heart, Layers3, MapPin, Moon, Orbit, Search, Sparkles, Sun } from 'lucide-react'
 
 import type { ApiStatus, BirthProfile, PeriodKey, ToolKey } from './appTypes'
 
@@ -74,6 +74,8 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
   const yearOptions = Array.from({length:16},(_,i)=>year-5+i)
   const pickerLabel = periodDriven ? (effectivePeriod === 'today' ? '운세 날짜' : effectivePeriod === 'week' ? '주간 선택 · 월요일~일요일' : effectivePeriod === 'month' ? '월간 선택 · 달력 월' : '연간 선택 · 달력 연도') : '관계 분석 기준 날짜'
   const resetDate = effectivePeriod === 'month' ? `${now.slice(0,7)}-01` : effectivePeriod === 'year' ? `${now.slice(0,4)}-01-01` : now
+  const lifeTools = analysisTools.filter((tool)=>['compatibility','marriage','location'].includes(tool.key))
+  const advancedTools = analysisTools.filter((tool)=>['integrated','precision'].includes(tool.key))
   return <div className="moonlit-home-controls">
     {workspace!=='period'&&<button type="button" className="workspace-back" onClick={()=>onWorkspace?.('period')}>← 전체 기간운세로 돌아가기</button>}
     {workspace==='field'&&fieldHub}
@@ -91,23 +93,35 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
       <div className="period-picker-caption"><strong>{displayRange(queryDate,effectivePeriod)}</strong><button type="button" onClick={()=>onQueryDateChange(resetDate)}>{resetLabel}</button></div>
     </section>}
 
-    <section className="section-block period-fortune-section">
-      <div className="section-label">{workspace==='period'?'전체 기간운세':workspace==='field'?'이 분야의 기간':'선택 체계의 기간'}</div>
+    <section className="section-block period-fortune-section home-fortune-group">
+      <div className="home-section-heading">
+        <div className="section-label">{workspace==='period'?'내 운세':workspace==='field'?'이 분야의 기간':'선택 체계의 기간'}</div>
+        {workspace==='period'&&<p>오늘·주간·월간·연간 전체 기간운세</p>}
+      </div>
       <div className="period-grid" role="tablist" aria-label="기간 운세">{fortunePeriods.map(({key,label,icon:Icon})=>{const active=selectedTool===null&&period===key;return <button aria-selected={active} className={`period-button ${active?'is-active':''}`} key={key} role="tab" type="button" onClick={()=>onPeriodSelect(key,workspace==='period')}><Icon size={17}/><span>{label}</span></button>})}</div>
+      {workspace==='period'&&<button className="home-field-entry" type="button" onClick={()=>onWorkspace?.('field')}><Heart size={20}/><span><strong>분야별 운세</strong><small>선택한 기간의 연애·금전·학업 등 10개 분야</small></span><ChevronRight size={16}/></button>}
     </section>
 
     {selectedTool === 'precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid" role="tablist" aria-label="정밀분석 기간">{fortunePeriods.map(({key,label,icon:Icon})=><button aria-selected={period===key} className={`period-button ${period===key?'is-active':''}`} key={key} role="tab" type="button" onClick={()=>onPeriodSelect(key,false)}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
 
-    {workspace==='period'&&<section className="reading-entry-grid" aria-label="독립 운세 선택"><button type="button" onClick={()=>onWorkspace?.('field')}><Heart size={21}/><span><strong>분야별 운세</strong><small>연애·금전·학업 등 10개 분야</small></span><ChevronRight size={16}/></button><button type="button" onClick={()=>onWorkspace?.('western')}><Orbit size={21}/><span><strong>서양점성술</strong><small>행성·분야별 흐름</small></span><ChevronRight size={16}/></button><button type="button" onClick={()=>onWorkspace?.('saju')}><Gem size={21}/><span><strong>사주</strong><small>대운·세운·월운</small></span><ChevronRight size={16}/></button><button type="button" onClick={()=>onWorkspace?.('thai')}><Sparkles size={21}/><span><strong>태국점성술</strong><small>생활 영역·기간 배치</small></span><ChevronRight size={16}/></button></section>}
-    {workspace==='period'&&<button aria-pressed={selectedTool==='compatibility'} className={`home-tool-card home-compatibility-cta ${selectedTool==='compatibility'?'is-selected':''}`} type="button" onClick={()=>onToolSelect('compatibility')}><span className="home-tool-symbol tone-rose"><Heart size={24} strokeWidth={1.8} aria-hidden="true"/></span><span className="home-tool-copy"><span className="home-compatibility-eyebrow">두 사람의 관계 보기</span><strong>궁합운</strong><small>궁합·재회·관계 흐름을 한곳에서 살펴봐</small></span><span className="home-compatibility-action">궁합 보기</span><ChevronRight size={18} aria-hidden="true"/></button>}
-    {workspace==='period'&&<details className="section-block tools-section home-specialist-tools" open={selectedTool!==null&&selectedTool!=='compatibility'?true:undefined}><summary>통합·결혼·고급 분석 <ChevronDown size={16}/></summary>
-      <div className="section-heading-row"><div className="section-label">별빛으로 살펴보기</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div>
-      <div className="home-tool-groups">{[
-        {label:'세 체계의 흐름',keys:['integrated']},
-        {label:'관계',keys:['marriage']},
-      ].map(group=><div className="home-tool-group" key={group.label}><h3>{group.label}</h3><div className="home-tool-grid">{analysisTools.filter(t=>group.keys.includes(t.key)).map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={23} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div></div>)}
-      <details className="home-advanced" open={selectedTool==='location'||selectedTool==='precision'?true:undefined}><summary>고급 분석 <ChevronDown size={16} aria-hidden="true"/></summary><div className="home-tool-grid">{analysisTools.filter(t=>['location','precision'].includes(t.key)).map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={23} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div></details>
+    {workspace==='period'&&<section className="section-block home-life-section" aria-label="관계와 인생">
+      <div className="home-section-heading"><div className="section-label">관계와 인생</div><p>궁합·결혼·지역 분석을 목적별로 따로 봐.</p></div>
+      <div className="home-life-grid">{lifeTools.map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card home-life-card ${key==='location'?'is-wide':''} ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={22} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div>
+    </section>}
+
+    {workspace==='period'&&<section className="section-block home-system-section" aria-label="해석 체계">
+      <div className="home-section-heading"><div className="section-label">해석 체계</div><p>같은 기간 운세를 통합하거나 체계별로 확인해.</p></div>
+      <div className="home-system-grid">
+        <button type="button" aria-pressed={selectedTool===null} className={selectedTool===null?'is-active':''} onClick={()=>onPeriodSelect(period,true)}><Layers3 size={20}/><span>통합</span></button>
+        <button type="button" onClick={()=>onWorkspace?.('western')}><Orbit size={20}/><span>서양점성술</span></button>
+        <button type="button" onClick={()=>onWorkspace?.('saju')}><Gem size={20}/><span>사주</span></button>
+        <button type="button" onClick={()=>onWorkspace?.('thai')}><Sparkles size={20}/><span>태국점성술</span></button>
       </div>
+    </section>}
+
+    {workspace==='period'&&<details className="section-block tools-section home-specialist-tools" open={selectedTool==='integrated'||selectedTool==='precision'?true:undefined}><summary>연간·정밀 분석 <ChevronDown size={16}/></summary>
+      <div className="section-heading-row"><div className="section-label">더 깊게 보기</div><span className={`server-pill ${apiStatus}`}>{apiLabel}</span></div>
+      <div className="home-tool-grid">{advancedTools.map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={23} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div>
     </details>}
   </div>
 }
