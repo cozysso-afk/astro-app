@@ -69,6 +69,7 @@ jobs:
           node --experimental-strip-types --test web/src/lib/precisionTransport.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
+          node --experimental-strip-types --test web/src/lib/basicFortuneReading.test.mjs
           node --test web/src/lib/sajuTechnicalDisclosure.test.mjs
           node --test web/src/lib/compatibilityCta.ui-contract.test.mjs
           node --test web/src/lib/westernReadingUx.test.mjs
