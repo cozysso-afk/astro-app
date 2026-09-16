@@ -2,38 +2,43 @@ name: Apply system topic routing V48
 
 on:
   push:
-    branches: [fix/system-topic-routing-v48]
+    branches:
+      - fix/system-topic-routing-v48
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, '[system-topic-routing-v48-applied]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/system-topic-routing-v48
           fetch-depth: 0
-      - name: Patch system/topic routing
+      - name: Patch system topic routing
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          def replace_once(path, old, new):
-              p=Path(path); s=p.read_text()
-              if old not in s:
-                  raise SystemExit(f'anchor missing: {path}: {old[:100]!r}')
-              p.write_text(s.replace(old,new,1))
+          system_path = Path('web/src/SystemReadingViews.tsx')
+          source = system_path.read_text()
+          if 'function injectReadingContext(' in source:
+              print('routing patch already applied')
+              raise SystemExit(0)
 
-          path='web/src/SystemReadingViews.tsx'
-          replace_once(path,
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit('anchor missing: ' + label)
+              return text.replace(old, new, 1)
+
+          source = replace_once(source,
               "import { useState, cloneElement, isValidElement, type ReactNode } from 'react'\n",
-              "import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'\n")
-          anchor="const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const\n"
-          helper="""const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
+              "import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'\n",
+              'react import')
 
+          anchor = "const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const\n"
+          helper = anchor + """
 type ReadingChildContext = { field?: FortuneField; systemOverview?: ReactNode; systemSummary?: string; westernOnly?: boolean; technicalDetails?: ReactNode }
 function injectReadingContext(children: ReactNode, props: ReadingChildContext): ReactNode {
   return Children.map(children, child => {
@@ -47,26 +52,34 @@ function injectReadingContext(children: ReactNode, props: ReadingChildContext): 
   })
 }
 """
-          replace_once(path, anchor, helper)
-          old_integrated="{isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}"
-          new_integrated="{injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}"
-          replace_once(path, old_integrated, new_integrated)
-          old_western="{isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}"
-          new_western="{injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}"
-          replace_once(path, old_western, new_western)
+          source = replace_once(source, anchor, helper, 'system helper')
+          source = replace_once(source,
+              "{isValidElement<{field?:FortuneField;systemOverview?:ReactNode;systemSummary?:string}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined}) : <>{overview}{children}</>}",
+              "{injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}",
+              'integrated child')
+          source = replace_once(source,
+              "{isValidElement<{field?:FortuneField;westernOnly?:boolean;technicalDetails?:ReactNode}>(children) && typeof children.type !== 'string' ? cloneElement(children,{field:focusedField,westernOnly:true,technicalDetails:undefined}) : children}",
+              "{injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}",
+              'western child')
+          system_path.write_text(source)
 
-          replace_once('web/src/PeriodFortuneResults.tsx',
+          result_path = Path('web/src/PeriodFortuneResults.tsx')
+          result = result_path.read_text()
+          result = replace_once(result,
               "<summary><span>계산 기반 보조 해설</span><small>{hasNaturalReading ? 'Gemini 해설의 보조 근거' : '자연어 해설을 못 불러올 때 확인'}</small></summary>",
-              "<summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>")
+              "<summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>",
+              'fallback copy')
+          result_path.write_text(result)
           PY
       - name: Run focused routing tests
         run: |
           cd web
           node --test src/lib/systemTopicRouting.test.mjs
-      - name: Commit patch
+      - name: Commit patch if changed
         run: |
+          if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/src/SystemReadingViews.tsx web/src/PeriodFortuneResults.tsx
-          git commit -m "fix: scope readings to selected system and topic [system-topic-routing-v48-applied]"
+          git commit -m "fix: scope readings to selected system and topic"
           git push origin HEAD:fix/system-topic-routing-v48
