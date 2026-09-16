@@ -1,0 +1,44 @@
+name: Fix Gemini-primary render contract v46
+
+on:
+  push:
+    branches: [fix/gemini-main-cost-cap-v46]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update visible-reading test boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/lib/readingExperience.render.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          old='const visible=html.split(\'<details class="relationship-enrichment"\')[0]'
+          new='const visible=html.split(\'<details class="relationship-technical"\')[0]'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one old boundary, got {s.count(old)}')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Verify render contract
+        working-directory: web
+        run: |
+          npm ci
+          node --test src/lib/readingExperience.render.test.mjs
+      - name: Commit and remove one-shot workflow
+        run: |
+          git rm .github/workflows/fix-gemini-primary-render-contract-v46.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/lib/readingExperience.render.test.mjs
+          git commit -m "Align render contract with Gemini-primary reading layout"
+          git push origin HEAD:${GITHUB_REF_NAME}
