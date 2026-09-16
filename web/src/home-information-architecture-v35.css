@@ -1,0 +1,175 @@
+/* V35 · Home information architecture only
+ * Group period, relationship/life, and system entries by user intent.
+ * Keep the home compact; do not change reading/result styling here.
+ */
+.app-shell .moonlit-home-controls .home-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-shell .moonlit-home-controls .home-section-heading > p {
+  margin: 0 !important;
+  min-width: 0;
+  color: #7b7f8c !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  text-align: right;
+}
+
+.app-shell .moonlit-home-controls .home-fortune-group {
+  display: grid;
+  gap: 9px !important;
+}
+
+.app-shell .moonlit-home-controls .home-field-entry {
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255,255,255,.94);
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(255,255,255,.91), rgba(244,236,248,.78));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.92), 0 4px 12px rgba(68,76,98,.07);
+  color: #3c4354;
+  text-align: left;
+}
+
+.app-shell .moonlit-home-controls .home-field-entry > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-shell .moonlit-home-controls .home-field-entry strong {
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 760;
+}
+
+.app-shell .moonlit-home-controls .home-field-entry small {
+  color: #747988;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .moonlit-home-controls .home-life-section,
+.app-shell .moonlit-home-controls .home-system-section {
+  display: grid;
+  gap: 9px !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-shell .moonlit-home-controls .home-life-card {
+  min-width: 0 !important;
+  min-height: 72px !important;
+  grid-template-columns: 34px minmax(0, 1fr) 14px !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 9px !important;
+  border-radius: 17px !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-card.is-wide {
+  grid-column: 1 / -1;
+  min-height: 64px !important;
+  grid-template-columns: 36px minmax(0, 1fr) 16px !important;
+  padding: 9px 11px !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-card .home-tool-copy {
+  min-width: 0;
+  gap: 2px !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-card .home-tool-copy > strong {
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+  font-weight: 760 !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-card .home-tool-copy > small {
+  margin: 0 !important;
+  color: #747988 !important;
+  font-size: 10.5px !important;
+  line-height: 1.35 !important;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .moonlit-home-controls .home-system-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.app-shell .moonlit-home-controls .home-system-grid > button {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 4px;
+  border: 1px solid rgba(255,255,255,.94);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(231,235,245,.72));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.92), 0 4px 12px rgba(68,76,98,.06);
+  color: #555b6c;
+}
+
+.app-shell .moonlit-home-controls .home-system-grid > button span {
+  max-width: 100%;
+  font-size: 11.5px;
+  line-height: 1.2;
+  font-weight: 690;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.app-shell .moonlit-home-controls .home-system-grid > button.is-active,
+.app-shell .moonlit-home-controls .home-system-grid > button[aria-pressed='true'] {
+  border-color: rgba(153,126,70,.42);
+  background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(250,231,190,.79));
+  color: #76591f;
+}
+
+.app-shell .moonlit-home-controls .home-specialist-tools {
+  margin-top: 0 !important;
+}
+
+.app-shell .moonlit-home-controls .home-specialist-tools > summary {
+  min-height: 44px;
+}
+
+@media (max-width: 360px) {
+  .app-shell .moonlit-home-controls .home-section-heading {
+    align-items: flex-start;
+  }
+  .app-shell .moonlit-home-controls .home-section-heading > p {
+    max-width: 58%;
+  }
+  .app-shell .moonlit-home-controls .home-life-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-shell .moonlit-home-controls .home-life-card.is-wide {
+    grid-column: auto;
+  }
+  .app-shell .moonlit-home-controls .home-system-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
