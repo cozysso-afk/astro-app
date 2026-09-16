@@ -1,22 +1,24 @@
-/* V35 · Home information architecture only
+/* V35.1 · Home information architecture and mobile card balance
  * Group period, relationship/life, and system entries by user intent.
- * Keep the home compact; do not change reading/result styling here.
+ * Keep result styling untouched; this file owns only home entry layout.
  */
 .app-shell .moonlit-home-controls .home-section-heading {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 3px;
   min-width: 0;
 }
 
 .app-shell .moonlit-home-controls .home-section-heading > p {
   margin: 0 !important;
   min-width: 0;
+  max-width: 100%;
   color: #7b7f8c !important;
   font-size: 11px !important;
-  line-height: 1.35 !important;
-  text-align: right;
+  line-height: 1.4 !important;
+  text-align: left;
 }
 
 .app-shell .moonlit-home-controls .home-fortune-group {
@@ -63,50 +65,72 @@
 .app-shell .moonlit-home-controls .home-life-section,
 .app-shell .moonlit-home-controls .home-system-section {
   display: grid;
-  gap: 9px !important;
+  gap: 10px !important;
 }
 
+/* Relationship/life entries are intentionally one-column on phones.
+ * The longer labels need real text width; two narrow cards made the icon and
+ * copy collide visually and forced awkward line breaks.
+ */
 .app-shell .moonlit-home-controls .home-life-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
 }
 
-.app-shell .moonlit-home-controls .home-life-card {
+.app-shell .moonlit-home-controls .home-life-card,
+.app-shell .moonlit-home-controls .home-life-card.is-wide {
+  grid-column: auto;
   min-width: 0 !important;
-  min-height: 72px !important;
-  grid-template-columns: 34px minmax(0, 1fr) 14px !important;
+  min-height: 68px !important;
+  grid-template-columns: 44px minmax(0, 1fr) 16px !important;
   align-items: center !important;
-  gap: 7px !important;
-  padding: 9px !important;
-  border-radius: 17px !important;
+  gap: 13px !important;
+  padding: 10px 13px !important;
+  border-radius: 18px !important;
+  text-align: left !important;
 }
 
-.app-shell .moonlit-home-controls .home-life-card.is-wide {
-  grid-column: 1 / -1;
-  min-height: 64px !important;
-  grid-template-columns: 36px minmax(0, 1fr) 16px !important;
-  padding: 9px 11px !important;
+.app-shell .moonlit-home-controls .home-life-card .home-tool-symbol {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  border-radius: 15px !important;
+}
+
+.app-shell .moonlit-home-controls .home-life-card .home-tool-symbol > svg {
+  width: 21px !important;
+  height: 21px !important;
 }
 
 .app-shell .moonlit-home-controls .home-life-card .home-tool-copy {
   min-width: 0;
-  gap: 2px !important;
+  display: grid !important;
+  align-content: center;
+  gap: 4px !important;
 }
 
 .app-shell .moonlit-home-controls .home-life-card .home-tool-copy > strong {
-  font-size: 14px !important;
-  line-height: 1.25 !important;
-  font-weight: 760 !important;
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  font-weight: 770 !important;
+  letter-spacing: -.015em;
 }
 
 .app-shell .moonlit-home-controls .home-life-card .home-tool-copy > small {
   margin: 0 !important;
+  max-width: 100%;
   color: #747988 !important;
-  font-size: 10.5px !important;
-  line-height: 1.35 !important;
+  font-size: 11.5px !important;
+  line-height: 1.4 !important;
   overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .app-shell .moonlit-home-controls .home-system-grid {
@@ -157,17 +181,18 @@
 }
 
 @media (max-width: 360px) {
-  .app-shell .moonlit-home-controls .home-section-heading {
-    align-items: flex-start;
-  }
-  .app-shell .moonlit-home-controls .home-section-heading > p {
-    max-width: 58%;
-  }
-  .app-shell .moonlit-home-controls .home-life-grid {
-    grid-template-columns: 1fr;
-  }
+  .app-shell .moonlit-home-controls .home-life-card,
   .app-shell .moonlit-home-controls .home-life-card.is-wide {
-    grid-column: auto;
+    grid-template-columns: 40px minmax(0, 1fr) 14px !important;
+    gap: 11px !important;
+    padding: 9px 11px !important;
+  }
+  .app-shell .moonlit-home-controls .home-life-card .home-tool-symbol {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    border-radius: 14px !important;
   }
   .app-shell .moonlit-home-controls .home-system-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
