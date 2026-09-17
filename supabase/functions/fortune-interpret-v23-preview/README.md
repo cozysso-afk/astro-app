@@ -37,4 +37,4 @@ The final provisional result still passes through the existing sanitizer and res
 
 Regression coverage checks that repeated observations cluster before topic mapping, the four period types remain structurally distinct, provisional V23 remains local with zero provider fetches, final provisional prose remains birth-time safe and Western-only, and legacy requests keep their compatibility route and cache identity.
 
-Production web activation remains separate from the preview Edge Function deployment.
+The V22/V23 Edge Function preview code has been deployed separately on the existing Supabase project. Production web activation remains a separate release step.
