@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { installIntegratedPrecisionFetch } from './precisionTransport.ts'
 
@@ -31,4 +32,10 @@ test('active exact start prompt and inspect opt into V23 while status stays comp
   const status=await capture('status',{job_id:'job-test'})
   assert.match(status.url,/fortune-interpret-v22-preview$/)
   assert.equal(status.body.narrative_engine,undefined)
+})
+
+test('browser Fortune AI cache contract is bumped for V23 so legacy V21 prose cannot be reused',()=>{
+  const source=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
+  assert.match(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23-period-narrative-v1'/)
+  assert.doesNotMatch(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21\.4-e2e-evidence'/)
 })
