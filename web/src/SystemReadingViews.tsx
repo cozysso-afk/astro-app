@@ -164,7 +164,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     {!field&&<div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!available(t)} title={!available(t)?'이 체계에서 연결된 근거가 부족해':undefined} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
     {field&&<h3>{field.label} · {period}</h3>}
     {system==='integrated' ? <>
-      {injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})}
+      {injectReadingContext(children,{field:focusedField,systemOverview:overview})}
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>점수는 사건 확률이 아니야. 특히 연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니 조건과 위험을 같이 확인해.</p></header>
       {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}

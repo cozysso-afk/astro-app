@@ -192,7 +192,8 @@ for(const period of ['today','week','month','year']) test(`repeated ${period} pr
 test('reading headline declarations override legacy important Gothic and billboard size',()=>{
   const main=readFileSync(new URL('../main.tsx',import.meta.url),'utf8')
   const imports=[...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(m=>m[1])
-  assert.equal(imports.at(-1),'reading-experience.css')
+  assert.equal(imports.at(-1),'reading-font-fix-v54.css')
+  assert.ok(imports.indexOf('reading-experience.css') < imports.indexOf('reading-font-fix-v54.css'))
   const css=postcss.parse(readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8'))
   const declarations={}
   css.walkRules(rule=>{
