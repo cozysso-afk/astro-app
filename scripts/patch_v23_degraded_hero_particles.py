@@ -24,7 +24,7 @@ if old_line not in text:
 text = text.replace(old_line, new_line, 1)
 p.write_text(text, encoding='utf-8')
 
-# 3) Fix Korean particles in independent Western headings (e.g. 올해는, 금전 관리가).
+# 3) Fix Korean particles in independent Western/Saju headings (e.g. 올해는, 금전 관리가).
 p = Path('web/src/SystemReadingViews.tsx')
 text = p.read_text(encoding='utf-8')
 old = '''function westernWhen(dayCount:number) {\n  if (dayCount <= 1) return '오늘'\n  if (dayCount <= 9) return '이번 주'\n  if (dayCount <= 45) return '이번 달'\n  return '올해'\n}\nfunction westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {\n'''
@@ -38,6 +38,8 @@ repls = {
     "return `${when}은 ${strongLabel}이 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`": "return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`",
     "if (strongest[0]===weakest[0]) return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`": "if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`",
     "return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]}이 상대적으로 강하고, ${WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]}은 약한 편이야.`": "return `${koreanParticle(when,'은는')} ${koreanParticle(WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0],'이가')} 상대적으로 강하고, ${koreanParticle(WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0],'은는')} 약한 편이야.`",
+    "if (!lenses.length) return `${when}은 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`": "if (!lenses.length) return `${koreanParticle(when,'은는')} 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`",
+    "return `${when}은 ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`": "return `${koreanParticle(when,'은는')} ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`",
 }
 for before, after in repls.items():
     if before not in text:
@@ -75,10 +77,11 @@ test('V23 timing-repaired narrative can remain visible without relaxing strict q
   assert.equal(interpretationHeroEligible({score:100,stages:[1,2,3,4,5].map(stage=>({stage,passed:true}))},{degraded_quality:false}),true)
 })
 
-test('independent Western period copy uses Korean particle selection instead of hard-coded 올해은', () => {
+test('independent period copy uses Korean particle selection instead of hard-coded 올해은', () => {
   assert.match(systemViews, /function koreanParticle/)
   assert.doesNotMatch(systemViews, /`\$\{when\}은/)
   assert.match(systemViews, /koreanParticle\(when,'은는'\)/)
+  assert.match(systemViews, /koreanParticle\(strongLabel,'이가'\)/)
 })
 '''
 if "V23 timing-repaired narrative can remain visible" in text:
