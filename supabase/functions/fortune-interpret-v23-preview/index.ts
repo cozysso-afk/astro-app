@@ -125,7 +125,14 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   }
   const quality=inspectInterpretationQuality(data,payload);
   if(!quality.ok){
-    if(meta?.allow_degraded_quality===true&&criticalQualityPassed(quality))return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(meta?.local_quality_fallback),quality_warning:String(meta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해."),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+    const criticalPassed=criticalQualityPassed(quality);
+    const locallyRepairedTiming=quality?.local_timing_repair===true&&criticalPassed;
+    if((meta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming){
+      const warning=locallyRepairedTiming
+        ? "직접 근거가 없는 날짜·구간만 로컬에서 제거했고 구조·근거·의미 방향·일관성은 통과했어. 같은 결과를 고치려고 Gemini를 한 번 더 호출하지 않아."
+        : String(meta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해.");
+      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(meta?.local_quality_fallback),quality_warning:warning,local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+    }
     return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,...meta},quality);
   }
   return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:Boolean(meta?.local_quality_fallback),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
