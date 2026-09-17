@@ -1,8 +1,8 @@
-# Trigger after workflow exists on branch
 name: Apply reading owner test v55
 on:
   push:
-    branches: ['fix/summary-font-scope-v55']
+    branches:
+      - fix/summary-font-scope-v55
 permissions:
   contents: write
 jobs:
@@ -19,18 +19,13 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('web/src/lib/readingExperience.test.mjs')
-          s=p.read_text()
-          old="""  assert.equal(imports.at(-1),'reading-experience.css')
-  const css=postcss.parse(readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8'))
-"""
-          new="""  assert.equal(imports.at(-1),'reading-font-fix-v54.css')
-  assert.ok(imports.indexOf('reading-experience.css') < imports.indexOf('reading-font-fix-v54.css'))
-  const css=postcss.parse(readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8'))
-"""
+          p = Path('web/src/lib/readingExperience.test.mjs')
+          s = p.read_text()
+          old = "  assert.equal(imports.at(-1),'reading-experience.css')"
+          new = "  assert.equal(imports.at(-1),'reading-font-fix-v54.css')\n  assert.ok(imports.indexOf('reading-experience.css') < imports.indexOf('reading-font-fix-v54.css'))"
           if old not in s:
               raise SystemExit('reading owner assertion target not found')
-          p.write_text(s.replace(old,new,1))
+          p.write_text(s.replace(old, new, 1))
           PY
           rm .github/workflows/apply-reading-owner-test-v55.yml
       - name: Commit
