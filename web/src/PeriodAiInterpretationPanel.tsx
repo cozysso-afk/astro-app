@@ -10,7 +10,7 @@ import { estimateGeminiUsage } from './lib/aiUsage'
 import { periodAiCostPreview } from './lib/aiCostPreview'
 import { topicOrder } from './lib/fortuneTopics'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
-import { normalizeTopicEntries, interpretationQualityPassed } from './lib/interpretationTopics'
+import { normalizeTopicEntries, interpretationHeroEligible, interpretationQualityPassed } from './lib/interpretationTopics'
 import { FortuneFlowCards } from './FortuneFlowCards'
 import type { ReactNode } from 'react'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
@@ -85,7 +85,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
   const narrativeValidation = result.usage?.quality_validation
-  const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && !result.usage?.degraded_quality && interpretationQualityPassed(narrativeValidation)
+  const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && interpretationHeroEligible(narrativeValidation, result.usage)
   const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
   const referenceFlowCards = relationshipReferenceFlowCards(userSummary, calculation)

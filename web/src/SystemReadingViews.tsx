@@ -78,25 +78,32 @@ function westernWhen(dayCount:number) {
   if (dayCount <= 45) return '이번 달'
   return '올해'
 }
+function koreanParticle(text:string, pair:'은는'|'이가') {
+  const clean = String(text ?? '').trim()
+  const last = clean.charAt(clean.length - 1)
+  const code = last.charCodeAt(0)
+  const hasFinal = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0
+  return `${clean}${pair === '은는' ? (hasFinal ? '은' : '는') : (hasFinal ? '이' : '가')}`
+}
 function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
   const readable = rows.filter(([name])=>name!=='투자주의')
-  if (!readable.length) return `${when}은 비교할 수 있는 서양점성술 분야 점수가 없어.`
+  if (!readable.length) return `${koreanParticle(when,'은는')} 비교할 수 있는 서양점성술 분야 점수가 없어.`
   const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
   const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
   const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]] ?? strongest[0]
   const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]] ?? weakest[0]
   if (weakest[0]!==strongest[0] && strongest[1].average-weakest[1].average>=8) {
-    return `${when}은 ${strongLabel} 쪽이 상대적으로 더 살아 있어. 반대로 ${weakLabel}은 힘이 덜 실리니, ${westernGuidance(weakest[0],weakest[1])}`
+    return `${koreanParticle(when,'은는')} ${strongLabel} 쪽이 상대적으로 더 살아 있어. 반대로 ${koreanParticle(weakLabel,'은는')} 힘이 덜 실리니, ${westernGuidance(weakest[0],weakest[1])}`
   }
-  return `${when}은 ${strongLabel}이 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`
+  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`
 }
 function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string) {
   const readable = rows.filter(([name])=>name!=='투자주의')
   if (!readable.length) return '이 분야의 서양점성술 계산값이 충분하지 않아.'
   const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
   const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
-  if (strongest[0]===weakest[0]) return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`
-  return `${when}은 ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]}이 상대적으로 강하고, ${WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]}은 약한 편이야.`
+  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`
+  return `${koreanParticle(when,'은는')} ${koreanParticle(WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0],'이가')} 상대적으로 강하고, ${koreanParticle(WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0],'은는')} 약한 편이야.`
 }
 function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
   const picked:Array<[string,FortuneStat]> = []
@@ -109,10 +116,10 @@ function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
   return picked
 }
 function sajuHeadline(lenses:Lens[], when:string) {
-  if (!lenses.length) return `${when}은 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`
+  if (!lenses.length) return `${koreanParticle(when,'은는')} 생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아. 계산 근거만 확인해줘.`
   const lead = SAJU_LEAD_COPY[lenses[0].key] ?? lenses[0].action
   const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
-  return `${when}은 ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`
+  return `${koreanParticle(when,'은는')} ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`
 }
 function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens saju-lens-card"><h4>{lens.title}</h4><p className="system-lens-meaning">{lens.meaning}</p><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><p className="system-lens-evidence"><b>근거</b><span>{evidence || '연결된 운 구간 근거가 없어.'}</span></p><details className="system-lens-limit"><summary>해석 범위</summary><p>{lens.limit}</p></details></article> }
 function shortKoreanDate(value?: string) {
