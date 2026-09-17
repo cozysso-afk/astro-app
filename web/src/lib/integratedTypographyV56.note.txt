@@ -1,1 +1,0 @@
-Integrated period card typography target: headline = bold Noto Serif KR; supporting summary = system sans. Independent Western/Saju/Thai system typography remains unchanged.
