@@ -3,15 +3,16 @@ import fs from 'node:fs'
 import test from 'node:test'
 
 const exact={contract_version:'integrated-precision-v2',time_available:true,time_exact:true,status:'exact',time_source:'official_record',time_confidence:'exact',scoring_mode:'full_exact',allow_natal_moon_scoring:true,allow_angles_houses_scoring:true,allow_house_ruler_bonus:true,allow_intraday_timing:true,allow_saju_ai:true,allow_thai_ai:true,layer_policy:{natal_moon:'allow',angles_houses:'allow',house_ruler_bonus:'allow',intraday_timing:'allow',saju_ai:'allow',thai_ai:'allow'}}
+const provisional={contract_version:'integrated-precision-v2',time_available:true,time_exact:false,status:'provisional',time_source:'unknown',time_confidence:'unknown',scoring_mode:'planet_only_provisional',allow_natal_moon_scoring:false,allow_angles_houses_scoring:false,allow_house_ruler_bonus:false,allow_intraday_timing:false,allow_saju_ai:false,allow_thai_ai:false,layer_policy:{natal_moon:'exclude',angles_houses:'exclude',house_ruler_bonus:'exclude',intraday_timing:'exclude',saju_ai:'exclude',thai_ai:'exclude'}}
 
-async function loadV22(fakeFetch){
+async function loadV22(fakeFetch,createClient=()=>{throw new Error('DB must not be used on exact proxy route')}){
   const {stripTypeScriptTypes}=await import('node:module')
   const vm=await import('node:vm')
   const file=new URL('../fortune-interpret-v22-preview/index.ts',import.meta.url)
   const bindings={}
   let source=fs.readFileSync(file,'utf8')
   for(const match of source.matchAll(/^import \{([^}]+)\} from "([^"]+)";$/gm)){
-    const imported=match[2].startsWith('npm:')?{createClient:()=>{throw new Error('DB must not be used on exact proxy route')}}:await import(new URL(match[2],file).href)
+    const imported=match[2].startsWith('npm:')?{createClient}:await import(new URL(match[2],file).href)
     for(const name of match[1].split(',').map(x=>x.trim()))bindings[name]=imported[name]
   }
   source=source.replace(/^import .*;\r?\n/gm,'')
@@ -49,4 +50,39 @@ test('exact request with narrative_engine v23 routes generation to V23',async()=
   assert.equal(response.headers.get('x-starlight-upstream'),'fortune-interpret-v23-preview')
   const body=await response.json()
   assert.equal(body.job_id,'j23')
+})
+
+function localClients(seen){
+  return (_url,key)=>{
+    if(key==='anon')return {auth:{getUser:async()=>({data:{user:{id:'user-1'}},error:null})}}
+    assert.equal(key,'service')
+    return {from(table){
+      assert.equal(table,'ai_interpret_jobs')
+      const query={
+        select(){return query},eq(){return query},order(){return query},limit(){return query},
+        async maybeSingle(){return {data:null,error:null}},
+        insert(value){seen.inserted=value;return query},
+        async single(){return {data:{id:'local-v23-job'},error:null}},
+      }
+      return query
+    }}
+  }
+}
+
+test('provisional V23 opt-in remains local, zero-Gemini, and uses period-aware prose',async()=>{
+  const seen={fetchCalls:0,inserted:null}
+  const calculation={precision:provisional,period:{start:'2026-09-14',end:'2026-09-20',day_count:7},western:{overall:{},daily_scores:[],months:[],relationship_signals:{}},saju:{},thai:{}}
+  const handler=await loadV22(async()=>{seen.fetchCalls+=1;throw new Error('provisional V23 must remain local')},localClients(seen))
+  const response=await handler(req({narrative_engine:'v23',calculation}))
+  const body=await response.json()
+  assert.equal(response.status,200)
+  assert.equal(body.status,'done')
+  assert.equal(body.narrative_engine,'v23')
+  assert.equal(body.gemini_paid_call,false)
+  assert.equal(seen.fetchCalls,0)
+  assert.match(seen.inserted.kind,/^supabase-ai-v22-integrated-precision-v2\.1:v23-period-aware:/)
+  assert.equal(seen.inserted.model,'deterministic-provisional-v23')
+  assert.match(seen.inserted.result_json.headline,/이번 주|주간 흐름/)
+  assert.equal(seen.inserted.result_json.systems.saju,'')
+  assert.equal(seen.inserted.result_json.systems.thai,'')
 })
