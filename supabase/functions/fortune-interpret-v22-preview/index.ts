@@ -6,7 +6,8 @@ import { normalizeProxiedFortuneResponse, publicFortuneError } from "../_shared/
 import { auditProvisionalResidue, attachPrecisionPacketMetadata, buildProvisionalExternalPrompt, precisionGateFromPayload, sanitizeProvisionalCalculation, sanitizeProvisionalInterpretationOutput } from "./precisionV2.ts";
 
 const VERSION="supabase-ai-v22-integrated-precision-v2.1";
-const UPSTREAM="fortune-interpret-v23-preview";
+const UPSTREAM="fortune-interpret-v21-preview";
+const V23_UPSTREAM="fortune-interpret-v23-preview";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -14,14 +15,16 @@ const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
 function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status,headers:CORS});}
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
 async function currentUser(req:Request){const auth=req.headers.get("Authorization")??"";if(!auth)return null;const c=createClient(SUPABASE_URL,ANON,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false}});const {data,error}=await c.auth.getUser();return error?null:data.user??null;}
+function exactUpstream(body:any){return body?.narrative_engine==="v23"?V23_UPSTREAM:UPSTREAM;}
 async function proxyExact(req:Request,body:any){
+  const upstream=exactUpstream(body);
   const outHeaders=new Headers(CORS);
-  outHeaders.set("x-starlight-upstream",UPSTREAM);
+  outHeaders.set("x-starlight-upstream",upstream);
   try{
     const headers=new Headers();
     for(const name of ["authorization","apikey","x-client-info"]){const value=req.headers.get(name);if(value)headers.set(name,value);}
     headers.set("content-type","application/json");
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/${UPSTREAM}`,{method:"POST",headers,body:JSON.stringify(body)});
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/${upstream}`,{method:"POST",headers,body:JSON.stringify(body)});
     const parsed=await response.json().catch(()=>null);
     const normalized=normalizeProxiedFortuneResponse(parsed,response.status,body?.action);
     return new Response(JSON.stringify(normalized.body),{status:normalized.status,headers:outHeaders});
@@ -38,7 +41,7 @@ Deno.serve(async(req)=>{
   if(body?.action==="meta"){
     const upstream=await proxyExact(req,body);
     const data=await upstream.json();
-    return res({...data,interpreter_version:VERSION,integrated_precision_contract:"integrated-precision-v2",precision_gateway:true,exact_upstream:UPSTREAM},upstream.status);
+    return res({...data,interpreter_version:VERSION,integrated_precision_contract:"integrated-precision-v2",precision_gateway:true},upstream.status);
   }
   if(body?.action==="status"||body?.action==="cancel")return proxyExact(req,body);
   if(!body?.calculation)return res(publicFortuneError("CALCULATION_REQUIRED",undefined,{gemini_paid_call:false}),400);
