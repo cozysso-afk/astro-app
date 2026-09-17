@@ -65,7 +65,7 @@ Deno.serve(async(req)=>{
     const v23=usesV23(body);
     const raw=v23?buildLocalPeriodAwareFallbackV23(packet):buildLocalQualityFallbackCore(packet);const finalData=sanitizeProvisionalInterpretationOutput(raw);const finalAudit=auditProvisionalResidue(finalData);
     if(!finalAudit.ok)return res(publicFortuneError("PROVISIONAL_FINAL_AUDIT_FAILED",undefined,{gemini_paid_call:false}),409);
-    const hash=await payloadHash(packet);const cacheFlavor=v23?"v23-period-aware":"legacy";const kind=`${VERSION}:${cacheFlavor}:${hash.slice(0,32)}`;const a=admin();
+    const hash=await payloadHash(packet);const hashPart=hash.slice(0,32);const kind=v23?`${VERSION}:v23-period-aware:${hashPart}`:`${VERSION}:${hashPart}`;const a=admin();
     const {data:cached}=await a.from("ai_interpret_jobs").select("id,result_json").eq("user_id",user.id).eq("kind",kind).eq("status","done").order("completed_at",{ascending:false}).limit(1).maybeSingle();
     if(cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false,narrative_engine:v23?"v23":"legacy",gemini_paid_call:false});
     const now=new Date().toISOString();
