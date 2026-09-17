@@ -1,0 +1,26 @@
+/* V54 · final mobile reading font fix
+ * This selector intentionally does NOT depend on .app-shell: the live PWA reading card
+ * can render outside that wrapper. Keep it immediately before reading-experience.css;
+ * higher specificity + !important lets the real Myeongjo face beat legacy Gothic rules.
+ */
+@media (max-width: 600px) {
+  html body .fortune-experience .period-ai-head h3,
+  html body .relationship-experience .reading-hero h3 {
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 700 !important;
+    line-height: 1.72 !important;
+    letter-spacing: -.025em !important;
+    word-break: keep-all !important;
+  }
+
+  html body .fortune-experience .period-ai-head .reading-hero-subtitle,
+  html body .relationship-experience .reading-hero-subtitle {
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 400 !important;
+    line-height: 1.88 !important;
+    letter-spacing: -.012em !important;
+    word-break: keep-all !important;
+  }
+}
