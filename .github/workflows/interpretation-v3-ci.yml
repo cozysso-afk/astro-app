@@ -17,6 +17,7 @@ on:
       - 'supabase/migrations/**'
       - 'supabase/functions/fortune-interpret-v21-preview/**'
       - 'supabase/functions/fortune-interpret-v22-preview/**'
+      - 'supabase/functions/fortune-interpret-v23-preview/**'
       - 'supabase/functions/relationship-interpret-v9-preview/**'
       - 'web/src/**'
       - 'web/package.json'
@@ -65,8 +66,14 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/thaiContract.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v22-preview/precisionV2.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/periodNarrativeV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/promptV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/provisionalV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/routingV23.test.mjs
           node --experimental-strip-types --check supabase/functions/fortune-interpret-v22-preview/index.ts
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v23-preview/index.ts
           node --experimental-strip-types --test web/src/lib/precisionTransport.test.mjs
+          node --experimental-strip-types --test web/src/lib/v23NarrativeTransport.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
           node --experimental-strip-types --test web/src/lib/basicFortuneReading.test.mjs
