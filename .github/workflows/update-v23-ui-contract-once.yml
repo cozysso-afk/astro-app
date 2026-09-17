@@ -6,6 +6,7 @@ on:
       - fix/v23-delivery-pipeline
     paths:
       - scripts/update_v23_ui_contract_once.py
+      - .github/workflows/update-v23-ui-contract-once.yml
 
 permissions:
   contents: write
@@ -18,6 +19,14 @@ jobs:
         with:
           ref: fix/v23-delivery-pipeline
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
       - name: Update UI contract
         run: python scripts/update_v23_ui_contract_once.py
       - name: Verify UI contract
