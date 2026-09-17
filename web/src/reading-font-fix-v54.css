@@ -1,11 +1,11 @@
-/* V56 · final integrated reading typography owner
+/* V57 · final integrated reading typography owner
  * Keep independent Western/Saju/Thai system typography untouched.
- * Integrated headline must be a visibly serif Noto Serif KR bold face;
- * the sentence below it must stay sans-serif.
+ * Use the same proven Korean Myeongjo face as the working system views for the integrated headline.
+ * The sentence below it stays sans-serif.
  */
 @media (max-width: 600px) {
   html body .period-ai-card.period-ai-v18 .period-ai-head h3 {
-    font-family: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
     font-synthesis: none !important;
     font-weight: 700 !important;
     line-height: 1.62 !important;
