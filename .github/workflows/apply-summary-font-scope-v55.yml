@@ -13,19 +13,16 @@ jobs:
         with:
           ref: fix/summary-font-scope-v55
           fetch-depth: 0
-      - name: Patch live reading DOM and topic scope
+      - name: Patch live reading font owner
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          p = Path('web/src/SystemReadingViews.tsx')
-          s = p.read_text()
-          old = "injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:view.saju&&view.contexts.length?view.sajuSummary:undefined})"
-          new = "injectReadingContext(children,{field:focusedField,systemOverview:overview,systemSummary:!focusedField&&view.saju&&view.contexts.length?view.sajuSummary:undefined})"
-          if old not in s:
-              raise SystemExit('integrated summary injection target not found')
-          p.write_text(s.replace(old, new, 1))
+          views = Path('web/src/SystemReadingViews.tsx').read_text()
+          expected = "injectReadingContext(children,{field:focusedField,systemOverview:overview})"
+          if expected not in views:
+              raise SystemExit('focused topic scope fix is missing')
 
           Path('web/src/reading-font-fix-v54.css').write_text("""/* V55 · live reading typography owner
            * Period AI cards are not guaranteed to live under .fortune-experience/.app-shell.
@@ -58,11 +55,13 @@ jobs:
           s = p.read_text()
           old = "import './reading-font-fix-v54.css'\nimport './reading-experience.css'"
           new = "import './reading-experience.css'\nimport './reading-font-fix-v54.css'"
-          if old not in s:
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
               raise SystemExit('font import order target not found')
-          p.write_text(s.replace(old, new, 1))
+          p.write_text(s)
 
-          Path('web/src/lib/summaryFontScopeV55.test.mjs').write_text("""import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\n\nconst css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')\nconst main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')\nconst views = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')\n\ntest('live period headline uses Myeongjo on the actual rendered card', () => {\n  assert.match(css, /\\.period-ai-card\\.period-ai-v18 \\.period-ai-head h3[\\s\\S]*?font-family:\\s*'Nanum Myeongjo'/)\n  assert.match(css, /\\.period-ai-card\\.period-ai-v18 \\.reading-hero-subtitle[\\s\\S]*?font-family:\\s*-apple-system/)\n  assert.ok(main.indexOf(\"import './reading-experience.css'\") < main.indexOf(\"import './reading-font-fix-v54.css'\"))\n})\n\ntest('focused integrated topics do not reuse the overall Saju summary', () => {\n  assert.match(views, /systemSummary:!focusedField&&view\\.saju&&view\\.contexts\\.length\\?view\\.sajuSummary:undefined/)\n})\n""")
+          Path('web/src/lib/summaryFontScopeV55.test.mjs').write_text("""import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\n\nconst css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')\nconst main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')\nconst views = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')\n\ntest('live period headline uses Myeongjo on the actual rendered card', () => {\n  assert.match(css, /\\.period-ai-card\\.period-ai-v18 \\.period-ai-head h3[\\s\\S]*?font-family:\\s*'Nanum Myeongjo'/)\n  assert.match(css, /\\.period-ai-card\\.period-ai-v18 \\.reading-hero-subtitle[\\s\\S]*?font-family:\\s*-apple-system/)\n  assert.ok(main.indexOf(\"import './reading-experience.css'\") < main.indexOf(\"import './reading-font-fix-v54.css'\"))\n})\n\ntest('focused integrated topics use their own summary instead of the overall Saju summary', () => {\n  assert.match(views, /injectReadingContext\\(children,\\{field:focusedField,systemOverview:overview\\}\\)/)\n})\n""")
           PY
           rm .github/workflows/apply-summary-font-scope-v55.yml
       - name: Commit fix
@@ -70,6 +69,6 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add web/src/SystemReadingViews.tsx web/src/reading-font-fix-v54.css web/src/main.tsx web/src/lib/summaryFontScopeV55.test.mjs .github/workflows/apply-summary-font-scope-v55.yml
+          git add web/src/reading-font-fix-v54.css web/src/main.tsx web/src/lib/summaryFontScopeV55.test.mjs .github/workflows/apply-summary-font-scope-v55.yml
           git commit -m 'Fix live summary font and focused topic scope'
           git push origin HEAD:fix/summary-font-scope-v55
