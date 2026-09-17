@@ -189,8 +189,6 @@ export function sanitizeExternalFortuneText(text: string) {
       ].join('\n')
     }
   }
-  // If a provisional marker is visible but the payload cannot be parsed, fail closed
-  // instead of copying the original mixed-system text.
   if (text.includes('"contract_version": "integrated-precision-v2"') && text.includes('"status": "provisional"')) {
     return '[별빛의 운명] provisional 계산의 외부 AI 복사 데이터를 안전하게 정리하지 못해 원본 복사를 차단했어.'
   }
@@ -219,12 +217,18 @@ export function installIntegratedPrecisionFetch() {
       if (/\/functions\/v1\/fortune-interpret-v21-preview$/.test(parsedUrl.pathname)) {
         if (typeof init?.body === 'string') {
           const body = safeParse(init.body)
-          if (body?.calculation && ['start','prompt','inspect'].includes(String(body?.action ?? ''))) {
-            const ready = fortuneAiPrecisionReadiness(body.calculation)
-            if (!ready.ok) {
-              return new Response(JSON.stringify({ ok:false, error:'새 정밀도 계약으로 다시 계산해야 AI 해설을 시작할 수 있어.', gemini_paid_call:false }), {
-                status:409, headers:{'Content-Type':'application/json; charset=utf-8'},
-              })
+          if (body && typeof body === 'object') {
+            if (body?.calculation && ['start','prompt','inspect'].includes(String(body?.action ?? ''))) {
+              const ready = fortuneAiPrecisionReadiness(body.calculation)
+              if (!ready.ok) {
+                return new Response(JSON.stringify({ ok:false, error:'새 정밀도 계약으로 다시 계산해야 AI 해설을 시작할 수 있어.', gemini_paid_call:false }), {
+                  status:409, headers:{'Content-Type':'application/json; charset=utf-8'},
+                })
+              }
+            }
+            if (['start','prompt','inspect'].includes(String(body?.action ?? ''))) {
+              body.narrative_engine = 'v23'
+              init = { ...init, body: JSON.stringify(body) }
             }
           }
         }
@@ -235,7 +239,6 @@ export function installIntegratedPrecisionFetch() {
         } else if (input instanceof URL) {
           input = parsedUrl
         } else {
-          // Preserve Request body/headers and let the original init override normally.
           input = new Request(rewritten, input.clone())
         }
       }
@@ -245,7 +248,6 @@ export function installIntegratedPrecisionFetch() {
           status:409, headers:{'Content-Type':'application/json; charset=utf-8'},
         })
       }
-      // Non-AI transport failures are allowed to reach the API, whose provenance gate fails closed.
     }
     return original(input, init)
   }
@@ -298,6 +300,5 @@ export function externalPeriodKind(calculation: any, requested?: unknown): strin
 }
 export function upgradeCopiedFortunePrompt(text: string, calculation: unknown) {
   if (text.includes('[EXTERNAL_AI_PROMPT_V2')) return text
-  // Only the explicit AI-copy handler calls this; original result/JSON copy is unchanged.
   return externalFortuneInstructions(externalPeriodKind(calculation)) + '\n\n' + text
 }
