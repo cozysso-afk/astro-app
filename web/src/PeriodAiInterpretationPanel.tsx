@@ -102,11 +102,15 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     (day.evidence ?? []).map((evidence)=>({ date: day.date, evidence })),
   ).slice(0, 16)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
-
+  const verifiedHero = verifiedNarrative && !field && !westernOnly
+  const heroHeadline = verifiedHero ? visibleAiText(data.headline) || userSummary.headline : userSummary.headline
+  const heroSummary = verifiedHero
+    ? visibleAiText(data.overall.summary) || userSummary.summary
+    : field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary
 
   return <section className="period-ai-card period-ai-v18">
     <div className="reading-copy-access"><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{userSummary.headline}</h3><p className="reading-hero-subtitle">{field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary}</p></div></div>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{heroHeadline}</h3><p className="reading-hero-subtitle">{heroSummary}</p></div></div>
 
     {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/>{!!referenceFlowCards.length&&<FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>}<FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
