@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
+const css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
+
+test('live mobile reading headline uses an unmistakable Nanum Myeongjo face', () => {
+  assert.match(css, /html body \.fortune-experience \.period-ai-head h3/)
+  assert.doesNotMatch(css, /\.app-shell \.fortune-experience \.period-ai-head h3/)
+  assert.match(css, /font-family:\s*'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
+  assert.match(css, /font-weight:\s*700\s*!important/)
+  assert.match(css, /\.period-ai-head \.reading-hero-subtitle[\s\S]*font-weight:\s*400\s*!important/)
+})
+
+test('font fix loads immediately before the shared reading owner while shared owner stays last', () => {
+  const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(match => match[1])
+  const fix = imports.indexOf('reading-font-fix-v54.css')
+  const owner = imports.indexOf('reading-experience.css')
+  assert.ok(fix >= 0 && owner === fix + 1)
+  assert.equal(imports.at(-1), 'reading-experience.css')
+})
