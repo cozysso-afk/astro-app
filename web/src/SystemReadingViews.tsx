@@ -1,6 +1,6 @@
 import type { LoveStatus } from './lib/loveReadingContext'
 import type { FortuneField } from './lib/fortuneFields'
-import { Children, Fragment, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
 import type { IntegratedApiResponse, FortuneStat } from './appTypes'
 import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, ganzhiWithReading, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
@@ -135,6 +135,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const [system,setSystem] = useState<SystemId>(initialSystem)
   const [topic,setTopic] = useState<LifeTopic>(field?.lens ?? '전체')
   const [wheelIndex,setWheelIndex] = useState(0)
+  useEffect(()=>{setSystem(initialSystem);setTopic(field?.lens ?? '전체')},[initialSystem,field?.lens])
   const view=buildSystemReading(c)
   const wheel = wheelIndex<0 ? view.natalWheel : view.wheels[wheelIndex]?.wheel ?? []
   const activeWheel = wheel.length ? wheel : view.wheels[0]?.wheel ?? view.natalWheel

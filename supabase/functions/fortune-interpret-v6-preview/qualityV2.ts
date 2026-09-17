@@ -16,6 +16,40 @@ function rowCoversDate(row:any,date:string){
   const start=isoDate(row?.start),end=isoDate(row?.end);
   return Boolean(start&&end&&start<=date&&date<=end);
 }
+function repairUnsupportedV23Timing(data:any,payload:any,map:Map<string,any>){
+  if(payload?.__v23_evidence_timing_repair!==true||!data||typeof data!=="object")return false;
+  let changed=false;
+  if(Array.isArray(data?.key_windows)){
+    const original=data.key_windows;
+    const kept=original.filter((w:any)=>{
+      const refs=(w?.evidence_refs??[]).map((r:any)=>map.get(String(r))).filter(Boolean) as any[];
+      const dates=[isoDate(w?.start),isoDate(w?.end)].filter(Boolean);
+      const valid=refs.length>0&&dates.length>0&&dates.every((d:string)=>withinPeriod(d,payload)&&refs.some((row:any)=>rowCoversDate(row,d)));
+      if(!valid)changed=true;
+      return valid;
+    });
+    if(kept.length!==original.length){
+      data.key_windows=kept;
+      const windowRefs=new Set<string>(kept.flatMap((w:any)=>(w?.evidence_refs??[]).map(String)));
+      if(Array.isArray(data?.decisions))data.decisions=data.decisions.filter((d:any)=>(d?.evidence_refs??[]).some((ref:any)=>windowRefs.has(String(ref))));
+    }
+  }
+  const rr=data?.relationship_reading;
+  if(rr&&typeof rr==="object"){
+    const dates=uniq(datesInText(String(rr?.focus_timing??"")));
+    if(dates.length){
+      const refs=(rr?.evidence_refs??[]).map((r:any)=>map.get(String(r))).filter(Boolean) as any[];
+      const supported=dates.filter((d:string)=>refs.some((row:any)=>isoDate(row?.date)===d));
+      if(supported.length!==dates.length){
+        rr.focus_timing=supported.length
+          ? `${supported.join("·")}의 관계 근거는 직접 연결돼 있어. 그 밖의 날짜는 확정하지 않고 실제 연락과 반응을 확인해.`
+          : "관계 흐름은 특정 날짜를 확정하지 않고, 직접 연결된 근거가 있는 시기의 실제 연락과 반응을 중심으로 확인해.";
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
 function claimStrings(data:any){
   const out:string[]=[];
   const add=(v:any)=>{if(typeof v==="string"&&v)out.push(v);};
@@ -51,6 +85,7 @@ function hasDeterministicClaim(prose:string){
 
 export function inspectInterpretationQuality(data:any,payload:any){
   const map=ledgerMap(payload),kind=String(payload?.period_kind??"day"),stages:any[]=[];
+  const localTimingRepair=repairUnsupportedV23Timing(data,payload,map as Map<string,any>);
 
   const s1:string[]=[];
   if(!data?.headline||!data?.overall?.summary)s1.push("headline/overall 누락");
@@ -259,7 +294,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
   stages.push(qualityStage(5,"깊이·실용성",uniq(s5).slice(0,45)));
 
   const passed=stages.filter(s=>s.passed).length;
-  return {version:QUALITY_VERSION,ok:passed===5,score:passed*20,stages,refs_used:refsUsed.length,ledger_size:map.size};
+  return {version:QUALITY_VERSION,ok:passed===5,score:passed*20,stages,refs_used:refsUsed.length,ledger_size:map.size,local_timing_repair:localTimingRepair};
 }
 
 export function strictQualityRetryInstruction(report:any){

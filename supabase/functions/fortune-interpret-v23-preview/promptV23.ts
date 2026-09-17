@@ -15,6 +15,10 @@ export function buildV23PromptPacket(payload:any) {
 }
 
 export function buildV23PromptBudget(payload:any) {
+  // This private runtime marker is intentionally kept out of the prompt packet.
+  // It lets the shared quality validator safely prune unsupported V23 timing
+  // claims without changing the legacy V21 validation contract.
+  if (payload && typeof payload === 'object') payload.__v23_evidence_timing_repair = true
   const base = promptBudget(payload)
   const packet = buildV23PromptPacket(payload)
   const bytes = enc.encode(JSON.stringify(packet)).byteLength

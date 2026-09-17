@@ -139,7 +139,10 @@ test('period default view uses the natural view model and keeps raw prose in one
   const defaultMarkup = period.slice(renderStart, technicalStart)
   const technicalMarkup = period.slice(technicalStart)
 
-  assert.match(defaultMarkup, /userSummary\.headline/)
+  assert.match(defaultMarkup, /heroHeadline/)
+  assert.match(defaultMarkup, /heroSummary/)
+  assert.match(period.slice(0, renderStart), /verifiedHero \? visibleAiText\(data\.headline\) \|\| userSummary\.headline : userSummary\.headline/)
+  assert.match(period.slice(0, renderStart), /verifiedHero[\s\S]*visibleAiText\(data\.overall\.summary\) \|\| userSummary\.summary/)
   assert.match(defaultMarkup, /userSummary\.favorableCards/)
   assert.match(defaultMarkup, /userSummary\.cautionCards/)
   assert.match(defaultMarkup, /userSummary\.focusTopics/)
