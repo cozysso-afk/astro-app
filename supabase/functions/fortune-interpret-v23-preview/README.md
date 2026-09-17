@@ -1,42 +1,40 @@
-# Fortune Interpretation V23 · period narrative candidate
+# Fortune interpretation V23 preview
 
-V23 is a narrative-layer candidate. It does not change calculation, evidence-ledger generation, precision contracts, or current production routing.
+V23 changes the interpretation narrative layer without changing the calculation engines.
 
-## Why this exists
+## Main idea
 
-The current interpretation stack is strong at evidence tracing and safety, but day/week/month/annual can converge on the same topic-first prose with different period labels. V23 changes the editorial starting point without weakening evidence validation.
+Interpret astronomical evidence as phenomena first, then explain how those phenomena manifest across life topics. Do not start the story from a topic score.
 
-## Core change
+## Period contracts
 
-V23 interprets in this order:
+- `day`: direct trigger, same-day felt effect, intraday/dated evidence, immediate action.
+- `week`: early/mid/late trajectory, turning points, accumulation and release across seven days.
+- `month`: early/mid/late month, recurrence, persistence, temporary vs continuing patterns.
+- `annual`: structural background, quarter/month changes, long-running background vs short triggers.
 
-1. group repeated observations into **phenomena** first;
-2. identify whether each phenomenon is a trigger, background condition, tension, support, caution, or context;
-3. apply a **period-specific time lens**;
-4. only then explain how the phenomenon manifests across topics;
-5. keep existing evidence IDs available for downstream validation.
+## Exact mode
 
-Topic names are deliberately not part of the primary astronomical clustering key. One Mercury/Jupiter observation that touches both 학업 and 시험 should be interpreted once, then mapped to the two manifestations instead of narrated twice as unrelated evidence.
+`fortune-interpret-v23-preview/index.ts` keeps the existing V21 Gemini safety, evidence, cost, quality, cache, Thai-safety and fallback contracts, while adding the V23 phenomenon-first prompt packet and period narrative instruction.
 
-## Four distinct narrative contracts
+V22 routes exact requests to V23 only when the request includes `narrative_engine: "v23"`. Without that opt-in, the V21 compatibility route remains available.
 
-- **day**: trigger → felt effect → intraday/one-day turn → immediate action → reality check
-- **week**: weekly trajectory → early/mid/late → turning point → carryover action
-- **month**: large monthly flow → early/mid/late → recurrence → temporary vs persistent change → priority
-- **annual**: structural theme → quarters → long background → short trigger → yearly priority
+## Provisional mode
 
-Each contract has its own evidence priority and explicit forbidden patterns. The purpose is to prevent a shared template from surviving by changing only period nouns and dates.
+Entered birth time is not automatically treated as verified exact provenance. V23 therefore also applies the period-specific narrative horizon to the existing local deterministic Western-only provisional fallback.
 
-## Regression guard
+`provisionalV23.ts` does **not** relax the precision contract:
 
-`auditPeriodDistinctness()` measures lexical overlap across period outputs. The first V23 regression suite also checks that:
+- Saju and Thai stay excluded from provisional interpretation.
+- natal Moon, ASC/MC, houses and house-ruler bonuses stay excluded.
+- exact intraday timing stays excluded.
+- no Gemini call is made for provisional V23 generation.
+- day/week/month/annual use different narrative horizons and a separate V23 cache identity.
 
-- same phenomenon across different topics clusters once;
-- mixed supportive/caution observations become tension instead of duplicated events;
-- Western/Saju/Thai are not fused merely because their topic labels match;
-- day and annual choose different evidence when trigger vs recurring-background evidence is available;
-- copy-pasted day/week/month prose fails distinctness QA.
+The final provisional result still passes through the existing sanitizer and residue audit.
 
-## Integration status
+## QA
 
-This branch adds the V23 narrative frame and prompt adapter only. Current V21/V22 production routing stays untouched until the V23 regressions pass and the next integration patch explicitly wires V23 into the Gemini generation path.
+Regression coverage checks that repeated observations cluster before topic mapping, the four period types remain structurally distinct, provisional V23 remains local with zero provider fetches, final provisional prose remains birth-time safe and Western-only, and legacy requests keep their compatibility route and cache identity.
+
+Production web activation remains separate from the preview Edge Function deployment.
