@@ -15,3 +15,5 @@ test('live period headline uses Myeongjo on the actual rendered card', () => {
 test('focused integrated topics use their own summary instead of the overall Saju summary', () => {
   assert.match(views, /injectReadingContext\(children,\{field:focusedField,systemOverview:overview\}\)/)
 })
+
+// Keep this contract on the user-authored PR head so all protected checks run normally.
