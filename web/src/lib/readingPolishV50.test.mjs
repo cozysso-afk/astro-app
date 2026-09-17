@@ -7,21 +7,19 @@ const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
 
-test('iOS/PWA downloads a distinct Korean Myeongjo face and main reading headline stays visibly Myeongjo', () => {
+test('integrated reading uses bold Noto Serif headline and sans-serif supporting copy', () => {
   assert.match(index, /family=Nanum\+Myeongjo:wght@400;700&family=Noto\+Serif\+KR:wght@500;600;700&display=swap/)
-  assert.match(polish, /font-family:\s*'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
-  const mainHeadlineRule = polish.match(/html body \.app-shell \.fortune-experience \.period-ai-head h3,[\s\S]*?html body \.app-shell \.relationship-experience \.reading-hero h3\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-  assert.match(mainHeadlineRule, /font-family:\s*'Nanum Myeongjo'/)
-  assert.match(mainHeadlineRule, /font-weight:\s*400\s*!important/)
-  assert.match(mainHeadlineRule, /font-synthesis:\s*none\s*!important/)
+  const mainHeadlineRule = polish.match(/html body \.app-shell \.fortune-experience \.period-ai-head h3\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+  assert.match(mainHeadlineRule, /font-family:\s*'Noto Serif KR'/)
+  assert.match(mainHeadlineRule, /font-weight:\s*700\s*!important/)
   const leadRule = polish.match(/\.fortune-experience \.period-ai-head \.reading-hero-subtitle\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-  assert.match(leadRule, /font-family:\s*'Nanum Myeongjo'/)
+  assert.match(leadRule, /font-family:\s*-apple-system/)
   assert.match(leadRule, /font-weight:\s*400\s*!important/)
   const systemHeadlineRule = polish.match(/\.system-reading \.system-hero h3\s*\{([\s\S]*?)\}/)?.[1] ?? ''
   assert.match(systemHeadlineRule, /font-weight:\s*700\s*!important/)
   const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(match => match[1])
   assert.ok(imports.indexOf('reading-polish-v50.css') < imports.indexOf('reading-experience.css'))
-  assert.equal(imports.at(-1), 'reading-experience.css')
+  assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
 test('Western independent surface suppresses every integrated period panel wrapper', () => {
