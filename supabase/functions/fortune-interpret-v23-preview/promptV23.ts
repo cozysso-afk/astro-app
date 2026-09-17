@@ -1,7 +1,8 @@
-import { buildPromptPacket } from '../fortune-interpret-v21-preview/costGuardV21.ts'
+import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
 export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23-phenomenon-first'
+const enc = new TextEncoder()
 
 export function buildV23PromptPacket(payload:any) {
   const base = buildPromptPacket(payload)
@@ -10,6 +11,30 @@ export function buildV23PromptPacket(payload:any) {
     ...base,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
+  }
+}
+
+export function buildV23PromptBudget(payload:any) {
+  const base = promptBudget(payload)
+  const packet = buildV23PromptPacket(payload)
+  const bytes = enc.encode(JSON.stringify(packet)).byteLength
+  const estimated_input_tokens = Math.ceil(bytes / 2.6)
+  const ratio = estimated_input_tokens / Math.max(1, Number(base.estimated_input_tokens ?? 1))
+  // Scaling the full V21 job estimate is deliberately conservative because it
+  // also scales the output reserve when V23 adds prompt context.
+  const estimated_max_job_krw = Math.max(
+    Number(base.estimated_max_job_krw ?? 0),
+    Number(base.estimated_max_job_krw ?? 0) * ratio,
+  )
+  return {
+    ...base,
+    packet,
+    bytes,
+    estimated_input_tokens,
+    estimated_max_job_krw,
+    ok: bytes <= Number(base.max_bytes ?? 0) && estimated_max_job_krw <= Number(base.max_job_krw ?? 0),
+    narrative_version: PERIOD_NARRATIVE_VERSION,
+    prompt_version: V23_PROMPT_VERSION,
   }
 }
 
