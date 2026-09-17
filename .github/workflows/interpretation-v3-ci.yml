@@ -68,7 +68,9 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v22-preview/precisionV2.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/periodNarrativeV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/promptV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/routingV23.test.mjs
           node --experimental-strip-types --check supabase/functions/fortune-interpret-v22-preview/index.ts
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v23-preview/index.ts
           node --experimental-strip-types --test web/src/lib/precisionTransport.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneAiJob.test.mjs
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
