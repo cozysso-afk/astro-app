@@ -22,6 +22,11 @@ function periodBadge(title: string) {
   return '기간'
 }
 
+function periodHeading(title: string, badge: string) {
+  if (/^(?:서양점성술|사주|태국점성술)\s*·\s*/.test(title)) return `${badge} 운세`
+  return title
+}
+
 export function PeriodFortunePanel({
   title,
   startDate,
@@ -35,14 +40,15 @@ export function PeriodFortunePanel({
   children,
 }: PeriodFortunePanelProps) {
   const badge = periodBadge(title)
+  const heading = periodHeading(title, badge)
   return <section className={`tool-panel period-fortune-report period-fortune-${badge}`}>
     <div className="tool-panel-heading period-report-heading">
       <span className="tool-icon tone-gold period-report-icon"><Moon size={22}/></span>
       <div className="period-report-copy">
         <div className="period-report-kicker-row"><span className="eyebrow">기간 운세</span><span className="period-report-badge">{badge}</span></div>
-        <h2>{title}</h2>
+        <h2>{heading}</h2>
         <div className="period-report-range"><CalendarDays size={15}/><strong>{startDate}</strong>{startDate !== endDate && <><span>→</span><strong>{endDate}</strong></>}</div>
-        <p>선택한 기간의 흐름과 중요한 시기를 정리해서 보여줘.</p>
+        <p>선택한 기간의 흐름과 중요한 시기를 정리해서 보여줘. 해석 체계는 아래 선택 탭을 기준으로 해.</p>
       </div>
     </div>
 
