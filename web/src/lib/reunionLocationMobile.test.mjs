@@ -38,10 +38,12 @@ test('reunion timing rows wrap inside the viewport with visible hierarchy', () =
   assert.match(css, /\.relationship-range-buttons[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)\s*!important/)
 })
 
-test('v42 remains below legacy layers while reading-experience keeps final ownership', () => {
+test('v42 remains below shared reading styles and only the scoped font owner may follow them', () => {
   const v42 = main.indexOf("import './reunion-location-mobile-v42.css'")
   const owner = main.indexOf("import './reading-experience.css'")
+  const fontOwner = main.indexOf("import './reading-font-fix-v54.css'")
   assert.ok(v42 >= 0 && owner > v42)
+  assert.ok(fontOwner > owner)
   const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map((match) => match[1])
-  assert.equal(imports.at(-1), 'reading-experience.css')
+  assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
