@@ -32,3 +32,27 @@ export function interpretationQualityPassed(validation?: {score?:number; stages?
   if (!validation || validation.stages?.some(stage => stage.passed !== true)) return false
   return validation.score === 100 || Boolean(validation.stages?.length && validation.stages.every(stage => stage.passed === true))
 }
+
+/**
+ * A V23 timing-repaired reading may safely expose its generated narrative even
+ * when stage 5 (depth/practicality) is the only failed stage. This does not
+ * relax backend acceptance or evidence rules; it only prevents the frontend
+ * from replacing an already accepted V23 narrative with generic score copy.
+ */
+export function interpretationHeroEligible(
+  validation?: {score?:number; stages?:Array<{stage?:number; passed?:boolean}>} | null,
+  usage?: {degraded_quality?:boolean; local_quality_fallback?:boolean; quality_warning?:string|null; cost_guard_version?:string} | null,
+): boolean {
+  if (interpretationQualityPassed(validation)) return !usage?.degraded_quality
+  if (!usage?.degraded_quality || usage?.local_quality_fallback) return false
+  if (!String(usage?.cost_guard_version ?? '').startsWith('supabase-ai-v23')) return false
+  if (!/직접 근거가 없는 날짜·구간만 로컬에서 제거/.test(String(usage?.quality_warning ?? ''))) return false
+  const stages = validation?.stages ?? []
+  if (stages.length < 5) return false
+  let sawDepthStage = false
+  for (const stage of stages) {
+    if (stage.stage === 5) { sawDepthStage = true; if (stage.passed !== false) return false; continue }
+    if (stage.stage != null && stage.stage >= 1 && stage.stage <= 4 && stage.passed !== true) return false
+  }
+  return sawDepthStage
+}

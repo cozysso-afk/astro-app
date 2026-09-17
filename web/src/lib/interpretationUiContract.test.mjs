@@ -4,10 +4,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { buildFortuneUserSummary } from './fortuneUserSummary.ts'
-import { normalizeTopicEntries } from './interpretationTopics.ts'
+import { interpretationHeroEligible, normalizeTopicEntries } from './interpretationTopics.ts'
 
 const annual = readFileSync(new URL('../AiInterpretationPanel.tsx', import.meta.url), 'utf8')
 const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')
+const systemViews = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
 const topicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']
 
 function sectionFrom(source, marker) {
@@ -401,3 +402,26 @@ test('year uses real monthly phases when available instead of repeating a daily 
 // Exercise the redesigned view models and real component rendering through the existing CI entrypoint.
 import './readingExperience.test.mjs'
 import './readingExperience.render.test.mjs'
+
+
+test('V23 timing-repaired narrative can remain visible without relaxing strict quality pass', () => {
+  const validation = {score:80,stages:[1,2,3,4,5].map(stage=>({stage,passed:stage!==5}))}
+  const repaired = {
+    degraded_quality:true,
+    local_quality_fallback:false,
+    cost_guard_version:'supabase-ai-v23.0-phenomenon-first',
+    quality_warning:'직접 근거가 없는 날짜·구간만 로컬에서 제거했고 구조·근거·의미 방향·일관성은 통과했어. 같은 결과를 고치려고 Gemini를 한 번 더 호출하지 않아.',
+  }
+  assert.equal(interpretationHeroEligible(validation,repaired),true)
+  assert.equal(interpretationHeroEligible(validation,{...repaired,cost_guard_version:'supabase-ai-v21.4-e2e-evidence'}),false)
+  assert.equal(interpretationHeroEligible(validation,{...repaired,quality_warning:'일반 degraded 결과'}),false)
+  assert.equal(interpretationHeroEligible({score:80,stages:[1,2,3,4,5].map(stage=>({stage,passed:stage!==2&&stage!==5}))},repaired),false)
+  assert.equal(interpretationHeroEligible({score:100,stages:[1,2,3,4,5].map(stage=>({stage,passed:true}))},{degraded_quality:false}),true)
+})
+
+test('independent period copy uses Korean particle selection instead of hard-coded 올해은', () => {
+  assert.match(systemViews, /function koreanParticle/)
+  assert.doesNotMatch(systemViews, /`\$\{when\}은/)
+  assert.match(systemViews, /koreanParticle\(when,'은는'\)/)
+  assert.match(systemViews, /koreanParticle\(strongLabel,'이가'\)/)
+})
