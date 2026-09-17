@@ -1,0 +1,34 @@
+name: V23 quality version compatibility once
+
+on:
+  push:
+    branches:
+      - fix/v23-delivery-pipeline
+    paths:
+      - scripts/revert_v23_quality_version_once.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v23-delivery-pipeline
+          fetch-depth: 0
+      - name: Restore public quality version compatibility
+        run: python scripts/revert_v23_quality_version_once.py
+      - name: Run public quality contract and V23 timing repair tests
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v21-preview/costGuardV21.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/qualityV23TimingRepair.test.mjs
+      - name: Commit compatibility patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/fortune-interpret-v6-preview/qualityV2.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Keep quality summary version backward compatible"
+          git push origin HEAD:fix/v23-delivery-pipeline
