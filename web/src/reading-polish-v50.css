@@ -1,24 +1,27 @@
-/* V50 · mobile reading polish
- * Core reading conclusions use a real Korean Myeongjo webfont; UI labels remain sans-serif.
- * Keep this before reading-experience.css; higher specificity owns only these reading targets.
+/* V56 · mobile reading polish
+ * Integrated reading: headline = clear bold Myeongjo, body = sans-serif.
+ * Independent Western/Saju/Thai system typography stays unchanged.
  */
 @media (max-width: 600px) {
-  /*
-   * iOS/PWA renders the heavy Nanum Myeongjo face close to the surrounding Gothic UI.
-   * Keep the main editorial headline on the same regular Myeongjo face as the lead prose;
-   * hierarchy comes from size/spacing, not a faux-Gothic-looking heavy weight.
-   */
-  html body .app-shell .fortune-experience .period-ai-head h3,
-  html body .app-shell .relationship-experience .reading-hero h3 {
-    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+  html body .app-shell .fortune-experience .period-ai-head h3 {
+    font-family: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
     font-synthesis: none !important;
-    font-weight: 400 !important;
-    line-height: 1.78 !important;
-    letter-spacing: -.018em !important;
+    font-weight: 700 !important;
+    line-height: 1.68 !important;
+    letter-spacing: -.025em !important;
     word-break: keep-all !important;
   }
 
-  /* Independent system headlines can stay stronger while remaining true Myeongjo. */
+  html body .app-shell .relationship-experience .reading-hero h3 {
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 700 !important;
+    line-height: 1.72 !important;
+    letter-spacing: -.025em !important;
+    word-break: keep-all !important;
+  }
+
+  /* Independent system headlines keep the existing serif treatment. */
   html body .app-shell .system-reading .system-hero h3 {
     font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
     font-synthesis: none !important;
@@ -28,12 +31,12 @@
     word-break: keep-all !important;
   }
 
-  /* The sentence directly under the integrated headline is reading prose too. */
+  /* Integrated supporting sentence is UI/body copy, not editorial headline. */
   html body .app-shell .fortune-experience .period-ai-head .reading-hero-subtitle {
-    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
     font-synthesis: none !important;
     font-weight: 400 !important;
-    line-height: 1.88 !important;
+    line-height: 1.78 !important;
     letter-spacing: -.012em !important;
     word-break: keep-all !important;
   }
