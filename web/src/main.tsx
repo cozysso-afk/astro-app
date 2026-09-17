@@ -38,8 +38,8 @@ import './basic-fortune-v43.css'
 import './ai-cost-preview-v47.css'
 import './reading-legibility-v49.css'
 import './reading-polish-v50.css'
-import './reading-font-fix-v54.css'
 import './reading-experience.css'
+import './reading-font-fix-v54.css'
 
 installIntegratedPrecisionFetch()
 
