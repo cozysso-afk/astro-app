@@ -28,9 +28,10 @@ test('western independent view never shows the integrated period panel again', (
   assert.match(polish, /system-reading\.system-western > \.period-deep-reading\s*\{[\s\S]*?display:\s*none\s*!important/)
 })
 
-test('mobile integrated reading uses a downloaded Korean Myeongjo for headline and lead prose', () => {
-  assert.match(polish, /period-ai-head h3,[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
-  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
+test('mobile integrated reading uses bold Noto Serif headline and sans supporting copy', () => {
+  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-family:\s*'Noto Serif KR'/)
+  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-weight:\s*700\s*!important/)
+  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*-apple-system/)
 })
 
 test('top-level life topics use a fixed two-row mobile grid instead of horizontal clipping', () => {
@@ -40,7 +41,7 @@ test('top-level life topics use a fixed two-row mobile grid instead of horizonta
   assert.doesNotMatch(css, /system-topic-selector\.system-topic-selector-fixed[\s\S]*overflow-x:\s*auto/)
 })
 
-test('scoped system UX loads before the shared reading owner, which stays the final stylesheet owner', () => {
+test('scoped system UX loads before the shared reading owner, which stays below system UX', () => {
   const western = main.indexOf("import './system-reading-ux-v40.css'")
   const owner = main.indexOf("import './reading-experience.css'")
   assert.ok(western >= 0 && owner > western)
