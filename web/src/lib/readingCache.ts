@@ -15,7 +15,8 @@ const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
-const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23-period-narrative-v1'
+const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
+const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v1'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
 
@@ -117,6 +118,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const precision = fortuneAiPrecisionReadiness(calculation)
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
+    narrative_contract: FORTUNE_NARRATIVE_CACHE_CONTRACT,
     precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
     ...fortuneProvisionalSynthesisSignature(precision.ok ? precision.mode : 'invalid'),
     precision: calculation.precision ?? null,
