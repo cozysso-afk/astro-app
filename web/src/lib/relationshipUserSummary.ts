@@ -2,7 +2,7 @@ import type { Aspect, FortuneStat, RelationshipAnalysisMode, ReunionTimingContex
 
 const PERSONAL = new Set(['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'])
 const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
-const EXACT_ONLY_POINTS = new Set(['ASC', 'DSC', 'MC', 'IC', 'Vertex'])
+const SENSITIVE = new Set(['Moon', 'ASC', 'DSC', 'MC', 'IC', 'Vertex'])
 const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
 export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
@@ -18,12 +18,11 @@ export function aspectRole(aspect: Aspect): Role {
 
 function aspectKey(aspect: Aspect) { return `${aspect.a}:${aspect.aspect}:${aspect.b}:${aspect.layer ?? 'natal'}` }
 
-export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = EXACT_ONLY_POINTS) {
+export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = SENSITIVE) {
   const seen = new Set<string>()
-  const exactOnly = new Set([...EXACT_ONLY_POINTS, ...[...sensitive].filter((point) => point !== 'Moon')])
   const safe = aspects.filter(aspect => {
     if (!PLANETS[aspect.a] || !PLANETS[aspect.b] || !Number.isFinite(aspect.orb)) return false
-    if (!partnerExact && [aspect.a, aspect.b].some(p => exactOnly.has(p))) return false
+    if (!partnerExact && [aspect.a, aspect.b].some(p => SENSITIVE.has(p) || sensitive.has(p))) return false
     const key = aspectKey(aspect)
     if (seen.has(key)) return false
     seen.add(key)
