@@ -73,12 +73,18 @@ export function buildSystemReading(c: IntegratedApiResponse) {
 }
 export const THREE_SYSTEM_INSTRUCTIONS = '계산 권위는 별빛의 운명 엔진이며 너는 해석자다. 재계산·새 점수·데이터 밖 근거 생성 금지. 점수는 확률이 아니다. 실제 자료가 있는 Western·Saju·Thai를 각각 설명하고 근거의 결합과 충돌, 현실 발현·행동·주의·과해석 한계를 종합하라. 사주·Thai를 한 줄 부록으로 축소하지 말라. 세 체계는 독립적이며 합산하거나 강제로 일치시키지 않는다. 미계산 신강·용신·배우자성, Thai 최종 길흉·사건 확률·정확한 예측 시각을 만들지 말라. 연락 수신/발신은 분리한다. 투자 가격·수익 예측 금지. 일간은 실제 하루, 주간은 실제 구간 변화, 월간은 실제 월운/절 경계, 연간은 실제 대운/세운/월 구간을 사용하라.'
 
-export const SAJU_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(TEN_GOD_LENSES),애정:Object.keys(TEN_GOD_LENSES),대인:['식상','비겁'],학업:['인성','식상','관성'],직업:['관성','식상','재성'],금전:['재성'],컨디션:[]}
+const ALL_TEN_GOD_KEYS = Object.keys(TEN_GOD_LENSES)
+// Topic tabs are views over the same calculated ten-god evidence. A topic should
+// not become disabled merely because the current period's active ten-god was
+// originally authored under another presentation topic.
+export const SAJU_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:ALL_TEN_GOD_KEYS,애정:ALL_TEN_GOD_KEYS,대인:ALL_TEN_GOD_KEYS,학업:ALL_TEN_GOD_KEYS,직업:ALL_TEN_GOD_KEYS,금전:ALL_TEN_GOD_KEYS,컨디션:ALL_TEN_GOD_KEYS}
 export const THAI_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(BHUMI_LENSES),애정:['boriwan','sri','montri','kalakini'],대인:['boriwan','montri','kalakini'],학업:['utsaha','montri'],직업:['det','utsaha','montri'],금전:['mula','sri','kalakini'],컨디션:['ayu']}
 export function compactSystemPrompt(packet: Record<string,unknown>) {
   for(const limit of [12,8,4,2,1]) {
     const compact = Object.fromEntries(Object.entries(packet).map(([key,value])=>[key,Array.isArray(value)?value.slice(0,limit):value]))
-    const text=`${THREE_SYSTEM_INSTRUCTIONS}\n선택 체계와 분야만 상담형으로 해설하라. 다른 체계의 계산을 가져오지 말라. 생략된 구간은 추정하지 말라.\nCALCULATED_DATA=${JSON.stringify(compact)}`
+    const text=`${THREE_SYSTEM_INSTRUCTIONS}\
+선택 체계와 분야만 상담형으로 해설하라. 다른 체계의 계산을 가져오지 말라. 생략된 구간은 추정하지 말라.\
+CALCULATED_DATA=${JSON.stringify(compact)}`
     if(text.length<=7500)return text
   }
   throw new Error('핵심 근거가 7,500자를 넘어 복사하지 못했어. 더 좁은 기간을 선택해줘.')
@@ -100,19 +106,66 @@ export function thaiPeriodLabel(start:string,end:string) {
   return start===end ? `선택 날짜의 연간 배치 · ${start}` : `선택 기간의 연간 배치 · ${start}–${end}`
 }
 
-// Topic-specific explanation of an already calculated ten-god group.
-// No spouse-star, strength, favourable-element or event inference is added.
-export function lensForTopic(lens: Lens, topic: LifeTopic): Lens {
-  if (topic !== '애정') return lens
-  const relationship: Record<string, [string,string,string]> = {
+const TOPIC_TEN_GOD_COPY: Partial<Record<Exclude<LifeTopic,'전체'>,Record<string,[string,string,string]>>> = {
+  애정:{
     인성:['마음을 받아들이는 방식','상대의 말과 관계 경험을 어떻게 받아들이고 이해하는지 살피는 맥락이야. 다가가려는 마음이 있어도 나에게 편안한 거리와 시간이 필요한지 함께 볼 수 있어.','혼자 해석한 뜻과 실제로 들은 말을 구분하고, 이해되지 않는 부분은 물어봐.'],
     관성:['관계의 약속과 책임','관계에서 기대하는 약속과 책임을 살피는 맥락이야. 가까워지고 싶은 마음과 어느 정도의 관계를 약속할지는 구분해서 이야기할 수 있어.','연락 빈도나 만남 방식, 관계의 이름에 서로 같은 기대를 갖는지 확인해.'],
     재성:['함께 쓸 시간과 현실 조건','관계에 쓸 수 있는 시간과 여유, 생활 조건을 살피는 맥락이야. 호감이 있어도 일정이나 거리 때문에 만남을 구체화하기 어려운지 함께 봐.','만날 수 있는 시간과 이동 부담을 구체적으로 맞춰봐.'],
     식상:['호감과 의사를 표현하는 방식','생각과 호감을 말이나 행동으로 드러내는 맥락이야. 표현이 많아지는 것과 상대가 같은 뜻으로 받아들이는 것은 다를 수 있어.','안부인지 만남 제안인지 원하는 뜻을 분명하게 전하고 상대의 답을 들어봐.'],
     비겁:['내 기준과 관계의 균형','관계 안에서 내 기준을 지키면서 상대와 균형을 맞추는 맥락이야. 친근함이 있어도 각자가 원하는 거리와 관계 방식이 다를 수 있어.','맞춰줄 수 있는 부분과 지키고 싶은 경계를 구체적으로 말해봐.'],
-  }
-  const copy = relationship[lens.key]
-  return copy ? {...lens,title:copy[0],meaning:copy[1],action:copy[2],limit:'계산된 십성을 관계의 생활 맥락으로 읽은 해설이야. 배우자성·상대 마음·연애 성립을 판정한 결과는 아니야.'} : lens
+  },
+  대인:{
+    인성:['상대 말을 받아들이는 방식','사람 사이에서 먼저 듣고 이해하는 쪽에 무게가 가는 맥락이야. 내가 이해한 뜻과 상대가 실제로 말한 뜻이 같은지 확인하는 과정이 중요해.','추측으로 채우지 말고 상대가 한 말과 내가 해석한 내용을 나눠 적어봐.'],
+    관성:['관계 속 역할과 기준','사람 사이의 규칙, 약속, 책임 범위를 분명히 하는 맥락이야. 친분과 역할 책임을 섞으면 부담이 커질 수 있어.','부탁이나 공동 작업은 누가 무엇을 언제까지 맡는지 구체적으로 맞춰.'],
+    재성:['시간과 부담의 배분','관계에 쓰는 시간과 비용, 현실적인 여유를 조절하는 맥락이야. 호의가 있어도 감당 가능한 범위를 넘기지 않는 게 중요해.','도와줄 수 있는 범위와 어려운 범위를 먼저 정해.'],
+    식상:['말과 표현의 전달','생각을 말과 행동으로 밖에 내보내는 맥락이야. 표현이 많아지는 것과 서로 같은 뜻으로 이해하는 건 별개야.','핵심을 짧게 말하고 상대가 이해한 내용을 한 번 확인해.'],
+    비겁:['협력과 내 기준','친구·동료와 같이 움직이면서도 내 기준을 지키는 맥락이야. 협력과 경쟁이 동시에 느껴질 수 있어.','같이 할 일과 각자 책임질 일을 분리해.'],
+  },
+  학업:{
+    인성:['이해와 복습','배운 내용을 받아들이고 정리하는 힘을 보는 맥락이야. 새 진도보다 이미 본 내용을 설명할 수 있는지가 중요해.','핵심 개념을 내 말로 다시 설명하고 빈 부분만 채워.'],
+    관성:['마감과 평가 기준','시험 범위, 제출 기준, 일정처럼 외부 기준을 맞추는 맥락이야.','평가 기준과 마감부터 적고 공부 순서를 거기에 맞춰.'],
+    재성:['공부 자원 배분','시간·교재·비용처럼 공부에 쓸 수 있는 자원을 배분하는 맥락이야.','공부 시간과 자료를 늘리기보다 실제 사용할 분량부터 정해.'],
+    식상:['답안과 표현','아는 내용을 말·글·문제로 꺼내 쓰는 맥락이야. 이해한 것과 실제로 답안에 표현하는 건 다를 수 있어.','문제 풀이와 설명 연습으로 아는 내용을 밖으로 꺼내봐.'],
+    비겁:['내 페이스와 비교','주변 속도와 비교하기보다 내 학습 리듬을 지키는 맥락이야.','남의 진도보다 내가 반복 가능한 공부 단위를 정해.'],
+  },
+  직업:{
+    인성:['정보와 문서 정리','업무에 필요한 자료를 이해하고 문서로 정리하는 맥락이야.','결정 전에 근거 문서와 필요한 정보를 한 번 정리해.'],
+    관성:['책임과 평가 기준','맡은 역할, 규칙, 평가 기준을 다루는 맥락이야.','완료 기준과 기한, 책임자를 명확히 해.'],
+    재성:['업무 자원과 조건','예산·시간·인력처럼 일을 굴리는 현실 조건을 다루는 맥락이야.','필요 자원과 현재 가능한 자원을 비교해 우선순위를 정해.'],
+    식상:['보고와 결과물','생각을 보고·제안·산출물로 보여주는 맥락이야.','말로만 합의하지 말고 결과물과 다음 행동을 남겨.'],
+    비겁:['협업과 역할 분담','동료와 같이 움직이면서 내 책임 범위를 지키는 맥락이야.','공동 업무는 기여와 결정 권한을 나눠 적어.'],
+  },
+  금전:{
+    인성:['돈 관련 정보 확인','계약·고지·자료처럼 돈을 판단하기 전에 확인할 정보를 다루는 맥락이야.','금액보다 먼저 계약 조건과 원문을 확인해.'],
+    관성:['고정 의무와 납부 기준','세금·납부·계약 의무처럼 반드시 지켜야 할 기준을 다루는 맥락이야.','먼저 나갈 돈과 기한이 있는 의무부터 분리해.'],
+    재성:['예산과 자원 배분','돈과 시간 같은 현실 자원을 어디에 배분할지 보는 맥락이야.','예상 수입보다 확정 지출과 가용 예산부터 맞춰.'],
+    식상:['소비와 결과물','돈을 써서 얻으려는 결과가 실제로 필요한지 점검하는 맥락이야.','지출 목적과 기대 결과를 한 줄씩 적고 불필요한 항목을 빼.'],
+    비겁:['공동 비용과 내 기준','공동 지출이나 주변 사람과의 금전 경계를 다루는 맥락이야.','빌려주기·나눠내기·공동구매는 금액과 책임을 먼저 정해.'],
+  },
+  컨디션:{
+    인성:['회복과 받아들이는 시간','정보와 자극을 계속 늘리기보다 머리와 생활 리듬을 정리할 시간이 필요한지 보는 맥락이야.','새 일을 더 넣기 전에 쉬는 시간과 정리 시간을 확보해.'],
+    관성:['일정 부담과 긴장','해야 할 일과 책임이 생활 리듬을 얼마나 압박하는지 보는 맥락이야.','마감이 있는 일과 미뤄도 되는 일을 나눠 부담을 줄여.'],
+    재성:['생활 자원과 체력 배분','시간·돈·에너지처럼 하루를 유지하는 자원을 어떻게 나누는지 보는 맥락이야.','꼭 필요한 일정에 먼저 여유를 남기고 소모가 큰 일을 한꺼번에 몰지 마.'],
+    식상:['활동량과 표현','움직이고 말하고 결과를 내는 활동량이 늘어나는 맥락이야.','활동 뒤 회복 시간을 같이 잡고, 계속 출력만 하는 일정은 줄여.'],
+    비겁:['내 페이스 유지','주변 일정이나 요구에 휩쓸리지 않고 내 생활 속도를 지키는 맥락이야.','남의 속도보다 내가 무리 없이 반복할 수 있는 일정을 기준으로 잡아.'],
+  },
+}
+
+const TOPIC_LIMIT: Partial<Record<LifeTopic,string>> = {
+  애정:'계산된 십성을 관계의 생활 맥락으로 읽은 해설이야. 배우자성·상대 마음·연애 성립을 판정한 결과는 아니야.',
+  대인:'특정 사람이 실제로 어떻게 반응할지 예측하는 결과는 아니야.',
+  학업:'성적·합격 여부를 예측하는 결과는 아니야.',
+  직업:'취업·승진·평가 결과를 확정하는 자료는 아니야.',
+  금전:'수입 증가·가격 방향·투자 수익을 예측하는 자료는 아니야.',
+  컨디션:'질병이나 건강 상태를 진단하는 자료는 아니야.',
+}
+
+// Topic-specific explanation of an already calculated ten-god group.
+// No spouse-star, strength, favourable-element or event inference is added.
+export function lensForTopic(lens: Lens, topic: LifeTopic): Lens {
+  if (topic === '전체') return lens
+  const copy = TOPIC_TEN_GOD_COPY[topic]?.[lens.key]
+  return copy ? {...lens,topic,title:copy[0],meaning:copy[1],action:copy[2],limit:TOPIC_LIMIT[topic] ?? lens.limit} : {...lens,topic,limit:TOPIC_LIMIT[topic] ?? lens.limit}
 }
 
 export function thaiPlacementComparison(current: {bhumi_key:string;planet:{label:string}}, natal: Array<{bhumi_key:string;planet:{label:string}}>, isNatal: boolean): string {
