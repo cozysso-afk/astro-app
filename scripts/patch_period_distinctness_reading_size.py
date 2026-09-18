@@ -36,7 +36,7 @@ p.write_text(text, encoding='utf-8')
 p = Path('web/src/PeriodFortuneResults.tsx')
 text = p.read_text(encoding='utf-8')
 old = '  return <div className="fortune-experience">'
-new = '  return <div className={`fortune-experience period-${period}`}> '
+new = '  return <div className={`fortune-experience period-${period}`}>'
 if old not in text:
     raise SystemExit('fortune-experience wrapper not found')
 text = text.replace(old, new, 1)
@@ -86,12 +86,12 @@ test('day prioritizes a one-day trigger while week prioritizes a multi-day patte
   const base = payload('week')
   base.evidence_ledger = [
     {
-      id: 'W:day:1', system: 'western', topic: '직업', scope: 'daily_actual', date: '2026-09-14',
+      id: 'W:daily:직업:1', system: 'western', topic: '직업', scope: 'daily_actual', date: '2026-09-14',
       direction: 'caution', text: 'Mars square Saturn',
       observation: { transit: 'Mars', target: 'Saturn', aspect: 'square' },
     },
     ...['2026-09-14','2026-09-16','2026-09-18'].map((date,index)=>({
-      id: `W:week:${index+1}`, system: 'western', topic: '대인관계', scope: 'daily_actual', date,
+      id: `W:daily:대인관계:${index+2}`, system: 'western', topic: '대인관계', scope: 'daily_actual', date,
       direction: 'supportive', text: 'Jupiter trine Sun',
       observation: { transit: 'Jupiter', target: 'Sun', aspect: 'trine' },
     })),
