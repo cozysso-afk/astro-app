@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v11\.9-evidence-grounding-repair"/)
+  assert.match(server,/REUNION_VERSION="relationship-v11\.10-provisional-time-reference"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })

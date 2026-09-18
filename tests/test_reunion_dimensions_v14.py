@@ -149,7 +149,7 @@ def test_full_reunion_result_has_dimension_matrix_and_secondary_support_but_no_s
         analysis_mode="reunion",
     )
     assert out["ok"] is True
-    assert out["engine"] == "relationship-western-v1.11-reunion-dimensions"
+    assert out["engine"] == "relationship-western-v1.12-provisional-entered-time"
     assert set(DIMENSIONS).issubset(out["reunion_dimensions"])
     for dimension in DIMENSIONS:
         axis = out["reunion_dimensions"][dimension]

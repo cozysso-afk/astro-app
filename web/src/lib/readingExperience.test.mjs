@@ -95,10 +95,11 @@ test('married mode is current marriage and repair; no future-spouse or marriage-
   assert.equal(view.practicalTitle,'지금 함께 바꿔볼 것')
   assert.doesNotMatch(JSON.stringify([view.headline,view.sections,view.practical,view.practicalTitle]),/미래 배우자|결혼 전|재회|재접촉|결혼할|결혼 가능성/)
 })
-test('unverified time excludes sensitive aspects and absent direction remains unknown', () => {
+test('entered provisional time keeps Moon but excludes exact-only angle aspects from compact fallback', () => {
   const unsafe=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]
   const view=buildRelationshipUserSummary({aspects:unsafe,partnerExact:false,mode:'reunion'})
-  assert.ok(view.ranked.every(a=>!['Moon','ASC'].includes(a.a)))
+  assert.ok(view.ranked.some(a=>a.a==='Moon'))
+  assert.ok(view.ranked.every(a=>a.a!=='ASC'))
   assert.equal(view.incoming.band,'정보 부족')
   assert.equal(view.outgoing.band,'정보 부족')
   assert.equal(view.windows.length,0)
