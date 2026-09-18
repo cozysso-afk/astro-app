@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { repairReunionGroundingV2 } from './reunionGroundingV2.ts'
+import { polishReunionNarrativeText, repairReunionGroundingV2 } from './reunionGroundingV2.ts'
 
 const payload = {
   reunion_evidence_v2: {
@@ -52,4 +52,32 @@ test('does not manufacture prose when a core generated section is missing', () =
   const out = repairReunionGroundingV2(x, payload)
   assert.equal(out.ok, false)
   assert.equal(out.reason, 'missing_core_section_text')
+})
+
+test('turns technical English annotations into natural Korean and removes false sub-degree precision', () => {
+  const raw = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 오차 0.002° 수준의 극도로 정밀한 각을 형성해.'
+  const out = polishReunionNarrativeText(raw, true)
+  assert.match(out, /진행 금성/)
+  assert.match(out, /육십분위/)
+  assert.match(out, /태양/)
+  assert.equal(out.includes('Progressed'), false)
+  assert.equal(out.includes('Venus('), false)
+  assert.equal(out.includes('sextile('), false)
+  assert.equal(out.includes('0.002°'), false)
+  assert.equal(out.includes('극도로 정밀한'), false)
+})
+
+test('suppresses a repeated technical evidence sentence when the later section still has unique interpretation', () => {
+  const x = reading()
+  x.reunion_synthesis_v2.summary = '재접촉 문은 열려 있지만 실제 관계 회복은 별도 조건이 필요해. 누가 먼저 움직이는지와 언제 접점이 강해지는지를 나눠 봐야 하고, 다시 붙은 뒤의 유지력도 따로 확인해야 해. 같은 계산 근거를 여러 섹션에서 반복해 강도를 부풀리지는 않을게.'
+  x.reunion_synthesis_v2.why_reconnect.interpretation = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 orb 0.021°로 가까워 과거의 호의적 정서를 다시 자극해. 이 접점은 재연결 동기를 설명하는 근거야.'
+  x.reunion_synthesis_v2.initiative.interpretation = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 orb 0.021°로 가까워 과거의 호의적 정서를 다시 자극해. 다만 먼저 움직이는 방향은 별도의 수신·발신 지표에서 내 쪽이 조금 앞서.'
+  const out = repairReunionGroundingV2(x, { ...payload, precision: { partner_time_exact: false } })
+  assert.equal(out.ok, true)
+  const why = out.data.reunion_synthesis_v2.why_reconnect.interpretation
+  const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
+  assert.match(why, /진행 금성/)
+  assert.equal(initiative.includes('진행 금성'), false)
+  assert.match(initiative, /먼저 움직이는 방향/)
+  assert.equal(`${why} ${initiative}`.includes('0.021°'), false)
 })
