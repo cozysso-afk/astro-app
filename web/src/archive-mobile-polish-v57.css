@@ -1,43 +1,114 @@
 @media (max-width: 420px) {
-  .archive-search-panel {
+  .app-shell .archive-search-panel {
     gap: 12px;
     padding: 12px;
   }
 
-  .archive-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 8px;
+  /* Keep the two main selectors roomy, then place start/end dates side by side. */
+  .app-shell .archive-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px 9px;
+    overflow: visible;
   }
 
-  .archive-search-fortune .archive-filter-grid label:nth-child(1),
-  .archive-search-fortune .archive-filter-grid label:nth-child(2),
-  .archive-search-verification .archive-filter-grid label:first-child {
-    grid-column: 1 / -1;
+  .app-shell .archive-search-fortune .archive-filter-grid > label:nth-child(1),
+  .app-shell .archive-search-fortune .archive-filter-grid > label:nth-child(2),
+  .app-shell .archive-search-verification .archive-filter-grid > label:first-child {
+    grid-column: 1 / -1 !important;
   }
 
-  .archive-filter-grid select {
-    min-height: 44px;
-    padding: 0 12px;
-    font-size: .8rem;
+  .app-shell .archive-filter-grid > label {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible;
   }
 
-  .archive-filter-grid input[type="date"] {
-    min-height: 44px;
-    padding: 0 6px;
-    font-size: .72rem;
-    text-align: center;
+  .app-shell .archive-filter-grid select {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 38px 0 13px;
+    border-radius: 13px;
+    font-size: .86rem;
+    line-height: 1.2;
+  }
+
+  /* iOS keeps date controls left-biased unless the internal edit box is centered too. */
+  .app-shell .archive-filter-grid input[type="date"] {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 46px;
+    height: 46px;
+    inline-size: 100% !important;
+    padding: 0 4px;
+    border-radius: 13px;
+    box-sizing: border-box !important;
+    font-size: .76rem;
+    line-height: 46px;
+    text-align: center !important;
+    text-align-last: center;
     -webkit-appearance: none;
     appearance: none;
+    overflow: hidden;
   }
 
-  .archive-filter-grid input[type="date"]::-webkit-date-and-time-value {
-    min-height: 1.2em;
-    margin: 0;
-    text-align: center;
+  .app-shell .archive-filter-grid input[type="date"]::-webkit-date-and-time-value {
+    width: 100%;
+    min-width: 0;
+    margin: 0 auto;
+    text-align: center !important;
   }
 
-  .archive-filter-grid input[type="date"]::-webkit-calendar-picker-indicator {
-    margin-left: 2px;
+  .app-shell .archive-filter-grid input[type="date"]::-webkit-datetime-edit {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     padding: 0;
+  }
+
+  .app-shell .archive-filter-grid input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+  }
+
+  .app-shell .archive-filter-grid input[type="date"]::-webkit-calendar-picker-indicator {
+    flex: 0 0 auto;
+    margin: 0 2px 0 0;
+    padding: 0;
+  }
+
+  /* Make the cloud action row read as one clean control group. */
+  .app-shell .archive-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1.18fr 1fr 1fr;
+    gap: 7px;
+  }
+
+  .app-shell .archive-toolbar-actions button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 6px;
+    border-radius: 13px;
+    gap: 4px;
+    white-space: nowrap;
+    font-size: .7rem;
+    line-height: 1;
+    letter-spacing: -.015em;
+  }
+
+  .app-shell .archive-toolbar-actions button:first-of-type {
+    background: rgba(255, 253, 250, .98);
+  }
+
+  .app-shell .archive-toolbar-actions button svg {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
   }
 }
