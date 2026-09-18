@@ -1,0 +1,51 @@
+name: Finalize Reunion Evidence V2
+
+on:
+  push:
+    branches: [feat/reunion-evidence-v2]
+    paths:
+      - 'scripts/finalize_reunion_evidence_v2.py'
+      - '.github/workflows/finalize-reunion-evidence-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/reunion-evidence-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply final fixes
+        run: python3 scripts/finalize_reunion_evidence_v2.py
+      - name: Evidence compiler
+        run: node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs
+      - name: Reunion V2 contract
+        run: node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+      - name: Relationship mode contract
+        run: node --test web/src/lib/relationshipModeContract.test.mjs
+      - name: Edge syntax
+        run: node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Production build
+        working-directory: web
+        run: npm run build
+      - name: Commit final product changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview/index.ts web/src/lib/readingCache.ts web/src/lib/relationshipModeContract.test.mjs web/src/lib/relationshipReunionV2.contract.test.mjs .github/workflows/interpretation-v3-ci.yml
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+          else
+            git commit -m 'Finalize reunion evidence v2 contracts'
+            git push origin HEAD:feat/reunion-evidence-v2
+          fi
