@@ -169,13 +169,16 @@ export function buildReunionEvidenceV2(packet: any) {
   }))
   const convergence = QUESTION_KEYS.flatMap(q => {
     const qrows = evidence.filter(e=>e.question===q)
-    const groups = [...new Set(qrows.map(e=>e.independence_group))]
-    return groups.length >= 2 ? [{question:q,independent_groups:groups,evidence_refs:qrows.slice(0,6).map(e=>e.id)}] : []
+    return (['support','counter'] as const).flatMap(role => {
+      const aligned = qrows.filter(e=>e.role===role)
+      const groups = [...new Set(aligned.map(e=>e.independence_group))]
+      return groups.length >= 2 ? [{question:q,role,independent_groups:groups,evidence_refs:aligned.filter(e=>groups.includes(e.independence_group)).slice(0,6).map(e=>e.id)}] : []
+    })
   })
   const coverage = {
     natal_synastry: evidence.some(e=>e.independence_group==='natal_synastry'),
     house_overlays: Boolean(house?.available), midpoint_composite:Boolean(adv?.composite?.available), davison:Boolean(adv?.davison?.available), marks:Boolean(adv?.marks?.available),
     progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Independent families may converge; derived duplicates are not additive probabilities.',coverage,questions,evidence:evidence.slice(0,36),convergence}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities.',coverage,questions,evidence:evidence.slice(0,36),convergence}
 }
