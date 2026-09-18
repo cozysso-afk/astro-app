@@ -1,0 +1,246 @@
+/* Reunion product pass: compact the paid reading, keep Saju relationship-specific,
+   and stop the whole mobile page from drifting horizontally. */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip !important;
+}
+
+.app-shell .tool-panel,
+.app-shell .results-wrap,
+.app-shell .relationship-experience,
+.app-shell .relationship-experience > *,
+.app-shell .relationship-experience .reading-section,
+.app-shell .relationship-experience .reading-explanation,
+.app-shell .relationship-experience .contact-row,
+.app-shell .relationship-experience .relationship-pattern,
+.app-shell .relationship-experience .system-lens {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell .relationship-experience {
+  width: 100% !important;
+  overflow-x: clip !important;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
+.app-shell .relationship-experience p,
+.app-shell .relationship-experience h3,
+.app-shell .relationship-experience h4,
+.app-shell .relationship-experience summary,
+.app-shell .relationship-experience small,
+.app-shell .relationship-experience span {
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.app-shell .relationship-experience pre {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+/* The mode chooser may scroll inside itself, but must never widen the page. */
+.app-shell .relationship-mode-row {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Paid reunion copy should read like an editorial answer, not a giant report. */
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-natural-reading {
+  display: grid;
+  gap: 16px;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-natural-reading > h3 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.46 !important;
+  letter-spacing: -0.025em !important;
+  font-weight: 760 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-natural-reading > .reading-conclusion {
+  margin: 0 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+  font-size: 16px !important;
+  line-height: 1.72 !important;
+  letter-spacing: -0.018em !important;
+  font-weight: 520 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .ai-generated-cost {
+  margin: -4px 0 0 !important;
+  padding: 9px 11px;
+  border-radius: 11px;
+  background: rgba(238, 232, 247, 0.62);
+  color: var(--reading-secondary);
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-snapshot {
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-snapshot h4,
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-block h4,
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-direction-copy h4 {
+  margin: 0 0 6px !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  font-weight: 760 !important;
+  color: var(--reading-indigo);
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-snapshot .reunion-initiative-summary {
+  margin: 0 0 10px !important;
+  font-size: 14.5px !important;
+  line-height: 1.68 !important;
+  letter-spacing: -0.012em !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-row {
+  padding: 12px 13px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-row p {
+  font-size: 13.5px !important;
+  line-height: 1.58 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-direction-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-direction-copy > section,
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-block {
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid var(--reading-border);
+  border-radius: 16px;
+  background: rgba(255, 253, 250, 0.74);
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-direction-copy p,
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-block p {
+  margin: 0 !important;
+  font-size: 14.5px !important;
+  line-height: 1.72 !important;
+  letter-spacing: -0.012em !important;
+  font-weight: 450 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-low-window {
+  margin-top: 10px !important;
+  padding-top: 10px;
+  border-top: 1px solid var(--reading-border);
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-low-window b {
+  display: inline-block;
+  margin-right: 7px;
+  color: #805743;
+  font-size: 12px;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-precision-note {
+  margin: -2px 0 0;
+  border-top: 1px solid var(--reading-border);
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-precision-note > summary {
+  min-height: 40px;
+  padding: 10px 0;
+  font-size: 12.5px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-precision-note > p {
+  margin: 0 0 8px !important;
+  color: var(--reading-secondary);
+  font-size: 13px !important;
+  line-height: 1.62 !important;
+}
+
+/* Calculated fallback remains useful, but it should not visually overpower the paid answer. */
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback {
+  margin-top: 2px;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback .reading-section > h3,
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback .relationship-pattern h4 {
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback .reading-conclusion,
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback .relationship-section-copy,
+.app-shell .relationship-experience[data-mode='reunion'] .relationship-calculated-fallback .reading-explanation > p {
+  font-size: 14px !important;
+  line-height: 1.68 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Reunion Saju is a relationship lens, not a generic career/money dictionary. */
+.app-shell .relationship-experience .relationship-saju-context {
+  display: grid;
+  gap: 10px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.app-shell .relationship-experience .relationship-saju-context > h3 {
+  margin: 0 0 2px !important;
+  font-size: 15.5px !important;
+}
+
+.app-shell .relationship-experience .relationship-saju-row {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid rgba(133, 101, 54, 0.13);
+  border-radius: 15px;
+  background: rgba(255, 248, 234, 0.58);
+}
+
+.app-shell .relationship-experience .relationship-saju-row h4 {
+  margin: 0 0 7px !important;
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+  color: #765d3f;
+}
+
+.app-shell .relationship-experience .relationship-saju-row p {
+  margin: 0 !important;
+  font-size: 13.5px !important;
+  line-height: 1.65 !important;
+}
+
+.app-shell .relationship-experience .relationship-saju-row .relationship-saju-action {
+  margin-top: 7px !important;
+  color: #655a52;
+}
+
+@media (min-width: 620px) {
+  .app-shell .relationship-experience[data-mode='reunion'] .reunion-ai-direction-copy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
