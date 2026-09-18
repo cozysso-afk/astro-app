@@ -27,7 +27,8 @@ function exactPacket(){return {
 
 test('maps every available relationship layer into question-first evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.0')
+  assert.equal(out.version,'reunion-evidence-v2.1-editorial-polish')
+  assert.match(out.policy,/do not re-explain the same aspect/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
   const rebuild=out.convergence.find(x=>x.question==='rebuild'&&x.role==='support')
