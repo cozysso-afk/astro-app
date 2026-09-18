@@ -7,6 +7,7 @@ const require=createRequire(new URL('../../../web/package.json',import.meta.url)
 const ts=require('typescript');
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 const helper={};vm.runInNewContext(compile(fs.readFileSync(new URL('./publicError.ts',import.meta.url),'utf8')),{exports:helper});
+const grounding={};vm.runInNewContext(compile(fs.readFileSync(new URL('./reunionGroundingV2.ts',import.meta.url),'utf8')),{exports:grounding});
 const source=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
 const canary='authorization: Bearer TEST_CANARY';
 const prose='합성 관계 근거와 설명입니다. '.repeat(40);
@@ -29,13 +30,26 @@ function harness(options={}) {
       Object.assign(rows[0],patch);return {data:{id:'synthetic-job'},error:null};
     }return q;
   }};
-  vm.runInNewContext(compile(source),{exports:{},require:id=>id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider()},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
+  vm.runInNewContext(compile(source),{exports:{},require:id=>id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id==='./reunionGroundingV2.ts'?grounding:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider()},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
   return {rows,writes,requests,get inserts(){return inserts},async run(purpose='compatibility'){const response=await handler(new Request('https://example.test/relationship',{method:'POST',headers:{authorization:'Bearer synthetic-session'},body:JSON.stringify({calculation:{result:{}},purpose})}));return {status:response.status,body:await response.json()}}};
 }
 function safe(value){assert(!JSON.stringify(value).includes('TEST_CANARY'));}
 for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married'])test(`${mode}: actual handler happy path and valid cache reuse`,async()=>{
   const h=harness();const first=await h.run(mode);assert.equal(first.body.ok,true);assert.equal(first.body.data.headline,fixture.headline);assert.equal(first.body.data.overview,prose.trim());assert.equal(first.body.usage.total_tokens,33);assert.equal(first.body.usage.attempt_count,1);assert.equal(h.writes[0].status,'done');
   const second=await h.run(mode);assert.equal(second.body.reused,true);assert.deepEqual(second.body.data,first.body.data);assert.equal(second.body.model,first.body.model);assert.equal(second.body.interpreter_version,first.body.interpreter_version);assert.equal(h.requests.length,1);
+});
+test('repairable reunion grounding defects are fixed locally without a second Gemini call',async()=>{
+  const repairable=structuredClone(fixture);
+  repairable.reunion_synthesis_v2.summary='짧은 요약';
+  repairable.reunion_synthesis_v2.why_reconnect.evidence_refs=['NOT_REAL'];
+  repairable.reunion_synthesis_v2.initiative.evidence_refs=[];
+  repairable.reunion_synthesis_v2.timing.evidence_refs=[];
+  repairable.reunion_synthesis_v2.timing.windows[0].evidence_refs=['NOPE'];
+  repairable.reunion_synthesis_v2.repeat_risks.evidence_refs=['BAD'];
+  const h=harness({fetch:()=>provider(repairable)}),r=await h.run('reunion');
+  assert.equal(r.body.ok,true);assert.equal(h.requests.length,1);assert.equal(r.body.usage.attempt_count,1);
+  assert(r.body.data.reunion_synthesis_v2.summary.length>=180);
+  const json=JSON.stringify(r.body.data.reunion_synthesis_v2);for(const bad of ['NOT_REAL','NOPE','BAD'])assert.equal(json.includes(bad),false);
 });
 test('generation exceptions produce fixed HTTP response and safe failed storage',async()=>{
   const h=harness({fetch:()=>{throw new Error(canary)}}),r=await h.run();assert.equal(r.body.error_code,'REL_GENERATION_FAILED');assert.equal(h.requests.length,2);assert.equal(h.writes[0].status,'failed');assert.equal(h.writes[0].error,r.body.error);safe(r);safe(h.writes);
@@ -52,7 +66,6 @@ test('invalid done cache rejects arbitrary outer objects without provider calls'
 });
 test('cached metadata and usage projection strip unknown nested diagnostics without changing prose',async()=>{
   const h=harness(),first=await h.run();
-  // Keywords in legitimate interpretation prose must not be generic-filtered.
   h.rows[0].result_json.data.overview='The word authorization appears in this interpretation.';
   h.rows[0].result_json.debug={authorization:canary};h.rows[0].result_json.data.debug={authorization:canary};
   for(const usage of [{...first.body.usage,debug:{authorization:canary}},[],canary,null]){
