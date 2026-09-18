@@ -30,7 +30,9 @@ test('maps every available relationship layer into question-first evidence',()=>
   assert.equal(out.version,'reunion-evidence-v2.0')
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
-  assert.ok(out.convergence.some(x=>x.question==='rebuild'))
+  const rebuild=out.convergence.find(x=>x.question==='rebuild'&&x.role==='support')
+  assert.ok(rebuild)
+  assert.ok(rebuild.independent_groups.length>=2)
 })
 
 test('does not invent exact-time layers when unavailable',()=>{
@@ -48,4 +50,16 @@ test('keeps conflicting natal evidence as counter evidence instead of averaging 
   const riskRefs=out.questions.repeat_risks.counter_refs
   assert.ok(riskRefs.length>0)
   assert.ok(out.evidence.some(e=>riskRefs.includes(e.id)&&e.aspect.includes('Mars square Uranus')))
+})
+
+test('convergence requires independent evidence aligned to the same role',()=>{
+  const p=exactPacket()
+  p.house_overlays={available:false}
+  p.advanced.composite={available:false}
+  p.reunion_secondary_support.months[0].dimensions.emotional_reactivation.evidence=[asp('Venus','square','Moon',.4,'challenging')]
+  const out=buildReunionEvidenceV2(p)
+  assert.ok(out.questions.why_reconnect.support_refs.length>0)
+  assert.ok(out.questions.why_reconnect.counter_refs.length>0)
+  assert.equal(out.convergence.some(x=>x.question==='why_reconnect'),false)
+  assert.equal(out.convergence.some(x=>x.question==='repeat_risks'),false)
 })
