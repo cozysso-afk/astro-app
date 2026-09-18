@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "alias": ["astro-app-web-ten.vercel.app"],
   "git": {
     "deploymentEnabled": {
       "*": false,
