@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildV23CorePrompt } from './promptV23.ts'
+import { buildPeriodNarrativeContext } from './periodNarrativeV23.ts'
 
 function payload(kind='week') {
   return {
@@ -63,4 +64,25 @@ test('V23 prompt explicitly blocks score narration from becoming the explanation
   const out = buildV23CorePrompt(payload('month'))
   assert.match(out.text, /점수·평균·변동폭을 설명 자체로 착각하지 마/)
   assert.match(out.text, /고정 조언문을 분야명만 바꿔 반복하지 마/)
+})
+
+test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {
+  const evidence = [
+    {
+      id: 'day-trigger', system: 'western', topic: '직업', scope: 'daily_actual', date: '2026-09-14',
+      direction: 'caution', text: 'Mars square Saturn',
+      observation: { transit: 'Mars', target: 'Saturn', aspect: 'square' },
+    },
+    ...['2026-09-14','2026-09-16','2026-09-18'].map((date,index)=>({
+      id: `week-pattern-${index+1}`, system: 'western', topic: '대인관계', scope: 'daily_actual', date,
+      direction: 'supportive', text: 'Jupiter trine Sun',
+      observation: { transit: 'Jupiter', target: 'Sun', aspect: 'trine' },
+    })),
+  ]
+  const day = buildPeriodNarrativeContext({period_kind:'day', evidence_ledger:evidence})
+  const week = buildPeriodNarrativeContext({period_kind:'week', evidence_ledger:evidence})
+  assert.match(day.phenomena[0].label, /Mars square Saturn/)
+  assert.match(week.phenomena[0].label, /Jupiter trine Sun/)
+  assert.match(buildV23CorePrompt(payload('day')).text, /오늘만의 촉발/)
+  assert.match(buildV23CorePrompt(payload('week')).text, /초반→중반→후반/)
 })

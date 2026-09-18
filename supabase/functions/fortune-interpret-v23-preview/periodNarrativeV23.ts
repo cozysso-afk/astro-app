@@ -1,4 +1,4 @@
-export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.0'
+export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.1-distinct-period-shapes'
 
 export type PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
@@ -48,6 +48,7 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
   sequence: string[]
   evidence_priority: string[]
   forbidden: string[]
+  distinctive_requirements: string[]
   granularity: string
 }> = {
   day: {
@@ -55,6 +56,11 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
     sequence: ['오늘의 촉발', '체감 방식', '시간대 또는 당일 전환', '즉시 행동', '오늘 확인할 현실 신호'],
     evidence_priority: ['intraday_evidence', 'intraday_window', 'daily_actual', 'dated direct evidence'],
     forbidden: ['주간·월간·연간 일반론', '기간 평균을 본문 중심으로 반복', '오늘 근거 없이 장기 추세를 확대'],
+    distinctive_requirements: [
+      '헤드라인과 첫 문단은 오늘만의 촉발 또는 당일 직접 근거를 중심으로 쓴다.',
+      '초반·중반·후반 같은 주간 구조를 만들지 않는다.',
+      '행동은 오늘 바로 확인하거나 조정할 수 있는 한 가지 구체 행동으로 끝낸다.',
+    ],
     granularity: 'hours-and-one-day',
   },
   week: {
@@ -62,6 +68,11 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
     sequence: ['이번 주 핵심 흐름', '초반', '중반', '후반', '전환점', '이번 주에 이어지는 행동'],
     evidence_priority: ['daily trajectory', 'dated direct evidence', 'repeated short pattern', 'period context'],
     forbidden: ['날짜별 독립 운세 나열', '월간·연간 구조적 결론', '같은 행동문구 반복'],
+    distinctive_requirements: [
+      '헤드라인은 특정 하루의 촉발보다 7일간의 이동·누적·전환을 요약한다.',
+      '가능하면 서로 다른 날짜 2개 이상을 연결해 초반→중반→후반의 변화를 설명한다.',
+      '오늘 운세처럼 즉시 행동 한 줄로 끝내지 말고 이번 주에 유지하거나 조정할 패턴을 제시한다.',
+    ],
     granularity: 'early-mid-late-week',
   },
   month: {
@@ -69,6 +80,10 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
     sequence: ['이번 달 큰 흐름', '월초', '중순', '월말', '반복되는 패턴', '일시적인 변화와 지속되는 변화', '현실적 우선순위'],
     evidence_priority: ['weekly or multi-day recurrence', 'month segments', 'dated direct evidence', 'period context'],
     forbidden: ['일일 시간창을 중심축으로 사용', '한 날짜만으로 월 전체를 대표', '주간 문구를 기간만 늘려 재사용'],
+    distinctive_requirements: [
+      '반복되는 패턴과 월중 방향 전환을 중심으로 쓰고 단일 하루의 분위기를 월 전체 결론으로 확대하지 않는다.',
+      '월초·중순·월말 가운데 실제 근거가 있는 구간만 연결한다.',
+    ],
     granularity: 'early-mid-late-month',
   },
   annual: {
@@ -76,6 +91,10 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
     sequence: ['올해의 구조적 테마', '1분기', '2분기', '3분기', '4분기', '장기 배경', '일시적 촉발', '올해의 우선순위'],
     evidence_priority: ['long-running transit context', 'monthly trajectory', 'quarter changes', 'dated peaks as supporting detail'],
     forbidden: ['좋은 날짜 TOP 목록을 본문 중심으로 사용', '일일 행동문구를 연간 조언으로 확대', '짧은 접촉을 연중 지속으로 추정'],
+    distinctive_requirements: [
+      '장기 배경과 분기별 전환을 먼저 설명하고 특정 하루는 보조 근거로만 쓴다.',
+      '연간 조언은 한 해 동안 반복해서 확인할 기준으로 작성한다.',
+    ],
     granularity: 'quarters-and-months',
   },
 }
@@ -166,11 +185,20 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
 function periodSpecificClusterScore(kind: PeriodKind, cluster: PhenomenonCluster): number {
   let score = cluster.salience
   if (kind === 'day') {
-    if (cluster.role === 'trigger') score += 16
-    if (cluster.distinct_dates > 2) score -= 5
+    // A day reading should be dominated by one-day triggers, not the same
+    // multi-day background that will also lead the weekly reading.
+    if (cluster.role === 'trigger') score += 28
+    if (cluster.distinct_dates === 1) score += 18
+    if (cluster.role === 'background') score -= 18
+    if (cluster.distinct_dates >= 3) score -= 22
   } else if (kind === 'week') {
-    if (cluster.distinct_dates >= 2 && cluster.distinct_dates <= 7) score += 10
-    if (cluster.role === 'tension') score += 4
+    // A week reading should prefer movement across several dates. A single-day
+    // trigger can still appear as a turning point, but it must not own the week.
+    if (cluster.distinct_dates >= 2 && cluster.distinct_dates <= 7) score += 18
+    if (cluster.role === 'background') score += 4
+    if (cluster.role === 'tension') score += 6
+    if (cluster.distinct_dates === 1) score -= 12
+    if (cluster.role === 'trigger' && cluster.distinct_dates <= 1) score -= 10
   } else if (kind === 'month') {
     if (cluster.distinct_dates >= 3) score += 12
     if (cluster.role === 'background') score += 7
@@ -202,6 +230,7 @@ export function buildPeriodNarrativeContext(payload: any) {
     required_sequence: contract.sequence,
     evidence_priority: contract.evidence_priority,
     forbidden_patterns: contract.forbidden,
+    distinctive_requirements: contract.distinctive_requirements,
     phenomena: selectNarrativePhenomena(payload),
     interpretation_policy: [
       '먼저 현상 묶음을 읽고 그 다음 어떤 분야에 나타나는지 설명한다.',
@@ -219,7 +248,7 @@ export function buildPeriodNarrativeInstruction(payload: any): string {
     `${i + 1}. ${p.label} | role=${p.role} | dates=${p.dates.join(',') || '-'} | topics=${p.topics.join(',') || '-'} | refs=${p.evidence_refs.join(',')}`
   ).join('\n') || '직접 현상 묶음 없음'
 
-  return `[PERIOD_NARRATIVE_V23]\n기간유형=${ctx.kind}\n목표=${ctx.objective}\n시간해상도=${ctx.granularity}\n\n[반드시 따를 서사 순서]\n${ctx.required_sequence.map((x, i) => `${i + 1}. ${x}`).join('\n')}\n\n[근거 우선순위]\n${ctx.evidence_priority.map(x => `- ${x}`).join('\n')}\n\n[금지]\n${ctx.forbidden_patterns.map(x => `- ${x}`).join('\n')}\n\n[핵심 현상 묶음]\n${phenomena}\n\n[해석 원칙]\n${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}\n\n중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
+  return `[PERIOD_NARRATIVE_V23]\n기간유형=${ctx.kind}\n목표=${ctx.objective}\n시간해상도=${ctx.granularity}\n\n[반드시 따를 서사 순서]\n${ctx.required_sequence.map((x, i) => `${i + 1}. ${x}`).join('\n')}\n\n[근거 우선순위]\n${ctx.evidence_priority.map(x => `- ${x}`).join('\n')}\n\n[기간 차별화 필수]\n${ctx.distinctive_requirements.map(x => `- ${x}`).join('\n')}\n\n[금지]\n${ctx.forbidden_patterns.map(x => `- ${x}`).join('\n')}\n\n[핵심 현상 묶음]\n${phenomena}\n\n[해석 원칙]\n${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}\n\n중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
 }
 
 function tokens(value: string): Set<string> {

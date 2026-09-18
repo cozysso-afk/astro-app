@@ -24,3 +24,29 @@
     word-break: keep-all !important;
   }
 }
+
+/* V59 · month/year long-form reading legibility
+ * Longer monthly and annual prose was still inheriting 13–14px body sizes.
+ * Scope the larger type to the integrated month/year reading only.
+ */
+@media (max-width: 600px) {
+  html body #root .app-shell .fortune-experience.period-month .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head .reading-hero-subtitle,
+  html body #root .app-shell .fortune-experience.period-year .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head .reading-hero-subtitle {
+    font-size: 16px !important;
+    line-height: 1.84 !important;
+  }
+
+  html body #root .app-shell .fortune-experience.period-month .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-user-focus .period-ai-topic p,
+  html body #root .app-shell .fortune-experience.period-year .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-user-focus .period-ai-topic p,
+  html body #root .app-shell .fortune-experience.period-month .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .reading-explanation > p,
+  html body #root .app-shell .fortune-experience.period-year .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .reading-explanation > p {
+    font-size: 15.5px !important;
+    line-height: 1.82 !important;
+  }
+}
