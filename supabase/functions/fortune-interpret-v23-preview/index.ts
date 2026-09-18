@@ -7,6 +7,7 @@ import { buildDeterministicTopicAnalysis, buildLocalQualityFallbackCore, stabili
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { buildV23CorePrompt, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
+import { exactV23JobKind } from "./cacheIdentityV23.ts";
 
 const VERSION="supabase-ai-v23.0-phenomenon-first";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -218,7 +219,7 @@ Deno.serve(async(req)=>{
   if(b?.action!=="start")return res(publicFortuneError("UNSUPPORTED_ACTION"),400);
   if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);
   if(!pb.ok)return res(publicFortuneError("PROMPT_BUDGET_EXCEEDED",undefined,{cost_guard_blocked:true}),413);
-  const hash=await payloadHash(payload);const kind=`${VERSION}:${hash.slice(0,32)}`;const a=admin();const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
+  const hash=await payloadHash(payload);const kind=exactV23JobKind(VERSION,payload,hash);const a=admin();const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
   const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,result_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
   if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
   const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();

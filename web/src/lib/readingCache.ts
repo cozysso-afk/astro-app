@@ -17,6 +17,7 @@ const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
 const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v1'
+const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v2'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
 
@@ -116,9 +117,13 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const saju = calculation.saju && typeof calculation.saju === 'object' ? calculation.saju as Record<string, unknown> : {}
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
   const precision = fortuneAiPrecisionReadiness(calculation)
+  const periodKind = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()
+  const narrativeContract = periodKind === 'day' || periodKind === 'week'
+    ? FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT
+    : FORTUNE_NARRATIVE_CACHE_CONTRACT
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
-    narrative_contract: FORTUNE_NARRATIVE_CACHE_CONTRACT,
+    narrative_contract: narrativeContract,
     precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
     ...fortuneProvisionalSynthesisSignature(precision.ok ? precision.mode : 'invalid'),
     precision: calculation.precision ?? null,
