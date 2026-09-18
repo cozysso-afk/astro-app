@@ -44,6 +44,11 @@ test('prototype-looking codes are not inherited public messages; harmless legacy
   }
   for(const error of ['관계 AI 해설 시간이 초과됐어.','인증이 필요해.','relationship request failed','cookie parsing failed','ordinary malformed %ZZ text'])assert.equal(boundary.relationshipAiPublicErrorMessage({error}),error)
 })
+test('relationship cost guard subtypes are not mislabeled as the generic cost cap',()=>{
+  assert.equal(boundary.relationshipAiPublicErrorMessage({error_code:'REL_COST_GUARD_BLOCKED',inflight:true}),'같은 관계 해설을 이미 생성 중이야. 완료까지 잠시 기다린 뒤 다시 눌러줘.')
+  assert.equal(boundary.relationshipAiPublicErrorMessage({error_code:'REL_COST_GUARD_BLOCKED',prompt_budget:true}),'이번 관계 데이터가 커서 1회 작업 안전 한도를 넘었어. 계산 범위를 줄여 다시 시도해줘.')
+  assert.equal(boundary.relationshipAiPublicErrorMessage({error_code:'REL_COST_GUARD_BLOCKED',rolling_job_guard:true}),'짧은 시간에 새 관계 해설 요청이 많아 보호 한도에 걸렸어. 잠시 뒤 다시 시도해줘.')
+})
 test('additional double encoding, invalid UTF and Cf combinations are unsafe',()=>{
   for(const s of ['https://example.test/#access_token=TEST_CANARY','upstream;client_secret=TEST_CANARY','%FF%61%70%69%6b%65%79%3DTEST_CANARY','%ZZclient_\u200bsecret%3DTEST_CANARY']){
     for(const value of [s,encodeURIComponent(s)])assert.equal(boundary.relationshipAiPublicErrorMessage({error:value}),boundary.RELATIONSHIP_ERROR_FALLBACK)

@@ -1,0 +1,43 @@
+@media (max-width: 420px) {
+  .archive-search-panel {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .archive-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 8px;
+  }
+
+  .archive-search-fortune .archive-filter-grid label:nth-child(1),
+  .archive-search-fortune .archive-filter-grid label:nth-child(2),
+  .archive-search-verification .archive-filter-grid label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .archive-filter-grid select {
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: .8rem;
+  }
+
+  .archive-filter-grid input[type="date"] {
+    min-height: 44px;
+    padding: 0 6px;
+    font-size: .72rem;
+    text-align: center;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .archive-filter-grid input[type="date"]::-webkit-date-and-time-value {
+    min-height: 1.2em;
+    margin: 0;
+    text-align: center;
+  }
+
+  .archive-filter-grid input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-left: 2px;
+    padding: 0;
+  }
+}

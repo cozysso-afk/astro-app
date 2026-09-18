@@ -75,11 +75,15 @@ function safeLegacyMessage(value: unknown) {
   return text && !relationshipAiErrorLooksUnsafe(text) ? text : ''
 }
 
-
 export function relationshipAiPublicErrorMessage(value:unknown) {
   const r=recordFromUnknown(value)
   if(!r)return RELATIONSHIP_ERROR_FALLBACK
   const code=typeof r.error_code==='string'?r.error_code:''
+  if(code==='REL_COST_GUARD_BLOCKED') {
+    if(r.inflight===true) return '같은 관계 해설을 이미 생성 중이야. 완료까지 잠시 기다린 뒤 다시 눌러줘.'
+    if(r.prompt_budget===true) return '이번 관계 데이터가 커서 1회 작업 안전 한도를 넘었어. 계산 범위를 줄여 다시 시도해줘.'
+    if(r.rolling_job_guard===true) return '짧은 시간에 새 관계 해설 요청이 많아 보호 한도에 걸렸어. 잠시 뒤 다시 시도해줘.'
+  }
   if(Object.prototype.hasOwnProperty.call(PUBLIC_MESSAGES,code))return PUBLIC_MESSAGES[code]
   return safeLegacyMessage(r.error)||RELATIONSHIP_ERROR_FALLBACK
 }
