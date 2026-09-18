@@ -30,6 +30,9 @@ jobs:
       - name: Apply provisional entered-time patch
         run: python scripts/patch_provisional_relationship_time_v1.py
 
+      - name: Align relationship engine version regression
+        run: sed -i 's/relationship-western-v1.11-reunion-dimensions/relationship-western-v1.12-provisional-entered-time/g' tests/test_reunion_dimensions_v14.py
+
       - name: Install calculation test dependencies
         run: python -m pip install -q -r api/requirements.txt pytest httpx
 
@@ -70,6 +73,7 @@ jobs:
             relationship_western_v1.py \
             tests/test_birth_time_reliability_v12.py \
             tests/test_relationship_reliability_v13.py \
+            tests/test_reunion_dimensions_v14.py \
             web/src/AppNext.tsx \
             web/src/lib/relationshipUserSummary.ts \
             web/src/lib/readingExperience.test.mjs \
