@@ -32,9 +32,9 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
   assert.match(edge, /secondaryDimensionPacket/)
 })
 
-test('relationship interpretation cache versions track the provisional-time evidence contracts', () => {
+test('relationship interpretation cache versions track the provisional-time and editorial evidence contracts', () => {
   assert.match(edge, /VERSION="relationship-v11\.8-provisional-time-reference"/)
   assert.match(edge, /REUNION_VERSION="relationship-v11\.10-provisional-time-reference"/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.10-provisional-time-reference'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.10-editorial-polish-v1'/)
 })
