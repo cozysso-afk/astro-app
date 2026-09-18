@@ -6,6 +6,7 @@ const server=readFileSync(new URL('../../../supabase/functions/relationship-inte
 const publicError=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
+const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
   assert.match(server,/REUNION_VERSION="relationship-v11\.9-evidence-grounding-repair"/)
@@ -33,4 +34,24 @@ test('web prefers v2 question flow while retaining old reunion fallback',()=>{
   assert.match(panel,/다시 붙었을 때 관계 구조/)
   assert.match(panel,/다시 깨뜨릴 수 있는 반복 패턴/)
   assert.match(panel,/reunion && reunionAi/)
+})
+
+test('reunion reading breaks long prose and exposes calculated day highlights',()=>{
+  assert.match(panel,/function ReadableCopy/)
+  assert.match(panel,/reunion-readable-copy/)
+  assert.match(panel,/timing\.reconnection/)
+  assert.match(panel,/timing\.incoming/)
+  assert.match(panel,/timing\.outgoing/)
+  assert.match(panel,/best_days/)
+  assert.match(panel,/날짜로 좁혀 보면/)
+  assert.match(panel,/실제 연락·재회 확률이 아니라/)
+  assert.match(reunionCss,/\.reunion-v2-window/)
+  assert.match(reunionCss,/\.reunion-date-focus-list/)
+})
+
+test('archive filter guards iOS date controls from widening the page',()=>{
+  assert.match(reunionCss,/\.archive-filter-grid input\[type='date'\]/)
+  assert.match(reunionCss,/max-inline-size:\s*100%\s*!important/)
+  assert.match(reunionCss,/@media \(max-width: 480px\)/)
+  assert.match(reunionCss,/\.archive-filter-grid\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)\s*!important/)
 })
