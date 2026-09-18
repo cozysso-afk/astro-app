@@ -7,9 +7,146 @@ type RepairResult = {
   reason?: string
 }
 
+type DedupState = {
+  sentences: Set<string>
+  evidence: Set<string>
+}
+
 const arr = (v: unknown): any[] => Array.isArray(v) ? v : []
 const text = (v: unknown) => String(v ?? '').trim()
 const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))]
+
+const PLANET_TERMS: Array<[string,string]> = [
+  ['True Node','진북교점'], ['Mercury','수성'], ['Venus','금성'], ['Jupiter','목성'], ['Saturn','토성'],
+  ['Uranus','천왕성'], ['Neptune','해왕성'], ['Pluto','명왕성'], ['Mars','화성'], ['Moon','달'], ['Sun','태양'],
+  ['ASC','상승점'], ['DSC','하강점'], ['MC','중천점'], ['IC','천저점'],
+]
+const ASPECT_TERMS: Array<[string,string]> = [
+  ['conjunction','합'], ['sextile','육십분위'], ['square','사각'], ['trine','삼각'], ['quincunx','퀸컨스'], ['opposition','대립'],
+]
+const BODY_KO = PLANET_TERMS.map(([,ko]) => ko)
+const ASPECT_KO = ASPECT_TERMS.map(([,ko]) => ko)
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeDegreePrecision(value: string) {
+  return value.replace(/(\d+\.\d{2,})\s*°/g, (_m, raw) => {
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return `${raw}°`
+    if (n >= 0 && n < 0.05) return '0.1° 미만'
+    return `${n.toFixed(1)}°`
+  })
+}
+
+export function polishReunionNarrativeText(value: unknown, provisional = false) {
+  let out = text(value)
+  if (!out) return ''
+
+  out = out
+    .replace(/\bSecondary\s+Progression(?:\(2차 진행\))?/gi, '2차 진행')
+    .replace(/\bDaily\s+transit(?:\(트랜짓·현재 행성 이동\))?/gi, '일일 트랜짓')
+    .replace(/\bprogressed\s+synastry(?:\(시너스트리·궁합차트\))?/gi, '진행 시너스트리')
+    .replace(/\bprogressed\s+composite\b/gi, '진행 컴포지트')
+    .replace(/\bsynastry(?:\(시너스트리·궁합차트\))?/gi, '시너스트리')
+    .replace(/\btransit(?:\(트랜짓·현재 행성 이동\))?/gi, '트랜짓')
+    .replace(/\bDavison(?:\(데이비슨\))?/g, '데이비슨')
+    .replace(/\bMarks(?:\(마크스\))?/g, '마크스')
+    .replace(/\bprovisional(?:\(잠정\))?/gi, '잠정')
+
+  for (const [en, ko] of PLANET_TERMS) {
+    const e = escapeRegExp(en), k = escapeRegExp(ko)
+    out = out.replace(new RegExp(`\\bProgressed\\s+${e}(?:\\(${k}\\))?`, 'gi'), `진행 ${ko}`)
+    out = out.replace(new RegExp(`\\b${e}(?:\\(${k}\\))?`, 'g'), ko)
+  }
+  for (const [en, ko] of ASPECT_TERMS) {
+    const e = escapeRegExp(en), k = escapeRegExp(ko)
+    out = out.replace(new RegExp(`\\b${e}(?:\\(${k}(?:·150도각)?\\))?`, 'gi'), ko)
+  }
+
+  out = out
+    .replace(/\bProgressed\b/gi, '진행')
+    .replace(/\borb\b/gi, '오브')
+    .replace(/\bincoming\b/gi, '상대→나')
+    .replace(/\boutgoing\b/gi, '나→상대')
+    .replace(/\breconnection\b/gi, '재접점')
+
+  out = normalizeDegreePrecision(out)
+  out = out
+    .replace(/(?:오차|오브)\s*0\.1° 미만(?:\s*수준)?의?\s*(?:극도로\s*)?정밀한/g, '아주 가까운')
+    .replace(/극도로\s*정밀한/g, '매우 가까운')
+
+  if (provisional) {
+    out = out
+      .replace(/정확한\s+(합|육십분위|사각|삼각|퀸컨스|대립)/g, '가까운 $1')
+      .replace(/정밀한\s+(합|육십분위|사각|삼각|퀸컨스|대립)/g, '가까운 $1')
+  }
+
+  return out
+    .replace(/\s+([,.!?])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+function splitSentences(value: string) {
+  const t = text(value)
+  if (!t) return []
+  return t.replace(/([.!?])\s+/g, '$1\n').split('\n').map(x => x.trim()).filter(Boolean)
+}
+
+function sentenceFingerprint(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\d+(?:\.\d+)?/g, '#')
+    .replace(/[°·,:;()\[\]{}'"“”‘’/\\\-–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function aspectToken(value: string) {
+  for (const term of ASPECT_KO) {
+    if (term !== '합' && value.includes(term)) return term
+  }
+  return /합(?:을|를|이|가|의|으로|과|과의|$|[\s,.!?])/.test(value) ? '합' : ''
+}
+
+function evidenceFingerprint(value: string) {
+  const bodies = uniq(BODY_KO.filter(term => value.includes(term))).sort()
+  const aspect = aspectToken(value)
+  const technical = Boolean(aspect) || value.includes('오브') || value.includes('°') || value.includes('조화각') || value.includes('긴장각')
+  if (bodies.length < 2 || !technical) return ''
+  return `${bodies.join('+')}|${aspect || '각'}`
+}
+
+function dedupeNarrative(value: unknown, state: DedupState, provisional: boolean, trackEvidence = true) {
+  const polished = polishReunionNarrativeText(value, provisional)
+  const sentences = splitSentences(polished)
+  if (sentences.length <= 1) {
+    const only = sentences[0] ?? polished
+    const fp = sentenceFingerprint(only)
+    const ev = trackEvidence ? evidenceFingerprint(only) : ''
+    if (fp) state.sentences.add(fp)
+    if (ev) state.evidence.add(ev)
+    return only
+  }
+
+  const kept: string[] = []
+  const candidates = sentences.map(sentence => {
+    const fp = sentenceFingerprint(sentence)
+    const ev = trackEvidence ? evidenceFingerprint(sentence) : ''
+    const duplicate = (fp && state.sentences.has(fp)) || (ev && state.evidence.has(ev))
+    return { sentence, fp, ev, duplicate }
+  })
+
+  for (const row of candidates) if (!row.duplicate) kept.push(row.sentence)
+  const finalRows = kept.length ? candidates.filter(row => kept.includes(row.sentence)) : candidates.slice(0,1)
+  for (const row of finalRows) {
+    if (row.fp) state.sentences.add(row.fp)
+    if (row.ev) state.evidence.add(row.ev)
+  }
+  return finalRows.map(row => row.sentence).join(' ')
+}
 
 function validSet(payload: any) {
   return new Set(arr(payload?.reunion_evidence_v2?.evidence).map((x: any) => text(x?.id)).filter(Boolean))
@@ -31,20 +168,63 @@ function hasCoreText(v: any) {
 }
 
 function composeSummary(v2: any) {
-  const parts = uniq([
-    text(v2?.summary),
+  const primary = uniq([
     text(v2?.why_reconnect?.conclusion),
     text(v2?.initiative?.conclusion),
     text(v2?.timing?.conclusion),
     text(v2?.rebuild?.conclusion),
     text(v2?.repeat_risks?.conclusion),
-    text(v2?.why_reconnect?.interpretation),
-    text(v2?.initiative?.interpretation),
-    ...arr(v2?.timing?.windows).map((x: any) => text(x?.meaning)),
-    ...arr(v2?.rebuild?.conditions).map(text),
-    ...arr(v2?.repeat_risks?.patterns).map(text),
+    ...arr(v2?.timing?.windows).slice(0,2).map((x: any) => text(x?.meaning)),
   ])
-  return parts.join(' ').slice(0, 3200)
+  let result = primary.join(' ')
+  if (result.length < 180) {
+    const backup = uniq([
+      text(v2?.why_reconnect?.interpretation),
+      text(v2?.initiative?.interpretation),
+      ...arr(v2?.rebuild?.conditions).slice(0,2).map(text),
+      ...arr(v2?.repeat_risks?.patterns).slice(0,2).map(text),
+    ])
+    for (const part of backup) {
+      if (!part || result.includes(part)) continue
+      result = `${result} ${part}`.trim()
+      if (result.length >= 180) break
+    }
+  }
+  return result.slice(0, 3200)
+}
+
+function polishV2(v2: any, provisional: boolean) {
+  const state: DedupState = { sentences: new Set(), evidence: new Set() }
+  const whyConclusion = dedupeNarrative(v2?.why_reconnect?.conclusion, state, provisional, false)
+  const whyInterpretation = dedupeNarrative(v2?.why_reconnect?.interpretation, state, provisional, true)
+  const initiativeConclusion = dedupeNarrative(v2?.initiative?.conclusion, state, provisional, false)
+  const initiativeInterpretation = dedupeNarrative(v2?.initiative?.interpretation, state, provisional, true)
+  const timingConclusion = dedupeNarrative(v2?.timing?.conclusion, state, provisional, false)
+  const timingWindows = arr(v2?.timing?.windows).map((w: any) => ({
+    ...w,
+    period: text(w?.period),
+    meaning: dedupeNarrative(w?.meaning, state, provisional, true),
+  }))
+  const rebuildConclusion = dedupeNarrative(v2?.rebuild?.conclusion, state, provisional, false)
+  const rebuildConditions = arr(v2?.rebuild?.conditions).map((x: any) => dedupeNarrative(x, state, provisional, true)).filter(Boolean)
+  const repeatConclusion = dedupeNarrative(v2?.repeat_risks?.conclusion, state, provisional, false)
+  const repeatPatterns = arr(v2?.repeat_risks?.patterns).map((x: any) => dedupeNarrative(x, state, provisional, true)).filter(Boolean)
+
+  return {
+    ...v2,
+    summary: polishReunionNarrativeText(v2?.summary, provisional),
+    why_reconnect: { ...v2.why_reconnect, conclusion: whyConclusion, interpretation: whyInterpretation },
+    initiative: { ...v2.initiative, conclusion: initiativeConclusion, interpretation: initiativeInterpretation },
+    timing: { ...v2.timing, conclusion: timingConclusion, windows: timingWindows },
+    rebuild: { ...v2.rebuild, conclusion: rebuildConclusion, conditions: uniq(rebuildConditions) },
+    repeat_risks: { ...v2.repeat_risks, conclusion: repeatConclusion, patterns: uniq(repeatPatterns) },
+    convergence: arr(v2?.convergence).map((x: any) => ({
+      ...x,
+      theme: polishReunionNarrativeText(x?.theme, provisional),
+      meaning: polishReunionNarrativeText(x?.meaning, provisional),
+    })),
+    precision_note: polishReunionNarrativeText(v2?.precision_note, provisional),
+  }
 }
 
 export function repairReunionGroundingV2(data: any, payload: any): RepairResult {
@@ -69,8 +249,8 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     repeat_risks: fallbackRefs(payload, 'repeat_risks', valid),
   }
 
-  const before = JSON.stringify(source)
-  const v2: any = {
+  const before = JSON.stringify(data)
+  let v2: any = {
     ...source,
     why_reconnect: { ...source.why_reconnect, evidence_refs: normalizeRefs(source?.why_reconnect?.evidence_refs, fallbacks.why_reconnect, valid) },
     initiative: { ...source.initiative, evidence_refs: normalizeRefs(source?.initiative?.evidence_refs, fallbacks.initiative, valid) },
@@ -91,6 +271,8 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
   }
 
   if (text(v2.summary).length < 180) v2.summary = composeSummary(v2)
+  const provisional = payload?.precision?.partner_time_exact === false
+  v2 = polishV2(v2, provisional)
 
   const allRefs = uniq([
     ...arr(v2?.why_reconnect?.evidence_refs),
@@ -104,6 +286,20 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     return { ok: false, repaired: false, data, reason: 'insufficient_grounded_content' }
   }
 
-  const next = { ...data, reunion_synthesis_v2: v2 }
-  return { ok: true, repaired: before !== JSON.stringify(v2), data: next }
+  const next = {
+    ...data,
+    headline: polishReunionNarrativeText(data?.headline, provisional),
+    overview: polishReunionNarrativeText(data?.overview, provisional),
+    timing: polishReunionNarrativeText(data?.timing, provisional),
+    reunion_context: polishReunionNarrativeText(data?.reunion_context, provisional),
+    practical_advice: arr(data?.practical_advice).map((x: any) => polishReunionNarrativeText(x, provisional)),
+    top_aspects: arr(data?.top_aspects).map((x: any) => ({
+      ...x,
+      label: polishReunionNarrativeText(x?.label, provisional),
+      meaning: polishReunionNarrativeText(x?.meaning, provisional),
+    })),
+    limits: polishReunionNarrativeText(data?.limits, provisional),
+    reunion_synthesis_v2: v2,
+  }
+  return { ok: true, repaired: before !== JSON.stringify(next), data: next }
 }

@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.0'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.1-editorial-polish'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -180,5 +180,5 @@ export function buildReunionEvidenceV2(packet: any) {
     house_overlays: Boolean(house?.available), midpoint_composite:Boolean(adv?.composite?.available), davison:Boolean(adv?.davison?.available), marks:Boolean(adv?.marks?.available),
     progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities.',coverage,questions,evidence:evidence.slice(0,36),convergence}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision no finer than 0.1°.',coverage,questions,evidence:evidence.slice(0,36),convergence}
 }
