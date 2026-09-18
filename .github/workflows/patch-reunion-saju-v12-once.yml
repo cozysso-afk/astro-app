@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '22'
       - name: Apply product patch
-        run: python scripts/patch_reunion_saju_v12.py
+        run: python scripts/run_patch_reunion_saju_v12.py
       - name: Install web dependencies
         working-directory: web
         run: npm ci
