@@ -27,7 +27,7 @@ function normalizeRefs(current: unknown, fallback: string[], valid: Set<string>,
 }
 
 function hasCoreText(v: any) {
-  return text(v?.conclusion).length >= 24 && text(v?.interpretation).length >= 36
+  return text(v?.conclusion).length >= 12 && text(v?.interpretation).length >= 24
 }
 
 function composeSummary(v2: any) {
@@ -39,6 +39,10 @@ function composeSummary(v2: any) {
     text(v2?.rebuild?.conclusion),
     text(v2?.repeat_risks?.conclusion),
     text(v2?.why_reconnect?.interpretation),
+    text(v2?.initiative?.interpretation),
+    ...arr(v2?.timing?.windows).map((x: any) => text(x?.meaning)),
+    ...arr(v2?.rebuild?.conditions).map(text),
+    ...arr(v2?.repeat_risks?.patterns).map(text),
   ])
   return parts.join(' ').slice(0, 3200)
 }
@@ -53,7 +57,7 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
   if (!hasCoreText(source?.why_reconnect) || !hasCoreText(source?.initiative)) {
     return { ok: false, repaired: false, data, reason: 'missing_core_section_text' }
   }
-  if (text(source?.timing?.conclusion).length < 24 || text(source?.rebuild?.conclusion).length < 24 || text(source?.repeat_risks?.conclusion).length < 24) {
+  if (text(source?.timing?.conclusion).length < 12 || text(source?.rebuild?.conclusion).length < 12 || text(source?.repeat_risks?.conclusion).length < 12) {
     return { ok: false, repaired: false, data, reason: 'missing_core_conclusion' }
   }
 
