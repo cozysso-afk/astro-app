@@ -80,28 +80,33 @@ p.write_text(text.rstrip() + append, encoding='utf-8')
 # 4) Regression: day and week must prioritize different phenomenon shapes.
 p = Path('supabase/functions/fortune-interpret-v23-preview/promptV23.test.mjs')
 text = p.read_text(encoding='utf-8')
+import_line = "import { buildPeriodNarrativeContext } from './periodNarrativeV23.ts'\n"
+if import_line not in text:
+    marker = "import { buildV23CorePrompt } from './promptV23.ts'\n"
+    if marker not in text:
+        raise SystemExit('V23 prompt test import marker missing')
+    text = text.replace(marker, marker + import_line, 1)
 append = r'''
 
 test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {
-  const base = payload('week')
-  base.evidence_ledger = [
+  const evidence = [
     {
-      id: 'W:daily:직업:1', system: 'western', topic: '직업', scope: 'daily_actual', date: '2026-09-14',
+      id: 'day-trigger', system: 'western', topic: '직업', scope: 'daily_actual', date: '2026-09-14',
       direction: 'caution', text: 'Mars square Saturn',
       observation: { transit: 'Mars', target: 'Saturn', aspect: 'square' },
     },
     ...['2026-09-14','2026-09-16','2026-09-18'].map((date,index)=>({
-      id: `W:daily:대인관계:${index+2}`, system: 'western', topic: '대인관계', scope: 'daily_actual', date,
+      id: `week-pattern-${index+1}`, system: 'western', topic: '대인관계', scope: 'daily_actual', date,
       direction: 'supportive', text: 'Jupiter trine Sun',
       observation: { transit: 'Jupiter', target: 'Sun', aspect: 'trine' },
     })),
   ]
-  const day = buildV23CorePrompt({...base,period_kind:'day'})
-  const week = buildV23CorePrompt({...base,period_kind:'week'})
-  assert.match(day.packet.period_narrative.phenomena[0].label, /Mars square Saturn/)
-  assert.match(week.packet.period_narrative.phenomena[0].label, /Jupiter trine Sun/)
-  assert.match(day.text, /오늘만의 촉발/)
-  assert.match(week.text, /초반→중반→후반/)
+  const day = buildPeriodNarrativeContext({period_kind:'day', evidence_ledger:evidence})
+  const week = buildPeriodNarrativeContext({period_kind:'week', evidence_ledger:evidence})
+  assert.match(day.phenomena[0].label, /Mars square Saturn/)
+  assert.match(week.phenomena[0].label, /Jupiter trine Sun/)
+  assert.match(buildV23CorePrompt(payload('day')).text, /오늘만의 촉발/)
+  assert.match(buildV23CorePrompt(payload('week')).text, /초반→중반→후반/)
 })
 '''
 if 'day prioritizes a one-day trigger while week prioritizes a multi-day pattern' in text:
