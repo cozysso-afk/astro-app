@@ -1,0 +1,78 @@
+/* Redline pass v55 — iOS archive date controls + reunion card rhythm.
+   Imported last so it can safely override the older mobile density layers. */
+
+/* iOS Safari can preserve an intrinsic width on date inputs even inside a 1fr grid.
+   Keep the control inside the same left/right inset as the other archive fields. */
+.app-shell .archive-search-panel,
+.app-shell .archive-filter-grid,
+.app-shell .archive-filter-grid > label {
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell .archive-filter-grid,
+.app-shell .archive-filter-grid > label {
+  overflow: hidden;
+}
+
+.app-shell .archive-filter-grid input[type='date'] {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  inline-size: 100% !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  box-sizing: border-box !important;
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+}
+
+.app-shell .archive-filter-grid input[type='date']::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+@media (max-width: 480px) {
+  .app-shell .archive-filter-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* The redlined reunion block felt vertically loose: tighten the title-to-card gap,
+   row padding, and the date footer without making the cards cramped. */
+.app-shell .relationship-experience[data-mode='reunion'] {
+  gap: 20px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .reading-section > h3 {
+  margin-bottom: 9px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-directions,
+.app-shell .relationship-experience[data-mode='reunion'] .period-ai-relationship-directions {
+  gap: 8px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-row,
+.app-shell .relationship-experience[data-mode='reunion'] .period-ai-direction-item {
+  padding: 10px 13px 9px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-row p,
+.app-shell .relationship-experience[data-mode='reunion'] .period-ai-direction-item p {
+  margin-top: 5px !important;
+}
+
+.app-shell .relationship-experience[data-mode='reunion'] .contact-timing {
+  margin-top: 5px !important;
+  line-height: 1.35 !important;
+}
+
+/* Keep the next section visually separate after compacting the direction cards. */
+.app-shell .relationship-experience[data-mode='reunion'] .reading-section + .reading-section {
+  margin-top: 0 !important;
+}
