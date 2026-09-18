@@ -72,6 +72,7 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/provisionalV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/routingV23.test.mjs
           node --test supabase/functions/fortune-interpret-v23-preview/deliveryPolicyV23.test.mjs
+          node --test supabase/functions/relationship-interpret-v9-preview/reunionBudgetV11.test.mjs
           node --experimental-strip-types --check supabase/functions/fortune-interpret-v22-preview/index.ts
           node --experimental-strip-types --check supabase/functions/fortune-interpret-v23-preview/index.ts
           node --experimental-strip-types --test web/src/lib/precisionTransport.test.mjs
@@ -80,6 +81,8 @@ jobs:
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
           node --experimental-strip-types --test web/src/lib/basicFortuneReading.test.mjs
           node --test web/src/lib/sajuTechnicalDisclosure.test.mjs
+          node --test web/src/lib/sajuTopicAvailabilityV57.test.mjs
+          node --test web/src/lib/reunionDirectUxV57.test.mjs
           node --test web/src/lib/compatibilityCta.ui-contract.test.mjs
           node --test web/src/lib/westernReadingUx.test.mjs
           node --test web/src/lib/reunionLocationMobile.test.mjs
