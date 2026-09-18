@@ -1,5 +1,5 @@
 /* Archive mobile owner v59.
-   Loaded last on purpose: this file owns the final iPhone archive layout. */
+   Loaded near the end with deliberately high specificity so it owns the iPhone archive layout while the scoped reading-font owner can remain last. */
 @media (max-width: 420px) {
   html body #root .app-shell .archive-search-panel {
     gap: 13px !important;
