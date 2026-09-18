@@ -20,6 +20,7 @@ const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v1'
 const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v3'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.7-reunion-specific'
+const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11.8-evidence-v2'
 
 function normalizedFortunePeriodKind(request: Record<string, unknown>, calculation: Record<string, unknown>, period: Record<string, unknown>): string {
   const raw = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()
@@ -156,5 +157,6 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
 }
 
 export function relationshipAiCacheId(calculation: Record<string, unknown>, purpose: string, model: string, context?: unknown): string {
-  return `relationship-ai:${hashText(stableStringify({ contract: RELATIONSHIP_AI_CACHE_CONTRACT, model, purpose, calculation, context: context ?? null }))}`
+  const contract = purpose === 'reunion' ? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT
+  return `relationship-ai:${hashText(stableStringify({ contract, model, purpose, calculation, context: context ?? null }))}`
 }

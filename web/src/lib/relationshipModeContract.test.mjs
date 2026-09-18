@@ -49,7 +49,10 @@ test('personal marriage preserves computed data with non-prophetic creative pres
 
 test('relationship AI keeps compatibility reunion unmarried-partner and married semantics separate', () => {
   assert.match(relationshipFn, /type Purpose="compatibility"\|"reunion"\|"marriage_unmarried"\|"marriage_married"/)
-  assert.match(relationshipFn, /수신\/발신\/재접점을 분리/)
+  assert.match(relationshipFn, /CALCULATED_DATA\.reunion_evidence_v2/)
+  assert.match(relationshipFn, /왜 다시 연결될 여지가 있는가/)
+  assert.match(relationshipFn, /같은 파생계열 반복은 수렴 근거로 세지 않는다/)
+  assert.match(relationshipFn, /reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(relationshipFn, /특정 상대가 있는 미혼 결혼궁합/)
   assert.match(relationshipFn, /공식화될 가능성/)
   assert.match(relationshipFn, /프러포즈·약혼·결혼 결정/)
@@ -88,7 +91,8 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.7-reunion-specific'/)
-  assert.match(cache, /contract: RELATIONSHIP_AI_CACHE_CONTRACT/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.8-evidence-v2'/)
+  assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
 
