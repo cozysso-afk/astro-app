@@ -110,7 +110,10 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
    transit_triggers:trans?{period:trans?.period,policy:trans?.policy,top_days:transitDays,top_months:transitMonths}:null,
    limitations:Array.isArray(r?.limitations)?r.limitations.slice(0,8):[]
  });
- if(purpose==="reunion")base.reunion_evidence_v2=buildReunionEvidenceV2(base);
+ if(purpose==="reunion"){
+   const reunion_evidence_v2=buildReunionEvidenceV2(base);
+   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_evidence_v2,limitations:base.limitations};
+ }
  return base;
 }
 function selectPromptPacket(calc:any,ctx:any,purpose:Purpose){let originalBytes=0,last:any=null;for(let level=0;level<=2;level++){const payload=compact(calc,ctx,purpose,level);const budget=promptBudget(payload,purpose);if(level===0)originalBytes=budget.bytes;last={payload,budget,compression_level:level,original_prompt_bytes:originalBytes};if(budget.ok)return last;}return last;}
@@ -153,6 +156,7 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - 가능한 경우 서로 다른 independence_group 2개 이상을 종합한다. 같은 파생계열 반복은 수렴 근거로 세지 않는다.
 - natal synastry는 기본 상호작용, composite는 관계 자체의 기본 구조, Davison은 현실의 관계 과제, Marks A/B는 각 방향의 관계 경험, progressed synastry는 현재 두 사람의 진행 접점, progressed composite는 관계 자체의 현재 단계, Marks tertiary와 daily transit은 단기 시기 촉발로 역할을 분리한다.
 - 연락·재접촉 / 감정 재활성 / 관계 재구축 지원층을 하나의 재회 점수로 합치지 않는다. 연락이 열리는 것과 안정적 재결합은 별개로 결론낸다.
+- 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
 - "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
 - 선택기간 내 2~4개 시기창을 제시하되, Secondary Progression을 Daily Transit보다 상위 시기근거로 둔다.
 
@@ -194,15 +198,15 @@ function grounded(data:any,payload:any,p:Purpose,relaxed=false){
  const all=JSON.stringify(data),src=JSON.stringify(payload);
  const forbidden=["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"];
  for(const word of forbidden)if(all.includes(word)&&!src.includes(word))return false;
+ const unknownTime=payload?.precision?.partner_time_exact===false;
+ const scale=relaxed?.60:(unknownTime?.72:1);
+ const need=(n:number)=>Math.max(40,Math.floor(n*scale));
  if(p==="reunion"){
    const v2=data?.reunion_synthesis_v2??{};
    const validEvidenceRefs=new Set((payload?.reunion_evidence_v2?.evidence??[]).map((x:any)=>String(x?.id??"")).filter(Boolean));
    const refs=[...(v2?.why_reconnect?.evidence_refs??[]),...(v2?.initiative?.evidence_refs??[]),...(v2?.timing?.evidence_refs??[]),...(v2?.rebuild?.evidence_refs??[]),...(v2?.repeat_risks?.evidence_refs??[]),...(v2?.timing?.windows??[]).flatMap((x:any)=>x?.evidence_refs??[]),...(v2?.convergence??[]).flatMap((x:any)=>x?.evidence_refs??[])];
    if(String(v2?.summary??"").length<need(180)||refs.length<5||refs.some((x:any)=>!validEvidenceRefs.has(String(x))))return false;
  }
- const unknownTime=payload?.precision?.partner_time_exact===false;
- const scale=relaxed?.60:(unknownTime?.72:1);
- const need=(n:number)=>Math.max(40,Math.floor(n*scale));
  if(p==="compatibility"){
    if(String(data.overview??"").length<need(350))return false;
    for(const k of ["chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term"])

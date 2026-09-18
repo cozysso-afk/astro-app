@@ -15,7 +15,8 @@ test('reunion v2 is reunion-only and preserves other relationship cache version'
 
 test('server compiles question-first evidence and validates returned evidence refs',()=>{
   assert.match(server,/buildReunionEvidenceV2/)
-  assert.match(server,/base\.reunion_evidence_v2=buildReunionEvidenceV2\(base\)/)
+  assert.match(server,/const reunion_evidence_v2=buildReunionEvidenceV2\(base\)/)
+  assert.match(server,/return \{analysis_mode:base\.analysis_mode,period:base\.period,relationship_status:base\.relationship_status,timing_contract:base\.timing_contract,precision:base\.precision,saju_relationship:base\.saju_relationship,reunion_evidence_v2,limitations:base\.limitations\}/)
   assert.match(server,/reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(server,/validEvidenceRefs/)
   assert.match(server,/refs\.some\(\(x:any\)=>!validEvidenceRefs\.has/)
