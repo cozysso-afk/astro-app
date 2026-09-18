@@ -28,13 +28,13 @@ jobs:
         run: node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs
       - name: Reunion V2 contract
         run: node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
       - name: Relationship mode contract
         run: node --test web/src/lib/relationshipModeContract.test.mjs
       - name: Edge syntax
         run: node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
       - name: Production build
         working-directory: web
         run: npm run build
