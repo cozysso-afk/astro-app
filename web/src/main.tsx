@@ -43,6 +43,7 @@ import './reunion-reading-product-v13.css'
 import './redline-layout-v55.css'
 import './archive-mobile-polish-v57.css'
 import './reading-font-fix-v54.css'
+import './archive-mobile-polish-v59.css'
 
 installIntegratedPrecisionFetch()
 
