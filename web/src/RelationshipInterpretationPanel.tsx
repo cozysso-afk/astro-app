@@ -1,12 +1,14 @@
 import { tenGodLens } from './lib/systemReading'
 import { ReadingBadge, ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ReadingExplanation } from './ReadingExplanation'
-import { AlertTriangle, Orbit, Sparkles } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { AlertTriangle, ImageDown, LoaderCircle, Orbit, Sparkles } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
 import type { Aspect, RelationshipAiResponse, RelationshipAnalysisMode, ReunionTimingContext } from './appTypes'
 import { buildRelationshipUserSummary, type RelationshipPattern } from './lib/relationshipUserSummary'
 import { relationshipAiCostPreview } from './lib/aiCostPreview'
 import { firstSentences, relationshipGenerationCost, reunionSajuCopy } from './lib/reunionPresentation'
+import { exportReadingImages } from './lib/readingImageExport'
+import './reading-image-export.css'
 
 function readableParagraphs(value: string, targetChars = 190) {
   const text = String(value ?? '').trim()
@@ -39,6 +41,23 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   timing?: ReunionTimingContext | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
+  const exportRef = useRef<HTMLElement | null>(null)
+  const [imageExporting, setImageExporting] = useState(false)
+  const [imageExportStatus, setImageExportStatus] = useState('')
+  const imageExportLabel = reunion ? '재회 결과' : analysisMode === 'marriage_married' ? '결혼생활 결과' : analysisMode === 'marriage_unmarried' ? '결혼궁합 결과' : '궁합 결과'
+  const saveResultImages = async () => {
+    if (!exportRef.current || imageExporting) return
+    setImageExporting(true)
+    setImageExportStatus('')
+    try {
+      const result = await exportReadingImages(exportRef.current, imageExportLabel)
+      if (!result.cancelled) setImageExportStatus(result.shared ? `${result.pages}장 공유 화면을 열었어.` : `${result.pages}장 이미지로 저장했어.`)
+    } catch (error) {
+      setImageExportStatus(error instanceof Error ? error.message : '이미지 저장 중 문제가 생겼어.')
+    } finally {
+      setImageExporting(false)
+    }
+  }
   const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: reunion ? timing : null })
   const relation = sajuContext?.available === true && sajuContext.day_master_relation && typeof sajuContext.day_master_relation === 'object' ? sajuContext.day_master_relation as Record<string, unknown> : {}
   const sajuRows = [['내가 상대를 대할 때',relation.user_to_counterpart_ten_god],['상대가 나를 대할 때',relation.counterpart_to_user_ten_god]].flatMap(([label,value])=>typeof value === 'string' && tenGodLens(value) ? [{label:String(label),value,lens:tenGodLens(value)!}] : [])
@@ -126,8 +145,15 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
-  return <section className="relationship-experience reading-experience" data-mode={analysisMode}>
+  return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
     <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p></header>
+    <div className="reading-export-toolbar" data-reading-export-ignore="true">
+      <button type="button" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>
+        {imageExporting ? <LoaderCircle className="reading-export-spinner" size={17} aria-hidden="true"/> : <ImageDown size={17} aria-hidden="true"/>}
+        {imageExporting ? '이미지 만드는 중…' : '결과 이미지 저장'}
+      </button>
+      {!!imageExportStatus && <small role="status">{imageExportStatus}</small>}
+    </div>
 
     {ai?.ok && ai.data ? <section className="reading-section relationship-natural-reading">
       <h3>{ai.data.headline}</h3>

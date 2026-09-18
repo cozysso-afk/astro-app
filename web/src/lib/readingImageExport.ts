@@ -112,8 +112,8 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
   if (!blocks.length) throw new Error('저장할 결과 내용을 찾지 못했어.')
 
   const canvases: HTMLCanvasElement[] = []
-  let canvas: HTMLCanvasElement
-  let ctx: CanvasRenderingContext2D
+  let canvas = document.createElement('canvas')
+  let ctx = canvas.getContext('2d')!
   let y = 0
 
   const newPage = () => {
