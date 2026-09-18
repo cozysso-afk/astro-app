@@ -44,7 +44,6 @@ test('personal marriage preserves computed data with non-prophetic creative pres
   assert.match(personalPanel, /통계 확률 아님/)
   assert.match(personalPanel, /기술 근거 자세히 보기/)
   assert.match(personalPanel, /AI 초상 콘셉트 프롬프트 복사/)
-
 })
 
 test('relationship AI keeps compatibility reunion unmarried-partner and married semantics separate', () => {
@@ -60,7 +59,8 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(relationshipFn, /이미 결혼한 두 사람의 결혼생활 분석/)
   assert.match(relationshipFn, /결혼 가능성 표현은 금지/)
   assert.match(relationshipFn, /intimacy_resources/)
-  assert.match(relationshipFn, /if\(!exact\)aspects=aspects\.filter/)
+  assert.match(relationshipFn, /if\(!available\)aspects=aspects\.filter/)
+  assert.match(relationshipFn, /provisional\(잠정\) 참고 근거/)
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
@@ -90,11 +90,10 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.7-reunion-specific'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.8-evidence-v2'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.10-provisional-time-reference'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
-
 
 test('external relationship prompt is compact bounded and clearly separated from raw full copy', () => {
   assert.match(formatters, /EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS = 28000/)
@@ -104,7 +103,8 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
-  assert.match(relationshipFn, /relationship-v11\.7-reunion-specific/)
+  assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
+  assert.match(relationshipFn, /relationship-v11\.10-provisional-time-reference/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.
