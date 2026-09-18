@@ -43,4 +43,10 @@ replace_once(
     "</p></header>\n    <div className=\"reading-export-toolbar\" data-reading-export-ignore=\"true\">\n      <button type=\"button\" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>\n        {imageExporting ? <LoaderCircle className=\"reading-export-spinner\" size={17} aria-hidden=\"true\"/> : <ImageDown size={17} aria-hidden=\"true\"/>}\n        {imageExporting ? '이미지 만드는 중…' : '결과 이미지 저장'}\n      </button>\n      {!!imageExportStatus && <small role=\"status\">{imageExportStatus}</small>}\n    </div>\n\n    {ai?.ok && ai.data ? <section",
 )
 
+replace_once(
+    'web/src/lib/readingImageExport.ts',
+    "  let canvas: HTMLCanvasElement\n  let ctx: CanvasRenderingContext2D",
+    "  let canvas = document.createElement('canvas')\n  let ctx = canvas.getContext('2d')!",
+)
+
 print('relationship image export patch complete')
