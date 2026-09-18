@@ -6,8 +6,8 @@ import type { RelationshipErrorCode } from "./publicError.ts";
 import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
-const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.7-reunion-specific";
-const REUNION_VERSION="relationship-v11.9-evidence-grounding-repair";
+const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
+const REUNION_VERSION="relationship-v11.10-provisional-time-reference";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -38,7 +38,7 @@ function sajuPacket(x:any,n:number){if(!x||typeof x!=="object")return null;if(!x
 function compactSignal(s:any,n:number){if(!s||typeof s!=="object")return null;return {exact_contacts:Number(s?.exact_contacts??0),supportive_contacts:Number(s?.supportive_contacts??0),challenging_contacts:Number(s?.challenging_contacts??0),tightest:aspectList(s?.tightest,n)};}
 const CORE_PLANETS=["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","True Node","ASC","MC"];
 function chartCore(c:any,n:number){if(!c||typeof c!=="object")return null;const pos=c?.positions??{};const keys=CORE_PLANETS.filter(k=>pos?.[k]).slice(0,n);return {positions:Object.fromEntries(keys.map(k=>{const v=pos[k]??{};return [k,{lon:Number(v?.lon??v?.longitude??v?.longitude_deg??0),sign:v?.sign??v?.sign_ko??null,house:v?.house??null}]})),angles:c?.angles?{ASC:c.angles?.ASC??null,MC:c.angles?.MC??null,IC:c.angles?.IC??null,DSC:c.angles?.DSC??null}:null};}
-function advancedPacket(x:any,n:number){if(!x||typeof x!=="object")return null;if(!x.available)return {available:false,reason:x?.reason??""};return {available:true,reason:x?.reason??"",method:x?.method??null,chart:chartCore(x?.chart,n),user:chartCore(x?.user,n),counterpart:chartCore(x?.counterpart,n)};}
+function advancedPacket(x:any,n:number){if(!x||typeof x!=="object")return null;if(!x.available)return {available:false,reason:x?.reason??""};return {available:true,reason:x?.reason??"",precision:x?.precision??null,note:x?.note??null,method:x?.method??null,chart:chartCore(x?.chart,n),user:chartCore(x?.user,n),counterpart:chartCore(x?.counterpart,n)};}
 function transitHit(x:any){if(!x||typeof x!=="object")return null;return {person:x?.person??null,transit:x?.transit??null,aspect:x?.aspect??null,target:x?.target??null,orb:Number(x?.orb??0),tone:x?.tone??null,score:Number(x?.score??0),layer_class:x?.layer_class??null,orb_grade:x?.orb_grade??null,time_sensitivity:x?.time_sensitivity??null,evidence_confidence:x?.evidence_confidence??null,layer_priority:x?.layer_priority??null,event_probability:x?.event_probability??"not_calculated"};}
 function transitDay(x:any,n:number){if(!x||typeof x!=="object")return null;return {date:x?.date??null,score:Number(x?.score??0),user_score:Number(x?.user_score??0),counterpart_score:Number(x?.counterpart_score??0),shared_activation:Boolean(x?.shared_activation),hits:(Array.isArray(x?.hits)?x.hits:[]).map(transitHit).filter(Boolean).slice(0,n)};}
 function transitMonth(x:any){if(!x||typeof x!=="object")return null;return {calendar_month:x?.calendar_month??null,score:Number(x?.score??0),top_dates:Array.isArray(x?.top_dates)?x.top_dates.slice(0,4):[]};}
@@ -87,7 +87,7 @@ function secondarySupportPacket(raw:any,n:number){
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact),available=Boolean(n?.partner_time_available??exact);
  let aspects=(Array.isArray(n?.aspects)?n.aspects:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb);
- if(!exact)aspects=aspects.filter((a:any)=>!TIME_SENSITIVE.has(a.a)&&!TIME_SENSITIVE.has(a.b));
+ if(!available)aspects=aspects.filter((a:any)=>!TIME_SENSITIVE.has(a.a)&&!TIME_SENSITIVE.has(a.b));
  const L=level===0?{static:36,focus:6,house:12,cross:12,chart:13,months:12,tight:5,ranked:12,days:14,hits:5,topMonths:10}:level===1?{static:28,focus:4,house:9,cross:9,chart:10,months:9,tight:3,ranked:9,days:10,hits:3,topMonths:8}:{static:20,focus:3,house:6,cross:6,chart:8,months:6,tight:2,ranked:6,days:8,hits:2,topMonths:6};
  const focus=r?.relationship_focus?.groups??{};
  const trans=r?.relationship_transits??r?.reunion_transits??null;
@@ -123,7 +123,7 @@ function selectPromptPacket(calc:any,ctx:any,purpose:Purpose){let originalBytes=
 const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가 별도로 차트를 복사해 다른 GPT에게 물어볼 필요가 없도록 계산 근거가 풍부한 리딩을 작성한다. 다만 계산되지 않은 사실·상대의 실제 속마음·사건 확률을 만들지 않는다.
 
 공통 절대규칙:
-- 출생시간을 입력했다는 사실과 exact 검증은 다르다. precision.birth_time_reliability를 우선 확인하고, exact가 아니면 ASC/DSC/MC/IC·하우스·Davison/Marks를 확정 근거로 사용하지 않는다. provisional 행성층은 잠정 근거라고 명시한다.
+- 출생시간을 입력했다는 사실과 exact 검증은 다르다. precision.birth_time_reliability를 우선 확인한다. exact가 아니어도 입력 생시 기반 Moon·ASC/DSC/MC/IC·하우스·Davison/Marks가 데이터에 제공되면 provisional(잠정) 참고 근거로 읽을 수 있지만, 확정·결정적 근거로 승격하지 않는다. sensitivity_scan 경고와 evidence_confidence를 함께 보고 흔들리는 각도/하우스는 보조 맥락으로만 쓴다.
 - 오브가 좁은 실제 접점을 우선한다. 접점 개수보다 orb_grade·evidence_confidence·time_sensitivity를 우선한다.
 - 레이어 우선순위는 Natal structure > Secondary Progression > 주요/중장기 Transit > 빠른 Daily Transit > Tertiary/Marks 보조층이다. 하위 보조층 하나만으로 상위 레이어 결론을 뒤집지 않는다.
 - sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다.

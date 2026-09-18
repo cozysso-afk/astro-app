@@ -52,7 +52,8 @@ def test_legacy_entered_time_is_preserved_but_not_silently_promoted_to_exact():
     actual_utc = datetime.fromisoformat(chart["utc"])
     assert abs((actual_utc - expected_utc).total_seconds()) < 0.001  # entered 19:00 KST, not noon proxy
     assert "Moon" in chart["positions"]
-    assert chart["angles"] == {}
+    assert chart["angles"].get("ASC") is not None
+    assert "ASC" in chart["time_sensitive_points_provisional"]
     assert chart["time_reliability"]["time_exact"] is False
 
 
@@ -109,15 +110,19 @@ def test_relationship_builder_keeps_provisional_planet_layers_but_disables_exact
     assert out["birth_time_reliability"]["counterpart"]["time_exact"] is False
     assert out["natal_synastry"]["partner_time_available"] is True
     assert out["natal_synastry"]["partner_time_exact"] is False
-    assert out["house_overlays"]["available"] is False
-    assert out["davison"]["available"] is False
-    assert out["marks"]["available"] is False
+    assert out["house_overlays"]["available"] is True
+    assert out["house_overlays"]["precision"] == "provisional"
+    assert out["davison"]["available"] is True
+    assert out["davison"]["precision"] == "provisional"
+    assert out["marks"]["available"] is True
+    assert out["marks"]["precision"] == "provisional"
     month = out["months"][0]
     assert month["progressed_synastry"]["available"] is True
     assert month["progressed_synastry"]["precision"] == "provisional"
     assert month["progressed_composite"]["available"] is True
     assert month["progressed_composite"]["precision"] == "provisional"
-    assert month["marks_tertiary"]["available"] is False
+    assert month["marks_tertiary"]["available"] is True
+    assert month["marks_tertiary"]["precision"] == "provisional"
 
 
 def test_verified_exact_profiles_still_unlock_exact_layers():

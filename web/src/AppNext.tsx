@@ -155,7 +155,7 @@ const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'�
 const topicDisplay = (topic:string) => `${topicEmoji[topic] ?? '✦'} ${topic}`
 const relationshipDayPresets = [7,31,90,180,365]
 const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
-const relationshipTimeSensitivePoints = new Set(['Moon','ASC','DSC','MC','IC'])
+const relationshipTimeSensitivePoints = new Set(['ASC','DSC','MC','IC'])
 
 const OUTCOME_STORAGE_KEY = 'starlight-destiny.relationship-outcomes.v2'
 

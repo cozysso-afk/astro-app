@@ -10,7 +10,7 @@ Calculated layers:
 - Tertiary-I progressions of each Marks chart (1 ephemeris day = 27.32158218 life days)
 
 The module deliberately returns calculation facts, not event probabilities or claims about another
-person's private feelings. Angles/houses and Davison/Marks layers require exact birth time and place.
+person's private feelings. Entered birth time/place may produce provisional angle/house/Davison/Marks reference layers; only provenance-verified time is labelled exact.
 """
 
 import math
@@ -23,7 +23,7 @@ from birth_time_reliability_v1 import resolve_birth_time_reliability
 from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
 from reunion_dimension_v1 import DIMENSIONS, daily_dimension_scores, secondary_support
 
-ENGINE_VERSION = "relationship-western-v1.11-reunion-dimensions"
+ENGINE_VERSION = "relationship-western-v1.12-provisional-entered-time"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -84,6 +84,10 @@ def _transit_hits(transit_chart, natal_chart, person):
         orb_limit = _transit_orb_limit(t_name)
         layer_class = "major_transit" if t_name in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else "daily_transit"
         for target, n_lon in targets.items():
+            # Entered-time angles are useful as provisional interpretation context, but
+            # they must not change deterministic reunion timing scores until exact.
+            if target in {"ASC", "DSC", "MC", "IC"} and not natal_exact:
+                continue
             target_weight = TRANSIT_TARGET_WEIGHTS.get(target, .35)
             dist = _angle_distance(t_lon, float(n_lon))
             for aspect, exact in ASPECTS.items():
@@ -429,7 +433,7 @@ def _profile_chart(profile, allow_unknown_time=False):
         profile.get("latitude"), profile.get("longitude"),
         include_moon=time_available,
         include_angles=bool(
-            reliability["time_exact"]
+            time_available
             and profile.get("latitude") is not None
             and profile.get("longitude") is not None
         ),
@@ -437,7 +441,8 @@ def _profile_chart(profile, allow_unknown_time=False):
     chart["time_reliability"] = reliability
     chart["time_basis"] = "local_noon_proxy" if using_noon_proxy else "entered_birth_time"
     if time_available and not reliability["time_exact"]:
-        chart["time_sensitive_points_omitted"] = ["ASC", "DSC", "MC", "IC", "quadrant_houses"]
+        chart["time_sensitive_points_provisional"] = ["Moon", "ASC", "DSC", "MC", "IC", "quadrant_houses"]
+        chart["time_sensitive_points_omitted"] = []
     elif not time_available:
         chart["time_sensitive_points_omitted"] = ["Moon", "ASC", "DSC", "MC", "IC", "quadrant_houses"]
     return chart
@@ -737,7 +742,7 @@ def _house_overlays(source_chart, target_chart, source_label, target_label):
     }
     used_system = str(house_system.get("used") or "Placidus")
     if not quadrant_cusps or asc is None:
-        return {"available": False, "reason": f"{target_label} exact birth time/place required for house overlays"}
+        return {"available": False, "reason": f"{target_label} entered birth time/place required for house overlays"}
     rows=[]
     for planet, info in (source_chart.get("positions") or {}).items():
         quadrant_house = _house_of_longitude(quadrant_cusps, info["lon"])
@@ -837,6 +842,8 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     cp_available = bool(cp_reliability["time_available"])
     user_exact = bool(user_reliability["time_exact"] and user_profile.get("latitude") is not None and user_profile.get("longitude") is not None)
     cp_exact = bool(cp_reliability["time_exact"] and counterpart_profile.get("latitude") is not None and counterpart_profile.get("longitude") is not None)
+    user_clock_ready = bool(user_available and user_profile.get("latitude") is not None and user_profile.get("longitude") is not None)
+    cp_clock_ready = bool(cp_available and counterpart_profile.get("latitude") is not None and counterpart_profile.get("longitude") is not None)
     result["birth_time_reliability"] = {"user": user_reliability, "counterpart": cp_reliability}
 
     user_natal = _profile_chart(user_profile, allow_unknown_time=True)
@@ -847,7 +854,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     result["sensitivity_scan"] = {
         "user": _birth_time_sensitivity_scan(user_profile, cp_natal, "a"),
         "counterpart": _birth_time_sensitivity_scan(counterpart_profile, user_natal, "b"),
-        "policy": "non-exact entered times are scanned diagnostically; scan-only angle/house candidates never enter production scores",
+        "policy": "non-exact entered times are scanned diagnostically; entered-time angles/houses may appear as provisional reference layers, while scan candidates and provisional angles never alter deterministic timing scores",
     }
 
     fallback_labels = []
@@ -866,7 +873,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     if cp_exact:
         natal_precision_note = "Counterpart birth time is provenance-verified exact; planets and angles are available."
     elif cp_available:
-        natal_precision_note = "Counterpart entered birth time is available but not verified exact; planetary positions including Moon use the entered clock time, while ASC/DSC/MC/IC and houses are omitted."
+        natal_precision_note = "Counterpart entered birth time is available but not verified exact; Moon and entered-time ASC/DSC/MC/IC are calculated as provisional reference points and must not be described as exact."
     else:
         natal_precision_note = "Counterpart birth time is unknown; Moon and angles are excluded and remaining planets use local noon as a non-exact proxy."
     result["natal_synastry"] = {
@@ -889,7 +896,8 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "policy": "standard relationship-astrology themes grouped from actual natal synastry aspects; no good/bad total score",
     }
     result["house_overlays"] = {
-        "available": bool(user_exact and cp_exact),
+        "available": bool(user_clock_ready and cp_clock_ready),
+        "precision": "exact" if user_exact and cp_exact else ("provisional" if user_clock_ready and cp_clock_ready else "unavailable"),
         "user_in_counterpart": _house_overlays(user_natal, cp_natal, "user", "counterpart"),
         "counterpart_in_user": _house_overlays(cp_natal, user_natal, "counterpart", "user"),
         "precision_note": (
@@ -897,14 +905,16 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             if user_exact and cp_exact and fallback_labels else
             "Exact-time Whole Sign + Placidus house overlays available."
             if user_exact and cp_exact else
-            "House overlays require provenance-verified exact birth times for both people. Entered but unverified times are preserved for provisional planet layers, not promoted to exact houses."
+            "Entered-time Whole Sign + quadrant house overlays are shown as provisional reference only; birth-time sensitivity can materially move angles and houses."
+            if user_clock_ready and cp_clock_ready else
+            "House overlays require a concrete entered birth time and coordinates for both people."
         ),
     }
     result["composite"] = {
         "available": True,
         "chart": _midpoint_chart(user_natal, cp_natal),
         "precision": "exact" if user_exact and cp_exact else ("provisional" if user_available and cp_available else "time_unknown"),
-        "note": "Mathematical midpoint composite. Unverified entered times may support provisional planetary midpoints but never exact angles/houses; unknown time omits Moon and angles.",
+        "note": "Mathematical midpoint composite. Unverified entered times may support provisional planetary and angle midpoints; only provenance-verified time is exact. Unknown time omits Moon and angles.",
     }
 
     result["analysis_mode"] = analysis_mode
@@ -921,21 +931,31 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         result["reunion_dimensions"] = transit_layer["dimensions"]
 
     davison = marks_a = marks_b = None
-    if user_exact and cp_exact:
+    if user_clock_ready and cp_clock_ready:
+        relationship_precision = "exact" if user_exact and cp_exact else "provisional"
         davison = _davison_from_profiles(user_profile, counterpart_profile)
         marks_a = _marks_chart(user_profile, davison)
         marks_b = _marks_chart(counterpart_profile, davison)
-        result["davison"] = {"available": True, "chart": davison}
+        result["davison"] = {
+            "available": True,
+            "precision": relationship_precision,
+            "chart": davison,
+            "note": "Provisional when based on entered but unverified clock time; never promote to exact without provenance verification." if relationship_precision == "provisional" else "Provenance-verified exact-time Davison chart.",
+        }
         result["marks"] = {
             "available": True,
+            "precision": relationship_precision,
             "user": marks_a,
             "counterpart": marks_b,
             "method": "Bob Marks method: Davison(person, relationship Davison), calculated separately for each direction",
+            "note": "Provisional when the Davison base uses entered but unverified clock time." if relationship_precision == "provisional" else "Exact-time Marks base.",
         }
+        if relationship_precision == "provisional":
+            result["limitations"].append("Entered but unverified birth time/place: house, Davison and Marks layers are calculated as provisional reference only and may shift if the recorded time changes.")
     else:
-        result["davison"] = {"available": False, "reason": "Davison requires exact birth time and coordinates for both people."}
-        result["marks"] = {"available": False, "reason": "Marks charts require the exact-time Davison base chart."}
-        result["limitations"].append("Provenance-verified exact birth time/place missing for one or both people: Davison, Marks and Marks tertiary progression are disabled rather than estimated.")
+        result["davison"] = {"available": False, "reason": "Davison requires a concrete entered birth time and coordinates for both people."}
+        result["marks"] = {"available": False, "reason": "Marks charts require an available Davison base chart."}
+        result["limitations"].append("Concrete birth time/place missing for one or both people: Davison, Marks and Marks tertiary progression remain unavailable.")
 
     monthly = []
     for seg_start, seg_end in month_segments:
@@ -945,8 +965,8 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         layer_aspects = {}
 
         if user_available and cp_available:
-            up = _secondary_progressed_chart(user_profile, target)
-            cp = _secondary_progressed_chart(counterpart_profile, target)
+            up = _secondary_progressed_chart(user_profile, target, include_angles=user_clock_ready)
+            cp = _secondary_progressed_chart(counterpart_profile, target, include_angles=cp_clock_ready)
             progressed_precision = "exact" if user_exact and cp_exact else "provisional"
             ps = {
                 "user_progressed_to_partner_natal": _aspects(up, cp_natal, mode="secondary", limit=24),
@@ -979,6 +999,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             cross_contacts = _aspects(mt_a, mt_b, mode="tertiary", limit=24)
             row["marks_tertiary"] = {
                 "available": True,
+                "precision": "exact" if user_exact and cp_exact else "provisional",
                 "user": {"completed_lunar_months": n_a, "chart": mt_a, "to_base_marks_aspects": a_contacts},
                 "counterpart": {"completed_lunar_months": n_b, "chart": mt_b, "to_base_marks_aspects": b_contacts},
                 "directional_cross_aspects": cross_contacts,
@@ -988,7 +1009,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             layer_aspects["marks_tertiary.counterpart_to_base"] = b_contacts
             layer_aspects["marks_tertiary.directional_cross"] = cross_contacts
         else:
-            row["marks_tertiary"] = {"available": False, "reason": "Exact-time Marks base charts unavailable."}
+            row["marks_tertiary"] = {"available": False, "reason": "Marks base charts unavailable because a concrete birth time/place is missing."}
 
         row["signal_summary"] = _summary(layer_aspects)
         if analysis_mode == "reunion":
@@ -1011,7 +1032,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "layer_priority": "Interpret in this order: natal structure > secondary progression > major/medium-term transit > fast daily transit > tertiary/Marks supplementary. A tertiary-only hit cannot overturn higher-layer evidence.",
         "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
         "reunion_dimensions": "For reunion mode keep three orthogonal outcomes separate: contact/recontact activation, emotional/relationship reactivation, and relationship-rebuilding support. Within every dimension keep incoming, outgoing and reconnection separate. Never collapse them into one reunion score.",
-        "birth_time": "An entered clock time is not automatically an exact birth time. Provisional times may support planetary layers, while angles/houses/Davison/Marks require provenance-verified exact time.",
+        "birth_time": "An entered clock time is not automatically exact. When a concrete time and coordinates exist, Moon/angles/houses/Davison/Marks may be calculated as provisional reference layers; only provenance-verified time may be labelled exact or treated as decisive. Provisional angles do not alter deterministic timing scores.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }
     return result

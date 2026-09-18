@@ -2,7 +2,7 @@ import type { Aspect, FortuneStat, RelationshipAnalysisMode, ReunionTimingContex
 
 const PERSONAL = new Set(['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'])
 const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
-const SENSITIVE = new Set(['Moon', 'ASC', 'DSC', 'MC', 'IC', 'Vertex'])
+const SENSITIVE = new Set(['ASC', 'DSC', 'MC', 'IC', 'Vertex'])
 const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
 export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
@@ -82,7 +82,6 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     if (p.role === 'stability') return { ...p, action: '생활비와 집안일, 돌봄을 누가 얼마나 맡을지 구체적으로 나눠봐.' }
     return p
   })
-  // One visible pattern per semantic role; retain every aspect in the raw disclosure.
   const patterns: RelationshipPattern[] = []
   const interaction: Record<Role, [string,string,string]> = {
     communication: ['말이 통하는 순간과 엇갈리는 순간','수월하게 생각을 나누는 접점과 말이 어긋나는 접점이 함께 있어.','말문이 잘 트여도 어려운 이야기를 끝까지 풀어가는지는 별도로 봐야 해. 중요한 부탁에 서로 같은 내용으로 답하는지가 판단 기준이야.'],
@@ -98,7 +97,6 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     const secondary=positive&&negative ? (primary.supportive?negative:positive) : group[1]
     const combined=positive&&negative
     const [title,conclusion,meaning]=interaction[role]
-    // Unknown/mixed tone alone is never turned into a claim of positive + negative agreement.
     const reason=secondary ? `${primary.reason} ${secondary.reason.split('. ')[0]}. ${combined ? meaning : '여러 접점이 같은 주제를 건드리지만, 접점 수가 많다고 결과가 확정되는 건 아니야.'}` : primary.reason
     patterns.push({...primary,key:role,title:combined?title:primary.title,conclusion:combined?`${conclusion} 한 가지 장점만으로 관계 전체를 판단하기보다, 서로 다른 반응이 어떤 상황에서 나타나는지 나눠 읽어야 해.`:primary.conclusion,reason,
       action: input.mode==='marriage_married' && role==='communication' ? '같은 다툼이 시작되는 말과 시간을 함께 적어봐. 피곤할 때는 결론을 미루되 언제 다시 이야기할지 정해 두는 게 실제 조정이야.'

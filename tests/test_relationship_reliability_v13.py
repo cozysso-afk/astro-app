@@ -85,7 +85,7 @@ def test_scan_ratio_contract_prefers_repeatability_over_single_exact_hit():
     assert classify_scan_ratio(0.2) == "fragile"
 
 
-def test_provisional_partner_gets_five_point_sensitivity_scan_without_unlocking_exact_layers():
+def test_provisional_partner_gets_scan_and_provisional_reference_layers_without_becoming_exact():
     user = _profile()
     counterpart = _profile(
         birth_date=date(1992, 2, 29),
@@ -115,10 +115,14 @@ def test_provisional_partner_gets_five_point_sensitivity_scan_without_unlocking_
     assert scan["angle_variation_deg"]["ASC"] > 0
 
     assert out["natal_synastry"]["partner_time_exact"] is False
-    assert out["house_overlays"]["available"] is False
-    assert out["davison"]["available"] is False
-    assert out["marks"]["available"] is False
+    assert out["house_overlays"]["available"] is True
+    assert out["house_overlays"]["precision"] == "provisional"
+    assert out["davison"]["available"] is True
+    assert out["davison"]["precision"] == "provisional"
+    assert out["marks"]["available"] is True
+    assert out["marks"]["precision"] == "provisional"
     assert out["months"][0]["progressed_synastry"]["precision"] == "provisional"
+    assert out["months"][0]["marks_tertiary"]["precision"] == "provisional"
 
 
 def test_natal_aspects_expose_robust_time_sensitive_and_evidence_metadata():

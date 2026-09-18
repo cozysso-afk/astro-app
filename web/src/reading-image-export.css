@@ -1,0 +1,62 @@
+.reading-export-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: -2px 0 16px;
+  min-width: 0;
+}
+
+.reading-export-toolbar button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border: 1px solid rgba(88, 101, 126, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #44526a;
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(60, 78, 103, 0.08);
+}
+
+.reading-export-toolbar button:disabled {
+  opacity: 0.62;
+}
+
+.reading-export-toolbar small {
+  min-width: 0;
+  color: #737b8a;
+  line-height: 1.45;
+}
+
+.reading-export-spinner {
+  animation: reading-export-spin 0.9s linear infinite;
+}
+
+@keyframes reading-export-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .reading-export-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .reading-export-toolbar button {
+    width: 100%;
+  }
+
+  .reading-export-toolbar small {
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-export-spinner { animation: none; }
+}
