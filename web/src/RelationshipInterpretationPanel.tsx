@@ -63,6 +63,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const compactPatterns = (rows: RelationshipPattern[]) => <>{rows.slice(0,2).map(interpretation)}{rows.length>2&&<details className="reading-more"><summary>패턴 {rows.length-2}개 더 보기</summary>{rows.slice(2).map(interpretation)}</details>}</>
 
   const generatedCost = relationshipGenerationCost(ai)
+  const reunionV2 = reunion && ai?.ok ? ai.data?.reunion_synthesis_v2 ?? null : null
   const reunionAi = reunion && ai?.ok && ai.data?.reunion_reading ? {
     bottom: firstSentences(ai.data.reunion_reading.bottom_line || ai.data.overview, 3),
     incoming: firstSentences(ai.data.reunion_reading.incoming_contact, 2),
@@ -78,9 +79,17 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
     {ai?.ok && ai.data ? <section className="reading-section relationship-natural-reading">
       <h3>{ai.data.headline}</h3>
-      <p className="reading-conclusion">{reunionAi?.bottom || (analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview)}</p>
+      <p className="reading-conclusion">{reunionV2?.summary || reunionAi?.bottom || (analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview)}</p>
       {!!generatedCost && <p className="ai-generated-cost">{generatedCost}</p>}
-      {reunion && reunionAi ? <>
+      {reunion && reunionV2 ? <>
+        <section className="reunion-ai-block"><h4>다시 연결될 여지가 있는 이유</h4><p>{reunionV2.why_reconnect.conclusion}</p><p>{reunionV2.why_reconnect.interpretation}</p></section>
+        <section className="reunion-ai-snapshot"><h4>누가 먼저 움직일 흐름인가</h4><p className="reunion-initiative-summary">{reunionV2.initiative.conclusion}</p><p>{reunionV2.initiative.interpretation}</p><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
+        <section className="reunion-ai-block"><h4>접점이 강해지는 시기</h4><p>{reunionV2.timing.conclusion}</p>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><p>{w.meaning}</p></article>)}</section>
+        <section className="reunion-ai-block"><h4>다시 붙었을 때 관계 구조</h4><p>{reunionV2.rebuild.conclusion}</p>{reunionV2.rebuild.conditions.length>0&&<ul>{reunionV2.rebuild.conditions.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
+        <section className="reunion-ai-block"><h4>다시 깨뜨릴 수 있는 반복 패턴</h4><p>{reunionV2.repeat_risks.conclusion}</p>{reunionV2.repeat_risks.patterns.length>0&&<ul>{reunionV2.repeat_risks.patterns.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
+        {reunionV2.convergence.length>0&&<details className="reunion-precision-note"><summary>여러 차트가 함께 가리키는 수렴 근거</summary>{reunionV2.convergence.map((x,i)=><div key={i}><b>{x.theme}{x.period?` · ${x.period}`:''}</b><p>{x.meaning}</p></div>)}</details>}
+        {!!reunionV2.precision_note&&<details className="reunion-precision-note"><summary>정밀도·제외 근거</summary><p>{reunionV2.precision_note}</p></details>}
+      </> : reunion && reunionAi ? <>
         <section className="reunion-ai-snapshot">
           <h4>누가 먼저 움직일 흐름인가</h4>
           <p className="reunion-initiative-summary">{reunionInitiativeSummary}</p>

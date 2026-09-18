@@ -169,6 +169,16 @@ export type RelationshipAiResponse = {
       relationship_filter: string
       precision_note: string
     }
+    reunion_synthesis_v2?: {
+      summary: string
+      why_reconnect: { conclusion:string; interpretation:string; evidence_refs:string[] }
+      initiative: { conclusion:string; interpretation:string; evidence_refs:string[] }
+      timing: { conclusion:string; windows:Array<{period:string; meaning:string; evidence_refs:string[]}>; evidence_refs:string[] }
+      rebuild: { conclusion:string; conditions:string[]; evidence_refs:string[] }
+      repeat_risks: { conclusion:string; patterns:string[]; evidence_refs:string[] }
+      convergence: Array<{theme:string; period:string; meaning:string; evidence_refs:string[]}>
+      precision_note: string
+    }
     marriage_reading?: {
       mode: string
       bottom_line: string
