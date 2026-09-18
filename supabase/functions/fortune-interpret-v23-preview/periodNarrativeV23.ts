@@ -197,8 +197,11 @@ function periodSpecificClusterScore(kind: PeriodKind, cluster: PhenomenonCluster
     if (cluster.distinct_dates >= 2 && cluster.distinct_dates <= 7) score += 18
     if (cluster.role === 'background') score += 4
     if (cluster.role === 'tension') score += 6
-    if (cluster.distinct_dates === 1) score -= 12
-    if (cluster.role === 'trigger' && cluster.distinct_dates <= 1) score -= 10
+    // Keep a one-day trigger available as a weekly turning point, but below
+    // genuinely multi-day movement. This preserves direct evidence without
+    // letting one day become the whole weekly narrative.
+    if (cluster.distinct_dates === 1) score -= 4
+    if (cluster.role === 'trigger' && cluster.distinct_dates <= 1) score -= 4
   } else if (kind === 'month') {
     if (cluster.distinct_dates >= 3) score += 12
     if (cluster.role === 'background') score += 7
