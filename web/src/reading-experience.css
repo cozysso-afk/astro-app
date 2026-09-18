@@ -533,3 +533,45 @@ body:has(.app-shell){background:#f7f8fb!important}
 @keyframes opal-arrive{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:no-preference){.app-shell .reading-entry-grid>button,.app-shell .period-button,.app-shell .fortune-field-grid>button{transition:transform .18s ease,box-shadow .18s ease}.app-shell .reading-entry-grid>button:active,.app-shell .period-button:active,.app-shell .fortune-field-grid>button:active{transform:scale(.97)}.app-shell .system-overview,.app-shell .reading-flows{animation:opal-arrive .28s ease-out both}}
 @media(prefers-reduced-motion:reduce){.app-shell *,.app-shell *::before,.app-shell *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* V12 reunion reading: keep specific-reading prose inside the viewport and make hierarchy explicit. */
+.relationship-experience {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+.relationship-experience *,
+.relationship-experience *::before,
+.relationship-experience *::after { box-sizing: border-box; min-width: 0; }
+.relationship-experience .reading-section,
+.relationship-experience .reading-explanation,
+.relationship-experience .contact-row,
+.relationship-experience .relationship-pattern { max-width: 100%; overflow-wrap: anywhere; }
+.reunion-ai-snapshot {
+  margin: 16px 0 18px;
+  padding: 16px;
+  border: 1px solid var(--reading-border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(234,243,237,.9), rgba(238,232,247,.72));
+  overflow: hidden;
+}
+.reunion-ai-snapshot h4 { margin: 0 0 8px; font-size: 16px; color: var(--reading-indigo); }
+.reunion-ai-snapshot .reunion-initiative-summary { margin: 0 0 12px; font-size: 15.5px; line-height: 1.78; word-break: keep-all; }
+.reunion-ai-snapshot small { display: block; margin-top: 10px; color: var(--reading-secondary); font-size: 12px; line-height: 1.6; }
+.relationship-fallback-card {
+  padding: 16px !important;
+  border: 1px solid var(--reading-border);
+  border-radius: 18px;
+  background: rgba(255,253,250,.72);
+  overflow: hidden;
+}
+.relationship-section-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.relationship-section-heading h3 { margin: 0 !important; flex: 1 1 180px; }
+.relationship-section-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.relationship-section-copy,
+.relationship-fallback-card > p { margin-top: 10px !important; font-size: 15.5px; line-height: 1.82; word-break: keep-all; }

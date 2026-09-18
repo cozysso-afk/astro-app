@@ -21,3 +21,13 @@ test('provisional V23 invalidates day and week while preserving month and annual
   assert.equal(provisionalV23JobKind(version,{period_kind:'month'},hash),legacy)
   assert.equal(provisionalV23JobKind(version,{period_kind:'annual'},hash),legacy)
 })
+
+
+test('day/week cache identity recognizes UI aliases and infers actual date spans',()=>{
+  const version='supabase-ai-v23.0-phenomenon-first'
+  const legacy=`${version}:${hash.slice(0,32)}`
+  assert.notEqual(exactV23JobKind(version,{period_kind:'today'},hash),legacy)
+  assert.notEqual(exactV23JobKind(version,{period:{start:'2026-09-18',end:'2026-09-18'}},hash),legacy)
+  assert.notEqual(exactV23JobKind(version,{period:{start:'2026-09-14',end:'2026-09-20'}},hash),legacy)
+  assert.equal(exactV23JobKind(version,{period:{start:'2026-09-01',end:'2026-09-30'}},hash),legacy)
+})

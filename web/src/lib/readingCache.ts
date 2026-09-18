@@ -17,9 +17,27 @@ const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
 const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21.4-e2e-evidence'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v1'
-const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v2'
+const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v3'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
-const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.6-reunion-compact-evidence'
+const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.7-reunion-specific'
+
+function normalizedFortunePeriodKind(request: Record<string, unknown>, calculation: Record<string, unknown>, period: Record<string, unknown>): string {
+  const raw = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()
+  const aliases: Record<string,string> = { today:'day', daily:'day', day:'day', weekly:'week', week:'week', monthly:'month', month:'month', yearly:'annual', year:'annual', annual:'annual' }
+  if (aliases[raw]) return aliases[raw]
+  const start = String(period.start ?? '')
+  const end = String(period.end ?? '')
+  const a = Date.parse(`${start}T00:00:00Z`)
+  const b = Date.parse(`${end}T00:00:00Z`)
+  if (Number.isFinite(a) && Number.isFinite(b) && b >= a) {
+    const days = Math.floor((b-a)/86400000)+1
+    if (days <= 1) return 'day'
+    if (days <= 9) return 'week'
+    if (days <= 45) return 'month'
+    return 'annual'
+  }
+  return raw
+}
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
@@ -117,7 +135,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const saju = calculation.saju && typeof calculation.saju === 'object' ? calculation.saju as Record<string, unknown> : {}
   const thai = calculation.thai && typeof calculation.thai === 'object' ? calculation.thai as Record<string, unknown> : {}
   const precision = fortuneAiPrecisionReadiness(calculation)
-  const periodKind = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()
+  const periodKind = normalizedFortunePeriodKind(request, calculation, period)
   const narrativeContract = periodKind === 'day' || periodKind === 'week'
     ? FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT
     : FORTUNE_NARRATIVE_CACHE_CONTRACT
