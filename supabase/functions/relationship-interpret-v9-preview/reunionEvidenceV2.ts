@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.5-return-prompt-compact'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.6-prompt-budget-hardening'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -137,7 +137,7 @@ function compactReturnEvent(row: any) {
     activation_score:num(row?.activation_score),
     balance:short(row?.balance,20) || null,
     precision:short(row?.precision,20) || null,
-    top_aspects:arr(row?.top_aspects).slice(0,3).map(compactReturnAspect).filter(Boolean),
+    top_aspects:arr(row?.top_aspects).slice(0,2).map(compactReturnAspect).filter(Boolean),
   }
 }
 
@@ -153,7 +153,7 @@ function compactReturnPerson(block: any, limit: number) {
 
 function compactReturnSupportForPrompt(support: any) {
   if (!support || typeof support !== 'object') return support ?? null
-  const candidate_dates = arr(support?.candidate_dates).slice(0,10).map((row:any)=>({
+  const candidate_dates = arr(support?.candidate_dates).slice(0,8).map((row:any)=>({
     date:short(row?.date,16),
     stages:arr(row?.stages).slice(0,4).map((x:any)=>short(x,28)),
     fast_trigger_score:num(row?.fast_trigger_score),
@@ -169,12 +169,100 @@ function compactReturnSupportForPrompt(support: any) {
   return {
     engine:short(support?.engine,64),
     period:support?.period??null,
-    solar_return:{role:'annual_background',user:compactReturnPerson(support?.solar_return?.user,3),counterpart:compactReturnPerson(support?.solar_return?.counterpart,3)},
-    lunar_return:{role:'monthly_emotional_background',user:compactReturnPerson(support?.lunar_return?.user,6),counterpart:compactReturnPerson(support?.lunar_return?.counterpart,6)},
+    solar_return:{role:'annual_background',user:compactReturnPerson(support?.solar_return?.user,2),counterpart:compactReturnPerson(support?.solar_return?.counterpart,2)},
+    lunar_return:{role:'monthly_emotional_background',user:compactReturnPerson(support?.lunar_return?.user,4),counterpart:compactReturnPerson(support?.lunar_return?.counterpart,4)},
     candidate_dates,
     weight_policy:support?.weight_policy??null,
     display_policy:support?.display_policy??null,
-    policy:short(support?.policy,420),
+    policy:short(support?.policy,280),
+    event_probability:'not_calculated',
+  }
+}
+
+function compactStageStat(stat: any) {
+  if (!stat || typeof stat !== 'object') return null
+  return {
+    average:num(stat?.average),
+    band:short(stat?.band,24),
+    spread:num(stat?.spread),
+    best_days:arr(stat?.best_days).slice(0,3).map((row:any)=>({date:short(row?.date,16),score:num(row?.score)})),
+    caution_days:arr(stat?.caution_days).slice(0,2).map((row:any)=>({date:short(row?.date,16),score:num(row?.score)})),
+    exact_date_policy:short(stat?.exact_date_policy,32) || null,
+  }
+}
+
+function compactDimensionsForPrompt(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw ?? null
+  const stage = (value: any) => value && typeof value === 'object' ? {
+    incoming:compactStageStat(value?.incoming),
+    outgoing:compactStageStat(value?.outgoing),
+    reconnection:compactStageStat(value?.reconnection),
+    top_evidence:arr(value?.top_evidence).slice(0,4).map((row:any)=>({
+      date:short(row?.date,16),
+      score:num(row?.score),
+      user_score:num(row?.user_score),
+      counterpart_score:num(row?.counterpart_score),
+      exact_date_basis:short(row?.exact_date_basis,32) || 'fast_transit_trigger',
+    })),
+  } : null
+  return {
+    emotional_reactivation:stage(raw?.emotional_reactivation),
+    contact_recontact:stage(raw?.contact_recontact),
+    in_person_meeting:stage(raw?.in_person_meeting),
+    relationship_rebuilding:stage(raw?.relationship_rebuilding),
+    policy:short(raw?.policy,320),
+  }
+}
+
+function compactTimingEvidence(value: any) {
+  if (!value || typeof value !== 'object') return null
+  const a = short(value?.a ?? value?.transit,24)
+  const aspect = short(value?.aspect,24)
+  const b = short(value?.b ?? value?.target,24)
+  if (!a && !aspect && !b) return null
+  return {a,aspect,b,orb:num(value?.orb),tone:short(value?.tone,16)}
+}
+
+function compactTimingWindowsForPrompt(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw ?? null
+  const source = arr(raw?.windows)
+  const chosen: any[] = []
+  const seen = new Set<string>()
+  const add = (row:any) => {
+    const key = `${row?.date ?? ''}|${row?.stage ?? ''}`
+    if (!row || seen.has(key)) return
+    seen.add(key)
+    chosen.push(row)
+  }
+  for (const stage of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding']) {
+    source.filter((row:any)=>row?.stage===stage).slice(0,3).forEach(add)
+  }
+  source.forEach((row:any)=>{ if (chosen.length < 16) add(row) })
+  return {
+    windows:chosen.slice(0,16).map((row:any)=>({
+      date:short(row?.date,16),
+      stage:short(row?.stage,32),
+      label:short(row?.label,80),
+      activation:num(row?.activation),
+      rank_weight:num(row?.rank_weight),
+      fast_evidence:arr(row?.fast_evidence).slice(0,2).map(compactTimingEvidence).filter(Boolean),
+      period_support:arr(row?.period_support).slice(0,2).map(compactTimingEvidence).filter(Boolean),
+      independent_systems:arr(row?.independent_systems).slice(0,3).map((x:any)=>short(x,32)),
+      independent_system_count:Number(row?.independent_system_count ?? 0),
+      convergence:Boolean(row?.convergence),
+      exact_date_basis:short(row?.exact_date_basis,32) || 'fast_transit_trigger',
+      event_probability:'not_calculated',
+    })),
+    policy:short(raw?.policy,320),
+    event_probability:'not_calculated',
+  }
+}
+
+function compactSecondarySupportForPrompt(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw ?? null
+  return {
+    represented_in:'reunion_evidence_v2',
+    policy:short(raw?.policy,220),
     event_probability:'not_calculated',
   }
 }
@@ -304,8 +392,11 @@ export function buildReunionEvidenceV2(packet: any) {
     solar_return: Boolean(packet?.reunion_return_support?.solar_return?.user?.available || packet?.reunion_return_support?.solar_return?.counterpart?.available),
     lunar_return: Boolean(packet?.reunion_return_support?.lunar_return?.user?.available || packet?.reunion_return_support?.lunar_return?.counterpart?.available),
   }
-  if (packet && typeof packet === 'object' && packet.reunion_return_support) {
-    packet.reunion_return_support = compactReturnSupportForPrompt(packet.reunion_return_support)
+  if (packet && typeof packet === 'object') {
+    if (packet.reunion_return_support) packet.reunion_return_support = compactReturnSupportForPrompt(packet.reunion_return_support)
+    if (packet.reunion_timing_windows) packet.reunion_timing_windows = compactTimingWindowsForPrompt(packet.reunion_timing_windows)
+    if (packet.reunion_dimensions) packet.reunion_dimensions = compactDimensionsForPrompt(packet.reunion_dimensions)
+    if (packet.reunion_secondary_support) packet.reunion_secondary_support = compactSecondarySupportForPrompt(packet.reunion_secondary_support)
   }
   return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
 }

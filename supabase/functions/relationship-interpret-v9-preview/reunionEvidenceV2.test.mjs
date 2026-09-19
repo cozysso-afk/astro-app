@@ -27,7 +27,7 @@ function exactPacket(){return {
 
 test('maps every available relationship layer into question-first four-stage evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.5-return-prompt-compact')
+  assert.equal(out.version,'reunion-evidence-v2.6-prompt-budget-hardening')
   assert.match(out.policy,/Emotion, contact, meeting, and reunion are separate stages/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
@@ -39,18 +39,33 @@ test('maps every available relationship layer into question-first four-stage evi
   assert.ok(out.evidence.some(e=>e.layer==='dimension.in_person_meeting'))
 })
 
-test('solar and lunar returns stay context-only and cannot create a convergence vote',()=>{
+test('solar and lunar returns stay context-only and prompt copies shed duplicated bulk',()=>{
   const p=exactPacket()
-  const solarEvent={window_start:'2026-03-21',window_end_exclusive:'2027-03-21',activation_score:58,balance:'supportive',precision:'exact',top_aspects:[asp('Venus','trine','Moon',.3)]}
-  const lunarEvent={window_start:'2026-12-29',window_end_exclusive:'2027-01-26',activation_score:62,balance:'mixed',precision:'exact',top_aspects:[asp('Mercury','sextile','Venus',.2)]}
+  const solarEvent={window_start:'2026-03-21',window_end_exclusive:'2027-03-21',activation_score:58,balance:'supportive',precision:'exact',top_aspects:[asp('Venus','trine','Moon',.3),asp('Mercury','sextile','Venus',.2),asp('Mars','trine','Sun',.4)]}
+  const lunarEvent={window_start:'2026-12-29',window_end_exclusive:'2027-01-26',activation_score:62,balance:'mixed',precision:'exact',top_aspects:[asp('Mercury','sextile','Venus',.2),asp('Venus','trine','Moon',.3),asp('Mars','square','Saturn',.4,'challenging')]}
   p.reunion_return_support={
     engine:'relationship-return-v1.1-bounded-context-presentation',
-    solar_return:{user:{available:true,events:[solarEvent]},counterpart:{available:true,events:[solarEvent]}},
-    lunar_return:{user:{available:true,events:[lunarEvent]},counterpart:{available:true,events:[lunarEvent]}},
+    solar_return:{user:{available:true,events:Array.from({length:8},()=>solarEvent)},counterpart:{available:true,events:Array.from({length:8},()=>solarEvent)}},
+    lunar_return:{user:{available:true,events:Array.from({length:16},()=>lunarEvent)},counterpart:{available:true,events:Array.from({length:16},()=>lunarEvent)}},
     monthly_context:Array.from({length:12},(_,i)=>({calendar_month:`2027-${String(i+1).padStart(2,'0')}`,huge:'x'.repeat(4000)})),
-    candidate_dates:[{date:'2027-01-05',exact_date_basis:'fast_transit_trigger',fast_trigger_score:76,priority_index:73,return_context:{background_score:56,solar_return:{pair_activation_score:55,shared_activation:true},lunar_return:{pair_activation_score:57,shared_activation:false}}}],
+    candidate_dates:Array.from({length:16},(_,i)=>({date:`2027-01-${String(i+1).padStart(2,'0')}`,stages:['contact_recontact'],exact_date_basis:'fast_transit_trigger',fast_trigger_score:76-i,priority_index:73-i,return_context:{background_score:56,solar_return:{pair_activation_score:55,shared_activation:true},lunar_return:{pair_activation_score:57,shared_activation:false}}})),
+    policy:'Return context '.repeat(100),
   }
-  const before=JSON.stringify(p.reunion_return_support).length
+  p.reunion_timing_windows={
+    policy:'Timing windows '.repeat(120),
+    windows:Array.from({length:24},(_,i)=>({
+      date:`2027-02-${String((i%24)+1).padStart(2,'0')}`,
+      stage:['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding'][i%4],
+      label:'very long timing label '.repeat(10),activation:80-i,rank_weight:88-i,
+      fast_evidence:Array.from({length:5},()=>({...asp('Mercury','trine','Venus',.2),noise:'x'.repeat(2000)})),
+      period_support:Array.from({length:5},()=>({...asp('Venus','sextile','Moon',.3),noise:'x'.repeat(2000)})),
+      independent_systems:['daily_transit','secondary_progression','duplicate'],independent_system_count:2,convergence:true,exact_date_basis:'fast_transit_trigger',event_probability:'not_calculated',
+    })),
+  }
+  for(const key of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding']) {
+    p.reunion_dimensions[key]={...p.reunion_dimensions[key],incoming:stat(55),outgoing:stat(52),reconnection:stat(60),top_evidence:Array.from({length:8},(_,i)=>({date:`2027-03-${String(i+1).padStart(2,'0')}`,score:70-i,user_score:50,counterpart_score:55,user_evidence:Array.from({length:3},()=>({...asp('Venus','trine','Mars'),noise:'x'.repeat(1500)})),counterpart_evidence:Array.from({length:3},()=>({...asp('Mercury','sextile','Venus'),noise:'x'.repeat(1500)})),exact_date_basis:'fast_transit_trigger'}))}
+  }
+  const before=JSON.stringify(p).length
   const out=buildReunionEvidenceV2(p)
   assert.equal(out.coverage.solar_return,true)
   assert.equal(out.coverage.lunar_return,true)
@@ -59,13 +74,20 @@ test('solar and lunar returns stay context-only and cannot create a convergence 
   assert.ok(returns.every(e=>e.role==='context'))
   assert.ok(returns.every(e=>e.direction==='shared'))
   assert.ok(returns.every(e=>e.question!=='initiative'))
-  assert.ok(returns.some(e=>e.date==='2027-01-05'))
   assert.equal(out.convergence.some(x=>x.independent_groups.some(g=>g.includes('return'))),false)
   assert.match(out.policy,/never creates an exact date/i)
-  const after=JSON.stringify(p.reunion_return_support).length
-  assert.ok(after < before/4)
+  const after=JSON.stringify(p).length
+  assert.ok(after < before/5,`expected strong prompt compaction: ${before} -> ${after}`)
   assert.equal('monthly_context' in p.reunion_return_support,false)
-  assert.equal(p.reunion_return_support.candidate_dates[0].exact_date_basis,'fast_transit_trigger')
+  assert.ok(p.reunion_return_support.solar_return.user.events.length<=2)
+  assert.ok(p.reunion_return_support.lunar_return.user.events.length<=4)
+  assert.ok(p.reunion_return_support.candidate_dates.length<=8)
+  assert.equal(p.reunion_secondary_support.represented_in,'reunion_evidence_v2')
+  assert.equal('months' in p.reunion_secondary_support,false)
+  assert.ok(p.reunion_timing_windows.windows.length<=16)
+  assert.ok(p.reunion_timing_windows.windows.every(row=>row.fast_evidence.length<=2&&row.period_support.length<=2))
+  assert.ok(p.reunion_timing_windows.windows.some(row=>row.stage==='relationship_rebuilding'))
+  assert.ok(p.reunion_dimensions.contact_recontact.top_evidence.every(row=>!('user_evidence' in row)&&!('counterpart_evidence' in row)))
 })
 
 test('does not invent exact-time layers when unavailable',()=>{

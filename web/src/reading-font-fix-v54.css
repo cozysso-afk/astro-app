@@ -94,3 +94,51 @@
     line-height: 1.55 !important;
   }
 }
+
+/* V61 · reunion mobile stability
+ * The mode row is a finite four-choice control, not a horizontal scroller.
+ * iOS can repaint/raster-shift the page while a transformed SVG spins inside the
+ * long relationship calculation surface, so the relationship loader stays static.
+ */
+@media (max-width: 600px) {
+  html body #root .app-shell .tool-panel:has(.relationship-main-mode-row) {
+    overflow-x: hidden !important;
+  }
+
+  @supports (overflow: clip) {
+    html body #root .app-shell .tool-panel:has(.relationship-main-mode-row) {
+      overflow-x: clip !important;
+    }
+  }
+
+  html body #root .app-shell .relationship-main-mode-row {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 6px !important;
+    margin: 14px 0 0 !important;
+    padding: 2px 0 4px !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-x: none !important;
+    -webkit-overflow-scrolling: auto !important;
+    touch-action: pan-y !important;
+  }
+
+  html body #root .app-shell .relationship-main-mode-row > button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding-inline: 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html body #root .app-shell .relationship-main-mode-row ~ .primary-button .spin {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+}
