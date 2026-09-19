@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.4-return-neutral-direction'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.5-return-prompt-compact'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -77,11 +77,9 @@ function addMetric(items: Evidence[], question: QuestionKey, layer: string, grou
   items.push(makeEvidence({question,layer,family:'metric',independence_group:group,role:'context',direction,period:null,date:best[0]?.split(':')[0] ?? null,aspect:null,orb:null,tone:null,facts:[`average=${avg.toFixed(1)}`,`band=${short(stat.band,30)}`,...best]}, items.length+1))
 }
 
-
 function addReturnContext(items: Evidence[], packet: any) {
   const support = packet?.reunion_return_support
   if (!support || typeof support !== 'object' || support?.available === false) return
-  const directionFor = (person: string): Evidence['direction'] => person === 'counterpart' ? 'incoming' : person === 'user' ? 'outgoing' : 'shared'
   const addEvents = (kind: 'solar_return'|'lunar_return', group: string, question: QuestionKey) => {
     const block = support?.[kind] ?? {}
     for (const person of ['user','counterpart']) {
@@ -123,6 +121,61 @@ function addReturnContext(items: Evidence[], packet: any) {
         'independent_bonus_eligible=false',
       ],
     }, items.length+1))
+  }
+}
+
+function compactReturnAspect(a: any) {
+  if (!a || typeof a !== 'object') return null
+  return {a:short(a?.a,24),aspect:short(a?.aspect,24),b:short(a?.b,24),orb:num(a?.orb),tone:short(a?.tone,16)}
+}
+
+function compactReturnEvent(row: any) {
+  if (!row || typeof row !== 'object') return null
+  return {
+    window_start:short(row?.window_start,16) || null,
+    window_end_exclusive:short(row?.window_end_exclusive,16) || null,
+    activation_score:num(row?.activation_score),
+    balance:short(row?.balance,20) || null,
+    precision:short(row?.precision,20) || null,
+    top_aspects:arr(row?.top_aspects).slice(0,3).map(compactReturnAspect).filter(Boolean),
+  }
+}
+
+function compactReturnPerson(block: any, limit: number) {
+  if (!block || typeof block !== 'object') return {available:false,events:[]}
+  const events = arr(block?.events)
+    .map(compactReturnEvent)
+    .filter(Boolean)
+    .sort((a:any,b:any)=>Number(b?.activation_score ?? 0)-Number(a?.activation_score ?? 0))
+    .slice(0,limit)
+  return {available:Boolean(block?.available),reason:block?.reason??null,events}
+}
+
+function compactReturnSupportForPrompt(support: any) {
+  if (!support || typeof support !== 'object') return support ?? null
+  const candidate_dates = arr(support?.candidate_dates).slice(0,10).map((row:any)=>({
+    date:short(row?.date,16),
+    stages:arr(row?.stages).slice(0,4).map((x:any)=>short(x,28)),
+    fast_trigger_score:num(row?.fast_trigger_score),
+    priority_index:num(row?.priority_index),
+    exact_date_basis:short(row?.exact_date_basis,32),
+    return_role:short(row?.return_role,40),
+    return_context:{
+      background_score:num(row?.return_context?.background_score),
+      solar_return:{pair_activation_score:num(row?.return_context?.solar_return?.pair_activation_score),shared_activation:Boolean(row?.return_context?.solar_return?.shared_activation)},
+      lunar_return:{pair_activation_score:num(row?.return_context?.lunar_return?.pair_activation_score),shared_activation:Boolean(row?.return_context?.lunar_return?.shared_activation)},
+    },
+  }))
+  return {
+    engine:short(support?.engine,64),
+    period:support?.period??null,
+    solar_return:{role:'annual_background',user:compactReturnPerson(support?.solar_return?.user,3),counterpart:compactReturnPerson(support?.solar_return?.counterpart,3)},
+    lunar_return:{role:'monthly_emotional_background',user:compactReturnPerson(support?.lunar_return?.user,6),counterpart:compactReturnPerson(support?.lunar_return?.counterpart,6)},
+    candidate_dates,
+    weight_policy:support?.weight_policy??null,
+    display_policy:support?.display_policy??null,
+    policy:short(support?.policy,420),
+    event_probability:'not_calculated',
   }
 }
 
@@ -250,6 +303,9 @@ export function buildReunionEvidenceV2(packet: any) {
     progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
     solar_return: Boolean(packet?.reunion_return_support?.solar_return?.user?.available || packet?.reunion_return_support?.solar_return?.counterpart?.available),
     lunar_return: Boolean(packet?.reunion_return_support?.lunar_return?.user?.available || packet?.reunion_return_support?.lunar_return?.counterpart?.available),
+  }
+  if (packet && typeof packet === 'object' && packet.reunion_return_support) {
+    packet.reunion_return_support = compactReturnSupportForPrompt(packet.reunion_return_support)
   }
   return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
 }
