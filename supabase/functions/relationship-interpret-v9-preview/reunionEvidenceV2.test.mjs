@@ -20,20 +20,23 @@ function exactPacket(){return {
     months:[{calendar_month:'2027-01',progressed_synastry:{available:true,user_progressed_to_partner_natal:[asp('Mercury','trine','Venus',.2)],partner_progressed_to_user_natal:[asp('Venus','sextile','Mercury',.3)],progressed_to_progressed:[asp('Mercury','trine','Mercury',.4)]},progressed_composite:{available:true,to_natal_composite_aspects:[asp('Sun','trine','Saturn',.35)]},marks_tertiary:{available:true,user:{to_base_marks_aspects:[asp('Mercury','sextile','Venus',.5)]},counterpart:{to_base_marks_aspects:[asp('Venus','trine','Moon',.4)]},directional_cross_aspects:[asp('Mercury','trine','Venus',.3)]}}]
   },
   directional:{incoming:stat(68.3,'2027-01-21'),outgoing:stat(53.9,'2026-10-21'),reconnection:stat(61.1,'2027-01-05')},
-  reunion_dimensions:{contact_recontact:{reconnection:stat(64)},emotional_reactivation:{reconnection:stat(59)},relationship_rebuilding:{reconnection:stat(42)}},
-  reunion_secondary_support:{months:[{calendar_month:'2027-01',dimensions:{contact_recontact:{evidence:[asp('Mercury','trine','Venus',.2)]},emotional_reactivation:{evidence:[asp('Venus','sextile','Moon',.4)]},relationship_rebuilding:{evidence:[asp('Saturn','trine','Venus',.5)]}}}]},
+  reunion_dimensions:{emotional_reactivation:{reconnection:stat(59)},contact_recontact:{reconnection:stat(64)},in_person_meeting:{reconnection:stat(51)},relationship_rebuilding:{reconnection:stat(42)}},
+  reunion_secondary_support:{months:[{calendar_month:'2027-01',dimensions:{emotional_reactivation:{evidence:[asp('Venus','sextile','Moon',.4)]},contact_recontact:{evidence:[asp('Mercury','trine','Venus',.2)]},in_person_meeting:{evidence:[asp('Venus','trine','Mars',.3)]},relationship_rebuilding:{evidence:[asp('Saturn','trine','Venus',.5)]}}}]},
   transit_triggers:{top_days:[{date:'2027-01-05',hits:[{person:'counterpart',transit:'Mercury',a:'Mercury',aspect:'trine',target:'Venus',b:'Venus',orb:.2,tone:'supportive'}]}]}
 }}
 
-test('maps every available relationship layer into question-first evidence',()=>{
+test('maps every available relationship layer into question-first four-stage evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.1-editorial-polish')
-  assert.match(out.policy,/do not re-explain the same aspect/i)
+  assert.equal(out.version,'reunion-evidence-v2.2-four-stage-direction-gate')
+  assert.match(out.policy,/Emotion, contact, meeting, and reunion are separate stages/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
   const rebuild=out.convergence.find(x=>x.question==='rebuild'&&x.role==='support')
   assert.ok(rebuild)
   assert.ok(rebuild.independent_groups.length>=2)
+  assert.equal(out.initiative_gate.available,false)
+  assert.equal(out.initiative_gate.verdict,'undetermined')
+  assert.ok(out.evidence.some(e=>e.layer==='dimension.in_person_meeting'))
 })
 
 test('does not invent exact-time layers when unavailable',()=>{
@@ -44,6 +47,28 @@ test('does not invent exact-time layers when unavailable',()=>{
   assert.equal(out.coverage.marks,false)
   assert.equal(out.coverage.marks_tertiary,false)
   assert.equal(out.evidence.some(e=>['davison','marks.user','marks.counterpart'].includes(e.layer)),false)
+})
+
+test('side activation metrics alone never open the first-contact direction gate',()=>{
+  const p=exactPacket()
+  p.advanced.months[0].progressed_synastry.user_progressed_to_partner_natal=[]
+  p.advanced.months[0].progressed_synastry.partner_progressed_to_user_natal=[]
+  p.advanced.months[0].marks_tertiary.user.to_base_marks_aspects=[]
+  p.advanced.months[0].marks_tertiary.counterpart.to_base_marks_aspects=[]
+  p.directional.incoming=stat(99)
+  p.directional.outgoing=stat(10)
+  const out=buildReunionEvidenceV2(p)
+  assert.equal(out.initiative_gate.available,false)
+  assert.equal(out.initiative_gate.verdict,'undetermined')
+})
+
+test('direction gate opens only when two independent action families align on one side',()=>{
+  const p=exactPacket()
+  p.advanced.months[0].marks_tertiary.counterpart.to_base_marks_aspects=[]
+  const out=buildReunionEvidenceV2(p)
+  assert.equal(out.initiative_gate.available,true)
+  assert.equal(out.initiative_gate.verdict,'user_to_counterpart')
+  assert.deepEqual(new Set(out.initiative_gate.outgoing.independent_groups),new Set(['secondary_progression','marks_tertiary']))
 })
 
 test('keeps conflicting natal evidence as counter evidence instead of averaging it away',()=>{

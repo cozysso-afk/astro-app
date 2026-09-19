@@ -35,8 +35,8 @@ function normalizeDegreePrecision(value: string) {
   return value.replace(/(\d+\.\d{2,})\s*°/g, (_m, raw) => {
     const n = Number(raw)
     if (!Number.isFinite(n)) return `${raw}°`
-    if (n >= 0 && n < 0.05) return '0.1° 미만'
-    return `${n.toFixed(1)}°`
+    if (n >= 0 && n < 0.005) return '0.01° 미만'
+    return `${n.toFixed(2)}°`
   })
 }
 
@@ -68,13 +68,13 @@ export function polishReunionNarrativeText(value: unknown, provisional = false) 
   out = out
     .replace(/\bProgressed\b/gi, '진행')
     .replace(/\borb\b/gi, '오브')
-    .replace(/\bincoming\b/gi, '상대→나')
-    .replace(/\boutgoing\b/gi, '나→상대')
+    .replace(/\bincoming\b/gi, '상대측 활성')
+    .replace(/\boutgoing\b/gi, '내측 활성')
     .replace(/\breconnection\b/gi, '재접점')
 
   out = normalizeDegreePrecision(out)
   out = out
-    .replace(/(?:오차|오브)\s*0\.1° 미만(?:\s*수준)?의?\s*(?:극도로\s*)?정밀한/g, '아주 가까운')
+    .replace(/(?:오차|오브)\s*0\.01° 미만(?:\s*수준)?의?\s*(?:극도로\s*)?정밀한/g, '오브 0.01° 미만으로 매우 가까운')
     .replace(/극도로\s*정밀한/g, '매우 가까운')
 
   if (provisional) {
@@ -161,6 +161,18 @@ function normalizeRefs(current: unknown, fallback: string[], valid: Set<string>,
   const kept = uniq(arr(current).map(text).filter(x => valid.has(x)))
   if (kept.length >= min) return kept.slice(0, 12)
   return uniq([...kept, ...fallback]).slice(0, Math.max(min, 3))
+}
+
+function allowedTimingDateGate(payload: any) {
+  const present = Boolean(payload?.reunion_timing_windows && Array.isArray(payload?.reunion_timing_windows?.windows))
+  const dates = new Set(arr(payload?.reunion_timing_windows?.windows).map((x:any)=>text(x?.date)).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)))
+  return { present, dates }
+}
+
+function timingWindowAllowed(window: any, gate: {present:boolean;dates:Set<string>}) {
+  if (!gate.present) return true
+  const found = text(window?.period).match(/\d{4}-\d{2}-\d{2}/g) ?? []
+  return !found.length || found.every((x:string)=>gate.dates.has(x))
 }
 
 function hasCoreText(v: any) {
@@ -268,6 +280,18 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
       ...x,
       evidence_refs: normalizeRefs(x?.evidence_refs, [], valid, 0),
     })).filter((x: any) => x.evidence_refs.length >= 2),
+  }
+
+  const timingDateGate = allowedTimingDateGate(payload)
+  v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, timingDateGate)) }
+  const gate = payload?.reunion_evidence_v2?.initiative_gate
+  if (gate?.available !== true) {
+    v2.initiative = {
+      ...v2.initiative,
+      conclusion: '현재 계산만으로 누가 먼저 연락한다고 판정하지 않는다.',
+      interpretation: '상대측 활성과 내측 활성은 각 차트가 자극받는 정도일 뿐 실제 행동 방향이 아니다. 서로 독립된 방향성 행동 근거가 충분히 겹치지 않아 선연락 주체는 판정 불가다.',
+      evidence_refs: normalizeRefs(v2?.initiative?.evidence_refs, fallbacks.initiative, valid),
+    }
   }
 
   if (text(v2.summary).length < 180) v2.summary = composeSummary(v2)

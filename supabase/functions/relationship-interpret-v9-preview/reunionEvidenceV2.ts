@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.1-editorial-polish'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.2-four-stage-direction-gate'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -133,8 +133,8 @@ export function buildReunionEvidenceV2(packet: any) {
     if (pc?.available) for (const a of arr(pc.to_natal_composite_aspects).slice(0,4)) addAspect(items,'rebuild','progressed_composite','secondary','secondary_composite',a,undefined,period,'shared')
     const mt = m?.marks_tertiary
     if (mt?.available) {
-      for (const a of arr(mt?.user?.to_base_marks_aspects).slice(0,2)) addAspect(items,'timing','marks_tertiary.user','tertiary','marks_tertiary',a,undefined,period,'outgoing')
-      for (const a of arr(mt?.counterpart?.to_base_marks_aspects).slice(0,2)) addAspect(items,'timing','marks_tertiary.counterpart','tertiary','marks_tertiary',a,undefined,period,'incoming')
+      for (const a of arr(mt?.user?.to_base_marks_aspects).slice(0,2)) addAspect(items,'initiative','marks_tertiary.user','tertiary','marks_tertiary',a,undefined,period,'outgoing')
+      for (const a of arr(mt?.counterpart?.to_base_marks_aspects).slice(0,2)) addAspect(items,'initiative','marks_tertiary.counterpart','tertiary','marks_tertiary',a,undefined,period,'incoming')
       for (const a of arr(mt?.directional_cross_aspects).slice(0,2)) addAspect(items,'timing','marks_tertiary.cross','tertiary','marks_tertiary',a,undefined,period,'shared')
     }
   }
@@ -144,8 +144,9 @@ export function buildReunionEvidenceV2(packet: any) {
   addMetric(items,'timing','directional.reconnection','directional_metric',packet?.directional?.reconnection,'shared')
 
   const dims = packet?.reunion_dimensions ?? {}
-  addMetric(items,'timing','dimension.contact_recontact','dimension_metric',dims?.contact_recontact?.reconnection,'shared')
   addMetric(items,'why_reconnect','dimension.emotional_reactivation','dimension_metric',dims?.emotional_reactivation?.reconnection,'shared')
+  addMetric(items,'timing','dimension.contact_recontact','dimension_metric',dims?.contact_recontact?.reconnection,'shared')
+  addMetric(items,'timing','dimension.in_person_meeting','dimension_metric',dims?.in_person_meeting?.reconnection,'shared')
   addMetric(items,'rebuild','dimension.relationship_rebuilding','dimension_metric',dims?.relationship_rebuilding?.reconnection,'shared')
 
   for (const d of arr(packet?.transit_triggers?.top_days).slice(0,8)) {
@@ -155,7 +156,7 @@ export function buildReunionEvidenceV2(packet: any) {
   }
 
   for (const m of arr(packet?.reunion_secondary_support?.months)) {
-    for (const [name,q] of [['contact_recontact','timing'],['emotional_reactivation','why_reconnect'],['relationship_rebuilding','rebuild']] as const) {
+    for (const [name,q] of [['emotional_reactivation','why_reconnect'],['contact_recontact','timing'],['in_person_meeting','timing'],['relationship_rebuilding','rebuild']] as const) {
       const x = m?.dimensions?.[name]
       if (!x) continue
       for (const a of arr(x.evidence).slice(0,3)) addAspect(items,q,`secondary_support.${name}`,'secondary','secondary_progression',a,undefined,m?.calendar_month,'shared')
@@ -175,10 +176,27 @@ export function buildReunionEvidenceV2(packet: any) {
       return groups.length >= 2 ? [{question:q,role,independent_groups:groups,evidence_refs:aligned.filter(e=>groups.includes(e.independence_group)).slice(0,6).map(e=>e.id)}] : []
     })
   })
+  const actionTerms = ['Mercury','Venus','Mars','Sun']
+  const directionalRows = evidence.filter(e => e.question === 'initiative' && (e.direction === 'incoming' || e.direction === 'outgoing') && e.aspect && (e.independence_group === 'secondary_progression' || e.independence_group === 'marks_tertiary') && actionTerms.some(term => String(e.aspect).includes(term)))
+  const gateSide = (direction: 'incoming'|'outgoing') => {
+    const rows = directionalRows.filter(e => e.direction === direction)
+    const groups = [...new Set(rows.map(e=>e.independence_group))]
+    return {independent_groups:groups,evidence_refs:rows.slice(0,6).map(e=>e.id),qualified:groups.length>=2}
+  }
+  const incomingGate = gateSide('incoming'), outgoingGate = gateSide('outgoing')
+  const gateAvailable = incomingGate.qualified !== outgoingGate.qualified && (incomingGate.qualified || outgoingGate.qualified)
+  const initiative_gate = {
+    available: gateAvailable,
+    verdict: gateAvailable ? (incomingGate.qualified ? 'counterpart_to_user' : 'user_to_counterpart') : 'undetermined',
+    incoming: incomingGate,
+    outgoing: outgoingGate,
+    policy: 'Side-level transit metrics are excluded. A first-move direction requires at least two independent directional action families aligned on one side; otherwise the result is undetermined.',
+  }
+
   const coverage = {
     natal_synastry: evidence.some(e=>e.independence_group==='natal_synastry'),
     house_overlays: Boolean(house?.available), midpoint_composite:Boolean(adv?.composite?.available), davison:Boolean(adv?.davison?.available), marks:Boolean(adv?.marks?.available),
     progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision no finer than 0.1°.',coverage,questions,evidence:evidence.slice(0,36),convergence}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Return labels that restate the same transit phenomenon do not add an independent vote. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
 }

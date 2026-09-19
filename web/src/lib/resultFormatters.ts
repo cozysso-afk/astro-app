@@ -238,7 +238,7 @@ function compactReunionDimensionsForExternal(value: unknown, caps: { directional
   if (!value || typeof value !== 'object') return null
   const row = value as Record<string, unknown>
   const one = (key: string) => compactReunionDimensionForExternal(row[key],caps.directionalMonths,caps.transitDays,caps.statBest,caps.statCaution)
-  return {period:row.period ?? null,contact_recontact:one('contact_recontact'),emotional_reactivation:one('emotional_reactivation'),relationship_rebuilding:one('relationship_rebuilding'),policy:row.policy ?? null}
+  return {period:row.period ?? null,emotional_reactivation:one('emotional_reactivation'),contact_recontact:one('contact_recontact'),in_person_meeting:one('in_person_meeting'),relationship_rebuilding:one('relationship_rebuilding'),policy:row.policy ?? null}
 }
 
 function compactSecondaryDimensionForExternal(value: unknown, evidenceLimit: number) {
@@ -259,7 +259,7 @@ function compactReunionSecondarySupportForExternal(value: unknown, monthLimit: n
   const months = (Array.isArray(row.months) ? row.months : []).slice(0,monthLimit).map((item)=>{
     const m = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
     const d = (m.dimensions && typeof m.dimensions === 'object' ? m.dimensions : {}) as Record<string, unknown>
-    return {calendar_month:m.calendar_month ?? null,representative_date:m.representative_date ?? null,dimensions:{contact_recontact:compactSecondaryDimensionForExternal(d.contact_recontact,evidenceLimit),emotional_reactivation:compactSecondaryDimensionForExternal(d.emotional_reactivation,evidenceLimit),relationship_rebuilding:compactSecondaryDimensionForExternal(d.relationship_rebuilding,evidenceLimit)}}
+    return {calendar_month:m.calendar_month ?? null,representative_date:m.representative_date ?? null,dimensions:{emotional_reactivation:compactSecondaryDimensionForExternal(d.emotional_reactivation,evidenceLimit),contact_recontact:compactSecondaryDimensionForExternal(d.contact_recontact,evidenceLimit),in_person_meeting:compactSecondaryDimensionForExternal(d.in_person_meeting,evidenceLimit),relationship_rebuilding:compactSecondaryDimensionForExternal(d.relationship_rebuilding,evidenceLimit)}}
   })
   return {months,policy:row.policy ?? null,event_probability:'not_calculated'}
 }
@@ -321,6 +321,8 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     reunion_transits: transits,
     reunion_dimensions: compactReunionDimensionsForExternal(rawResult.reunion_dimensions,caps),
     reunion_secondary_support: compactReunionSecondarySupportForExternal(rawResult.reunion_secondary_support,caps.months,caps.tight),
+    reunion_timing_windows: rawResult.reunion_timing_windows ?? null,
+    reunion_return_support: rawResult.reunion_return_support ?? null,
     reunion_directional_context: reunionContext ? {
       period:reunionContext.period,
       incoming:compactStatForExternal(reunionContext.incoming,caps.statBest,caps.statCaution),
@@ -339,7 +341,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
   const modeRule = kind === 'marriage'
     ? '- 결혼 여부를 예언하지 않고 장기 결속·협력·긴장 활성도를 본다.'
     : kind === 'reunion'
-      ? '- 재회는 ① 연락/재접촉 활성화 ② 감정 재활성화 ③ 실제 관계 재구축 가능성을 서로 다른 층으로 분리한다. 수신(상대→나)·발신(나→상대)·과거인연 재접점도 섞지 않는다.'
+      ? '- 재회는 ① 감정 활성 ② 연락·재접촉 ③ 실제 만남 ④ 관계 재결합을 서로 독립된 단계로 계산한다. 앞 단계가 강해도 다음 단계로 자동 승격하지 않는다. 상대측/내측 활성만으로 누가 먼저 연락한다고 판정하지 않는다.'
       : '- 궁합의 정적 구조와 선택 기간의 시기 활성도를 구분한다.'
   const married = request.analysis_mode === 'marriage_married' || (kind === 'marriage' && request.relationship_status === 'married')
   const structure = married ? '[현재 부부 흐름] [정서적 거리] [대화] [생활 역할] [반복 갈등] [회복력] [장기 안정성] [현실적인 조정 포인트]'
@@ -358,13 +360,13 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '계산 권위는 별빛의 운명 엔진에 있다. 외부 LLM은 해석자이며 두 번째 계산기가 아니다.',
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
-    kind === 'reunion' ? '- 재회운은 reunion_dimensions의 연락·재접촉 / 감정·관계 재활성 / 관계 재구축 지원층을 분리하고, 각 축의 incoming/outgoing/reconnection도 합치지 않는다. reunion_secondary_support는 daily transit 점수와 합산하지 않는다.' : '',
+    kind === 'reunion' ? '- 재회운은 reunion_dimensions의 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 분리한다. incoming/outgoing은 상대측/내측 활성이지 행동 방향이 아니다. reunion_secondary_support는 기간 배경이며 exact date를 만들지 않는다.' : '',
     '- 개인행성·수성의 소통·금성/화성의 끌림·토성의 책임·교점의 관계 관련성을 우선하고 반복 주제와 애스펙트 성격, 오브를 함께 본다. 외행성끼리의 세대 접점을 작은 오브만으로 최우선에 놓지 않는다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
     '- 사주는 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고 없는 천간합·신강/신약·용신·배우자성은 만들지 않는다.',
     modeRule,
-    kind === 'reunion' ? '- 수신(상대→나)·발신(나→상대)·재접점을 따로 읽고, directional 날짜와 reunion_transits의 실제 날짜가 겹치는지 교차검증한다.' : '',
+    kind === 'reunion' ? '- 정확한 날짜는 reunion_timing_windows에 실제 존재하는 fast-trigger 날짜만 쓴다. 진행각은 기간 신호로만 읽고 날짜를 만들지 않는다. 상대측/내측 활성은 선연락 주체 판정에 사용하지 않는다.' : '',
     '[필수 답변 구조]',
     structure,
     married ? '이미 존재하는 부부관계로 읽는다. 미래 배우자·미래 결혼 가능성을 예측하지 않는다.' : '결혼하거나 재회할 것이라고 예언하지 않는다.',
@@ -375,7 +377,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '근거가 적으면 점수 방향만 보이며 구체적인 근거가 부족하다고 밝히고 분량을 억지로 채우지 않는다.',
     '서로 독립된 레이어 점수를 합산하지 않는다. 실제로 같은 시기에 맥락이 겹칠 때만 비교하고 충돌도 설명한다.',
     '생시 제한으로 제외된 ASC/DSC·MC/IC·하우스·Davison·Marks·시간 민감 진행을 복원하지 않는다.',
-    kind === 'reunion' ? '재회에서는 reunion_dimensions, reunion_directional_context, reunion_transits, secondary support를 다른 층으로 읽는다. 재접촉 활성도는 재회 성공 확률이 아니다.' : '',
+    kind === 'reunion' ? '재회에서는 reunion_dimensions, reunion_timing_windows, reunion_directional_context, reunion_transits, secondary support를 다른 층으로 읽는다. 감정 활성≠연락≠만남≠재결합이며 재접촉 활성도는 재회 성공 확률이 아니다.' : '',
     '실제로 있는 날짜만 쓰고 상대 속마음·사건 확률·새 점수·없는 애스펙트를 만들지 않는다.',
     '한국어 상담형 문단으로 전문용어를 풀어라. 한줄 나열·의미 없는 장황함·같은 결론과 어미 반복·evidence ID·JSON 필드명 낭독을 피한다.',
   ].filter(Boolean)
