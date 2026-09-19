@@ -1,0 +1,38 @@
+name: Apply reunion return v18 integration
+
+on:
+  push:
+    branches:
+      - feat/reunion-solar-lunar-return-v18
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[return-v18-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feat/reunion-solar-lunar-return-v18
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply integration patch
+        run: python scripts/upgrade_reunion_returns_v18.py
+      - name: Validate patch
+        run: git diff --check
+      - name: Commit patched sources
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/main.py supabase/functions/relationship-interpret-v9-preview/index.ts supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.ts web/src/lib/resultFormatters.ts
+          git commit -m "feat: integrate solar lunar return context [return-v18-applied]"
+          git push origin HEAD:feat/reunion-solar-lunar-return-v18
