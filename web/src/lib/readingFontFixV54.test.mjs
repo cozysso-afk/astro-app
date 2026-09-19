@@ -13,6 +13,13 @@ test('live mobile reading headline uses an unmistakable Nanum Myeongjo face', ()
   assert.match(css, /\.period-ai-head \.reading-hero-subtitle[\s\S]*font-weight:\s*400\s*!important/)
 })
 
+test('compatibility hero stays compact and uses the full text column on mobile', () => {
+  assert.match(css, /relationship-experience\[data-mode="compatibility"\] \.reading-hero\s*\{[\s\S]*?min-height:\s*0\s*!important/)
+  assert.match(css, /relationship-experience\[data-mode="compatibility"\] \.reading-hero \.celestial-mark\s*\{[\s\S]*?position:\s*absolute\s*!important/)
+  assert.match(css, /relationship-experience\[data-mode="compatibility"\] \.reading-hero h3\s*\{[\s\S]*?font-size:\s*17px\s*!important/)
+  assert.match(css, /relationship-experience\[data-mode="compatibility"\] \.reading-hero h3\s*\{[\s\S]*?max-width:\s*none\s*!important/)
+})
+
 test('font fix loads immediately before the shared reading owner while shared owner stays last', () => {
   const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(match => match[1])
   const fix = imports.indexOf('reading-font-fix-v54.css')
