@@ -163,14 +163,16 @@ function normalizeRefs(current: unknown, fallback: string[], valid: Set<string>,
   return uniq([...kept, ...fallback]).slice(0, Math.max(min, 3))
 }
 
-function allowedTimingDates(payload: any) {
-  return new Set(arr(payload?.reunion_timing_windows?.windows).map((x:any)=>text(x?.date)).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)))
+function allowedTimingDateGate(payload: any) {
+  const present = Boolean(payload?.reunion_timing_windows && Array.isArray(payload?.reunion_timing_windows?.windows))
+  const dates = new Set(arr(payload?.reunion_timing_windows?.windows).map((x:any)=>text(x?.date)).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)))
+  return { present, dates }
 }
 
-function timingWindowAllowed(window: any, allowed: Set<string>) {
-  if (!allowed.size) return true
+function timingWindowAllowed(window: any, gate: {present:boolean;dates:Set<string>}) {
+  if (!gate.present) return true
   const found = text(window?.period).match(/\d{4}-\d{2}-\d{2}/g) ?? []
-  return !found.length || found.every((x:string)=>allowed.has(x))
+  return !found.length || found.every((x:string)=>gate.dates.has(x))
 }
 
 function hasCoreText(v: any) {
@@ -280,8 +282,8 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     })).filter((x: any) => x.evidence_refs.length >= 2),
   }
 
-  const allowedDates = allowedTimingDates(payload)
-  v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, allowedDates)) }
+  const timingDateGate = allowedTimingDateGate(payload)
+  v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, timingDateGate)) }
   const gate = payload?.reunion_evidence_v2?.initiative_gate
   if (gate?.available !== true) {
     v2.initiative = {
