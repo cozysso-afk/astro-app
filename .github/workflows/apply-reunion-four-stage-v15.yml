@@ -26,6 +26,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Fix replacement helper for literal backslashes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply_reunion_four_stage_v15.py')
+          s=p.read_text(encoding='utf-8')
+          old='out, n = re.subn(pattern, repl, text, count=1, flags=flags)'
+          new='out, n = re.subn(pattern, lambda _m: repl, text, count=1, flags=flags)'
+          if old not in s:
+              raise SystemExit('sub_once helper anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+
       - name: Apply migration
         run: python scripts/apply_reunion_four_stage_v15.py
 
