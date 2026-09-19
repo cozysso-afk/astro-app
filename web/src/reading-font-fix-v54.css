@@ -50,3 +50,47 @@
     line-height: 1.82 !important;
   }
 }
+
+/* V60 · relationship mobile hero repair
+ * Compatibility/relationship mode should read like a compact summary card, not a poster.
+ * Keep the celestial mark out of normal flow so it cannot steal a wide text column.
+ */
+@media (max-width: 600px) {
+  html body #root .app-shell .relationship-experience[data-mode="compatibility"] .reading-hero {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 14px 16px 16px !important;
+  }
+
+  html body #root .app-shell .relationship-experience[data-mode="compatibility"] .reading-hero .celestial-mark {
+    position: absolute !important;
+    top: 14px !important;
+    right: 14px !important;
+    float: none !important;
+    margin: 0 !important;
+  }
+
+  html body #root .app-shell .relationship-experience[data-mode="compatibility"] .reading-hero .eyebrow {
+    padding-right: 40px !important;
+    margin: 0 !important;
+  }
+
+  html body #root .app-shell .relationship-experience[data-mode="compatibility"] .reading-hero h3 {
+    width: 100% !important;
+    max-width: none !important;
+    padding-right: 8px !important;
+    margin: 6px 0 0 !important;
+    font-size: 17px !important;
+    line-height: 1.56 !important;
+    letter-spacing: -.02em !important;
+  }
+
+  html body #root .app-shell .relationship-experience[data-mode="compatibility"] .reading-hero .reading-hero-subtitle {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 8px 0 0 !important;
+    padding: 0 !important;
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+  }
+}
