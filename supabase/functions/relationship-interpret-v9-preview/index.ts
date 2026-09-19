@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v11.12-solar-lunar-return-context";
+const REUNION_VERSION="relationship-v11.13-return-background-presentation";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -162,6 +162,8 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - natal synastry는 기본 상호작용, composite는 관계 자체의 기본 구조, Davison은 현실의 관계 과제, Marks A/B는 각 방향의 관계 경험, progressed synastry는 현재 두 사람의 진행 접점, progressed composite는 관계 자체의 현재 단계, Marks tertiary와 daily transit은 단기 시기 촉발로 역할을 분리한다.
 - 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 네 단계로 분리하고 한 단계의 강함을 다음 단계의 성립으로 자동 승격하지 않는다.
 - CALCULATED_DATA.reunion_return_support의 Solar Return(태양회귀)은 연간 배경, Lunar Return(달회귀)은 월간·정서 배경으로만 사용한다. Return만으로 구체 날짜를 만들지 말고, 이미 fast transit trigger를 통과한 날짜들 사이에서 배경 교차검증/동률 해소에만 사용한다. 같은 천문 현상을 transit과 Return으로 중복 가산하지 않는다.
+- Return에서 user/counterpart 쪽이 활성됐다는 사실은 선연락 방향 근거가 아니다. Return은 initiative(누가 먼저 움직이는가) 판정에 사용하지 말고, 방향은 initiative_gate가 available일 때만 따른다.
+- 사용자 본문에서는 Solar Return/Lunar Return 기술명을 앞세우지 말고 각각 '연간 배경', '월간 배경'으로 먼저 풀어 쓴다. 기술명은 정밀도·근거 설명에서만 병기한다.
 - 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
 - "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
 - 시기창은 기간 신호와 날짜 트리거를 분리한다. Secondary Progression은 기간 배경만 만들고, 특정 날짜는 reunion_timing_windows에 실제 fast transit trigger가 있을 때만 제시한다.

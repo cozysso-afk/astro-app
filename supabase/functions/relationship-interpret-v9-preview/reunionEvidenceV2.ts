@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.3-solar-lunar-return-context'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.4-return-neutral-direction'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -94,11 +94,12 @@ function addReturnContext(items: Evidence[], packet: any) {
           `balance=${short(row?.balance,24)}`,
           `precision=${short(row?.precision,24)}`,
           `independent_bonus_eligible=false`,
+          `directional_use=forbidden`,
           ...arr(row?.top_aspects).slice(0,3).map((a:any)=>`${aspectText(a)} orb=${Number(a?.orb ?? 0).toFixed(2)}°`),
         ]
         items.push(makeEvidence({
           question, layer:`return.${kind}.${person}`, family:'return', independence_group:group,
-          role:'context', direction:directionFor(person), period:start && end ? `${start}..${end}` : start || null,
+          role:'context', direction:'shared', period:start && end ? `${start}..${end}` : start || null,
           date:null, aspect:null, orb:null, tone:row?.balance ?? null, facts,
         }, items.length+1))
       }
@@ -250,5 +251,5 @@ export function buildReunionEvidenceV2(packet: any) {
     solar_return: Boolean(packet?.reunion_return_support?.solar_return?.user?.available || packet?.reunion_return_support?.solar_return?.counterpart?.available),
     lunar_return: Boolean(packet?.reunion_return_support?.lunar_return?.user?.available || packet?.reunion_return_support?.lunar_return?.counterpart?.available),
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
 }

@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v11\.12-solar-lunar-return-context"/)
+  assert.match(server,/REUNION_VERSION="relationship-v11\.13-return-background-presentation"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -50,6 +50,9 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(panel,/timing\.outgoing/)
   assert.match(panel,/best_days/)
   assert.match(panel,/날짜로 좁혀 보면/)
+  assert.match(panel,/연간·월간 배경/)
+  assert.match(panel,/왜 이렇게 봤어\?/)
+  assert.match(panel,/returnSupport/)
   assert.match(panel,/실제 연락·재회 확률이 아니라/)
   assert.match(reunionCss,/\.reunion-v2-window/)
   assert.match(reunionCss,/\.reunion-date-focus-list/)

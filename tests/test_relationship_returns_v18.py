@@ -42,6 +42,13 @@ def test_solar_and_lunar_returns_are_separate_background_layers():
     assert all(row["exact_date_basis"] == "fast_transit_trigger" for row in support["candidate_dates"])
     assert all(row["independent_bonus_eligible"] is False for row in support["candidate_dates"])
     assert all(row["event_probability"] == "not_calculated" for row in support["candidate_dates"])
+    assert support["weight_policy"]["fast_trigger_weight"] == 0.85
+    assert support["weight_policy"]["return_context_weight"] == 0.15
+    assert support["display_policy"]["initiative_use"] == "forbidden"
+    for row in support["candidate_dates"]:
+        expected = round(row["fast_trigger_score"] * 0.85 + row["return_context"]["background_score"] * 0.15, 1)
+        assert row["priority_index"] == expected
+        assert row["priority_components"]["return_weight_cap"] == 0.15
 
     # The return layer annotates but never rewrites the fast-trigger stage score.
     contact = out["reunion_dimensions"]["contact_recontact"]["top_evidence"][0]

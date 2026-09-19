@@ -24,7 +24,9 @@ import swisseph as swe
 
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-ENGINE_VERSION = "relationship-return-v1.0-solar-lunar-context"
+ENGINE_VERSION = "relationship-return-v1.1-bounded-context-presentation"
+FAST_TRIGGER_WEIGHT = 0.85
+RETURN_CONTEXT_WEIGHT = 0.15
 
 BODY_IDS = {
     "Sun": swe.SUN,
@@ -419,9 +421,14 @@ def augment_relationship_with_returns(result: dict[str, Any], user_profile: dict
         candidates.append({
             **base,
             "return_context": context,
-            "priority_index": round(fast_score * 0.85 + background * 0.15, 1),
+            "priority_index": round(fast_score * FAST_TRIGGER_WEIGHT + background * RETURN_CONTEXT_WEIGHT, 1),
             "exact_date_basis": "fast_transit_trigger",
             "return_role": "background_tiebreaker_only",
+            "priority_components": {
+                "fast_trigger_weight": FAST_TRIGGER_WEIGHT,
+                "return_context_weight": RETURN_CONTEXT_WEIGHT,
+                "return_weight_cap": RETURN_CONTEXT_WEIGHT,
+            },
             "independent_bonus_eligible": False,
             "event_probability": "not_calculated",
         })
@@ -454,6 +461,17 @@ def augment_relationship_with_returns(result: dict[str, Any], user_profile: dict
         },
         "monthly_context": monthly,
         "candidate_dates": candidates[:16],
+        "weight_policy": {
+            "fast_trigger_weight": FAST_TRIGGER_WEIGHT,
+            "return_context_weight": RETURN_CONTEXT_WEIGHT,
+            "return_weight_cap": RETURN_CONTEXT_WEIGHT,
+            "meaning": "Return can only re-rank dates that already passed the fast-trigger gate; it never creates a date or event probability.",
+        },
+        "display_policy": {
+            "main_labels": ["연간 배경", "월간 배경"],
+            "technical_labels": ["Solar Return(태양회귀)", "Lunar Return(달회귀)"],
+            "initiative_use": "forbidden",
+        },
         "policy": (
             "Solar Return and Lunar Return are separate return-chart context layers. "
             "They may rank or contextualize dates that already passed the fast-transit gate, "

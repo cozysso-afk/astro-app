@@ -381,3 +381,39 @@ body,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+/* Return context presentation v19 */
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 9px 0 6px;
+}
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-context-card {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(112, 91, 142, 0.14);
+  border-radius: 15px;
+  background: rgba(255,255,255,0.62);
+}
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-context-card b {
+  display: block;
+  margin-bottom: 5px;
+  font-size: .9rem;
+}
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-context-card p,
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-rule {
+  margin: 0;
+  line-height: 1.58;
+}
+.app-shell .relationship-experience[data-mode='reunion'] .reunion-return-rule {
+  margin-top: 7px;
+  font-size: .8rem;
+  opacity: .72;
+}
+@media (max-width: 480px) {
+  .app-shell .relationship-experience[data-mode='reunion'] .reunion-return-context-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
