@@ -47,14 +47,23 @@ def test_exact_progressed_mercury_preserved_and_direction_is_distinct():
 
 
 def _row(day,score):
-    return {'date':day,'stage':'contact_recontact','eligible':True,'components':{'final':score,'independent_systems':['western']},'fast_evidence':[],'period_support':[],'mid_evidence':[]}
+    return {
+        'date':day,'stage':'contact_recontact','eligible':True,'stage_trigger_ok':True,
+        'components':{'final':score,'event_trigger':score,'event_trigger_raw':score,'long_term':60,'mid_term':50,'independent_systems':['western']},
+        'fast_evidence':[],'period_support':[],'mid_evidence':[]
+    }
 
 
-def _peak_row(day,event,final=None,stage='contact_recontact',trigger=True):
+def _peak_row(day,event,final=None,stage='contact_recontact',trigger=True,raw=None):
     final = event if final is None else final
+    raw = event if raw is None else raw
     return {
         'date':day,'stage':stage,'eligible':True,'stage_trigger_ok':trigger,
-        'components':{'final':final,'event_trigger':event,'long_term':60,'mid_term':50,'independent_systems':['western']},
+        'components':{
+            'final':final,'event_trigger':event,'event_trigger_raw':raw,
+            'primary_trigger_strength':event if trigger else 0,'primary_trigger_orb':0.1 if trigger else None,
+            'long_term':60,'mid_term':50,'independent_systems':['western']
+        },
         'fast_evidence':[],'period_support':[],'mid_evidence':[],
     }
 
@@ -79,14 +88,39 @@ def test_local_peak_selector_does_not_treat_every_gate_day_as_candidate():
     assert sum(r['eligible'] for r in rows)==15
 
 
-def test_stage_specific_trigger_is_required_before_local_peak_selection():
-    moon=[{'a':'Moon'}]
-    mercury=[{'a':'Mercury'}]
-    mars=[{'a':'Mars'}]
+def test_asof_future_peak_is_not_suppressed_by_past_maximum():
+    asof=date(2026,9,19)
+    rows=[_peak_row('2026-09-18',100)]
+    rows += [_peak_row((asof+timedelta(days=i)).isoformat(),89-i) for i in range(8)]
+    h._mark_local_peaks(rows,min_date=asof,max_date=date(2026,9,26))
+    selected=[r['date'] for r in rows if r['selection_eligible']]
+    assert selected==['2026-09-19']
+    assert not rows[0]['selection_eligible']
+
+
+def test_stage_specific_trigger_must_materially_contribute():
+    moon=[{'a':'Moon','strength':80,'orb':0.1,'event_id':'moon'}]
+    weak_mercury=[{'a':'Mercury','strength':0.1,'orb':0.01,'event_id':'weak-mercury'}]
+    mercury=[{'a':'Mercury','strength':12,'orb':0.9,'event_id':'mercury'}]
+    mars=[{'a':'Mars','strength':12.1,'orb':0.8,'event_id':'mars'}]
     assert not h._stage_trigger_ok('contact_recontact',moon)
-    assert h._stage_trigger_ok('contact_recontact',mercury)
+    assert not h._stage_trigger_ok('contact_recontact',moon+weak_mercury)
+    assert h._stage_trigger_ok('contact_recontact',moon+mercury)
     assert not h._stage_trigger_ok('in_person_meeting',mercury)
     assert h._stage_trigger_ok('in_person_meeting',mars)
+
+
+def test_display_fast_evidence_always_contains_material_primary_trigger():
+    evidence=[
+        {'a':'Moon','strength':90,'orb':0.1,'event_id':'a'},
+        {'a':'Moon','strength':80,'orb':0.2,'event_id':'b'},
+        {'a':'Mars','strength':70,'orb':0.3,'event_id':'c'},
+        {'a':'Moon','strength':60,'orb':0.4,'event_id':'d'},
+        {'a':'Mercury','strength':12.5,'orb':0.5,'event_id':'primary'},
+    ]
+    shown=h._display_fast_evidence('contact_recontact',evidence,4)
+    assert shown[0]['event_id']=='primary'
+    assert len(shown)==4
 
 
 def test_nearest_public_candidate_is_nearest_local_peak_not_first_gate_day():
@@ -95,19 +129,87 @@ def test_nearest_public_candidate_is_nearest_local_peak_not_first_gate_day():
     for i in range(20):
         score=100-abs(i-9)*5
         rows.append(_peak_row((start+timedelta(days=i)).isoformat(),score))
-    h._mark_local_peaks(rows)
+    h._mark_local_peaks(rows,min_date=start,max_date=date(2027,1,20))
     peaks=h._peak_windows(rows,start,3)
     assert peaks[0]['date']=='2027-01-10'
     assert not rows[0]['selection_eligible']
 
 
-def test_selectivity_reports_gate_ratio_separately_from_peak_ratio():
+def test_stage_local_peaks_are_not_cross_stage_suppressed_within_two_days():
+    start=date(2026,1,1)
+    rows=[
+        _peak_row('2026-01-01',50,stage='contact_recontact'),
+        _peak_row('2026-01-02',98,stage='emotional_reactivation'),
+        _peak_row('2026-01-20',40,stage='in_person_meeting'),
+    ]
+    h._mark_local_peaks(rows,min_date=start,max_date=date(2026,1,31))
+    public=h._peak_windows(rows,start,limit=None)
+    keys={(r['date'],r['stage']) for r in public}
+    assert ('2026-01-01','contact_recontact') in keys
+    assert ('2026-01-02','emotional_reactivation') in keys
+    nearest=min(public,key=lambda r:(r['date'],-r['final'],r['stage']))
+    assert nearest['date']=='2026-01-01'
+
+
+def test_same_stage_seven_days_collapses_but_eight_days_survives():
+    start=date(2026,1,1)
+    rows=[
+        _peak_row('2026-01-01',80),
+        _peak_row('2026-01-08',90),
+        _peak_row('2026-01-16',85),
+    ]
+    h._mark_local_peaks(rows,min_date=start,max_date=date(2026,1,31))
+    selected=[r['date'] for r in rows if r['selection_eligible']]
+    assert selected==['2026-01-08','2026-01-16']
+
+
+def test_capped_plateau_uses_raw_trigger_signal_before_date_tiebreak():
+    start=date(2026,1,1)
+    rows=[
+        _peak_row('2026-01-01',100,final=100,raw=101),
+        _peak_row('2026-01-02',100,final=100,raw=105),
+        _peak_row('2026-01-03',100,final=100,raw=102),
+    ]
+    h._mark_local_peaks(rows,min_date=start,max_date=date(2026,1,3))
+    assert [r['date'] for r in rows if r['selection_eligible']]==['2026-01-02']
+
+
+def test_flat_plateau_after_asof_keeps_one_future_representative():
+    asof=date(2026,9,19)
+    rows=[_peak_row('2026-09-18',100,raw=120)]
+    rows += [_peak_row((asof+timedelta(days=i)).isoformat(),100,raw=120) for i in range(8)]
+    h._mark_local_peaks(rows,min_date=asof,max_date=date(2026,9,26))
+    assert [r['date'] for r in rows if r['selection_eligible']]==['2026-09-19']
+
+
+def test_selectivity_reports_gate_trigger_and_peak_counts_separately():
     rows=[_peak_row(f'2026-01-{i:02d}',50+i) for i in range(1,11)]
-    h._mark_local_peaks(rows)
-    summary=h._selectivity_summary(rows)['contact_recontact']
+    h._mark_local_peaks(rows,min_date=date(2026,1,1),max_date=date(2026,1,10))
+    summary=h._selectivity_summary(rows,date(2026,1,1))['contact_recontact']
     assert summary['gate_pass_days']==10
+    assert summary['stage_trigger_pass_days']==10
     assert summary['local_peak_days']<summary['gate_pass_days']
     assert summary['status']=='LOW_SELECTIVITY'
+    assert 'LOW_GATE_SELECTIVITY' in summary['warnings']
+
+
+def test_selected_requires_explicit_selection_flag_not_gate_fallback():
+    assert not h._selected({'eligible':True})
+    assert h._selected({'eligible':True,'selection_eligible':True})
+
+
+def test_bounded_public_lists_keep_nearest_candidate():
+    rows=[{'date':f'2026-01-{i:02d}','stage':'contact_recontact','final':100-i} for i in range(1,8)]
+    nearest=rows[-1]
+    bounded=h._bounded_with_nearest(rows,nearest,3)
+    assert len(bounded)==3
+    assert nearest in bounded
+
+
+def test_fast_sampling_is_three_hour_grid_with_end_of_day_sample():
+    assert h.FAST_SAMPLE_HOURS[:3]==(0,3,6)
+    assert h.FAST_SAMPLE_HOURS[-1]==23.999
+    assert max(b-a for a,b in zip(h.FAST_SAMPLE_HOURS,h.FAST_SAMPLE_HOURS[1:]))<=3
 
 
 def test_return_crossing_handles_retrograde_repeats_and_wrap(monkeypatch):
@@ -119,13 +221,15 @@ def test_return_crossing_handles_retrograde_repeats_and_wrap(monkeypatch):
     assert [round(e['jd']-base) for e in events]==[0,1,2,3,4]
 
 
-def test_continuous_activation_has_local_peaks_and_separate_past_slice():
+def test_continuous_activation_has_one_future_local_peak_and_separate_past_slice():
     start=date(2026,1,1); asof=date(2026,9,19)
     rows=[_row((start+timedelta(days=i)).isoformat(),50+i/10) for i in range(365)]
-    peaks=h._peak_windows(rows,asof,3)
-    assert len(peaks)==3
-    assert all((date.fromisoformat(w['end'])-date.fromisoformat(w['start'])).days<=2 for w in peaks)
-    assert all(w['start']>=asof.isoformat() for w in peaks)
+    h._mark_local_peaks(rows,min_date=asof,max_date=date(2026,12,31))
+    peaks=h._peak_windows(rows,asof,limit=None)
+    assert len(peaks)==1
+    assert peaks[0]['date']=='2026-12-31'
+    assert (date.fromisoformat(peaks[0]['end'])-date.fromisoformat(peaks[0]['start'])).days<=2
+    assert peaks[0]['start']>=asof.isoformat()
     past=h._group_windows([r for r in rows if r['date']<asof.isoformat()],asof)
     assert past[0]['end']=='2026-09-18'
 
@@ -173,14 +277,23 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
     body['actual_events']=['2026-09-20']; body['user']['actual_events']=['2026-09-21']
     two=relationship_western(RelationshipRequest(**body))
     assert one==two
-    hierarchy=one['result']['reunion_hierarchy']
+    result=one['result']
+    hierarchy=result['reunion_hierarchy']
     assert hierarchy['validation']['status']=='PASS'
     assert len(hierarchy['daily_trace'])==11*4
     assert len(hierarchy['long_term_daily'])==11*4
-    assert hierarchy['version']=='reunion-hierarchy-v2.1-selectivity'
+    assert hierarchy['version']=='reunion-hierarchy-v2.2-selectivity-boundaries'
     assert 'selectivity' in hierarchy and 'selection_policy' in hierarchy
-    assert all(r['date']>='2026-09-19' for r in one['result']['reunion_timing_windows']['windows'])
-    assert all(r.get('local_peak') for r in one['result']['reunion_timing_windows']['windows'])
+    assert hierarchy['selection_policy']['primary_trigger_min_strength']==h.THRESHOLDS['event_trigger']
+    windows=result['reunion_timing_windows']['windows']
+    assert all(r['date']>='2026-09-19' for r in windows)
+    assert all(r.get('local_peak') for r in windows)
+    if hierarchy['nearest_window']:
+        nearest=hierarchy['nearest_window']
+        assert any(r['date']==nearest['date'] and r['stage']==nearest['stage'] for r in windows)
+    gate_count=sum(1 for r in hierarchy['daily_trace'] if r['eligible'])
+    selected_count=sum(1 for r in hierarchy['daily_trace'] if r['selection_eligible'])
+    assert selected_count<=gate_count
     for row in hierarchy['daily_trace']:
         c=row['components']
         expected=round(min(100,c['weighted_sum']*c['gate_multiplier']+c['convergence_bonus']),2)
@@ -189,3 +302,5 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
             assert all(c['gates'].values())
         if row['selection_eligible']:
             assert row['eligible'] and row['stage_trigger_ok'] and row['local_peak']
+            required=h.PRIMARY_TRIGGER_BY_STAGE[row['stage']]
+            assert any(e.get('a') in required and e.get('strength',0)>=h.THRESHOLDS['event_trigger'] for e in row['fast_evidence'])
