@@ -27,14 +27,17 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
   assert.match(formatters, /timing_contract:\s*\{/)
   assert.match(formatters, /compactReunionDimensionsForExternal\(rawResult\.reunion_dimensions,caps\)/)
   assert.match(formatters, /compactReunionSecondarySupportForExternal\(rawResult\.reunion_secondary_support,caps\.months,caps\.tight\)/)
+  assert.match(formatters, /reunion_timing_windows: rawResult\.reunion_timing_windows \?\? null/)
+  assert.match(formatters, /reunion_return_support: rawResult\.reunion_return_support \?\? null/)
   assert.doesNotMatch(formatters, /reunion_dimensions: rawResult\.reunion_dimensions \?\? null/)
   assert.doesNotMatch(formatters, /reunion_secondary_support: rawResult\.reunion_secondary_support \?\? null/)
   assert.match(edge, /secondaryDimensionPacket/)
+  assert.match(edge, /reunion_timing_windows:base\.reunion_timing_windows/)
 })
 
-test('relationship interpretation cache versions track the provisional-time and editorial evidence contracts', () => {
+test('relationship interpretation cache versions track the provisional-time and four-stage reunion contracts', () => {
   assert.match(edge, /VERSION="relationship-v11\.8-provisional-time-reference"/)
-  assert.match(edge, /REUNION_VERSION="relationship-v11\.10-provisional-time-reference"/)
+  assert.match(edge, /REUNION_VERSION="relationship-v11\.11-four-stage-gated-dates"/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.10-editorial-polish-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.11-four-stage-gated-dates-v1'/)
 })
