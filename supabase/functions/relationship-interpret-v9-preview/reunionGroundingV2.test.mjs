@@ -43,6 +43,7 @@ test('repairs invalid refs only from the server evidence matrix and expands a sh
   assert.equal(json.includes('NOPE'), false)
   assert.ok(out.data.reunion_synthesis_v2.why_reconnect.evidence_refs.every(x => ['E1','E2'].includes(x)))
   assert.ok(out.data.reunion_synthesis_v2.initiative.evidence_refs.length > 0)
+  assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /판정하지 않는다/)
   assert.equal(out.data.reunion_synthesis_v2.convergence.length, 0)
 })
 
@@ -54,12 +55,13 @@ test('does not manufacture prose when a core generated section is missing', () =
   assert.equal(out.reason, 'missing_core_section_text')
 })
 
-test('turns technical English annotations into natural Korean and removes false sub-degree precision', () => {
+test('turns technical English annotations into natural Korean and displays tiny orbs without misleading 0.0 degree rounding', () => {
   const raw = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 오차 0.002° 수준의 극도로 정밀한 각을 형성해.'
   const out = polishReunionNarrativeText(raw, true)
   assert.match(out, /진행 금성/)
   assert.match(out, /육십분위/)
   assert.match(out, /태양/)
+  assert.match(out, /0\.01° 미만/)
   assert.equal(out.includes('Progressed'), false)
   assert.equal(out.includes('Venus('), false)
   assert.equal(out.includes('sextile('), false)
@@ -67,7 +69,7 @@ test('turns technical English annotations into natural Korean and removes false 
   assert.equal(out.includes('극도로 정밀한'), false)
 })
 
-test('suppresses a repeated technical evidence sentence when the later section still has unique interpretation', () => {
+test('suppresses repeated technical evidence and refuses a first-contact direction when the server direction gate is closed or absent', () => {
   const x = reading()
   x.reunion_synthesis_v2.summary = '재접촉 문은 열려 있지만 실제 관계 회복은 별도 조건이 필요해. 누가 먼저 움직이는지와 언제 접점이 강해지는지를 나눠 봐야 하고, 다시 붙은 뒤의 유지력도 따로 확인해야 해. 같은 계산 근거를 여러 섹션에서 반복해 강도를 부풀리지는 않을게.'
   x.reunion_synthesis_v2.why_reconnect.interpretation = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 orb 0.021°로 가까워 과거의 호의적 정서를 다시 자극해. 이 접점은 재연결 동기를 설명하는 근거야.'
@@ -78,6 +80,46 @@ test('suppresses a repeated technical evidence sentence when the later section s
   const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
   assert.match(why, /진행 금성/)
   assert.equal(initiative.includes('진행 금성'), false)
-  assert.match(initiative, /먼저 움직이는 방향/)
+  assert.match(initiative, /판정 불가/)
+  assert.equal(initiative.includes('내 쪽이 조금 앞서'), false)
   assert.equal(`${why} ${initiative}`.includes('0.021°'), false)
+})
+
+test('keeps a directional conclusion only when the server initiative gate is explicitly open', () => {
+  const x = reading()
+  const gatedPayload = {
+    ...payload,
+    reunion_evidence_v2: {
+      ...payload.reunion_evidence_v2,
+      initiative_gate: { available: true, verdict: 'user_to_counterpart' },
+    },
+  }
+  const out = repairReunionGroundingV2(x, gatedPayload)
+  assert.equal(out.ok, true)
+  assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /내 쪽 움직임/)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.conclusion.includes('판정하지 않는다'), false)
+})
+
+test('exact dates fail closed when there is no fast-trigger allowlist while broad progression periods remain', () => {
+  const x = reading()
+  x.reunion_synthesis_v2.timing.windows = [
+    { period: '2027-01-15', meaning: '정확한 날짜를 임의로 찍은 창이야.', evidence_refs: ['E3'] },
+    { period: '2027-01', meaning: '진행각이 가리키는 넓은 기간 신호야.', evidence_refs: ['E4'] },
+  ]
+  const out = repairReunionGroundingV2(x, { ...payload, reunion_timing_windows: { windows: [] } })
+  assert.equal(out.ok, true)
+  const periods = out.data.reunion_synthesis_v2.timing.windows.map(x => x.period)
+  assert.deepEqual(periods, ['2027-01'])
+})
+
+test('an exact date survives only when the calculation fast-trigger allowlist contains that date', () => {
+  const x = reading()
+  x.reunion_synthesis_v2.timing.windows = [
+    { period: '2027-01-15', meaning: '계산 트리거가 실제 겹친 날짜야.', evidence_refs: ['E3'] },
+    { period: '2027-01-16', meaning: '허용 목록에 없는 날짜야.', evidence_refs: ['E4'] },
+  ]
+  const out = repairReunionGroundingV2(x, { ...payload, reunion_timing_windows: { windows: [{ date: '2027-01-15' }] } })
+  assert.equal(out.ok, true)
+  const periods = out.data.reunion_synthesis_v2.timing.windows.map(x => x.period)
+  assert.deepEqual(periods, ['2027-01-15'])
 })
