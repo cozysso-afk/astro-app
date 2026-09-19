@@ -13,6 +13,7 @@ on:
       - 'relationship_saju_v1.py'
       - 'relationship_reliability_v1.py'
       - 'reunion_dimension_v1.py'
+      - 'reunion_hierarchy_v2.py'
       - 'birth_time_reliability_v1.py'
       - 'personal_marriage_v1.py'
       - 'personal_love_forecast_v1.py'
@@ -34,6 +35,7 @@ on:
       - 'tests/test_birth_time_reliability_v12.py'
       - 'tests/test_relationship_reliability_v13.py'
       - 'tests/test_reunion_dimensions_v14.py'
+      - 'tests/test_reunion_hierarchy_v2.py'
       - 'tests/test_relationship_api_e2e_v15.py'
       - 'tests/test_relationship_returns_v18.py'
       - 'tests/test_personal_love_engine_v16.py'
@@ -79,7 +81,24 @@ jobs:
         run: python -m pip install -q -r api/requirements.txt pytest httpx
 
       - name: Calculation syntax contract
-        run: python -m py_compile integrated_fortune_v1.py integrated_fortune_precision_v2.py relationship_western_v1.py relationship_return_v1.py relationship_saju_v1.py relationship_reliability_v1.py reunion_dimension_v1.py birth_time_reliability_v1.py personal_marriage_v1.py personal_love_forecast_v1.py western_house_system_v1.py astrocartography_v1.py thai_lagna_v1.py thai_suriyayat_v1.py api/main.py
+        run: >-
+          python -m py_compile
+          integrated_fortune_v1.py
+          integrated_fortune_precision_v2.py
+          relationship_western_v1.py
+          relationship_return_v1.py
+          relationship_saju_v1.py
+          relationship_reliability_v1.py
+          reunion_dimension_v1.py
+          reunion_hierarchy_v2.py
+          birth_time_reliability_v1.py
+          personal_marriage_v1.py
+          personal_love_forecast_v1.py
+          western_house_system_v1.py
+          astrocartography_v1.py
+          thai_lagna_v1.py
+          thai_suriyayat_v1.py
+          api/main.py
 
       - name: Western, Saju, and relationship calculation audit
         run: |
@@ -97,6 +116,7 @@ jobs:
             tests/test_birth_time_reliability_v12.py \
             tests/test_relationship_reliability_v13.py \
             tests/test_reunion_dimensions_v14.py \
+            tests/test_reunion_hierarchy_v2.py \
             tests/test_relationship_api_e2e_v15.py \
             tests/test_relationship_returns_v18.py \
             tests/test_personal_love_engine_v16.py \
