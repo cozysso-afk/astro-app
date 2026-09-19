@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 
@@ -55,14 +56,8 @@ def _compact_window(window: dict | None) -> dict | None:
     }
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"ok": True, "audit": "pr186-v22"}
-
-
-@app.get("/replay/{case_id}")
-def replay(case_id: str, q: str = Query(...)) -> dict:
-    payload = _decode_payload(case_id, q)
+def _run_case(case_id: str, ciphertext: str) -> dict:
+    payload = _decode_payload(case_id, ciphertext)
     started = time.perf_counter()
     response = relationship_western(RelationshipRequest(**payload))
     runtime = time.perf_counter() - started
@@ -99,3 +94,45 @@ def replay(case_id: str, q: str = Query(...)) -> dict:
             "selected": sum(bool(r.get("selection_eligible")) for r in trace),
         },
     }
+
+
+def _log_view(result: dict) -> dict:
+    return {
+        "case": result["case"],
+        "version": result["version"],
+        "runtime_seconds": result["runtime_seconds"],
+        "validation": result["validation"],
+        "selectivity": result["selectivity"],
+        "stage_counts": result["stage_counts"],
+        "public_count": result["public_count"],
+        "trace_totals": result["trace_totals"],
+        "nearest": result["nearest"],
+        "top_periods": result["top_periods"],
+        "public_index": [
+            {"date": row.get("date"), "stage": row.get("stage"), "final": row.get("final")}
+            for row in result["public"]
+        ],
+    }
+
+
+@app.on_event("startup")
+def startup_replay() -> None:
+    if not json.loads(os.getenv("AUDIT_KEYS_JSON", "{}")):
+        return
+    cipher_path = Path(__file__).with_name("audit_ciphertexts.json")
+    if not cipher_path.exists():
+        return
+    ciphers = json.loads(cipher_path.read_text(encoding="utf-8"))
+    for case_id in ("y2026", "y2027a", "y2027b"):
+        result = _run_case(case_id, ciphers[case_id])
+        print("AUDIT_RESULT " + json.dumps(_log_view(result), ensure_ascii=False, sort_keys=True), flush=True)
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"ok": True, "audit": "pr186-v22"}
+
+
+@app.get("/replay/{case_id}")
+def replay(case_id: str, q: str = Query(...)) -> dict:
+    return _run_case(case_id, q)
