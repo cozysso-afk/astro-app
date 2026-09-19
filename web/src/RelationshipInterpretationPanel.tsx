@@ -1,3 +1,4 @@
+import { hierarchyView } from './lib/reunionHierarchy'
 import { tenGodLens } from './lib/systemReading'
 import { ReadingBadge, ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ReadingExplanation } from './ReadingExplanation'
@@ -34,13 +35,15 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
   aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
+  hierarchy?: Record<string, unknown> | null;
   timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
+  const hierarchyData = hierarchyView(hierarchy)
   const exportRef = useRef<HTMLElement | null>(null)
   const [imageExporting, setImageExporting] = useState(false)
   const [imageExportStatus, setImageExportStatus] = useState('')
@@ -68,7 +71,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   })()
 
   const reunionDateHighlights = (() => {
-    if (!reunion || !timing) return [] as Array<{date:string; labels:string[]; score:number}>
+    if (!reunion || !timing || hierarchy) return [] as Array<{date:string; labels:string[]; score:number}>
     const byDate = new Map<string,{date:string; labels:string[]; score:number}>()
     const sources = [
       { stat: timing.reconnection, label: '과거 인연 재접점' },
@@ -94,7 +97,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   })()
 
   const reunionReturnSummary = (() => {
-    if (!reunion || !returnSupport || typeof returnSupport !== 'object') return null
+    if (!reunion || !returnSupport || typeof returnSupport !== 'object' || hierarchy) return null
     const support = returnSupport as any
     const rows = (value: unknown): any[] => Array.isArray(value) ? value : []
     const numberOrNull = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : null
@@ -204,6 +207,27 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       </button>
       {!!imageExportStatus && <small role="status">{imageExportStatus}</small>}
     </div>
+
+    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy">
+      <h3>최종 결론</h3>
+      <p>재접점 활성도: {String(hierarchyData.stages?.contact_recontact?.activation ?? '유효 후보 없음')} · 재결합 지원 활성도: {String(hierarchyData.stages?.relationship_rebuilding?.activation ?? '유효 후보 없음')}</p>
+      <p>선연락 주체: 판정 불가</p>
+      <p>{Object.values(hierarchyData.stages).map(s=>`${s.label}: ${s.activation ?? '유효 후보 없음'}`).join(' · ')}</p>
+      {hierarchyData.stability_structure && <p>안정적 관계 유지 구조: 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수는 재결합 확률이나 관계의 지속 여부를 뜻하지 않습니다.</p>}
+      {hierarchyData.validation?.status !== 'PASS' && <p role="alert">계산 검증에 실패해 후보 날짜와 해석 생성을 보류했습니다.</p>}
+      <h4>오늘 이후 가장 강한 기간 TOP 3</h4>
+      {hierarchyData.top_periods.map((w)=><article className="relationship-pattern" key={`${w.start}:${w.stage}`}>
+        <b>{w.start} ~ {w.end} · {w.label}</b><p>핵심 날짜 {w.date} · 상대 활성도 {w.final}점</p>
+        <details><summary>점수 근거</summary><p>장기 {w.components.long_term} · 중기 {w.components.mid_term} · 촉발점 {w.components.event_trigger} · 체계 교차 {w.components.cross_system} · 최종 {w.components.final}</p></details>
+      </article>)}
+      {!hierarchyData.top_periods.length && <p>조회 기간에 장기·중기·단기 조건을 모두 통과한 미래 후보가 없습니다.</p>}
+      {hierarchyData.nearest_window?.date && <p>가장 가까운 활성창: {hierarchyData.nearest_window.start} ~ {hierarchyData.nearest_window.end} · 핵심 날짜 {hierarchyData.nearest_window.date}</p>}
+      <p>반복 패턴: {leadFriction?.caution ?? '긴장과 끌림을 구분하고, 연락 이후 실제 행동이 지속되는지 확인하세요.'}</p>
+      <p>{hierarchyData.score_meaning}</p>
+      <details className="reading-more"><summary>왜 이렇게 나왔는지 — 쉬운 설명</summary><p>먼저 장기 관계 활성과 중기 배경이 겹치는 기간을 찾고, 그 안에서 연락·감정·만남·관계 재정의의 촉발점을 따로 계산했습니다. 정확한 각 하나만으로 재회 날짜를 정하지 않습니다.</p><p>감정 활성 ≠ 연락 ≠ 만남 ≠ 재결합 ≠ 안정적 관계 유지</p></details>
+      <details className="reading-more"><summary>이미 지나간 활성기</summary>{hierarchyData.past_windows.map((w)=><p key={`${w.start}:${w.stage}`}>{w.start} ~ {w.end} · {w.label} · {w.final}점</p>)}</details>
+      <details className="reading-more"><summary>전문 근거·검증 범위</summary><p>Secondary Progression(세컨더리 프로그레션/2차 진행) · Solar Arc(솔라아크/태양호) · Transit(트랜짓/경과) · 다섯 행성 회귀 · 사주 절입</p>{hierarchyData.limitations.map(x=><p key={x}>{x}</p>)}{(hierarchyData.validation?.checks ?? []).filter((x)=>x.status!=='PASS').map((x)=><p key={x.name}>{x.name}: {x.status} — {x.detail}</p>)}</details>
+    </section>}
 
     {ai?.ok && ai.data ? <section className="reading-section relationship-natural-reading">
       <h3>{ai.data.headline}</h3>

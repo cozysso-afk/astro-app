@@ -1030,16 +1030,16 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             cp = _secondary_progressed_chart(counterpart_profile, target, include_angles=cp_clock_ready)
             progressed_precision = "exact" if user_exact and cp_exact else "provisional"
             ps = {
-                "user_progressed_to_partner_natal": _aspects(up, cp_natal, mode="secondary", limit=24),
-                "partner_progressed_to_user_natal": _aspects(cp, user_natal, mode="secondary", limit=24),
-                "progressed_to_progressed": _aspects(up, cp, mode="secondary", limit=24),
+                "user_progressed_to_partner_natal": _aspects(up, cp_natal, mode="secondary", limit=500 if analysis_mode == "reunion" else 24),
+                "partner_progressed_to_user_natal": _aspects(cp, user_natal, mode="secondary", limit=500 if analysis_mode == "reunion" else 24),
+                "progressed_to_progressed": _aspects(up, cp, mode="secondary", limit=500 if analysis_mode == "reunion" else 24),
             }
             row["progressed_synastry"] = {"available": True, "precision": progressed_precision, **ps}
             layer_aspects.update({f"progressed_synastry.{k}": v for k, v in ps.items()})
 
             prog_comp = _midpoint_chart(up, cp)
             natal_comp = result["composite"]["chart"]
-            pc_aspects = _aspects(prog_comp, natal_comp, mode="secondary", limit=24)
+            pc_aspects = _aspects(prog_comp, natal_comp, mode="secondary", limit=500 if analysis_mode == "reunion" else 24)
             row["progressed_composite"] = {
                 "available": True,
                 "precision": progressed_precision,

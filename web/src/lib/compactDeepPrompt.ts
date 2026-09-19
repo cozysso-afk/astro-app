@@ -121,6 +121,7 @@ export function buildRelationshipCompactPrompt(instructions: string, kind: strin
     precision:{partner_time_exact:exact,policy:'생시 미검증 시 Moon·ASC/DSC·MC/IC·하우스·Davison·Marks·시간 민감 진행을 추정하거나 복원하지 않는다.'},
     patterns:aspects.slice(0,level>=1?8:10).map(a=>({role:aspectRole(a),...pick(a,['a','b','aspect','tone','orb'])})),
     reunion_directional_context:kind==='reunion'?directions(timing):undefined,
+    reunion_hierarchy:kind==='reunion'?pick(r.reunion_hierarchy,['version','as_of_date','validation','weights','thresholds','stages','top_periods','nearest_window','initiative','coverage','score_meaning']):undefined,
     reunion_timing_windows:kind==='reunion'?pick(r.reunion_timing_windows,['windows','policy']):undefined,
     reunion_dimensions:kind==='reunion'?Object.fromEntries(['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding'].map(k=>[k,axis(r.reunion_dimensions?.[k])])):undefined,
     timing:list(r.reunion_transits?.top_days).slice(0,level>=2?2:4).map(d=>({...pick(d,['date','score','user_score','counterpart_score']),hits:list(d.hits).slice(0,1).map(h=>pick(h,['person','transit','target','aspect','tone']))})),

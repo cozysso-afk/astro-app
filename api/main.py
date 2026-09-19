@@ -19,13 +19,14 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 from relationship_return_v1 import ENGINE_VERSION as REL_RETURN_ENGINE_VERSION, augment_relationship_with_returns
+from reunion_hierarchy_v2 import apply_reunion_hierarchy
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.9-reunion-solar-lunar-return-v1"
+APP_VERSION = "api-fortune-v6.0-reunion-hierarchy"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -112,6 +113,8 @@ class RelationshipProfile(BaseModel):
 class RelationshipRequest(BaseModel):
     user: RelationshipProfile
     counterpart: RelationshipProfile
+    as_of_date: date | None = None
+    query_utc_offset_hours: float | None = Field(default=None, ge=-14, le=14)
     start_date: date
     end_date: date
     relationship_status: RelationshipStatus = "dating"
@@ -477,6 +480,10 @@ def relationship_western(request: RelationshipRequest) -> dict:
                     "policy": "Solar/Lunar Return is an optional background cross-check and does not block the core reunion calculation.",
                     "event_probability": "not_calculated",
                 }
+            query_offset = request.query_utc_offset_hours if request.query_utc_offset_hours is not None else request.user.utc_offset_hours
+            as_of = request.as_of_date or datetime.now(timezone(timedelta(hours=query_offset))).date()
+            result = apply_reunion_hierarchy(result, user_payload, cp_payload, request.start_date, request.end_date,
+                as_of_date=as_of, query_utc_offset_hours=query_offset)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
 

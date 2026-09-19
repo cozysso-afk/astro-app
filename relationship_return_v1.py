@@ -24,7 +24,7 @@ import swisseph as swe
 
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-ENGINE_VERSION = "relationship-return-v1.1-bounded-context-presentation"
+ENGINE_VERSION = "relationship-return-v2-five-body-exact-crossings"
 FAST_TRIGGER_WEIGHT = 0.85
 RETURN_CONTEXT_WEIGHT = 0.15
 
@@ -152,32 +152,42 @@ def _refine_return(body: str, target_lon: float, center_jd: float, half_width: f
 
 
 def _find_returns(body: str, target_lon: float, start_dt: datetime, end_dt: datetime) -> list[dict[str, Any]]:
+    """Bracket signed crossings, including retrograde repeats and range endpoints.
+
+    No 300-day deduplication for Mercury/Venus/Mars. Stationary near-misses
+    are rejected by a longitude residual of 1e-6 degrees.
+    """
     if end_dt <= start_dt:
         return []
-    step_days = 0.5 if body == "Moon" else 1.0
-    half_width = 0.75 if body == "Moon" else 1.5
-    min_spacing_days = 20.0 if body == "Moon" else 300.0
-    start_jd, end_jd = _jd(start_dt), _jd(end_dt)
-    points: list[tuple[float, float]] = []
-    cursor = start_jd
-    while cursor <= end_jd + step_days:
-        points.append((cursor, _distance(_planet_lon(cursor, body), target_lon)))
-        cursor += step_days
-    found: list[dict[str, Any]] = []
-    for idx in range(1, len(points) - 1):
-        prev_d, cur_d, next_d = points[idx - 1][1], points[idx][1], points[idx + 1][1]
-        if cur_d > prev_d or cur_d > next_d:
-            continue
-        refined_jd, orb = _refine_return(body, target_lon, points[idx][0], half_width)
-        if orb > 0.03:
-            continue
-        if refined_jd < start_jd - 0.1 or refined_jd > end_jd + 0.1:
-            continue
-        if found and abs(refined_jd - float(found[-1]["jd"])) < min_spacing_days:
-            if orb < float(found[-1]["orb"]):
-                found[-1] = {"jd": refined_jd, "orb": orb}
-            continue
-        found.append({"jd": refined_jd, "orb": orb})
+    start, end = _jd(start_dt), _jd(end_dt)
+    step = 0.25
+    def signed(jd):
+        return (_planet_lon(jd, body) - target_lon + 180.0) % 360.0 - 180.0
+    found = []
+    left, fl = start, signed(start)
+    while left < end:
+        right = min(end, left + step)
+        fr = signed(right)
+        root = None
+        if abs(fl) <= 1e-7:
+            root = left
+        elif abs(fr) <= 1e-7:
+            root = right
+        elif fl * fr <= 0 and abs(fr - fl) < 180.0:
+            lo, hi, flo = left, right, fl
+            for _ in range(48):
+                mid = (lo + hi) / 2
+                fm = signed(mid)
+                if flo * fm <= 0:
+                    hi = mid
+                else:
+                    lo, flo = mid, fm
+            root = (lo + hi) / 2
+        if root is not None:
+            residual = _distance(_planet_lon(root, body), target_lon)
+            if residual <= 1e-6 and (not found or root - found[-1]['jd'] > 1e-5):
+                found.append({'jd': root, 'orb': residual})
+        left, fl = right, fr
     return found
 
 
@@ -299,8 +309,49 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
             event["window_start"] = event["local_date"]
             event["window_end_exclusive"] = next_date
 
+    planetary = {}
+    for body, key, padding in (("Mercury", "mercury_return", 420), ("Venus", "venus_return", 650), ("Mars", "mars_return", 900)):
+        events = []
+        if reliability["time_available"]:
+            scan_start = datetime.combine(start_date - timedelta(days=padding), dt_time(), tzinfo=timezone.utc)
+            scan_end = datetime.combine(end_date + timedelta(days=padding), dt_time(), tzinfo=timezone.utc)
+            for item in _find_returns(body, solar_natal_positions[body], scan_start, scan_end):
+                instant = _datetime_from_jd(item["jd"])
+                events.append({
+                    "person": label, "return_type": key, "exact_utc": instant.isoformat(),
+                    "local_date": _local_iso_date(instant, offset), "orb": item["orb"],
+                    "precision": "exact" if reliability["time_exact"] else "provisional",
+                    **_activation_summary(_aspect_hits(_positions(item["jd"]), solar_natal_positions, body)),
+                    "independent_bonus_eligible": False,
+                })
+            for idx, event in enumerate(events):
+                event["window_start"] = event["local_date"]
+                event["window_end_exclusive"] = events[idx+1]["local_date"] if idx+1 < len(events) else None
+        planetary[key] = {"available": bool(events), "events": events, "role": "medium_term_context"}
+
+    # Keep exact UTC cycle boundaries and separated house systems. Birthplace is
+    # the explicit return-location fallback; it is not a claimed current residence.
+    from relationship_western_v1 import _chart_from_jd, _whole_sign_house, _house_of_longitude
+    for event in solar_events + lunar_events + [e for v in planetary.values() for e in v["events"]]:
+        jd = _jd(datetime.fromisoformat(event["exact_utc"]))
+        chart = _chart_from_jd(jd, profile.get("latitude"), profile.get("longitude"))
+        angles = chart["angles"]
+        event["angles"] = angles if reliability["time_exact"] else {}
+        event["location_basis"] = "entered_birthplace; current return location unavailable"
+        event["positions"] = {k: v["lon"] for k, v in chart["positions"].items()}
+        event["house_activations"] = [
+            {"planet": k, "whole_sign": _whole_sign_house(angles["ASC"], v["lon"]),
+             "quadrant": _house_of_longitude(angles["cusps"], v["lon"])}
+            for k,v in chart["positions"].items()
+            if angles and reliability["time_exact"] and k in {"Moon", "Mercury", "Venus", "Mars"}
+        ]
+    for events in [solar_events, lunar_events] + [v["events"] for v in planetary.values()]:
+        for idx, event in enumerate(events):
+            event["next_exact_utc"] = events[idx+1]["exact_utc"] if idx+1 < len(events) else None
+
     return {
         "person": label,
+        **planetary,
         "solar_return": {
             "available": bool(solar_events),
             "events": solar_events,
@@ -459,6 +510,7 @@ def augment_relationship_with_returns(result: dict[str, Any], user_profile: dict
             "user": user_ctx["lunar_return"],
             "counterpart": cp_ctx["lunar_return"],
         },
+        **{key: {"role": "medium_term_context", "user": user_ctx[key], "counterpart": cp_ctx[key]} for key in ("mercury_return", "venus_return", "mars_return")},
         "monthly_context": monthly,
         "candidate_dates": candidates[:16],
         "weight_policy": {
