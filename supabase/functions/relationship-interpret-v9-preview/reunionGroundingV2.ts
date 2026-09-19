@@ -74,7 +74,7 @@ export function polishReunionNarrativeText(value: unknown, provisional = false) 
 
   out = normalizeDegreePrecision(out)
   out = out
-    .replace(/(?:오차|오브)\s*0\.01° 미만(?:\s*수준)?의?\s*(?:극도로\s*)?정밀한/g, '아주 가까운')
+    .replace(/(?:오차|오브)\s*0\.01° 미만(?:\s*수준)?의?\s*(?:극도로\s*)?정밀한/g, '오브 0.01° 미만으로 매우 가까운')
     .replace(/극도로\s*정밀한/g, '매우 가까운')
 
   if (provisional) {
