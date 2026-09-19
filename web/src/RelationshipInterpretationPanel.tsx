@@ -64,12 +64,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
   const reunionInitiativeSummary = (() => {
     if (!reunion || !timing) return ''
-    const incoming = Number(timing.incoming?.average)
-    const outgoing = Number(timing.outgoing?.average)
-    if (!Number.isFinite(incoming) || !Number.isFinite(outgoing)) return '누가 먼저 움직일 흐름은 현재 계산만으로 비교하기 어려워.'
-    const gap = incoming - outgoing
-    const lead = gap >= 5 ? '상대 → 나 축이 더 강하게 잡혀' : gap <= -5 ? '나 → 상대 축이 더 강하게 잡혀' : '두 방향의 차이가 크지 않아'
-    return `${lead}. 상대 → 나 ${incoming.toFixed(0)}, 나 → 상대 ${outgoing.toFixed(0)}의 상대활성도 비교야.`
+    return '현재 상대측/내측 활성도만으로 누가 먼저 연락한다고 판정하지 않아. 실제 방향성 행동 근거가 서로 독립된 체계에서 확인될 때만 방향을 제시해.'
   })()
 
   const reunionDateHighlights = (() => {
@@ -77,8 +72,8 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     const byDate = new Map<string,{date:string; labels:string[]; score:number}>()
     const sources = [
       { stat: timing.reconnection, label: '과거 인연 재접점' },
-      { stat: timing.incoming, label: '상대 → 나' },
-      { stat: timing.outgoing, label: '나 → 상대' },
+      { stat: timing.incoming, label: '상대측 활성' },
+      { stat: timing.outgoing, label: '내측 활성' },
     ]
     for (const { stat, label } of sources) {
       for (const point of stat?.best_days?.slice(0, 5) ?? []) {

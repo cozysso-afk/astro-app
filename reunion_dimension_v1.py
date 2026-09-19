@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
-DIMENSIONS = ("contact_recontact", "emotional_reactivation", "relationship_rebuilding")
+# Product semantics: these four stages are deliberately orthogonal.
+# Emotional activation must never be auto-promoted to contact, contact to a meeting,
+# or a meeting to relationship rebuilding/reunion.
+DIMENSIONS = (
+    "emotional_reactivation",
+    "contact_recontact",
+    "in_person_meeting",
+    "relationship_rebuilding",
+)
+FAST_TRIGGER_PLANETS = {"Sun", "Mercury", "Venus", "Mars"}
 
 ASPECT_WEIGHTS = {
     "conjunction": 1.00,
@@ -13,33 +22,41 @@ ASPECT_WEIGHTS = {
     "quincunx": 0.68,
 }
 
-# These are product-interpretation weights, not empirical event probabilities.
-# They separate three questions that must never be collapsed into one reunion score.
+# Product-interpretation weights only; never empirical event probabilities.
 TRANSIT_WEIGHTS = {
-    "contact_recontact": {
-        "Sun": 0.45, "Mercury": 1.00, "Venus": 0.85, "Mars": 0.65,
-        "Jupiter": 0.35, "Saturn": 0.15, "Uranus": 0.55, "Neptune": 0.20, "Pluto": 0.25,
-    },
     "emotional_reactivation": {
         "Sun": 0.60, "Mercury": 0.30, "Venus": 1.00, "Mars": 0.75,
         "Jupiter": 0.55, "Saturn": 0.35, "Uranus": 0.45, "Neptune": 0.75, "Pluto": 0.90,
     },
+    "contact_recontact": {
+        "Sun": 0.45, "Mercury": 1.00, "Venus": 0.85, "Mars": 0.65,
+        "Jupiter": 0.35, "Saturn": 0.15, "Uranus": 0.55, "Neptune": 0.20, "Pluto": 0.25,
+    },
+    "in_person_meeting": {
+        "Sun": 0.65, "Mercury": 0.70, "Venus": 0.95, "Mars": 0.95,
+        "Jupiter": 0.50, "Saturn": 0.20, "Uranus": 0.55, "Neptune": 0.20, "Pluto": 0.30,
+    },
     "relationship_rebuilding": {
-        "Sun": 0.25, "Mercury": 0.35, "Venus": 0.40, "Mars": 0.15,
+        "Sun": 0.35, "Mercury": 0.45, "Venus": 0.70, "Mars": 0.30,
         "Jupiter": 0.95, "Saturn": 1.00, "Uranus": 0.20, "Neptune": 0.20, "Pluto": 0.45,
     },
 }
 
 TARGET_WEIGHTS = {
+    "emotional_reactivation": {
+        "Sun": 0.80, "Moon": 1.00, "Mercury": 0.30, "Venus": 1.00, "Mars": 0.75,
+        "Jupiter": 0.45, "Saturn": 0.45, "Uranus": 0.40, "Neptune": 0.80, "Pluto": 0.90,
+        "True Node": 0.50, "ASC": 0.50, "DSC": 0.75, "MC": 0.20, "IC": 0.55,
+    },
     "contact_recontact": {
         "Sun": 0.65, "Moon": 0.50, "Mercury": 1.00, "Venus": 0.80, "Mars": 0.55,
         "Jupiter": 0.30, "Saturn": 0.30, "Uranus": 0.35, "Neptune": 0.30, "Pluto": 0.40,
         "True Node": 0.35, "ASC": 0.45, "DSC": 0.75, "MC": 0.25, "IC": 0.25,
     },
-    "emotional_reactivation": {
-        "Sun": 0.80, "Moon": 1.00, "Mercury": 0.30, "Venus": 1.00, "Mars": 0.75,
-        "Jupiter": 0.45, "Saturn": 0.45, "Uranus": 0.40, "Neptune": 0.80, "Pluto": 0.90,
-        "True Node": 0.50, "ASC": 0.50, "DSC": 0.75, "MC": 0.20, "IC": 0.55,
+    "in_person_meeting": {
+        "Sun": 0.70, "Moon": 0.65, "Mercury": 0.65, "Venus": 0.90, "Mars": 0.85,
+        "Jupiter": 0.45, "Saturn": 0.25, "Uranus": 0.40, "Neptune": 0.25, "Pluto": 0.40,
+        "True Node": 0.40, "ASC": 0.75, "DSC": 1.00, "MC": 0.20, "IC": 0.35,
     },
     "relationship_rebuilding": {
         "Sun": 0.75, "Moon": 0.55, "Mercury": 0.70, "Venus": 0.80, "Mars": 0.35,
@@ -49,15 +66,17 @@ TARGET_WEIGHTS = {
 }
 
 SECONDARY_POINTS = {
-    "contact_recontact": {"Mercury", "Venus", "Sun", "Mars"},
     "emotional_reactivation": {"Moon", "Venus", "Sun", "Mars", "Pluto", "Neptune"},
-    "relationship_rebuilding": {"Saturn", "Jupiter", "Sun", "Venus", "Mercury", "True Node"},
+    "contact_recontact": {"Mercury", "Venus", "Sun", "Mars"},
+    "in_person_meeting": {"Venus", "Mars", "Mercury", "Sun", "Moon", "ASC", "DSC"},
+    "relationship_rebuilding": {"Saturn", "Jupiter", "Sun", "Venus", "Mercury", "True Node", "DSC", "IC"},
 }
 
 DIMENSION_LABELS = {
-    "contact_recontact": "연락·재접촉 활성",
-    "emotional_reactivation": "감정·관계 재활성",
-    "relationship_rebuilding": "관계 재구축 지원층",
+    "emotional_reactivation": "감정 활성",
+    "contact_recontact": "연락·재접촉",
+    "in_person_meeting": "실제 만남",
+    "relationship_rebuilding": "관계 재결합",
 }
 
 
@@ -101,6 +120,24 @@ def dimension_side_score(hits: list[dict[str, Any]], dimension: str) -> tuple[fl
     return score, evidence[:8]
 
 
+def fast_trigger_evidence(hits: list[dict[str, Any]], dimension: str, minimum_score: float = 12.0) -> list[dict[str, Any]]:
+    """Return fast-body evidence that is strong enough to justify a calendar-date candidate."""
+    rows = []
+    for hit in hits:
+        if str(hit.get("transit") or "") not in FAST_TRIGGER_PLANETS:
+            continue
+        score = score_transit_hit(hit, dimension)
+        if score < minimum_score:
+            continue
+        row = dict(hit)
+        row["dimension_score"] = score
+        row["exact_date_trigger"] = True
+        row["event_probability"] = "not_calculated"
+        rows.append(row)
+    rows.sort(key=lambda row: (-float(row["dimension_score"]), float(row.get("orb") or 99.0)))
+    return rows[:6]
+
+
 def daily_dimension_scores(
     user_hits: list[dict[str, Any]],
     counterpart_hits: list[dict[str, Any]],
@@ -109,6 +146,8 @@ def daily_dimension_scores(
     for dimension in DIMENSIONS:
         user_score, user_evidence = dimension_side_score(user_hits, dimension)
         counterpart_score, counterpart_evidence = dimension_side_score(counterpart_hits, dimension)
+        user_fast = fast_trigger_evidence(user_hits, dimension)
+        counterpart_fast = fast_trigger_evidence(counterpart_hits, dimension)
         shared_bonus = 8.0 if user_score >= 35.0 and counterpart_score >= 35.0 else 0.0
         combined = round(min(100.0, user_score * 0.45 + counterpart_score * 0.55 + shared_bonus), 1)
         output[dimension] = {
@@ -119,6 +158,9 @@ def daily_dimension_scores(
             "shared_activation": bool(user_score >= 25.0 and counterpart_score >= 25.0),
             "user_evidence": user_evidence[:4],
             "counterpart_evidence": counterpart_evidence[:4],
+            "fast_trigger": bool(user_fast or counterpart_fast),
+            "fast_evidence": (counterpart_fast[:2] + user_fast[:2])[:4],
+            "exact_date_basis": "fast_transit_trigger" if (user_fast or counterpart_fast) else "period_only",
             "event_probability": "not_calculated",
         }
     return output
@@ -162,7 +204,9 @@ def secondary_support(month_row: dict[str, Any]) -> dict[str, Any]:
             "independent_layer_count": len(layer_names),
             "convergence": len(layer_names) >= 2,
             "score": None,
-            "policy": "secondary progression evidence is kept separate from transit activation; no mixed reunion score is calculated",
+            "period_role": "background_window_only",
+            "exact_date_eligible": False,
+            "policy": "secondary progression is period/background evidence only; it cannot create an exact calendar date without a fast transit trigger",
             "event_probability": "not_calculated",
         }
     return result

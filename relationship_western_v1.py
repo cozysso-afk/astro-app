@@ -21,9 +21,9 @@ import swisseph as swe
 from western_house_system_v1 import calculate_quadrant_houses
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
-from reunion_dimension_v1 import DIMENSIONS, daily_dimension_scores, secondary_support
+from reunion_dimension_v1 import DIMENSIONS, FAST_TRIGGER_PLANETS, daily_dimension_scores, secondary_support
 
-ENGINE_VERSION = "relationship-western-v1.12-provisional-entered-time"
+ENGINE_VERSION = "relationship-western-v1.13-four-stage-gated-dates"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -143,14 +143,15 @@ def _relationship_timing_band(score):
     return "매우 약함"
 
 
-def _relationship_timing_stat(rows, key, label):
+def _relationship_timing_stat(rows, key, label, date_gate_key=None):
     points = [
-        {"date": row["date"], "label": label, "score": float(row[key])}
+        {"date": row["date"], "label": label, "score": float(row[key]), "date_eligible": bool(row.get(date_gate_key)) if date_gate_key else True}
         for row in rows if isinstance(row.get(key), (int, float))
     ]
     if not points:
         return None
     avg = sum(point["score"] for point in points) / len(points)
+    date_points = [point for point in points if point["date_eligible"]]
 
     def spaced(source, reverse, limit):
         ordered = sorted(source, key=lambda x: x["score"], reverse=reverse)
@@ -159,7 +160,7 @@ def _relationship_timing_stat(rows, key, label):
             day = date.fromisoformat(point["date"])
             if any(abs((day - date.fromisoformat(existing["date"])).days) <= 1 for existing in selected):
                 continue
-            selected.append({**point, "score": round(point["score"], 1)})
+            selected.append({"date": point["date"], "label": point["label"], "score": round(point["score"], 1)})
             if len(selected) >= limit:
                 break
         return selected
@@ -168,14 +169,15 @@ def _relationship_timing_stat(rows, key, label):
         "average": round(avg, 1),
         "band": _relationship_timing_band(avg),
         "spread": round(max(point["score"] for point in points) - min(point["score"] for point in points), 1),
-        "best_days": spaced(points, True, 7),
-        "caution_days": spaced(points, False, 5),
+        "best_days": spaced(date_points, True, 7),
+        "caution_days": spaced(date_points, False, 5),
+        "exact_date_policy": "fast_trigger_required" if date_gate_key else "not_gated",
     }
 
 
 def _relationship_directional_context(rows, start_date, end_date):
-    incoming_label = "상대측 차트의 관계 트랜짓 활성도 · 실제 연락 의도/확률 아님"
-    outgoing_label = "내 차트의 관계 트랜짓 활성도 · 실제 연락 결과 확률 아님"
+    counterpart_label = "상대측 차트 활성도 · 상대가 먼저 연락한다는 뜻 아님"
+    user_label = "내측 차트 활성도 · 내가 먼저 연락한다는 뜻 아님"
     reconnection_label = "두 차트 동시 재접점 활성도 · 실제 재회 확률 아님"
     months = {}
     for row in rows:
@@ -186,35 +188,38 @@ def _relationship_directional_context(rows, start_date, end_date):
             "calendar_month": month_key,
             "start": month_rows[0]["date"],
             "end": month_rows[-1]["date"],
-            "incoming": _relationship_timing_stat(month_rows, "counterpart_score", incoming_label),
-            "outgoing": _relationship_timing_stat(month_rows, "user_score", outgoing_label),
-            "reconnection": _relationship_timing_stat(month_rows, "score", reconnection_label),
+            "incoming": _relationship_timing_stat(month_rows, "counterpart_score", counterpart_label, "date_trigger_eligible"),
+            "outgoing": _relationship_timing_stat(month_rows, "user_score", user_label, "date_trigger_eligible"),
+            "reconnection": _relationship_timing_stat(month_rows, "score", reconnection_label, "date_trigger_eligible"),
         })
     return {
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
-        "incoming": _relationship_timing_stat(rows, "counterpart_score", incoming_label),
-        "outgoing": _relationship_timing_stat(rows, "user_score", outgoing_label),
-        "reconnection": _relationship_timing_stat(rows, "score", reconnection_label),
+        "incoming": _relationship_timing_stat(rows, "counterpart_score", counterpart_label, "date_trigger_eligible"),
+        "outgoing": _relationship_timing_stat(rows, "user_score", user_label, "date_trigger_eligible"),
+        "reconnection": _relationship_timing_stat(rows, "score", reconnection_label, "date_trigger_eligible"),
         "months": monthly,
         "source": "two-person relationship transit engine",
-        "policy": "incoming/outgoing are directional chart-activation proxies. They do not reveal private intent and are not event probabilities.",
+        "initiative_gate": {"available": False, "verdict": "undetermined", "reason": "side activation alone is not an action-direction indicator"},
+        "policy": "incoming/outgoing are legacy field names for counterpart-side/user-side chart activation only. Never translate counterpart activation into 'counterpart contacts first' or user activation into 'user contacts first' without an independent directional action gate.",
     }
 
 
 def _dimension_timing_stat(rows, dimension, score_key, label):
     adapted = []
     for row in rows:
-        value = ((row.get("dimensions") or {}).get(dimension) or {}).get(score_key)
+        data = (row.get("dimensions") or {}).get(dimension) or {}
+        value = data.get(score_key)
         if isinstance(value, (int, float)):
-            adapted.append({"date": row["date"], "value": float(value)})
-    return _relationship_timing_stat(adapted, "value", label) if adapted else None
+            adapted.append({"date": row["date"], "value": float(value), "stage_fast_trigger": bool(data.get("fast_trigger"))})
+    return _relationship_timing_stat(adapted, "value", label, "stage_fast_trigger") if adapted else None
 
 
 def _reunion_dimension_context(rows, start_date, end_date):
     labels = {
+        "emotional_reactivation": "감정 활성지수 · 실제 속마음/사건 확률 아님",
         "contact_recontact": "연락·재접촉 활성지수 · 사건 발생 확률 아님",
-        "emotional_reactivation": "감정·관계 재활성지수 · 실제 속마음/사건 확률 아님",
-        "relationship_rebuilding": "관계 재구축 지원 활성지수 · 실제 재결합/장기지속 확률 아님",
+        "in_person_meeting": "실제 만남 활성지수 · 만남 발생 확률 아님",
+        "relationship_rebuilding": "관계 재결합 지원 활성지수 · 실제 재결합/장기지속 확률 아님",
     }
     months = {}
     for row in rows:
@@ -232,14 +237,11 @@ def _reunion_dimension_context(rows, start_date, end_date):
                 "outgoing": _dimension_timing_stat(month_rows, dimension, "user_score", labels[dimension]),
                 "reconnection": _dimension_timing_stat(month_rows, dimension, "score", labels[dimension]),
             })
-        ranked = sorted(
-            rows,
-            key=lambda row: -float(((row.get("dimensions") or {}).get(dimension) or {}).get("score") or 0.0),
-        )
+        ranked = sorted(rows, key=lambda row: -float(((row.get("dimensions") or {}).get(dimension) or {}).get("score") or 0.0))
         top_evidence = []
         for row in ranked:
             data = (row.get("dimensions") or {}).get(dimension) or {}
-            if float(data.get("score") or 0.0) <= 0:
+            if float(data.get("score") or 0.0) <= 0 or not data.get("fast_trigger"):
                 continue
             day = date.fromisoformat(row["date"])
             if any(abs((day - date.fromisoformat(existing["date"])).days) <= 1 for existing in top_evidence):
@@ -251,6 +253,8 @@ def _reunion_dimension_context(rows, start_date, end_date):
                 "counterpart_score": data.get("counterpart_score", 0.0),
                 "user_evidence": list(data.get("user_evidence") or [])[:2],
                 "counterpart_evidence": list(data.get("counterpart_evidence") or [])[:2],
+                "fast_evidence": list(data.get("fast_evidence") or [])[:3],
+                "exact_date_basis": "fast_transit_trigger",
                 "event_probability": "not_calculated",
             })
             if len(top_evidence) >= 8:
@@ -266,7 +270,8 @@ def _reunion_dimension_context(rows, start_date, end_date):
     return {
         **result,
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
-        "policy": "contact/recontact, emotional reactivation, and relationship rebuilding support are orthogonal transit-activation dimensions. Each keeps incoming/outgoing/reconnection directions separate. No overall reunion score or event probability is calculated.",
+        "stage_order": list(DIMENSIONS),
+        "policy": "emotion, contact/recontact, in-person meeting, and relationship rebuilding/reunion are orthogonal activation stages. No stage auto-escalates into the next. Legacy incoming/outgoing fields are side activation only, not who acts first. Exact dates require a fast transit trigger; no overall reunion score or event probability is calculated.",
     }
 
 
@@ -283,19 +288,27 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         shared_bonus = 8.0 if user_score >= 35 and cp_score >= 35 else 0.0
         combined = round(min(100.0, user_score * .45 + cp_score * .55 + shared_bonus), 1)
         dimensions = daily_dimension_scores(user_hits, cp_hits)
+        all_hits = cp_hits + user_hits
+        return_hits = [
+            dict(hit, return_type=f"{hit.get('transit')}_natal_return", independence_group="daily_transit_same_phenomenon", independent_bonus_eligible=False)
+            for hit in all_hits
+            if hit.get("transit") in FAST_TRIGGER_PLANETS and hit.get("transit") == hit.get("target") and hit.get("aspect") == "conjunction"
+        ]
         rows.append({
             "date": cursor.isoformat(),
             "score": combined,
             "user_score": user_score,
             "counterpart_score": cp_score,
             "shared_activation": bool(user_score >= 25 and cp_score >= 25),
-            "hits": (cp_hits[:3] + user_hits[:3])[:6],
+            "date_trigger_eligible": any(bool(x.get("fast_trigger")) for x in dimensions.values()),
+            "hits": all_hits[:6],
+            "return_hits": return_hits[:4],
             "dimensions": dimensions,
         })
         cursor += timedelta(days=1)
 
-    ranked = sorted(rows, key=lambda x: (-x["score"], x["date"]))
-    # Avoid filling the top list with adjacent dates from the same transit pass.
+    eligible_rows = [row for row in rows if row.get("date_trigger_eligible")]
+    ranked = sorted(eligible_rows, key=lambda x: (-x["score"], x["date"]))
     top_days = []
     for row in ranked:
         d = date.fromisoformat(row["date"])
@@ -311,18 +324,66 @@ def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offs
         months.setdefault(key, []).append(row)
     top_months = []
     for key, month_rows in months.items():
-        strongest = sorted(month_rows, key=lambda x: x["score"], reverse=True)[:5]
+        trigger_rows = [x for x in month_rows if x.get("date_trigger_eligible")]
+        if not trigger_rows:
+            continue
+        strongest = sorted(trigger_rows, key=lambda x: x["score"], reverse=True)[:5]
         score = round(sum(x["score"] for x in strongest) / max(1, len(strongest)), 1)
-        top_months.append({"calendar_month": key, "score": score, "top_dates": [x["date"] for x in strongest[:3]]})
+        top_months.append({"calendar_month": key, "score": score, "top_dates": [x["date"] for x in strongest[:3]], "exact_date_basis": "fast_transit_trigger"})
     top_months.sort(key=lambda x: (-x["score"], x["calendar_month"]))
     return {
         "available": True,
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
-        "policy": "daily transits to both natal charts; descriptive activation, not contact/reunion probability",
+        "policy": "daily transits to both natal charts; exact-date candidates require a fast Sun/Mercury/Venus/Mars trigger. Slow or progression evidence alone remains period-level context and never creates a date.",
         "top_days": top_days,
         "top_months": top_months[:12],
+        "return_support": {
+            "policy": "planetary return is a labeled transit-to-same-natal-planet conjunction. Because it is the same astronomical phenomenon as the daily transit, it is context only and never counted as an independent convergence bonus.",
+            "days": [{"date": row["date"], "hits": row.get("return_hits", [])} for row in rows if row.get("return_hits")][:18],
+        },
         "directional_context": _relationship_directional_context(rows, start_date, end_date),
         "dimensions": _reunion_dimension_context(rows, start_date, end_date),
+    }
+
+
+def _build_reunion_timing_windows(transit_layer, secondary_packet):
+    if not isinstance(transit_layer, dict) or not transit_layer.get("available"):
+        return {"windows": [], "policy": "no daily transit layer; no exact dates", "event_probability": "not_calculated"}
+    secondary_by_month = {
+        str(row.get("calendar_month")): (row.get("dimensions") or {})
+        for row in (secondary_packet or {}).get("months", []) if isinstance(row, dict)
+    }
+    windows = []
+    for day in transit_layer.get("top_days") or []:
+        month_support = secondary_by_month.get(str(day.get("date", ""))[:7], {})
+        for stage in DIMENSIONS:
+            stage_data = (day.get("dimensions") or {}).get(stage) or {}
+            if not stage_data.get("fast_trigger") or float(stage_data.get("score") or 0.0) <= 0:
+                continue
+            secondary = month_support.get(stage) or {}
+            progression_supported = bool(secondary.get("evidence"))
+            families = ["daily_transit"] + (["secondary_progression"] if progression_supported else [])
+            rank_weight = round(float(stage_data.get("score") or 0.0) + (8.0 if progression_supported else 0.0), 1)
+            windows.append({
+                "date": day.get("date"),
+                "stage": stage,
+                "label": stage_data.get("label"),
+                "activation": round(float(stage_data.get("score") or 0.0), 1),
+                "rank_weight": rank_weight,
+                "fast_evidence": list(stage_data.get("fast_evidence") or [])[:3],
+                "period_support": list(secondary.get("evidence") or [])[:3],
+                "independent_systems": families,
+                "independent_system_count": len(families),
+                "convergence": len(families) >= 2,
+                "return_context": list(day.get("return_hits") or [])[:2],
+                "exact_date_basis": "fast_transit_trigger",
+                "event_probability": "not_calculated",
+            })
+    windows.sort(key=lambda row: (-int(bool(row["convergence"])), -float(row["rank_weight"]), str(row["date"]), str(row["stage"])))
+    return {
+        "windows": windows[:24],
+        "policy": "progression is period/background evidence only. A calendar date appears only when a fast transit trigger exists; progression may raise ranking when it overlaps the same stage. Planetary return context is deduplicated from its underlying transit and adds no independent vote.",
+        "event_probability": "not_calculated",
     }
 
 
@@ -1023,15 +1084,18 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
                 {"calendar_month": row["calendar_month"], "representative_date": row["representative_date"], "dimensions": row.get("reunion_secondary_support")}
                 for row in monthly
             ],
-            "policy": "secondary progressed synastry and progressed composite are higher-priority timing evidence and remain separate from daily transit activation scores; Marks/Tertiary stays supplementary and is not folded into these primary dimension supports",
+            "policy": "secondary progressed synastry and progressed composite are period/background evidence only and remain separate from daily transit activation scores; they cannot create an exact date without a fast trigger. Marks/Tertiary stays supplementary.",
             "event_probability": "not_calculated",
         }
+        result["reunion_timing_windows"] = _build_reunion_timing_windows(result.get("reunion_transits"), result["reunion_secondary_support"])
+        result["reunion_return_support"] = (result.get("reunion_transits") or {}).get("return_support")
     result["interpretation_policy"] = {
         "static": "Natal synastry/composite/Davison/Marks describe different relationship structures and must not be collapsed into one score.",
         "timing": "Secondary progressed synastry/progressed composite and Marks Tertiary-I are timing layers. Repeated tight contacts across independent layers may be called convergence, never event certainty.",
         "layer_priority": "Interpret in this order: natal structure > secondary progression > major/medium-term transit > fast daily transit > tertiary/Marks supplementary. A tertiary-only hit cannot overturn higher-layer evidence.",
         "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
-        "reunion_dimensions": "For reunion mode keep three orthogonal outcomes separate: contact/recontact activation, emotional/relationship reactivation, and relationship-rebuilding support. Within every dimension keep incoming, outgoing and reconnection separate. Never collapse them into one reunion score.",
+        "reunion_dimensions": "For reunion mode keep four orthogonal stages separate: emotional activation, contact/recontact, in-person meeting, and relationship rebuilding/reunion. One stage never auto-escalates to the next. Legacy incoming/outgoing fields are counterpart-side/user-side activation only, never who contacts first.",
+        "reunion_dates": "Secondary progression is period context. Exact dates require fast Sun/Mercury/Venus/Mars transit evidence. Planetary return is deduplicated from the same transit phenomenon and cannot add an independent convergence vote.",
         "birth_time": "An entered clock time is not automatically exact. When a concrete time and coordinates exist, Moon/angles/houses/Davison/Marks may be calculated as provisional reference layers; only provenance-verified time may be labelled exact or treated as decisive. Provisional angles do not alter deterministic timing scores.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }

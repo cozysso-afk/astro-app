@@ -41,8 +41,8 @@ def _profile(*, birth_date, birth_time, latitude, longitude, source="official_re
     }
 
 
-def test_dimension_policy_has_exactly_three_orthogonal_axes():
-    assert DIMENSIONS == ("contact_recontact", "emotional_reactivation", "relationship_rebuilding")
+def test_dimension_policy_has_exactly_four_orthogonal_axes():
+    assert DIMENSIONS == ("emotional_reactivation", "contact_recontact", "in_person_meeting", "relationship_rebuilding")
 
 
 def test_mercury_contact_hit_does_not_automatically_become_rebuilding_strength():
@@ -75,7 +75,7 @@ def test_daily_dimensions_keep_user_counterpart_and_shared_scores_separate():
         assert 0 <= dimensions[name]["counterpart_score"] <= 100
 
 
-def test_reunion_transit_builder_exposes_three_axes_without_overwriting_directional_context(monkeypatch):
+def test_reunion_transit_builder_exposes_four_axes_without_promoting_side_activation_to_initiative(monkeypatch):
     def fake_hits(transit_chart, natal_chart, person):
         return [_hit("Mercury", "Mercury", person=person)] if person == "user" else [_hit("Saturn", "Saturn", person=person)]
 
@@ -90,10 +90,13 @@ def test_reunion_transit_builder_exposes_three_axes_without_overwriting_directio
 
     assert out["directional_context"]["incoming"] is not None
     assert out["directional_context"]["outgoing"] is not None
+    assert out["directional_context"]["initiative_gate"]["available"] is False
+    assert out["directional_context"]["initiative_gate"]["verdict"] == "undetermined"
+    assert "in_person_meeting" in out["dimensions"]
     dimensions = out["dimensions"]
     assert dimensions["contact_recontact"]["outgoing"]["average"] > dimensions["contact_recontact"]["incoming"]["average"]
     assert dimensions["relationship_rebuilding"]["incoming"]["average"] > dimensions["relationship_rebuilding"]["outgoing"]["average"]
-    assert "overall reunion score" in dimensions["policy"]
+    assert "No stage auto-escalates" in dimensions["policy"]
 
 
 def test_secondary_support_is_kept_separate_from_transit_score_and_marks_tertiary():
@@ -127,6 +130,8 @@ def test_secondary_support_is_kept_separate_from_transit_score_and_marks_tertiar
     }
     support = secondary_support(month)
     rebuilding = support["relationship_rebuilding"]
+    assert "in_person_meeting" in support
+    assert support["in_person_meeting"]["exact_date_eligible"] is False
     assert rebuilding["score"] is None
     assert rebuilding["event_probability"] == "not_calculated"
     assert rebuilding["independent_layer_count"] == 2
@@ -149,7 +154,7 @@ def test_full_reunion_result_has_dimension_matrix_and_secondary_support_but_no_s
         analysis_mode="reunion",
     )
     assert out["ok"] is True
-    assert out["engine"] == "relationship-western-v1.12-provisional-entered-time"
+    assert out["engine"] == "relationship-western-v1.13-four-stage-gated-dates"
     assert set(DIMENSIONS).issubset(out["reunion_dimensions"])
     for dimension in DIMENSIONS:
         axis = out["reunion_dimensions"][dimension]
@@ -158,6 +163,10 @@ def test_full_reunion_result_has_dimension_matrix_and_secondary_support_but_no_s
         assert axis["reconnection"] is not None
         assert axis["event_probability"] == "not_calculated"
     assert out["reunion_secondary_support"]["event_probability"] == "not_calculated"
+    assert out["reunion_timing_windows"]["event_probability"] == "not_calculated"
+    for row in out["reunion_timing_windows"]["windows"]:
+        assert row["exact_date_basis"] == "fast_transit_trigger"
+        assert "daily_transit" in row["independent_systems"]
     assert "reunion_score" not in out
     assert "reunion_score" not in out["reunion_dimensions"]
 
