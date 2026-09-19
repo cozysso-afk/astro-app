@@ -27,7 +27,7 @@ function exactPacket(){return {
 
 test('maps every available relationship layer into question-first four-stage evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.2-four-stage-direction-gate')
+  assert.equal(out.version,'reunion-evidence-v2.3-solar-lunar-return-context')
   assert.match(out.policy,/Emotion, contact, meeting, and reunion are separate stages/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
@@ -37,6 +37,26 @@ test('maps every available relationship layer into question-first four-stage evi
   assert.equal(out.initiative_gate.available,false)
   assert.equal(out.initiative_gate.verdict,'undetermined')
   assert.ok(out.evidence.some(e=>e.layer==='dimension.in_person_meeting'))
+})
+
+test('solar and lunar returns stay context-only and cannot create a convergence vote',()=>{
+  const p=exactPacket()
+  const solarEvent={window_start:'2026-03-21',window_end_exclusive:'2027-03-21',activation_score:58,balance:'supportive',precision:'exact',top_aspects:[asp('Venus','trine','Moon',.3)]}
+  const lunarEvent={window_start:'2026-12-29',window_end_exclusive:'2027-01-26',activation_score:62,balance:'mixed',precision:'exact',top_aspects:[asp('Mercury','sextile','Venus',.2)]}
+  p.reunion_return_support={
+    solar_return:{user:{available:true,events:[solarEvent]},counterpart:{available:true,events:[solarEvent]}},
+    lunar_return:{user:{available:true,events:[lunarEvent]},counterpart:{available:true,events:[lunarEvent]}},
+    candidate_dates:[{date:'2027-01-05',exact_date_basis:'fast_transit_trigger',fast_trigger_score:76,priority_index:73,return_context:{background_score:56}}],
+  }
+  const out=buildReunionEvidenceV2(p)
+  assert.equal(out.coverage.solar_return,true)
+  assert.equal(out.coverage.lunar_return,true)
+  const returns=out.evidence.filter(e=>e.family==='return')
+  assert.ok(returns.length>=5)
+  assert.ok(returns.every(e=>e.role==='context'))
+  assert.ok(returns.some(e=>e.date==='2027-01-05'))
+  assert.equal(out.convergence.some(x=>x.independent_groups.some(g=>g.includes('return'))),false)
+  assert.match(out.policy,/never creates an exact date/i)
 })
 
 test('does not invent exact-time layers when unavailable',()=>{

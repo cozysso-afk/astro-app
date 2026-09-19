@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v11\.11-four-stage-gated-dates"/)
+  assert.match(server,/REUNION_VERSION="relationship-v11\.12-solar-lunar-return-context"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -22,6 +22,8 @@ test('server compiles question-first evidence and validates returned evidence re
   assert.match(server,/reunion_secondary_support:base\.reunion_secondary_support/)
   assert.match(server,/reunion_timing_windows:base\.reunion_timing_windows/)
   assert.match(server,/reunion_return_support:base\.reunion_return_support/)
+  assert.match(server,/Solar Return\(태양회귀\)/)
+  assert.match(server,/Lunar Return\(달회귀\)/)
   assert.match(server,/reunion_evidence_v2/)
   assert.match(server,/reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(server,/validEvidenceRefs/)

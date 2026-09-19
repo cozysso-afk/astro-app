@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.2-four-stage-direction-gate'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.3-solar-lunar-return-context'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -47,7 +47,7 @@ function keyFor(e: Evidence) {
 }
 
 function priority(e: Evidence) {
-  const family = ({natal:90,secondary:100,relationship_chart:82,house:76,transit:68,tertiary:58,metric:64} as Record<string,number>)[e.family] ?? 50
+  const family = ({natal:90,secondary:100,relationship_chart:82,house:76,transit:68,return:66,tertiary:58,metric:64} as Record<string,number>)[e.family] ?? 50
   const role = e.role === 'support' ? 4 : e.role === 'counter' ? 3 : 0
   const tight = typeof e.orb === 'number' ? Math.max(0, 8 - e.orb * 3) : 0
   return family + role + tight
@@ -75,6 +75,54 @@ function addMetric(items: Evidence[], question: QuestionKey, layer: string, grou
   if (avg === null) return
   const best = arr(stat.best_days).slice(0,3).map(x => `${x?.date}:${Number(x?.score ?? 0).toFixed(1)}`)
   items.push(makeEvidence({question,layer,family:'metric',independence_group:group,role:'context',direction,period:null,date:best[0]?.split(':')[0] ?? null,aspect:null,orb:null,tone:null,facts:[`average=${avg.toFixed(1)}`,`band=${short(stat.band,30)}`,...best]}, items.length+1))
+}
+
+
+function addReturnContext(items: Evidence[], packet: any) {
+  const support = packet?.reunion_return_support
+  if (!support || typeof support !== 'object' || support?.available === false) return
+  const directionFor = (person: string): Evidence['direction'] => person === 'counterpart' ? 'incoming' : person === 'user' ? 'outgoing' : 'shared'
+  const addEvents = (kind: 'solar_return'|'lunar_return', group: string, question: QuestionKey) => {
+    const block = support?.[kind] ?? {}
+    for (const person of ['user','counterpart']) {
+      for (const row of arr(block?.[person]?.events).slice(0,8)) {
+        const score = num(row?.activation_score)
+        const start = short(row?.window_start, 16)
+        const end = short(row?.window_end_exclusive, 16)
+        const facts = [
+          `${kind} background=${score === null ? '-' : score.toFixed(1)}`,
+          `balance=${short(row?.balance,24)}`,
+          `precision=${short(row?.precision,24)}`,
+          `independent_bonus_eligible=false`,
+          ...arr(row?.top_aspects).slice(0,3).map((a:any)=>`${aspectText(a)} orb=${Number(a?.orb ?? 0).toFixed(2)}°`),
+        ]
+        items.push(makeEvidence({
+          question, layer:`return.${kind}.${person}`, family:'return', independence_group:group,
+          role:'context', direction:directionFor(person), period:start && end ? `${start}..${end}` : start || null,
+          date:null, aspect:null, orb:null, tone:row?.balance ?? null, facts,
+        }, items.length+1))
+      }
+    }
+  }
+  addEvents('solar_return','solar_return_context','why_reconnect')
+  addEvents('solar_return','solar_return_context','rebuild')
+  addEvents('lunar_return','lunar_return_context','timing')
+
+  for (const row of arr(support?.candidate_dates).slice(0,10)) {
+    if (!row?.date || row?.exact_date_basis !== 'fast_transit_trigger') continue
+    const bg = num(row?.return_context?.background_score)
+    items.push(makeEvidence({
+      question:'timing', layer:'return.candidate_context', family:'return', independence_group:'return_context_annotation',
+      role:'context', direction:'shared', period:null, date:short(row.date,16), aspect:null, orb:null, tone:null,
+      facts:[
+        `fast_trigger_score=${Number(row?.fast_trigger_score ?? 0).toFixed(1)}`,
+        `return_background=${bg === null ? '-' : bg.toFixed(1)}`,
+        `priority_index=${Number(row?.priority_index ?? 0).toFixed(1)}`,
+        'return_role=background_tiebreaker_only',
+        'independent_bonus_eligible=false',
+      ],
+    }, items.length+1))
+  }
 }
 
 function compact(items: Evidence[]) {
@@ -163,6 +211,8 @@ export function buildReunionEvidenceV2(packet: any) {
     }
   }
 
+  addReturnContext(items, packet)
+
   const evidence = compact(items)
   const questions = Object.fromEntries(QUESTION_KEYS.map(q => {
     const rows = evidence.filter(e => e.question === q).slice(0,8)
@@ -197,6 +247,8 @@ export function buildReunionEvidenceV2(packet: any) {
     natal_synastry: evidence.some(e=>e.independence_group==='natal_synastry'),
     house_overlays: Boolean(house?.available), midpoint_composite:Boolean(adv?.composite?.available), davison:Boolean(adv?.davison?.available), marks:Boolean(adv?.marks?.available),
     progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
+    solar_return: Boolean(packet?.reunion_return_support?.solar_return?.user?.available || packet?.reunion_return_support?.solar_return?.counterpart?.available),
+    lunar_return: Boolean(packet?.reunion_return_support?.lunar_return?.user?.available || packet?.reunion_return_support?.lunar_return?.counterpart?.available),
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Return labels that restate the same transit phenomenon do not add an independent vote. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
 }
