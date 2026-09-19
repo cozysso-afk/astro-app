@@ -1,0 +1,52 @@
+name: PR186 v2.3 guarded patch
+
+on:
+  push:
+    branches:
+      - audit/pr186-replay-v22
+    paths:
+      - scripts/apply_reunion_v23_patch.py
+      - .github/workflows/pr186-v23-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out audit patch source
+        uses: actions/checkout@v4
+        with:
+          ref: audit/pr186-replay-v22
+          path: audit
+
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-hierarchy-v2
+          path: target
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply guarded patch
+        run: python audit/scripts/apply_reunion_v23_patch.py target
+
+      - name: Syntax check changed Python
+        working-directory: target
+        run: |
+          python -m py_compile reunion_hierarchy_v2.py
+          python -m py_compile tests/test_reunion_hierarchy_v2.py
+          git diff --check
+
+      - name: Commit v2.3 patch
+        working-directory: target
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reunion_hierarchy_v2.py tests/test_reunion_hierarchy_v2.py
+          git commit -m "fix(reunion): anchor medium window and semantic stage triggers"
+          git push origin HEAD:fix/reunion-hierarchy-v2
