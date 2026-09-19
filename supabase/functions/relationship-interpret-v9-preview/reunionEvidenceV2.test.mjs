@@ -27,7 +27,7 @@ function exactPacket(){return {
 
 test('maps every available relationship layer into question-first four-stage evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.3-solar-lunar-return-context')
+  assert.equal(out.version,'reunion-evidence-v2.4-return-neutral-direction')
   assert.match(out.policy,/Emotion, contact, meeting, and reunion are separate stages/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
@@ -54,6 +54,8 @@ test('solar and lunar returns stay context-only and cannot create a convergence 
   const returns=out.evidence.filter(e=>e.family==='return')
   assert.ok(returns.length>=5)
   assert.ok(returns.every(e=>e.role==='context'))
+  assert.ok(returns.every(e=>e.direction==='shared'))
+  assert.ok(returns.every(e=>e.question!=='initiative'))
   assert.ok(returns.some(e=>e.date==='2027-01-05'))
   assert.equal(out.convergence.some(x=>x.independent_groups.some(g=>g.includes('return'))),false)
   assert.match(out.policy,/never creates an exact date/i)

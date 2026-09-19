@@ -34,11 +34,11 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
   aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
-  timing?: ReunionTimingContext | null; technicalDetails?: ReactNode
+  timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
   const exportRef = useRef<HTMLElement | null>(null)
@@ -93,6 +93,46 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       .sort((a,b)=>a.date.localeCompare(b.date))
   })()
 
+  const reunionReturnSummary = (() => {
+    if (!reunion || !returnSupport || typeof returnSupport !== 'object') return null
+    const support = returnSupport as any
+    const rows = (value: unknown): any[] => Array.isArray(value) ? value : []
+    const numberOrNull = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : null
+    const band = (score: number) => score >= 65 ? '강하게' : score >= 45 ? '보통 이상으로' : score >= 25 ? '가볍게' : '약하게'
+    const monthLabel = (value: unknown) => {
+      const raw = String(value ?? '')
+      const match = /^(\d{4})-(\d{2})$/.exec(raw)
+      return match ? `${match[1]}년 ${Number(match[2])}월` : raw
+    }
+    const periodStart = String(support?.period?.start ?? timing?.period.start ?? '')
+    const activeSolar = (person: 'user'|'counterpart') => {
+      const events = rows(support?.solar_return?.[person]?.events)
+      if (!events.length) return null
+      return events.find((event:any) => {
+        const start = String(event?.window_start ?? '')
+        const end = String(event?.window_end_exclusive ?? '')
+        return !!periodStart && start <= periodStart && (!end || periodStart < end)
+      }) ?? events[0]
+    }
+    const solarValues = [activeSolar('user'), activeSolar('counterpart')]
+      .map((event:any) => numberOrNull(event?.activation_score))
+      .filter((value): value is number => value !== null)
+    const annualScore = solarValues.length ? solarValues.reduce((sum,value)=>sum+value,0) / solarValues.length : null
+    const lunarRows = rows(support?.monthly_context)
+      .map((row:any) => ({ month:String(row?.calendar_month ?? ''), score:numberOrNull(row?.lunar_return?.pair_activation_score) }))
+      .filter((row:any) => row.month && row.score !== null && row.score > 0)
+      .sort((a:any,b:any) => b.score-a.score || a.month.localeCompare(b.month))
+    const topLunar = lunarRows.slice(0,2)
+    const candidates = rows(support?.candidate_dates)
+    const annualText = annualScore === null
+      ? '연간 관계 배경은 계산 가능한 근거가 부족해서 별도 강도를 붙이지 않았어.'
+      : `연간 관계 배경은 ${band(annualScore)} 활성돼 있어. 관계 문제를 다시 의식하거나 정리하는 분위기가 두드러질 수 있다는 뜻이지, 연락이나 재결합 확률을 뜻하지는 않아.`
+    const monthlyText = topLunar.length
+      ? `${topLunar.map((row:any)=>monthLabel(row.month)).join(' · ')}의 월간 배경이 상대적으로 도드라져. 감정과 관계 주제가 올라오기 쉬운 달이라는 뜻이고, 실제 연락·만남은 빠른 행동 트리거가 따로 겹쳐야 해.`
+      : '월간 배경에서 따로 강조할 구간은 잡히지 않았어. 생시가 없으면 달 기반 월간 배경은 계산하지 않아.'
+    return { annualScore, annualText, monthlyText, topLunar, candidateCount:candidates.length }
+  })()
+
   const leadPattern = view.patterns[0] ?? view.friction[0]
   const leadFriction = view.friction[0]
   const firstWindow = reunion ? view.windows[0] : undefined
@@ -138,6 +178,21 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     precision: firstSentences(ai.data.reunion_reading.precision_note, 2),
   } : null
 
+  const returnContextBlock = reunionReturnSummary ? <section className="reunion-ai-block reunion-return-context">
+    <h4>연간·월간 배경</h4>
+    <div className="reunion-return-context-grid">
+      <article className="reunion-return-context-card"><b>연간 배경</b><p>{reunionReturnSummary.annualText}</p></article>
+      <article className="reunion-return-context-card"><b>월간 배경</b><p>{reunionReturnSummary.monthlyText}</p></article>
+    </div>
+    <p className="reunion-return-rule">구체 날짜는 빠른 사건 트리거가 먼저 통과한 후보만 쓰고, 이 배경층은 후보 우선순위를 최대 15%만 조정해.</p>
+    <details className="reunion-precision-note reunion-return-technical"><summary>왜 이렇게 봤어?</summary>
+      <p>Solar Return(태양회귀)은 연간 배경, Lunar Return(달회귀)은 월간·정서 배경으로만 계산해. 둘 다 연락 날짜를 새로 만들거나 누가 먼저 연락할지를 정하는 근거로 쓰지 않아.</p>
+      {reunionReturnSummary.annualScore !== null && <p>연간 배경 활성값 {reunionReturnSummary.annualScore.toFixed(1)} · 사건 확률 아님</p>}
+      {reunionReturnSummary.topLunar.length>0 && <p>월간 배경 상위: {reunionReturnSummary.topLunar.map((row:any)=>`${row.month} ${row.score.toFixed(1)}`).join(' · ')}</p>}
+      <p>빠른 트리거 85% + Return 배경 최대 15% · 후보 날짜 {reunionReturnSummary.candidateCount}개 안에서만 순위를 보정해.</p>
+    </details>
+  </section> : null
+
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
   return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
@@ -156,6 +211,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       {!!generatedCost && <p className="ai-generated-cost">{generatedCost}</p>}
       {reunion && reunionV2 ? <>
         <section className="reunion-ai-block"><h4>다시 연결될 여지가 있는 이유</h4><ReadableCopy text={reunionV2.why_reconnect.conclusion}/><ReadableCopy text={reunionV2.why_reconnect.interpretation}/></section>
+        {returnContextBlock}
         <section className="reunion-ai-snapshot"><h4>누가 먼저 움직일 흐름인가</h4><ReadableCopy className="reunion-initiative-summary" text={reunionV2.initiative.conclusion}/><ReadableCopy text={reunionV2.initiative.interpretation}/><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
         <section className="reunion-ai-block"><h4>접점이 강해지는 시기</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
         <section className="reunion-ai-block"><h4>다시 붙었을 때 관계 구조</h4><ReadableCopy text={reunionV2.rebuild.conclusion}/>{reunionV2.rebuild.conditions.length>0&&<ul>{reunionV2.rebuild.conditions.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
@@ -183,6 +239,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
         <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
+        {returnContextBlock}
         <section className="reading-section relationship-fallback-card"><div className="relationship-section-heading"><h3>{view.stabilityTitle}</h3><span className="relationship-section-meta"><ReadingBadge kind="rebuilding"/><span className="reading-state">{view.sustainability}</span></span></div><p className="relationship-section-copy">{view.sustainabilityText}</p></section>
         <section className="reading-section relationship-fallback-card"><h3>반복될 가능성이 높은 문제</h3>{view.friction.length ? compactPatterns(view.friction) : <p className="relationship-section-copy">반복 갈등을 뚜렷하게 짚을 접점이 부족해. 문제가 없다는 뜻은 아니야.</p>}</section>
         <section className="reading-section"><h3>주요 시기</h3>{view.windows.length ? <ReadingTimeline events={view.windows.map(w=>({date:w.date,kind:w.kind,label:w.label,status:w.status,detail:w.detail}))}/> : <p>다른 날과 구별할 만큼 뚜렷한 시기는 없어.</p>}</section>
