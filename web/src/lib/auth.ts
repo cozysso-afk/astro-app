@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { getSupabaseSession } from './supabase'
+import { getSupabaseSession, supabase } from './supabase'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 export const PRIVATE_API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
@@ -13,25 +13,33 @@ export type AppAccess = {
 let originalFetch: typeof window.fetch | null = null
 let authenticatedFetchInstalled = false
 
-function rawFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const fn = originalFetch ?? window.fetch.bind(window)
-  return fn(input, init)
-}
-
 export async function checkAppAccess(session: Session): Promise<AppAccess> {
-  const response = await rawFetch(`${PRIVATE_API_BASE}/v1/auth/me`, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  })
-  const payload = await response.json().catch(() => ({})) as Record<string, unknown>
-  if (response.status === 401) throw new Error('로그인 세션이 만료됐어. 다시 인증해줘.')
-  if (response.status === 403) return { allowed: false }
-  if (!response.ok || payload.allowed !== true) {
-    throw new Error(typeof payload.detail === 'string' ? payload.detail : '앱 접근 권한을 확인하지 못했어.')
+  const email = (session.user.email ?? '').trim().toLowerCase()
+  if (!email || session.user.is_anonymous === true) return { allowed: false }
+
+  // Login must not depend on the Render calculation API being awake or reachable.
+  // app_access has RLS that only exposes an enabled row for the authenticated
+  // email and, when bound, the exact auth.uid(). The calculation API still
+  // performs the same allowlist check on every /v1 request after login.
+  const { data, error } = await supabase
+    .from('app_access')
+    .select('email,role,user_id')
+    .eq('enabled', true)
+    .eq('email', email)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error('로그인 권한을 확인하는 중 연결이 끊겼어. 네트워크를 확인하고 다시 눌러줘.')
   }
+  if (!data) return { allowed: false }
+
+  const boundUserId = typeof data.user_id === 'string' ? data.user_id : ''
+  if (boundUserId && boundUserId !== session.user.id) return { allowed: false }
+
   return {
     allowed: true,
-    email: typeof payload.email === 'string' ? payload.email : undefined,
-    role: typeof payload.role === 'string' ? payload.role : undefined,
+    email: typeof data.email === 'string' ? data.email : email,
+    role: typeof data.role === 'string' ? data.role : undefined,
   }
 }
 
