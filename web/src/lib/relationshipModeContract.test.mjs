@@ -109,7 +109,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v11\.12-solar-lunar-return-context/)
+  assert.match(relationshipFn, /relationship-v11\.13-return-background-presentation/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.
