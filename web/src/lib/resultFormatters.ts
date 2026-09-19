@@ -360,7 +360,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '계산 권위는 별빛의 운명 엔진에 있다. 외부 LLM은 해석자이며 두 번째 계산기가 아니다.',
     '[해석 규칙]',
     '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
-    kind === 'reunion' ? '- 재회운은 reunion_dimensions의 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 분리한다. incoming/outgoing은 상대측/내측 활성이지 행동 방향이 아니다. reunion_secondary_support는 기간 배경이며 exact date를 만들지 않는다.' : '',
+    kind === 'reunion' ? '- 재회운은 reunion_dimensions의 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 분리한다. incoming/outgoing은 상대측/내측 활성이지 행동 방향이 아니다. reunion_secondary_support는 진행계열 기간 배경이며 exact date를 만들지 않는다. reunion_return_support의 Solar Return(태양회귀)은 연간 배경, Lunar Return(달회귀)은 월간·정서 배경이다. Return은 fast trigger를 통과한 날짜를 교차검증하는 보조층일 뿐 날짜를 새로 만들거나 같은 transit을 중복 가산하지 않는다.' : '',
     '- 개인행성·수성의 소통·금성/화성의 끌림·토성의 책임·교점의 관계 관련성을 우선하고 반복 주제와 애스펙트 성격, 오브를 함께 본다. 외행성끼리의 세대 접점을 작은 오브만으로 최우선에 놓지 않는다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',

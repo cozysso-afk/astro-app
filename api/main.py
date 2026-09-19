@@ -18,13 +18,14 @@ from integrated_fortune_precision_v2 import build_integrated_fortune_precision_v
 from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fortune
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
+from relationship_return_v1 import ENGINE_VERSION as REL_RETURN_ENGINE_VERSION, augment_relationship_with_returns
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 
-APP_VERSION = "api-fortune-v5.8-integrated-precision-v2"
+APP_VERSION = "api-fortune-v5.9-reunion-solar-lunar-return-v1"
 
 app = FastAPI(
     title="별빛의 운명 API",
@@ -289,6 +290,7 @@ def meta() -> dict:
     return {
         "api_version": APP_VERSION,
         "relationship_engine": REL_ENGINE_VERSION,
+        "relationship_return_engine": REL_RETURN_ENGINE_VERSION,
         "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "location_engine": LOCATION_ENGINE_VERSION,
         "personal_marriage_engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
@@ -462,6 +464,19 @@ def relationship_western(request: RelationshipRequest) -> dict:
             result["saju_relationship"] = build_relationship_saju(user_payload, cp_payload)
         except Exception as saju_exc:
             result["saju_relationship"] = {"available": False, "engine": REL_SAJU_ENGINE_VERSION, "error": str(saju_exc)}
+        if request.analysis_mode == "reunion":
+            try:
+                result = augment_relationship_with_returns(
+                    result, user_payload, cp_payload, request.start_date, request.end_date
+                )
+            except Exception as return_exc:
+                result["reunion_return_support"] = {
+                    "available": False,
+                    "engine": REL_RETURN_ENGINE_VERSION,
+                    "error": str(return_exc),
+                    "policy": "Solar/Lunar Return is an optional background cross-check and does not block the core reunion calculation.",
+                    "event_probability": "not_calculated",
+                }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
 
