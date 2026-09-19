@@ -26,33 +26,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Fix replacement helper for literal backslashes
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/apply_reunion_four_stage_v15.py')
-          s=p.read_text(encoding='utf-8')
-          old='out, n = re.subn(pattern, repl, text, count=1, flags=flags)'
-          new='out, n = re.subn(pattern, lambda _m: repl, text, count=1, flags=flags)'
-          if old not in s:
-              raise SystemExit('sub_once helper anchor missing')
-          p.write_text(s.replace(old,new,1),encoding='utf-8')
-          PY
-
-      - name: Apply migration
+      - name: Apply v15 contract hardening
         run: python scripts/apply_reunion_four_stage_v15.py
 
-      - name: Syntax check Python engine
-        run: python -m py_compile reunion_dimension_v1.py relationship_western_v1.py tests/test_reunion_dimensions_v14.py tests/test_relationship_api_e2e_v15.py
+      - name: Syntax check relationship engine
+        run: python -m py_compile reunion_dimension_v1.py relationship_western_v1.py
 
       - name: Commit generated changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add reunion_dimension_v1.py relationship_western_v1.py tests/test_reunion_dimensions_v14.py tests/test_relationship_api_e2e_v15.py web/src/lib/resultFormatters.ts web/src/lib/compactDeepPrompt.ts web/src/ReunionPanels.tsx web/src/RelationshipInterpretationPanel.tsx supabase/functions/relationship-interpret-v9-preview/index.ts supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.ts supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts
+          git add supabase/functions/relationship-interpret-v9-preview/index.ts web/src/lib/readingCache.ts web/src/lib/relationshipModeContract.test.mjs
           if git diff --cached --quiet; then
             echo 'No generated changes'
           else
-            git commit -m 'feat: separate reunion into four gated stages'
+            git commit -m 'fix: keep reunion v15 gating fields in AI payload'
             git push origin HEAD:feat/reunion-four-stage-engine-v15
           fi
