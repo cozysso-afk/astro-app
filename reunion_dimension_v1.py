@@ -11,7 +11,7 @@ DIMENSIONS = (
     "in_person_meeting",
     "relationship_rebuilding",
 )
-FAST_TRIGGER_PLANETS = {"Sun", "Mercury", "Venus", "Mars"}
+FAST_TRIGGER_PLANETS = {"Sun", "Moon", "Mercury", "Venus", "Mars"}
 
 ASPECT_WEIGHTS = {
     "conjunction": 1.00,
@@ -25,19 +25,19 @@ ASPECT_WEIGHTS = {
 # Product-interpretation weights only; never empirical event probabilities.
 TRANSIT_WEIGHTS = {
     "emotional_reactivation": {
-        "Sun": 0.60, "Mercury": 0.30, "Venus": 1.00, "Mars": 0.75,
+        "Moon": 1.00, "Sun": 0.60, "Mercury": 0.30, "Venus": 1.00, "Mars": 0.75,
         "Jupiter": 0.55, "Saturn": 0.35, "Uranus": 0.45, "Neptune": 0.75, "Pluto": 0.90,
     },
     "contact_recontact": {
-        "Sun": 0.45, "Mercury": 1.00, "Venus": 0.85, "Mars": 0.65,
+        "Moon": 0.65, "Sun": 0.45, "Mercury": 1.00, "Venus": 0.85, "Mars": 0.65,
         "Jupiter": 0.35, "Saturn": 0.15, "Uranus": 0.55, "Neptune": 0.20, "Pluto": 0.25,
     },
     "in_person_meeting": {
-        "Sun": 0.65, "Mercury": 0.70, "Venus": 0.95, "Mars": 0.95,
+        "Moon": 0.65, "Sun": 0.65, "Mercury": 0.70, "Venus": 0.95, "Mars": 0.95,
         "Jupiter": 0.50, "Saturn": 0.20, "Uranus": 0.55, "Neptune": 0.20, "Pluto": 0.30,
     },
     "relationship_rebuilding": {
-        "Sun": 0.35, "Mercury": 0.45, "Venus": 0.70, "Mars": 0.30,
+        "Moon": 0.55, "Sun": 0.35, "Mercury": 0.45, "Venus": 0.70, "Mars": 0.30,
         "Jupiter": 0.95, "Saturn": 1.00, "Uranus": 0.20, "Neptune": 0.20, "Pluto": 0.45,
     },
 }
@@ -114,7 +114,7 @@ def dimension_side_score(hits: list[dict[str, Any]], dimension: str) -> tuple[fl
             "event_probability": "not_calculated",
         })
         evidence.append(row)
-    evidence.sort(key=lambda row: (-float(row["dimension_score"]), float(row.get("orb") or 99.0)))
+    evidence.sort(key=lambda row: (-float(row["dimension_score"]), float(row["orb"] if row.get("orb") is not None else 99.0)))
     top = evidence[:4]
     score = round(min(100.0, sum(float(row["dimension_score"]) for row in top) / 2.35), 1) if top else 0.0
     return score, evidence[:8]
@@ -134,7 +134,7 @@ def fast_trigger_evidence(hits: list[dict[str, Any]], dimension: str, minimum_sc
         row["exact_date_trigger"] = True
         row["event_probability"] = "not_calculated"
         rows.append(row)
-    rows.sort(key=lambda row: (-float(row["dimension_score"]), float(row.get("orb") or 99.0)))
+    rows.sort(key=lambda row: (-float(row["dimension_score"]), float(row["orb"] if row.get("orb") is not None else 99.0)))
     return rows[:6]
 
 
@@ -196,7 +196,7 @@ def secondary_support(month_row: dict[str, Any]) -> dict[str, Any]:
             if matched:
                 layer_names.add(layer.split(".")[0])
                 evidence.extend(matched)
-        evidence.sort(key=lambda row: (float(row.get("orb") or 99.0), int(row.get("layer_priority") or 9)))
+        evidence.sort(key=lambda row: (float(row["orb"] if row.get("orb") is not None else 99.0), int(row.get("layer_priority") or 9)))
         result[dimension] = {
             "label": DIMENSION_LABELS[dimension],
             "evidence": evidence[:8],

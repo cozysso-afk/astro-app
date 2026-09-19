@@ -44,6 +44,7 @@ def _request(*, user=None, counterpart=None, analysis_mode="reunion", relationsh
     return {
         "user": user or _user(),
         "counterpart": counterpart or _counterpart(),
+        "as_of_date": start,
         "start_date": start,
         "end_date": end,
         "relationship_status": relationship_status,

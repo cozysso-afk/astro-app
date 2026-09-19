@@ -136,6 +136,7 @@ export type RelationshipApiResponse = {
       top_months: Array<{ calendar_month: string; score: number; top_dates: string[] }>
       directional_context?: ReunionTimingContext
     }
+    reunion_hierarchy?: Record<string, unknown>
     reunion_return_support?: Record<string, unknown>
   }
 }
