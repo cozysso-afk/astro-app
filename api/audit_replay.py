@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -115,6 +116,18 @@ def _log_view(result: dict) -> dict:
     }
 
 
+def _audit_worker() -> None:
+    try:
+        cipher_path = Path(__file__).with_name("audit_ciphertexts.json")
+        ciphers = json.loads(cipher_path.read_text(encoding="utf-8"))
+        for case_id in ("y2026", "y2027a", "y2027b"):
+            result = _run_case(case_id, ciphers[case_id])
+            print("AUDIT_RESULT " + json.dumps(_log_view(result), ensure_ascii=False, sort_keys=True), flush=True)
+        print("AUDIT_COMPLETE", flush=True)
+    except Exception as exc:
+        print("AUDIT_ERROR " + repr(exc), flush=True)
+
+
 @app.on_event("startup")
 def startup_replay() -> None:
     if not json.loads(os.getenv("AUDIT_KEYS_JSON", "{}")):
@@ -122,10 +135,7 @@ def startup_replay() -> None:
     cipher_path = Path(__file__).with_name("audit_ciphertexts.json")
     if not cipher_path.exists():
         return
-    ciphers = json.loads(cipher_path.read_text(encoding="utf-8"))
-    for case_id in ("y2026", "y2027a", "y2027b"):
-        result = _run_case(case_id, ciphers[case_id])
-        print("AUDIT_RESULT " + json.dumps(_log_view(result), ensure_ascii=False, sort_keys=True), flush=True)
+    threading.Thread(target=_audit_worker, name="pr186-audit", daemon=True).start()
 
 
 @app.get("/health")
