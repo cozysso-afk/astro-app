@@ -49,6 +49,11 @@ test('personal marriage preserves computed data with non-prophetic creative pres
 test('relationship AI keeps compatibility reunion unmarried-partner and married semantics separate', () => {
   assert.match(relationshipFn, /type Purpose="compatibility"\|"reunion"\|"marriage_unmarried"\|"marriage_married"/)
   assert.match(relationshipFn, /CALCULATED_DATA\.reunion_evidence_v2/)
+  assert.match(relationshipFn, /reunion_dimensions:base\.reunion_dimensions/)
+  assert.match(relationshipFn, /reunion_timing_windows:base\.reunion_timing_windows/)
+  assert.match(relationshipFn, /reunion_secondary_support:base\.reunion_secondary_support/)
+  assert.match(relationshipFn, /initiative_gate/)
+  assert.match(relationshipFn, /감정 활성 \/ 연락·재접촉 \/ 실제 만남 \/ 관계 재결합/)
   assert.match(relationshipFn, /왜 다시 연결될 여지가 있는가/)
   assert.match(relationshipFn, /같은 파생계열 반복은 수렴 근거로 세지 않는다/)
   assert.match(relationshipFn, /reunion_synthesis_v2:REUNION_V2_SCHEMA/)
@@ -91,7 +96,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.10-editorial-polish-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v11\.11-four-stage-gated-dates-v1'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -104,7 +109,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v11\.10-provisional-time-reference/)
+  assert.match(relationshipFn, /relationship-v11\.11-four-stage-gated-dates/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

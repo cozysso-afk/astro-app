@@ -115,7 +115,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  });
  if(purpose==="reunion"){
    const reunion_evidence_v2=buildReunionEvidenceV2(base);
-   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_evidence_v2,limitations:base.limitations};
+   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_dimensions:base.reunion_dimensions,reunion_secondary_support:base.reunion_secondary_support,reunion_timing_windows:base.reunion_timing_windows,reunion_return_support:base.reunion_return_support,reunion_evidence_v2,limitations:base.limitations};
  }
  return base;
 }
@@ -160,10 +160,10 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - 각 핵심 결론에는 reunion_evidence_v2에 실제 존재하는 evidence_refs를 반드시 붙인다. 존재하지 않는 ref를 만들지 않는다.
 - 가능한 경우 서로 다른 independence_group 2개 이상을 종합한다. 같은 파생계열 반복은 수렴 근거로 세지 않는다.
 - natal synastry는 기본 상호작용, composite는 관계 자체의 기본 구조, Davison은 현실의 관계 과제, Marks A/B는 각 방향의 관계 경험, progressed synastry는 현재 두 사람의 진행 접점, progressed composite는 관계 자체의 현재 단계, Marks tertiary와 daily transit은 단기 시기 촉발로 역할을 분리한다.
-- 연락·재접촉 / 감정 재활성 / 관계 재구축 지원층을 하나의 재회 점수로 합치지 않는다. 연락이 열리는 것과 안정적 재결합은 별개로 결론낸다.
+- 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 네 단계로 분리하고 한 단계의 강함을 다음 단계의 성립으로 자동 승격하지 않는다.
 - 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
 - "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
-- 선택기간 내 2~4개 시기창을 제시하되, Secondary Progression을 Daily Transit보다 상위 시기근거로 둔다.
+- 시기창은 기간 신호와 날짜 트리거를 분리한다. Secondary Progression은 기간 배경만 만들고, 특정 날짜는 reunion_timing_windows에 실제 fast transit trigger가 있을 때만 제시한다.
 
 [미혼 결혼 marriage_unmarried]
 '결혼으로 공식화될 가능성·프러포즈/약혼/결혼 결정이 강해지는 시기'를 재미용 점성 해석으로 적극적으로 제시한다. 다만 통계적 확률이나 확정된 미래 사실처럼 단정하지 않는다. 이어서 '이 둘이 결혼생활로 들어가면 어떻게 작동하나'를 깊게 본다.
