@@ -41,6 +41,7 @@ on:
       - 'tests/test_relationship_returns_v18.py'
       - 'tests/test_timezone_provenance_v25.py'
       - 'tests/test_return_relocation_v26.py'
+      - 'tests/test_return_relocation_v27.py'
       - 'tests/test_personal_love_engine_v16.py'
       - 'tests/test_personal_love_api_v16.py'
       - 'tests/test_integrated_precision_v2.py'
@@ -125,6 +126,7 @@ jobs:
             tests/test_relationship_returns_v18.py \
             tests/test_timezone_provenance_v25.py \
             tests/test_return_relocation_v26.py \
+            tests/test_return_relocation_v27.py \
             tests/test_personal_love_engine_v16.py \
             tests/test_personal_love_api_v16.py \
             tests/test_integrated_precision_v2.py \
