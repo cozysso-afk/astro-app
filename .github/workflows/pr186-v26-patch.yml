@@ -29,7 +29,7 @@ jobs:
           python -m py_compile api/main.py relationship_return_v1.py tests/test_return_relocation_v26.py
           git diff --check
 
-      - name: Commit and push v2.6
+      - name: Commit and push v2.6 code/tests
         run: |
           if git diff --quiet; then
             echo "No changes to commit"
@@ -37,6 +37,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/main.py relationship_return_v1.py .github/workflows/calculation-audit-ci.yml tests/test_return_relocation_v26.py
+          git add api/main.py relationship_return_v1.py tests/test_return_relocation_v26.py
           git commit -m "fix(reunion): add explicit return relocation provenance"
           git push origin HEAD:fix/reunion-hierarchy-v2
