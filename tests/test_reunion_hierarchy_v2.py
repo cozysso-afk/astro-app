@@ -98,30 +98,145 @@ def test_asof_future_peak_is_not_suppressed_by_past_maximum():
     assert not rows[0]['selection_eligible']
 
 
-def test_stage_specific_trigger_must_materially_contribute():
-    moon=[{'a':'Moon','strength':80,'orb':0.1,'event_id':'moon'}]
-    weak_mercury=[{'a':'Mercury','strength':0.1,'orb':0.01,'event_id':'weak-mercury'}]
-    mercury=[{'a':'Mercury','strength':12,'orb':0.9,'event_id':'mercury'}]
-    mars=[{'a':'Mars','strength':12.1,'orb':0.8,'event_id':'mars'}]
+def test_guard_band_compares_query_external_future_peaks_and_clips_public_dates():
+    rows=[_peak_row('2026-12-31',100),_peak_row('2027-01-01',80),
+          _peak_row('2027-12-31',80),_peak_row('2028-01-01',100)]
+    h._mark_requested_peaks(rows,date(2027,1,1),date(2027,12,31),date(2026,9,19))
+    assert not any(r['selection_eligible'] for r in rows)
+    # With Jan 1 as-of, Dec 31 is past and must not suppress Jan 1.
+    h._mark_requested_peaks(rows,date(2027,1,1),date(2027,12,31),date(2027,1,1))
+    assert [r['date'] for r in rows if r['selection_eligible']]==['2027-01-01']
+
+
+def test_stage_specific_trigger_must_materially_contribute_with_relevant_target_and_aspect():
+    moon=[{'a':'Moon','b':'Venus','aspect':'square','strength':80,'orb':0.1,'event_id':'moon'}]
+    weak_mercury=[{'a':'Mercury','b':'Moon','aspect':'conjunction','strength':0.1,'orb':0.01,'event_id':'weak-mercury'}]
+    mercury=[{'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12,'orb':0.9,'event_id':'mercury'}]
+    wrong_target=[{'a':'Mercury','b':'Mars','aspect':'conjunction','strength':90,'orb':0.01,'event_id':'wrong-target'}]
+    quincunx=[{'a':'Mercury','b':'Moon','aspect':'quincunx','strength':90,'orb':0.01,'event_id':'quincunx'}]
+    mars=[{'a':'Mars','b':'DSC','aspect':'opposition','strength':12.1,'orb':0.8,'event_id':'mars'}]
     assert not h._stage_trigger_ok('contact_recontact',moon)
     assert not h._stage_trigger_ok('contact_recontact',moon+weak_mercury)
     assert h._stage_trigger_ok('contact_recontact',moon+mercury)
-    assert not h._stage_trigger_ok('in_person_meeting',mercury)
+    assert not h._stage_trigger_ok('contact_recontact',wrong_target)
+    assert not h._stage_trigger_ok('contact_recontact',quincunx)
     assert h._stage_trigger_ok('in_person_meeting',mars)
 
 
 def test_display_fast_evidence_always_contains_material_primary_trigger():
     evidence=[
-        {'a':'Moon','strength':90,'orb':0.1,'event_id':'a'},
-        {'a':'Moon','strength':80,'orb':0.2,'event_id':'b'},
-        {'a':'Mars','strength':70,'orb':0.3,'event_id':'c'},
-        {'a':'Moon','strength':60,'orb':0.4,'event_id':'d'},
-        {'a':'Mercury','strength':12.5,'orb':0.5,'event_id':'primary'},
+        {'a':'Moon','b':'Venus','aspect':'square','strength':90,'orb':0.1,'event_id':'a'},
+        {'a':'Moon','b':'Moon','aspect':'trine','strength':80,'orb':0.2,'event_id':'b'},
+        {'a':'Mars','b':'DSC','aspect':'opposition','strength':70,'orb':0.3,'event_id':'c'},
+        {'a':'Moon','b':'Sun','aspect':'sextile','strength':60,'orb':0.4,'event_id':'d'},
+        {'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12.5,'orb':0.5,'event_id':'primary'},
     ]
     shown=h._display_fast_evidence('contact_recontact',evidence,4)
     assert shown[0]['event_id']=='primary'
     assert len(shown)==4
 
+
+
+def test_medium_gate_uses_lunar_return_only_while_other_returns_remain_context():
+    rows=[
+        {'return_type':'lunar_return','mid_gate':True,'event_id':'lunar','strength':30},
+        {'return_type':'venus_return','mid_gate':False,'event_id':'venus','strength':100},
+    ]
+    gate=h._mid_gate_evidence(rows)
+    assert [r['event_id'] for r in gate]==['lunar']
+    assert h._ranked_score(gate)[0]==30
+    assert h._ranked_score(rows)[0]>30
+
+
+def test_medium_context_return_families_are_stage_specific_and_keep_lunar_anchor():
+    assert all('lunar_return' in keys for keys in h.MID_CONTEXT_RETURN_KEYS_BY_STAGE.values())
+    assert 'mercury_return' in h.MID_CONTEXT_RETURN_KEYS_BY_STAGE['contact_recontact']
+    assert 'mars_return' in h.MID_CONTEXT_RETURN_KEYS_BY_STAGE['in_person_meeting']
+    assert 'solar_return' in h.MID_CONTEXT_RETURN_KEYS_BY_STAGE['relationship_rebuilding']
+    assert h.MID_GATE_RETURN_KEYS=={'lunar_return'}
+
+
+@pytest.mark.parametrize('stage,planet,target',[
+    ('contact_recontact','Mercury','Moon'),
+    ('in_person_meeting','Mars','DSC'),
+])
+def test_semantic_gate_rejects_missing_target_minor_aspect_and_invalid_orb(stage,planet,target):
+    hit={'a':planet,'b':target,'aspect':'conjunction','strength':30,'orb':.2,'event_id':'synthetic'}
+    assert h._stage_trigger_ok(stage,[hit])
+    for invalid in ({'b':'Pluto'},{'aspect':'quincunx'},{'orb':1.0},{'orb':-1},{'orb':math.nan},{'strength':math.inf}):
+        assert not h._stage_trigger_ok(stage,[{**hit,**invalid}])
+
+
+def _synthetic_pipeline(monkeypatch, return_key, *, long_strength=60, fast_planet='Mercury'):
+    # Artificial positions/profiles; no saved personal information.
+    p={'birth_date':date(1980,1,1),'birth_time':time(12),'utc_offset_hours':0,
+       'latitude':0,'longitude':0,'time_source':'official_record','time_confidence':'exact'}
+    event={'exact_utc':'2026-01-01T00:00:00+00:00','next_exact_utc':'2026-02-01T00:00:00+00:00',
+           'precision':'exact','positions':{'Mercury':10},'angles':{},'house_activations':[]}
+    original=h._contacts
+    def contacts(source,target,stage,family,direction,**kwargs):
+        if family=='return':
+            return original({'Mercury':10},{'Moon':10},stage,family,direction,**kwargs)
+        if family in {'secondary','natal_trigger'}:
+            return [{'event_id':family+direction,'family':family,'a':fast_planet,'b':'Moon',
+                     'aspect':'conjunction','orb':.1,'strength':long_strength if family=='secondary' else 60}]
+        return []
+    monkeypatch.setattr(h,'_contacts',contacts)
+    monkeypatch.setattr(h,'_validate',lambda *_:{'status':'PASS','checks':[]})
+    result={'reunion_return_support':{return_key:{'user':{'events':[event]},'counterpart':{'events':[]}}}}
+    h.apply_reunion_hierarchy(result,p,p,date(2026,1,15),date(2026,1,15),as_of_date=date(2026,1,15))
+    return result['reunion_hierarchy']
+
+
+@pytest.mark.parametrize('key',['solar_return','mercury_return','venus_return','mars_return','missing'])
+def test_non_lunar_returns_cannot_create_hierarchy_candidate(monkeypatch,key):
+    result=_synthetic_pipeline(monkeypatch,key)
+    assert not result['top_periods']
+    assert all(not r['medium_anchor_pass'] and not r['fast_trigger_evaluated'] for r in result['daily_trace'])
+
+
+def test_lunar_anchor_and_valid_contact_trigger_pass_without_promoting_meeting(monkeypatch):
+    result=_synthetic_pipeline(monkeypatch,'lunar_return')
+    rows={r['stage']:r for r in result['daily_trace']}
+    assert rows['contact_recontact']['hierarchy_eligible']
+    assert rows['contact_recontact']['selection_eligible']
+    assert not rows['in_person_meeting']['hierarchy_eligible']
+    for r in rows.values():
+        if r['selection_eligible']: assert r['hierarchy_eligible'] and all(r['components']['gates'].values())
+
+
+def test_emotion_does_not_automatically_promote_contact_or_meeting(monkeypatch):
+    result=_synthetic_pipeline(monkeypatch,'lunar_return',fast_planet='Moon')
+    assert all(not r['hierarchy_eligible'] for r in result['daily_trace'] if r['stage'] in {'contact_recontact','in_person_meeting'})
+
+
+def test_long_failure_skips_medium_evidence_and_fast_sampling(monkeypatch):
+    def forbidden(*args,**kwargs): raise AssertionError('medium evaluated despite failed long gate')
+    monkeypatch.setattr(h,'_return_evidence',forbidden)
+    result=_synthetic_pipeline(monkeypatch,'lunar_return',long_strength=0)
+    assert all(not r['medium_anchor_evaluated'] and not r['fast_trigger_evaluated'] for r in result['daily_trace'])
+
+
+def test_request_scoped_return_cache_preserves_exact_boundary_results():
+    event={'exact_utc':'2026-01-01T00:00:00+00:00','next_exact_utc':'2026-01-20T12:00:00+00:00',
+           'precision':'exact','positions':{'Mercury':10},'angles':{},'house_activations':[]}
+    next_event={**event,'exact_utc':event['next_exact_utc'],'next_exact_utc':'2026-02-20T00:00:00+00:00','positions':{'Mercury':20}}
+    support={'lunar_return':{'user':{'events':[event,next_event]}}}
+    natal={'user':{'Moon':10},'counterpart':{}}
+    cache={}
+    for instant in (datetime(2026,1,10,tzinfo=timezone.utc),datetime(2026,1,20,11,59,tzinfo=timezone.utc),datetime(2026,1,20,12,tzinfo=timezone.utc)):
+        assert h._return_evidence(support,instant,'contact_recontact',natal,cache)==h._return_evidence(support,instant,'contact_recontact',natal)
+    assert len(cache)==2
+
+
+def test_shared_geometry_cache_keeps_all_stage_weights_and_orbs_identical():
+    cache={}
+    source={'Moon':10.1,'Venus':70.2,'Mercury':130.3,'Mars':190.4}
+    target={'Moon':10,'Venus':70,'DSC':190}
+    for stage in h.DIMENSIONS:
+        for family in ('secondary','solar_arc','natal_trigger'):
+            assert h._contacts(source,target,stage,family,'user',geometry_cache=cache)==h._contacts(source,target,stage,family,'user')
+    assert len(cache)==len(source)*len(target)
 
 def test_nearest_public_candidate_is_nearest_local_peak_not_first_gate_day():
     start=date(2027,1,1)
@@ -184,13 +299,16 @@ def test_flat_plateau_after_asof_keeps_one_future_representative():
 
 def test_selectivity_reports_gate_trigger_and_peak_counts_separately():
     rows=[_peak_row(f'2026-01-{i:02d}',50+i) for i in range(1,11)]
+    for row in rows:
+        row['hierarchy_eligible']=False
     h._mark_local_peaks(rows,min_date=date(2026,1,1),max_date=date(2026,1,10))
     summary=h._selectivity_summary(rows,date(2026,1,1))['contact_recontact']
-    assert summary['gate_pass_days']==10
+    assert summary['numeric_gate_pass_days']==10
     assert summary['stage_trigger_pass_days']==10
-    assert summary['local_peak_days']<summary['gate_pass_days']
-    assert summary['status']=='LOW_SELECTIVITY'
-    assert 'LOW_GATE_SELECTIVITY' in summary['warnings']
+    assert summary['hierarchy_pass_days']==0
+    assert summary['local_peak_days']<summary['numeric_gate_pass_days']
+    assert summary['status']=='OK'
+    assert 'LOW_NUMERIC_GATE_SELECTIVITY' in summary['warnings']
 
 
 def test_selected_requires_explicit_selection_flag_not_gate_fallback():
@@ -282,7 +400,7 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
     assert hierarchy['validation']['status']=='PASS'
     assert len(hierarchy['daily_trace'])==11*4
     assert len(hierarchy['long_term_daily'])==11*4
-    assert hierarchy['version']=='reunion-hierarchy-v2.2-selectivity-boundaries'
+    assert hierarchy['version']=='reunion-hierarchy-v2.3-medium-anchor'
     assert 'selectivity' in hierarchy and 'selection_policy' in hierarchy
     assert hierarchy['selection_policy']['primary_trigger_min_strength']==h.THRESHOLDS['event_trigger']
     windows=result['reunion_timing_windows']['windows']
@@ -301,6 +419,13 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
         if row['eligible']:
             assert all(c['gates'].values())
         if row['selection_eligible']:
-            assert row['eligible'] and row['stage_trigger_ok'] and row['local_peak']
+            assert row['eligible'] and row['hierarchy_eligible'] and row['stage_trigger_ok'] and row['local_peak']
             required=h.PRIMARY_TRIGGER_BY_STAGE[row['stage']]
-            assert any(e.get('a') in required and e.get('strength',0)>=h.THRESHOLDS['event_trigger'] for e in row['fast_evidence'])
+            targets=h.PRIMARY_TRIGGER_TARGETS_BY_STAGE[row['stage']]
+            assert any(
+                e.get('a') in required
+                and e.get('b') in targets
+                and e.get('aspect') in h.PRIMARY_TRIGGER_ASPECTS
+                and e.get('strength',0)>=h.THRESHOLDS['event_trigger']
+                for e in row['fast_evidence']
+            )

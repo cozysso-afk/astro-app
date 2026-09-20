@@ -22,7 +22,7 @@ from reunion_dimension_v1 import (
 
 DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정의'}
 
-VERSION = 'reunion-hierarchy-v2.2-selectivity-boundaries'
+VERSION = 'reunion-hierarchy-v2.3-medium-anchor'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -44,6 +44,20 @@ PRIMARY_TRIGGER_BY_STAGE = {
     'in_person_meeting': {'Mars'},
     'relationship_rebuilding': {'Venus', 'Sun'},
 }
+MID_GATE_RETURN_KEYS = {'lunar_return'}
+MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
+    'emotional_reactivation': ('lunar_return', 'venus_return'),
+    'contact_recontact': ('lunar_return', 'mercury_return'),
+    'in_person_meeting': ('lunar_return', 'venus_return', 'mars_return'),
+    'relationship_rebuilding': ('lunar_return', 'venus_return', 'solar_return'),
+}
+PRIMARY_TRIGGER_TARGETS_BY_STAGE = {
+    'emotional_reactivation': {'Sun', 'Moon', 'Venus'},
+    'contact_recontact': {'Sun', 'Moon', 'Mercury', 'Venus'},
+    'in_person_meeting': {'Moon', 'Venus', 'Mars', 'ASC', 'DSC'},
+    'relationship_rebuilding': {'Sun', 'Moon', 'Venus', 'DSC'},
+}
+PRIMARY_TRIGGER_ASPECTS = {'conjunction', 'sextile', 'square', 'trine', 'opposition'}
 DISCLAIMER = '점수는 해당 기간의 점성·명리적 상대 활성도를 비교하기 위한 값이며, 실제 연락·만남·재회의 확률을 의미하지 않습니다.'
 
 
@@ -91,7 +105,7 @@ def _raw_ranked_score(rows):
     return round(sum(float(e.get('strength', 0)) * w for e, w in zip(rows, weights)), 3)
 
 
-def _contacts(source, target, stage, family, direction, *, sources=None, targets=None, limit=1.5):
+def _contacts(source, target, stage, family, direction, *, sources=None, targets=None, limit=1.5, geometry_cache=None):
     out = []
     for a, lon in source.items():
         if sources is not None and a not in sources:
@@ -99,11 +113,14 @@ def _contacts(source, target, stage, family, direction, *, sources=None, targets
         for b, natal in target.items():
             if targets is not None and b not in targets:
                 continue
-            dist = rw._angle_distance(lon, natal)
-            for aspect, angle in rw.ASPECTS.items():
-                orb = abs(dist - angle)
-                if orb >= limit:
-                    continue
+            geometry_key = (lon, natal, limit)
+            matches = geometry_cache.get(geometry_key) if geometry_cache is not None else None
+            if matches is None:
+                dist = rw._angle_distance(lon, natal)
+                matches = tuple((aspect, abs(dist - angle)) for aspect, angle in rw.ASPECTS.items() if abs(dist - angle) < limit)
+                if geometry_cache is not None:
+                    geometry_cache[geometry_key] = matches
+            for aspect, orb in matches:
                 weight = TARGET_WEIGHTS[stage].get(b, .2)
                 source_weight = 1.0 if family in {'secondary', 'solar_arc'} else TRANSIT_WEIGHTS[stage].get(a, 0)
                 strength = 100 * source_weight * weight * ASPECT_WEIGHTS[aspect] * (1 - orb / limit)
@@ -146,14 +163,29 @@ def _active_return(events, instant):
     return None
 
 
-def _return_evidence(support, instant, stage, natal):
+def _return_evidence(support, instant, stage, natal, cache=None):
+    # Request-scoped: a return chart and its natal contacts are invariant until
+    # the exact UTC cycle boundary. Never cache across profiles or requests.
+    if cache is not None:
+        signature = tuple(
+            (key, side, (event or {}).get('exact_utc'))
+            for key in MID_CONTEXT_RETURN_KEYS_BY_STAGE[stage]
+            for side in ('user', 'counterpart')
+            for event in [_active_return(support.get(key, {}).get(side, {}).get('events', []), instant)]
+        )
+        cache_key = (stage, signature)
+        if cache_key not in cache:
+            cache[cache_key] = _return_evidence(support, instant, stage, natal)
+        return cache[cache_key]
+    """Return stage-relevant context; Lunar Return is the required medium-window anchor."""
     rows, active = [], []
-    for key in RETURN_KEYS:
+    for key in MID_CONTEXT_RETURN_KEYS_BY_STAGE[stage]:
         for side in ('user', 'counterpart'):
             e = _active_return(support.get(key, {}).get(side, {}).get('events', []), instant)
             if not e or e.get('precision') == 'date_noon_proxy':
                 continue
-            active.append((key, side, e))
+            if key in MID_GATE_RETURN_KEYS:
+                active.append((key, side, e))
             anchor = {
                 'solar_return': 'Sun',
                 'lunar_return': 'Moon',
@@ -174,6 +206,7 @@ def _return_evidence(support, instant, stage, natal):
             )
             for hit in hits:
                 hit['return_type'] = key
+                hit['mid_gate'] = key in MID_GATE_RETURN_KEYS
             rows.extend(hits)
             for h in e.get('house_activations', []):
                 if h.get('whole_sign') in {3, 5, 7, 8}:
@@ -182,12 +215,19 @@ def _return_evidence(support, instant, stage, natal):
                         'family': 'return_house',
                         'system': 'western',
                         'a': h['planet'],
+                        'return_type': key,
+                        'mid_gate': key in MID_GATE_RETURN_KEYS,
                         'house_system': 'Whole Sign',
                         'house': h['whole_sign'],
                         'strength': 12.0,
                         'tone': 'context',
                     })
     return rows, active
+
+
+def _mid_gate_evidence(rows):
+    """Only Lunar Return evidence opens the medium-term gate; other returns remain context."""
+    return [row for row in rows if row.get('mid_gate') and row.get('return_type') in MID_GATE_RETURN_KEYS]
 
 
 def _saju_context(user, counterpart, start, end, offset):
@@ -316,11 +356,18 @@ def _validate(user, counterpart, support):
 
 
 def _stage_trigger_evidence(stage, evidence):
-    """Return the strongest materially contributing stage-defining fast contact."""
+    """Return a material fast contact whose planet, target and aspect fit the stage."""
     required = PRIMARY_TRIGGER_BY_STAGE[stage]
+    targets = PRIMARY_TRIGGER_TARGETS_BY_STAGE[stage]
     qualifying = [
         e for e in evidence
-        if e.get('a') in required and float(e.get('strength', 0)) >= THRESHOLDS['event_trigger']
+        if e.get('a') in required
+        and e.get('b') in targets
+        and e.get('aspect') in PRIMARY_TRIGGER_ASPECTS
+        and float(e.get('strength', 0)) >= THRESHOLDS['event_trigger']
+        and math.isfinite(float(e.get('strength', 0)))
+        and isinstance(e.get('orb'), (int, float))
+        and 0 <= e['orb'] < 1.0
     ]
     if not qualifying:
         return None
@@ -380,8 +427,7 @@ def _mark_local_peaks(rows, radius=PEAK_RADIUS_DAYS, *, min_date=None, max_date=
         candidates = [
             r for r in rows
             if r['stage'] == stage
-            and r['eligible']
-            and r.get('stage_trigger_ok', True)
+            and r.get('hierarchy_eligible', r['eligible'] and r.get('stage_trigger_ok', True))
             and (min_iso is None or r['date'] >= min_iso)
             and (max_iso is None or r['date'] <= max_iso)
         ]
@@ -400,6 +446,16 @@ def _mark_local_peaks(rows, radius=PEAK_RADIUS_DAYS, *, min_date=None, max_date=
 
 def _selected(row):
     return bool(row.get('selection_eligible', False))
+
+
+def _mark_requested_peaks(rows, start, end, as_of):
+    # Include query-external future context, but never let a past peak suppress
+    # an actionable future peak. Expose only the original requested interval.
+    _mark_local_peaks(rows, min_date=max(start - timedelta(days=PEAK_RADIUS_DAYS), as_of),
+                      max_date=end + timedelta(days=PEAK_RADIUS_DAYS))
+    for row in rows:
+        if not start.isoformat() <= row['date'] <= end.isoformat():
+            row['local_peak'] = row['selection_eligible'] = False
 
 
 def _group_windows(rows, as_of):
@@ -436,7 +492,7 @@ def _group_windows(rows, as_of):
 def _peak_windows(rows, as_of, limit=24):
     """Display three-day neighborhoods around every selected stage-local peak."""
     eligible = [r for r in rows if _selected(r) and r['date'] >= as_of.isoformat()]
-    by_key = {(r['date'], r['stage']): r for r in rows if r['eligible']}
+    by_key = {(r['date'], r['stage']): r for r in rows if r.get('hierarchy_eligible', r['eligible'] and r.get('stage_trigger_ok', True))}
     chosen = []
     for r in sorted(eligible, key=lambda r: (-r['components']['final'], r['date'], r['stage'])):
         d = date.fromisoformat(r['date'])
@@ -477,36 +533,54 @@ def _bounded_with_nearest(rows, nearest, limit):
 
 
 def _selectivity_summary(rows, as_of=None):
-    total_days = max(1, len({r['date'] for r in rows}))
+    """Counts are sequential gates, not counterfactual scores for skipped layers."""
     as_of_iso = as_of.isoformat() if isinstance(as_of, date) else None
+    def counts(items):
+        n = len(items)
+        values = {
+            'total_days': n,
+            'long_term_pass_days': sum(bool(r.get('components', {}).get('gates', {}).get('long_term', r.get('eligible', False))) for r in items),
+            'medium_anchor_evaluated_days': sum(r.get('medium_anchor_evaluated', False) for r in items),
+            'medium_anchor_pass_days': sum(r.get('medium_anchor_pass', False) for r in items),
+            'raw_numeric_gate_pass_days': sum(r.get('raw_numeric_gate_pass', r.get('eligible', False)) for r in items),
+            'semantic_stage_trigger_pass_days': sum(r.get('stage_trigger_ok', False) for r in items),
+            'hierarchy_eligible_days': sum(r.get('hierarchy_eligible', False) for r in items),
+            'local_peak_days': sum(_selected(r) for r in items),
+        }
+        for key, value in list(values.items()):
+            if key != 'total_days':
+                values[key.removesuffix('_days') + '_ratio'] = round(value / n, 4) if n else 0.0
+        return values
     out = {}
     for stage in DIMENSIONS:
         stage_rows = [r for r in rows if r['stage'] == stage]
-        gate_count = sum(1 for r in stage_rows if r['eligible'])
-        trigger_count = sum(1 for r in stage_rows if r['eligible'] and r.get('stage_trigger_ok', False))
-        peak_count = sum(1 for r in stage_rows if _selected(r))
-        gate_ratio = gate_count / total_days
-        future_rows = [r for r in stage_rows if as_of_iso is None or r['date'] >= as_of_iso]
-        future_gate = sum(1 for r in future_rows if r['eligible'])
-        future_trigger = sum(1 for r in future_rows if r['eligible'] and r.get('stage_trigger_ok', False))
-        future_peak = sum(1 for r in future_rows if _selected(r))
+        values = counts(stage_rows)
+        future = counts([r for r in stage_rows if as_of_iso is None or r['date'] >= as_of_iso])
         warnings = []
-        if gate_ratio > SELECTIVITY_WARNING_RATIO:
-            warnings.append('LOW_GATE_SELECTIVITY')
-        if future_gate and not future_trigger:
-            warnings.append('NO_FUTURE_STAGE_TRIGGER')
-        if future_trigger and not future_peak:
+        if values['raw_numeric_gate_pass_ratio'] > SELECTIVITY_WARNING_RATIO:
+            warnings.append('LOW_NUMERIC_GATE_SELECTIVITY')
+        if values['hierarchy_eligible_ratio'] > SELECTIVITY_WARNING_RATIO:
+            warnings.append('LOW_HIERARCHY_SELECTIVITY')
+        if future['raw_numeric_gate_pass_days'] and not future['hierarchy_eligible_days']:
+            warnings.append('NO_FUTURE_HIERARCHY_PASS')
+        if future['hierarchy_eligible_days'] and not future['local_peak_days']:
             warnings.append('NO_FUTURE_PEAK')
+        # Preserve v2.2/v2.3 guarded-patch aliases for downstream consumers.
+        values.update(
+            gate_pass_days=values['raw_numeric_gate_pass_days'],
+            numeric_gate_pass_days=values['raw_numeric_gate_pass_days'],
+            stage_trigger_pass_days=values['semantic_stage_trigger_pass_days'],
+            hierarchy_pass_days=values['hierarchy_eligible_days'],
+            gate_pass_ratio=values['raw_numeric_gate_pass_ratio'],
+            hierarchy_pass_ratio=values['hierarchy_eligible_ratio'],
+            future_gate_pass_days=future['raw_numeric_gate_pass_days'],
+            future_numeric_gate_pass_days=future['raw_numeric_gate_pass_days'],
+            future_stage_trigger_pass_days=future['semantic_stage_trigger_pass_days'],
+            future_hierarchy_pass_days=future['hierarchy_eligible_days'],
+        )
         out[stage] = {
-            'gate_pass_days': gate_count,
-            'stage_trigger_pass_days': trigger_count,
-            'local_peak_days': peak_count,
-            'future_gate_pass_days': future_gate,
-            'future_stage_trigger_pass_days': future_trigger,
-            'future_local_peak_days': future_peak,
-            'total_days': total_days,
-            'gate_pass_ratio': round(gate_ratio, 4),
-            'status': 'LOW_SELECTIVITY' if gate_ratio > SELECTIVITY_WARNING_RATIO else 'OK',
+            **values, **{'future_' + k: v for k, v in future.items()},
+            'status': 'LOW_SELECTIVITY' if values['hierarchy_eligible_ratio'] > SELECTIVITY_WARNING_RATIO else 'OK',
             'warnings': warnings,
         }
     return out
@@ -524,8 +598,10 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
     }
     natal = {s: _points(c) for s, c in natal_charts.items()}
     profiles = {'user': user, 'counterpart': counterpart}
+    calculation_start = start - timedelta(days=PEAK_RADIUS_DAYS)
+    calculation_end = end + timedelta(days=PEAK_RADIUS_DAYS)
     try:
-        saju = _saju_context(user, counterpart, start, end, offset)
+        saju = _saju_context(user, counterpart, calculation_start, calculation_end, offset)
         validation['checks'].append({
             'name': 'saju_jie_segments',
             'status': 'PASS',
@@ -537,8 +613,9 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
         validation['status'] = 'FAIL'
 
     rows, long_windows, day_views = [], [], []
-    cursor = start
-    while cursor <= end:
+    return_cache = {}
+    cursor = calculation_start
+    while cursor <= calculation_end:
         instant = datetime.combine(cursor, time(12), tzinfo=tz)
         transits = _points(rw._chart_from_jd(rw._jd_from_utc(instant), include_angles=False))
         progression, arc = {}, {}
@@ -560,7 +637,8 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             rw._transit_hits(side_chart, natal_charts['user'], 'user'),
             rw._transit_hits(side_chart, natal_charts['counterpart'], 'counterpart'),
         )
-        fast_transit_cache = {}
+        fast_transit_cache = {12: transits}
+        geometry_cache = {}
         dims = {}
         for stage in DIMENSIONS:
             long_evidence = []
@@ -571,10 +649,12 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                             charts[side], natal[other], stage, family, side + '->' + other,
                             sources=PERSONAL, targets=TARGETS,
                             limit=1.5 if family == 'secondary' else 1.0,
+                            geometry_cache=geometry_cache,
                         ))
                 long_evidence.extend(_contacts(
                     transits, natal[side], stage, 'slow_transit', side,
                     sources=SLOW, targets=TARGETS, limit=1.4,
+                    geometry_cache=geometry_cache,
                 ))
             long_score, long_rows = _ranked_score(long_evidence)
             preserved = sorted(
@@ -589,8 +669,13 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                 'evidence': long_rows,
             })
 
-            mid_rows, active_returns = _return_evidence(support, instant, stage, natal)
-            mid_score, mid_rows = _ranked_score(mid_rows)
+            long_pass = long_score >= THRESHOLDS['long_term']
+            mid_context_rows, active_returns = (
+                _return_evidence(support, instant, stage, natal, cache=return_cache)
+                if long_pass else ([], [])
+            )
+            mid_score, mid_rows = _ranked_score(_mid_gate_evidence(mid_context_rows))
+            mid_context_score, mid_context_ranked = _ranked_score(mid_context_rows)
             fast_rows = []
             if long_score >= THRESHOLDS['long_term'] and mid_score >= THRESHOLDS['mid_term']:
                 for hour in FAST_SAMPLE_HOURS:
@@ -608,12 +693,14 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                             fast_rows.extend(_contacts(
                                 tr, points, stage, family, side,
                                 sources=FAST_BY_STAGE[stage], targets=TARGETS | {'Mars'}, limit=1.0,
+                                geometry_cache=geometry_cache,
                             ))
                     for key, side, e in active_returns:
                         angles = {k: v for k, v in e.get('angles', {}).items() if k in {'ASC', 'DSC'}}
                         fast_rows.extend(_contacts(
                             tr, angles, stage, 'return_angle_trigger', f'{side}:{key}:{e["exact_utc"]}',
                             sources=FAST_BY_STAGE[stage], limit=1.0,
+                            geometry_cache=geometry_cache,
                         ))
             event_score, fast_rows = _ranked_score(fast_rows)
             event_raw_score = _raw_ranked_score(fast_rows)
@@ -624,19 +711,27 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             if stage in {'emotional_reactivation', 'relationship_rebuilding'} and saju_day['cross_support']:
                 systems.append('saju')
             components = score_components(long_score, mid_score, event_score, systems)
+            components['mid_context_score'] = mid_context_score
             components['event_trigger_raw'] = event_raw_score
             components['primary_trigger_strength'] = round(float(primary_trigger.get('strength', 0)), 3) if primary_trigger else 0.0
             components['primary_trigger_orb'] = round(float(primary_trigger.get('orb', 99)), 6) if primary_trigger else None
             eligible = components['eligible'] and validation['status'] == 'PASS'
+            hierarchy_eligible = eligible and stage_trigger_ok
             rows.append({
                 'date': cursor.isoformat(),
                 'stage': stage,
                 'eligible': eligible,
+                'hierarchy_eligible': hierarchy_eligible,
+                'raw_numeric_gate_pass': components['eligible'],
+                'medium_anchor_evaluated': long_pass,
+                'medium_anchor_pass': long_pass and mid_score >= THRESHOLDS['mid_term'],
+                'fast_trigger_evaluated': long_pass and mid_score >= THRESHOLDS['mid_term'],
                 'stage_trigger_ok': stage_trigger_ok,
                 'components': components,
                 'fast_evidence': display_fast,
                 'period_support': long_rows[:5],
                 'mid_evidence': mid_rows[:4],
+                'mid_context_evidence': mid_context_ranked[:4],
                 'saju_context': saju_day,
             })
             dims[stage] = {
@@ -644,7 +739,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                 'score': components['final'],
                 'user_score': side_dimensions[stage]['user_score'],
                 'counterpart_score': side_dimensions[stage]['counterpart_score'],
-                'fast_trigger': eligible and stage_trigger_ok,
+                'fast_trigger': hierarchy_eligible,
                 'fast_evidence': display_fast,
                 'user_evidence': [],
                 'counterpart_evidence': [],
@@ -662,7 +757,10 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
         cursor += timedelta(days=1)
 
     public_start = max(start, as_of_date)
-    _mark_local_peaks(rows, min_date=public_start, max_date=end)
+    _mark_requested_peaks(rows, start, end, as_of_date)
+    rows = [r for r in rows if start.isoformat() <= r['date'] <= end.isoformat()]
+    long_windows = [r for r in long_windows if start.isoformat() <= r['date'] <= end.isoformat()]
+    day_views = [r for r in day_views if start.isoformat() <= r['date'] <= end.isoformat()]
     windows = _group_windows(rows, as_of_date)
     current_future = _peak_windows(rows, as_of_date, limit=None)
     past = _group_windows([r for r in rows if r['date'] < as_of_date.isoformat()], as_of_date)
@@ -678,11 +776,16 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             r for r in rows
             if r['stage'] == stage and r['date'] >= as_of_date.isoformat() and r['eligible']
         ]
+        hierarchy_upcoming = [
+            r for r in rows
+            if r['stage'] == stage and r['date'] >= as_of_date.isoformat() and r.get('hierarchy_eligible', False)
+        ]
         stage_summary[stage] = {
             'label': DIMENSION_LABELS[stage],
             'activation': max((r['components']['final'] for r in upcoming), default=None),
             'candidate_count': len(upcoming),
             'gate_pass_count': len(gate_upcoming),
+            'hierarchy_pass_count': len(hierarchy_upcoming),
         }
 
     static = result.get('natal_synastry', {}).get('aspects', [])
@@ -701,8 +804,16 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
         'selection_policy': {
             'local_peak_radius_days': PEAK_RADIUS_DAYS,
             'public_peak_start': public_start.isoformat(),
+            'guard_band_days': PEAK_RADIUS_DAYS,
+            'comparison_range': {'start': max(calculation_start, as_of_date).isoformat(), 'end': calculation_end.isoformat()},
+            'requested_range': {'start': start.isoformat(), 'end': end.isoformat()},
             'stage_primary_triggers': {k: sorted(v) for k, v in PRIMARY_TRIGGER_BY_STAGE.items()},
+            'stage_primary_targets': {k: sorted(v) for k, v in PRIMARY_TRIGGER_TARGETS_BY_STAGE.items()},
+            'stage_primary_aspects': sorted(PRIMARY_TRIGGER_ASPECTS),
             'primary_trigger_min_strength': THRESHOLDS['event_trigger'],
+            'medium_gate_return': 'lunar_return',
+            'gate_evaluation': 'sequential: medium only after long; fast only after medium; skipped scores are zero, not measured counterfactuals',
+            'medium_context_returns': {k: list(v) for k, v in MID_CONTEXT_RETURN_KEYS_BY_STAGE.items()},
             'fast_sample_hours': FAST_SAMPLE_HOURS,
             'cross_system': 'saju month background + same-day spouse-palace support; ranking support only',
         },
@@ -730,9 +841,10 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             '자미두수 계산기 미구현: 교차검증에서 제외',
             '회귀 위치는 입력 출생지 기준이며 현재 거주지와 다를 수 있음',
             '일별 빠른 촉발점은 3시간 간격 표본이며 정확한 사건 발생 시각을 뜻하지 않음',
-            '조회 시작·끝 바깥의 ±7일 피크 비교 문맥은 현재 계산하지 않으므로 경계 피크는 범위 제한을 가짐',
+            '중기 관문은 월 단위 Lunar Return을 필수 앵커로 사용하며 다른 행성 회귀는 단계별 배경 문맥으로만 유지',
+            '조회 범위 밖 ±7일을 내부 비교하되 과거 피크는 미래 후보를 억제하지 않고 표시 날짜는 요청 범위로 제한',
             '문턱·가중치는 버전 관리되는 비교 규칙이며 적중률로 보정하지 않음',
-            '장기·중기 관문 통과일 중 단계별 필수 촉발이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
+            '장기·중기 관문 통과 후 단계별 관련 대상·주요 각에 대한 필수 촉발이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
         ],
         'saju_boundaries': {k: saju.get(k, []) for k in ('years', 'months')},
         'event_probability': 'not_calculated',
@@ -749,7 +861,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             'rank_weight': w['final'],
             'independent_system_count': len(w['independent_systems']),
             'convergence': len(w['independent_systems']) >= 2,
-            'exact_date_basis': 'hierarchical_gates_then_material_stage_trigger_then_future_local_peak',
+            'exact_date_basis': 'hierarchical_gates_with_lunar_medium_anchor_then_semantic_stage_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in public24
@@ -787,7 +899,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             'stages': [w['stage']],
             'priority_index': w['final'],
             'components': w['components'],
-            'exact_date_basis': 'hierarchical_gates_then_material_stage_trigger_then_future_local_peak',
+            'exact_date_basis': 'hierarchical_gates_with_lunar_medium_anchor_then_semantic_stage_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in candidate_windows
@@ -795,9 +907,9 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
     support['weight_policy'] = {
         'weights': WEIGHTS,
         'thresholds': THRESHOLDS,
-        'meaning': 'long and medium gates precede materially contributing stage-specific fast triggers; public dates are future-only local peaks; no 85/15 fallback',
+        'meaning': 'long gate + Lunar Return medium anchor precede materially contributing semantic stage triggers; other returns stay context; public dates are future-only local peaks',
     }
-    support['policy'] = '장기·중기 관문과 단계별 필수 촉발이 실제 문턱 이상 기여한 뒤 기준일 이후 주변 대비 국소 피크인 날짜만 최종 후보. 회귀는 서양 내부 근거이며 독립 체계로 중복 가산하지 않음.'
+    support['policy'] = '장기 관문 뒤 Lunar Return을 월 단위 중기 앵커로 사용하고, 단계별 관련 대상·주요 각의 필수 촉발이 실제 문턱 이상 기여한 뒤 기준일 이후 국소 피크만 최종 후보. 다른 행성 회귀는 배경 문맥이며 독립 체계로 중복 가산하지 않음.'
     support['as_of_date'] = as_of_date.isoformat()
     result['reunion_return_support'] = support
     return result
