@@ -138,6 +138,18 @@ v2.4는 단계별 장기 관문에서 더 일찍 탈락하므로 중기·3시간
 - 전체 Calculation Audit 로컬 실행은 `de421.bsp`를 내려받는 과정에서 로컬 SSL 인증서 오류로 중단됐다. 계산 실패가 아니라 테스트 데이터 다운로드 환경 실패이며 GitHub CI에서 최종 확인한다.
 - 추가 검증: 감정 단독 비승격, 연락/만남/재정의 독립성, direct/context 각 역할, return-angle 단독 거부, natal trigger 통과, Moon+Venus 결합 조건, Mercury→Sun 단계별 장기 분리, fast Venus의 장기 gate 우회 금지, trace 사유 표시.
 
+## CI
+
+v2.4 계산 커밋 `3f6ae1333bf50640eeeb0d00119017d9fcfe7378` 기준 세 workflow가 모두 통과했다.
+
+| Workflow | 결과 | 실행 |
+|---|---|---|
+| Calculation Audit CI | PASS | https://github.com/cozysso-afk/astro-app/actions/runs/35513481277 |
+| Web CI | PASS | https://github.com/cozysso-afk/astro-app/actions/runs/35513481284 |
+| Interpretation Release CI | PASS | https://github.com/cozysso-afk/astro-app/actions/runs/35513481286 |
+
+Calculation Audit CI가 `reunion_hierarchy_v2.py` 구문 검사와 `tests/test_reunion_hierarchy_v2.py`를 포함한 계산 감사 묶음을 직접 실행했다. 해설의 `reunion_hierarchy.validation.status == PASS` fail-closed 조건은 변경하지 않았다. CI 통과는 저장 사례 evidence 검증과 별개의 확인 항목으로 취급했다.
+
 ## A~H 판정
 
 | 항목 | 판정 | 근거 |
