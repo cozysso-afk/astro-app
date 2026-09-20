@@ -11,6 +11,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 import swisseph as swe
 import relationship_western_v1 as rw
+from timezone_provenance_v1 import resolve_local_datetime, resolve_profile_birth_datetime
 from reunion_dimension_v1 import (
     daily_dimension_scores,
     DIMENSIONS,
@@ -22,7 +23,7 @@ from reunion_dimension_v1 import (
 
 DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정의'}
 
-VERSION = 'reunion-hierarchy-v2.4-stage-semantics'
+VERSION = 'reunion-hierarchy-v2.5-iana-timezone-provenance'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -346,7 +347,6 @@ def _validate(user, counterpart, support):
         checks.append({'name': name, 'status': 'PASS' if ok else 'FAIL', 'detail': detail})
 
     for side, p in (('user', user), ('counterpart', counterpart)):
-        offset = p.get('utc_offset_hours', 9)
         coords = p.get('latitude'), p.get('longitude')
         check(
             side + '_coordinates',
@@ -356,18 +356,23 @@ def _validate(user, counterpart, support):
         )
         if coords == (None, None):
             checks[-1].update(status='SKIP', detail='coordinates absent; no angle/house evidence admitted')
-        check(
-            side + '_offset',
-            isinstance(offset, (int, float)) and math.isfinite(offset) and -14 <= offset <= 14,
-            'fixed entered historical UTC offset; no automatic DST inference',
-        )
+        resolved = resolve_profile_birth_datetime(p, noon_proxy=p.get('birth_time') is None)
+        checks.append({
+            'name': side + '_timezone_resolution',
+            'status': 'PASS' if resolved.timezone_source == 'iana' else 'UNVERIFIED',
+            'detail': (
+                'IANA historical offset resolved exactly once'
+                if resolved.timezone_source == 'iana'
+                else 'legacy fixed offset applied exactly once; historical DST cannot be inferred'
+            ),
+        })
         if p.get('birth_time') is not None:
-            utc = rw._utc_datetime(p['birth_date'], p['birth_time'], offset)
-            local = utc.astimezone(timezone(timedelta(hours=offset)))
+            utc = resolved.utc
+            local = utc.astimezone(resolved.tzinfo)
             check(
                 side + '_time_roundtrip',
                 local.replace(tzinfo=None) == datetime.combine(p['birth_date'], p['birth_time']),
-                'UTC applied exactly once; includes fractional/zero offsets',
+                'birth local civil time round-trips after one timezone conversion',
             )
             jd = rw._jd_from_utc(utc)
             check(
@@ -392,7 +397,11 @@ def _validate(user, counterpart, support):
     )
     checks.extend([
         {'name': 'coordinate_semantics', 'status': 'UNVERIFIED', 'detail': 'in-range coordinate swaps require a geocoded place identifier'},
-        {'name': 'historical_dst_provenance', 'status': 'UNVERIFIED', 'detail': 'profile provides fixed UTC offset, not IANA zone or historical DST provenance'},
+        {
+            'name': 'historical_dst_provenance',
+            'status': 'PASS' if all(p.get('timezone_id') for p in (user, counterpart)) else 'UNVERIFIED',
+            'detail': 'valid IANA timezone takes priority; legacy fixed offset remains explicit fallback',
+        },
         {'name': 'conventions', 'status': 'PASS', 'detail': 'Swiss tropical longitude in degrees; True Node; Whole Sign primary, quadrant houses kept separate; secondary day/year=365.2422; solar arc=true progressed Sun arc'},
     ])
     return {
@@ -707,10 +716,16 @@ def _selectivity_summary(rows, as_of=None):
     return out
 
 
-def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date, query_utc_offset_hours=None):
+def apply_reunion_hierarchy(
+    result, user, counterpart, start, end, *, as_of_date,
+    query_utc_offset_hours=None, query_timezone_id=None,
+):
     """Canonical API finalizer. Inputs intentionally exclude remembered events."""
     offset = user.get('utc_offset_hours', 9) if query_utc_offset_hours is None else query_utc_offset_hours
-    tz = timezone(timedelta(hours=offset))
+    query_resolution = resolve_local_datetime(
+        start, time(12), timezone_id=query_timezone_id, utc_offset_hours=offset
+    )
+    tz = query_resolution.tzinfo
     support = result.get('reunion_return_support') or {}
     validation = _validate(user, counterpart, support)
     natal_charts = {
@@ -719,6 +734,10 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
     }
     natal = {s: _points(c) for s, c in natal_charts.items()}
     profiles = {'user': user, 'counterpart': counterpart}
+    birth_resolutions = {
+        side: resolve_profile_birth_datetime(profile, noon_proxy=profile.get('birth_time') is None)
+        for side, profile in profiles.items()
+    }
     calculation_start = start - timedelta(days=PEAK_RADIUS_DAYS)
     calculation_end = end + timedelta(days=PEAK_RADIUS_DAYS)
     try:
@@ -745,7 +764,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                 continue
             pc = rw._secondary_progressed_chart(p, instant, include_angles=False)
             progression[side] = _points(pc, False)
-            birth = rw._utc_datetime(p['birth_date'], p['birth_time'], p.get('utc_offset_hours', 9))
+            birth = birth_resolutions[side].utc
             expected = rw._jd_from_utc(birth) + (instant - birth).total_seconds() / 86400 / rw.YEAR_DAYS
             if abs(pc['jd_ut'] - expected) > 1e-6:
                 raise ValueError('secondary progression epoch mismatch')
@@ -936,6 +955,16 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
         'version': VERSION,
         'as_of_date': as_of_date.isoformat(),
         'query_utc_offset_hours': offset,
+        'timezone_provenance': {
+            'user': birth_resolutions['user'].provenance(),
+            'counterpart': birth_resolutions['counterpart'].provenance(),
+            'query': {
+                'timezone_id': query_timezone_id,
+                'source': query_resolution.timezone_source,
+                'resolved_utc_offset_hours': query_resolution.resolved_utc_offset_hours,
+                'policy': query_resolution.policy,
+            },
+        },
         'validation': validation,
         'weights': WEIGHTS,
         'thresholds': THRESHOLDS,

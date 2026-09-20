@@ -209,6 +209,39 @@ def test_relationship_pydantic_bounds_reject_invalid_timezone_and_coordinates():
     assert bad_latitude.status_code == 422
 
 
+def test_relationship_api_accepts_iana_birth_provenance_and_rejects_bad_or_nonexistent_time():
+    valid = api_main.RelationshipProfile.model_validate(
+        _user(timezone_id="Asia/Seoul", utc_offset_hours=-4)
+    ).engine_payload()
+    assert valid["timezone_id"] == "Asia/Seoul"
+    assert valid["utc_offset_hours"] == -4.0  # retained only as the ignored legacy fallback
+
+    invalid = client.post(
+        "/v1/relationship/western",
+        json=_request(user=_user(timezone_id="Invalid/Zone")),
+    )
+    assert invalid.status_code == 422
+
+    nonexistent = client.post(
+        "/v1/relationship/western",
+        json=_request(user=_user(
+            birth_date="2026-03-08", birth_time="02:30:00",
+            timezone_id="America/New_York", utc_offset_hours=-5,
+        )),
+    )
+    assert nonexistent.status_code == 422
+
+
+def test_query_timezone_is_separate_from_each_birth_timezone():
+    request = api_main.RelationshipRequest.model_validate(_request(
+        user=_user(timezone_id="Asia/Seoul"),
+        counterpart=_counterpart(timezone_id="America/New_York", utc_offset_hours=-5),
+    ) | {"query_timezone_id": "Europe/London", "query_utc_offset_hours": 0})
+    assert request.user.timezone_id == "Asia/Seoul"
+    assert request.counterpart.timezone_id == "America/New_York"
+    assert request.query_timezone_id == "Europe/London"
+
+
 def test_relationship_response_is_json_serializable_and_meta_engine_matches_runtime():
     response = client.post("/v1/relationship/western", json=_request(analysis_mode="compatibility"))
     assert response.status_code == 200, response.text

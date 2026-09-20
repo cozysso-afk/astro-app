@@ -23,6 +23,7 @@ from typing import Any
 import swisseph as swe
 
 from birth_time_reliability_v1 import resolve_birth_time_reliability
+from timezone_provenance_v1 import resolve_profile_birth_datetime
 
 ENGINE_VERSION = "relationship-return-v2-five-body-exact-crossings"
 FAST_TRIGGER_WEIGHT = 0.85
@@ -115,17 +116,17 @@ def _positions(jd: float) -> dict[str, float]:
 
 
 def _birth_utc(profile: dict[str, Any], *, noon_proxy: bool = False) -> datetime:
-    birth_time = profile.get("birth_time")
-    if birth_time is None:
-        if not noon_proxy:
-            raise ValueError("birth_time unavailable")
-        birth_time = dt_time(12, 0)
-    local = datetime.combine(profile["birth_date"], birth_time)
-    return (local - timedelta(hours=float(profile.get("utc_offset_hours", 9.0)))).replace(tzinfo=timezone.utc)
+    if not noon_proxy and profile.get("_resolved_birth_datetime") is not None:
+        return profile["_resolved_birth_datetime"].utc
+    resolved = resolve_profile_birth_datetime(profile, noon_proxy=noon_proxy)
+    if not noon_proxy:
+        profile["_resolved_birth_datetime"] = resolved
+        profile["timezone_provenance"] = resolved.provenance()
+    return resolved.utc
 
 
-def _local_iso_date(dt: datetime, offset_hours: float) -> str:
-    local = dt.astimezone(timezone(timedelta(hours=float(offset_hours))))
+def _local_iso_date(dt: datetime, local_tz) -> str:
+    local = dt.astimezone(local_tz)
     return local.date().isoformat()
 
 
@@ -251,7 +252,10 @@ def _activation_summary(hits: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _person_return_context(profile: dict[str, Any], start_date: date, end_date: date, label: str) -> dict[str, Any]:
     reliability = resolve_birth_time_reliability(profile)
-    offset = float(profile.get("utc_offset_hours", 9.0))
+    birth_resolution = resolve_profile_birth_datetime(
+        profile, noon_proxy=not reliability["time_available"] or profile.get("birth_time") is None
+    )
+    local_tz = birth_resolution.tzinfo
     solar_birth_utc = _birth_utc(profile, noon_proxy=True)
     solar_natal_positions = _positions(_jd(solar_birth_utc))
 
@@ -267,7 +271,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
             "person": label,
             "return_type": "solar_return",
             "exact_utc": return_dt.isoformat(),
-            "local_date": _local_iso_date(return_dt, offset),
+            "local_date": _local_iso_date(return_dt, local_tz),
             "orb": round(float(item["orb"]), 5),
             "precision": "exact" if reliability["time_exact"] else ("provisional" if reliability["time_available"] else "date_noon_proxy"),
             "birth_time_reliability": reliability,
@@ -296,7 +300,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 "person": label,
                 "return_type": "lunar_return",
                 "exact_utc": return_dt.isoformat(),
-                "local_date": _local_iso_date(return_dt, offset),
+                "local_date": _local_iso_date(return_dt, local_tz),
                 "orb": round(float(item["orb"]), 5),
                 "precision": "exact" if reliability["time_exact"] else "provisional",
                 "birth_time_reliability": reliability,
@@ -319,7 +323,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 instant = _datetime_from_jd(item["jd"])
                 events.append({
                     "person": label, "return_type": key, "exact_utc": instant.isoformat(),
-                    "local_date": _local_iso_date(instant, offset), "orb": item["orb"],
+                    "local_date": _local_iso_date(instant, local_tz), "orb": item["orb"],
                     "precision": "exact" if reliability["time_exact"] else "provisional",
                     **_activation_summary(_aspect_hits(_positions(item["jd"]), solar_natal_positions, body)),
                     "independent_bonus_eligible": False,
@@ -364,6 +368,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
             "policy": "monthly/emotional background context only; does not create exact event dates",
         },
         "birth_time_reliability": reliability,
+        "timezone_provenance": birth_resolution.provenance(),
     }
 
 

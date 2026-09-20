@@ -480,7 +480,7 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
     assert hierarchy['validation']['status']=='PASS'
     assert len(hierarchy['daily_trace'])==11*4
     assert len(hierarchy['long_term_daily'])==11*4
-    assert hierarchy['version']=='reunion-hierarchy-v2.4-stage-semantics'
+    assert hierarchy['version']=='reunion-hierarchy-v2.5-iana-timezone-provenance'
     assert 'selectivity' in hierarchy and 'selection_policy' in hierarchy
     assert hierarchy['selection_policy']['primary_trigger_min_strength']==h.THRESHOLDS['event_trigger']
     windows=result['reunion_timing_windows']['windows']
