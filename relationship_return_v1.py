@@ -18,14 +18,16 @@ Important policy:
 """
 
 from datetime import date, datetime, time as dt_time, timedelta, timezone
+import math
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import swisseph as swe
 
 from birth_time_reliability_v1 import resolve_birth_time_reliability
-from timezone_provenance_v1 import resolve_profile_birth_datetime
+from timezone_provenance_v1 import TimezoneResolutionError, resolve_profile_birth_datetime
 
-ENGINE_VERSION = "relationship-return-v2-five-body-exact-crossings"
+ENGINE_VERSION = "relationship-return-v2.1-five-body-relocation-provenance"
 FAST_TRIGGER_WEIGHT = 0.85
 RETURN_CONTEXT_WEIGHT = 0.15
 
@@ -250,12 +252,117 @@ def _activation_summary(hits: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
+def _resolve_return_location(profile: dict[str, Any], birth_resolution) -> dict[str, Any]:
+    """Resolve the location used only for return local-date/angle/house geometry.
+
+    A supplied forecast location is an explicit location proxy for the forecast
+    period.  Without one, planetary returns remain valid but no ASC/house
+    geometry is admitted; birthplace is never silently treated as current
+    residence.  Birth timezone remains only a calendar-label fallback.
+    """
+    raw = profile.get("forecast_location")
+    if raw is None:
+        return {
+            "latitude": None,
+            "longitude": None,
+            "tzinfo": birth_resolution.tzinfo,
+            "angles_available": False,
+            "source": "unavailable",
+            "calendar_timezone_basis": "birth_timezone_fallback",
+            "provenance": {
+                "source": "unavailable",
+                "timezone_id": getattr(birth_resolution.tzinfo, "key", None),
+                "coordinates_available": False,
+                "place_id_present": False,
+                "calendar_timezone_basis": "birth_timezone_fallback",
+                "angles_policy": "omitted_without_forecast_location",
+            },
+        }
+    if not isinstance(raw, dict):
+        raise ValueError("forecast_location must be an object")
+    try:
+        lat = float(raw["latitude"])
+        lon = float(raw["longitude"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("forecast_location requires numeric latitude/longitude") from exc
+    if not math.isfinite(lat) or not -90 <= lat <= 90:
+        raise ValueError("forecast_location latitude must be finite and between -90 and 90")
+    if not math.isfinite(lon) or not -180 <= lon <= 180:
+        raise ValueError("forecast_location longitude must be finite and between -180 and 180")
+    zone_name = str(raw.get("timezone_id") or "").strip()
+    if not zone_name:
+        raise TimezoneResolutionError("forecast_location timezone_id is required")
+    try:
+        zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError as exc:
+        raise TimezoneResolutionError(f"unknown forecast_location timezone_id: {zone_name}") from exc
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "tzinfo": zone,
+        "angles_available": True,
+        "source": "forecast_location",
+        "calendar_timezone_basis": "forecast_location_timezone",
+        "provenance": {
+            "source": "forecast_location",
+            "timezone_id": zone_name,
+            "coordinates_available": True,
+            "place_id_present": bool(raw.get("place_id")),
+            "calendar_timezone_basis": "forecast_location_timezone",
+            "angles_policy": "forecast_location_when_birth_time_exact",
+        },
+    }
+
+
+def _attach_return_geometry(
+    event: dict[str, Any], profile: dict[str, Any], reliability: dict[str, Any], return_location: dict[str, Any]
+) -> None:
+    from relationship_western_v1 import _chart_from_jd, _whole_sign_house, _house_of_longitude
+
+    jd = _jd(datetime.fromisoformat(event["exact_utc"]))
+    admit_angles = bool(reliability["time_exact"] and return_location["angles_available"])
+    chart = _chart_from_jd(
+        jd,
+        return_location["latitude"] if admit_angles else None,
+        return_location["longitude"] if admit_angles else None,
+    )
+    angles = chart["angles"] if admit_angles else {}
+    event["angles"] = angles
+    event["positions"] = {k: v["lon"] for k, v in chart["positions"].items()}
+    event["house_activations"] = [
+        {
+            "planet": k,
+            "whole_sign": _whole_sign_house(angles["ASC"], v["lon"]),
+            "quadrant": _house_of_longitude(angles["cusps"], v["lon"]),
+        }
+        for k, v in chart["positions"].items()
+        if angles and k in {"Moon", "Mercury", "Venus", "Mars"}
+    ]
+    provenance = dict(return_location["provenance"])
+    provenance["angles_admitted"] = admit_angles
+    provenance["angle_reason"] = (
+        "forecast_location_and_exact_birth_time"
+        if admit_angles
+        else "birth_time_not_exact"
+        if return_location["angles_available"]
+        else "forecast_location_not_supplied"
+    )
+    event["return_location_provenance"] = provenance
+    event["location_basis"] = (
+        "forecast_location"
+        if return_location["source"] == "forecast_location"
+        else "unavailable; forecast_location_not_supplied"
+    )
+
+
 def _person_return_context(profile: dict[str, Any], start_date: date, end_date: date, label: str) -> dict[str, Any]:
     reliability = resolve_birth_time_reliability(profile)
     birth_resolution = resolve_profile_birth_datetime(
         profile, noon_proxy=not reliability["time_available"] or profile.get("birth_time") is None
     )
-    local_tz = birth_resolution.tzinfo
+    return_location = _resolve_return_location(profile, birth_resolution)
+    local_tz = return_location["tzinfo"]
     solar_birth_utc = _birth_utc(profile, noon_proxy=True)
     solar_natal_positions = _positions(_jd(solar_birth_utc))
 
@@ -333,22 +440,11 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 event["window_end_exclusive"] = events[idx+1]["local_date"] if idx+1 < len(events) else None
         planetary[key] = {"available": bool(events), "events": events, "role": "medium_term_context"}
 
-    # Keep exact UTC cycle boundaries and separated house systems. Birthplace is
-    # the explicit return-location fallback; it is not a claimed current residence.
-    from relationship_western_v1 import _chart_from_jd, _whole_sign_house, _house_of_longitude
+    # Return planetary positions are location-independent.  ASC/houses are
+    # admitted only with an explicit forecast/current-location proxy; birthplace
+    # is not silently treated as the person's location at the return instant.
     for event in solar_events + lunar_events + [e for v in planetary.values() for e in v["events"]]:
-        jd = _jd(datetime.fromisoformat(event["exact_utc"]))
-        chart = _chart_from_jd(jd, profile.get("latitude"), profile.get("longitude"))
-        angles = chart["angles"]
-        event["angles"] = angles if reliability["time_exact"] else {}
-        event["location_basis"] = "entered_birthplace; current return location unavailable"
-        event["positions"] = {k: v["lon"] for k, v in chart["positions"].items()}
-        event["house_activations"] = [
-            {"planet": k, "whole_sign": _whole_sign_house(angles["ASC"], v["lon"]),
-             "quadrant": _house_of_longitude(angles["cusps"], v["lon"])}
-            for k,v in chart["positions"].items()
-            if angles and reliability["time_exact"] and k in {"Moon", "Mercury", "Venus", "Mars"}
-        ]
+        _attach_return_geometry(event, profile, reliability, return_location)
     for events in [solar_events, lunar_events] + [v["events"] for v in planetary.values()]:
         for idx, event in enumerate(events):
             event["next_exact_utc"] = events[idx+1]["exact_utc"] if idx+1 < len(events) else None
@@ -369,6 +465,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
         },
         "birth_time_reliability": reliability,
         "timezone_provenance": birth_resolution.provenance(),
+        "return_location_provenance": return_location["provenance"],
     }
 
 

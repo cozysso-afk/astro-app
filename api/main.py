@@ -74,6 +74,24 @@ class RectifiedWindow(BaseModel):
     end: dt_time | None = None
 
 
+class ForecastLocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    place_id: str | None = None
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    timezone_id: str
+
+    @model_validator(mode="after")
+    def validate_timezone(self):
+        resolve_local_datetime(
+            date(2000, 1, 1), dt_time(12, 0),
+            timezone_id=self.timezone_id,
+            utc_offset_hours=None,
+        )
+        return self
+
+
 class RelationshipProfile(BaseModel):
     name: str | None = None
     birth_date: date
@@ -87,6 +105,7 @@ class RelationshipProfile(BaseModel):
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
     timezone_id: str | None = None
     timezone_fold: int | None = Field(default=None, ge=0, le=1)
+    forecast_location: ForecastLocation | None = None
 
     @model_validator(mode="after")
     def validate_birth_timezone(self):
@@ -123,6 +142,7 @@ class RelationshipProfile(BaseModel):
             "utc_offset_hours": self.utc_offset_hours,
             "timezone_id": self.timezone_id,
             "timezone_fold": self.timezone_fold,
+            "forecast_location": self.forecast_location.model_dump() if self.forecast_location else None,
         }
 
 
