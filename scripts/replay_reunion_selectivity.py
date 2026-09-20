@@ -36,7 +36,7 @@ def replay(checkout, requests):
                     'total_days': len(items),
                     'long_term_pass': sum(r['components']['gates']['long_term'] for r in items),
                     'medium_anchor_pass': sum(r['medium_anchor_pass'] for r in items) if all('medium_anchor_pass' in r for r in items) else None,
-                    'raw_numeric_gate_pass': sum(all(r['components']['gates'].values()) for r in items),
+                    'raw_numeric_gate_pass': sum(r.get('raw_numeric_gate_pass', all(r['components']['gates'].values())) for r in items),
                     'semantic_stage_trigger_pass': sum(r['stage_trigger_ok'] for r in items),
                     'hierarchy_eligible': sum(r.get('hierarchy_eligible', r['eligible'] and r['stage_trigger_ok']) for r in items),
                     'local_peaks': sum(r['selection_eligible'] for r in items),

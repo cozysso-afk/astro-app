@@ -109,12 +109,13 @@ def test_guard_band_compares_query_external_future_peaks_and_clips_public_dates(
 
 
 def test_stage_specific_trigger_must_materially_contribute_with_relevant_target_and_aspect():
-    moon=[{'a':'Moon','b':'Venus','aspect':'square','strength':80,'orb':0.1,'event_id':'moon'}]
-    weak_mercury=[{'a':'Mercury','b':'Moon','aspect':'conjunction','strength':0.1,'orb':0.01,'event_id':'weak-mercury'}]
-    mercury=[{'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12,'orb':0.9,'event_id':'mercury'}]
-    wrong_target=[{'a':'Mercury','b':'Mars','aspect':'conjunction','strength':90,'orb':0.01,'event_id':'wrong-target'}]
-    quincunx=[{'a':'Mercury','b':'Moon','aspect':'quincunx','strength':90,'orb':0.01,'event_id':'quincunx'}]
-    mars=[{'a':'Mars','b':'DSC','aspect':'opposition','strength':12.1,'orb':0.8,'event_id':'mars'}]
+    base={'family':'natal_trigger'}
+    moon=[{**base,'a':'Moon','b':'Venus','aspect':'square','strength':80,'orb':0.1,'event_id':'moon'}]
+    weak_mercury=[{**base,'a':'Mercury','b':'Moon','aspect':'conjunction','strength':0.1,'orb':0.01,'event_id':'weak-mercury'}]
+    mercury=[{**base,'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12,'orb':0.9,'event_id':'mercury'}]
+    wrong_target=[{**base,'a':'Mercury','b':'Mars','aspect':'conjunction','strength':90,'orb':0.01,'event_id':'wrong-target'}]
+    quincunx=[{**base,'a':'Mercury','b':'Moon','aspect':'quincunx','strength':90,'orb':0.01,'event_id':'quincunx'}]
+    mars=[{**base,'a':'Mars','b':'DSC','aspect':'opposition','strength':12.1,'orb':0.8,'event_id':'mars'}]
     assert not h._stage_trigger_ok('contact_recontact',moon)
     assert not h._stage_trigger_ok('contact_recontact',moon+weak_mercury)
     assert h._stage_trigger_ok('contact_recontact',moon+mercury)
@@ -124,12 +125,13 @@ def test_stage_specific_trigger_must_materially_contribute_with_relevant_target_
 
 
 def test_display_fast_evidence_always_contains_material_primary_trigger():
+    base={'family':'natal_trigger'}
     evidence=[
-        {'a':'Moon','b':'Venus','aspect':'square','strength':90,'orb':0.1,'event_id':'a'},
-        {'a':'Moon','b':'Moon','aspect':'trine','strength':80,'orb':0.2,'event_id':'b'},
-        {'a':'Mars','b':'DSC','aspect':'opposition','strength':70,'orb':0.3,'event_id':'c'},
-        {'a':'Moon','b':'Sun','aspect':'sextile','strength':60,'orb':0.4,'event_id':'d'},
-        {'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12.5,'orb':0.5,'event_id':'primary'},
+        {**base,'a':'Moon','b':'Venus','aspect':'square','strength':90,'orb':0.1,'event_id':'a'},
+        {**base,'a':'Moon','b':'Moon','aspect':'trine','strength':80,'orb':0.2,'event_id':'b'},
+        {**base,'a':'Mars','b':'DSC','aspect':'opposition','strength':70,'orb':0.3,'event_id':'c'},
+        {**base,'a':'Moon','b':'Sun','aspect':'sextile','strength':60,'orb':0.4,'event_id':'d'},
+        {**base,'a':'Mercury','b':'Moon','aspect':'conjunction','strength':12.5,'orb':0.5,'event_id':'primary'},
     ]
     shown=h._display_fast_evidence('contact_recontact',evidence,4)
     assert shown[0]['event_id']=='primary'
@@ -161,10 +163,88 @@ def test_medium_context_return_families_are_stage_specific_and_keep_lunar_anchor
     ('in_person_meeting','Mars','DSC'),
 ])
 def test_semantic_gate_rejects_missing_target_minor_aspect_and_invalid_orb(stage,planet,target):
-    hit={'a':planet,'b':target,'aspect':'conjunction','strength':30,'orb':.2,'event_id':'synthetic'}
+    hit={'a':planet,'b':target,'aspect':'conjunction','strength':30,'orb':.2,'event_id':'synthetic','family':'natal_trigger'}
     assert h._stage_trigger_ok(stage,[hit])
     for invalid in ({'b':'Pluto'},{'aspect':'quincunx'},{'orb':1.0},{'orb':-1},{'orb':math.nan},{'strength':math.inf}):
         assert not h._stage_trigger_ok(stage,[{**hit,**invalid}])
+
+
+def _policy_hit(planet,target,aspect='conjunction',family='natal_trigger',strength=60,orb=.1,event_id='hit'):
+    return {'a':planet,'b':target,'aspect':aspect,'family':family,'strength':strength,'orb':orb,'event_id':event_id}
+
+
+def test_direct_aspect_triggers_but_supportive_aspect_is_context_only():
+    direct=_policy_hit('Mercury','Moon')
+    support=_policy_hit('Mercury','Moon',aspect='trine',event_id='support')
+    assert h._stage_trigger_ok('contact_recontact',[direct])
+    evaluated=h._stage_policy_evaluation('contact_recontact',[support])
+    assert evaluated['primary'] is None
+    assert evaluated['context']==[support]
+    assert evaluated['rejection_counts']['context_only_aspect']==1
+
+
+def test_return_angle_only_contact_is_context_and_cannot_create_exact_date():
+    angle=_policy_hit('Mercury','DSC',family='return_angle_trigger')
+    evaluated=h._stage_policy_evaluation('contact_recontact',[angle])
+    assert evaluated['primary'] is None
+    assert evaluated['rejection_counts']['context_only_family']==1
+
+
+def test_emotional_moon_requires_natal_contact_and_independent_venus_context():
+    moon=_policy_hit('Moon','Venus',event_id='moon')
+    progressed={**moon,'family':'progressed_trigger','event_id':'progressed-moon'}
+    venus_context=_policy_hit('Venus','Moon',aspect='trine',event_id='venus-context')
+    assert not h._stage_trigger_ok('emotional_reactivation',[moon])
+    assert not h._stage_trigger_ok('emotional_reactivation',[progressed,venus_context])
+    assert h._stage_trigger_ok('emotional_reactivation',[moon,venus_context])
+
+
+def test_stage_evidence_does_not_promote_to_unrelated_stages():
+    emotional=[_policy_hit('Venus','Moon')]
+    contact=[_policy_hit('Mercury','Moon')]
+    meeting=[_policy_hit('Mars','DSC')]
+    assert h._stage_trigger_ok('emotional_reactivation',emotional)
+    assert not h._stage_trigger_ok('contact_recontact',emotional)
+    assert not h._stage_trigger_ok('in_person_meeting',emotional)
+    assert h._stage_trigger_ok('contact_recontact',contact)
+    assert not h._stage_trigger_ok('relationship_rebuilding',contact)
+    assert not h._stage_trigger_ok('relationship_rebuilding',[_policy_hit('Mercury','DSC')])
+    assert h._stage_trigger_ok('in_person_meeting',meeting)
+    assert not h._stage_trigger_ok('relationship_rebuilding',meeting)
+
+
+def test_contact_and_meeting_targets_are_semantically_distinct():
+    assert not h._stage_trigger_ok('contact_recontact',[_policy_hit('Mercury','Sun')])
+    assert h._stage_trigger_ok('contact_recontact',[_policy_hit('Mercury','DSC')])
+    assert not h._stage_trigger_ok('in_person_meeting',[_policy_hit('Mars','Moon')])
+    assert h._stage_trigger_ok('in_person_meeting',[_policy_hit('Mars','ASC')])
+
+
+def test_rebuilding_fast_venus_alone_cannot_bypass_long_gate():
+    trigger=h._stage_policy_evaluation('relationship_rebuilding',[_policy_hit('Venus','DSC')])
+    event_score,_=h._ranked_score(trigger['accepted'])
+    assert trigger['primary'] is not None
+    assert not h.score_components(0,100,event_score,['western'])['eligible']
+    assert h.score_components(60,40,event_score,['western'])['eligible']
+
+
+def test_stage_long_policies_do_not_reuse_mercury_sun_for_every_stage():
+    assert 'Mercury' in h.STAGE_LONG_POLICY['contact_recontact']['directed_planets']
+    assert 'Sun' in h.STAGE_LONG_POLICY['contact_recontact']['directed_targets']
+    for stage in ('emotional_reactivation','in_person_meeting','relationship_rebuilding'):
+        assert not (
+            'Mercury' in h.STAGE_LONG_POLICY[stage]['directed_planets']
+            and 'Sun' in h.STAGE_LONG_POLICY[stage]['directed_targets']
+        )
+
+
+def test_policy_trace_has_explicit_acceptance_and_rejection_semantics():
+    rows=[_policy_hit('Mercury','Moon'),_policy_hit('Mercury','Moon',aspect='sextile',event_id='context')]
+    evaluated=h._stage_policy_evaluation('contact_recontact',rows)
+    shown=h._display_fast_evidence('contact_recontact',rows,evaluation=evaluated)
+    assert shown[0]['accepted_by_stage_policy'] is True
+    assert shown[0]['rejection_reason'] is None
+    assert any(row['rejection_reason']=='context_only' for row in shown)
 
 
 def _synthetic_pipeline(monkeypatch, return_key, *, long_strength=60, fast_planet='Mercury'):
@@ -400,7 +480,7 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
     assert hierarchy['validation']['status']=='PASS'
     assert len(hierarchy['daily_trace'])==11*4
     assert len(hierarchy['long_term_daily'])==11*4
-    assert hierarchy['version']=='reunion-hierarchy-v2.3-medium-anchor'
+    assert hierarchy['version']=='reunion-hierarchy-v2.4-stage-semantics'
     assert 'selectivity' in hierarchy and 'selection_policy' in hierarchy
     assert hierarchy['selection_policy']['primary_trigger_min_strength']==h.THRESHOLDS['event_trigger']
     windows=result['reunion_timing_windows']['windows']
@@ -419,13 +499,17 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
         if row['eligible']:
             assert all(c['gates'].values())
         if row['selection_eligible']:
-            assert row['eligible'] and row['hierarchy_eligible'] and row['stage_trigger_ok'] and row['local_peak']
+            assert row['eligible'] and row['hierarchy_eligible'] and row['raw_numeric_gate_pass']
+            assert row['stage_trigger_ok'] and row['local_peak']
+            assert row['trigger_policy_trace']['accepted_by_stage_policy']
             required=h.PRIMARY_TRIGGER_BY_STAGE[row['stage']]
             targets=h.PRIMARY_TRIGGER_TARGETS_BY_STAGE[row['stage']]
             assert any(
                 e.get('a') in required
                 and e.get('b') in targets
                 and e.get('aspect') in h.PRIMARY_TRIGGER_ASPECTS
+                and e.get('family') in h.EXACT_TRIGGER_FAMILIES
                 and e.get('strength',0)>=h.THRESHOLDS['event_trigger']
+                and e.get('accepted_by_stage_policy')
                 for e in row['fast_evidence']
             )

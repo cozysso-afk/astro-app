@@ -22,7 +22,7 @@ from reunion_dimension_v1 import (
 
 DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정의'}
 
-VERSION = 'reunion-hierarchy-v2.3-medium-anchor'
+VERSION = 'reunion-hierarchy-v2.4-stage-semantics'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -38,12 +38,64 @@ FAST_BY_STAGE = {
     'in_person_meeting': {'Mars', 'Mercury', 'Venus'},
     'relationship_rebuilding': {'Venus', 'Moon', 'Sun', 'Mercury'},
 }
-PRIMARY_TRIGGER_BY_STAGE = {
-    'emotional_reactivation': {'Venus', 'Moon'},
-    'contact_recontact': {'Mercury'},
-    'in_person_meeting': {'Mars'},
-    'relationship_rebuilding': {'Venus', 'Sun'},
+DIRECT_TRIGGER_ASPECTS = {'conjunction', 'square', 'opposition'}
+CONTEXT_ONLY_ASPECTS = {'sextile', 'trine', 'quincunx'}
+EXACT_TRIGGER_FAMILIES = {'natal_trigger', 'progressed_trigger'}
+STAGE_LONG_POLICY = {
+    'emotional_reactivation': {
+        'directed_planets': {'Moon', 'Venus', 'Sun'},
+        'directed_targets': {'Moon', 'Venus', 'Sun'},
+        'slow_planets': SLOW,
+        'slow_targets': {'Moon', 'Venus', 'Sun'},
+    },
+    'contact_recontact': {
+        'directed_planets': {'Mercury'},
+        'directed_targets': {'Mercury', 'Moon', 'Venus', 'Sun', 'DSC'},
+        'slow_planets': {'Jupiter', 'Saturn', 'Uranus'},
+        'slow_targets': {'Mercury', 'Venus', 'DSC'},
+    },
+    'in_person_meeting': {
+        'directed_planets': {'Moon', 'Venus', 'Sun'},
+        'directed_targets': {'ASC', 'DSC', 'Venus', 'Mars'},
+        'slow_planets': {'Jupiter', 'Saturn', 'Uranus'},
+        'slow_targets': {'ASC', 'DSC', 'Venus', 'Mars'},
+    },
+    'relationship_rebuilding': {
+        'directed_planets': {'Venus', 'Sun'},
+        'directed_targets': {'Moon', 'Venus', 'Sun', 'DSC', 'Saturn'},
+        'slow_planets': {'Jupiter', 'Saturn'},
+        'slow_targets': {'Moon', 'Venus', 'Sun', 'DSC', 'Saturn'},
+    },
 }
+STAGE_TRIGGER_POLICY = {
+    'emotional_reactivation': {
+        'primary_planets': {'Moon', 'Venus'},
+        'targets': {'Moon', 'Venus', 'Sun'},
+        'direct_aspects': DIRECT_TRIGGER_ASPECTS,
+        'exact_families': EXACT_TRIGGER_FAMILIES,
+        'moon_requires_venus_context': True,
+    },
+    'contact_recontact': {
+        'primary_planets': {'Mercury'},
+        'targets': {'Mercury', 'Moon', 'Venus', 'DSC'},
+        'direct_aspects': DIRECT_TRIGGER_ASPECTS,
+        'exact_families': EXACT_TRIGGER_FAMILIES,
+    },
+    'in_person_meeting': {
+        'primary_planets': {'Mars'},
+        'targets': {'ASC', 'DSC', 'Venus', 'Mars'},
+        'direct_aspects': DIRECT_TRIGGER_ASPECTS,
+        'exact_families': EXACT_TRIGGER_FAMILIES,
+    },
+    'relationship_rebuilding': {
+        'primary_planets': {'Venus', 'Sun'},
+        'support_planets': {'Mercury'},
+        'targets': {'DSC', 'Venus', 'Saturn'},
+        'direct_aspects': DIRECT_TRIGGER_ASPECTS,
+        'exact_families': EXACT_TRIGGER_FAMILIES,
+    },
+}
+PRIMARY_TRIGGER_BY_STAGE = {stage: policy['primary_planets'] for stage, policy in STAGE_TRIGGER_POLICY.items()}
 MID_GATE_RETURN_KEYS = {'lunar_return'}
 MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
     'emotional_reactivation': ('lunar_return', 'venus_return'),
@@ -51,13 +103,8 @@ MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
     'in_person_meeting': ('lunar_return', 'venus_return', 'mars_return'),
     'relationship_rebuilding': ('lunar_return', 'venus_return', 'solar_return'),
 }
-PRIMARY_TRIGGER_TARGETS_BY_STAGE = {
-    'emotional_reactivation': {'Sun', 'Moon', 'Venus'},
-    'contact_recontact': {'Sun', 'Moon', 'Mercury', 'Venus'},
-    'in_person_meeting': {'Moon', 'Venus', 'Mars', 'ASC', 'DSC'},
-    'relationship_rebuilding': {'Sun', 'Moon', 'Venus', 'DSC'},
-}
-PRIMARY_TRIGGER_ASPECTS = {'conjunction', 'sextile', 'square', 'trine', 'opposition'}
+PRIMARY_TRIGGER_TARGETS_BY_STAGE = {stage: policy['targets'] for stage, policy in STAGE_TRIGGER_POLICY.items()}
+PRIMARY_TRIGGER_ASPECTS = DIRECT_TRIGGER_ASPECTS
 DISCLAIMER = '점수는 해당 기간의 점성·명리적 상대 활성도를 비교하기 위한 값이며, 실제 연락·만남·재회의 확률을 의미하지 않습니다.'
 
 
@@ -355,26 +402,82 @@ def _validate(user, counterpart, support):
     }
 
 
-def _stage_trigger_evidence(stage, evidence):
-    """Return a material fast contact whose planet, target and aspect fit the stage."""
-    required = PRIMARY_TRIGGER_BY_STAGE[stage]
-    targets = PRIMARY_TRIGGER_TARGETS_BY_STAGE[stage]
-    qualifying = [
-        e for e in evidence
-        if e.get('a') in required
-        and e.get('b') in targets
-        and e.get('aspect') in PRIMARY_TRIGGER_ASPECTS
-        and float(e.get('strength', 0)) >= THRESHOLDS['event_trigger']
-        and math.isfinite(float(e.get('strength', 0)))
+def _stage_policy_evaluation(stage, evidence):
+    """Separate exact-date evidence from background context with auditable reasons."""
+    policy = STAGE_TRIGGER_POLICY[stage]
+    reasons = {}
+    accepted, context = [], []
+
+    def reject(row, reason, *, is_context=False):
+        reasons[reason] = reasons.get(reason, 0) + 1
+        if is_context:
+            context.append(row)
+
+    venus_context = any(
+        e.get('a') == 'Venus'
+        and e.get('b') in {'Moon', 'Venus', 'Sun'}
+        and e.get('family') in EXACT_TRIGGER_FAMILIES
+        and e.get('aspect') in DIRECT_TRIGGER_ASPECTS | CONTEXT_ONLY_ASPECTS
+        and isinstance(e.get('strength'), (int, float))
+        and math.isfinite(float(e['strength']))
+        and float(e['strength']) >= THRESHOLDS['event_trigger']
         and isinstance(e.get('orb'), (int, float))
-        and 0 <= e['orb'] < 1.0
-    ]
-    if not qualifying:
-        return None
-    return min(
-        qualifying,
-        key=lambda e: (-float(e.get('strength', 0)), float(e.get('orb', 99)), str(e.get('event_id', ''))),
+        and math.isfinite(float(e['orb']))
+        and 0 <= float(e['orb']) < 1.0
+        for e in evidence
     )
+    for row in evidence:
+        if row.get('a') not in policy['primary_planets']:
+            if row.get('a') in policy.get('support_planets', set()) and row.get('b') in policy['targets']:
+                reject(row, 'context_only_planet', is_context=True)
+            else:
+                reject(row, 'primary_planet_mismatch')
+            continue
+        if row.get('b') not in policy['targets']:
+            reject(row, 'target_mismatch')
+            continue
+        if row.get('family') not in policy['exact_families']:
+            reject(row, 'context_only_family', is_context=True)
+            continue
+        if row.get('aspect') in CONTEXT_ONLY_ASPECTS:
+            reject(row, 'context_only_aspect', is_context=True)
+            continue
+        if row.get('aspect') not in policy['direct_aspects']:
+            reject(row, 'aspect_mismatch')
+            continue
+        strength = row.get('strength')
+        if not isinstance(strength, (int, float)) or not math.isfinite(float(strength)) or float(strength) < THRESHOLDS['event_trigger']:
+            reject(row, 'insufficient_strength')
+            continue
+        orb = row.get('orb')
+        if not isinstance(orb, (int, float)) or not math.isfinite(float(orb)) or not 0 <= float(orb) < 1.0:
+            reject(row, 'orb_out_of_range')
+            continue
+        if stage == 'emotional_reactivation' and row.get('a') == 'Moon':
+            if row.get('family') != 'natal_trigger':
+                reject(row, 'moon_requires_natal_contact')
+                continue
+            if row.get('b') not in {'Moon', 'Venus'}:
+                reject(row, 'moon_target_not_emotional')
+                continue
+            if not venus_context:
+                reject(row, 'moon_requires_venus_context')
+                continue
+        accepted.append(row)
+
+    accepted.sort(key=lambda e: (-float(e.get('strength', 0)), float(e.get('orb', 99)), str(e.get('event_id', ''))))
+    context.sort(key=lambda e: (-float(e.get('strength', 0)), float(e.get('orb', 99)), str(e.get('event_id', ''))))
+    primary = accepted[0] if accepted else None
+    return {
+        'accepted': accepted,
+        'context': context,
+        'primary': primary,
+        'rejection_counts': reasons,
+    }
+
+
+def _stage_trigger_evidence(stage, evidence):
+    return _stage_policy_evaluation(stage, evidence)['primary']
 
 
 def _stage_trigger_ok(stage, evidence):
@@ -382,16 +485,31 @@ def _stage_trigger_ok(stage, evidence):
     return _stage_trigger_evidence(stage, evidence) is not None
 
 
-def _display_fast_evidence(stage, evidence, limit=4):
+def _display_fast_evidence(stage, evidence, limit=4, evaluation=None):
     """Keep the stage-defining trigger visible even when it ranks below other fast hits."""
-    primary = _stage_trigger_evidence(stage, evidence)
+    evaluation = evaluation or _stage_policy_evaluation(stage, evidence)
+    primary = evaluation['primary']
+    accepted_ids = {row.get('event_id') for row in evaluation['accepted']}
+    context_ids = {row.get('event_id') for row in evaluation['context']}
+
+    def annotate(row):
+        row = dict(row)
+        row['accepted_by_stage_policy'] = row.get('event_id') in accepted_ids
+        row['rejection_reason'] = None if row['accepted_by_stage_policy'] else (
+            'context_only' if row.get('event_id') in context_ids else 'not_stage_defining'
+        )
+        return row
+
     out = []
     if primary is not None:
-        out.append(primary)
-    for row in evidence:
+        out.append(annotate(primary))
+    ordered = evaluation['accepted'] + evaluation['context'] + evidence
+    for row in ordered:
         if primary is not None and row.get('event_id') == primary.get('event_id'):
             continue
-        out.append(row)
+        if any(existing.get('event_id') == row.get('event_id') for existing in out):
+            continue
+        out.append(annotate(row))
         if len(out) >= limit:
             break
     return out[:limit]
@@ -461,7 +579,10 @@ def _mark_requested_peaks(rows, start, end, as_of):
 def _group_windows(rows, as_of):
     windows = []
     for stage in DIMENSIONS:
-        selected = sorted([r for r in rows if r['stage'] == stage and r['eligible']], key=lambda r: r['date'])
+        selected = sorted(
+            [r for r in rows if r['stage'] == stage and r.get('hierarchy_eligible', r['eligible'])],
+            key=lambda r: r['date'],
+        )
         groups = []
         for row in selected:
             if not groups or (date.fromisoformat(row['date']) - date.fromisoformat(groups[-1][-1]['date'])).days > 1:
@@ -641,19 +762,20 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
         geometry_cache = {}
         dims = {}
         for stage in DIMENSIONS:
+            long_policy = STAGE_LONG_POLICY[stage]
             long_evidence = []
             for side, other in (('user', 'counterpart'), ('counterpart', 'user')):
                 for family, charts in (('secondary', progression), ('solar_arc', arc)):
                     if side in charts:
                         long_evidence.extend(_contacts(
                             charts[side], natal[other], stage, family, side + '->' + other,
-                            sources=PERSONAL, targets=TARGETS,
+                            sources=long_policy['directed_planets'], targets=long_policy['directed_targets'],
                             limit=1.5 if family == 'secondary' else 1.0,
                             geometry_cache=geometry_cache,
                         ))
                 long_evidence.extend(_contacts(
                     transits, natal[side], stage, 'slow_transit', side,
-                    sources=SLOW, targets=TARGETS, limit=1.4,
+                    sources=long_policy['slow_planets'], targets=long_policy['slow_targets'], limit=1.4,
                     geometry_cache=geometry_cache,
                 ))
             long_score, long_rows = _ranked_score(long_evidence)
@@ -692,7 +814,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                         ):
                             fast_rows.extend(_contacts(
                                 tr, points, stage, family, side,
-                                sources=FAST_BY_STAGE[stage], targets=TARGETS | {'Mars'}, limit=1.0,
+                                sources=FAST_BY_STAGE[stage], targets=STAGE_TRIGGER_POLICY[stage]['targets'], limit=1.0,
                                 geometry_cache=geometry_cache,
                             ))
                     for key, side, e in active_returns:
@@ -702,17 +824,25 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                             sources=FAST_BY_STAGE[stage], limit=1.0,
                             geometry_cache=geometry_cache,
                         ))
-            event_score, fast_rows = _ranked_score(fast_rows)
-            event_raw_score = _raw_ranked_score(fast_rows)
-            primary_trigger = _stage_trigger_evidence(stage, fast_rows)
+            all_fast_score, fast_rows = _ranked_score(fast_rows)
+            trigger_evaluation = _stage_policy_evaluation(stage, fast_rows)
+            event_score, direct_trigger_rows = _ranked_score(trigger_evaluation['accepted'])
+            event_context_score, context_trigger_rows = _ranked_score(trigger_evaluation['context'])
+            event_raw_score = _raw_ranked_score(direct_trigger_rows)
+            primary_trigger = trigger_evaluation['primary']
             stage_trigger_ok = primary_trigger is not None
-            display_fast = _display_fast_evidence(stage, fast_rows)
+            display_fast = _display_fast_evidence(stage, fast_rows, evaluation=trigger_evaluation)
+            raw_systems = ['western'] if long_score >= 35 and mid_score >= 25 and all_fast_score >= 12 else []
             systems = ['western'] if long_score >= 35 and mid_score >= 25 and event_score >= 12 else []
             if stage in {'emotional_reactivation', 'relationship_rebuilding'} and saju_day['cross_support']:
                 systems.append('saju')
+                raw_systems.append('saju')
+            raw_components = score_components(long_score, mid_score, all_fast_score, raw_systems)
             components = score_components(long_score, mid_score, event_score, systems)
             components['mid_context_score'] = mid_context_score
             components['event_trigger_raw'] = event_raw_score
+            components['event_context_score'] = event_context_score
+            components['all_fast_context_score'] = all_fast_score
             components['primary_trigger_strength'] = round(float(primary_trigger.get('strength', 0)), 3) if primary_trigger else 0.0
             components['primary_trigger_orb'] = round(float(primary_trigger.get('orb', 99)), 6) if primary_trigger else None
             eligible = components['eligible'] and validation['status'] == 'PASS'
@@ -722,11 +852,19 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
                 'stage': stage,
                 'eligible': eligible,
                 'hierarchy_eligible': hierarchy_eligible,
-                'raw_numeric_gate_pass': components['eligible'],
+                'raw_numeric_gate_pass': raw_components['eligible'],
+                'raw_numeric_components': raw_components,
                 'medium_anchor_evaluated': long_pass,
                 'medium_anchor_pass': long_pass and mid_score >= THRESHOLDS['mid_term'],
                 'fast_trigger_evaluated': long_pass and mid_score >= THRESHOLDS['mid_term'],
                 'stage_trigger_ok': stage_trigger_ok,
+                'trigger_policy_trace': {
+                    'accepted_by_stage_policy': stage_trigger_ok,
+                    'primary_trigger': display_fast[0] if stage_trigger_ok else None,
+                    'accepted_evidence_count': len(direct_trigger_rows),
+                    'context_evidence_count': len(context_trigger_rows),
+                    'rejection_counts': trigger_evaluation['rejection_counts'],
+                },
                 'components': components,
                 'fast_evidence': display_fast,
                 'period_support': long_rows[:5],
@@ -810,6 +948,17 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             'stage_primary_triggers': {k: sorted(v) for k, v in PRIMARY_TRIGGER_BY_STAGE.items()},
             'stage_primary_targets': {k: sorted(v) for k, v in PRIMARY_TRIGGER_TARGETS_BY_STAGE.items()},
             'stage_primary_aspects': sorted(PRIMARY_TRIGGER_ASPECTS),
+            'context_only_aspects': sorted(CONTEXT_ONLY_ASPECTS),
+            'exact_trigger_families': sorted(EXACT_TRIGGER_FAMILIES),
+            'return_angle_role': 'context_only',
+            'stage_long_policy': {
+                stage: {key: sorted(value) for key, value in policy.items()}
+                for stage, policy in STAGE_LONG_POLICY.items()
+            },
+            'stage_trigger_policy': {
+                stage: {key: sorted(value) if isinstance(value, set) else value for key, value in policy.items()}
+                for stage, policy in STAGE_TRIGGER_POLICY.items()
+            },
             'primary_trigger_min_strength': THRESHOLDS['event_trigger'],
             'medium_gate_return': 'lunar_return',
             'gate_evaluation': 'sequential: medium only after long; fast only after medium; skipped scores are zero, not measured counterfactuals',
@@ -844,7 +993,8 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             '중기 관문은 월 단위 Lunar Return을 필수 앵커로 사용하며 다른 행성 회귀는 단계별 배경 문맥으로만 유지',
             '조회 범위 밖 ±7일을 내부 비교하되 과거 피크는 미래 후보를 억제하지 않고 표시 날짜는 요청 범위로 제한',
             '문턱·가중치는 버전 관리되는 비교 규칙이며 적중률로 보정하지 않음',
-            '장기·중기 관문 통과 후 단계별 관련 대상·주요 각에 대한 필수 촉발이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
+            '장기·중기 관문 통과 후 단계별 관련 대상의 직접 촉발각이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
+            '삼합·육합·퀸컹스와 회귀각 접촉은 배경 문맥이며 단독으로 정확한 날짜 후보를 만들지 않음',
         ],
         'saju_boundaries': {k: saju.get(k, []) for k in ('years', 'months')},
         'event_probability': 'not_calculated',
@@ -861,7 +1011,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             'rank_weight': w['final'],
             'independent_system_count': len(w['independent_systems']),
             'convergence': len(w['independent_systems']) >= 2,
-            'exact_date_basis': 'hierarchical_gates_with_lunar_medium_anchor_then_semantic_stage_trigger_then_future_local_peak',
+            'exact_date_basis': 'stage_specific_long_gate_then_lunar_anchor_then_direct_semantic_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in public24
@@ -899,7 +1049,7 @@ def apply_reunion_hierarchy(result, user, counterpart, start, end, *, as_of_date
             'stages': [w['stage']],
             'priority_index': w['final'],
             'components': w['components'],
-            'exact_date_basis': 'hierarchical_gates_with_lunar_medium_anchor_then_semantic_stage_trigger_then_future_local_peak',
+            'exact_date_basis': 'stage_specific_long_gate_then_lunar_anchor_then_direct_semantic_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in candidate_windows
