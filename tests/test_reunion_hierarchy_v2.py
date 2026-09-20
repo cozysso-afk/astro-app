@@ -480,7 +480,7 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
     assert hierarchy['validation']['status']=='PASS'
     assert len(hierarchy['daily_trace'])==11*4
     assert len(hierarchy['long_term_daily'])==11*4
-    assert hierarchy['version']=='reunion-hierarchy-v2.5-iana-timezone-provenance'
+    assert hierarchy['version']=='reunion-hierarchy-v2.8-birth-time-precision-audit'
     assert 'selectivity' in hierarchy and 'selection_policy' in hierarchy
     assert hierarchy['selection_policy']['primary_trigger_min_strength']==h.THRESHOLDS['event_trigger']
     windows=result['reunion_timing_windows']['windows']
@@ -513,3 +513,45 @@ def test_real_api_reproducibility_current_filter_and_component_trace():
                 and e.get('accepted_by_stage_policy')
                 for e in row['fast_evidence']
             )
+
+
+def test_medium_precision_audit_flags_provisional_dependency_without_reweighting():
+    rows = [
+        {'return_type':'lunar_return','mid_gate':True,'event_id':'p','strength':40,'return_precision':'provisional'},
+        {'return_type':'lunar_return','mid_gate':True,'event_id':'e','strength':20,'return_precision':'exact'},
+    ]
+    audit = h._medium_precision_audit(rows)
+    assert audit['all_score'] == h._ranked_score(h._mid_gate_evidence(rows))[0] == 45.0
+    assert audit['exact_only_score'] == 20.0
+    assert audit['gate_pass'] is True and audit['exact_only_gate_pass'] is False
+    assert audit['status'] == 'gate_depends_on_provisional'
+
+
+def test_medium_precision_audit_does_not_downgrade_exact_gate():
+    rows = [
+        {'return_type':'lunar_return','mid_gate':True,'event_id':'e','strength':40,'return_precision':'exact'},
+        {'return_type':'lunar_return','mid_gate':True,'event_id':'p','strength':20,'return_precision':'provisional'},
+    ]
+    audit = h._medium_precision_audit(rows)
+    assert audit['gate_pass'] is True and audit['exact_only_gate_pass'] is True
+    assert audit['status'] == 'provisional_contributes_but_exact_gate_passes'
+
+
+def test_return_evidence_preserves_provisional_lunar_precision():
+    event = {
+        'exact_utc':'2026-01-01T00:00:00+00:00',
+        'next_exact_utc':'2026-02-01T00:00:00+00:00',
+        'precision':'provisional',
+        'positions':{'Mercury':10.0},
+        'angles':{},
+        'house_activations':[],
+    }
+    support = {'lunar_return':{'user':{'events':[event]},'counterpart':{'events':[]}}}
+    natal = {'user':{'Moon':10.0},'counterpart':{'Moon':20.0}}
+    rows, active = h._return_evidence(
+        support, datetime(2026,1,15,tzinfo=timezone.utc), 'contact_recontact', natal
+    )
+    lunar = [row for row in rows if row.get('return_type') == 'lunar_return']
+    assert lunar and all(row['return_precision'] == 'provisional' for row in lunar)
+    assert all(row['return_side'] == 'user' for row in lunar)
+    assert active and active[0][0] == 'lunar_return'

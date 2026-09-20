@@ -23,7 +23,7 @@ from reunion_dimension_v1 import (
 
 DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정의'}
 
-VERSION = 'reunion-hierarchy-v2.5-iana-timezone-provenance'
+VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -255,6 +255,8 @@ def _return_evidence(support, instant, stage, natal, cache=None):
             for hit in hits:
                 hit['return_type'] = key
                 hit['mid_gate'] = key in MID_GATE_RETURN_KEYS
+                hit['return_precision'] = e.get('precision') or 'unknown'
+                hit['return_side'] = side
             rows.extend(hits)
             for h in e.get('house_activations', []):
                 if h.get('whole_sign') in {3, 5, 7, 8}:
@@ -265,6 +267,8 @@ def _return_evidence(support, instant, stage, natal, cache=None):
                         'a': h['planet'],
                         'return_type': key,
                         'mid_gate': key in MID_GATE_RETURN_KEYS,
+                        'return_precision': e.get('precision') or 'unknown',
+                        'return_side': side,
                         'house_system': 'Whole Sign',
                         'house': h['whole_sign'],
                         'strength': 12.0,
@@ -276,6 +280,41 @@ def _return_evidence(support, instant, stage, natal, cache=None):
 def _mid_gate_evidence(rows):
     """Only Lunar Return evidence opens the medium-term gate; other returns remain context."""
     return [row for row in rows if row.get('mid_gate') and row.get('return_type') in MID_GATE_RETURN_KEYS]
+
+
+def _medium_precision_audit(rows):
+    """Expose provisional-time dependency without changing gate scores or ranking."""
+    gate_rows = _mid_gate_evidence(rows)
+    all_score, _ = _ranked_score(gate_rows)
+    exact_rows = [row for row in gate_rows if row.get('return_precision') == 'exact']
+    provisional_rows = [row for row in gate_rows if row.get('return_precision') == 'provisional']
+    unknown_rows = [
+        row for row in gate_rows
+        if row.get('return_precision') not in {'exact', 'provisional'}
+    ]
+    exact_score, _ = _ranked_score(exact_rows)
+    threshold = THRESHOLDS['mid_term']
+    if unknown_rows:
+        status = 'unknown_precision_present'
+    elif provisional_rows and all_score >= threshold and exact_score < threshold:
+        status = 'gate_depends_on_provisional'
+    elif provisional_rows and exact_score >= threshold:
+        status = 'provisional_contributes_but_exact_gate_passes'
+    elif gate_rows:
+        status = 'exact_only'
+    else:
+        status = 'no_lunar_anchor'
+    return {
+        'status': status,
+        'all_score': all_score,
+        'exact_only_score': exact_score,
+        'gate_pass': all_score >= threshold,
+        'exact_only_gate_pass': exact_score >= threshold,
+        'exact_evidence_count': len(exact_rows),
+        'provisional_evidence_count': len(provisional_rows),
+        'unknown_precision_evidence_count': len(unknown_rows),
+        'policy': 'audit_only; provisional evidence is not reweighted or suppressed in v2.8',
+    }
 
 
 def _saju_context(user, counterpart, start, end, offset):
@@ -612,6 +651,7 @@ def _group_windows(rows, as_of):
                 'fast_evidence': peak['fast_evidence'],
                 'period_support': peak['period_support'],
                 'mid_evidence': peak['mid_evidence'],
+                'medium_precision_audit': peak.get('medium_precision_audit'),
                 'independent_systems': peak['components']['independent_systems'],
                 'final': peak['components']['final'],
                 'eligible': True,
@@ -640,6 +680,7 @@ def _peak_windows(rows, as_of, limit=24):
             'fast_evidence': r['fast_evidence'],
             'period_support': r['period_support'],
             'mid_evidence': r['mid_evidence'],
+            'medium_precision_audit': r.get('medium_precision_audit'),
             'independent_systems': r['components']['independent_systems'],
             'final': r['components']['final'],
             'eligible': True,
@@ -817,6 +858,7 @@ def apply_reunion_hierarchy(
             )
             mid_score, mid_rows = _ranked_score(_mid_gate_evidence(mid_context_rows))
             mid_context_score, mid_context_ranked = _ranked_score(mid_context_rows)
+            medium_precision_audit = _medium_precision_audit(mid_context_rows)
             fast_rows = []
             if long_score >= THRESHOLDS['long_term'] and mid_score >= THRESHOLDS['mid_term']:
                 for hour in FAST_SAMPLE_HOURS:
@@ -889,6 +931,7 @@ def apply_reunion_hierarchy(
                 'period_support': long_rows[:5],
                 'mid_evidence': mid_rows[:4],
                 'mid_context_evidence': mid_context_ranked[:4],
+                'medium_precision_audit': medium_precision_audit,
                 'saju_context': saju_day,
             })
             dims[stage] = {
@@ -990,6 +1033,7 @@ def apply_reunion_hierarchy(
             },
             'primary_trigger_min_strength': THRESHOLDS['event_trigger'],
             'medium_gate_return': 'lunar_return',
+            'birth_time_precision_policy': 'provisional Lunar Return remains calculable; each candidate reports exact-only gate counterfactual without reweighting or suppressing evidence',
             'gate_evaluation': 'sequential: medium only after long; fast only after medium; skipped scores are zero, not measured counterfactuals',
             'medium_context_returns': {k: list(v) for k, v in MID_CONTEXT_RETURN_KEYS_BY_STAGE.items()},
             'fast_sample_hours': FAST_SAMPLE_HOURS,
@@ -1020,6 +1064,7 @@ def apply_reunion_hierarchy(
             '회귀 위치는 입력 출생지 기준이며 현재 거주지와 다를 수 있음',
             '일별 빠른 촉발점은 3시간 간격 표본이며 정확한 사건 발생 시각을 뜻하지 않음',
             '중기 관문은 월 단위 Lunar Return을 필수 앵커로 사용하며 다른 행성 회귀는 단계별 배경 문맥으로만 유지',
+            '추정 출생시간의 Lunar Return은 provisional 근거로 계산하되 public candidate에 exact-only gate 비교를 함께 기록하며 v2.8에서는 임의 감점하지 않음',
             '조회 범위 밖 ±7일을 내부 비교하되 과거 피크는 미래 후보를 억제하지 않고 표시 날짜는 요청 범위로 제한',
             '문턱·가중치는 버전 관리되는 비교 규칙이며 적중률로 보정하지 않음',
             '장기·중기 관문 통과 후 단계별 관련 대상의 직접 촉발각이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
