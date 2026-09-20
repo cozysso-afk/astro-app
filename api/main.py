@@ -92,6 +92,23 @@ class ForecastLocation(BaseModel):
         return self
 
 
+class ForecastLocationInterval(ForecastLocation):
+    start_utc: datetime
+    end_utc: datetime
+
+    @model_validator(mode="after")
+    def validate_interval(self):
+        if self.start_utc.tzinfo is None or self.start_utc.utcoffset() is None:
+            raise ValueError("forecast_location_timeline start_utc must be timezone-aware")
+        if self.end_utc.tzinfo is None or self.end_utc.utcoffset() is None:
+            raise ValueError("forecast_location_timeline end_utc must be timezone-aware")
+        self.start_utc = self.start_utc.astimezone(timezone.utc)
+        self.end_utc = self.end_utc.astimezone(timezone.utc)
+        if self.end_utc <= self.start_utc:
+            raise ValueError("forecast_location_timeline end_utc must be after start_utc")
+        return self
+
+
 class RelationshipProfile(BaseModel):
     name: str | None = None
     birth_date: date
@@ -106,6 +123,7 @@ class RelationshipProfile(BaseModel):
     timezone_id: str | None = None
     timezone_fold: int | None = Field(default=None, ge=0, le=1)
     forecast_location: ForecastLocation | None = None
+    forecast_location_timeline: list[ForecastLocationInterval] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_birth_timezone(self):
@@ -116,6 +134,11 @@ class RelationshipProfile(BaseModel):
             utc_offset_hours=self.utc_offset_hours,
             fold=self.timezone_fold,
         )
+        timeline = sorted(self.forecast_location_timeline, key=lambda entry: entry.start_utc)
+        for previous, current in zip(timeline, timeline[1:]):
+            if current.start_utc < previous.end_utc:
+                raise ValueError("forecast_location_timeline intervals must not overlap")
+        self.forecast_location_timeline = timeline
         return self
 
     def engine_payload(self) -> dict:
@@ -143,6 +166,7 @@ class RelationshipProfile(BaseModel):
             "timezone_id": self.timezone_id,
             "timezone_fold": self.timezone_fold,
             "forecast_location": self.forecast_location.model_dump() if self.forecast_location else None,
+            "forecast_location_timeline": [entry.model_dump() for entry in self.forecast_location_timeline],
         }
 
 
