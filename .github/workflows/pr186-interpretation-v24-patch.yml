@@ -28,7 +28,13 @@ jobs:
       - name: Apply guarded patches
         run: |
           python scripts/apply_interpretation_v24_human_language.py
-          python scripts/apply_interpretation_v24_provisional_time.py
+          if grep -q "partnerExact, angleTimeAvailable, ai" web/src/RelationshipInterpretationPanel.tsx \
+            && grep -q "timePrecisionNote" web/src/lib/relationshipUserSummary.ts \
+            && grep -q "angleTimeAvailable=" web/src/AppNext.tsx; then
+            echo 'Provisional-time source patch already applied; skipping.'
+          else
+            python scripts/apply_interpretation_v24_provisional_time.py
+          fi
       - name: Install web dependencies
         working-directory: web
         run: npm ci
