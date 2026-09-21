@@ -304,8 +304,8 @@ test('A/B: study leads favorable flow while relationship weakness stays in cauti
   const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 } })
   assert.deepEqual(summary.bestFlow,['학업','직장'])
   assert.deepEqual(summary.cautionFlow,['연애','컨디션'])
-  assert.match(summary.headline,/^오늘은 공부와 업무/)
-  assert.ok(summary.headline.indexOf('공부') < summary.headline.indexOf('연애'))
+  assert.match(summary.headline,/^오늘의 중심은 학업 쪽이야\./)
+  assert.ok(summary.headline.indexOf('학업') < summary.headline.indexOf('연애'))
   assert.equal(summary.relationship,undefined)
 })
 
