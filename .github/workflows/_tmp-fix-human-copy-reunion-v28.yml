@@ -1,0 +1,46 @@
+name: temporary human copy/reunion v28 verifier
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+    paths:
+      - scripts/_tmp_fix_human_copy_reunion_v28.py
+      - .github/workflows/_tmp-fix-human-copy-reunion-v28.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-hierarchy-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply v28 human copy/reunion patch
+        run: python scripts/_tmp_fix_human_copy_reunion_v28.py
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Run interpretation regressions
+        working-directory: web
+        run: node --experimental-strip-types --test src/lib/readingExperience.test.mjs src/lib/humanLanguageV25.test.mjs src/lib/relationshipReunionV2.contract.test.mjs
+      - name: Build web
+        working-directory: web
+        run: npm run build
+      - name: Commit verified source changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '4189824+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/fortuneUserSummary.ts web/src/RelationshipInterpretationPanel.tsx web/src/EditorialQaPreview.tsx supabase/functions/relationship-interpret-v9-preview/index.ts web/src/lib/readingCache.ts web/src/lib/humanLanguageV25.test.mjs web/src/lib/readingExperience.test.mjs
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: make fortune copy human and reunion stage grounded'
+          git push origin HEAD:fix/reunion-hierarchy-v2
