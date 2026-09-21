@@ -647,13 +647,28 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
     return topics.map(topic => ({ item, topic }))
   }).sort((a,b)=>Math.abs(Number(b.item.contribution ?? 0))-Math.abs(Number(a.item.contribution ?? 0)))
   const preferred = ranked.filter(row => wanted.has(row.topic))
-  const lead = (preferred.length ? preferred : ranked)[0]
-  if (!lead) return focusedDayFallback(context, bestFlow, cautionFlow)
+  const overallPrimary = !scopedTopics.size ? bestFlow.find(topic => DAILY_HEADLINE_SCENE[topic]) : undefined
+  const lead = overallPrimary
+    ? ranked.find(row => row.topic === overallPrimary)
+    : (preferred.length ? preferred : ranked)[0]
+  if (!lead) {
+    if (overallPrimary) {
+      const primaryScene = DAILY_HEADLINE_SCENE[overallPrimary]
+      const primaryLevel = flowLevel(topicStat(context, overallPrimary))
+      const primaryText = primaryLevel === 'low' ? primaryScene.caution : primaryScene.use
+      const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== overallPrimary && DAILY_HEADLINE_SCENE[topic])
+      const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''
+      return `오늘 전체 흐름에서 가장 먼저 볼 건 ${overallPrimary}이야. ${primaryText}${secondaryText}`
+    }
+    return focusedDayFallback(context, bestFlow, cautionFlow)
+  }
   const scene = DAILY_HEADLINE_SCENE[lead.topic]
   const focus = DAILY_EVIDENCE_FOCUS[lead.topic]
   if (!scene || !focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
   const polarity = typeof lead.item.polarity === 'number' && Number.isFinite(lead.item.polarity) ? Math.sign(lead.item.polarity) : 0
-  const caution = cautionFlow.includes(lead.topic) || polarity < 0
+  const caution = scopedTopics.size
+    ? cautionFlow.includes(lead.topic) || polarity < 0
+    : cautionFlow.includes(lead.topic)
   const sceneText = caution ? scene.caution : scene.use
   const motion = String(lead.item.motion ?? '')
   const applying = /Applying|적용/i.test(motion)
