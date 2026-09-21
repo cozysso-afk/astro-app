@@ -48,7 +48,28 @@ if 'angleTimeAvailable?: boolean' not in text:
     )
     if 'const angleTimeAvailable = input.angleTimeAvailable' not in text:
         raise SystemExit('relationship summary signature patch failed')
-    summary.write_text(text)
+
+if 'const timePrecisionNote =' not in text:
+    old = """  const practical = marriage
+    ? negativeStructure ? '한 사람이 집안일과 책임을 떠안지 않도록 분담 범위와 쉴 시간을 구체적으로 정해봐.' : '함께 쓰는 돈과 혼자 보내는 시간, 집안일을 어떻게 나눌지 이야기해봐.'
+    : friction.some(p => p.role === 'communication') ? '말이 엇갈릴 때 바로 결론 내리지 말고, 각자 받아들인 뜻을 한 번씩 말해봐.' : '편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐.'
+  return { mode: input.mode,"""
+    new = """  const practical = marriage
+    ? negativeStructure ? '한 사람이 집안일과 책임을 떠안지 않도록 분담 범위와 쉴 시간을 구체적으로 정해봐.' : '함께 쓰는 돈과 혼자 보내는 시간, 집안일을 어떻게 나눌지 이야기해봐.'
+    : friction.some(p => p.role === 'communication') ? '말이 엇갈릴 때 바로 결론 내리지 말고, 각자 받아들인 뜻을 한 번씩 말해봐.' : '편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐.'
+  const timePrecisionNote = !input.partnerExact && angleTimeAvailable
+    ? '입력한 추정 생시를 기준으로 하우스와 각도까지 읽었어. 주변 생시에서 달라질 수 있는 시간 민감 근거는 확정값이 아니라 참고 범위로 봐줘.'
+    : ''
+  return { mode: input.mode,"""
+    if old not in text:
+        raise SystemExit('practical block not found')
+    text = text.replace(old, new, 1)
+    text = text.replace(
+        "friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked }",
+        "friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked, timePrecisionNote }",
+        1,
+    )
+summary.write_text(text)
 
 panel = ROOT / 'web/src/RelationshipInterpretationPanel.tsx'
 text = panel.read_text()
@@ -63,7 +84,13 @@ if 'angleTimeAvailable' not in text.split('}) {', 1)[0]:
     if old_call not in text:
         raise SystemExit('panel summary call not found')
     text = text.replace(old_call, new_call, 1)
-    panel.write_text(text)
+if '{view.timePrecisionNote&&' not in text:
+    hero = "</p></header>\n    <div className=\"reading-export-toolbar\""
+    hero_new = "</p>{view.timePrecisionNote&&<p className=\"reading-precision-note\">{view.timePrecisionNote}</p>}</header>\n    <div className=\"reading-export-toolbar\""
+    if hero not in text:
+        raise SystemExit('panel hero insertion point not found')
+    text = text.replace(hero, hero_new, 1)
+panel.write_text(text)
 
 app = ROOT / 'web/src/AppNext.tsx'
 text = app.read_text()
@@ -79,7 +106,7 @@ if 'angleTimeAvailable=' not in text:
 test_path = ROOT / 'web/src/lib/readingExperience.test.mjs'
 test = test_path.read_text()
 old_test = """test('entered provisional time keeps Moon but excludes exact-only angle aspects from compact fallback', () => {\n  const unsafe=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]\n  const view=buildRelationshipUserSummary({aspects:unsafe,partnerExact:false,mode:'reunion'})\n  assert.ok(view.ranked.some(a=>a.a==='Moon'))\n  assert.ok(view.ranked.every(a=>a.a!=='ASC'))\n  assert.equal(view.incoming.band,'정보 부족')\n  assert.equal(view.outgoing.band,'정보 부족')\n  assert.equal(view.windows.length,0)\n})"""
-new_test = """test('entered provisional time keeps angle evidence with an explicit sensitivity caveat', () => {\n  const provisional=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed',time_sensitivity:'fragile',evidence_confidence:'low'}]\n  const view=buildRelationshipUserSummary({aspects:provisional,partnerExact:false,angleTimeAvailable:true,mode:'reunion'})\n  assert.ok(view.ranked.some(a=>a.a==='Moon'))\n  assert.ok(view.ranked.some(a=>a.a==='ASC'))\n  assert.match(view.patterns.map(p=>p.reason).join(' '),/입력한 추정 생시 기준/)\n  assert.equal(view.incoming.band,'정보 부족')\n  assert.equal(view.outgoing.band,'정보 부족')\n  assert.equal(view.windows.length,0)\n})\n\ntest('completely unknown time still excludes angle-dependent compact evidence', () => {\n  const unknown=[...aspects,{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]\n  const view=buildRelationshipUserSummary({aspects:unknown,partnerExact:false,angleTimeAvailable:false,mode:'reunion'})\n  assert.ok(view.ranked.every(a=>a.a!=='ASC'))\n})"""
+new_test = """test('entered provisional time keeps angle evidence with an explicit sensitivity caveat', () => {\n  const provisional=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed',time_sensitivity:'fragile',evidence_confidence:'low'}]\n  const view=buildRelationshipUserSummary({aspects:provisional,partnerExact:false,angleTimeAvailable:true,mode:'reunion'})\n  assert.ok(view.ranked.some(a=>a.a==='Moon'))\n  assert.ok(view.ranked.some(a=>a.a==='ASC'))\n  assert.match(view.timePrecisionNote,/입력한 추정 생시/)\n  assert.match(view.timePrecisionNote,/하우스와 각도까지 읽었어/)\n  assert.equal(view.incoming.band,'정보 부족')\n  assert.equal(view.outgoing.band,'정보 부족')\n  assert.equal(view.windows.length,0)\n})\n\ntest('completely unknown time still excludes angle-dependent compact evidence', () => {\n  const unknown=[...aspects,{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]\n  const view=buildRelationshipUserSummary({aspects:unknown,partnerExact:false,angleTimeAvailable:false,mode:'reunion'})\n  assert.ok(view.ranked.every(a=>a.a!=='ASC'))\n  assert.equal(view.timePrecisionNote,'')\n})"""
 if new_test not in test:
     if old_test not in test:
         raise SystemExit('old provisional-time test not found')
