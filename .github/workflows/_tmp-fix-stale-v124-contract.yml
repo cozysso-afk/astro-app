@@ -1,0 +1,62 @@
+name: temporary v12.4 contract verifier
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Refresh only stale reunion v12.3 assertions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/lib/relationshipModeContract.test.mjs')
+          s = p.read_text()
+          replacements = [
+              ("RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\\.3-rich-human-narrative-v1'", "RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\\.4-stage-grounded-narrative-v1'"),
+              ("relationship-v12\\.3-rich-human-narrative", "relationship-v12\\.4-stage-grounded-narrative"),
+          ]
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'missing stale assertion: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Run stability regressions
+        working-directory: web
+        run: |
+          node --test src/lib/relationshipModeContract.test.mjs
+          node --experimental-strip-types --test src/lib/interpretationUiContract.test.mjs
+          node --test src/lib/relationshipReunionV2.contract.test.mjs
+          node --test src/lib/humanLanguageV25.test.mjs
+      - name: Production build
+        working-directory: web
+        run: npm run build
+      - name: Commit verified stale-test fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/relationshipModeContract.test.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+          else
+            git commit -m 'test: align reunion contract assertions with v12.4'
+            git push origin HEAD:fix/reunion-hierarchy-v2
+          fi
