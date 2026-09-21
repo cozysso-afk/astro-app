@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Apply patch
-        run: python scripts/pr186_human_language_v25.py
+        run: |
+          python scripts/pr186_human_language_v25.py
+          python scripts/pr186_human_language_v25_fix.py
       - name: Install web dependencies
         working-directory: web
         run: npm ci
