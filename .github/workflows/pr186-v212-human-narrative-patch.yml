@@ -1,0 +1,68 @@
+name: PR186 v2.12 human narrative patch
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+    paths:
+      - 'scripts/apply_reunion_v212_human_narrative.py'
+      - '.github/workflows/pr186-v212-human-narrative-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  guarded-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-hierarchy-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Apply guarded narrative patch
+        run: python scripts/apply_reunion_v212_human_narrative.py
+
+      - name: Prove calculation engines are untouched
+        run: |
+          git diff --exit-code -- \
+            reunion_hierarchy_v2.py \
+            relationship_return_v1.py \
+            relationship_western_v1.py \
+            relationship_saju_v1.py
+
+      - name: Reunion contract tests
+        run: node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+
+      - name: Reading render tests
+        working-directory: web
+        run: |
+          npm ci
+          node --experimental-strip-types --test src/lib/readingExperience.render.test.mjs
+
+      - name: Web build
+        working-directory: web
+        run: npm run build
+
+      - name: Commit narrative-only changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            web/src/RelationshipInterpretationPanel.tsx \
+            web/src/lib/readingCache.ts \
+            web/src/lib/relationshipReunionV2.contract.test.mjs \
+            supabase/functions/relationship-interpret-v9-preview/index.ts
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+          else
+            git commit -m 'feat(reunion): restore hierarchy-grounded human narrative'
+            git push origin HEAD:fix/reunion-hierarchy-v2
+          fi
