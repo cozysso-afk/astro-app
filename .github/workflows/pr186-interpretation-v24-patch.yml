@@ -28,6 +28,19 @@ jobs:
       - name: Apply guarded patches
         run: |
           python scripts/apply_interpretation_v24_human_language.py
+          # The weekly helper stores structured beats. Render the phase label,
+          # not the whole object, so the user sees 초반/중반/후반 rather than [object Object].
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/src/lib/fortuneUserSummary.ts')
+          s = p.read_text()
+          old = "const clauses = beats.map(beat=>`${beat}에는 ${beat.topic}에서 ${beat.meaning}이 두드러져 ${beat.scene}`)"
+          new = "const clauses = beats.map(beat=>`${beat.label}에는 ${beat.topic}에서 ${beat.meaning}이 두드러져 ${beat.scene}`)"
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
+          elif new not in s:
+              raise SystemExit('weekly arc label source not found')
+          PY
           if grep -q "partnerExact, angleTimeAvailable, ai" web/src/RelationshipInterpretationPanel.tsx \
             && grep -q "timePrecisionNote" web/src/lib/relationshipUserSummary.ts \
             && grep -q "angleTimeAvailable=" web/src/AppNext.tsx; then
