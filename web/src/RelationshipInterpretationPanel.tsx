@@ -259,12 +259,12 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         </div>
         <p className="reunion-initiative-closed"><b>누가 먼저 연락?</b> 현재 계산으로는 판정 보류. 상대측/내측 활성도 비교값은 실제 행동 방향이 아니어서 선연락 근거로 쓰지 않아.</p>
 
-        <h4>오늘 이후 핵심 시기</h4>
+        <h4>오늘 이후 후보 시기</h4>
         {hierarchyData.top_periods.map((w)=><article className="relationship-pattern reunion-future-window" key={`${w.start}:${w.stage}`}>
-          <b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>핵심 날짜 {w.date} · 보조지표 활성도 {w.final}</small>
+          <b>{w.start} ~ {w.end} · {w.label} 후보 창</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>대표 날짜 {w.date} · 사건 확정일 아님 · 보조지표 활성도 {w.final}</small>
           <details><summary>왜 후보가 됐는지</summary><p>장기 배경과 중기 흐름이 먼저 겹친 뒤, 이 단계에 맞는 사건 촉발 신호까지 함께 통과했어.</p><small>기술값 · 장기 {w.components.long_term} · 중기 {w.components.mid_term} · 사건 촉발 {w.components.event_trigger} · 체계 교차 {w.components.cross_system} · 최종 {w.components.final}</small></details>
         </article>)}
-        {!hierarchyData.top_periods.length && <p>오늘 이후 공개할 핵심 후보가 없어.</p>}
+        {!hierarchyData.top_periods.length && <p>오늘 이후 공개할 후보 시기가 없어.</p>}
       </>}
       <p className="reunion-score-meaning">{hierarchyData.score_meaning}</p>
       <details className="reading-more reunion-fixed-structure"><summary>고정 관계 구조 · 필요할 때만 보기</summary>

@@ -119,6 +119,17 @@ function flowLevel(stat: FortuneStat | null | undefined): FlowLevel {
   return 'steady'
 }
 
+
+// FLOW_BAND_V26: display nuance without changing calculation thresholds or ranking.
+function displayFlowBand(score: number, fallback = '보통') {
+  if (!Number.isFinite(score)) return fallback
+  if (score >= 60) return '강함'
+  if (score >= 52) return '다소 강함'
+  if (score >= 45) return '보통'
+  if (score >= 38) return '다소 약함'
+  return '약함'
+}
+
 function topicStat(context: FortuneUserSummaryContext, topic: string) {
   return context.calculation.western.overall?.[topic] ?? null
 }
@@ -700,9 +711,14 @@ function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
     return [{label,topic:hit.topic,meaning,scene:polarity < 0 ? scene.caution : scene.use}]
   })
   if (beats.length < 2) return ''
-  const clauses = beats.map(beat=>`${beat.label}에는 ${beat.topic}에서 ${beat.meaning}이 두드러져 ${beat.scene}`)
-  if (clauses.length === 2) return `${clauses[0]}으로 시작해서, ${clauses[1]}으로 무게가 옮겨가는 주야.`
-  return `${clauses[0]}으로 시작하고, ${clauses[1]}, ${clauses[2]}으로 이어지는 주야.`
+  // WEEKLY_ARC_COMPACT_V26: keep the arc, drop repeated '쪽/두드러져' scaffolding.
+  const compactScene = (scene: string) => scene
+    .replace(/하는 쪽$/, '하는 데')
+    .replace(/보는 쪽$/, '보는 데')
+    .replace(/는 쪽$/, '는 데')
+  const clauses = beats.map(beat=>`${beat.label}엔 ${beat.topic}에서 ${compactScene(beat.scene)}`)
+  if (clauses.length === 2) return `${clauses[0]} 힘이 실리고, ${clauses[1]} 무게가 옮겨가.`
+  return `${clauses[0]} 힘이 실리고, ${clauses[1]} 흐름을 거쳐, ${clauses[2]} 마무리되는 주야.`
 }
 
 function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext) {
@@ -819,8 +835,8 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? daySummary(bestFlow, cautionFlow) : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
     bestFlow, cautionFlow,
-    favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: topicStat(context, row.topic)?.band ?? '보통', meaning: row.topic === '연락' ? '받는 연락과 먼저 보내는 연락을 구분해' : row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].use : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].use : FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),
-    cautionCards: cautionCandidates.map(row => ({ topic: row.topic, score: row.score!, band: row.topic === '투자주의' ? '주의' : topicStat(context, row.topic)?.band ?? '약함', meaning: row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].caution : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].caution : FLOW_COPY[row.topic]?.[1] ?? '속도를 낮추는 편이 좋아' })),
+    favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: displayFlowBand(row.score!, topicStat(context, row.topic)?.band ?? '보통'), meaning: row.topic === '연락' ? '받는 연락과 먼저 보내는 연락을 구분해' : row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].use : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].use : FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),
+    cautionCards: cautionCandidates.map(row => ({ topic: row.topic, score: row.score!, band: row.topic === '투자주의' ? '주의' : displayFlowBand(row.score!, topicStat(context, row.topic)?.band ?? '약함'), meaning: row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].caution : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].caution : FLOW_COPY[row.topic]?.[1] ?? '속도를 낮추는 편이 좋아' })),
     doItems: best.map(row => row.topic === '재회' ? consistency.reconnectionConclusion : topicCopy(row.topic, row.level, when).conclusion),
     cautionItems: caution.map(row => row.topic === '재회' ? consistency.reconnectionConclusion : topicCopy(row.topic, row.level, when).conclusion),
     focusTopics, referenceTopics, importantWindows,

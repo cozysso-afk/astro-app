@@ -7,7 +7,7 @@ import { topicOrder } from './lib/fortuneTopics'
 function stat(score: number) {
   return {
     average: score,
-    band: score < 40 ? '약함' : score >= 60 ? '강함' : '보통',
+    band: score >= 60 ? '강함' : score >= 52 ? '다소 강함' : score >= 45 ? '보통' : score >= 38 ? '다소 약함' : '약함',
     spread: 0,
     best_days: [],
     caution_days: [],
@@ -88,7 +88,7 @@ function makeFortuneFixture(period: 'today' | 'week') {
 function FortuneQA({ period }: { period: 'today' | 'week' }) {
   const summary = useMemo(() => makeFortuneFixture(period), [period])
   return <div className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><div><span className="period-ai-kicker">QA fixture · {summary.when} 핵심</span><span className="reading-period-date">{period === 'today' ? '2026-09-21' : '2026-09-21 → 2026-09-27'}</span><h3>{summary.headline}</h3><p className="reading-hero-subtitle">{summary.summary}</p></div></div>
+    <div className="period-ai-head"><div><span className="period-ai-kicker">{summary.when} 핵심</span><span className="reading-period-date">{period === 'today' ? '2026-09-21' : '2026-09-21 → 2026-09-27'}</span><h3>{summary.headline}</h3><p className="reading-hero-subtitle">{summary.summary}</p></div></div>
     <div className="reading-flows">
       <h4 className="reading-section-heading">한눈에 보는 흐름</h4>
       <FortuneFlowCards title={summary.doTitle} items={summary.favorableCards}/>
@@ -99,12 +99,12 @@ function FortuneQA({ period }: { period: 'today' | 'week' }) {
 
 function ReunionQA() {
   return <div className="period-ai-card period-ai-v18">
-    <div className="period-ai-head"><div><span className="period-ai-kicker">QA fixture · 재회운 사람말 본문</span><h3>다시 대화할 여지는 열려 있지만, 관계 회복은 연락 이후 행동을 보고 판단하는 흐름이야.</h3><p className="reading-hero-subtitle">감정이 다시 올라오는 신호와 실제 연락·만남·재구축은 같은 단계가 아니야. 이번 검수 화면은 기술 용어보다 사람말 본문이 충분히 길고 앞에 오는지 보기 위한 fixture야.</p></div></div>
+    <div className="period-ai-head" style={{order:-1}}><div><span className="period-ai-kicker">재회운 핵심</span><h3>다시 대화할 여지는 열려 있지만, 관계 회복은 연락 이후 행동을 보고 판단하는 흐름이야.</h3><p className="reading-hero-subtitle">감정이 다시 올라오는 신호와 실제 연락·만남·재구축은 같은 단계가 아니야. 이번 검수 화면은 기술 용어보다 사람말 본문이 충분히 길고 앞에 오는지 보기 위한 fixture야.</p></div></div>
     <section className="period-ai-window-section"><div className="period-ai-section-title"><span>지금 두 사람 사이에서 살아 있는 흐름</span></div><p>서로를 다시 의식하게 만드는 자극은 남아 있어. 다만 지금 계산에서 가장 먼저 살아나는 건 감정과 기억 쪽이고, 실제 행동은 그보다 한 단계 늦게 따라오는 구조야. 한 번의 반응이나 답장만으로 관계가 복구됐다고 읽기보다, 대화가 이어지고 다음 약속으로 넘어가는지를 따로 봐야 해.</p></section>
     <section className="period-ai-window-section"><div className="period-ai-section-title"><span>왜 다시 연결될 수 있나</span></div><p>완전히 끝난 관계처럼 무감각해지는 흐름보다는 다시 생각나고 확인하고 싶어지는 흐름이 반복돼. 특히 대화를 다시 열 수 있는 계기와 과거 기억이 자극되는 시기가 겹치면 접점이 생길 여지가 커져. 다만 그 접점은 재결합 확정이 아니라 다시 말을 섞을 수 있는 문이 열리는 정도로 읽는 게 맞아.</p></section>
     <section className="period-ai-window-section"><div className="period-ai-section-title"><span>지금 막히는 지점</span></div><p>감정이 올라오는 속도보다 실제 행동 전환이 느린 편이야. 서로의 의도를 확인하기 전에 예전 갈등을 떠올리거나, 먼저 움직였다가 다시 상처받는 상황을 피하려는 태도가 끼어들기 쉬워. 그래서 이번 흐름은 누가 더 마음이 있느냐보다 실제로 대화를 이어가고 약속을 지키는지가 더 중요해.</p></section>
     <section className="period-ai-window-section"><div className="period-ai-section-title"><span>다시 움직인다면 어떤 순서인가</span></div><p>감정 재활성화 → 짧은 연락이나 반응 → 대화 지속 → 실제 만남 → 관계를 어떤 조건으로 다시 이어갈지 정하는 순서로 봐. 앞 단계를 건너뛰고 바로 관계 정의를 요구하면 흐름이 끊기기 쉬워. 연락이 왔다는 사실보다 그 다음 행동이 이어지는지를 확인해야 해.</p></section>
-    <section className="period-ai-window-section"><div className="period-ai-section-title"><span>오늘 이후 핵심 시기</span></div><p><strong>2026-10-21</strong>은 재접촉 계기가 먼저 살아나는 후보, <strong>2027-01-21</strong>은 상대측 반응을 관찰하기 좋은 후보, <strong>2027-04-18</strong>은 내가 먼저 움직일 때의 반응을 보기 좋은 후보로 두고 읽어. 날짜는 사건 확률이 아니라 엔진이 통과시킨 활성 창이야.</p></section>
+    <section className="period-ai-window-section"><div className="period-ai-section-title"><span>오늘 이후 후보 시기</span></div><p><strong>2026-10-21 전후</strong>는 재접촉 계기를 살피는 첫 후보 창, <strong>2027-01-21 전후</strong>는 상대측 반응을 관찰하는 후보 창, <strong>2027-04-18 전후</strong>는 내가 먼저 움직였을 때의 반응을 비교해 볼 후보 창이야. 특정 하루를 사건일로 찍는 게 아니라, 각 단계 근거가 상대적으로 모이는 시기로 읽어.</p></section>
     <section className="period-ai-window-section"><div className="period-ai-section-title"><span>연락 이후, 재회까지 남은 것</span></div><p>대화가 다시 시작돼도 예전 갈등 구조가 그대로면 감정만 재점화되고 다시 멀어질 수 있어. 실제 재구축으로 가려면 말투나 태도보다 약속을 지키는 방식, 관계의 경계, 갈등이 생겼을 때 끊어버리지 않고 조정하는 방식이 달라져야 해. 이번에는 ‘연락이 왔다’보다 ‘연락 이후 무엇이 달라졌나’를 재회 판단의 기준으로 두는 게 맞아.</p></section>
   </div>
 }
