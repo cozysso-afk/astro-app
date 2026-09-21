@@ -52,6 +52,27 @@ for(const period of ['today','week','month','year'])test(`${period}: ten field m
   if(field.id==='contact'){assert.ok(v.relationship?.incoming);assert.ok(v.relationship?.outgoing);assert.ok(packet.relationship_signals.incoming);assert.ok(packet.relationship_signals.outgoing)}
  }
 })
+test('today topic headlines stay inside the selected field and overall is not copied from love',()=>{
+ const f=fixture('today')
+ const day=f.calculation.western.daily_scores.find(row=>row.date===f.calculation.period.start)
+ day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]
+ const overall=summary.buildFortuneUserSummary(f.data,{...f.context,topicEntries:Object.entries(f.data.topic_analysis)})
+ const loveTopics=['연애','연락','재회']
+ const love=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:loveTopics,topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>loveTopics.includes(topic))})
+ const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})
+ assert.notEqual(overall.headline,love.headline)
+ assert.match(overall.headline,/전체 흐름/)
+ assert.match(condition.headline,/컨디션/)
+ assert.doesNotMatch(condition.headline,/연락|답장|대화/)
+})
+
+test('weekly focused headlines ignore evidence from other life topics',()=>{
+ const f=fixture('week')
+ for(const day of f.calculation.western.daily_scores) day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]
+ const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})
+ assert.doesNotMatch(condition.headline,/연락|답장|대화/)
+})
+
 test('crosswalk accepts exact engine names only and never creates missing meanings',()=>{
  assert.equal(systems.tenGodLens('正印(정인)').topic,'학업')
  assert.equal(systems.tenGodLens('正官(정관)').topic,'직업')
