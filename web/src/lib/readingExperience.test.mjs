@@ -316,9 +316,9 @@ test('weekly fallback headline tells a multi-day arc instead of reusing the dail
     {date:'2026-09-18',evidence:[{source_topics:['이직'],transit:'Jupiter',target:'Sun',aspect:'trine',contribution:3,polarity:.5}]},
   ]
   const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
-  assert.match(view.headline,/초반에는/)
-  assert.match(view.headline,/중반에는/)
-  assert.match(view.headline,/후반에는/)
-  assert.match(view.headline,/이어지는 주야/)
-  assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
+  assert.match(view.headline,/초반엔/)
+  assert.match(view.headline,/중반엔/)
+  assert.match(view.headline,/후반엔/)
+  assert.match(view.headline,/마무리되는 주야/)
+  assert.doesNotMatch(view.headline,/두드러져|하는 쪽|보는 쪽|힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
 })
