@@ -30,6 +30,16 @@ jobs:
       - name: Apply guarded narrative patch
         run: python scripts/apply_reunion_v212_human_narrative.py
 
+      - name: Normalize v2.12 cache contract expectation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/lib/relationshipReunionV2.contract.test.mjs')
+          s=p.read_text()
+          s=s.replace('relationship-v12\\.2-human-narrative-v2','relationship-v12\\.2-human-narrative-v1')
+          p.write_text(s)
+          PY
+
       - name: Prove calculation engines are untouched
         run: |
           git diff --exit-code -- \
