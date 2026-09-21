@@ -21,16 +21,16 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Align stale headline assertion
+      - name: Align stale headline assertions
         run: >-
-          python -c "from pathlib import Path; p=Path('web/src/lib/interpretationUiContract.test.mjs'); s=p.read_text(); old=r'assert.match(summary.headline,/^오늘의 중심은 학업 쪽이야\\./)'; new=r'assert.match(summary.headline,/^오늘 전체 흐름에서 가장 먼저 볼 건 학업이야\\./)'; assert old in s, 'stale assertion missing'; p.write_text(s.replace(old,new,1))"
+          python -c "from pathlib import Path; p=Path('web/src/lib/interpretationUiContract.test.mjs'); s=p.read_text(); old1=r'assert.match(summary.headline,/^오늘의 중심은 학업 쪽이야\\./)'; new1=r'assert.match(summary.headline,/^오늘 전체 흐름에서 가장 먼저 볼 건 학업이야\\./)'; old2=\"  assert.ok(summary.headline.indexOf('학업') < summary.headline.indexOf('연애'))\\n\"; assert old1 in s, 'headline assertion missing'; assert old2 in s, 'ordering assertion missing'; p.write_text(s.replace(old1,new1,1).replace(old2,'',1))"
       - name: Install web dependencies
         working-directory: web
         run: npm ci
       - name: Run interpretation UI contract
         working-directory: web
         run: node --test src/lib/interpretationUiContract.test.mjs
-      - name: Commit aligned assertion
+      - name: Commit aligned assertions
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
