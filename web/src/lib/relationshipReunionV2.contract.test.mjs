@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.3-rich-human-narrative"/)
+  assert.match(server,/REUNION_VERSION="relationship-v12\.4-stage-grounded-narrative"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -58,11 +58,11 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion v2.13 keeps hierarchy timing deterministic while expanding human narrative',()=>{
+test('reunion v2.14 keeps hierarchy timing deterministic while expanding stage-grounded narrative',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v12\.3-rich-human-narrative-v1/)
+  assert.match(cache,/relationship-v12\.4-stage-grounded-narrative-v1/)
   assert.match(panel,/지금부터의 재회 흐름/)
   assert.match(panel,/가장 가까운 활성창/)
   assert.match(panel,/지난 활성기 · 사후검증용/)
