@@ -543,7 +543,7 @@ function relationshipSummary(context: FortuneUserSummaryContext, important: Set<
   }
 }
 
-// DAILY_HEADLINE_SCENE_V24: deterministic fallback should still describe today's concrete evidence.
+// DAILY_HEADLINE_SCENE_V25: the home-card headline must describe a concrete scene even when detailed evidence is sparse.
 const DAILY_HEADLINE_SCENE: Record<string, { use: string; caution: string }> = {
   금전: { use:'결제·정산·예산처럼 실제 돈의 순서를 정리하기 좋은 날이야.', caution:'예상 밖 지출이나 충동 결제는 금액과 필요성을 한 번 더 확인하는 편이 좋아.' },
   학업: { use:'계획을 늘리기보다 실제로 끝낸 분량을 만들기 좋은 날이야.', caution:'집중이 흩어지면 여러 과제를 벌이기보다 하나를 끝내는 쪽이 나아.' },
@@ -562,16 +562,33 @@ const DAILY_HEADLINE_SCENE: Record<string, { use: string; caution: string }> = {
   투자주의: { use:'포지션 크기와 감당 가능한 손실 범위를 먼저 점검하기 좋은 날이야.', caution:'주의 신호가 약해 보여도 안전하다고 가정하지 않는 편이 좋아.' },
 }
 
+function fallbackDayHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
+  const best = bestFlow.find(topic => DAILY_HEADLINE_SCENE[topic])
+  const watch = cautionFlow.find(topic => DAILY_HEADLINE_SCENE[topic])
+  const variant = [...context.calculation.period.start].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 3
+  if (best && watch) {
+    const use = DAILY_HEADLINE_SCENE[best].use
+    const caution = DAILY_HEADLINE_SCENE[watch].caution
+    if (variant === 0) return `오늘은 ${best}부터 보면, ${use} ${watch}에서는 ${caution}`
+    if (variant === 1) return `오늘의 중심은 ${best} 쪽이야. ${use} 다만 ${watch}에서는 ${caution}`
+    return `${use} 반면 ${watch}에서는 ${caution}`
+  }
+  if (best) return `오늘은 ${best} 쪽 장면이 가장 또렷해. ${DAILY_HEADLINE_SCENE[best].use}`
+  if (watch) return `오늘은 ${watch} 쪽에서 한 번 더 확인할 게 있어. ${DAILY_HEADLINE_SCENE[watch].caution}`
+  return '오늘은 특정 분야를 억지로 밀기보다, 실제로 들어오는 요청·답변·일정 변화를 확인하면서 움직이는 날이야.'
+}
+
 function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
   const day = (context.calculation.western.daily_scores ?? []).find(row => row.date === context.calculation.period.start)
   const evidence = day?.evidence ?? []
   const wanted = new Set([...bestFlow, ...cautionFlow])
-  const candidates = evidence.flatMap(item => {
-    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => wanted.has(topic)) : []
+  const ranked = evidence.flatMap(item => {
+    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => DAILY_HEADLINE_SCENE[topic]) : []
     return topics.map(topic => ({ item, topic }))
   }).sort((a,b)=>Math.abs(Number(b.item.contribution ?? 0))-Math.abs(Number(a.item.contribution ?? 0)))
-  const lead = candidates[0]
-  if (!lead) return ''
+  const preferred = ranked.filter(row => wanted.has(row.topic))
+  const lead = (preferred.length ? preferred : ranked)[0]
+  if (!lead) return fallbackDayHeadline(context, bestFlow, cautionFlow)
   const key = lead.item.transit && SYMBOLS[lead.item.transit]
     ? lead.item.transit
     : lead.item.target && SYMBOLS[lead.item.target]
@@ -579,10 +596,27 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
       : ''
   const meaning = key ? SYMBOLS[key]?.[1] : ''
   const scene = DAILY_HEADLINE_SCENE[lead.topic]
-  if (!meaning || !scene) return ''
-  const polarity = Number(lead.item.polarity ?? lead.item.contribution ?? 0)
+  if (!meaning || !scene) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  const polarity = typeof lead.item.polarity === 'number' && Number.isFinite(lead.item.polarity) ? Math.sign(lead.item.polarity) : 0
   const caution = cautionFlow.includes(lead.topic) || polarity < 0
-  return `오늘 ${lead.topic}에서는 ${meaning}이 특히 두드러져 ${caution ? scene.caution : scene.use}`
+  const motion = String(lead.item.motion ?? '')
+  const phase = /Applying|적용/i.test(motion)
+    ? '이 자극이 아직 가까워지는 중이라'
+    : /Exact|정확/i.test(motion)
+      ? '오늘 특히 선명하게 걸리는 편이라'
+      : /Separating|분리/i.test(motion)
+        ? '정점은 지나도 여운이 남아'
+        : '오늘 체감이 도드라져'
+  return `오늘 ${lead.topic}에서는 ${meaning}이 특히 두드러지고, ${phase} ${caution ? scene.caution : scene.use}`
+}
+
+function daySummary(bestFlow: string[], cautionFlow: string[]) {
+  const best = bestFlow[0]
+  const watch = cautionFlow[0]
+  if (best && watch) return `오늘은 ${best}에서 움직일 장면과 ${watch}에서 한 번 더 확인할 장면이 갈려. 점수 순위보다 위 한줄과 아래 실제 상황 설명을 먼저 봐.`
+  if (best) return `오늘은 ${best} 쪽 장면이 가장 또렷해. 아래에서 왜 그런지와 현실에서 뭘 확인할지 이어서 봐.`
+  if (watch) return `오늘은 ${watch} 쪽에서 무리하지 않는 게 핵심이야. 아래에서 어떤 장면을 특히 확인해야 하는지 이어서 봐.`
+  return '오늘은 한 분야가 압도적으로 튀기보다 작은 반응 차이가 중요해. 아래 실제 장면을 기준으로 읽어봐.'
 }
 
 // WEEKLY_HEADLINE_ARC_V24: a weekly fallback must describe movement across the week, not a daily sentence stretched to seven days.
@@ -656,10 +690,7 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
       : `${when} ${reconnectionClause}`
     return caution ? `${lead} ${caution} 쪽은 속도를 낮추는 편이 좋아.` : lead
   }
-  if (when === '오늘') {
-    const scene = dayEvidenceHeadline(context, bestFlow, cautionFlow)
-    if (scene) return scene
-  }
+  if (when === '오늘') return dayEvidenceHeadline(context, bestFlow, cautionFlow)
   if (when === '이번 주') {
     const arc = weeklyEvidenceHeadline(context)
     if (arc) return arc
@@ -757,7 +788,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     .filter(window => window.signal !== '배경' && window.start >= context.calculation.period.start && (window.end || window.start) >= window.start && (window.end || window.start) <= context.calculation.period.end && window.topics?.length)
     .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, kind: window.signal === '활용' ? 'favorable' as const : window.signal === '주의' ? 'caution' as const : 'mixed' as const, semantic: window.topics.length === 1 && window.topics[0] === '재회' ? 'reconnection' as const : undefined, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 6)
   return {
-    periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? '하루 안의 선택에 초점을 맞춰 읽어봐. 다른 날까지 같은 흐름으로 이어진다고 보지는 않아.' : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
+    periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? daySummary(bestFlow, cautionFlow) : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
     bestFlow, cautionFlow,
     favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: topicStat(context, row.topic)?.band ?? '보통', meaning: row.topic === '연락' ? '받는 연락과 먼저 보내는 연락을 구분해' : row.topic === '재회' ? consistency.reconnectionMeaning : FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),

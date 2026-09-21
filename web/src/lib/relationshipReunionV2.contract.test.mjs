@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.2-human-narrative"/)
+  assert.match(server,/REUNION_VERSION="relationship-v12\.3-rich-human-narrative"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -58,19 +58,19 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion v2.12 keeps hierarchy timing deterministic while restoring human narrative',()=>{
+test('reunion v2.13 keeps hierarchy timing deterministic while expanding human narrative',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v12\.2-human-narrative-v1/)
+  assert.match(cache,/relationship-v12\.3-rich-human-narrative-v1/)
   assert.match(panel,/지금부터의 재회 흐름/)
   assert.match(panel,/가장 가까운 활성창/)
   assert.match(panel,/지난 활성기 · 사후검증용/)
   assert.match(panel,/고정 관계 구조 · 필요할 때만 보기/)
-  assert.match(panel,/이번 흐름을 사람말로 풀면/)
+  assert.match(panel,/지금 두 사람 사이에서 살아 있는 흐름/)
   assert.match(panel,/지금 어디까지 와 있나/)
-  assert.match(panel,/연락 이후에 봐야 할 것/)
-  assert.match(panel,/지금 막힐 수 있는 지점/)
+  assert.match(panel,/연락이 닿은 뒤, 재회까지는 뭐가 남나/)
+  assert.match(panel,/다시 멀어질 수 있는 지점/)
   assert.match(panel,/reunionStageHuman/)
   assert.match(panel,/보조지표 활성도/)
   assert.match(panel,/\(!reunion \|\| !hierarchyData\)/)
