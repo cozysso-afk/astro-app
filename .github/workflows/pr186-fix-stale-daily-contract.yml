@@ -20,9 +20,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Align stale daily headline contract
         run: >-
           python -c "from pathlib import Path; p=Path('web/src/lib/interpretationUiContract.test.mjs'); s=p.read_text(); old=\"  assert.match(summary.headline,/^오늘은 공부와 업무/)\\n  assert.ok(summary.headline.indexOf('공부') < summary.headline.indexOf('연애'))\"; new=\"  assert.match(summary.headline,/^오늘의 중심은 학업 쪽이야\\./)\\n  assert.ok(summary.headline.indexOf('학업') < summary.headline.indexOf('연애'))\"; assert old in s; p.write_text(s.replace(old,new,1))"
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
       - name: Verify contract
         run: node --experimental-strip-types --test web/src/lib/interpretationUiContract.test.mjs
       - name: Commit verified test alignment
