@@ -61,6 +61,20 @@ jobs:
           tests="test('today topic headlines stay inside the selected field and overall is not copied from love',()=>{\n const f=fixture('today')\n const day=f.calculation.western.daily_scores.find(row=>row.date===f.calculation.period.start)\n day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]\n const overall=summary.buildFortuneUserSummary(f.data,{...f.context,topicEntries:Object.entries(f.data.topic_analysis)})\n const loveTopics=['연애','연락','재회']\n const love=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:loveTopics,topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>loveTopics.includes(topic))})\n const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})\n assert.notEqual(overall.headline,love.headline)\n assert.match(overall.headline,/전체 흐름/)\n assert.match(condition.headline,/컨디션/)\n assert.doesNotMatch(condition.headline,/연락|답장|대화/)\n})\n\ntest('weekly focused headlines ignore evidence from other life topics',()=>{\n const f=fixture('week')\n for(const day of f.calculation.western.daily_scores) day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]\n const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})\n assert.doesNotMatch(condition.headline,/연락|답장|대화/)\n})\n\n"
           if anchor not in s: raise SystemExit('missing test anchor')
           t.write_text(s.replace(anchor,tests+anchor,1))
+
+          r=Path('web/src/lib/readingExperience.test.mjs')
+          s=r.read_text()
+          old='  assert.match(view.headline,/대화의 요점과 실제 합의/)'
+          new='  assert.match(view.headline,/오늘 전체 흐름에서 가장 먼저 볼 건 대인관계|필요한 말이 실제 약속이나 일정/)'
+          if old not in s: raise SystemExit('missing readingExperience stale assertion')
+          r.write_text(s.replace(old,new,1))
+
+          u=Path('web/src/lib/interpretationUiContract.test.mjs')
+          s=u.read_text()
+          old='  assert.match(joined,/대화의 요점과 실제 합의/)'
+          new='  assert.match(joined,/대인관계.*필요한 말이 실제 약속이나 일정|필요한 말이 실제 약속이나 일정/)'
+          if old not in s: raise SystemExit('missing interpretation stale assertion')
+          u.write_text(s.replace(old,new,1))
           PY
       - name: Install web dependencies
         working-directory: web
@@ -77,7 +91,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add web/src/lib/fortuneUserSummary.ts web/src/lib/systemReading.test.mjs
+          git add web/src/lib/fortuneUserSummary.ts web/src/lib/systemReading.test.mjs web/src/lib/readingExperience.test.mjs web/src/lib/interpretationUiContract.test.mjs
           git diff --cached --check
           git commit -m 'fix: keep fortune topic headlines scoped' || exit 0
           git push origin HEAD:fix/daily-topic-scope-hotfix
