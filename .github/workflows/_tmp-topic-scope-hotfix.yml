@@ -1,0 +1,156 @@
+name: temporary topic scope hotfix
+
+on:
+  push:
+    branches:
+      - fix/daily-topic-scope-hotfix
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Patch topic-scoped daily and weekly headlines
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('web/src/lib/fortuneUserSummary.ts')
+          s=p.read_text()
+          old="""function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
+  const day = (context.calculation.western.daily_scores ?? []).find(row => row.date === context.calculation.period.start)
+  const evidence = day?.evidence ?? []
+  const wanted = new Set([...bestFlow, ...cautionFlow])
+  const ranked = evidence.flatMap(item => {
+    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => DAILY_HEADLINE_SCENE[topic]) : []
+    return topics.map(topic => ({ item, topic }))
+  }).sort((a,b)=>Math.abs(Number(b.item.contribution ?? 0))-Math.abs(Number(a.item.contribution ?? 0)))
+  const preferred = ranked.filter(row => wanted.has(row.topic))
+  const lead = (preferred.length ? preferred : ranked)[0]
+  if (!lead) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+"""
+          new="""function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
+  const focus = (context.focusTopics ?? []).find(topic => DAILY_HEADLINE_SCENE[topic])
+  if (!focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  const scene = DAILY_HEADLINE_SCENE[focus]
+  const level = flowLevel(topicStat(context, focus))
+  if (level === 'high') return `${focus}만 놓고 보면 오늘은 ${scene.use}`
+  if (level === 'low') return `${focus}만 놓고 보면 오늘은 ${scene.caution}`
+  const followThrough = DAILY_FOLLOW_THROUGH[focus] ?? '실제 반응이 어떻게 이어지는지 확인해.'
+  return `${focus}만 놓고 보면 오늘은 강하게 밀거나 피해야 할 신호가 뚜렷하지 않아. ${followThrough}`
+}
+
+function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
+  const day = (context.calculation.western.daily_scores ?? []).find(row => row.date === context.calculation.period.start)
+  const evidence = day?.evidence ?? []
+  const scopedTopics = new Set(context.focusTopics ?? [])
+  const wanted = new Set([...bestFlow, ...cautionFlow, ...scopedTopics])
+  const ranked = evidence.flatMap(item => {
+    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => DAILY_HEADLINE_SCENE[topic] && (!scopedTopics.size || scopedTopics.has(topic))) : []
+    return topics.map(topic => ({ item, topic }))
+  }).sort((a,b)=>Math.abs(Number(b.item.contribution ?? 0))-Math.abs(Number(a.item.contribution ?? 0)))
+  const preferred = ranked.filter(row => wanted.has(row.topic))
+  const lead = (preferred.length ? preferred : ranked)[0]
+  if (!lead) return focusedDayFallback(context, bestFlow, cautionFlow)
+"""
+          if old not in s: raise SystemExit('missing daily scope anchor')
+          s=s.replace(old,new,1)
+          old="""  const phase = applying
+    ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
+    : exact
+      ? '오늘은 이 주제가 가장 또렷하게 드러나는 구간이야.'
+      : '오늘은 이 흐름의 영향이 이어지는 구간이야.'
+  const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
+"""
+          new="""  const phase = applying
+    ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
+    : exact
+      ? '오늘은 이 주제가 가장 또렷하게 드러나는 구간이야.'
+      : '오늘은 이 흐름의 영향이 이어지는 구간이야.'
+  if (!scopedTopics.size) {
+    const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== lead.topic && DAILY_HEADLINE_SCENE[topic])
+    const secondaryText = secondary
+      ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}`
+      : ''
+    return `오늘 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}이야. ${sceneText} ${phase}${secondaryText}`
+  }
+  const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
+"""
+          if old not in s: raise SystemExit('missing daily overall anchor')
+          s=s.replace(old,new,1)
+          old="""function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
+  const startMs = Date.parse(`${context.calculation.period.start}T00:00:00Z`)
+"""
+          new="""function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
+  const scopedTopics = new Set(context.focusTopics ?? [])
+  const startMs = Date.parse(`${context.calculation.period.start}T00:00:00Z`)
+"""
+          if old not in s: raise SystemExit('missing weekly scope start anchor')
+          s=s.replace(old,new,1)
+          old="""      for (const topic of item.source_topics ?? []) {
+        if (!WEEKLY_HEADLINE_SCENE[topic]) continue
+"""
+          new="""      for (const topic of item.source_topics ?? []) {
+        if (!WEEKLY_HEADLINE_SCENE[topic] || (scopedTopics.size && !scopedTopics.has(topic))) continue
+"""
+          if old not in s: raise SystemExit('missing weekly scope filter anchor')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          t=Path('web/src/lib/systemReading.test.mjs')
+          s=t.read_text()
+          anchor="""test('crosswalk accepts exact engine names only and never creates missing meanings',()=>{
+"""
+          insert="""test('today topic headlines stay inside the selected field and overall is not copied from love',()=>{
+ const f=fixture('today')
+ const day=f.calculation.western.daily_scores.find(row=>row.date===f.calculation.period.start)
+ day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]
+ const overall=summary.buildFortuneUserSummary(f.data,{...f.context,topicEntries:Object.entries(f.data.topic_analysis)})
+ const loveTopics=['연애','연락','재회']
+ const love=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:loveTopics,topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>loveTopics.includes(topic))})
+ const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})
+ assert.notEqual(overall.headline,love.headline)
+ assert.match(overall.headline,/전체 흐름/)
+ assert.match(condition.headline,/컨디션/)
+ assert.doesNotMatch(condition.headline,/연락|답장|대화/)
+})
+
+test('weekly focused headlines ignore evidence from other life topics',()=>{
+ const f=fixture('week')
+ for(const day of f.calculation.western.daily_scores) day.evidence=[{source_topics:['연락'],transit:'Mercury',target:'Moon',aspect:'trine',contribution:99,polarity:1,motion:'Applying'}]
+ const condition=summary.buildFortuneUserSummary(f.data,{...f.context,focusTopics:['컨디션'],topicEntries:Object.entries(f.data.topic_analysis).filter(([topic])=>topic==='컨디션')})
+ assert.doesNotMatch(condition.headline,/연락|답장|대화/)
+})
+
+"""+anchor
+          if anchor not in s: raise SystemExit('missing test insert anchor')
+          t.write_text(s.replace(anchor,insert,1))
+          PY
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Run focused regression tests
+        working-directory: web
+        run: |
+          node --test src/lib/systemReading.test.mjs
+          node --experimental-strip-types --test src/lib/interpretationUiContract.test.mjs
+      - name: Build web
+        working-directory: web
+        run: npm run build
+      - name: Commit source after tests pass
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/fortuneUserSummary.ts web/src/lib/systemReading.test.mjs
+          git diff --cached --check
+          git commit -m 'fix: keep fortune topic headlines scoped' || exit 0
+          git push origin HEAD:fix/daily-topic-scope-hotfix
