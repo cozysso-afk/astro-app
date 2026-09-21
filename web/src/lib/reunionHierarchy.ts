@@ -8,7 +8,7 @@ export type ReunionHierarchy = {
   version:string; as_of_date:string; score_meaning:string;
   validation:{status:string; checks:Array<{name:string;status:string;detail:string}>};
   stages:Record<string,{label:string;activation:number|null;candidate_count:number}>;
-  top_periods:ReunionPeriod[]; nearest_window:ReunionPeriod|null; past_windows:ReunionPeriod[];
+  top_periods:ReunionPeriod[]; nearest_window:ReunionPeriod|null; past_windows:ReunionPeriod[]; current_windows:ReunionPeriod[];
   limitations:string[];
   stability_structure?:{support:unknown[];obstacles:unknown[];policy:string};
 }
@@ -24,12 +24,17 @@ export function hierarchyView(raw: Record<string,unknown>|null|undefined):Reunio
   const nearest = value.nearest_window && futurePeriod(value.nearest_window,asOf)
     ? value.nearest_window
     : [...topPeriods].sort((a,b)=>a.date.localeCompare(b.date) || b.final-a.final)[0] ?? null
+  const pastWindows = Array.isArray(value.past_windows)
+    ? value.past_windows.filter((row)=>!asOf || row.date < asOf).sort((a,b)=>b.final-a.final || b.date.localeCompare(a.date)).slice(0,3)
+    : []
+  const currentWindows = Array.isArray(value.current_windows)
+    ? value.current_windows.filter((row)=>!asOf || (row.start <= asOf && row.end >= asOf)).sort((a,b)=>b.final-a.final || a.date.localeCompare(b.date)).slice(0,3)
+    : []
   return {
     ...value,
     top_periods: topPeriods,
     nearest_window: nearest,
-    past_windows: Array.isArray(value.past_windows)
-      ? value.past_windows.filter((row)=>!asOf || row.date < asOf)
-      : [],
+    past_windows: pastWindows,
+    current_windows: currentWindows,
   }
 }

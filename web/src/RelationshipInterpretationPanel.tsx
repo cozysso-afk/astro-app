@@ -230,7 +230,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     </div>
 
     {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">
-      <h3>지금부터의 재회 흐름</h3>
+      <h3>재회 흐름 타임라인</h3>
       {hierarchyData.validation?.status !== 'PASS' ? <p role="alert">계산 검증에 실패해 미래 후보와 해설을 보류했어.</p> : <>
         {hierarchyData.nearest_window ? <article className="relationship-pattern reunion-nearest-window">
           <h4>가장 가까운 활성창</h4>
@@ -277,7 +277,20 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         </div>
         <p className="reunion-initiative-closed"><b>누가 먼저 연락?</b> 현재 계산으로는 판정 보류. 상대측/내측 활성도 비교값은 실제 행동 방향이 아니어서 선연락 근거로 쓰지 않아.</p>
 
-        <h4>오늘 이후 후보 시기</h4>
+        <h4>지난 활성기 · 사후 확인용</h4>
+        <p className="reunion-score-meaning">기준일 이전에 같은 관문을 통과했던 구간이야. 실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용이며, 과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야.</p>
+        {hierarchyData.past_windows.map((w)=><article className="relationship-pattern reunion-past-window" key={`past:${w.start}:${w.stage}`}>
+          <b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>대표 날짜 {w.date} · 이미 지난 구간 · 보조지표 활성도 {w.final}</small>
+        </article>)}
+        {!hierarchyData.past_windows.length && <p>조회 범위 안에서 따로 비교할 지난 활성기가 없어.</p>}
+
+        <h4>현재 흐름</h4>
+        {hierarchyData.current_windows.map((w)=><article className="relationship-pattern reunion-current-window" key={`current:${w.start}:${w.stage}`}>
+          <b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>기준일 {hierarchyData.as_of_date} 포함 · 사건 확정 아님 · 보조지표 활성도 {w.final}</small>
+        </article>)}
+        {!hierarchyData.current_windows.length && <p>기준일이 포함된 공개 활성창은 없어. 현재 감정이나 행동이 없다는 뜻이 아니라, 계층 관문을 통과한 현재 후보가 없다는 뜻이야.</p>}
+
+        <h4>앞으로의 후보 시기</h4>
         {hierarchyData.top_periods.map((w)=><article className="relationship-pattern reunion-future-window" key={`${w.start}:${w.stage}`}>
           <b>{w.start} ~ {w.end} · {w.label} 후보 창</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>대표 날짜 {w.date} · 사건 확정일 아님 · 보조지표 활성도 {w.final}</small>
           <details><summary>왜 후보가 됐는지</summary><p>장기 배경과 중기 흐름이 먼저 겹친 뒤, 이 단계에 맞는 사건 촉발 신호까지 함께 통과했어.</p><small>기술값 · 장기 {w.components.long_term} · 중기 {w.components.mid_term} · 사건 촉발 {w.components.event_trigger} · 체계 교차 {w.components.cross_system} · 최종 {w.components.final}</small></details>
@@ -292,7 +305,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         {reunionV2?.repeat_risks?.conclusion && <p>{firstSentences(reunionV2.repeat_risks.conclusion, 2)}</p>}
         {hierarchyData.stability_structure && <p>구조 근거: 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수 자체는 재결합 확률이 아니야.</p>}
       </details>
-      <details className="reading-more reunion-past-audit"><summary>지난 활성기 · 사후검증용</summary>{hierarchyData.past_windows.length ? hierarchyData.past_windows.map((w)=><p key={`${w.start}:${w.stage}`}>{w.start} ~ {w.end} · {w.label} · {w.final}점</p>) : <p>분리해 표시할 지난 활성기가 없어.</p>}</details>
+
       <details className="reading-more"><summary>전문 근거·검증 범위</summary><p>Secondary Progression(세컨더리 프로그레션/2차 진행) · Solar Arc(솔라아크/태양호) · Transit(트랜짓·경과) · 다섯 행성 회귀 · 사주 절입</p><p>감정 활성 ≠ 연락 ≠ 만남 ≠ 재결합 ≠ 안정적 관계 유지</p>{hierarchyData.limitations.map(x=><p key={x}>{x}</p>)}{(hierarchyData.validation?.checks ?? []).filter((x)=>x.status!=='PASS').map((x)=><p key={x.name}>{x.name}: {x.status} — {x.detail}</p>)}</details>
     </section>}
 
