@@ -23,10 +23,10 @@ jobs:
           node-version: 22
       - name: Apply guarded patch
         run: python scripts/pr186_fix_period_hero_priority.py
-      - name: Run interpretation contract tests
-        run: node --experimental-strip-types --test web/src/lib/interpretationUiContract.test.mjs web/src/lib/humanLanguageV25.test.mjs
       - name: Install web dependencies
         run: npm --prefix web ci
+      - name: Run interpretation contract tests
+        run: node --experimental-strip-types --test web/src/lib/interpretationUiContract.test.mjs web/src/lib/humanLanguageV25.test.mjs
       - name: Build web
         run: npm --prefix web run build
       - name: Commit verified source changes
