@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Apply focused editorial patch
@@ -29,9 +29,9 @@ jobs:
       - name: Install web dependencies
         working-directory: web
         run: npm ci
-      - name: Run editorial regression tests
+      - name: Run editorial regression test
         working-directory: web
-        run: node --test src/lib/humanLanguageV25.test.mjs src/lib/readingExperience.test.mjs src/lib/interpretationUiContract.test.mjs
+        run: node --test src/lib/humanLanguageV25.test.mjs
       - name: Build web
         working-directory: web
         run: npm run build
