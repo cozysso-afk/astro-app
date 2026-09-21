@@ -585,6 +585,64 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   return `오늘 ${lead.topic}에서는 ${meaning}이 특히 두드러져 ${caution ? scene.caution : scene.use}`
 }
 
+// WEEKLY_HEADLINE_ARC_V24: a weekly fallback must describe movement across the week, not a daily sentence stretched to seven days.
+const WEEKLY_HEADLINE_SCENE: Record<string, { use: string; caution: string }> = {
+  금전:{use:'정산·예산을 정리하는 쪽',caution:'지출과 결제 조건을 다시 확인하는 쪽'},
+  학업:{use:'실제로 끝낼 공부 분량을 만드는 쪽',caution:'집중을 흩뜨리는 일을 줄이는 쪽'},
+  시험:{use:'문제를 풀며 실수 지점을 잡는 쪽',caution:'범위를 넓히기보다 정확도를 챙기는 쪽'},
+  직장:{use:'요청·담당자·마감을 구체화하는 쪽',caution:'애매한 책임을 바로 떠안지 않는 쪽'},
+  이직:{use:'직무·보상·일정을 비교하는 쪽',caution:'기분보다 실제 제안 조건을 확인하는 쪽'},
+  대인관계:{use:'대화를 실제 약속과 일정으로 잇는 쪽',caution:'말투 하나보다 이후 태도를 확인하는 쪽'},
+  연애:{use:'호감을 실제 만남과 약속으로 확인하는 쪽',caution:'호감 표현 하나에 의미를 앞서 붙이지 않는 쪽'},
+  연락:{use:'답하기 쉬운 말로 대화를 구체화하는 쪽',caution:'답장 속도를 관계 결론으로 확대하지 않는 쪽'},
+  재회:{use:'추억보다 실제 대화와 달라진 태도를 확인하는 쪽',caution:'과거가 떠오르는 것과 재시작을 구분하는 쪽'},
+  소식:{use:'원문·답변·공식 안내를 직접 확인하는 쪽',caution:'중간 정보만으로 결과를 확정하지 않는 쪽'},
+  컨디션:{use:'집중할 일정과 쉴 시간을 나누는 쪽',caution:'한 주 내내 같은 속도로 밀지 않는 쪽'},
+  투자심리:{use:'매수 욕구와 실제 근거를 분리하는 쪽',caution:'조급함 때문에 원래 기준을 바꾸지 않는 쪽'},
+  수익실현:{use:'목표와 보유 이유를 다시 맞춰 보는 쪽',caution:'기분만으로 정리 시점을 정하지 않는 쪽'},
+  신규진입:{use:'진입 조건과 손실 한도를 확인하는 쪽',caution:'놓칠까 봐 위험 한도를 넓히지 않는 쪽'},
+  투자주의:{use:'포지션과 감당할 손실 범위를 점검하는 쪽',caution:'경계가 약해 보여도 안전하다고 가정하지 않는 쪽'},
+}
+
+function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
+  const startMs = Date.parse(`${context.calculation.period.start}T00:00:00Z`)
+  const endMs = Date.parse(`${context.calculation.period.end}T00:00:00Z`)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return ''
+  const totalDays = Math.max(1, Math.floor((endMs-startMs)/86400000)+1)
+  const phase = (date:string) => {
+    const ms = Date.parse(`${date}T00:00:00Z`)
+    const ratio = Number.isFinite(ms) ? (Math.floor((ms-startMs)/86400000)+0.5)/totalDays : 0
+    return ratio <= 1/3 ? '초반' : ratio <= 2/3 ? '중반' : '후반'
+  }
+  const bestByPhase = new Map<string,{topic:string; item:FortuneDailyEvidence; strength:number}>()
+  for (const day of context.calculation.western.daily_scores ?? []) {
+    if (day.date < context.calculation.period.start || day.date > context.calculation.period.end) continue
+    for (const item of day.evidence ?? []) {
+      for (const topic of item.source_topics ?? []) {
+        if (!WEEKLY_HEADLINE_SCENE[topic]) continue
+        const strength = Math.abs(Number(item.contribution ?? 0))
+        const key = phase(day.date)
+        const current = bestByPhase.get(key)
+        if (!current || strength > current.strength) bestByPhase.set(key,{topic,item,strength})
+      }
+    }
+  }
+  const beats = ['초반','중반','후반'].flatMap(label => {
+    const hit = bestByPhase.get(label)
+    if (!hit) return []
+    const key = hit.item.transit && SYMBOLS[hit.item.transit] ? hit.item.transit : hit.item.target && SYMBOLS[hit.item.target] ? hit.item.target : ''
+    const meaning = key ? SYMBOLS[key]?.[1] : ''
+    const scene = WEEKLY_HEADLINE_SCENE[hit.topic]
+    if (!meaning || !scene) return []
+    const polarity = Number(hit.item.polarity ?? 0)
+    return [{label,topic:hit.topic,meaning,scene:polarity < 0 ? scene.caution : scene.use}]
+  })
+  if (beats.length < 2) return ''
+  const clauses = beats.map(beat=>`${beat.label}에는 ${beat.topic}에서 ${beat.meaning}이 두드러져 ${beat.scene}`)
+  if (clauses.length === 2) return `${clauses[0]}으로 시작해서, ${clauses[1]}으로 무게가 옮겨가는 주야.`
+  return `${clauses[0]}으로 시작하고, ${clauses[1]}, ${clauses[2]}으로 이어지는 주야.`
+}
+
 function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext) {
   if (bestFlow.includes('재회')) {
     const otherBest = bestFlow.filter(topic => topic !== '재회')
@@ -601,6 +659,10 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
   if (when === '오늘') {
     const scene = dayEvidenceHeadline(context, bestFlow, cautionFlow)
     if (scene) return scene
+  }
+  if (when === '이번 주') {
+    const arc = weeklyEvidenceHeadline(context)
+    if (arc) return arc
   }
   return bestFlow.length && cautionFlow.length
     ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 괜찮지만, ${joinTopics(cautionFlow)} 쪽은 속도를 낮추는 편이 좋아.`

@@ -305,3 +305,19 @@ test('daily fallback headline uses the strongest linked evidence as a concrete s
   assert.match(view.headline,/실제 약속이나 일정/)
   assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|평소 계획을 유지하면서/)
 })
+
+
+test('weekly fallback headline tells a multi-day arc instead of reusing the daily template',()=>{
+  const f=fortuneFixture('week')
+  f.calculation.western.daily_scores=[
+    {date:'2026-09-12',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-15',evidence:[{source_topics:['컨디션'],transit:'Mars',target:'Saturn',aspect:'square',contribution:4,polarity:-.7}]},
+    {date:'2026-09-18',evidence:[{source_topics:['이직'],transit:'Jupiter',target:'Sun',aspect:'trine',contribution:3,polarity:.5}]},
+  ]
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/초반에는/)
+  assert.match(view.headline,/중반에는/)
+  assert.match(view.headline,/후반에는/)
+  assert.match(view.headline,/이어지는 주야/)
+  assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
+})
