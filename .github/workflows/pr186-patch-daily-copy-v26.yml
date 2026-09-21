@@ -1,0 +1,45 @@
+name: PR186 daily copy v26 patch
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+    paths:
+      - '.github/workflows/pr186-patch-daily-copy-v26.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-hierarchy-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply guarded patch
+        run: python scripts/pr186_patch_daily_copy_v26.py
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Verify daily copy regression
+        run: node --experimental-strip-types --test web/src/lib/interpretationUiContract.test.mjs
+      - name: Re-run no-provider copy QA
+        working-directory: web
+        run: node --experimental-strip-types src/lib/pr186NoApiCopyQa.mjs
+      - name: Build web
+        working-directory: web
+        run: npm run build
+      - name: Commit verified source and test changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/fortuneUserSummary.ts web/src/lib/interpretationUiContract.test.mjs
+          git diff --cached --quiet && exit 1
+          git commit -m 'fix: make daily headline scene-first and less repetitive'
+          git push origin HEAD:fix/reunion-hierarchy-v2
