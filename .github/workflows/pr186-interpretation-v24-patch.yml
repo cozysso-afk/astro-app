@@ -1,0 +1,45 @@
+name: PR186 interpretation v24 patch
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+    paths:
+      - scripts/apply_interpretation_v24_human_language.py
+      - .github/workflows/pr186-interpretation-v24-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-hierarchy-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply guarded patch
+        run: python scripts/apply_interpretation_v24_human_language.py
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Targeted reading test
+        working-directory: web
+        run: node --experimental-strip-types --test src/lib/readingExperience.test.mjs
+      - name: Commit patched sources
+        run: |
+          if git diff --quiet -- web/src/lib/fortuneUserSummary.ts web/src/lib/readingExperience.test.mjs; then
+            echo 'No patch changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/fortuneUserSummary.ts web/src/lib/readingExperience.test.mjs
+          git commit -m 'feat: make daily fallback headline evidence-scene based'
+          git push origin HEAD:fix/reunion-hierarchy-v2
