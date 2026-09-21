@@ -40,7 +40,7 @@ test('display bands separate nearby scores without changing ranking thresholds',
   assert.match(fortune,/FLOW_BAND_V26/)
   assert.match(fortune,/score >= 52.*다소 강함/)
   assert.match(fortune,/score >= 38.*다소 약함/)
-  assert.match(fortune,/WEEKLY_ARC_COMPACT_V26/)
+  assert.match(fortune,/WEEKLY_ARC_COHERENCE_V27/)
   assert.doesNotMatch(fortune,/beat\.label\}에는 .*두드러져/)
 })
 
