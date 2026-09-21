@@ -1,4 +1,4 @@
-name: temporary reunion v12.4 diagnostic
+name: temporary reunion v12.4 fixture verifier
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - fix/reunion-hierarchy-v2
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  repair-and-test:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -19,18 +19,53 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
-      - name: Add diagnostic assertion messages without changing repository
+      - name: Refresh reunion runtime fixture for v12.4 depth and dedupe contract
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs')
           s=p.read_text()
-          s=s.replace("assert.equal(first.body.ok,true);assert.equal(first.body.data.headline", "assert.equal(first.body.ok,true,JSON.stringify(first.body));assert.equal(first.body.data.headline", 1)
-          s=s.replace("assert.equal(r.body.ok,true);assert.equal(h.requests.length,1);", "assert.equal(r.body.ok,true,JSON.stringify(r.body));assert.equal(h.requests.length,1);", 1)
+          anchor="const prose='합성 관계 근거와 설명입니다. '.repeat(40);"
+          insert=anchor+"\nconst reunionProse=tag=>`${tag}에서 계산 근거가 뜻하는 바와 현실에서 확인할 장면을 구분해서 설명한다. ${tag} 단계가 다음 단계와 어떻게 다른지도 함께 설명해 과장 없이 읽을 수 있게 한다. `.repeat(12);"
+          if 'const reunionProse=' not in s:
+              if anchor not in s: raise SystemExit('missing prose anchor')
+              s=s.replace(anchor,insert,1)
+          replacements=[
+            ("reunion_synthesis_v2:{summary:prose,why_reconnect:{conclusion:prose,interpretation:prose,", "reunion_synthesis_v2:{summary:reunionProse('재회 전체 요약'),why_reconnect:{conclusion:reunionProse('다시 신경 쓰이는 이유 결론'),interpretation:reunionProse('다시 신경 쓰이는 이유 해설'),"),
+            ("initiative:{conclusion:prose,interpretation:prose,", "initiative:{conclusion:reunionProse('선연락 주체 결론'),interpretation:reunionProse('선연락 주체 해설'),"),
+            ("timing:{conclusion:prose,windows:[{period:'2027-01',meaning:prose,", "timing:{conclusion:reunionProse('현재 단계와 다음 단계'),windows:[{period:'2027-01',meaning:reunionProse('후보 시기 의미'),"),
+            ("rebuild:{conclusion:prose,conditions:[prose],", "rebuild:{conclusion:reunionProse('관계 재구축 조건'),conditions:[reunionProse('재구축 확인 장면')],"),
+            ("repeat_risks:{conclusion:prose,patterns:[prose],", "repeat_risks:{conclusion:reunionProse('반복 위험 결론'),patterns:[reunionProse('반복 위험 장면')],"),
+            ("convergence:[],precision_note:prose},marriage_reading:", "convergence:[],precision_note:reunionProse('정밀도 안내')},marriage_reading:"),
+          ]
+          for old,new in replacements:
+              if old not in s: raise SystemExit(f'missing fixture anchor: {old}')
+              s=s.replace(old,new,1)
           p.write_text(s)
           PY
-      - name: Run reunion runtime test with diagnostics
-        run: node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Run reunion runtime and grounding regressions
+        run: |
+          node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+          node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.test.mjs
+          node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+          node --experimental-strip-types --test web/src/lib/interpretationUiContract.test.mjs
+          node --test web/src/lib/relationshipModeContract.test.mjs
+          node --test web/src/lib/relationshipEvidencePipeline.test.mjs
+      - name: Production web build
+        working-directory: web
+        run: npm run build
+      - name: Commit only after regressions and build pass
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No fixture changes to commit'
+          else
+            git commit -m 'test: align reunion runtime fixture with v12.4 narrative contract'
+            git push origin HEAD:fix/reunion-hierarchy-v2
+          fi
