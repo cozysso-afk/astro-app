@@ -30,7 +30,8 @@ test('no relationship domain bonus; investment risk polarity is caution only', (
   assert.deepEqual(view.bestFlow,['대인관계','이직'])
   assert.equal(view.cautionFlow[0],'투자주의')
   assert.ok(!view.favorableCards.some(x=>x.topic==='투자주의'))
-  assert.match(view.headline,/사람 관계와 이직 조건/)
+  assert.match(view.headline,/대인관계/)
+  assert.match(view.headline,/실제 약속이나 일정/)
 })
 test('compact flow cards have score, band and one topic-specific meaning; overflow stays available', () => {
   const {data,context}=fortuneFixture()
@@ -285,4 +286,13 @@ test('many communication aspects cannot crowd out stability and mixed role copy 
   assert.equal(rows.filter(p=>p.role==='communication').length,1)
   assert.match(rows.find(p=>p.role==='communication').conclusion,/말이 어긋나는/)
   assert.equal(new Set(rows.map(p=>p.title)).size,rows.length)
+})
+
+
+test('daily fallback headline uses the strongest linked evidence as a concrete scene',()=>{
+  const f=fortuneFixture('today')
+  const view=buildFortuneUserSummary(f.data,f.context)
+  assert.match(view.headline,/생각을 정리하고 말을 주고받는 방식/)
+  assert.match(view.headline,/실제 약속이나 일정/)
+  assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|평소 계획을 유지하면서/)
 })
