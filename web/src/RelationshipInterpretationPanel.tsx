@@ -233,6 +233,16 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
           <small>핵심 날짜 {hierarchyData.nearest_window.date} · 보조지표 활성도 {hierarchyData.nearest_window.final}</small>
         </article> : <p>오늘 이후 조회 기간에는 장기·중기·단기 조건을 모두 통과한 활성창이 없어.</p>}
 
+        {typeof view.reconnection.score === 'number' && <section className="reunion-ai-block reunion-contact-indicators">
+          <h4>연락 가능성 · 보조지표</h4>
+          <div className="reunion-return-context-grid">
+            <article className="reunion-return-context-card"><b>재접촉 활성도</b><strong>{view.reconnection.score}/100</strong><small>{view.reconnection.band}</small></article>
+            {typeof view.incoming.score === 'number' && <article className="reunion-return-context-card"><b>상대측 반응 활성도</b><strong>{view.incoming.score}/100</strong><small>{view.incoming.band}</small></article>}
+            {typeof view.outgoing.score === 'number' && <article className="reunion-return-context-card"><b>내측 연락 적합도</b><strong>{view.outgoing.score}/100</strong><small>{view.outgoing.band}</small></article>}
+          </div>
+          <p className="reunion-score-meaning">숫자는 같은 조회 기간 안에서 신호가 얼마나 활성돼 있는지 비교하는 보조지표야. 실제 연락 확률·재회 확률이나 누가 먼저 연락할 확률이 아니야.</p>
+        </section>}
+
         {ai?.ok && ai.data && reunionV2 && <section className="reunion-human-narrative reunion-ai-block">
           <h4>지금 두 사람 사이에서 살아 있는 흐름</h4>
           <ReadableCopy className="reading-conclusion" text={reunionV2.summary}/>

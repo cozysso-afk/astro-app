@@ -319,6 +319,43 @@ test('weekly fallback headline tells a multi-day arc instead of reusing the dail
   assert.match(view.headline,/초반엔/)
   assert.match(view.headline,/중반엔/)
   assert.match(view.headline,/후반엔/)
-  assert.match(view.headline,/마무리되는 주야/)
-  assert.doesNotMatch(view.headline,/두드러져|하는 쪽|보는 쪽|힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
+  assert.match(view.headline,/마무리돼/)
+  assert.doesNotMatch(view.headline,/두드러져|하는 데 흐름을 거쳐|하는 데 마무리|힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
+})
+
+
+test('daily separating evidence reads as follow-through, not a fresh peak',()=>{
+  const f=fortuneFixture('today')
+  f.calculation.western.daily_scores[0].evidence[0].motion='Separating'
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/정점은 지났으니/)
+  assert.match(view.headline,/이미 시작된 일과 반응/)
+  assert.doesNotMatch(view.headline,/좋은 날이야.*정점은 지났|좋은 편이야.*정점은 지났/)
+})
+
+test('weekly repeated mid-late scene collapses and keeps grammatical phase relations',()=>{
+  const f=fortuneFixture('week')
+  f.calculation.western.daily_scores=[
+    {date:'2026-09-12',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:4,polarity:.7}]},
+    {date:'2026-09-13',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:4,polarity:.7}]},
+    {date:'2026-09-14',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-15',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-16',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-17',evidence:[{source_topics:['직장'],transit:'Mars',target:'Moon',aspect:'sextile',contribution:4,polarity:.7}]},
+    {date:'2026-09-18',evidence:[{source_topics:['직장'],transit:'Mars',target:'Moon',aspect:'sextile',contribution:4,polarity:.7}]},
+  ]
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/중반부터 후반까지/)
+  assert.equal((view.headline.match(/요청·담당자·마감/g)||[]).length,1)
+  assert.doesNotMatch(view.headline,/하는 데 흐름을 거쳐|하는 데 마무리/)
+})
+
+test('reunion keeps numeric activation as a secondary indicator instead of hiding it',()=>{
+  const view=relationship('reunion')
+  assert.equal(typeof view.reconnection.score,'number')
+  assert.equal(typeof view.incoming.score,'number')
+  assert.equal(typeof view.outgoing.score,'number')
+  const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/연락 가능성 · 보조지표/)
+  assert.match(panel,/실제 연락 확률·재회 확률/)
 })

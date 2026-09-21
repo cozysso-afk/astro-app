@@ -128,7 +128,7 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     }
     const point = band === '약함' ? stat?.caution_days?.[0] : stat?.best_days?.[0]
     const timing = stat && stat.spread > 0 && point && input.timing && point.date >= input.timing.period.start && point.date <= input.timing.period.end ? point.date : undefined
-    return { band, text: band === '정보 부족' ? '이 방향을 판단할 계산 정보가 없어. 다른 방향의 점수로 대신하지 않을게.' : copy[kind][band], timing }
+    return { score: typeof score === 'number' && Number.isFinite(score) ? Math.round(score) : undefined, band, text: band === '정보 부족' ? '이 방향을 판단할 계산 정보가 없어. 다른 방향의 점수로 대신하지 않을게.' : copy[kind][band], timing }
   }
   const incoming = direction(input.timing?.incoming, 'incoming')
   const outgoing = direction(input.timing?.outgoing, 'outgoing')

@@ -636,13 +636,17 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   const sceneText = caution ? scene.caution : scene.use
   const trigger = (key && DAILY_SYMBOL_FOCUS[key]) || '당일'
   const motion = String(lead.item.motion ?? '')
-  const phase = /Applying|적용/i.test(motion)
-    ? `${trigger} 자극도 아직 커지는 중이야.`
-    : /Exact|정확/i.test(motion)
+  const applying = /Applying|적용/i.test(motion)
+  const exact = /Exact|정확/i.test(motion)
+  const separating = /Separating|분리/i.test(motion)
+  if (separating) {
+    return `${lead.topic}에서 오늘 남아 있는 핵심은 ${focus}이야. ${trigger} 자극의 정점은 지났으니, 새로 밀어붙이기보다 이미 시작된 일과 반응이 실제 행동으로 어떻게 이어지는지 확인해.`
+  }
+  const phase = applying
+    ? `${trigger} 자극도 아직 커지는 중이라 첫 반응 하나보다 흐름이 이어지는지를 봐.`
+    : exact
       ? `${trigger} 자극이 오늘 특히 또렷해.`
-      : /Separating|분리/i.test(motion)
-        ? `${trigger} 자극의 정점은 지났지만 여운이 남아 있어.`
-        : `${trigger} 자극이 오늘 체감에 남아 있어.`
+      : `${trigger} 자극이 오늘 체감에 남아 있어.`
   const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
   if (variant === 0) return `${sceneText} 오늘 ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}`
   if (variant === 1) return `${lead.topic}에서 오늘 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}`
@@ -711,14 +715,17 @@ function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
     return [{label,topic:hit.topic,meaning,scene:polarity < 0 ? scene.caution : scene.use}]
   })
   if (beats.length < 2) return ''
-  // WEEKLY_ARC_COMPACT_V26: keep the arc, drop repeated '쪽/두드러져' scaffolding.
-  const compactScene = (scene: string) => scene
-    .replace(/하는 쪽$/, '하는 데')
-    .replace(/보는 쪽$/, '보는 데')
-    .replace(/는 쪽$/, '는 데')
-  const clauses = beats.map(beat=>`${beat.label}엔 ${beat.topic}에서 ${compactScene(beat.scene)}`)
-  if (clauses.length === 2) return `${clauses[0]} 힘이 실리고, ${clauses[1]} 무게가 옮겨가.`
-  return `${clauses[0]} 힘이 실리고, ${clauses[1]} 흐름을 거쳐, ${clauses[2]} 마무리되는 주야.`
+  // WEEKLY_ARC_COHERENCE_V27: each phase owns a complete clause; repeated adjacent scenes collapse.
+  const task = (scene: string) => scene.replace(/쪽$/, '일')
+  const sameBeat = (a: typeof beats[number], b: typeof beats[number]) => a.topic === b.topic && a.scene === b.scene
+  const phrase = (beat: typeof beats[number]) => `${beat.topic}에서 ${task(beat.scene)}`
+  if (beats.length === 2) {
+    if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야.`
+    return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 돼.`
+  }
+  if (sameBeat(beats[1], beats[2])) return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}부터 ${beats[2].label}까지는 ${phrase(beats[1])}이 중심이야.`
+  if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야. ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.`
+  return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 되고, ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.`
 }
 
 function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext) {
