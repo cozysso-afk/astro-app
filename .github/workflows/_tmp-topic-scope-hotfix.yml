@@ -71,10 +71,15 @@ jobs:
 
           u=Path('web/src/lib/interpretationUiContract.test.mjs')
           s=u.read_text()
-          old='  assert.match(joined,/대화의 요점과 실제 합의/)'
-          new='  assert.match(joined,/대인관계.*필요한 말이 실제 약속이나 일정|필요한 말이 실제 약속이나 일정/)'
-          if old not in s: raise SystemExit('missing interpretation stale assertion')
-          u.write_text(s.replace(old,new,1))
+          replacements=[
+            ('  assert.match(joined,/대화의 요점과 실제 합의/)','  assert.match(joined,/대인관계.*필요한 말이 실제 약속이나 일정|필요한 말이 실제 약속이나 일정/)'),
+            ('  assert.match(joined,/실제 진도로 옮기는 것/)','  assert.match(joined,/학업.*실제로 끝낸 분량|실제로 끝낸 분량/)'),
+            ('  assert.match(joined,/질문과 답장이 실제 대화로 이어지는지 보는 것/)','  assert.match(joined,/연락.*안부·질문·일정|안부·질문·일정/)'),
+          ]
+          for old,new in replacements:
+            if old not in s: raise SystemExit('missing interpretation stale assertion: '+old)
+            s=s.replace(old,new,1)
+          u.write_text(s)
           PY
       - name: Install web dependencies
         working-directory: web
