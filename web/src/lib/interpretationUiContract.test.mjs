@@ -323,9 +323,9 @@ test('daily scene headline changes its language by domain even when the same pla
   assert.equal(new Set(rows).size,rows.length)
   const joined=rows.join('\n')
   assert.doesNotMatch(joined,/생각을 정리하고 말을 주고받는 방식이 특히 두드러지고|변화이 특히|에 힘을 쓰기 괜찮지만/)
-  assert.match(joined,/대화의 요점과 실제 합의/)
-  assert.match(joined,/실제 진도로 옮기는 것/)
-  assert.match(joined,/질문과 답장이 실제 대화로 이어지는지 보는 것/)
+  assert.match(joined,/대인관계.*필요한 말이 실제 약속이나 일정|필요한 말이 실제 약속이나 일정/)
+  assert.match(joined,/학업.*실제로 끝낸 분량|실제로 끝낸 분량/)
+  assert.match(joined,/연락.*안부·질문·일정|안부·질문·일정/)
 })
 
 test('A/B: study leads favorable flow while relationship weakness stays in caution', () => {

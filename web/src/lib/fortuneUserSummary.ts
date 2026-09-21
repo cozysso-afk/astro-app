@@ -626,17 +626,29 @@ const DAILY_FOLLOW_THROUGH: Record<string,string> = {
   투자주의:'이미 정한 위험 한도 안에서 움직이고 있는지 확인해.',
 }
 
+function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
+  const focus = (context.focusTopics ?? []).find(topic => DAILY_HEADLINE_SCENE[topic])
+  if (!focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  const scene = DAILY_HEADLINE_SCENE[focus]
+  const level = flowLevel(topicStat(context, focus))
+  if (level === 'high') return `${focus}만 놓고 보면 오늘은 ${scene.use}`
+  if (level === 'low') return `${focus}만 놓고 보면 오늘은 ${scene.caution}`
+  const followThrough = DAILY_FOLLOW_THROUGH[focus] ?? '실제 반응이 어떻게 이어지는지 확인해.'
+  return `${focus}만 놓고 보면 오늘은 강하게 밀거나 피해야 할 신호가 뚜렷하지 않아. ${followThrough}`
+}
+
 function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
   const day = (context.calculation.western.daily_scores ?? []).find(row => row.date === context.calculation.period.start)
   const evidence = day?.evidence ?? []
-  const wanted = new Set([...bestFlow, ...cautionFlow])
+  const scopedTopics = new Set(context.focusTopics ?? [])
+  const wanted = new Set([...bestFlow, ...cautionFlow, ...scopedTopics])
   const ranked = evidence.flatMap(item => {
-    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => DAILY_HEADLINE_SCENE[topic]) : []
+    const topics = Array.isArray(item.source_topics) ? item.source_topics.filter(topic => DAILY_HEADLINE_SCENE[topic] && (!scopedTopics.size || scopedTopics.has(topic))) : []
     return topics.map(topic => ({ item, topic }))
   }).sort((a,b)=>Math.abs(Number(b.item.contribution ?? 0))-Math.abs(Number(a.item.contribution ?? 0)))
   const preferred = ranked.filter(row => wanted.has(row.topic))
   const lead = (preferred.length ? preferred : ranked)[0]
-  if (!lead) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  if (!lead) return focusedDayFallback(context, bestFlow, cautionFlow)
   const scene = DAILY_HEADLINE_SCENE[lead.topic]
   const focus = DAILY_EVIDENCE_FOCUS[lead.topic]
   if (!scene || !focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
@@ -656,6 +668,11 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
     : exact
       ? '오늘은 이 주제가 가장 또렷하게 드러나는 구간이야.'
       : '오늘은 이 흐름의 영향이 이어지는 구간이야.'
+  if (!scopedTopics.size) {
+    const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== lead.topic && DAILY_HEADLINE_SCENE[topic])
+    const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''
+    return `오늘 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}이야. ${sceneText} ${phase}${secondaryText}`
+  }
   const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
   if (variant === 0) return `${sceneText} 오늘 ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}`
   if (variant === 1) return `${lead.topic}에서 오늘 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}`
@@ -691,6 +708,7 @@ const WEEKLY_HEADLINE_SCENE: Record<string, { use: string; caution: string }> = 
 }
 
 function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
+  const scopedTopics = new Set(context.focusTopics ?? [])
   const startMs = Date.parse(`${context.calculation.period.start}T00:00:00Z`)
   const endMs = Date.parse(`${context.calculation.period.end}T00:00:00Z`)
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return ''
@@ -705,7 +723,7 @@ function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
     if (day.date < context.calculation.period.start || day.date > context.calculation.period.end) continue
     for (const item of day.evidence ?? []) {
       for (const topic of item.source_topics ?? []) {
-        if (!WEEKLY_HEADLINE_SCENE[topic]) continue
+        if (!WEEKLY_HEADLINE_SCENE[topic] || (scopedTopics.size && !scopedTopics.has(topic))) continue
         const strength = Math.abs(Number(item.contribution ?? 0))
         const key = phase(day.date)
         const current = bestByPhase.get(key)
