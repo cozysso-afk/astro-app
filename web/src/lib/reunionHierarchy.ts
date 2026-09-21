@@ -12,7 +12,24 @@ export type ReunionHierarchy = {
   limitations:string[];
   stability_structure?:{support:unknown[];obstacles:unknown[];policy:string};
 }
+
+const isoDay = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
+const futurePeriod = (row: ReunionPeriod, asOf: string) => !asOf || (!!isoDay(row.date) && row.date >= asOf)
+
 export function hierarchyView(raw: Record<string,unknown>|null|undefined):ReunionHierarchy|null {
   if(!raw || typeof raw.version!=='string' || !Array.isArray(raw.top_periods) || !raw.validation) return null
-  return raw as unknown as ReunionHierarchy
+  const value = raw as unknown as ReunionHierarchy
+  const asOf = isoDay(value.as_of_date)
+  const topPeriods = value.top_periods.filter((row)=>futurePeriod(row,asOf)).slice(0,3)
+  const nearest = value.nearest_window && futurePeriod(value.nearest_window,asOf)
+    ? value.nearest_window
+    : [...topPeriods].sort((a,b)=>a.date.localeCompare(b.date) || b.final-a.final)[0] ?? null
+  return {
+    ...value,
+    top_periods: topPeriods,
+    nearest_window: nearest,
+    past_windows: Array.isArray(value.past_windows)
+      ? value.past_windows.filter((row)=>!asOf || row.date < asOf)
+      : [],
+  }
 }
