@@ -1,0 +1,36 @@
+name: temporary reunion v12.4 diagnostic
+
+on:
+  push:
+    branches:
+      - fix/reunion-hierarchy-v2
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Add diagnostic assertion messages without changing repository
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs')
+          s=p.read_text()
+          s=s.replace("assert.equal(first.body.ok,true);assert.equal(first.body.data.headline", "assert.equal(first.body.ok,true,JSON.stringify(first.body));assert.equal(first.body.data.headline", 1)
+          s=s.replace("assert.equal(r.body.ok,true);assert.equal(h.requests.length,1);", "assert.equal(r.body.ok,true,JSON.stringify(r.body));assert.equal(h.requests.length,1);", 1)
+          p.write_text(s)
+          PY
+      - name: Run reunion runtime test with diagnostics
+        run: node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
