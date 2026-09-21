@@ -328,8 +328,9 @@ test('daily separating evidence reads as follow-through, not a fresh peak',()=>{
   const f=fortuneFixture('today')
   f.calculation.western.daily_scores[0].evidence[0].motion='Separating'
   const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
-  assert.match(view.headline,/정점은 지났으니/)
-  assert.match(view.headline,/이미 시작된 일과 반응/)
+  assert.match(view.headline,/가장 강했던 구간을 지나고 있어/)
+  assert.match(view.headline,/이미 오간 말이 실제 약속이나 행동으로 이어지는지/)
+  assert.doesNotMatch(view.headline,/자극|말·정리/)
   assert.doesNotMatch(view.headline,/좋은 날이야.*정점은 지났|좋은 편이야.*정점은 지났/)
 })
 
@@ -346,7 +347,7 @@ test('weekly repeated mid-late scene collapses and keeps grammatical phase relat
   ]
   const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
   assert.match(view.headline,/중반부터 후반까지/)
-  assert.equal((view.headline.match(/요청·담당자·마감/g)||[]).length,1)
+  assert.equal((view.headline.match(/누가 무엇을 언제까지 맡을지/g)||[]).length,1)
   assert.doesNotMatch(view.headline,/하는 데 흐름을 거쳐|하는 데 마무리/)
 })
 
@@ -356,6 +357,7 @@ test('reunion keeps numeric activation as a secondary indicator instead of hidin
   assert.equal(typeof view.incoming.score,'number')
   assert.equal(typeof view.outgoing.score,'number')
   const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
-  assert.match(panel,/연락 가능성 · 보조지표/)
-  assert.match(panel,/실제 연락 확률·재회 확률/)
+  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
 })

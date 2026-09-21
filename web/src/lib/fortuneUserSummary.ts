@@ -590,26 +590,40 @@ function fallbackDayHeadline(context: FortuneUserSummaryContext, bestFlow: strin
 }
 
 const DAILY_EVIDENCE_FOCUS: Record<string,string> = {
-  금전:'돈의 순서와 책임을 정리하는 쪽',
-  학업:'읽고 정리한 내용을 실제 진도로 옮기는 쪽',
-  시험:'아는 내용을 시간 안에 정확히 꺼내 쓰는 쪽',
-  직장:'요청을 담당자·마감·책임으로 구체화하는 쪽',
-  이직:'변화 욕구를 직무·보상·일정 비교로 바꾸는 쪽',
-  대인관계:'대화의 요점과 실제 합의를 맞추는 쪽',
-  연애:'호감 표현을 약속과 실제 만남으로 연결하는 쪽',
-  연락:'말을 꺼내고 질문·답장을 이어가는 쪽',
-  재회:'과거 감정보다 실제 재접촉과 태도를 확인하는 쪽',
-  소식:'전해 들은 말보다 확정된 답과 다음 절차를 확인하는 쪽',
-  컨디션:'집중할 일정과 회복할 시간을 나눠 쓰는 쪽',
-  투자심리:'사고 싶은 마음과 실제 매매 근거를 분리하는 쪽',
-  수익실현:'목표와 보유 이유를 실제 조건에 다시 맞추는 쪽',
-  신규진입:'가격·손실 한도·진입 이유를 함께 확인하는 쪽',
-  투자주의:'수익 기대보다 감당할 손실 범위를 먼저 보는 쪽',
+  금전:'돈의 순서와 책임을 정리하는 것',
+  학업:'읽고 정리한 내용을 실제 진도로 옮기는 것',
+  시험:'아는 내용을 시간 안에 정확히 꺼내 쓰는 것',
+  직장:'업무 범위·담당·마감을 분명히 하는 것',
+  이직:'변화 욕구를 직무·보상·일정 비교로 바꾸는 것',
+  대인관계:'대화의 요점과 실제 합의를 맞추는 것',
+  연애:'호감 표현이 약속과 실제 만남으로 이어지는지 보는 것',
+  연락:'말을 꺼낸 뒤 질문과 답장이 실제 대화로 이어지는지 보는 것',
+  재회:'과거 감정보다 실제 재접촉과 달라진 태도를 확인하는 것',
+  소식:'전해 들은 말보다 확정된 답과 다음 절차를 확인하는 것',
+  컨디션:'집중할 일정과 회복할 시간을 나눠 쓰는 것',
+  투자심리:'사고 싶은 마음과 실제 매매 근거를 분리하는 것',
+  수익실현:'목표와 보유 이유를 실제 조건에 다시 맞추는 것',
+  신규진입:'가격·손실 한도·진입 이유를 함께 확인하는 것',
+  투자주의:'수익 기대보다 감당할 손실 범위를 먼저 보는 것',
 }
-const DAILY_SYMBOL_FOCUS: Record<string,string> = {
-  Sun:'목표·주도권', Moon:'감정·편안함', Mercury:'말·정리', Venus:'호감·조화', Mars:'행동·마찰',
-  Jupiter:'확장·선택', Saturn:'책임·제약', Uranus:'변화·변수', Neptune:'기대·상상', Pluto:'몰입·주도권',
-  'True Node':'관계·선택', 'North Node':'관계·선택',
+
+// DAILY_MOTION_HUMAN_V28: phase language stays human and domain-specific; internal planet shorthand never reaches the headline.
+const DAILY_FOLLOW_THROUGH: Record<string,string> = {
+  금전:'이미 잡아 둔 예산과 결제가 계획대로 처리되는지 확인해.',
+  학업:'이미 시작한 공부가 실제로 끝낸 분량으로 남는지 확인해.',
+  시험:'이미 풀어 본 문제에서 같은 실수가 반복되는지 확인해.',
+  직장:'이미 오간 업무 합의가 실제 담당과 일정으로 이어지는지 확인해.',
+  이직:'이미 나온 제안이나 대화가 구체적인 조건으로 이어지는지 확인해.',
+  대인관계:'이미 오간 말이 실제 약속이나 행동으로 이어지는지 확인해.',
+  연애:'이미 오간 호감 표현이 실제 약속이나 만남으로 이어지는지 확인해.',
+  연락:'이미 시작된 대화가 한두 번의 답장에서 끝나지 않고 이어지는지 확인해.',
+  재회:'떠오른 감정이 아니라 실제 연락과 달라진 행동이 이어지는지 확인해.',
+  소식:'이미 들어온 정보가 확정 답변이나 다음 절차로 이어지는지 확인해.',
+  컨디션:'이미 잡아 둔 일정이 무리 없이 이어지는지 몸 상태를 확인해.',
+  투자심리:'이미 세운 기준이 조급함 때문에 흔들리지 않는지 확인해.',
+  수익실현:'이미 정한 목표와 보유 이유가 지금 조건에도 맞는지 확인해.',
+  신규진입:'이미 정한 진입 조건과 손실 한도가 실제로 지켜지는지 확인해.',
+  투자주의:'이미 정한 위험 한도 안에서 움직이고 있는지 확인해.',
 }
 
 function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
@@ -623,30 +637,25 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   const preferred = ranked.filter(row => wanted.has(row.topic))
   const lead = (preferred.length ? preferred : ranked)[0]
   if (!lead) return fallbackDayHeadline(context, bestFlow, cautionFlow)
-  const key = lead.item.transit && SYMBOLS[lead.item.transit]
-    ? lead.item.transit
-    : lead.item.target && SYMBOLS[lead.item.target]
-      ? lead.item.target
-      : ''
   const scene = DAILY_HEADLINE_SCENE[lead.topic]
   const focus = DAILY_EVIDENCE_FOCUS[lead.topic]
   if (!scene || !focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
   const polarity = typeof lead.item.polarity === 'number' && Number.isFinite(lead.item.polarity) ? Math.sign(lead.item.polarity) : 0
   const caution = cautionFlow.includes(lead.topic) || polarity < 0
   const sceneText = caution ? scene.caution : scene.use
-  const trigger = (key && DAILY_SYMBOL_FOCUS[key]) || '당일'
   const motion = String(lead.item.motion ?? '')
   const applying = /Applying|적용/i.test(motion)
   const exact = /Exact|정확/i.test(motion)
   const separating = /Separating|분리/i.test(motion)
   if (separating) {
-    return `${lead.topic}에서 오늘 남아 있는 핵심은 ${focus}이야. ${trigger} 자극의 정점은 지났으니, 새로 밀어붙이기보다 이미 시작된 일과 반응이 실제 행동으로 어떻게 이어지는지 확인해.`
+    const followThrough = DAILY_FOLLOW_THROUGH[lead.topic] ?? '이미 시작된 일이 실제 행동으로 이어지는지 확인해.'
+    return `${lead.topic}에서 오늘 남아 있는 핵심은 ${focus}이야. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}`
   }
   const phase = applying
-    ? `${trigger} 자극도 아직 커지는 중이라 첫 반응 하나보다 흐름이 이어지는지를 봐.`
+    ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
     : exact
-      ? `${trigger} 자극이 오늘 특히 또렷해.`
-      : `${trigger} 자극이 오늘 체감에 남아 있어.`
+      ? '오늘은 이 주제가 가장 또렷하게 드러나는 구간이야.'
+      : '오늘은 이 흐름의 영향이 이어지는 구간이야.'
   const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
   if (variant === 0) return `${sceneText} 오늘 ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}`
   if (variant === 1) return `${lead.topic}에서 오늘 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}`
@@ -664,21 +673,21 @@ function daySummary(bestFlow: string[], cautionFlow: string[]) {
 
 // WEEKLY_HEADLINE_ARC_V24: a weekly fallback must describe movement across the week, not a daily sentence stretched to seven days.
 const WEEKLY_HEADLINE_SCENE: Record<string, { use: string; caution: string }> = {
-  금전:{use:'정산·예산을 정리하는 쪽',caution:'지출과 결제 조건을 다시 확인하는 쪽'},
-  학업:{use:'실제로 끝낼 공부 분량을 만드는 쪽',caution:'집중을 흩뜨리는 일을 줄이는 쪽'},
-  시험:{use:'문제를 풀며 실수 지점을 잡는 쪽',caution:'범위를 넓히기보다 정확도를 챙기는 쪽'},
-  직장:{use:'요청·담당자·마감을 구체화하는 쪽',caution:'애매한 책임을 바로 떠안지 않는 쪽'},
-  이직:{use:'직무·보상·일정을 비교하는 쪽',caution:'기분보다 실제 제안 조건을 확인하는 쪽'},
-  대인관계:{use:'대화를 실제 약속과 일정으로 잇는 쪽',caution:'말투 하나보다 이후 태도를 확인하는 쪽'},
-  연애:{use:'호감을 실제 만남과 약속으로 확인하는 쪽',caution:'호감 표현 하나에 의미를 앞서 붙이지 않는 쪽'},
-  연락:{use:'답하기 쉬운 말로 대화를 구체화하는 쪽',caution:'답장 속도를 관계 결론으로 확대하지 않는 쪽'},
-  재회:{use:'추억보다 실제 대화와 달라진 태도를 확인하는 쪽',caution:'과거가 떠오르는 것과 재시작을 구분하는 쪽'},
-  소식:{use:'원문·답변·공식 안내를 직접 확인하는 쪽',caution:'중간 정보만으로 결과를 확정하지 않는 쪽'},
-  컨디션:{use:'집중할 일정과 쉴 시간을 나누는 쪽',caution:'한 주 내내 같은 속도로 밀지 않는 쪽'},
-  투자심리:{use:'매수 욕구와 실제 근거를 분리하는 쪽',caution:'조급함 때문에 원래 기준을 바꾸지 않는 쪽'},
-  수익실현:{use:'목표와 보유 이유를 다시 맞춰 보는 쪽',caution:'기분만으로 정리 시점을 정하지 않는 쪽'},
-  신규진입:{use:'진입 조건과 손실 한도를 확인하는 쪽',caution:'놓칠까 봐 위험 한도를 넓히지 않는 쪽'},
-  투자주의:{use:'포지션과 감당할 손실 범위를 점검하는 쪽',caution:'경계가 약해 보여도 안전하다고 가정하지 않는 쪽'},
+  금전:{use:'정산과 예산의 우선순위를 정리하는 것',caution:'지출과 결제 조건을 다시 확인하는 것'},
+  학업:{use:'끝낼 공부 분량을 정하고 실제로 마치는 것',caution:'집중을 흩뜨리는 일을 줄이고 한 과제를 끝내는 것'},
+  시험:{use:'문제를 풀며 실수 원인을 확인하는 것',caution:'범위를 넓히기보다 정확도를 챙기는 것'},
+  직장:{use:'누가 무엇을 언제까지 맡을지 분명히 하는 것',caution:'책임 범위가 애매한 일을 바로 떠안지 않는 것'},
+  이직:{use:'직무·보상·시작 일정을 실제 조건으로 비교하는 것',caution:'기분보다 실제 제안 조건을 확인하는 것'},
+  대인관계:{use:'오간 대화를 실제 약속이나 일정으로 이어 보는 것',caution:'말투 하나보다 이후 태도와 행동을 확인하는 것'},
+  연애:{use:'호감 표현이 실제 약속과 만남으로 이어지는지 보는 것',caution:'호감 표현 하나에 관계의 의미를 앞서 붙이지 않는 것'},
+  연락:{use:'답하기 쉬운 말로 대화를 시작하고 실제로 이어 보는 것',caution:'답장 속도를 관계의 결론으로 확대하지 않는 것'},
+  재회:{use:'추억보다 실제 대화와 달라진 행동이 있는지 확인하는 것',caution:'과거가 떠오르는 것과 관계 재시작을 구분하는 것'},
+  소식:{use:'원문·답변·공식 안내를 직접 확인하는 것',caution:'중간 정보만으로 결과를 확정하지 않는 것'},
+  컨디션:{use:'집중할 일정과 쉴 시간을 나눠 배치하는 것',caution:'한 주 내내 같은 속도로 밀어붙이지 않는 것'},
+  투자심리:{use:'매수 욕구와 실제 근거를 분리하는 것',caution:'조급함 때문에 원래 기준을 바꾸지 않는 것'},
+  수익실현:{use:'목표와 보유 이유를 지금 조건에 다시 맞춰 보는 것',caution:'기분만으로 정리 시점을 정하지 않는 것'},
+  신규진입:{use:'진입 조건과 손실 한도를 함께 확인하는 것',caution:'놓칠까 봐 위험 한도를 넓히지 않는 것'},
+  투자주의:{use:'포지션과 감당할 손실 범위를 점검하는 것',caution:'경계가 약해 보여도 안전하다고 가정하지 않는 것'},
 }
 
 function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
@@ -715,10 +724,9 @@ function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
     return [{label,topic:hit.topic,meaning,scene:polarity < 0 ? scene.caution : scene.use}]
   })
   if (beats.length < 2) return ''
-  // WEEKLY_ARC_COHERENCE_V27: each phase owns a complete clause; repeated adjacent scenes collapse.
-  const task = (scene: string) => scene.replace(/쪽$/, '일')
+  // WEEKLY_ARC_HUMAN_V28: each phase is a complete real-life task, not a compressed checklist phrase.
   const sameBeat = (a: typeof beats[number], b: typeof beats[number]) => a.topic === b.topic && a.scene === b.scene
-  const phrase = (beat: typeof beats[number]) => `${beat.topic}에서 ${task(beat.scene)}`
+  const phrase = (beat: typeof beats[number]) => `${beat.topic}에서 ${beat.scene}`
   if (beats.length === 2) {
     if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야.`
     return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 돼.`

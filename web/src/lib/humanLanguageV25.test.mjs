@@ -28,10 +28,10 @@ test('hierarchy reunion shows a full human story before technical evidence',()=>
 })
 
 test('rich reunion prose has a new cache contract and explicit depth instruction',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.3-rich-human-narrative"/)
-  assert.match(cache,/relationship-v12\.3-rich-human-narrative-v1/)
-  assert.match(edge,/summary는 4~6문장/)
-  assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 5~8문장/)
+  assert.match(edge,/REUNION_VERSION="relationship-v12\.4-stage-grounded-narrative"/)
+  assert.match(cache,/relationship-v12\.4-stage-grounded-narrative-v1/)
+  assert.match(edge,/summary는 5~7문장/)
+  assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 6~9문장/)
   assert.match(edge,/오브와 전문용어 나열은 기술 근거로 밀어라/)
 })
 
@@ -40,7 +40,7 @@ test('display bands separate nearby scores without changing ranking thresholds',
   assert.match(fortune,/FLOW_BAND_V26/)
   assert.match(fortune,/score >= 52.*다소 강함/)
   assert.match(fortune,/score >= 38.*다소 약함/)
-  assert.match(fortune,/WEEKLY_ARC_COHERENCE_V27/)
+  assert.match(fortune,/WEEKLY_ARC_HUMAN_V28/)
   assert.doesNotMatch(fortune,/beat\.label\}에는 .*두드러져/)
 })
 
@@ -51,4 +51,28 @@ test('reunion dates are framed as candidate windows and QA labels stay minimal',
   assert.match(qa,/2026-10-21 전후/)
   assert.match(qa,/해당 단계의 장기·중기·사건 촉발 근거가 함께 통과하는 기간/)
   assert.doesNotMatch(qa,/QA fixture · 재회운 사람말 본문/)
+})
+
+test('daily and weekly hero copy never leaks internal shorthand or checklist nouns',()=>{
+  assert.doesNotMatch(fortune,/DAILY_SYMBOL_FOCUS/)
+  assert.doesNotMatch(fortune,/말·정리 자극|목표·주도권 자극|책임·제약 자극/)
+  assert.match(fortune,/누가 무엇을 언제까지 맡을지 분명히 하는 것/)
+  assert.doesNotMatch(fortune,/요청·담당자·마감을 구체화하는 쪽/)
+})
+
+test('hierarchy numeric support uses stage-gated candidates rather than generic direction scores',()=>{
+  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/contact_recontact/)
+  assert.match(panel,/미래 후보 \$\{stage\.candidate_count\}개/)
+  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
+  assert.doesNotMatch(panel,/재접촉 활성도<\/b><strong>\{view\.reconnection\.score/)
+})
+
+test('reunion prose contract is score-aware and validates every major human section',()=>{
+  assert.match(edge,/candidate_count가 0이거나 activation이 null/)
+  assert.match(edge,/generic incoming\/outgoing\/reconnection 점수로 hierarchy gate를 덮어쓰지 마라/)
+  assert.match(edge,/why\.length<need\(420\)/)
+  assert.match(edge,/timing\?\.conclusion.*need\(220\)/s)
+  assert.match(edge,/rebuild\?\.conclusion.*need\(240\)/s)
+  assert.match(edge,/repeat_risks\?\.conclusion.*need\(140\)/s)
 })

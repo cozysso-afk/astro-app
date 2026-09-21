@@ -41,6 +41,12 @@ const REUNION_STAGE_HUMAN: Record<string, string> = {
   in_person_meeting: '대화가 현실 약속이나 직접 만남으로 이어지는 단계야. 온라인 반응과 실제 만남은 따로 봐.',
   relationship_rebuilding: '다시 만나는 것보다 관계를 어떤 조건으로 다시 이어갈지 정하는 단계야. 예전 패턴이 달라지는지가 핵심이야.',
 }
+const REUNION_STAGE_INDICATORS = [
+  ['emotional_reactivation','감정 재활성화'],
+  ['contact_recontact','연락·재접촉'],
+  ['in_person_meeting','실제 만남'],
+  ['relationship_rebuilding','관계 재구축'],
+] as const
 function reunionStageHuman(stageKey: string, fallbackLabel = '') {
   if (REUNION_STAGE_HUMAN[stageKey]) return REUNION_STAGE_HUMAN[stageKey]
   if (fallbackLabel.includes('감정')) return REUNION_STAGE_HUMAN.emotional_reactivation
@@ -230,18 +236,20 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
           <h4>가장 가까운 활성창</h4>
           <b>{hierarchyData.nearest_window.start} ~ {hierarchyData.nearest_window.end} · {hierarchyData.nearest_window.label}</b>
           <p>{reunionStageHuman(hierarchyData.nearest_window.stage, hierarchyData.nearest_window.label)}</p>
-          <small>핵심 날짜 {hierarchyData.nearest_window.date} · 보조지표 활성도 {hierarchyData.nearest_window.final}</small>
+          <small>대표 날짜 {hierarchyData.nearest_window.date} · 사건 확정일 아님 · 보조지표 활성도 {hierarchyData.nearest_window.final}</small>
         </article> : <p>오늘 이후 조회 기간에는 장기·중기·단기 조건을 모두 통과한 활성창이 없어.</p>}
 
-        {typeof view.reconnection.score === 'number' && <section className="reunion-ai-block reunion-contact-indicators">
-          <h4>연락 가능성 · 보조지표</h4>
+        <section className="reunion-ai-block reunion-contact-indicators">
+          <h4>단계별 활성도 · 보조지표</h4>
           <div className="reunion-return-context-grid">
-            <article className="reunion-return-context-card"><b>재접촉 활성도</b><strong>{view.reconnection.score}/100</strong><small>{view.reconnection.band}</small></article>
-            {typeof view.incoming.score === 'number' && <article className="reunion-return-context-card"><b>상대측 반응 활성도</b><strong>{view.incoming.score}/100</strong><small>{view.incoming.band}</small></article>}
-            {typeof view.outgoing.score === 'number' && <article className="reunion-return-context-card"><b>내측 연락 적합도</b><strong>{view.outgoing.score}/100</strong><small>{view.outgoing.band}</small></article>}
+            {REUNION_STAGE_INDICATORS.map(([stageKey,label])=>{
+              const stage=hierarchyData.stages[stageKey]
+              const hasCandidate=!!stage && stage.candidate_count>0 && typeof stage.activation==='number'
+              return <article className="reunion-return-context-card" key={stageKey}><b>{label}</b><strong>{hasCandidate ? `${Math.round(stage.activation as number)}/100` : '—'}</strong><small>{hasCandidate ? `미래 후보 ${stage.candidate_count}개` : '공개할 미래 후보 없음'}</small></article>
+            })}
           </div>
-          <p className="reunion-score-meaning">숫자는 같은 조회 기간 안에서 신호가 얼마나 활성돼 있는지 비교하는 보조지표야. 실제 연락 확률·재회 확률이나 누가 먼저 연락할 확률이 아니야.</p>
-        </section>}
+          <p className="reunion-score-meaning">숫자는 현재 감정 세기나 사건 확률이 아니라, 조회 범위에서 단계별 관문을 통과해 공개된 미래 후보 중 가장 높은 활성도야. 연락·재접촉 후보가 0개면 그 기간에 공개할 연락 후보가 없다는 뜻이고, 후보가 있더라도 그 숫자만으로 실제 연락·재회나 선연락 주체를 확정하지 않아.</p>
+        </section>
 
         {ai?.ok && ai.data && reunionV2 && <section className="reunion-human-narrative reunion-ai-block">
           <h4>지금 두 사람 사이에서 살아 있는 흐름</h4>
@@ -265,7 +273,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
         <div className="reunion-stage-status">
           <h4>다시 움직인다면 어떤 순서인가</h4>
-          {Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stage.label}><b>{stage.label}</b> · {reunionStageHuman(stageKey, stage.label)} <small>{stage.activation === null ? '현재 기간에 공개할 미래 후보 없음' : `보조지표 · 활성도 ${stage.activation}`}</small></p>)}
+          {Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stage.label}><b>{stage.label}</b> · {reunionStageHuman(stageKey, stage.label)} <small>{stage.candidate_count>0 ? `미래 후보 ${stage.candidate_count}개` : '현재 기간에 공개할 미래 후보 없음'}</small></p>)}
         </div>
         <p className="reunion-initiative-closed"><b>누가 먼저 연락?</b> 현재 계산으로는 판정 보류. 상대측/내측 활성도 비교값은 실제 행동 방향이 아니어서 선연락 근거로 쓰지 않아.</p>
 
