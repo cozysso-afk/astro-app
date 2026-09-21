@@ -6,6 +6,7 @@ on:
       - fix/reunion-hierarchy-v2
     paths:
       - scripts/_tmp_polish_editorial_qa.py
+      - .github/workflows/_tmp-polish-editorial-qa.yml
   workflow_dispatch:
 
 permissions:
