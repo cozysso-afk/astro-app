@@ -22,6 +22,13 @@ replace_once(
 )
 
 summary = ROOT / 'web/src/lib/relationshipUserSummary.ts'
+replace_once(
+    summary,
+    "const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }",
+    "const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점', ASC: '상승점', DSC: '하강점', MC: '중천', IC: '천저', Vertex: '버텍스' }",
+    'angle point display labels',
+)
+
 text = summary.read_text()
 if 'angleTimeAvailable?: boolean' not in text:
     text = text.replace(
