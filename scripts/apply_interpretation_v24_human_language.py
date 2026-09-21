@@ -87,6 +87,14 @@ export function buildFortuneUserSummary'''
 
 
 test_source = test_path.read_text()
+old_expectation = "assert.match(view.headline,/사람 관계와 이직 조건/)"
+if old_expectation in test_source:
+    test_source = test_source.replace(
+        old_expectation,
+        "assert.match(view.headline,/대인관계/)\n  assert.match(view.headline,/실제 약속이나 일정/)",
+        1,
+    )
+
 marker = "daily fallback headline uses the strongest linked evidence as a concrete scene"
 if marker not in test_source:
     test_source += r'''
@@ -99,6 +107,6 @@ test('daily fallback headline uses the strongest linked evidence as a concrete s
   assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|평소 계획을 유지하면서/)
 })
 '''
-    test_path.write_text(test_source)
+test_path.write_text(test_source)
 
 print('interpretation v24 human-language patch applied')
