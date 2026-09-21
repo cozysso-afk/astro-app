@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './AppNext'
 import { AuthGate } from './AuthGate'
-import { QAPreview } from './QAPreview'
+import { EditorialQaPreview } from './EditorialQaPreview'
 import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
 import './styles.css'
 import './relationship.css'
@@ -55,6 +55,6 @@ if (!qaPreview) installIntegratedPrecisionFetch()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {qaPreview ? <QAPreview/> : <AuthGate><App /></AuthGate>}
+    {qaPreview ? <EditorialQaPreview/> : <AuthGate><App /></AuthGate>}
   </React.StrictMode>,
 )
