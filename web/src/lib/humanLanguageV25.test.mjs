@@ -49,6 +49,6 @@ test('reunion dates are framed as candidate windows and QA labels stay minimal',
   assert.match(panel,/사건 확정일 아님/)
   assert.doesNotMatch(panel,/핵심 날짜 \{w\.date\}/)
   assert.match(qa,/2026-10-21 전후/)
-  assert.match(qa,/각 단계 근거가 상대적으로 모이는 시기/)
+  assert.match(qa,/해당 단계의 장기·중기·사건 촉발 근거가 함께 통과하는 기간/)
   assert.doesNotMatch(qa,/QA fixture · 재회운 사람말 본문/)
 })
