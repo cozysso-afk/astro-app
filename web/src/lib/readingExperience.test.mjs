@@ -96,14 +96,23 @@ test('married mode is current marriage and repair; no future-spouse or marriage-
   assert.equal(view.practicalTitle,'지금 함께 바꿔볼 것')
   assert.doesNotMatch(JSON.stringify([view.headline,view.sections,view.practical,view.practicalTitle]),/미래 배우자|결혼 전|재회|재접촉|결혼할|결혼 가능성/)
 })
-test('entered provisional time keeps Moon but excludes exact-only angle aspects from compact fallback', () => {
-  const unsafe=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]
-  const view=buildRelationshipUserSummary({aspects:unsafe,partnerExact:false,mode:'reunion'})
+test('entered provisional time keeps angle evidence with an explicit sensitivity caveat', () => {
+  const provisional=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed',time_sensitivity:'fragile',evidence_confidence:'low'}]
+  const view=buildRelationshipUserSummary({aspects:provisional,partnerExact:false,angleTimeAvailable:true,mode:'reunion'})
   assert.ok(view.ranked.some(a=>a.a==='Moon'))
-  assert.ok(view.ranked.every(a=>a.a!=='ASC'))
+  assert.ok(view.ranked.some(a=>a.a==='ASC'))
+  assert.match(view.timePrecisionNote,/입력한 추정 생시/)
+  assert.match(view.timePrecisionNote,/하우스와 각도까지 읽었어/)
   assert.equal(view.incoming.band,'정보 부족')
   assert.equal(view.outgoing.band,'정보 부족')
   assert.equal(view.windows.length,0)
+})
+
+test('completely unknown time still excludes angle-dependent compact evidence', () => {
+  const unknown=[...aspects,{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]
+  const view=buildRelationshipUserSummary({aspects:unknown,partnerExact:false,angleTimeAvailable:false,mode:'reunion'})
+  assert.ok(view.ranked.every(a=>a.a!=='ASC'))
+  assert.equal(view.timePrecisionNote,'')
 })
 test('logout exists only in settings and AuthGate retains the actual logout implementation', () => {
   const gate=readFileSync(new URL('../AuthGate.tsx',import.meta.url),'utf8')

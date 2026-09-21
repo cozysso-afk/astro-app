@@ -35,9 +35,9 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
-  aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
+  aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
   hierarchy?: Record<string, unknown> | null;
   timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
@@ -61,7 +61,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       setImageExporting(false)
     }
   }
-  const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: reunion ? timing : null })
+  const view = buildRelationshipUserSummary({ aspects, partnerExact, angleTimeAvailable, mode: analysisMode, sensitive: timeSensitivePoints, timing: reunion ? timing : null })
   const relation = sajuContext?.available === true && sajuContext.day_master_relation && typeof sajuContext.day_master_relation === 'object' ? sajuContext.day_master_relation as Record<string, unknown> : {}
   const sajuRows = [['내가 상대를 대할 때',relation.user_to_counterpart_ten_god],['상대가 나를 대할 때',relation.counterpart_to_user_ten_god]].flatMap(([label,value])=>typeof value === 'string' && tenGodLens(value) ? [{label:String(label),value,lens:tenGodLens(value)!}] : [])
 
@@ -199,7 +199,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
   return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
-    <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p></header>
+    <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>
     <div className="reading-export-toolbar" data-reading-export-ignore="true">
       <button type="button" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>
         {imageExporting ? <LoaderCircle className="reading-export-spinner" size={17} aria-hidden="true"/> : <ImageDown size={17} aria-hidden="true"/>}

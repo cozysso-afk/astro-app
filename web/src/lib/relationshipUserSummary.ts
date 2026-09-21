@@ -3,7 +3,7 @@ import type { Aspect, FortuneStat, RelationshipAnalysisMode, ReunionTimingContex
 const PERSONAL = new Set(['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'])
 const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
 const SENSITIVE = new Set(['ASC', 'DSC', 'MC', 'IC', 'Vertex'])
-const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }
+const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점', ASC: '상승점', DSC: '하강점', MC: '중천', IC: '천저', Vertex: '버텍스' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
 export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
 
@@ -18,11 +18,11 @@ export function aspectRole(aspect: Aspect): Role {
 
 function aspectKey(aspect: Aspect) { return `${aspect.a}:${aspect.aspect}:${aspect.b}:${aspect.layer ?? 'natal'}` }
 
-export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = SENSITIVE) {
+export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = SENSITIVE, angleTimeAvailable = partnerExact) {
   const seen = new Set<string>()
   const safe = aspects.filter(aspect => {
     if (!PLANETS[aspect.a] || !PLANETS[aspect.b] || !Number.isFinite(aspect.orb)) return false
-    if (!partnerExact && [aspect.a, aspect.b].some(p => SENSITIVE.has(p) || sensitive.has(p))) return false
+    if (!angleTimeAvailable && [aspect.a, aspect.b].some(p => SENSITIVE.has(p) || sensitive.has(p))) return false
     const key = aspectKey(aspect)
     if (seen.has(key)) return false
     seen.add(key)
@@ -74,9 +74,14 @@ function pattern(a: Aspect): RelationshipPattern {
   return { key: aspectKey(a), role, title: copy.title, conclusion: `${copy.reason} ${{ communication: '대화가 어긋난 뒤 서로 설명할 여유를 주는지가 관계의 차이를 만들어.', attraction: '좋았던 만남 하나보다 그 뒤에도 서로 편안한 태도가 이어지는지를 봐.', stability: '작은 약속을 지속적으로 지키는 과정에서 이 차이가 드러나기 쉬워.', power: '한쪽만 관계의 속도와 규칙을 정하지 않는지가 중요한 기준이야.', perspective: '서로 원하는 방향을 구체적인 생활 선택에 놓고 비교해봐.' }[role]}`, caution, reason: `${names}의 ${geometry}가 잡혀 있어. ${detail}`, action: copy.action, challenging: tense, supportive: positive }
 }
 
-export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
-  const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive)
-  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).map(pattern).map(p => {
+export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
+  const angleTimeAvailable = input.angleTimeAvailable ?? input.partnerExact
+  const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive, angleTimeAvailable)
+  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).map(a => {
+    const p = pattern(a)
+    const provisionalSensitive = !input.partnerExact && angleTimeAvailable && [a.a, a.b].some(point => SENSITIVE.has(point) || input.sensitive?.has(point))
+    return provisionalSensitive ? { ...p, reason: `${p.reason} 입력한 추정 생시 기준으로 보이는 시간 민감 근거라 실제 생시가 달라지면 하우스·각도나 오브가 움직일 수 있어.` } : p
+  }).map(p => {
     if (!input.mode.startsWith('marriage_')) return p
     if (p.role === 'attraction') return { ...p, conclusion: input.mode === 'marriage_married' ? `${p.challenging ? '애정이 있어도 편안함을 느끼는 방식은 다를 수 있어.' : '익숙한 사이에서도 애정을 주고받는 방식이 관계의 온도를 바꿔.'} 함께 있을 때의 거리와 혼자 회복할 시간을 같이 살펴봐.` : p.conclusion, action: input.mode === 'marriage_married' ? '익숙함에 기대지 말고 서로 편안하게 느끼는 애정 표현과 혼자 쉴 시간을 이야기해봐.' : '호감뿐 아니라 함께 지낼 때 필요한 거리와 애정 표현을 이야기해봐.' }
     if (p.role === 'stability') return { ...p, action: '생활비와 집안일, 돌봄을 누가 얼마나 맡을지 구체적으로 나눠봐.' }
@@ -169,11 +174,14 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
   const practical = marriage
     ? negativeStructure ? '한 사람이 집안일과 책임을 떠안지 않도록 분담 범위와 쉴 시간을 구체적으로 정해봐.' : '함께 쓰는 돈과 혼자 보내는 시간, 집안일을 어떻게 나눌지 이야기해봐.'
     : friction.some(p => p.role === 'communication') ? '말이 엇갈릴 때 바로 결론 내리지 말고, 각자 받아들인 뜻을 한 번씩 말해봐.' : '편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐.'
+  const timePrecisionNote = !input.partnerExact && angleTimeAvailable
+    ? '입력한 추정 생시를 기준으로 하우스와 각도까지 읽었어. 주변 생시에서 달라질 수 있는 시간 민감 근거는 확정값이 아니라 참고 범위로 봐줘.'
+    : ''
   return { mode: input.mode, title: reunion ? '재회 흐름 한눈에' : married ? '지금 우리 부부' : marriage ? '결혼 궁합 한눈에' : '한눈에 궁합',
     strengthsTitle: marriage ? '함께 살 때 강점' : '잘 맞는 점', frictionTitle: marriage ? '생활에서 부딪힐 점' : '부딪히기 쉬운 점',
     stabilityTitle: reunion ? '다시 붙었을 때 유지력' : married ? '관계 회복력 · 장기 안정성' : marriage ? '결혼 유지력' : '장기 유지력',
     practicalTitle: married ? '지금 함께 바꿔볼 것' : marriage ? '결혼 전 확인할 것' : '현실에서 맞춰야 할 것',
     practical, sections, strengths: patterns.filter(p => p.supportive).map(p => p.title),
     headline: [headline, orientation].filter(Boolean).join(' '), incoming, outgoing, reconnection, sustainability, sustainabilityText, windows,
-    friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked }
+    friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked, timePrecisionNote }
 }
