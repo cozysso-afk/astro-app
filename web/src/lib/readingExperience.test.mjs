@@ -301,8 +301,9 @@ test('many communication aspects cannot crowd out stability and mixed role copy 
 test('daily fallback headline uses the strongest linked evidence as a concrete scene',()=>{
   const f=fortuneFixture('today')
   const view=buildFortuneUserSummary(f.data,f.context)
-  assert.match(view.headline,/생각을 정리하고 말을 주고받는 방식/)
+  assert.match(view.headline,/대화의 요점과 실제 합의/)
   assert.match(view.headline,/실제 약속이나 일정/)
+  assert.doesNotMatch(view.headline,/생각을 정리하고 말을 주고받는 방식이 특히 두드러지고/)
   assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|평소 계획을 유지하면서/)
 })
 

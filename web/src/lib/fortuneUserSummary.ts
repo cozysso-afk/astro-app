@@ -578,6 +578,29 @@ function fallbackDayHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   return '오늘은 특정 분야를 억지로 밀기보다, 실제로 들어오는 요청·답변·일정 변화를 확인하면서 움직이는 날이야.'
 }
 
+const DAILY_EVIDENCE_FOCUS: Record<string,string> = {
+  금전:'돈의 순서와 책임을 정리하는 쪽',
+  학업:'읽고 정리한 내용을 실제 진도로 옮기는 쪽',
+  시험:'아는 내용을 시간 안에 정확히 꺼내 쓰는 쪽',
+  직장:'요청을 담당자·마감·책임으로 구체화하는 쪽',
+  이직:'변화 욕구를 직무·보상·일정 비교로 바꾸는 쪽',
+  대인관계:'대화의 요점과 실제 합의를 맞추는 쪽',
+  연애:'호감 표현을 약속과 실제 만남으로 연결하는 쪽',
+  연락:'말을 꺼내고 질문·답장을 이어가는 쪽',
+  재회:'과거 감정보다 실제 재접촉과 태도를 확인하는 쪽',
+  소식:'전해 들은 말보다 확정된 답과 다음 절차를 확인하는 쪽',
+  컨디션:'집중할 일정과 회복할 시간을 나눠 쓰는 쪽',
+  투자심리:'사고 싶은 마음과 실제 매매 근거를 분리하는 쪽',
+  수익실현:'목표와 보유 이유를 실제 조건에 다시 맞추는 쪽',
+  신규진입:'가격·손실 한도·진입 이유를 함께 확인하는 쪽',
+  투자주의:'수익 기대보다 감당할 손실 범위를 먼저 보는 쪽',
+}
+const DAILY_SYMBOL_FOCUS: Record<string,string> = {
+  Sun:'목표·주도권', Moon:'감정·편안함', Mercury:'말·정리', Venus:'호감·조화', Mars:'행동·마찰',
+  Jupiter:'확장·선택', Saturn:'책임·제약', Uranus:'변화·변수', Neptune:'기대·상상', Pluto:'몰입·주도권',
+  'True Node':'관계·선택', 'North Node':'관계·선택',
+}
+
 function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
   const day = (context.calculation.western.daily_scores ?? []).find(row => row.date === context.calculation.period.start)
   const evidence = day?.evidence ?? []
@@ -594,20 +617,25 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
     : lead.item.target && SYMBOLS[lead.item.target]
       ? lead.item.target
       : ''
-  const meaning = key ? SYMBOLS[key]?.[1] : ''
   const scene = DAILY_HEADLINE_SCENE[lead.topic]
-  if (!meaning || !scene) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  const focus = DAILY_EVIDENCE_FOCUS[lead.topic]
+  if (!scene || !focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
   const polarity = typeof lead.item.polarity === 'number' && Number.isFinite(lead.item.polarity) ? Math.sign(lead.item.polarity) : 0
   const caution = cautionFlow.includes(lead.topic) || polarity < 0
+  const sceneText = caution ? scene.caution : scene.use
+  const trigger = (key && DAILY_SYMBOL_FOCUS[key]) || '당일'
   const motion = String(lead.item.motion ?? '')
   const phase = /Applying|적용/i.test(motion)
-    ? '이 자극이 아직 가까워지는 중이라'
+    ? `${trigger} 자극도 아직 커지는 중이야.`
     : /Exact|정확/i.test(motion)
-      ? '오늘 특히 선명하게 걸리는 편이라'
+      ? `${trigger} 자극이 오늘 특히 또렷해.`
       : /Separating|분리/i.test(motion)
-        ? '정점은 지나도 여운이 남아'
-        : '오늘 체감이 도드라져'
-  return `오늘 ${lead.topic}에서는 ${meaning}이 특히 두드러지고, ${phase} ${caution ? scene.caution : scene.use}`
+        ? `${trigger} 자극의 정점은 지났지만 여운이 남아 있어.`
+        : `${trigger} 자극이 오늘 체감에 남아 있어.`
+  const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
+  if (variant === 0) return `${sceneText} 오늘 ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}`
+  if (variant === 1) return `${lead.topic}에서 오늘 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}`
+  return `오늘은 ${sceneText} ${lead.topic}에서는 ${focus}이 먼저 보여. ${phase}`
 }
 
 function daySummary(bestFlow: string[], cautionFlow: string[]) {

@@ -300,6 +300,29 @@ test('period result labels natural presentation without claiming deterministic t
   assert.doesNotMatch(defaultMarkup,/계산근거 기반 자동 해설|AI\(인공지능\) 기간 해설/)
 })
 
+test('daily scene headline changes its language by domain even when the same planet repeats', () => {
+  const makeHeadline = ({date,best,watch,transit,target,motion='Applying'}) => {
+    const { data, calculation } = fixture({ focus:{[best]:'핵심',[watch]:'주목'}, scores:{[best]:72,[watch]:32} })
+    calculation.period.start=date; calculation.period.end=date
+    calculation.western.daily_scores=[{date,evidence:[{source_topics:[best],transit,target,aspect:'trine',contribution:4,polarity:.7,motion,text:'fixture'}]}]
+    data.priorities=[`${best} 우선 확인 대상`,`${watch} 우선 확인 대상`]
+    return buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)}).headline
+  }
+  const rows=[
+    makeHeadline({date:'2026-09-21',best:'대인관계',watch:'학업',transit:'Mercury',target:'Jupiter'}),
+    makeHeadline({date:'2026-09-22',best:'연애',watch:'연락',transit:'Venus',target:'Moon',motion:'Exact'}),
+    makeHeadline({date:'2026-09-23',best:'학업',watch:'컨디션',transit:'Mercury',target:'Saturn'}),
+    makeHeadline({date:'2026-09-26',best:'연락',watch:'재회',transit:'Mercury',target:'Venus'}),
+    makeHeadline({date:'2026-09-27',best:'이직',watch:'컨디션',transit:'Uranus',target:'Sun',motion:'Separating'}),
+  ]
+  assert.equal(new Set(rows).size,rows.length)
+  const joined=rows.join('\n')
+  assert.doesNotMatch(joined,/생각을 정리하고 말을 주고받는 방식이 특히 두드러지고|변화이 특히|에 힘을 쓰기 괜찮지만/)
+  assert.match(joined,/대화의 요점과 실제 합의/)
+  assert.match(joined,/실제 진도로 옮기는 쪽/)
+  assert.match(joined,/질문·답장을 이어가는 쪽/)
+})
+
 test('A/B: study leads favorable flow while relationship weakness stays in caution', () => {
   const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 } })
   assert.deepEqual(summary.bestFlow,['학업','직장'])
