@@ -82,6 +82,10 @@ if "const qa=" not in test:
         "const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')\n",
         "const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')\nconst qa=readFileSync(new URL('../EditorialQaPreview.tsx',import.meta.url),'utf8')\n"
     )
+test = test.replace(
+    "panel.indexOf('지금 두 사람 사이에서 살아 있는 흐름') < panel.indexOf('오늘 이후 핵심 시기')",
+    "panel.indexOf('지금 두 사람 사이에서 살아 있는 흐름') < panel.indexOf('오늘 이후 후보 시기')"
+)
 if "display bands separate nearby scores" not in test:
     test += """
 
@@ -90,13 +94,13 @@ test('display bands separate nearby scores without changing ranking thresholds',
   assert.match(fortune,/score >= 52.*다소 강함/)
   assert.match(fortune,/score >= 38.*다소 약함/)
   assert.match(fortune,/WEEKLY_ARC_COMPACT_V26/)
-  assert.doesNotMatch(fortune,/beat\.label\}에는 .*두드러져/)
+  assert.doesNotMatch(fortune,/beat\\.label\\}에는 .*두드러져/)
 })
 
 test('reunion dates are framed as candidate windows and QA labels stay minimal',()=>{
   assert.match(panel,/오늘 이후 후보 시기/)
   assert.match(panel,/사건 확정일 아님/)
-  assert.doesNotMatch(panel,/핵심 날짜 \{w\.date\}/)
+  assert.doesNotMatch(panel,/핵심 날짜 \\{w\\.date\\}/)
   assert.match(qa,/2026-10-21 전후/)
   assert.match(qa,/각 단계 근거가 상대적으로 모이는 시기/)
   assert.doesNotMatch(qa,/QA fixture · 재회운 사람말 본문/)
