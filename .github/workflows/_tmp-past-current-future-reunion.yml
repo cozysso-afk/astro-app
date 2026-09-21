@@ -50,7 +50,7 @@ jobs:
           old='<details className="reading-more reunion-past-audit"><summary>지난 활성기 · 사후검증용</summary>{hierarchyData.past_windows.length ? hierarchyData.past_windows.map((w)=><p key={`${w.start}:${w.stage}`}>{w.start} ~ {w.end} · {w.label} · {w.final}점</p>) : <p>분리해 표시할 지난 활성기가 없어.</p>}</details>'
           if old not in s: raise SystemExit('missing old collapsed past audit')
           s=s.replace(old,'',1)
-          p.write_text(s)
+          p.write_text('\n'.join(line.rstrip() for line in s.splitlines())+'\n')
 
           q=Path('web/src/EditorialQaPreview.tsx')
           s=q.read_text()
