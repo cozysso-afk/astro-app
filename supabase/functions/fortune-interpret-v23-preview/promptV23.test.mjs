@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23-phenomenon-first')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.2-human-scene-first')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -64,6 +64,18 @@ test('V23 prompt explicitly blocks score narration from becoming the explanation
   const out = buildV23CorePrompt(payload('month'))
   assert.match(out.text, /점수·평균·변동폭을 설명 자체로 착각하지 마/)
   assert.match(out.text, /고정 조언문을 분야명만 바꿔 반복하지 마/)
+})
+
+test('human-language contract requires concrete scenes and semantic non-repetition', () => {
+  const day = buildV23CorePrompt(payload('day')).text
+  const week = buildV23CorePrompt(payload('week')).text
+  assert.match(day, /실제 생활에서 체감할 수 있는 구체적인 장면/)
+  assert.match(day, /다른 날짜나 다른 사람에게 그대로 붙여도 말이 되는 범용 조언이면 실패/)
+  assert.match(day, /"서두르지 마\/신중해\/천천히 봐"는 같은 의미/)
+  assert.match(day, /오늘만의 촉발·시간대·현실 장면/)
+  assert.match(day, /분야 점수 요약만 쓰지 마/)
+  assert.match(week, /7일의 이동이나 전환/)
+  assert.match(week, /초반→중반→후반/)
 })
 
 test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {

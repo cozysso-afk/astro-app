@@ -113,12 +113,12 @@ test('side activation metrics alone never open the first-contact direction gate'
   assert.equal(out.initiative_gate.verdict,'undetermined')
 })
 
-test('direction gate opens only when two independent action families align on one side',()=>{
+test('progression and derived Marks activation do not establish first-contact direction',()=>{
   const p=exactPacket()
   p.advanced.months[0].marks_tertiary.counterpart.to_base_marks_aspects=[]
   const out=buildReunionEvidenceV2(p)
-  assert.equal(out.initiative_gate.available,true)
-  assert.equal(out.initiative_gate.verdict,'user_to_counterpart')
+  assert.equal(out.initiative_gate.available,false)
+  assert.equal(out.initiative_gate.verdict,'undetermined')
   assert.deepEqual(new Set(out.initiative_gate.outgoing.independent_groups),new Set(['secondary_progression','marks_tertiary']))
 })
 

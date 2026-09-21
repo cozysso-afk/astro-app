@@ -321,6 +321,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     reunion_transits: transits,
     reunion_dimensions: compactReunionDimensionsForExternal(rawResult.reunion_dimensions,caps),
     reunion_secondary_support: compactReunionSecondarySupportForExternal(rawResult.reunion_secondary_support,caps.months,caps.tight),
+    reunion_hierarchy: rawResult.reunion_hierarchy ? Object.fromEntries(Object.entries(rawResult.reunion_hierarchy as Record<string,unknown>).filter(([key])=>!['daily_trace','long_term_daily','saju_boundaries'].includes(key))) : null,
     reunion_timing_windows: rawResult.reunion_timing_windows ?? null,
     reunion_return_support: rawResult.reunion_return_support ?? null,
     reunion_directional_context: reunionContext ? {
@@ -366,7 +367,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '- 생시 미상으로 빠진 Moon(달)·각도점·하우스·진행 레이어는 추정하지 않는다.',
     '- 사주는 실제 포함된 일간 관계·십성·배우자궁·교차 지지관계만 사용하고 없는 천간합·신강/신약·용신·배우자성은 만들지 않는다.',
     modeRule,
-    kind === 'reunion' ? '- 정확한 날짜는 reunion_timing_windows에 실제 존재하는 fast-trigger 날짜만 쓴다. 진행각은 기간 신호로만 읽고 날짜를 만들지 않는다. 상대측/내측 활성은 선연락 주체 판정에 사용하지 않는다.' : '',
+    kind === 'reunion' ? '- 시기 선정은 reunion_hierarchy를 최우선으로 따른다. 장기→중기→단기 관문과 기준일을 지키고, 과거 활성기를 미래로 쓰지 않는다. 점수는 확률이 아니다. 정확한 날짜는 reunion_timing_windows에 실제 존재하는 fast-trigger 날짜만 쓴다. 진행각은 기간 신호로만 읽고 날짜를 만들지 않는다. 상대측/내측 활성은 선연락 주체 판정에 사용하지 않는다.' : '',
     '[필수 답변 구조]',
     structure,
     married ? '이미 존재하는 부부관계로 읽는다. 미래 배우자·미래 결혼 가능성을 예측하지 않는다.' : '결혼하거나 재회할 것이라고 예언하지 않는다.',

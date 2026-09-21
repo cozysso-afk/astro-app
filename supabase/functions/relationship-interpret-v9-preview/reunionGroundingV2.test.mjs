@@ -123,3 +123,36 @@ test('an exact date survives only when the calculation fast-trigger allowlist co
   const periods = out.data.reunion_synthesis_v2.timing.windows.map(x => x.period)
   assert.deepEqual(periods, ['2027-01-15'])
 })
+
+test('hierarchy rejects past dates and ungrounded month-only future windows', () => {
+  const x=reading()
+  x.reunion_synthesis_v2.timing.windows=[
+    {period:'2026-08-01',meaning:'지나간 날짜',evidence_refs:['E3']},
+    {period:'2027-01',meaning:'관문 없는 넓은 기간',evidence_refs:['E3']},
+    {period:'2027-01-15',meaning:'관문 통과 날짜',evidence_refs:['E3']},
+  ]
+  const out=repairReunionGroundingV2(x,{...payload,reunion_hierarchy:{as_of_date:'2026-09-19'},reunion_timing_windows:{windows:[{date:'2026-08-01'},{date:'2027-01-15'}]}})
+  assert.equal(out.ok,true)
+  assert.deepEqual(out.data.reunion_synthesis_v2.timing.windows.map(x=>x.period),['2027-01-15'])
+})
+
+test('deterministic claims fail closed instead of being displayed as calculation facts',()=>{
+  const x=reading(); x.headline='반드시 연락한다'
+  const out=repairReunionGroundingV2(x,payload)
+  assert.equal(out.ok,false)
+  assert.equal(out.reason,'unsupported_deterministic_claim')
+})
+
+test('canonical period endpoints survive without joining unrelated windows',()=>{
+  const x=reading()
+  x.reunion_synthesis_v2.timing.windows=[
+    {period:'2027-01-14 ~ 2027-01-16',meaning:'계산된 소구간',evidence_refs:['E3']},
+    {period:'2027-01-14 ~ 2027-02-16',meaning:'서로 다른 구간을 임의로 연결',evidence_refs:['E3']},
+  ]
+  const out=repairReunionGroundingV2(x,{...payload,reunion_hierarchy:{as_of_date:'2026-09-19'},reunion_timing_windows:{windows:[
+    {date:'2027-01-15',start:'2027-01-14',end:'2027-01-16'},
+    {date:'2027-02-15',start:'2027-02-14',end:'2027-02-16'},
+  ]}})
+  assert.equal(out.ok,true)
+  assert.deepEqual(out.data.reunion_synthesis_v2.timing.windows.map(x=>x.period),['2027-01-14 ~ 2027-01-16'])
+})

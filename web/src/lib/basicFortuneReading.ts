@@ -151,9 +151,9 @@ export function buildBasicFortuneReading(calculation: IntegratedApiResponse, per
   const watch = caution[0]
   const scope = field?.label ? `${field.label}에서 ` : ''
   let headline = `${when}은 크게 치우친 흐름보다 평소 계획을 지키는 쪽이 좋아.`
-  if (best && watch) headline = `${when}은 ${best.topic} 쪽은 활용할 만하고, ${watch.topic} 쪽은 속도를 낮추는 편이 좋아.`
-  else if (best) headline = `${when}은 ${scope}${best.topic} 쪽 흐름이 상대적으로 좋아. 계획한 일을 구체적으로 진행해봐.`
-  else if (watch) headline = `${when}은 ${scope}${watch.topic} 쪽을 무리하지 않는 게 좋아. 확인과 점검을 먼저 해.`
+  if (best && watch) headline = `${when}: ${best.topic}은 ${best.meaning} ${watch.topic}은 ${watch.meaning}`
+  else if (best) headline = `${when}: ${best.topic}은 ${best.meaning}`
+  else if (watch) headline = `${when}: ${watch.topic}은 ${watch.meaning}`
   else if (field?.label) headline = `${when} ${field.label}은 크게 밀어붙이기보다 계획한 범위 안에서 움직이면 무난해.`
   const summary = field?.label
     ? `${field.label} 계산값을 바로 생활 언어로 풀었어. 아래에서 결론뿐 아니라 이유, 현실에서의 활용법, 주의할 점과 시기까지 이어서 볼 수 있어.`

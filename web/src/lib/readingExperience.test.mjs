@@ -30,7 +30,8 @@ test('no relationship domain bonus; investment risk polarity is caution only', (
   assert.deepEqual(view.bestFlow,['대인관계','이직'])
   assert.equal(view.cautionFlow[0],'투자주의')
   assert.ok(!view.favorableCards.some(x=>x.topic==='투자주의'))
-  assert.match(view.headline,/사람 관계와 이직 조건/)
+  assert.match(view.headline,/대인관계/)
+  assert.match(view.headline,/실제 약속이나 일정/)
 })
 test('compact flow cards have score, band and one topic-specific meaning; overflow stays available', () => {
   const {data,context}=fortuneFixture()
@@ -95,14 +96,23 @@ test('married mode is current marriage and repair; no future-spouse or marriage-
   assert.equal(view.practicalTitle,'지금 함께 바꿔볼 것')
   assert.doesNotMatch(JSON.stringify([view.headline,view.sections,view.practical,view.practicalTitle]),/미래 배우자|결혼 전|재회|재접촉|결혼할|결혼 가능성/)
 })
-test('entered provisional time keeps Moon but excludes exact-only angle aspects from compact fallback', () => {
-  const unsafe=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]
-  const view=buildRelationshipUserSummary({aspects:unsafe,partnerExact:false,mode:'reunion'})
+test('entered provisional time keeps angle evidence with an explicit sensitivity caveat', () => {
+  const provisional=[...aspects,{a:'Moon',b:'Venus',aspect:'trine',orb:0,tone:'supportive'},{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed',time_sensitivity:'fragile',evidence_confidence:'low'}]
+  const view=buildRelationshipUserSummary({aspects:provisional,partnerExact:false,angleTimeAvailable:true,mode:'reunion'})
   assert.ok(view.ranked.some(a=>a.a==='Moon'))
-  assert.ok(view.ranked.every(a=>a.a!=='ASC'))
+  assert.ok(view.ranked.some(a=>a.a==='ASC'))
+  assert.match(view.timePrecisionNote,/입력한 추정 생시/)
+  assert.match(view.timePrecisionNote,/하우스와 각도까지 읽었어/)
   assert.equal(view.incoming.band,'정보 부족')
   assert.equal(view.outgoing.band,'정보 부족')
   assert.equal(view.windows.length,0)
+})
+
+test('completely unknown time still excludes angle-dependent compact evidence', () => {
+  const unknown=[...aspects,{a:'ASC',b:'Mars',aspect:'conjunction',orb:0,tone:'mixed'}]
+  const view=buildRelationshipUserSummary({aspects:unknown,partnerExact:false,angleTimeAvailable:false,mode:'reunion'})
+  assert.ok(view.ranked.every(a=>a.a!=='ASC'))
+  assert.equal(view.timePrecisionNote,'')
 })
 test('logout exists only in settings and AuthGate retains the actual logout implementation', () => {
   const gate=readFileSync(new URL('../AuthGate.tsx',import.meta.url),'utf8')
@@ -285,4 +295,69 @@ test('many communication aspects cannot crowd out stability and mixed role copy 
   assert.equal(rows.filter(p=>p.role==='communication').length,1)
   assert.match(rows.find(p=>p.role==='communication').conclusion,/말이 어긋나는/)
   assert.equal(new Set(rows.map(p=>p.title)).size,rows.length)
+})
+
+
+test('daily fallback headline uses the strongest linked evidence as a concrete scene',()=>{
+  const f=fortuneFixture('today')
+  const view=buildFortuneUserSummary(f.data,f.context)
+  assert.match(view.headline,/대화의 요점과 실제 합의/)
+  assert.match(view.headline,/실제 약속이나 일정/)
+  assert.doesNotMatch(view.headline,/생각을 정리하고 말을 주고받는 방식이 특히 두드러지고/)
+  assert.doesNotMatch(view.headline,/힘을 쓰기 괜찮지만|평소 계획을 유지하면서/)
+})
+
+
+test('weekly fallback headline tells a multi-day arc instead of reusing the daily template',()=>{
+  const f=fortuneFixture('week')
+  f.calculation.western.daily_scores=[
+    {date:'2026-09-12',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-15',evidence:[{source_topics:['컨디션'],transit:'Mars',target:'Saturn',aspect:'square',contribution:4,polarity:-.7}]},
+    {date:'2026-09-18',evidence:[{source_topics:['이직'],transit:'Jupiter',target:'Sun',aspect:'trine',contribution:3,polarity:.5}]},
+  ]
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/초반엔/)
+  assert.match(view.headline,/중반엔/)
+  assert.match(view.headline,/후반엔/)
+  assert.match(view.headline,/마무리돼/)
+  assert.doesNotMatch(view.headline,/두드러져|하는 데 흐름을 거쳐|하는 데 마무리|힘을 쓰기 괜찮지만|속도를 낮추는 편이 좋아/)
+})
+
+
+test('daily separating evidence reads as follow-through, not a fresh peak',()=>{
+  const f=fortuneFixture('today')
+  f.calculation.western.daily_scores[0].evidence[0].motion='Separating'
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/가장 강했던 구간을 지나고 있어/)
+  assert.match(view.headline,/이미 오간 말이 실제 약속이나 행동으로 이어지는지/)
+  assert.doesNotMatch(view.headline,/자극|말·정리/)
+  assert.doesNotMatch(view.headline,/좋은 날이야.*정점은 지났|좋은 편이야.*정점은 지났/)
+})
+
+test('weekly repeated mid-late scene collapses and keeps grammatical phase relations',()=>{
+  const f=fortuneFixture('week')
+  f.calculation.western.daily_scores=[
+    {date:'2026-09-12',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:4,polarity:.7}]},
+    {date:'2026-09-13',evidence:[{source_topics:['대인관계'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:4,polarity:.7}]},
+    {date:'2026-09-14',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-15',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-16',evidence:[{source_topics:['직장'],transit:'Saturn',target:'Sun',aspect:'trine',contribution:3,polarity:.6}]},
+    {date:'2026-09-17',evidence:[{source_topics:['직장'],transit:'Mars',target:'Moon',aspect:'sextile',contribution:4,polarity:.7}]},
+    {date:'2026-09-18',evidence:[{source_topics:['직장'],transit:'Mars',target:'Moon',aspect:'sextile',contribution:4,polarity:.7}]},
+  ]
+  const view=buildFortuneUserSummary(f.data,{...f.context,calculation:f.calculation})
+  assert.match(view.headline,/중반부터 후반까지/)
+  assert.equal((view.headline.match(/누가 무엇을 언제까지 맡을지/g)||[]).length,1)
+  assert.doesNotMatch(view.headline,/하는 데 흐름을 거쳐|하는 데 마무리/)
+})
+
+test('reunion keeps numeric activation as a secondary indicator instead of hiding it',()=>{
+  const view=relationship('reunion')
+  assert.equal(typeof view.reconnection.score,'number')
+  assert.equal(typeof view.incoming.score,'number')
+  assert.equal(typeof view.outgoing.score,'number')
+  const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
 })

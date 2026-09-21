@@ -55,6 +55,12 @@ export type Aspect = {
   orb: number
   tone: 'supportive' | 'challenging' | 'mixed'
   layer?: string
+  orb_grade?: string | null
+  time_sensitivity?: string | null
+  evidence_confidence?: string | null
+  birth_time_dependency?: boolean | null
+  layer_priority?: number | null
+  event_probability?: string | null
 }
 
 export type SignalSummary = {
@@ -136,6 +142,7 @@ export type RelationshipApiResponse = {
       top_months: Array<{ calendar_month: string; score: number; top_dates: string[] }>
       directional_context?: ReunionTimingContext
     }
+    reunion_hierarchy?: Record<string, unknown>
     reunion_return_support?: Record<string, unknown>
   }
 }

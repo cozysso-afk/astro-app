@@ -13,12 +13,11 @@ test('Saju keeps supported topics selectable even when current period has no dir
   assert.match(systems,/현재 사주 계산 계약에는 이 분야를 직접 읽을 안전한 근거가 없어/)
 })
 
-test('reunion surface leads with direction, timing and initiative comparison',()=>{
-  assert.match(panel,/연락·재접촉 상대활성도/)
-  assert.match(panel,/누가 먼저 움직일지의 상대활성도/)
-  assert.match(panel,/상대 → 나/)
-  assert.match(panel,/나 → 상대/)
-  assert.match(panel,/과거 인연 재접점/)
+test('reunion surface leads with gated timing and keeps initiative undetermined',()=>{
+  assert.match(panel,/재접점 활성도:/)
+  assert.match(panel,/선연락 주체: 판정 불가/)
+  assert.match(panel,/오늘 이후 가장 강한 기간 TOP 3/)
+  assert.match(panel,/이미 지나간 활성기/)
 })
 
 test('reunion mobile reading is locked to vertical gestures and uses bounded fallback cards',()=>{
@@ -28,9 +27,9 @@ test('reunion mobile reading is locked to vertical gestures and uses bounded fal
 })
 
 test('reunion AI uses a reunion-specific cost and output contract instead of generic compatibility essays',()=>{
-  assert.match(rel,/relationship-v11\.7-reunion-specific/)
+  assert.match(rel,/relationship-v12\.0-hierarchical-timing/)
   assert.match(rel,/purpose==="reunion"\)return compactMode\?6500:8500/)
   assert.match(rel,/if\(purpose==="reunion"\)return \{type:"OBJECT",properties:/)
   assert.match(rel,/sensitivity_scan:sensitivityPacket\(r\?\.sensitivity_scan\)/)
-  assert.match(rel,/근거 없는 일반 상담문구를 반복하지 말고/)
+  assert.match(rel,/일반론 조언 금지/)
 })

@@ -1,0 +1,2336 @@
+{
+  "schema": "reunion-hierarchy-v2.4-saved-audit-v1",
+  "pii": "omitted",
+  "thresholds_changed": false,
+  "runtime_seconds": {
+    "historical_v23": {
+      "2026": 5.202,
+      "2027A": 4.945,
+      "2027B": 4.825
+    },
+    "paired_v23_median": {
+      "2027A": 6.761,
+      "2027B": 7.322,
+      "2026": 7.673
+    },
+    "paired_v24_median": {
+      "2027A": 5.822,
+      "2027B": 5.546,
+      "2026": 6.242
+    }
+  },
+  "cases": {
+    "2026": {
+      "v23_totals": {
+        "hierarchy_eligible": 790,
+        "local_peaks": 19,
+        "raw_numeric_gate_pass": 1073
+      },
+      "v24_totals": {
+        "total_days": 1460,
+        "long_term_pass": 1156,
+        "medium_anchor_pass": 874,
+        "raw_numeric_gate_pass": 865,
+        "semantic_stage_trigger_pass": 324,
+        "hierarchy_eligible": 324,
+        "local_peak": 12
+      },
+      "nearest": {
+        "v23": {
+          "date": "2026-09-22",
+          "stage": "contact_recontact"
+        },
+        "v24": {
+          "date": "2026-09-22",
+          "stage": "contact_recontact"
+        }
+      },
+      "top3": {
+        "v23": [
+          {
+            "date": "2026-12-08",
+            "stage": "emotional_reactivation",
+            "long": 91.36,
+            "medium": 81.58,
+            "event": 100,
+            "final": 82.37,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "opposition",
+              "family": "natal_trigger",
+              "orb": 0.009418,
+              "strength": 94.105
+            }
+          },
+          {
+            "date": "2026-11-28",
+            "stage": "emotional_reactivation",
+            "long": 90.78,
+            "medium": 81.58,
+            "event": 100,
+            "final": 82.17,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.014478,
+              "strength": 93.625
+            }
+          },
+          {
+            "date": "2026-11-02",
+            "stage": "emotional_reactivation",
+            "long": 95.89,
+            "medium": 62.65,
+            "event": 100,
+            "final": 79.22,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.020879,
+              "strength": 93.016
+            }
+          }
+        ],
+        "v24": [
+          {
+            "date": "2026-11-02",
+            "stage": "emotional_reactivation",
+            "long": 87.3,
+            "medium": 62.65,
+            "event": 100,
+            "final": 76.22,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.020879,
+              "strength": 93.016
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2026-10-21",
+            "stage": "emotional_reactivation",
+            "long": 87.77,
+            "medium": 61.42,
+            "event": 100,
+            "final": 76.07,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "opposition",
+              "family": "natal_trigger",
+              "orb": 0.019409,
+              "strength": 93.156
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2026-11-28",
+            "stage": "emotional_reactivation",
+            "long": 50.92,
+            "medium": 81.58,
+            "event": 100,
+            "final": 68.22,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.014478,
+              "strength": 93.625
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          }
+        ]
+      },
+      "stages": {
+        "emotional_reactivation": {
+          "v23": {
+            "hierarchy_pass": 301,
+            "local_peaks": 6,
+            "primary_planet": {
+              "Moon": 239,
+              "Venus": 62
+            },
+            "target": {
+              "Venus": 128,
+              "Sun": 46,
+              "Moon": 127
+            },
+            "aspect": {
+              "square": 87,
+              "conjunction": 44,
+              "sextile": 45,
+              "trine": 66,
+              "opposition": 59
+            },
+            "family": {
+              "natal_trigger": 168,
+              "progressed_trigger": 133
+            },
+            "strength": {
+              "min": 17.823,
+              "median": 72.763,
+              "p75": 82.181,
+              "p90": 91.481,
+              "max": 99.913
+            },
+            "orb": {
+              "min": 0.0,
+              "median": 0.127,
+              "p75": 0.2599,
+              "p90": 0.407,
+              "max": 0.8063
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "no_medium_anchor": 64,
+              "medium_anchor_pass": 301,
+              "raw_numeric_gate_pass": 301,
+              "semantic_stage_trigger_pass": 133,
+              "hierarchy_eligible": 133,
+              "local_peak": 5
+            },
+            "future_funnel": {
+              "total_days": 104,
+              "long_term_pass": 104,
+              "no_medium_anchor": 3,
+              "medium_anchor_pass": 101,
+              "raw_numeric_gate_pass": 101,
+              "semantic_stage_trigger_pass": 37,
+              "hierarchy_eligible": 37,
+              "local_peak": 5
+            },
+            "primary_planet": {
+              "Moon": 53,
+              "Venus": 80
+            },
+            "target": {
+              "Venus": 52,
+              "Sun": 26,
+              "Moon": 55
+            },
+            "aspect": {
+              "square": 50,
+              "conjunction": 33,
+              "opposition": 50
+            },
+            "family": {
+              "natal_trigger": 96,
+              "progressed_trigger": 37
+            },
+            "strength": {
+              "min": 15.893,
+              "median": 73.671,
+              "p75": 88.938,
+              "p90": 93.6122,
+              "max": 99.913
+            },
+            "orb": {
+              "min": 0.0,
+              "median": 0.1816,
+              "p75": 0.3944,
+              "p90": 0.59,
+              "max": 0.8327
+            },
+            "context_aspect": {
+              "trine": 163,
+              "sextile": 177,
+              "quincunx": 158
+            },
+            "context_family": {
+              "natal_trigger": 237,
+              "progressed_trigger": 261
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 186,
+              "moon_requires_natal_contact": 169,
+              "context_only_aspect": 574,
+              "moon_target_not_emotional": 70,
+              "target_mismatch": 158,
+              "moon_requires_venus_context": 85,
+              "insufficient_strength": 23
+            },
+            "local_peak_final_score": {
+              "min": 61.89,
+              "median": 68.22,
+              "p75": 76.07,
+              "p90": 76.16,
+              "max": 76.22
+            }
+          }
+        },
+        "contact_recontact": {
+          "v23": {
+            "hierarchy_pass": 202,
+            "local_peaks": 6,
+            "primary_planet": {
+              "Mercury": 202
+            },
+            "target": {
+              "Sun": 49,
+              "Mercury": 75,
+              "Venus": 53,
+              "Moon": 25
+            },
+            "aspect": {
+              "square": 71,
+              "trine": 60,
+              "sextile": 21,
+              "conjunction": 21,
+              "opposition": 29
+            },
+            "family": {
+              "natal_trigger": 99,
+              "progressed_trigger": 103
+            },
+            "strength": {
+              "min": 13.104,
+              "median": 58.115,
+              "p75": 72.676,
+              "p90": 85.6549,
+              "max": 98.012
+            },
+            "orb": {
+              "min": 0.0008,
+              "median": 0.0851,
+              "p75": 0.3396,
+              "p90": 0.5643,
+              "max": 0.8453
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "medium_anchor_pass": 310,
+              "raw_numeric_gate_pass": 310,
+              "semantic_stage_trigger_pass": 117,
+              "hierarchy_eligible": 117,
+              "no_medium_anchor": 55,
+              "local_peak": 7
+            },
+            "future_funnel": {
+              "total_days": 104,
+              "long_term_pass": 104,
+              "medium_anchor_pass": 104,
+              "raw_numeric_gate_pass": 104,
+              "semantic_stage_trigger_pass": 24,
+              "hierarchy_eligible": 24,
+              "local_peak": 7
+            },
+            "primary_planet": {
+              "Mercury": 117
+            },
+            "target": {
+              "Mercury": 46,
+              "Moon": 38,
+              "Venus": 29,
+              "DSC": 4
+            },
+            "aspect": {
+              "square": 69,
+              "conjunction": 16,
+              "opposition": 32
+            },
+            "family": {
+              "progressed_trigger": 53,
+              "natal_trigger": 64
+            },
+            "strength": {
+              "min": 12.157,
+              "median": 52.916,
+              "p75": 80.053,
+              "p90": 91.0814,
+              "max": 98.012
+            },
+            "orb": {
+              "min": 0.0011,
+              "median": 0.0944,
+              "p75": 0.3914,
+              "p90": 0.588,
+              "max": 0.8069
+            },
+            "context_aspect": {
+              "quincunx": 25,
+              "trine": 37,
+              "sextile": 29,
+              "conjunction": 2,
+              "square": 2
+            },
+            "context_family": {
+              "natal_trigger": 40,
+              "progressed_trigger": 50,
+              "return_angle_trigger": 5
+            },
+            "rejection_reasons": {
+              "context_only_aspect": 117,
+              "primary_planet_mismatch": 1416,
+              "insufficient_strength": 17,
+              "target_mismatch": 9,
+              "context_only_family": 8
+            },
+            "local_peak_final_score": {
+              "min": 49.0,
+              "median": 58.15,
+              "p75": 58.92,
+              "p90": 59.684,
+              "max": 60.32
+            }
+          }
+        },
+        "in_person_meeting": {
+          "v23": {
+            "hierarchy_pass": 172,
+            "local_peaks": 7,
+            "primary_planet": {
+              "Mars": 172
+            },
+            "target": {
+              "Moon": 36,
+              "Venus": 52,
+              "Mars": 57,
+              "DSC": 27
+            },
+            "aspect": {
+              "trine": 48,
+              "square": 37,
+              "conjunction": 22,
+              "sextile": 43,
+              "opposition": 22
+            },
+            "family": {
+              "natal_trigger": 89,
+              "progressed_trigger": 70,
+              "return_angle_trigger": 13
+            },
+            "strength": {
+              "min": 12.833,
+              "median": 52.214,
+              "p75": 66.444,
+              "p90": 76.7322,
+              "max": 89.228
+            },
+            "orb": {
+              "min": 0.0011,
+              "median": 0.2442,
+              "p75": 0.4495,
+              "p90": 0.6593,
+              "max": 0.8327
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 202,
+              "no_medium_anchor": 53,
+              "medium_anchor_pass": 149,
+              "raw_numeric_gate_pass": 140,
+              "raw_numeric_gate_fail": 9,
+              "semantic_stage_trigger_pass": 32,
+              "hierarchy_eligible": 32,
+              "no_long_support": 163,
+              "local_peak": 0
+            },
+            "future_funnel": {
+              "total_days": 104,
+              "long_term_pass": 5,
+              "no_medium_anchor": 1,
+              "no_long_support": 99,
+              "medium_anchor_pass": 4,
+              "raw_numeric_gate_fail": 1,
+              "raw_numeric_gate_pass": 3,
+              "local_peak": 0
+            },
+            "primary_planet": {
+              "Mars": 32
+            },
+            "target": {
+              "Venus": 17,
+              "Mars": 12,
+              "DSC": 3
+            },
+            "aspect": {
+              "square": 14,
+              "conjunction": 15,
+              "opposition": 3
+            },
+            "family": {
+              "natal_trigger": 18,
+              "progressed_trigger": 14
+            },
+            "strength": {
+              "min": 22.834,
+              "median": 62.321,
+              "p75": 76.6232,
+              "p90": 82.0372,
+              "max": 88.366
+            },
+            "orb": {
+              "min": 0.004,
+              "median": 0.2641,
+              "p75": 0.408,
+              "p90": 0.5648,
+              "max": 0.7097
+            },
+            "context_aspect": {
+              "quincunx": 4,
+              "trine": 4,
+              "sextile": 2,
+              "square": 4
+            },
+            "context_family": {
+              "progressed_trigger": 5,
+              "return_angle_trigger": 6,
+              "natal_trigger": 3
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 229,
+              "context_only_family": 26,
+              "insufficient_strength": 5,
+              "context_only_aspect": 50
+            },
+            "local_peak_final_score": {
+              "min": null,
+              "median": null,
+              "p75": null,
+              "p90": null,
+              "max": null
+            }
+          }
+        },
+        "relationship_rebuilding": {
+          "v23": {
+            "hierarchy_pass": 115,
+            "local_peaks": 0,
+            "primary_planet": {
+              "Venus": 77,
+              "Sun": 38
+            },
+            "target": {
+              "Moon": 25,
+              "DSC": 19,
+              "Venus": 32,
+              "Sun": 39
+            },
+            "aspect": {
+              "square": 39,
+              "sextile": 21,
+              "conjunction": 16,
+              "opposition": 17,
+              "trine": 22
+            },
+            "family": {
+              "natal_trigger": 61,
+              "return_angle_trigger": 9,
+              "progressed_trigger": 45
+            },
+            "strength": {
+              "min": 12.027,
+              "median": 31.213,
+              "p75": 43.0365,
+              "p90": 49.464,
+              "max": 54.164
+            },
+            "orb": {
+              "min": 0.0029,
+              "median": 0.0579,
+              "p75": 0.2587,
+              "p90": 0.3704,
+              "max": 0.5682
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 224,
+              "no_medium_anchor": 110,
+              "medium_anchor_pass": 114,
+              "raw_numeric_gate_pass": 114,
+              "semantic_stage_trigger_pass": 42,
+              "hierarchy_eligible": 42,
+              "no_long_support": 141,
+              "local_peak": 0
+            },
+            "future_funnel": {
+              "total_days": 104,
+              "long_term_pass": 13,
+              "no_medium_anchor": 13,
+              "no_long_support": 91,
+              "local_peak": 0
+            },
+            "primary_planet": {
+              "Venus": 28,
+              "Sun": 14
+            },
+            "target": {
+              "Venus": 13,
+              "Saturn": 22,
+              "DSC": 7
+            },
+            "aspect": {
+              "conjunction": 9,
+              "square": 24,
+              "opposition": 9
+            },
+            "family": {
+              "natal_trigger": 25,
+              "progressed_trigger": 17
+            },
+            "strength": {
+              "min": 13.451,
+              "median": 44.6605,
+              "p75": 53.5065,
+              "p90": 62.1287,
+              "max": 66.208
+            },
+            "orb": {
+              "min": 0.0044,
+              "median": 0.0497,
+              "p75": 0.1617,
+              "p90": 0.3338,
+              "max": 0.7181
+            },
+            "context_aspect": {
+              "sextile": 30,
+              "square": 8,
+              "quincunx": 21,
+              "conjunction": 4,
+              "opposition": 2,
+              "trine": 21
+            },
+            "context_family": {
+              "return_angle_trigger": 10,
+              "progressed_trigger": 27,
+              "natal_trigger": 49
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 336,
+              "context_only_aspect": 68,
+              "context_only_family": 5,
+              "context_only_planet": 56,
+              "target_mismatch": 7,
+              "insufficient_strength": 12
+            },
+            "local_peak_final_score": {
+              "min": null,
+              "median": null,
+              "p75": null,
+              "p90": null,
+              "max": null
+            }
+          }
+        }
+      },
+      "overlap": {
+        "v23_all_qualifying": {
+          "used_by_exactly_1_stage": 1922,
+          "used_by_2_stages": 100,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 1676,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 1603,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 100,
+              "union": 1455,
+              "jaccard_ratio": 0.0687
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 567,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 519,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 446,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_all_accepted": {
+          "used_by_exactly_1_stage": 446,
+          "used_by_2_stages": 12,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 378,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 261,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 12,
+              "union": 271,
+              "jaccard_ratio": 0.0443
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 187,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 209,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 92,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v23_primary": {
+          "used_by_exactly_1_stage": 730,
+          "used_by_2_stages": 30,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 503,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 473,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 30,
+              "union": 386,
+              "jaccard_ratio": 0.0777
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 374,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 317,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 287,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_primary": {
+          "used_by_exactly_1_stage": 310,
+          "used_by_2_stages": 7,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 250,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 165,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 7,
+              "union": 168,
+              "jaccard_ratio": 0.0417
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 149,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 159,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 74,
+              "jaccard_ratio": 0.0
+            }
+          }
+        }
+      },
+      "determinism_digest_v24": "8877f1bf3c487453911e4afd9dfb1444652dd5485b273a021402d26b25d4fd26"
+    },
+    "2027A": {
+      "v23_totals": {
+        "hierarchy_eligible": 547,
+        "local_peaks": 57,
+        "raw_numeric_gate_pass": 785
+      },
+      "v24_totals": {
+        "total_days": 1460,
+        "long_term_pass": 1107,
+        "medium_anchor_pass": 589,
+        "raw_numeric_gate_pass": 583,
+        "semantic_stage_trigger_pass": 179,
+        "hierarchy_eligible": 179,
+        "local_peak": 39
+      },
+      "nearest": {
+        "v23": {
+          "date": "2027-01-02",
+          "stage": "emotional_reactivation"
+        },
+        "v24": {
+          "date": "2027-01-02",
+          "stage": "emotional_reactivation"
+        }
+      },
+      "top3": {
+        "v23": [
+          {
+            "date": "2027-03-12",
+            "stage": "emotional_reactivation",
+            "long": 94.2,
+            "medium": 56.29,
+            "event": 100,
+            "final": 77.04,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "conjunction",
+              "family": "natal_trigger",
+              "orb": 0.044731,
+              "strength": 95.527
+            }
+          },
+          {
+            "date": "2027-02-25",
+            "stage": "emotional_reactivation",
+            "long": 94.17,
+            "medium": 53.19,
+            "event": 100,
+            "final": 76.26,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "conjunction",
+              "family": "natal_trigger",
+              "orb": 0.03159,
+              "strength": 96.841
+            }
+          },
+          {
+            "date": "2027-02-01",
+            "stage": "emotional_reactivation",
+            "long": 94.47,
+            "medium": 50.14,
+            "event": 100,
+            "final": 75.6,
+            "primary": {
+              "a": "Moon",
+              "b": "Venus",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.016829,
+              "strength": 93.401
+            }
+          }
+        ],
+        "v24": [
+          {
+            "date": "2027-05-17",
+            "stage": "emotional_reactivation",
+            "long": 93.63,
+            "medium": 33.17,
+            "event": 100,
+            "final": 71.06,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "conjunction",
+              "family": "progressed_trigger",
+              "orb": 0.025092,
+              "strength": 97.491
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2027-12-20",
+            "stage": "in_person_meeting",
+            "long": 78.96,
+            "medium": 33.48,
+            "event": 100,
+            "final": 66.01,
+            "primary": {
+              "a": "Mars",
+              "b": "DSC",
+              "aspect": "square",
+              "family": "natal_trigger",
+              "orb": 0.011581,
+              "strength": 86.388
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2027-05-26",
+            "stage": "emotional_reactivation",
+            "long": 71.72,
+            "medium": 41.53,
+            "event": 100,
+            "final": 65.48,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "square",
+              "family": "natal_trigger",
+              "orb": 0.053132,
+              "strength": 87.112
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          }
+        ]
+      },
+      "stages": {
+        "emotional_reactivation": {
+          "v23": {
+            "hierarchy_pass": 256,
+            "local_peaks": 20,
+            "primary_planet": {
+              "Moon": 185,
+              "Venus": 71
+            },
+            "target": {
+              "Venus": 116,
+              "Moon": 101,
+              "Sun": 39
+            },
+            "aspect": {
+              "opposition": 50,
+              "sextile": 30,
+              "trine": 42,
+              "conjunction": 55,
+              "square": 79
+            },
+            "family": {
+              "natal_trigger": 139,
+              "progressed_trigger": 117
+            },
+            "strength": {
+              "min": 21.818,
+              "median": 75.035,
+              "p75": 86.8083,
+              "p90": 92.593,
+              "max": 99.905
+            },
+            "orb": {
+              "min": 0.001,
+              "median": 0.0941,
+              "p75": 0.245,
+              "p90": 0.3755,
+              "max": 0.7339
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 140,
+              "medium_anchor_pass": 113,
+              "raw_numeric_gate_pass": 113,
+              "semantic_stage_trigger_pass": 55,
+              "hierarchy_eligible": 55,
+              "no_long_support": 225,
+              "no_medium_anchor": 27,
+              "local_peak": 11
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "long_term_pass": 140,
+              "medium_anchor_pass": 113,
+              "raw_numeric_gate_pass": 113,
+              "semantic_stage_trigger_pass": 55,
+              "hierarchy_eligible": 55,
+              "no_long_support": 225,
+              "no_medium_anchor": 27,
+              "local_peak": 11
+            },
+            "primary_planet": {
+              "Moon": 23,
+              "Venus": 32
+            },
+            "target": {
+              "Venus": 21,
+              "Moon": 26,
+              "Sun": 8
+            },
+            "aspect": {
+              "opposition": 17,
+              "conjunction": 16,
+              "square": 22
+            },
+            "family": {
+              "natal_trigger": 42,
+              "progressed_trigger": 13
+            },
+            "strength": {
+              "min": 13.658,
+              "median": 75.818,
+              "p75": 89.2355,
+              "p90": 93.852,
+              "max": 97.491
+            },
+            "orb": {
+              "min": 0.0058,
+              "median": 0.0799,
+              "p75": 0.3936,
+              "p90": 0.657,
+              "max": 0.8634
+            },
+            "context_aspect": {
+              "quincunx": 72,
+              "sextile": 76,
+              "trine": 74
+            },
+            "context_family": {
+              "progressed_trigger": 112,
+              "natal_trigger": 110
+            },
+            "rejection_reasons": {
+              "moon_requires_venus_context": 27,
+              "moon_requires_natal_contact": 56,
+              "context_only_aspect": 182,
+              "primary_planet_mismatch": 63,
+              "moon_target_not_emotional": 23,
+              "target_mismatch": 63,
+              "insufficient_strength": 9
+            },
+            "local_peak_final_score": {
+              "min": 53.92,
+              "median": 58.03,
+              "p75": 59.615,
+              "p90": 65.48,
+              "max": 71.06
+            }
+          }
+        },
+        "contact_recontact": {
+          "v23": {
+            "hierarchy_pass": 120,
+            "local_peaks": 14,
+            "primary_planet": {
+              "Mercury": 120
+            },
+            "target": {
+              "Sun": 30,
+              "Mercury": 27,
+              "Venus": 40,
+              "Moon": 23
+            },
+            "aspect": {
+              "sextile": 41,
+              "square": 41,
+              "conjunction": 5,
+              "trine": 16,
+              "opposition": 17
+            },
+            "family": {
+              "natal_trigger": 61,
+              "progressed_trigger": 59
+            },
+            "strength": {
+              "min": 12.503,
+              "median": 49.3985,
+              "p75": 66.915,
+              "p90": 75.8183,
+              "max": 93.184
+            },
+            "orb": {
+              "min": 0.0009,
+              "median": 0.0859,
+              "p75": 0.3725,
+              "p90": 0.5929,
+              "max": 0.7804
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "medium_anchor_pass": 209,
+              "raw_numeric_gate_pass": 209,
+              "semantic_stage_trigger_pass": 69,
+              "hierarchy_eligible": 69,
+              "no_medium_anchor": 156,
+              "local_peak": 14
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "medium_anchor_pass": 209,
+              "raw_numeric_gate_pass": 209,
+              "semantic_stage_trigger_pass": 69,
+              "hierarchy_eligible": 69,
+              "no_medium_anchor": 156,
+              "local_peak": 14
+            },
+            "primary_planet": {
+              "Mercury": 69
+            },
+            "target": {
+              "Mercury": 12,
+              "DSC": 5,
+              "Moon": 30,
+              "Venus": 22
+            },
+            "aspect": {
+              "square": 38,
+              "conjunction": 14,
+              "opposition": 17
+            },
+            "family": {
+              "natal_trigger": 40,
+              "progressed_trigger": 29
+            },
+            "strength": {
+              "min": 12.503,
+              "median": 45.932,
+              "p75": 69.415,
+              "p90": 79.7196,
+              "max": 93.184
+            },
+            "orb": {
+              "min": 0.0009,
+              "median": 0.1081,
+              "p75": 0.4395,
+              "p90": 0.6641,
+              "max": 0.8164
+            },
+            "context_aspect": {
+              "quincunx": 24,
+              "sextile": 31,
+              "trine": 18,
+              "opposition": 2
+            },
+            "context_family": {
+              "progressed_trigger": 44,
+              "natal_trigger": 28,
+              "return_angle_trigger": 3
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 1015,
+              "context_only_family": 9,
+              "context_only_aspect": 90,
+              "insufficient_strength": 8,
+              "target_mismatch": 10
+            },
+            "local_peak_final_score": {
+              "min": 46.78,
+              "median": 55.09,
+              "p75": 58.795,
+              "p90": 59.023,
+              "max": 61.17
+            }
+          }
+        },
+        "in_person_meeting": {
+          "v23": {
+            "hierarchy_pass": 134,
+            "local_peaks": 19,
+            "primary_planet": {
+              "Mars": 134
+            },
+            "target": {
+              "Mars": 50,
+              "Venus": 40,
+              "Moon": 33,
+              "DSC": 11
+            },
+            "aspect": {
+              "opposition": 24,
+              "trine": 33,
+              "square": 33,
+              "sextile": 33,
+              "conjunction": 11
+            },
+            "family": {
+              "progressed_trigger": 60,
+              "natal_trigger": 74
+            },
+            "strength": {
+              "min": 13.306,
+              "median": 49.997,
+              "p75": 61.5205,
+              "p90": 73.1055,
+              "max": 92.716
+            },
+            "orb": {
+              "min": 0.0004,
+              "median": 0.2497,
+              "p75": 0.5344,
+              "p90": 0.734,
+              "max": 0.8316
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "no_long_support": 58,
+              "long_term_pass": 307,
+              "medium_anchor_pass": 226,
+              "raw_numeric_gate_pass": 220,
+              "no_medium_anchor": 81,
+              "raw_numeric_gate_fail": 6,
+              "semantic_stage_trigger_pass": 43,
+              "hierarchy_eligible": 43,
+              "local_peak": 10
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "no_long_support": 58,
+              "long_term_pass": 307,
+              "medium_anchor_pass": 226,
+              "raw_numeric_gate_pass": 220,
+              "no_medium_anchor": 81,
+              "raw_numeric_gate_fail": 6,
+              "semantic_stage_trigger_pass": 43,
+              "hierarchy_eligible": 43,
+              "local_peak": 10
+            },
+            "primary_planet": {
+              "Mars": 43
+            },
+            "target": {
+              "Mars": 20,
+              "Venus": 16,
+              "DSC": 7
+            },
+            "aspect": {
+              "opposition": 20,
+              "square": 19,
+              "conjunction": 4
+            },
+            "family": {
+              "progressed_trigger": 29,
+              "natal_trigger": 14
+            },
+            "strength": {
+              "min": 13.678,
+              "median": 58.622,
+              "p75": 74.001,
+              "p90": 78.1052,
+              "max": 92.716
+            },
+            "orb": {
+              "min": 0.0062,
+              "median": 0.2432,
+              "p75": 0.6529,
+              "p90": 0.7579,
+              "max": 0.8316
+            },
+            "context_aspect": {
+              "quincunx": 3,
+              "trine": 3,
+              "sextile": 2
+            },
+            "context_family": {
+              "natal_trigger": 6,
+              "return_angle_trigger": 2
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 388,
+              "insufficient_strength": 3,
+              "context_only_aspect": 114,
+              "context_only_family": 11
+            },
+            "local_peak_final_score": {
+              "min": 54.54,
+              "median": 61.915,
+              "p75": 63.85,
+              "p90": 64.894,
+              "max": 66.01
+            }
+          }
+        },
+        "relationship_rebuilding": {
+          "v23": {
+            "hierarchy_pass": 37,
+            "local_peaks": 4,
+            "primary_planet": {
+              "Sun": 15,
+              "Venus": 22
+            },
+            "target": {
+              "DSC": 8,
+              "Moon": 4,
+              "Sun": 15,
+              "Venus": 10
+            },
+            "aspect": {
+              "square": 19,
+              "conjunction": 3,
+              "trine": 8,
+              "opposition": 2,
+              "sextile": 5
+            },
+            "family": {
+              "natal_trigger": 22,
+              "progressed_trigger": 11,
+              "return_angle_trigger": 4
+            },
+            "strength": {
+              "min": 12.636,
+              "median": 24.623,
+              "p75": 44.904,
+              "p90": 48.9176,
+              "max": 52.286
+            },
+            "orb": {
+              "min": 0.0048,
+              "median": 0.0595,
+              "p75": 0.2455,
+              "p90": 0.4604,
+              "max": 0.6954
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "no_long_support": 70,
+              "long_term_pass": 295,
+              "medium_anchor_pass": 41,
+              "raw_numeric_gate_pass": 41,
+              "no_medium_anchor": 254,
+              "semantic_stage_trigger_pass": 12,
+              "hierarchy_eligible": 12,
+              "local_peak": 4
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "no_long_support": 70,
+              "long_term_pass": 295,
+              "medium_anchor_pass": 41,
+              "raw_numeric_gate_pass": 41,
+              "no_medium_anchor": 254,
+              "semantic_stage_trigger_pass": 12,
+              "hierarchy_eligible": 12,
+              "local_peak": 4
+            },
+            "primary_planet": {
+              "Venus": 10,
+              "Sun": 2
+            },
+            "target": {
+              "Saturn": 4,
+              "Venus": 6,
+              "DSC": 2
+            },
+            "aspect": {
+              "square": 9,
+              "opposition": 3
+            },
+            "family": {
+              "natal_trigger": 4,
+              "progressed_trigger": 8
+            },
+            "strength": {
+              "min": 16.204,
+              "median": 42.483,
+              "p75": 49.1825,
+              "p90": 60.5429,
+              "max": 62.098
+            },
+            "orb": {
+              "min": 0.0076,
+              "median": 0.0665,
+              "p75": 0.4136,
+              "p90": 0.6757,
+              "max": 0.7183
+            },
+            "context_aspect": {
+              "conjunction": 2,
+              "square": 6,
+              "trine": 7,
+              "quincunx": 4,
+              "sextile": 13,
+              "opposition": 2
+            },
+            "context_family": {
+              "return_angle_trigger": 8,
+              "progressed_trigger": 15,
+              "natal_trigger": 11
+            },
+            "rejection_reasons": {
+              "context_only_aspect": 31,
+              "primary_planet_mismatch": 139,
+              "context_only_planet": 33,
+              "target_mismatch": 3,
+              "context_only_family": 2,
+              "insufficient_strength": 2
+            },
+            "local_peak_final_score": {
+              "min": 34.57,
+              "median": 43.29,
+              "p75": 43.885,
+              "p90": 43.912,
+              "max": 43.93
+            }
+          }
+        }
+      },
+      "overlap": {
+        "v23_all_qualifying": {
+          "used_by_exactly_1_stage": 1569,
+          "used_by_2_stages": 22,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 1384,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 1361,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 22,
+              "union": 1234,
+              "jaccard_ratio": 0.0178
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 357,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 252,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 229,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_all_accepted": {
+          "used_by_exactly_1_stage": 225,
+          "used_by_2_stages": 2,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 165,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 144,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 2,
+              "union": 106,
+              "jaccard_ratio": 0.0189
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 121,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 85,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 64,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v23_primary": {
+          "used_by_exactly_1_stage": 539,
+          "used_by_2_stages": 4,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 376,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 390,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 4,
+              "union": 289,
+              "jaccard_ratio": 0.0138
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 254,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 157,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 171,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_primary": {
+          "used_by_exactly_1_stage": 177,
+          "used_by_2_stages": 1,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 124,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 98,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 1,
+              "union": 66,
+              "jaccard_ratio": 0.0152
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 112,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 81,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 55,
+              "jaccard_ratio": 0.0
+            }
+          }
+        }
+      },
+      "determinism_digest_v24": "6979ed311af0b57c91d36c312637feb7286193be1557612100ffe77886855a3f"
+    },
+    "2027B": {
+      "v23_totals": {
+        "hierarchy_eligible": 547,
+        "local_peaks": 57,
+        "raw_numeric_gate_pass": 785
+      },
+      "v24_totals": {
+        "total_days": 1460,
+        "long_term_pass": 1107,
+        "medium_anchor_pass": 589,
+        "raw_numeric_gate_pass": 583,
+        "semantic_stage_trigger_pass": 179,
+        "hierarchy_eligible": 179,
+        "local_peak": 39
+      },
+      "nearest": {
+        "v23": {
+          "date": "2027-01-02",
+          "stage": "emotional_reactivation"
+        },
+        "v24": {
+          "date": "2027-01-02",
+          "stage": "emotional_reactivation"
+        }
+      },
+      "top3": {
+        "v23": [
+          {
+            "date": "2027-03-12",
+            "stage": "emotional_reactivation",
+            "long": 94.2,
+            "medium": 56.29,
+            "event": 100,
+            "final": 77.04,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "conjunction",
+              "family": "natal_trigger",
+              "orb": 0.044731,
+              "strength": 95.527
+            }
+          },
+          {
+            "date": "2027-02-25",
+            "stage": "emotional_reactivation",
+            "long": 94.17,
+            "medium": 53.19,
+            "event": 100,
+            "final": 76.26,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "conjunction",
+              "family": "natal_trigger",
+              "orb": 0.03159,
+              "strength": 96.841
+            }
+          },
+          {
+            "date": "2027-02-01",
+            "stage": "emotional_reactivation",
+            "long": 94.47,
+            "medium": 50.14,
+            "event": 100,
+            "final": 75.6,
+            "primary": {
+              "a": "Moon",
+              "b": "Venus",
+              "aspect": "opposition",
+              "family": "progressed_trigger",
+              "orb": 0.016829,
+              "strength": 93.401
+            }
+          }
+        ],
+        "v24": [
+          {
+            "date": "2027-05-17",
+            "stage": "emotional_reactivation",
+            "long": 93.63,
+            "medium": 33.17,
+            "event": 100,
+            "final": 71.06,
+            "primary": {
+              "a": "Venus",
+              "b": "Moon",
+              "aspect": "conjunction",
+              "family": "progressed_trigger",
+              "orb": 0.025092,
+              "strength": 97.491
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2027-12-20",
+            "stage": "in_person_meeting",
+            "long": 78.96,
+            "medium": 33.48,
+            "event": 100,
+            "final": 66.01,
+            "primary": {
+              "a": "Mars",
+              "b": "DSC",
+              "aspect": "square",
+              "family": "natal_trigger",
+              "orb": 0.011581,
+              "strength": 86.388
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          },
+          {
+            "date": "2027-05-26",
+            "stage": "emotional_reactivation",
+            "long": 71.72,
+            "medium": 41.53,
+            "event": 100,
+            "final": 65.48,
+            "primary": {
+              "a": "Venus",
+              "b": "Venus",
+              "aspect": "square",
+              "family": "natal_trigger",
+              "orb": 0.053132,
+              "strength": 87.112
+            },
+            "why": "stage long policy + Lunar Return anchor + direct stage trigger + local peak"
+          }
+        ]
+      },
+      "stages": {
+        "emotional_reactivation": {
+          "v23": {
+            "hierarchy_pass": 256,
+            "local_peaks": 20,
+            "primary_planet": {
+              "Moon": 185,
+              "Venus": 71
+            },
+            "target": {
+              "Venus": 116,
+              "Moon": 101,
+              "Sun": 39
+            },
+            "aspect": {
+              "opposition": 50,
+              "sextile": 30,
+              "trine": 42,
+              "conjunction": 55,
+              "square": 79
+            },
+            "family": {
+              "natal_trigger": 139,
+              "progressed_trigger": 117
+            },
+            "strength": {
+              "min": 21.818,
+              "median": 75.035,
+              "p75": 86.8083,
+              "p90": 92.593,
+              "max": 99.905
+            },
+            "orb": {
+              "min": 0.001,
+              "median": 0.0941,
+              "p75": 0.245,
+              "p90": 0.3755,
+              "max": 0.7339
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 140,
+              "medium_anchor_pass": 113,
+              "raw_numeric_gate_pass": 113,
+              "semantic_stage_trigger_pass": 55,
+              "hierarchy_eligible": 55,
+              "no_long_support": 225,
+              "no_medium_anchor": 27,
+              "local_peak": 11
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "long_term_pass": 140,
+              "medium_anchor_pass": 113,
+              "raw_numeric_gate_pass": 113,
+              "semantic_stage_trigger_pass": 55,
+              "hierarchy_eligible": 55,
+              "no_long_support": 225,
+              "no_medium_anchor": 27,
+              "local_peak": 11
+            },
+            "primary_planet": {
+              "Moon": 23,
+              "Venus": 32
+            },
+            "target": {
+              "Venus": 21,
+              "Moon": 26,
+              "Sun": 8
+            },
+            "aspect": {
+              "opposition": 17,
+              "conjunction": 16,
+              "square": 22
+            },
+            "family": {
+              "natal_trigger": 42,
+              "progressed_trigger": 13
+            },
+            "strength": {
+              "min": 13.658,
+              "median": 75.818,
+              "p75": 89.2355,
+              "p90": 93.852,
+              "max": 97.491
+            },
+            "orb": {
+              "min": 0.0058,
+              "median": 0.0799,
+              "p75": 0.3936,
+              "p90": 0.657,
+              "max": 0.8634
+            },
+            "context_aspect": {
+              "quincunx": 72,
+              "sextile": 76,
+              "trine": 74
+            },
+            "context_family": {
+              "progressed_trigger": 112,
+              "natal_trigger": 110
+            },
+            "rejection_reasons": {
+              "moon_requires_venus_context": 27,
+              "moon_requires_natal_contact": 56,
+              "context_only_aspect": 182,
+              "primary_planet_mismatch": 63,
+              "moon_target_not_emotional": 23,
+              "target_mismatch": 63,
+              "insufficient_strength": 9
+            },
+            "local_peak_final_score": {
+              "min": 53.92,
+              "median": 58.03,
+              "p75": 59.615,
+              "p90": 65.48,
+              "max": 71.06
+            }
+          }
+        },
+        "contact_recontact": {
+          "v23": {
+            "hierarchy_pass": 120,
+            "local_peaks": 14,
+            "primary_planet": {
+              "Mercury": 120
+            },
+            "target": {
+              "Sun": 30,
+              "Mercury": 27,
+              "Venus": 40,
+              "Moon": 23
+            },
+            "aspect": {
+              "sextile": 41,
+              "square": 41,
+              "conjunction": 5,
+              "trine": 16,
+              "opposition": 17
+            },
+            "family": {
+              "natal_trigger": 61,
+              "progressed_trigger": 59
+            },
+            "strength": {
+              "min": 12.503,
+              "median": 49.3985,
+              "p75": 66.915,
+              "p90": 75.8183,
+              "max": 93.184
+            },
+            "orb": {
+              "min": 0.0009,
+              "median": 0.0859,
+              "p75": 0.3725,
+              "p90": 0.5929,
+              "max": 0.7804
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "medium_anchor_pass": 209,
+              "raw_numeric_gate_pass": 209,
+              "semantic_stage_trigger_pass": 69,
+              "hierarchy_eligible": 69,
+              "no_medium_anchor": 156,
+              "local_peak": 14
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "long_term_pass": 365,
+              "medium_anchor_pass": 209,
+              "raw_numeric_gate_pass": 209,
+              "semantic_stage_trigger_pass": 69,
+              "hierarchy_eligible": 69,
+              "no_medium_anchor": 156,
+              "local_peak": 14
+            },
+            "primary_planet": {
+              "Mercury": 69
+            },
+            "target": {
+              "Mercury": 12,
+              "DSC": 5,
+              "Moon": 30,
+              "Venus": 22
+            },
+            "aspect": {
+              "square": 38,
+              "conjunction": 14,
+              "opposition": 17
+            },
+            "family": {
+              "natal_trigger": 40,
+              "progressed_trigger": 29
+            },
+            "strength": {
+              "min": 12.503,
+              "median": 45.932,
+              "p75": 69.415,
+              "p90": 79.7196,
+              "max": 93.184
+            },
+            "orb": {
+              "min": 0.0009,
+              "median": 0.1081,
+              "p75": 0.4395,
+              "p90": 0.6641,
+              "max": 0.8164
+            },
+            "context_aspect": {
+              "quincunx": 24,
+              "sextile": 31,
+              "trine": 18,
+              "opposition": 2
+            },
+            "context_family": {
+              "progressed_trigger": 44,
+              "natal_trigger": 28,
+              "return_angle_trigger": 3
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 1015,
+              "context_only_family": 9,
+              "context_only_aspect": 90,
+              "insufficient_strength": 8,
+              "target_mismatch": 10
+            },
+            "local_peak_final_score": {
+              "min": 46.78,
+              "median": 55.09,
+              "p75": 58.795,
+              "p90": 59.023,
+              "max": 61.17
+            }
+          }
+        },
+        "in_person_meeting": {
+          "v23": {
+            "hierarchy_pass": 134,
+            "local_peaks": 19,
+            "primary_planet": {
+              "Mars": 134
+            },
+            "target": {
+              "Mars": 50,
+              "Venus": 40,
+              "Moon": 33,
+              "DSC": 11
+            },
+            "aspect": {
+              "opposition": 24,
+              "trine": 33,
+              "square": 33,
+              "sextile": 33,
+              "conjunction": 11
+            },
+            "family": {
+              "progressed_trigger": 60,
+              "natal_trigger": 74
+            },
+            "strength": {
+              "min": 13.306,
+              "median": 49.997,
+              "p75": 61.5205,
+              "p90": 73.1055,
+              "max": 92.716
+            },
+            "orb": {
+              "min": 0.0004,
+              "median": 0.2497,
+              "p75": 0.5344,
+              "p90": 0.734,
+              "max": 0.8316
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "no_long_support": 58,
+              "long_term_pass": 307,
+              "medium_anchor_pass": 226,
+              "raw_numeric_gate_pass": 220,
+              "no_medium_anchor": 81,
+              "raw_numeric_gate_fail": 6,
+              "semantic_stage_trigger_pass": 43,
+              "hierarchy_eligible": 43,
+              "local_peak": 10
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "no_long_support": 58,
+              "long_term_pass": 307,
+              "medium_anchor_pass": 226,
+              "raw_numeric_gate_pass": 220,
+              "no_medium_anchor": 81,
+              "raw_numeric_gate_fail": 6,
+              "semantic_stage_trigger_pass": 43,
+              "hierarchy_eligible": 43,
+              "local_peak": 10
+            },
+            "primary_planet": {
+              "Mars": 43
+            },
+            "target": {
+              "Mars": 20,
+              "Venus": 16,
+              "DSC": 7
+            },
+            "aspect": {
+              "opposition": 20,
+              "square": 19,
+              "conjunction": 4
+            },
+            "family": {
+              "progressed_trigger": 29,
+              "natal_trigger": 14
+            },
+            "strength": {
+              "min": 13.678,
+              "median": 58.622,
+              "p75": 74.001,
+              "p90": 78.1052,
+              "max": 92.716
+            },
+            "orb": {
+              "min": 0.0062,
+              "median": 0.2432,
+              "p75": 0.6529,
+              "p90": 0.7579,
+              "max": 0.8316
+            },
+            "context_aspect": {
+              "quincunx": 3,
+              "trine": 3,
+              "sextile": 2
+            },
+            "context_family": {
+              "natal_trigger": 6,
+              "return_angle_trigger": 2
+            },
+            "rejection_reasons": {
+              "primary_planet_mismatch": 388,
+              "insufficient_strength": 3,
+              "context_only_aspect": 114,
+              "context_only_family": 11
+            },
+            "local_peak_final_score": {
+              "min": 54.54,
+              "median": 61.915,
+              "p75": 63.85,
+              "p90": 64.894,
+              "max": 66.01
+            }
+          }
+        },
+        "relationship_rebuilding": {
+          "v23": {
+            "hierarchy_pass": 37,
+            "local_peaks": 4,
+            "primary_planet": {
+              "Sun": 15,
+              "Venus": 22
+            },
+            "target": {
+              "DSC": 8,
+              "Moon": 4,
+              "Sun": 15,
+              "Venus": 10
+            },
+            "aspect": {
+              "square": 19,
+              "conjunction": 3,
+              "trine": 8,
+              "opposition": 2,
+              "sextile": 5
+            },
+            "family": {
+              "natal_trigger": 22,
+              "progressed_trigger": 11,
+              "return_angle_trigger": 4
+            },
+            "strength": {
+              "min": 12.636,
+              "median": 24.623,
+              "p75": 44.904,
+              "p90": 48.9176,
+              "max": 52.286
+            },
+            "orb": {
+              "min": 0.0048,
+              "median": 0.0595,
+              "p75": 0.2455,
+              "p90": 0.4604,
+              "max": 0.6954
+            }
+          },
+          "v24": {
+            "funnel": {
+              "total_days": 365,
+              "no_long_support": 70,
+              "long_term_pass": 295,
+              "medium_anchor_pass": 41,
+              "raw_numeric_gate_pass": 41,
+              "no_medium_anchor": 254,
+              "semantic_stage_trigger_pass": 12,
+              "hierarchy_eligible": 12,
+              "local_peak": 4
+            },
+            "future_funnel": {
+              "total_days": 365,
+              "no_long_support": 70,
+              "long_term_pass": 295,
+              "medium_anchor_pass": 41,
+              "raw_numeric_gate_pass": 41,
+              "no_medium_anchor": 254,
+              "semantic_stage_trigger_pass": 12,
+              "hierarchy_eligible": 12,
+              "local_peak": 4
+            },
+            "primary_planet": {
+              "Venus": 10,
+              "Sun": 2
+            },
+            "target": {
+              "Saturn": 4,
+              "Venus": 6,
+              "DSC": 2
+            },
+            "aspect": {
+              "square": 9,
+              "opposition": 3
+            },
+            "family": {
+              "natal_trigger": 4,
+              "progressed_trigger": 8
+            },
+            "strength": {
+              "min": 16.204,
+              "median": 42.483,
+              "p75": 49.1825,
+              "p90": 60.5429,
+              "max": 62.098
+            },
+            "orb": {
+              "min": 0.0076,
+              "median": 0.0665,
+              "p75": 0.4136,
+              "p90": 0.6757,
+              "max": 0.7183
+            },
+            "context_aspect": {
+              "conjunction": 2,
+              "square": 6,
+              "trine": 7,
+              "quincunx": 4,
+              "sextile": 13,
+              "opposition": 2
+            },
+            "context_family": {
+              "return_angle_trigger": 8,
+              "progressed_trigger": 15,
+              "natal_trigger": 11
+            },
+            "rejection_reasons": {
+              "context_only_aspect": 31,
+              "primary_planet_mismatch": 139,
+              "context_only_planet": 33,
+              "target_mismatch": 3,
+              "context_only_family": 2,
+              "insufficient_strength": 2
+            },
+            "local_peak_final_score": {
+              "min": 34.57,
+              "median": 43.29,
+              "p75": 43.885,
+              "p90": 43.912,
+              "max": 43.93
+            }
+          }
+        }
+      },
+      "overlap": {
+        "v23_all_qualifying": {
+          "used_by_exactly_1_stage": 1569,
+          "used_by_2_stages": 22,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 1384,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 1361,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 22,
+              "union": 1234,
+              "jaccard_ratio": 0.0178
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 357,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 252,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 229,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_all_accepted": {
+          "used_by_exactly_1_stage": 225,
+          "used_by_2_stages": 2,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 165,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 144,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 2,
+              "union": 106,
+              "jaccard_ratio": 0.0189
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 121,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 85,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 64,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v23_primary": {
+          "used_by_exactly_1_stage": 539,
+          "used_by_2_stages": 4,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 376,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 390,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 4,
+              "union": 289,
+              "jaccard_ratio": 0.0138
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 254,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 157,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 171,
+              "jaccard_ratio": 0.0
+            }
+          }
+        },
+        "v24_primary": {
+          "used_by_exactly_1_stage": 177,
+          "used_by_2_stages": 1,
+          "used_by_3_stages": 0,
+          "used_by_all_4_stages": 0,
+          "stage_pairs": {
+            "emotional_reactivation<->contact_recontact": {
+              "shared": 0,
+              "union": 124,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->in_person_meeting": {
+              "shared": 0,
+              "union": 98,
+              "jaccard_ratio": 0.0
+            },
+            "emotional_reactivation<->relationship_rebuilding": {
+              "shared": 1,
+              "union": 66,
+              "jaccard_ratio": 0.0152
+            },
+            "contact_recontact<->in_person_meeting": {
+              "shared": 0,
+              "union": 112,
+              "jaccard_ratio": 0.0
+            },
+            "contact_recontact<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 81,
+              "jaccard_ratio": 0.0
+            },
+            "in_person_meeting<->relationship_rebuilding": {
+              "shared": 0,
+              "union": 55,
+              "jaccard_ratio": 0.0
+            }
+          }
+        }
+      },
+      "determinism_digest_v24": "6979ed311af0b57c91d36c312637feb7286193be1557612100ffe77886855a3f"
+    }
+  }
+}

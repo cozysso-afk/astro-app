@@ -1053,6 +1053,8 @@ export default function AppNext() {
     const counterpartLongitude = parseOptionalNumber(counterpart.longitude)
     if (counterpart.timeKnown && (counterpartLatitude === null || counterpartLongitude === null)) { setRelationshipError('상대 출생시간을 안다면 출생지역도 선택해줘. 모르면 “출생시간 모름”을 체크해줘.'); return }
     const body = {
+      as_of_date: new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
+      query_utc_offset_hours: -new Date().getTimezoneOffset()/60,
       user: {
         name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime,
         ...birthTimeRequestMeta(birthProfile),
@@ -1700,10 +1702,11 @@ export default function AppNext() {
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} angleTimeAvailable={Boolean(relationshipResult.result.natal_synastry?.user_time_available && relationshipResult.result.natal_synastry?.partner_time_available)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
                 sajuContext={relationshipResult.result.saju_relationship}
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 returnSupport={relationshipResult.result.reunion_return_support ?? null}
+                hierarchy={relationshipResult.result.reunion_hierarchy ?? null}
                 technicalDetails={<>
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}

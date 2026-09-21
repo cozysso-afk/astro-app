@@ -165,14 +165,16 @@ function normalizeRefs(current: unknown, fallback: string[], valid: Set<string>,
 
 function allowedTimingDateGate(payload: any) {
   const present = Boolean(payload?.reunion_timing_windows && Array.isArray(payload?.reunion_timing_windows?.windows))
-  const dates = new Set(arr(payload?.reunion_timing_windows?.windows).map((x:any)=>text(x?.date)).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)))
-  return { present, dates }
+  const dates = new Set(arr(payload?.reunion_timing_windows?.windows).flatMap((x:any)=>[text(x?.date),text(x?.start),text(x?.end)]).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x) && (!payload?.reunion_hierarchy?.as_of_date || x >= payload.reunion_hierarchy.as_of_date)))
+  const ranges = arr(payload?.reunion_timing_windows?.windows).map((x:any)=>({start:text(x?.start ?? x?.date),end:text(x?.end ?? x?.date)}))
+  return { present, dates, ranges, strict:Boolean(payload?.reunion_hierarchy) }
 }
 
-function timingWindowAllowed(window: any, gate: {present:boolean;dates:Set<string>}) {
+function timingWindowAllowed(window: any, gate: {present:boolean;dates:Set<string>;ranges:Array<{start:string;end:string}>;strict?:boolean}) {
   if (!gate.present) return true
   const found = text(window?.period).match(/\d{4}-\d{2}-\d{2}/g) ?? []
-  return !found.length || found.every((x:string)=>gate.dates.has(x))
+  return (found.length > 0 || !gate.strict) && found.every((x:string)=>gate.dates.has(x)) &&
+    (!gate.strict || found.length < 2 || gate.ranges.some(r=>found.every(x=>x>=r.start && x<=r.end)))
 }
 
 function hasCoreText(v: any) {
@@ -324,6 +326,9 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     })),
     limits: polishReunionNarrativeText(data?.limits, provisional),
     reunion_synthesis_v2: v2,
+  }
+  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(next))) {
+    return { ok:false, repaired:false, data, reason:'unsupported_deterministic_claim' }
   }
   return { ok: true, repaired: before !== JSON.stringify(next), data: next }
 }

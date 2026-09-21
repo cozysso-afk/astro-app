@@ -239,10 +239,12 @@ function compactTimingWindowsForPrompt(raw: any) {
   }
   source.forEach((row:any)=>{ if (chosen.length < 16) add(row) })
   return {
+    as_of_date:raw.as_of_date, validation:raw.validation,
     windows:chosen.slice(0,16).map((row:any)=>({
       date:short(row?.date,16),
       stage:short(row?.stage,32),
       label:short(row?.label,80),
+      components:row?.components, eligible:row?.eligible, start:row?.start, end:row?.end,
       activation:num(row?.activation),
       rank_weight:num(row?.rank_weight),
       fast_evidence:arr(row?.fast_evidence).slice(0,2).map(compactTimingEvidence).filter(Boolean),
@@ -376,7 +378,7 @@ export function buildReunionEvidenceV2(packet: any) {
     return {independent_groups:groups,evidence_refs:rows.slice(0,6).map(e=>e.id),qualified:groups.length>=2}
   }
   const incomingGate = gateSide('incoming'), outgoingGate = gateSide('outgoing')
-  const gateAvailable = incomingGate.qualified !== outgoingGate.qualified && (incomingGate.qualified || outgoingGate.qualified)
+  const gateAvailable = false // Chart-side activation and Marks direction are not observed action direction.
   const initiative_gate = {
     available: gateAvailable,
     verdict: gateAvailable ? (incomingGate.qualified ? 'counterpart_to_user' : 'user_to_counterpart') : 'undetermined',
