@@ -29,17 +29,30 @@ jobs:
       - name: Install web dependencies
         working-directory: web
         run: npm ci
-      - name: Targeted reading test
+      - name: Targeted reading tests
         working-directory: web
-        run: node --experimental-strip-types --test src/lib/readingExperience.test.mjs
+        run: |
+          node --experimental-strip-types --test src/lib/readingExperience.test.mjs
+          node --experimental-strip-types --test src/lib/readingExperience.render.test.mjs
+      - name: Web build
+        working-directory: web
+        run: npm run build
       - name: Commit patched sources
         run: |
-          if git diff --quiet -- web/src/lib/fortuneUserSummary.ts web/src/lib/readingExperience.test.mjs; then
+          FILES=(
+            web/src/appTypes.ts
+            web/src/AppNext.tsx
+            web/src/RelationshipInterpretationPanel.tsx
+            web/src/lib/relationshipUserSummary.ts
+            web/src/lib/fortuneUserSummary.ts
+            web/src/lib/readingExperience.test.mjs
+          )
+          if git diff --quiet -- "${FILES[@]}"; then
             echo 'No patch changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add web/src/lib/fortuneUserSummary.ts web/src/lib/readingExperience.test.mjs
-          git commit -m 'feat: make daily fallback headline evidence-scene based'
+          git add "${FILES[@]}"
+          git commit -m 'feat: improve human-language fortune and provisional-time reading'
           git push origin HEAD:fix/reunion-hierarchy-v2
