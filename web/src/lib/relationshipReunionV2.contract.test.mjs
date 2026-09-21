@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.0-hierarchical-timing"/)
+  assert.match(server,/REUNION_VERSION="relationship-v12\.1-hierarchy-presentation"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -56,6 +56,24 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(panel,/실제 연락·재회 확률이 아니라/)
   assert.match(reunionCss,/\.reunion-v2-window/)
   assert.match(reunionCss,/\.reunion-date-focus-list/)
+})
+
+test('reunion v2.11 makes hierarchy the only primary future timing presentation',()=>{
+  const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
+  const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
+  const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
+  assert.match(cache,/relationship-v12\.1-hierarchy-presentation-v2/)
+  assert.match(panel,/지금부터의 재회 흐름/)
+  assert.match(panel,/가장 가까운 활성창/)
+  assert.match(panel,/지난 활성기 · 사후검증용/)
+  assert.match(panel,/고정 관계 구조 · 필요할 때만 보기/)
+  assert.match(panel,/\(!reunion \|\| !hierarchyData\)/)
+  assert.match(hierarchy,/top_periods: topPeriods/)
+  assert.match(hierarchy,/row\.date >= asOf/)
+  assert.match(server,/날짜 문자열을 새로 만들거나/)
+  assert.match(server,/이미 지난 날짜를 미래 핵심 시기처럼/)
+  assert.match(server,/카르마적 인연/)
+  assert.match(grounding,/카르마적 인연/)
 })
 
 test('archive filter guards iOS date controls from widening the page',()=>{

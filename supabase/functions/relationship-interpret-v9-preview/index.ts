@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v12.0-hierarchical-timing";
+const REUNION_VERSION="relationship-v12.1-hierarchy-presentation";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -242,7 +242,7 @@ function grounded(data:any,payload:any,p:Purpose,relaxed=false){
  return true;
 }
 
-function modeInstruction(purpose:Purpose){return purpose==="compatibility"?"일반 연애 궁합이다. 표준 궁합 포인트와 사주 관계층을 빠짐없이 읽고 각 섹션을 충분히 길게 써라.":purpose==="reunion"?"재회운이다. 감정 활성→연락·재접촉→실제 만남→관계 재결합을 네 개의 독립 단계로 읽고 절대 자동 승격하지 마라. reunion_evidence_v2의 다섯 질문을 순서대로 종합하되 initiative_gate가 닫혀 있으면 누가 먼저 연락하는지 판정하지 않는다. 날짜와 기간은 reunion_hierarchy의 관문을 통과한 후보만 사용한다. 기존 빠른 트랜짓이나 진행각으로 날짜를 새로 만들지 않는다. 같은 원자료 파생 신호를 여러 표에서 반복해 강도를 부풀리지 말고, 독립 계열이 충돌하면 평균내지 말고 단계별로 왜 다른지 설명하라. 범용 상담문구 대신 차트 레이어 간 일치·충돌을 현실 관계 장면으로 번역하라.":purpose==="marriage_unmarried"?"특정 상대가 있는 미혼 결혼궁합이다. 두 사람이 결혼생활로 들어갈 경우의 결속·정서적 집·생활 역할·돈/공유자원·친밀감·갈등회복·책임을 분리해 읽고, 결혼으로 공식화될 가능성과 프러포즈·약혼·결혼 결정이 강해지는 시기 흐름도 계산 근거 범위에서 적극적으로 제시하되 확정 사실처럼 단정하지 마라.":"이미 결혼한 두 사람의 결혼생활 분석이다. 결혼 가능성 표현은 금지하고 현재 결속·정서적 거리·생활 역할·공유재정/친밀감·반복갈등·회복 주기를 읽어라.";}
+function modeInstruction(purpose:Purpose){return purpose==="compatibility"?"일반 연애 궁합이다. 표준 궁합 포인트와 사주 관계층을 빠짐없이 읽고 각 섹션을 충분히 길게 써라.":purpose==="reunion"?"재회운이다. 감정 활성→연락·재접촉→실제 만남→관계 재결합을 네 개의 독립 단계로 읽고 절대 자동 승격하지 마라. reunion_evidence_v2의 다섯 질문을 순서대로 종합하되 initiative_gate가 닫혀 있으면 누가 먼저 연락하는지 판정하지 않는다. 날짜와 기간은 reunion_hierarchy의 오늘 이후 top_periods 및 nearest_window가 제공한 문자열만 그대로 인용한다. 날짜 문자열을 새로 만들거나, 이미 지난 날짜를 미래 핵심 시기처럼 제시하거나, 기존 빠른 트랜짓·진행각·Return 배경으로 새 날짜를 만들어서는 안 된다. hierarchy에 없는 월·기간을 핵심 시기로 승격하지 않는다. 같은 원자료 파생 신호를 여러 표에서 반복해 강도를 부풀리지 말고, 독립 계열이 충돌하면 평균내지 말고 단계별 차이를 설명하라. natal/시너스트리처럼 매 계산에서 고정되는 관계 구조는 짧게 요약하고, 이번 조회에서 달라진 stage·nearest window·future top periods를 우선 설명한다. '카르마적 인연', '운명적 인연', '끊을 수 없는 인연'처럼 검증 불가능한 숙명 표현을 쓰지 않는다. 범용 상담문구 대신 이번 계산의 구체적 단계 차이를 현실 관계 장면으로 번역하라.":purpose==="marriage_unmarried"?"특정 상대가 있는 미혼 결혼궁합이다. 두 사람이 결혼생활로 들어갈 경우의 결속·정서적 집·생활 역할·돈/공유자원·친밀감·갈등회복·책임을 분리해 읽고, 결혼으로 공식화될 가능성과 프러포즈·약혼·결혼 결정이 강해지는 시기 흐름도 계산 근거 범위에서 적극적으로 제시하되 확정 사실처럼 단정하지 마라.":"이미 결혼한 두 사람의 결혼생활 분석이다. 결혼 가능성 표현은 금지하고 현재 결속·정서적 거리·생활 역할·공유재정/친밀감·반복갈등·회복 주기를 읽어라.";}
 function promptText(payload:any,purpose:Purpose,compactMode=false){return `PURPOSE=${purpose}\n${modeInstruction(purpose)}\n${compactMode?"재시도다. 완전한 JSON을 만들되 근거·오브·사주 허용필드·시기는 유지하고 중복만 줄여라.\n":""}CALCULATED_DATA=${JSON.stringify(payload)}`;}
 function relationshipOutputTokens(purpose:Purpose,compactMode:boolean){if(purpose==="reunion")return compactMode?6500:8500;return compactMode?12000:16000;}
 function relationshipEstimatedJobKrw(inputTokens:number,purpose:Purpose){const intro=Date.now()<=GEMINI_INTRO_END,inputRate=intro ? .75 : 1.5,outputRate=intro ? 3.75 : 7.5,thoughtReserve=3000;const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;return one(relationshipOutputTokens(purpose,false))+one(relationshipOutputTokens(purpose,true));}

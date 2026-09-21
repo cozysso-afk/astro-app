@@ -327,7 +327,7 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     limits: polishReunionNarrativeText(data?.limits, provisional),
     reunion_synthesis_v2: v2,
   }
-  if (/끊어지지 않는 인연|운명적으로 다시 만난다|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(next))) {
+  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(next))) {
     return { ok:false, repaired:false, data, reason:'unsupported_deterministic_claim' }
   }
   return { ok: true, repaired: before !== JSON.stringify(next), data: next }
