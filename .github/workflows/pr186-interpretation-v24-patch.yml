@@ -6,6 +6,7 @@ on:
       - fix/reunion-hierarchy-v2
     paths:
       - scripts/apply_interpretation_v24_human_language.py
+      - scripts/apply_interpretation_v24_provisional_time.py
       - .github/workflows/pr186-interpretation-v24-patch.yml
 
 permissions:
@@ -24,8 +25,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Apply guarded patch
-        run: python scripts/apply_interpretation_v24_human_language.py
+      - name: Apply guarded patches
+        run: |
+          python scripts/apply_interpretation_v24_human_language.py
+          python scripts/apply_interpretation_v24_provisional_time.py
       - name: Install web dependencies
         working-directory: web
         run: npm ci
