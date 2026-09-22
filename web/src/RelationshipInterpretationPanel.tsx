@@ -235,84 +235,54 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       <p>재회운 정밀 계산을 다시 실행하면 AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기가 새 계산값으로 분리돼.</p>
     </section>}
 
-    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">
-      <h3>재회 흐름 타임라인</h3>
-      {hierarchyData.validation?.status !== 'PASS' ? <p role="alert">계산 검증에 실패해 미래 후보와 해설을 보류했어.</p> : <>
-        {hierarchyData.nearest_window ? <article className="relationship-pattern reunion-nearest-window">
-          <h4>가장 가까운 활성창</h4>
-          <b>{hierarchyData.nearest_window.start} ~ {hierarchyData.nearest_window.end} · {hierarchyData.nearest_window.label}</b>
-          <p>{reunionStageHuman(hierarchyData.nearest_window.stage, hierarchyData.nearest_window.label)}</p>
-          <small>대표 날짜 {hierarchyData.nearest_window.date} · 사건 확정일 아님 · 보조지표 활성도 {hierarchyData.nearest_window.final}</small>
-        </article> : <p>오늘 이후 조회 기간에는 장기·중기·단기 조건을 모두 통과한 활성창이 없어.</p>}
-
-        <section className="reunion-ai-block reunion-contact-indicators">
-          <h4>단계별 활성도 · 보조지표</h4>
-          <div className="reunion-return-context-grid">
-            {REUNION_STAGE_INDICATORS.map(([stageKey,label])=>{
-              const stage=hierarchyData.stages[stageKey]
-              const hasCandidate=!!stage && stage.candidate_count>0 && typeof stage.activation==='number'
-              return <article className="reunion-return-context-card" key={stageKey}><b>{label}</b><strong>{hasCandidate ? `${Math.round(stage.activation as number)}/100` : '—'}</strong><small>{hasCandidate ? `미래 후보 ${stage.candidate_count}개` : '공개할 미래 후보 없음'}</small></article>
-            })}
-          </div>
-          <p className="reunion-score-meaning">숫자는 현재 감정 세기나 사건 확률이 아니라, 조회 범위에서 단계별 관문을 통과해 공개된 미래 후보 중 가장 높은 활성도야. 연락·재접촉 후보가 0개면 그 기간에 공개할 연락 후보가 없다는 뜻이고, 후보가 있더라도 그 숫자만으로 실제 연락·재회나 선연락 주체를 확정하지 않아.</p>
+    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v212">
+      <h3>재회운 핵심</h3>
+      {hierarchyData.validation?.status !== 'PASS' ? <p role="alert">계산 검증에 실패해 시기 후보와 해설을 보류했어.</p> : <>
+        <section className="reunion-primary-section reunion-past-check">
+          <h4>지난 활성기 · 사후검증</h4>
+          <p className="reunion-score-meaning">기준일 이전에 같은 관문을 통과했던 구간이야. 실제 메시지·답장·만남·관계 변화 기록과 비교하는 개인 사후 확인용이야. 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야.</p>
+          {hierarchyData.past_windows.map((w)=><article className="relationship-pattern reunion-past-window" key={`past:${w.start}:${w.stage}`}><b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage,w.label)}</p><small>대표 날짜 {w.date} · 이미 지난 구간 · 보조지표 활성도 {w.final}</small></article>)}
+          {!hierarchyData.past_windows.length&&<p>조회 범위 안에서 실제 기록과 비교할 지난 활성기가 없어.</p>}
         </section>
 
-        {ai?.ok && ai.data && reunionV2 && <section className="reunion-human-narrative reunion-ai-block">
-          <h4>지금 두 사람 사이에서 살아 있는 흐름</h4>
-          <ReadableCopy className="reading-conclusion" text={reunionV2.summary}/>
+        <section className="reunion-primary-section reunion-current-flow">
+          <h4>현재 흐름</h4>
+          {reunionV2?.summary&&<ReadableCopy className="reading-conclusion" text={firstSentences(reunionV2.summary,3)}/>}
+          {hierarchyData.current_windows.map((w)=><article className="relationship-pattern reunion-current-window" key={`current:${w.start}:${w.stage}`}><b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage,w.label)}</p><small>기준일 {hierarchyData.as_of_date} 포함 · 사건 확정 아님 · 보조지표 활성도 {w.final}</small></article>)}
+          {!hierarchyData.current_windows.length&&<p>기준일이 포함된 공개 활성창은 없어. 현재 감정이나 행동이 없다는 뜻이 아니라, 지금 시점에 계층 관문을 통과한 사건 후보가 없다는 뜻이야.</p>}
+        </section>
 
-          <h4>왜 다시 신경 쓰이거나 연결될 수 있나</h4>
-          <ReadableCopy text={reunionV2.why_reconnect.conclusion}/>
-          <ReadableCopy text={reunionV2.why_reconnect.interpretation}/>
+        <section className="reunion-primary-section reunion-future-flow">
+          <h4>앞으로의 후보 시기</h4>
+          {hierarchyData.top_periods.map((w)=><article className="relationship-pattern reunion-future-window" key={`${w.start}:${w.stage}`}><b>{w.start} ~ {w.end} · {w.label} 후보 창</b><p>{reunionStageHuman(w.stage,w.label)}</p><small>대표 날짜 {w.date} · 사건 확정일 아님 · 보조지표 활성도 {w.final}</small></article>)}
+          {!hierarchyData.top_periods.length&&<p>오늘 이후 조회 범위에는 공개할 후보 시기가 없어.</p>}
+        </section>
 
-          {!!reunionV2.timing?.conclusion && <><h4>지금 어디까지 와 있나</h4><ReadableCopy text={reunionV2.timing.conclusion}/></>}
+        <section className="reunion-primary-section reunion-contact-not-reunion">
+          <h4>연락 ≠ 재회</h4>
+          {(()=>{const contact=hierarchyData.stages.contact_recontact;const meeting=hierarchyData.stages.in_person_meeting;const rebuild=hierarchyData.stages.relationship_rebuilding;return <p>{contact?.candidate_count>0?`연락·재접촉 후보는 ${contact.candidate_count}개가 잡혀 있어.`:'현재 조회 범위에는 공개할 연락·재접촉 후보가 없어.'} {meeting?.candidate_count>0?`그중 별도로 실제 만남 관문을 통과한 후보는 ${meeting.candidate_count}개야.`:'실제 만남 단계는 아직 별도 후보가 없어.'} {rebuild?.candidate_count>0?`관계 재구축 관문까지 통과한 후보는 ${rebuild.candidate_count}개야.`:'관계 재구축 단계까지 열린 후보는 아직 없어.'} 연락 한 번이나 답장 하나만으로 재회를 판정하지 않아.</p>})()}
+          <div className="reunion-return-context-grid">{REUNION_STAGE_INDICATORS.map(([stageKey,label])=>{const stage=hierarchyData.stages[stageKey];const hasCandidate=!!stage&&stage.candidate_count>0&&typeof stage.activation==='number';return <article className="reunion-return-context-card" key={stageKey}><b>{label}</b><strong>{hasCandidate?`${Math.round(stage.activation as number)}/100`:'—'}</strong><small>{hasCandidate?`후보 ${stage.candidate_count}개`:'후보 없음'}</small></article>})}</div>
+          <p className="reunion-score-meaning">숫자는 실제 연락·재회 확률이나 현재 감정의 세기가 아니라, 해당 단계 관문을 통과한 후보의 상대 활성도야.</p>
+        </section>
 
-          <h4>연락이 닿은 뒤, 재회까지는 뭐가 남나</h4>
-          <ReadableCopy text={reunionV2.rebuild.conclusion}/>
-          {reunionV2.rebuild.conditions.length>0 && <ul>{reunionV2.rebuild.conditions.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul>}
+        <section className="reunion-primary-section reunion-rebuild-conditions">
+          <h4>재구축 조건</h4>
+          {reunionV2?.rebuild?.conclusion?<ReadableCopy text={reunionV2.rebuild.conclusion}/>:<p>연락이 이어지는 것만으로는 부족해. 대화가 실제 약속이나 만남으로 넘어가고, 예전 갈등을 반복하지 않을 방식과 관계의 경계를 다시 합의하는 단계까지 확인해야 해.</p>}
+          {(reunionV2?.rebuild?.conditions?.length ?? 0)>0&&<ul>{reunionV2?.rebuild?.conditions?.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul>}
+          {hierarchyData.stages.relationship_rebuilding?.candidate_count>0?<p>현재 조회 범위에서는 관계 재구축 관문을 통과한 후보가 {hierarchyData.stages.relationship_rebuilding.candidate_count}개 있어. 그래도 실제 관계 회복을 확정하는 값은 아니야.</p>:<p>현재 조회 범위에는 관계 재구축 관문까지 통과한 공개 후보가 없어. 감정이나 연락 신호가 있어도 그 다음 행동을 따로 봐야 해.</p>}
+        </section>
 
-          {(reunionV2.repeat_risks.conclusion || reunionV2.repeat_risks.patterns.length>0) && <><h4>다시 멀어질 수 있는 지점</h4><ReadableCopy text={reunionV2.repeat_risks.conclusion}/>{reunionV2.repeat_risks.patterns.length>0 && <ul>{reunionV2.repeat_risks.patterns.slice(0,2).map((x,i)=><li key={i}>{x}</li>)}</ul>}</>}
-
-          {reunionV2.convergence.length>0 && <><h4>여러 근거가 같이 가리키는 부분</h4>{reunionV2.convergence.slice(0,3).map((x,i)=><article className="reunion-narrative-convergence" key={i}><b>{x.theme}</b><ReadableCopy text={x.meaning}/></article>)}</>}
-          {!!reunionV2.precision_note && <details className="reunion-precision-note"><summary>생시·정밀도에 따라 달라질 수 있는 부분</summary><ReadableCopy text={reunionV2.precision_note}/></details>}
-        </section>}
-
-        <div className="reunion-stage-status">
-          <h4>다시 움직인다면 어떤 순서인가</h4>
-          {Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stage.label}><b>{stage.label}</b> · {reunionStageHuman(stageKey, stage.label)} <small>{stage.candidate_count>0 ? `미래 후보 ${stage.candidate_count}개` : '현재 기간에 공개할 미래 후보 없음'}</small></p>)}
-        </div>
-        <p className="reunion-initiative-closed"><b>누가 먼저 연락?</b> 현재 계산으로는 판정 보류. 상대측/내측 활성도 비교값은 실제 행동 방향이 아니어서 선연락 근거로 쓰지 않아.</p>
-
-        <h4>지난 활성기 · 사후 확인용</h4>
-        <p className="reunion-score-meaning">기준일 이전에 같은 관문을 통과했던 구간이야. 실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용이며, 과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야.</p>
-        {hierarchyData.past_windows.map((w)=><article className="relationship-pattern reunion-past-window" key={`past:${w.start}:${w.stage}`}>
-          <b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>대표 날짜 {w.date} · 이미 지난 구간 · 보조지표 활성도 {w.final}</small>
-        </article>)}
-        {!hierarchyData.past_windows.length && <p>조회 범위 안에서 따로 비교할 지난 활성기가 없어.</p>}
-
-        <h4>현재 흐름</h4>
-        {hierarchyData.current_windows.map((w)=><article className="relationship-pattern reunion-current-window" key={`current:${w.start}:${w.stage}`}>
-          <b>{w.start} ~ {w.end} · {w.label}</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>기준일 {hierarchyData.as_of_date} 포함 · 사건 확정 아님 · 보조지표 활성도 {w.final}</small>
-        </article>)}
-        {!hierarchyData.current_windows.length && <p>기준일이 포함된 공개 활성창은 없어. 현재 감정이나 행동이 없다는 뜻이 아니라, 계층 관문을 통과한 현재 후보가 없다는 뜻이야.</p>}
-
-        <h4>앞으로의 후보 시기</h4>
-        {hierarchyData.top_periods.map((w)=><article className="relationship-pattern reunion-future-window" key={`${w.start}:${w.stage}`}>
-          <b>{w.start} ~ {w.end} · {w.label} 후보 창</b><p>{reunionStageHuman(w.stage, w.label)}</p><small>대표 날짜 {w.date} · 사건 확정일 아님 · 보조지표 활성도 {w.final}</small>
-          <details><summary>왜 후보가 됐는지</summary><p>장기 배경과 중기 흐름이 먼저 겹친 뒤, 이 단계에 맞는 사건 촉발 신호까지 함께 통과했어.</p><small>기술값 · 장기 {w.components.long_term} · 중기 {w.components.mid_term} · 사건 촉발 {w.components.event_trigger} · 체계 교차 {w.components.cross_system} · 최종 {w.components.final}</small></details>
-        </article>)}
-        {!hierarchyData.top_periods.length && <p>오늘 이후 공개할 후보 시기가 없어.</p>}
+        <details className="reading-more reunion-evidence-fold"><summary>근거 보기 · 계산/정밀도</summary>
+          {hierarchyData.nearest_window&&<article className="relationship-pattern reunion-nearest-window"><h4>가장 가까운 활성창</h4><b>{hierarchyData.nearest_window.start} ~ {hierarchyData.nearest_window.end} · {hierarchyData.nearest_window.label}</b><p>{reunionStageHuman(hierarchyData.nearest_window.stage,hierarchyData.nearest_window.label)}</p><small>대표 날짜 {hierarchyData.nearest_window.date} · 보조지표 활성도 {hierarchyData.nearest_window.final}</small></article>}
+          <p className="reunion-initiative-closed"><b>누가 먼저 연락?</b> 현재 활성도만으로는 판정하지 않아. 실제 방향성 행동 근거가 독립된 체계에서 확인될 때만 방향을 제시해.</p>
+          <p>{hierarchyData.score_meaning}</p>
+          {hierarchyData.stability_structure&&<p>고정 관계 구조: 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수 자체는 재결합 확률이 아니야.</p>}
+          {reunionV2?.why_reconnect?.conclusion&&<><h4>왜 다시 신경 쓰일 수 있나</h4><ReadableCopy text={firstSentences(reunionV2.why_reconnect.conclusion,2)}/></>}
+          {reunionV2?.repeat_risks?.conclusion&&<><h4>다시 멀어질 수 있는 지점</h4><ReadableCopy text={firstSentences(reunionV2.repeat_risks.conclusion,2)}/></>}
+          {reunionV2?.precision_note&&<><h4>정밀도 메모</h4><ReadableCopy text={reunionV2.precision_note}/></>}
+          {hierarchyData.limitations.map((x)=><p key={x}>{x}</p>)}
+        </details>
       </>}
-      <p className="reunion-score-meaning">{hierarchyData.score_meaning}</p>
-      <details className="reading-more reunion-fixed-structure"><summary>고정 관계 구조 · 필요할 때만 보기</summary>
-        <p>이 부분은 같은 두 사람이라면 매 계산에서 크게 달라지지 않는 출생차트·시너스트리 구조야. 새 시기 신호처럼 반복해서 강조하지 않아.</p>
-        {reunionV2?.why_reconnect?.conclusion && <p>{firstSentences(reunionV2.why_reconnect.conclusion, 2)}</p>}
-        {reunionV2?.rebuild?.conclusion && <p>{firstSentences(reunionV2.rebuild.conclusion, 2)}</p>}
-        {reunionV2?.repeat_risks?.conclusion && <p>{firstSentences(reunionV2.repeat_risks.conclusion, 2)}</p>}
-        {hierarchyData.stability_structure && <p>구조 근거: 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수 자체는 재결합 확률이 아니야.</p>}
-      </details>
-
-      <details className="reading-more"><summary>전문 근거·검증 범위</summary><p>Secondary Progression(세컨더리 프로그레션/2차 진행) · Solar Arc(솔라아크/태양호) · Transit(트랜짓·경과) · 다섯 행성 회귀 · 사주 절입</p><p>감정 활성 ≠ 연락 ≠ 만남 ≠ 재결합 ≠ 안정적 관계 유지</p>{hierarchyData.limitations.map(x=><p key={x}>{x}</p>)}{(hierarchyData.validation?.checks ?? []).filter((x)=>x.status!=='PASS').map((x)=><p key={x.name}>{x.name}: {x.status} — {x.detail}</p>)}</details>
     </section>}
 
     {ai?.ok && ai.data && (!reunion || !hierarchyData) ? <section className="reading-section relationship-natural-reading">
@@ -343,9 +313,9 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         {!!reunionAi.filter && <section className="reunion-ai-block"><h4>연락 이후 관계 유지력</h4><p>{reunionAi.filter}</p></section>}
         {!!reunionAi.precision && <details className="reunion-precision-note"><summary>정밀도·제외 근거</summary><p>{reunionAi.precision}</p></details>}
       </> : analysisMode.startsWith('marriage_') ? <><ReadingExplanation kind="reason">{[ai.data.marriage_reading?.bond,ai.data.marriage_reading?.emotional_home].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.marriage_reading?.daily_life,ai.data.marriage_reading?.intimacy_resources,ai.data.marriage_reading?.conflict_repair].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.marriage_reading?.commitment_or_current_cycle,ai.data.marriage_reading?.timing].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.marriage_reading?.caution,ai.data.marriage_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : <><ReadingExplanation kind="reason">{[ai.data.chemistry,ai.data.emotional_dynamic,ai.data.communication].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.long_term,...(ai.data.practical_advice??[])].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{ai.data.timing}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.conflict_pattern,ai.data.power_boundaries].filter(Boolean).join(' ')}</ReadingExplanation></>}
-    </section> : <section className="reading-section relationship-natural-reading is-ready"><h3>Gemini 자연어 해설</h3><p>계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section>}
+    </section> : <section className="reading-section relationship-natural-reading is-ready" hidden={reunion && !!hierarchyData}><h3>Gemini 자연어 해설</h3><p>계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section>}
 
-    <details className="relationship-calculated-fallback" open={!(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
+    <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
         <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
