@@ -62,8 +62,17 @@ test_path = Path('web/src/lib/relationshipReunionV2.contract.test.mjs')
 test = test_path.read_text(encoding='utf-8')
 test = test.replace('assert.match(panel,/재회 흐름 타임라인/)','assert.match(panel,/재회운 핵심/)')
 test = test.replace('assert.match(panel,/지난 활성기 · 사후 확인용/)','assert.match(panel,/지난 활성기 · 사후검증/)')
+for stale in [
+    '  assert.match(panel,/실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용/)\n',
+    '  assert.match(panel,/고정 관계 구조 · 필요할 때만 보기/)\n',
+    '  assert.match(panel,/지금 두 사람 사이에서 살아 있는 흐름/)\n',
+    '  assert.match(panel,/지금 어디까지 와 있나/)\n',
+    '  assert.match(panel,/연락이 닿은 뒤, 재회까지는 뭐가 남나/)\n',
+    '  assert.match(panel,/다시 멀어질 수 있는 지점/)\n',
+]:
+    test = test.replace(stale, '')
 anchor = '  assert.match(panel,/현재 흐름/)\n'
-addition = '  assert.match(panel,/앞으로의 후보 시기/)\n  assert.match(panel,/연락 ≠ 재회/)\n  assert.match(panel,/재구축 조건/)\n  assert.match(panel,/근거 보기 · 계산\\/정밀도/)\n  assert.match(panel,/hidden=\\{reunion && !!hierarchyData\\}/)\n'
+addition = '  assert.match(panel,/앞으로의 후보 시기/)\n  assert.match(panel,/연락 ≠ 재회/)\n  assert.match(panel,/재구축 조건/)\n  assert.match(panel,/근거 보기 · 계산\\/정밀도/)\n  assert.match(panel,/실제 메시지·답장·만남·관계 변화 기록과 비교하는 개인 사후 확인용/)\n  assert.match(panel,/연락 한 번이나 답장 하나만으로 재회를 판정하지 않아/)\n  assert.match(panel,/hidden=\\{reunion && !!hierarchyData\\}/)\n'
 if addition not in test:
     if anchor not in test:
         raise SystemExit('test anchor missing')
