@@ -103,6 +103,10 @@ function compactAspectForExternal(aspect: unknown) {
     orb_grade:row.orb_grade ?? undefined, time_sensitivity:row.time_sensitivity ?? undefined,
     evidence_confidence:row.evidence_confidence ?? undefined, layer_priority:row.layer_priority ?? undefined,
     event_probability:row.event_probability ?? 'not_calculated',
+    direction:row.direction ?? undefined, phase:row.phase ?? undefined, phase_basis:row.phase_basis ?? undefined,
+    exact_at:row.exact_at ?? null, exact_at_basis:row.exact_at_basis ?? undefined, reference_date:row.reference_date ?? undefined,
+    source_path:row.source_path ?? undefined, relationship_domains:Array.isArray(row.relationship_domains)?row.relationship_domains.slice(0,4):undefined,
+    stage_hints:Array.isArray(row.stage_hints)?row.stage_hints.slice(0,4):undefined, target_house:row.target_house ?? undefined,
   }
 }
 
@@ -322,6 +326,12 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     reunion_dimensions: compactReunionDimensionsForExternal(rawResult.reunion_dimensions,caps),
     reunion_secondary_support: compactReunionSecondarySupportForExternal(rawResult.reunion_secondary_support,caps.months,caps.tight),
     reunion_hierarchy: rawResult.reunion_hierarchy ? Object.fromEntries(Object.entries(rawResult.reunion_hierarchy as Record<string,unknown>).filter(([key])=>!['daily_trace','long_term_daily','saju_boundaries'].includes(key))) : null,
+    reunion_evidence_contract: rawResult.reunion_evidence_contract && typeof rawResult.reunion_evidence_contract === 'object' ? {
+      version:(rawResult.reunion_evidence_contract as Record<string,unknown>).version ?? null,
+      available:(rawResult.reunion_evidence_contract as Record<string,unknown>).available ?? false,
+      evidence:(Array.isArray((rawResult.reunion_evidence_contract as Record<string,unknown>).evidence) ? ((rawResult.reunion_evidence_contract as Record<string,unknown>).evidence as unknown[]) : []).slice(0,48).map(compactAspectForExternal).filter(Boolean),
+      policy:(rawResult.reunion_evidence_contract as Record<string,unknown>).policy ?? null,
+    } : null,
     reunion_timing_windows: rawResult.reunion_timing_windows ?? null,
     reunion_return_support: rawResult.reunion_return_support ?? null,
     reunion_directional_context: reunionContext ? {
