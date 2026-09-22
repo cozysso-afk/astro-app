@@ -1,0 +1,68 @@
+name: Reunion production timeline hotfix
+on:
+  push:
+    branches: [fix/reunion-production-timeline]
+permissions:
+  contents: write
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch old-saved-result guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          panel_path = Path('web/src/RelationshipInterpretationPanel.tsx')
+          panel = panel_path.read_text(encoding='utf-8')
+          marker = '''    </div>\n\n    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">'''
+          insert = '''    </div>\n\n    {reunion && !hierarchyData && <section className="reading-section reunion-legacy-result" role="status">\n      <h3>이전 계산 저장본</h3>\n      <p>이 결과는 단계별 사후검증 엔진이 포함되기 전 계산본이야. 아래에 보이는 과거 날짜를 현재나 미래의 추천 시기처럼 해석하지 마.</p>\n      <p>재회운 정밀 계산을 다시 실행하면 AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기가 새 계산값으로 분리돼.</p>\n    </section>}\n\n    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">'''
+          if marker not in panel:
+              raise SystemExit('panel insertion marker missing')
+          panel = panel.replace(marker, insert, 1)
+          old = '<h3>{ai.data.headline}</h3>'
+          new = "<h3>{reunion && !hierarchyData ? '이전 저장 해설 · 참고용' : ai.data.headline}</h3>"
+          if old not in panel:
+              raise SystemExit('legacy heading marker missing')
+          panel = panel.replace(old, new, 1)
+          old_timing = '<section className="reunion-ai-block"><h4>접점이 강해지는 시기</h4>'
+          new_timing = "<section className=\"reunion-ai-block\"><h4>{!hierarchyData ? '이전 저장본 시기 해설 · 현재/미래 판단용 아님' : '접점이 강해지는 시기'}</h4>"
+          if old_timing not in panel:
+              raise SystemExit('legacy timing marker missing')
+          panel = panel.replace(old_timing, new_timing, 1)
+          panel_path.write_text(panel, encoding='utf-8')
+
+          test_path = Path('web/src/lib/relationshipReunionV2.contract.test.mjs')
+          test = test_path.read_text(encoding='utf-8')
+          anchor = "  assert.match(panel,/지난 활성기 · 사후 확인용/)\n"
+          addition = "  assert.match(panel,/이전 계산 저장본/)\n  assert.match(panel,/AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기/)\n  assert.match(panel,/이전 저장본 시기 해설 · 현재\\/미래 판단용 아님/)\n"
+          if addition not in test:
+              if anchor not in test:
+                  raise SystemExit('contract assertion marker missing')
+              test = test.replace(anchor, anchor + addition, 1)
+              test_path.write_text(test, encoding='utf-8')
+          PY
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Targeted reunion contracts
+        working-directory: web
+        run: node src/lib/relationshipReunionV2.contract.test.mjs
+      - name: Web build
+        working-directory: web
+        run: npm run build
+      - name: Diff check
+        run: git diff --check
+      - name: Commit clean product change
+        run: |
+          git rm .github/workflows/reunion-production-timeline-hotfix.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add web/src/RelationshipInterpretationPanel.tsx web/src/lib/relationshipReunionV2.contract.test.mjs
+          git commit -m "fix: guard legacy reunion results after hierarchy rollout"
+          git push origin HEAD:fix/reunion-production-timeline
