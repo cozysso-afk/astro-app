@@ -23,8 +23,9 @@ from birth_time_reliability_v1 import resolve_birth_time_reliability
 from timezone_provenance_v1 import resolve_local_datetime, resolve_profile_birth_datetime
 from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
 from reunion_dimension_v1 import DIMENSIONS, FAST_TRIGGER_PLANETS, daily_dimension_scores, secondary_support
+from relationship_evidence_contract_v1 import build_reunion_evidence_contract
 
-ENGINE_VERSION = "relationship-western-v1.13-four-stage-gated-dates"
+ENGINE_VERSION = "relationship-western-v1.14-reunion-evidence-contract"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -1083,6 +1084,13 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
                 "progressed_to_progressed": _aspects(up, cp, mode="secondary", limit=500 if analysis_mode == "reunion" else 24),
             }
             row["progressed_synastry"] = {"available": True, "precision": progressed_precision, **ps}
+            row["progressed_house_overlays"] = {
+                "available": bool(user_clock_ready and cp_clock_ready),
+                "precision": progressed_precision if user_clock_ready and cp_clock_ready else "unavailable",
+                "user_progressed_in_counterpart": _house_overlays(up, cp_natal, "user_progressed", "counterpart") if cp_clock_ready else {"available": False, "reason": "counterpart entered birth time/place required"},
+                "counterpart_progressed_in_user": _house_overlays(cp, user_natal, "counterpart_progressed", "user") if user_clock_ready else {"available": False, "reason": "user entered birth time/place required"},
+                "policy": "Progressed planets are placed into the other person's natal Whole Sign + quadrant houses. House labels inherit the target person's birth-time precision and are provisional unless provenance-verified exact.",
+            }
             layer_aspects.update({f"progressed_synastry.{k}": v for k, v in ps.items()})
 
             prog_comp = _midpoint_chart(up, cp)
@@ -1098,6 +1106,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             layer_aspects["progressed_composite_to_natal_composite"] = pc_aspects
         else:
             row["progressed_synastry"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed synastry."}
+            row["progressed_house_overlays"] = {"available": False, "reason": "Progressed house overlays require concrete entered birth times and coordinates."}
             row["progressed_composite"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed composite."}
 
         if marks_a is not None and marks_b is not None:
@@ -1127,6 +1136,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
 
     result["months"] = monthly
     if analysis_mode == "reunion":
+        result["reunion_evidence_contract"] = build_reunion_evidence_contract(monthly)
         result["reunion_secondary_support"] = {
             "months": [
                 {"calendar_month": row["calendar_month"], "representative_date": row["representative_date"], "dimensions": row.get("reunion_secondary_support")}
@@ -1144,6 +1154,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
         "reunion_dimensions": "For reunion mode keep four orthogonal stages separate: emotional activation, contact/recontact, in-person meeting, and relationship rebuilding/reunion. One stage never auto-escalates to the next. Legacy incoming/outgoing fields are counterpart-side/user-side activation only, never who contacts first.",
         "reunion_dates": "Secondary progression is period context. Exact dates require fast Sun/Mercury/Venus/Mars transit evidence. Planetary return is deduplicated from the same transit phenomenon and cannot add an independent convergence vote.",
+        "reunion_evidence_contract": "Progressed synastry is kept directional (user→counterpart, counterpart→user, progressed↔progressed) and progressed composite is relationship-level. Monthly orb trend may label applying/separating, but unresolved exact dates remain null; progressed house overlays inherit birth-time precision.",
         "birth_time": "An entered clock time is not automatically exact. When a concrete time and coordinates exist, Moon/angles/houses/Davison/Marks may be calculated as provisional reference layers; only provenance-verified time may be labelled exact or treated as decisive. Provisional angles do not alter deterministic timing scores.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }

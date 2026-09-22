@@ -61,6 +61,16 @@ export type Aspect = {
   birth_time_dependency?: boolean | null
   layer_priority?: number | null
   event_probability?: string | null
+  direction?: 'user_to_counterpart' | 'counterpart_to_user' | 'shared' | 'relationship_itself' | string
+  phase?: 'applying' | 'separating' | 'exact' | 'indeterminate' | string
+  phase_basis?: string | null
+  exact_at?: string | null
+  exact_at_basis?: string | null
+  reference_date?: string | null
+  source_path?: string | null
+  relationship_domains?: string[]
+  stage_hints?: string[]
+  target_house?: { whole_house?: number | null; quadrant_house?: number | null; quadrant_system?: string | null } | null
 }
 
 export type SignalSummary = {
@@ -143,6 +153,7 @@ export type RelationshipApiResponse = {
       directional_context?: ReunionTimingContext
     }
     reunion_hierarchy?: Record<string, unknown>
+    reunion_evidence_contract?: { version?: string; available?: boolean; evidence?: Aspect[]; policy?: Record<string, string> }
     reunion_return_support?: Record<string, unknown>
   }
 }
