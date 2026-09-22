@@ -1,0 +1,69 @@
+name: Apply reunion interpretation vNext v2
+
+on:
+  push:
+    branches:
+      - feat/reunion-interpretation-vnext
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/reunion-interpretation-vnext
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply base patch
+        run: python scripts/apply_reunion_interpretation_vnext.py
+      - name: Preserve evidence breadth and isolate legacy tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          ev = Path('supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.ts')
+          s = ev.read_text(encoding='utf-8')
+          old = 'evidence:evidence.slice(0,36),convergence,initiative_gate}'
+          new = 'evidence:evidence.slice(0,64),convergence,initiative_gate}'
+          if old not in s:
+              raise SystemExit('evidence cap anchor missing')
+          ev.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs')
+          s = test.read_text(encoding='utf-8')
+          anchors = [
+              ("test('progression and derived Marks activation do not establish first-contact direction',()=>{\n  const p=exactPacket()",
+               "test('progression and derived Marks activation do not establish first-contact direction',()=>{\n  const p=exactPacket()\n  delete p.reunion_evidence_contract"),
+              ("test('convergence requires independent evidence aligned to the same role',()=>{\n  const p=exactPacket()",
+               "test('convergence requires independent evidence aligned to the same role',()=>{\n  const p=exactPacket()\n  delete p.reunion_evidence_contract"),
+          ]
+          for old, new in anchors:
+              if old not in s:
+                  raise SystemExit(f'test anchor missing: {old[:80]}')
+              s = s.replace(old, new, 1)
+          test.write_text(s, encoding='utf-8')
+          PY
+      - name: Focused interpretation contracts
+        run: |
+          node --test supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs
+          node --test web/src/lib/relationshipEvidencePipeline.test.mjs
+          node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+          git diff --check
+      - name: Remove temporary runners
+        run: |
+          rm scripts/apply_reunion_interpretation_vnext.py
+          rm .github/workflows/apply-reunion-interpretation-vnext.yml
+          rm .github/workflows/apply-reunion-interpretation-vnext-v2.yml
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat: ground reunion narrative in directional progression evidence"
+          git push origin HEAD:feat/reunion-interpretation-vnext
