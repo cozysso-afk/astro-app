@@ -229,6 +229,12 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       {!!imageExportStatus && <small role="status">{imageExportStatus}</small>}
     </div>
 
+    {reunion && !hierarchyData && <section className="reading-section reunion-legacy-result" role="status">
+      <h3>이전 계산 저장본</h3>
+      <p>이 결과는 단계별 사후검증 엔진이 포함되기 전 계산본이야. 아래에 보이는 과거 날짜를 현재나 미래의 추천 시기처럼 해석하지 마.</p>
+      <p>재회운 정밀 계산을 다시 실행하면 AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기가 새 계산값으로 분리돼.</p>
+    </section>}
+
     {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">
       <h3>재회 흐름 타임라인</h3>
       {hierarchyData.validation?.status !== 'PASS' ? <p role="alert">계산 검증에 실패해 미래 후보와 해설을 보류했어.</p> : <>
@@ -310,14 +316,14 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     </section>}
 
     {ai?.ok && ai.data && (!reunion || !hierarchyData) ? <section className="reading-section relationship-natural-reading">
-      <h3>{ai.data.headline}</h3>
+      <h3>{reunion && !hierarchyData ? '이전 저장 해설 · 참고용' : ai.data.headline}</h3>
       {reunion ? <ReadableCopy className="reading-conclusion" text={reunionV2?.summary || reunionAi?.bottom || ai.data.overview}/> : <p className="reading-conclusion">{analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview}</p>}
       {!!generatedCost && <p className="ai-generated-cost">{generatedCost}</p>}
       {reunion && reunionV2 ? <>
         <section className="reunion-ai-block"><h4>다시 연결될 여지가 있는 이유</h4><ReadableCopy text={reunionV2.why_reconnect.conclusion}/><ReadableCopy text={reunionV2.why_reconnect.interpretation}/></section>
         {returnContextBlock}
         <section className="reunion-ai-snapshot"><h4>누가 먼저 움직일 흐름인가</h4><ReadableCopy className="reunion-initiative-summary" text={reunionV2.initiative.conclusion}/><ReadableCopy text={reunionV2.initiative.interpretation}/><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
-        <section className="reunion-ai-block"><h4>접점이 강해지는 시기</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
+        <section className="reunion-ai-block"><h4>{!hierarchyData ? '이전 저장본 시기 해설 · 현재/미래 판단용 아님' : '접점이 강해지는 시기'}</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
         <section className="reunion-ai-block"><h4>다시 붙었을 때 관계 구조</h4><ReadableCopy text={reunionV2.rebuild.conclusion}/>{reunionV2.rebuild.conditions.length>0&&<ul>{reunionV2.rebuild.conditions.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
         <section className="reunion-ai-block"><h4>다시 깨뜨릴 수 있는 반복 패턴</h4><ReadableCopy text={reunionV2.repeat_risks.conclusion}/>{reunionV2.repeat_risks.patterns.length>0&&<ul>{reunionV2.repeat_risks.patterns.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
         {reunionV2.convergence.length>0&&<details className="reunion-precision-note"><summary>여러 차트가 함께 가리키는 수렴 근거</summary>{reunionV2.convergence.map((x,i)=><div key={i}><b>{x.theme}{x.period?` · ${x.period}`:''}</b><p>{x.meaning}</p></div>)}</details>}
