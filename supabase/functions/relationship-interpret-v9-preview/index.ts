@@ -117,7 +117,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  });
  if(purpose==="reunion"){
    const reunion_evidence_v2=buildReunionEvidenceV2(base);
-   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_hierarchy:base.reunion_hierarchy,reunion_dimensions:base.reunion_dimensions,reunion_secondary_support:base.reunion_secondary_support,reunion_timing_windows:base.reunion_timing_windows,reunion_return_support:base.reunion_return_support,reunion_evidence_v2,limitations:base.limitations};
+   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_hierarchy:base.reunion_hierarchy,reunion_dimensions:base.reunion_dimensions,reunion_secondary_support:base.reunion_secondary_support,reunion_evidence_contract:base.reunion_evidence_contract,reunion_timing_windows:base.reunion_timing_windows,reunion_return_support:base.reunion_return_support,reunion_evidence_v2,limitations:base.limitations};
  }
  return base;
 }
