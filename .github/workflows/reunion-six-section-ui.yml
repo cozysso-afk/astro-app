@@ -17,6 +17,18 @@ jobs:
           node-version: 22
       - name: Patch reunion primary reading
         run: python scripts/tmp_reunion_six_section_patch.py
+      - name: Fix optional rebuild conditions narrowing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/RelationshipInterpretationPanel.tsx')
+          s=p.read_text(encoding='utf-8')
+          old="{reunionV2?.rebuild?.conditions?.length>0&&<ul>{reunionV2.rebuild.conditions.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul>}"
+          new="{(reunionV2?.rebuild?.conditions?.length ?? 0)>0&&<ul>{reunionV2?.rebuild?.conditions?.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul>}"
+          if old not in s:
+              raise SystemExit('rebuild narrowing marker missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
       - name: Install web dependencies
         working-directory: web
         run: npm ci
