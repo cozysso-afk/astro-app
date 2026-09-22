@@ -29,6 +29,15 @@ jobs:
               raise SystemExit('rebuild narrowing marker missing')
           p.write_text(s.replace(old,new,1),encoding='utf-8')
           PY
+      - name: Normalize changed-file whitespace
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['web/src/RelationshipInterpretationPanel.tsx','web/src/lib/relationshipReunionV2.contract.test.mjs']:
+              p=Path(name)
+              lines=p.read_text(encoding='utf-8').splitlines()
+              p.write_text('\n'.join(line.rstrip() for line in lines)+'\n',encoding='utf-8')
+          PY
       - name: Install web dependencies
         working-directory: web
         run: npm ci
