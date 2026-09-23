@@ -1,0 +1,52 @@
+name: Align reunion UI regression test once
+
+on:
+  push:
+    branches: [feat/reunion-ui-vnext]
+    paths:
+      - '.github/workflows/reunion-ui-test-align-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Align stale activation UI assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/lib/readingExperience.test.mjs')
+          s=p.read_text()
+          old="""  const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
+"""
+          new="""  const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/계산 근거 보기/)
+  assert.match(panel,/보조지표 활성도/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/숫자는 사건 확률이나 현재 감정 세기가 아니라/)
+  assert.match(panel,/Math\\.round\\(stage\\.activation/)
+"""
+          if old not in s:
+              raise SystemExit('stale assertion block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Verify focused tests
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          node --test src/lib/readingExperience.test.mjs src/lib/reunionUiVnext.test.mjs
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/lib/readingExperience.test.mjs
+          git commit -m 'test: align reunion activation UI contract'
+          git push origin HEAD:feat/reunion-ui-vnext
