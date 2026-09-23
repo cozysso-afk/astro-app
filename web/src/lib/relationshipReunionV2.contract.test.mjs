@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const server=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const publicError=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+const hierarchyPanel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
@@ -58,27 +59,30 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion v2.14 keeps hierarchy timing deterministic while expanding stage-grounded narrative',()=>{
+test('reunion hierarchy vNext keeps deterministic timing and a present-first stage-grounded UI',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.5-directional-evidence-narrative-v1/)
-  assert.match(panel,/재회 흐름 타임라인/)
-  assert.match(panel,/가장 가까운 활성창/)
-  assert.match(panel,/지난 활성기 · 사후 확인용/)
+  const headings=['지금 두 사람은 어디에 있나','서로에게 걸리는 방향','관계 자체의 현재 단계','지난 활성기 · 사후 확인용','앞으로의 후보 시기','연락 ≠ 재회','관계를 다시 이어가려면','계산 근거 보기']
+  let cursor=-1
+  for(const heading of headings){
+    const next=hierarchyPanel.indexOf(heading)
+    assert.ok(next>cursor,`${heading} order`)
+    cursor=next
+  }
+  assert.match(hierarchyPanel,/가장 가까운 후보/)
+  assert.match(hierarchyPanel,/실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용/)
+  assert.match(hierarchyPanel,/과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
+  assert.match(hierarchyPanel,/실제 속마음이나 실제 선연락 행동을 관측한 값은 아니야/)
+  assert.match(hierarchyPanel,/진행 컴포짓을 포함한 관계층/)
+  assert.match(hierarchyPanel,/다시 멀어질 수 있는 지점/)
+  assert.match(hierarchyPanel,/보조지표 활성도/)
+  assert.match(hierarchyPanel,/사건 확정일 아님/)
   assert.match(panel,/이전 계산 저장본/)
   assert.match(panel,/AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기/)
   assert.match(panel,/이전 저장본 시기 해설 · 현재\/미래 판단용 아님/)
-  assert.match(panel,/실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용/)
-  assert.match(panel,/현재 흐름/)
-  assert.match(panel,/앞으로의 후보 시기/)
-  assert.match(panel,/고정 관계 구조 · 필요할 때만 보기/)
-  assert.match(panel,/지금 두 사람 사이에서 살아 있는 흐름/)
-  assert.match(panel,/지금 어디까지 와 있나/)
-  assert.match(panel,/연락이 닿은 뒤, 재회까지는 뭐가 남나/)
-  assert.match(panel,/다시 멀어질 수 있는 지점/)
-  assert.match(panel,/reunionStageHuman/)
-  assert.match(panel,/보조지표 활성도/)
+  assert.match(panel,/<ReunionHierarchyPanel/)
   assert.match(panel,/\(!reunion \|\| !hierarchyData\)/)
   assert.match(hierarchy,/top_periods: topPeriods/)
   assert.match(hierarchy,/past_windows: pastWindows/)
