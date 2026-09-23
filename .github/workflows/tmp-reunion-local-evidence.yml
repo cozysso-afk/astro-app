@@ -6,7 +6,6 @@ permissions:
   contents: write
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'feat: show local reunion progression evidence') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
