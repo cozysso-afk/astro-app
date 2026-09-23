@@ -253,3 +253,11 @@ def test_relationship_response_is_json_serializable_and_meta_engine_matches_runt
     meta = client.get("/v1/meta")
     assert meta.status_code == 200
     assert meta.json()["relationship_engine"] == payload["engine"]
+
+def test_reunion_meta_exposes_runtime_contract_and_git_sha_field():
+    response = client.get("/v1/meta")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reunion_evidence_contract"] == "reunion-evidence-contract-v1"
+    assert "runtime_git_sha" in body
+
