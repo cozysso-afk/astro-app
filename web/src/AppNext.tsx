@@ -444,9 +444,9 @@ export default function AppNext() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/v1/meta`)
+    fetch(`${API_BASE}/health`)
       .then((response) => {
-        if (!response.ok) throw new Error('meta check failed')
+        if (!response.ok) throw new Error('health check failed')
         return response.json()
       })
       .then((payload) => {

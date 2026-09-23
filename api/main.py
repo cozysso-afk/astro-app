@@ -358,7 +358,12 @@ def _run_calc_job(job_id: str, payload: dict):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "version": APP_VERSION}
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "reunion_evidence_contract": REUNION_EVIDENCE_CONTRACT_VERSION,
+        "runtime_git_sha": os.getenv("RENDER_GIT_COMMIT", ""),
+    }
 
 
 @app.get("/v1/meta")

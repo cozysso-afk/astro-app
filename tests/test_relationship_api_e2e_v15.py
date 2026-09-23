@@ -261,3 +261,10 @@ def test_reunion_meta_exposes_runtime_contract_and_git_sha_field():
     assert body["reunion_evidence_contract"] == "reunion-evidence-contract-v1"
     assert "runtime_git_sha" in body
 
+def test_reunion_health_exposes_public_runtime_contract_and_git_sha_field():
+    response = client.get("/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reunion_evidence_contract"] == "reunion-evidence-contract-v1"
+    assert "runtime_git_sha" in body
+
