@@ -1,7 +1,8 @@
 name: Temporary reunion local evidence patch
 on:
   push:
-    branches: [feat/reunion-local-evidence-reading]
+    branches:
+      - feat/reunion-local-evidence-reading
 permissions:
   contents: write
 jobs:
@@ -18,171 +19,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Patch UI
-        shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          app = Path('web/src/AppNext.tsx')
-          s = app.read_text()
-          old = "                hierarchy={relationshipResult.result.reunion_hierarchy ?? null}\n                technicalDetails={< >".replace('< >','<>')
-          new = "                hierarchy={relationshipResult.result.reunion_hierarchy ?? null}\n                evidenceContract={relationshipResult.result.reunion_evidence_contract ?? null}\n                technicalDetails={< >".replace('< >','<>')
-          assert old in s, 'AppNext relationship panel anchor missing'
-          app.write_text(s.replace(old, new, 1))
-
-          host = Path('web/src/RelationshipInterpretationPanel.tsx')
-          s = host.read_text()
-          old = "returnSupport, hierarchy, technicalDetails }: {"
-          new = "returnSupport, hierarchy, evidenceContract, technicalDetails }: {"
-          assert old in s, 'host destructuring anchor missing'
-          s = s.replace(old, new, 1)
-          old = "  hierarchy?: Record<string, unknown> | null;\n  timing?: ReunionTimingContext | null;"
-          new = "  hierarchy?: Record<string, unknown> | null;\n  evidenceContract?: { version?: string; available?: boolean; evidence?: Aspect[] } | null;\n  timing?: ReunionTimingContext | null;"
-          assert old in s, 'host prop type anchor missing'
-          s = s.replace(old, new, 1)
-          old = "    hierarchyData={hierarchyData}\n    reunionV2={reunionV2}"
-          new = "    hierarchyData={hierarchyData}\n    evidence={evidenceContract?.evidence ?? []}\n    reunionV2={reunionV2}"
-          assert old in s, 'host hierarchy invocation anchor missing'
-          host.write_text(s.replace(old, new, 1))
-
-          panel = Path('web/src/ReunionHierarchyPanel.tsx')
-          s = panel.read_text()
-          s = s.replace("import type { RelationshipAiResponse } from './appTypes'", "import type { Aspect, RelationshipAiResponse } from './appTypes'", 1)
-          anchor = "function Copy({ value }: { value?: string | null }) {\n  const text = String(value ?? '').trim()\n  return text ? <p>{text}</p> : null\n}\n"
-          assert anchor in s, 'local evidence helper anchor missing'
-          helpers = r'''
-
-const PLANET_LABEL: Record<string,string> = {
-  Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성',
-  Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성', 'True Node':'진북교점', Node:'교점', ASC:'상승점', DSC:'하강점', MC:'중천점', IC:'천저점',
-}
-const ASPECT_LABEL: Record<string,string> = {
-  conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
-}
-const DOMAIN_COPY: Array<[string,string]> = [
-  ['communication','생각·말·연락 주제가 서로 맞물리는 근거야.'],
-  ['affection_attraction','호감·애정 표현·관계 매력이 다시 의식되기 쉬운 근거야.'],
-  ['emotional','감정 반응과 정서적 연결이 서로를 건드리는 근거야.'],
-  ['action_meeting','행동이나 실제 접점으로 옮기는 힘을 건드리는 근거야.'],
-  ['stability_commitment','관계를 현실적으로 유지하거나 정리하는 조건을 건드리는 근거야.'],
-  ['instability_uncertainty','확신과 표현의 일관성이 흔들릴 수 있는 근거야.'],
-  ['intensity_transformation','관계를 가볍게 넘기기보다 강하게 의식하고 재정의하게 만드는 근거야.'],
-  ['visibility_status','관계의 상태나 바깥으로 드러나는 방식과 연결되는 근거야.'],
-]
-
-function aspectLabel(row: Aspect) {
-  const a = PLANET_LABEL[row.a] ?? row.a
-  const b = PLANET_LABEL[row.b] ?? row.b
-  const aspect = ASPECT_LABEL[row.aspect] ?? row.aspect
-  const orb = Number.isFinite(Number(row.orb)) ? Number(row.orb).toFixed(2) : '—'
-  return `${a} ${aspect} ${b} · 오브 ${orb}°`
-}
-
-function evidencePhase(row: Aspect) {
-  if (row.phase === 'exact') return row.exact_at ? `근접 정점 · 정확일 ${row.exact_at}` : '근접 정점'
-  if (row.phase === 'applying') return '적용 중 · 오브가 더 좁아지는 흐름'
-  if (row.phase === 'separating') return '분리 중 · 가장 가까운 구간을 지난 흐름'
-  return '시간 방향 미확정'
-}
-
-function evidenceMeaning(row: Aspect) {
-  const domains = Array.isArray(row.relationship_domains) ? row.relationship_domains : []
-  const base = DOMAIN_COPY.find(([key])=>domains.includes(key))?.[1]
-    ?? ((row.a === 'Mercury' || row.b === 'Mercury') ? '대화·생각·표현 방식이 강하게 맞물리는 근거야.'
-      : (row.a === 'Venus' || row.b === 'Venus') ? '호감과 관계 매력, 애정 표현 방식을 건드리는 근거야.'
-      : (row.a === 'Moon' || row.b === 'Moon') ? '감정 반응과 정서적 공감대를 건드리는 근거야.'
-      : (row.a === 'Mars' || row.b === 'Mars') ? '행동 욕구와 실제 움직임을 건드리는 근거야.'
-      : '현재 관계의 반응과 방향을 건드리는 계산 근거야.')
-  if (row.tone === 'challenging') return `${base} 다만 충돌·오해·제약 쪽으로도 나타날 수 있어서 다른 근거와 함께 봐야 해.`
-  if (row.tone === 'supportive') return `${base} 흐름을 부드럽게 이어주는 쪽이지만, 이것만으로 실제 연락이나 재회를 확정하지는 않아.`
-  return `${base} 지지와 긴장이 함께 섞일 수 있어서 한 방향으로 단정하지 않아.`
-}
-
-function houseLabel(row: Aspect, direction: string) {
-  const house = row.target_house
-  if (!house) return ''
-  const whole = Number(house.whole_house)
-  const quad = Number(house.quadrant_house)
-  const owner = direction === 'counterpart_to_user' ? '내' : direction === 'user_to_counterpart' ? '상대' : '대상'
-  if (Number.isFinite(whole) && Number.isFinite(quad) && whole === quad) return `${owner} ${whole}하우스 중첩`
-  const parts: string[] = []
-  if (Number.isFinite(whole)) parts.push(`홀사인 ${whole}하우스`)
-  if (Number.isFinite(quad)) parts.push(`${house.quadrant_system || '사분면'} ${quad}하우스`)
-  return parts.length ? `${owner} · ${parts.join(' / ')}` : ''
-}
-
-function evidenceDistance(row: Aspect, asOf: string) {
-  const date = String(row.reference_date ?? '')
-  const t = Date.parse(date || '9999-12-31')
-  const base = Date.parse(asOf || '9999-12-31')
-  return Number.isFinite(t) && Number.isFinite(base) ? Math.abs(t-base) : Number.MAX_SAFE_INTEGER
-}
-
-function selectEvidence(evidence: Aspect[], direction: string, asOf: string, limit = 3) {
-  const picked = new Map<string,Aspect>()
-  for (const row of evidence.filter((item)=>item.direction === direction)) {
-    const key = `${row.a}|${row.aspect}|${row.b}`
-    const current = picked.get(key)
-    if (!current || evidenceDistance(row,asOf) < evidenceDistance(current,asOf) ||
-      (evidenceDistance(row,asOf) === evidenceDistance(current,asOf) && Number(row.orb) < Number(current.orb))) picked.set(key,row)
-  }
-  const phaseRank = (phase?: string) => phase === 'exact' ? 0 : phase === 'applying' ? 1 : phase === 'separating' ? 2 : 3
-  return [...picked.values()].sort((a,b)=>evidenceDistance(a,asOf)-evidenceDistance(b,asOf) || phaseRank(a.phase)-phaseRank(b.phase) || Number(a.orb)-Number(b.orb)).slice(0,limit)
-}
-
-function EvidenceRows({ evidence, direction, asOf, title }: { evidence: Aspect[]; direction:string; asOf:string; title:string }) {
-  const rows = selectEvidence(evidence,direction,asOf)
-  if (!rows.length) return null
-  return <div className="reunion-local-evidence-group"><b>{title}</b>{rows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${direction}:${row.a}:${row.aspect}:${row.b}:${index}`}>
-    <strong>{aspectLabel(row)}</strong>
-    <p>{evidenceMeaning(row)}</p>
-    <small>{[evidencePhase(row), houseLabel(row,direction), row.reference_date ? `계산 기준 ${row.reference_date}` : '', row.exact_at ? `정확일 ${row.exact_at}` : ''].filter(Boolean).join(' · ')}</small>
-  </article>)}</div>
-}
-'''
-          s = s.replace(anchor, anchor + helpers, 1)
-          old = "  hierarchyData,\n  reunionV2,"
-          new = "  hierarchyData,\n  evidence,\n  reunionV2,"
-          assert old in s, 'panel destructuring anchor missing'
-          s = s.replace(old,new,1)
-          old = "  hierarchyData: ReunionHierarchy\n  reunionV2: ReunionSynthesis | null"
-          new = "  hierarchyData: ReunionHierarchy\n  evidence: Aspect[]\n  reunionV2: ReunionSynthesis | null"
-          assert old in s, 'panel prop type anchor missing'
-          s = s.replace(old,new,1)
-          old = "        <ReadingDirections rows={directionRows}/>\n        {reunionV2?.initiative && <>"
-          new = "        <ReadingDirections rows={directionRows}/>\n        <div className=\"reunion-local-evidence-grid\">\n          <EvidenceRows evidence={evidence} direction=\"counterpart_to_user\" asOf={hierarchyData.as_of_date} title=\"상대의 현재 진행 → 나\"/>\n          <EvidenceRows evidence={evidence} direction=\"user_to_counterpart\" asOf={hierarchyData.as_of_date} title=\"나의 현재 진행 → 상대\"/>\n          <EvidenceRows evidence={evidence} direction=\"shared\" asOf={hierarchyData.as_of_date} title=\"현재의 나 ↔ 현재의 상대 · 진행↔진행\"/>\n        </div>\n        {reunionV2?.initiative && <>"
-          assert old in s, 'direction render anchor missing'
-          s = s.replace(old,new,1)
-          old = "        {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}\n        <p className=\"reunion-score-meaning\">"
-          new = "        {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}\n        <EvidenceRows evidence={evidence} direction=\"relationship_itself\" asOf={hierarchyData.as_of_date} title=\"진행 컴포짓 · 관계 자체\"/>\n        <p className=\"reunion-score-meaning\">"
-          assert old in s, 'relationship state anchor missing'
-          panel.write_text(s.replace(old,new,1))
-
-          test = Path('web/src/lib/reunionLocalEvidenceUi.test.mjs')
-          test.write_text(r'''import test from 'node:test'
-import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-
-const app=readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8')
-const host=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
-const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
-
-test('reunion renders normalized progression evidence locally without requiring Gemini prose',()=>{
-  assert.match(app,/evidenceContract=\{relationshipResult\.result\.reunion_evidence_contract \?\? null\}/)
-  assert.match(host,/evidence=\{evidenceContract\?\.evidence \?\? \[\]\}/)
-  assert.match(panel,/상대의 현재 진행 → 나/)
-  assert.match(panel,/나의 현재 진행 → 상대/)
-  assert.match(panel,/현재의 나 ↔ 현재의 상대 · 진행↔진행/)
-  assert.match(panel,/진행 컴포짓 · 관계 자체/)
-  assert.match(panel,/오브가 더 좁아지는 흐름/)
-  assert.match(panel,/가장 가까운 구간을 지난 흐름/)
-  assert.match(panel,/정확일/)
-  assert.match(panel,/target_house/)
-  assert.doesNotMatch(panel,/상대가 나를 생각하고 있다/)
-  assert.doesNotMatch(panel,/재회 확률/)
-})
-''')
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgphcHAgPSBQYXRoKCd3ZWIvc3JjL0FwcE5leHQudHN4JykKcyA9IGFwcC5yZWFkX3RleHQoKQpvbGQgPSAiICAgICAgICAgICAgICAgIGhpZXJhcmNoeT17cmVsYXRpb25zaGlwUmVzdWx0LnJlc3VsdC5yZXVuaW9uX2hpZXJhcmNoeSA/PyBudWxsfVxuICAgICAgICAgICAgICAgIHRlY2huaWNhbERldGFpbHM9ezw+IgpuZXcgPSAiICAgICAgICAgICAgICAgIGhpZXJhcmNoeT17cmVsYXRpb25zaGlwUmVzdWx0LnJlc3VsdC5yZXVuaW9uX2hpZXJhcmNoeSA/PyBudWxsfVxuICAgICAgICAgICAgICAgIGV2aWRlbmNlQ29udHJhY3Q9e3JlbGF0aW9uc2hpcFJlc3VsdC5yZXN1bHQucmV1bmlvbl9ldmlkZW5jZV9jb250cmFjdCA/PyBudWxsfVxuICAgICAgICAgICAgICAgIHRlY2huaWNhbERldGFpbHM9ezw+Igphc3NlcnQgb2xkIGluIHMsICdBcHBOZXh0IHJlbGF0aW9uc2hpcCBwYW5lbCBhbmNob3IgbWlzc2luZycKYXBwLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCwgbmV3LCAxKSkKCmhvc3QgPSBQYXRoKCd3ZWIvc3JjL1JlbGF0aW9uc2hpcEludGVycHJldGF0aW9uUGFuZWwudHN4JykKcyA9IGhvc3QucmVhZF90ZXh0KCkKb2xkID0gInJldHVyblN1cHBvcnQsIGhpZXJhcmNoeSwgdGVjaG5pY2FsRGV0YWlscyB9OiB7IgpuZXcgPSAicmV0dXJuU3VwcG9ydCwgaGllcmFyY2h5LCBldmlkZW5jZUNvbnRyYWN0LCB0ZWNobmljYWxEZXRhaWxzIH06IHsiCmFzc2VydCBvbGQgaW4gcywgJ2hvc3QgZGVzdHJ1Y3R1cmluZyBhbmNob3IgbWlzc2luZycKcyA9IHMucmVwbGFjZShvbGQsIG5ldywgMSkKb2xkID0gIiAgaGllcmFyY2h5PzogUmVjb3JkPHN0cmluZywgdW5rbm93bj4gfCBudWxsO1xuICB0aW1pbmc/OiBSZXVuaW9uVGltaW5nQ29udGV4dCB8IG51bGw7IgpuZXcgPSAiICBoaWVyYXJjaHk/OiBSZWNvcmQ8c3RyaW5nLCB1bmtub3duPiB8IG51bGw7XG4gIGV2aWRlbmNlQ29udHJhY3Q/OiB7IHZlcnNpb24/OiBzdHJpbmc7IGF2YWlsYWJsZT86IGJvb2xlYW47IGV2aWRlbmNlPzogQXNwZWN0W10gfSB8IG51bGw7XG4gIHRpbWluZz86IFJldW5pb25UaW1pbmdDb250ZXh0IHwgbnVsbDsiCmFzc2VydCBvbGQgaW4gcywgJ2hvc3QgcHJvcCB0eXBlIGFuY2hvciBtaXNzaW5nJwpzID0gcy5yZXBsYWNlKG9sZCwgbmV3LCAxKQpvbGQgPSAiICAgIGhpZXJhcmNoeURhdGE9e2hpZXJhcmNoeURhdGF9XG4gICAgcmV1bmlvblYyPXtyZXVuaW9uVjJ9IgpuZXcgPSAiICAgIGhpZXJhcmNoeURhdGE9e2hpZXJhcmNoeURhdGF9XG4gICAgZXZpZGVuY2U9e2V2aWRlbmNlQ29udHJhY3Q/LmV2aWRlbmNlID8/IFtdfVxuICAgIHJldW5pb25WMj17cmV1bmlvblYyfSIKYXNzZXJ0IG9sZCBpbiBzLCAnaG9zdCBoaWVyYXJjaHkgaW52b2NhdGlvbiBhbmNob3IgbWlzc2luZycKaG9zdC53cml0ZV90ZXh0KHMucmVwbGFjZShvbGQsIG5ldywgMSkpCgpwYW5lbCA9IFBhdGgoJ3dlYi9zcmMvUmV1bmlvbkhpZXJhcmNoeVBhbmVsLnRzeCcpCnMgPSBwYW5lbC5yZWFkX3RleHQoKQpvbGRfaW1wb3J0ID0gImltcG9ydCB0eXBlIHsgUmVsYXRpb25zaGlwQWlSZXNwb25zZSB9IGZyb20gJy4vYXBwVHlwZXMnIgphc3NlcnQgb2xkX2ltcG9ydCBpbiBzLCAncGFuZWwgaW1wb3J0IGFuY2hvciBtaXNzaW5nJwpzID0gcy5yZXBsYWNlKG9sZF9pbXBvcnQsICJpbXBvcnQgdHlwZSB7IEFzcGVjdCwgUmVsYXRpb25zaGlwQWlSZXNwb25zZSB9IGZyb20gJy4vYXBwVHlwZXMnIiwgMSkKYW5jaG9yID0gImZ1bmN0aW9uIENvcHkoeyB2YWx1ZSB9OiB7IHZhbHVlPzogc3RyaW5nIHwgbnVsbCB9KSB7XG4gIGNvbnN0IHRleHQgPSBTdHJpbmcodmFsdWUgPz8gJycpLnRyaW0oKVxuICByZXR1cm4gdGV4dCA/IDxwPnt0ZXh0fTwvcD4gOiBudWxsXG59XG4iCmFzc2VydCBhbmNob3IgaW4gcywgJ2xvY2FsIGV2aWRlbmNlIGhlbHBlciBhbmNob3IgbWlzc2luZycKaGVscGVycyA9IHInJycKCmNvbnN0IFBMQU5FVF9MQUJFTDogUmVjb3JkPHN0cmluZyxzdHJpbmc+ID0gewogIFN1bjon7YOc7JaRJywgTW9vbjon64usJywgTWVyY3VyeTon7IiY7ISxJywgVmVudXM6J+q4iOyEsScsIE1hcnM6J+2ZlOyEsScsIEp1cGl0ZXI6J+uqqeyEsScsIFNhdHVybjon7Yag7ISxJywKICBVcmFudXM6J+yynOyZleyEsScsIE5lcHR1bmU6J+2VtOyZleyEsScsIFBsdXRvOifrqoXsmZXshLEnLCAnVHJ1ZSBOb2RlJzon7KeE67aB6rWQ7KCQJywgTm9kZTon6rWQ7KCQJywgQVNDOifsg4HsirnsoJAnLCBEU0M6J+2VmOqwleygkCcsIE1DOifspJHsspzsoJAnLCBJQzon7LKc7KCA7KCQJywKfQpjb25zdCBBU1BFQ1RfTEFCRUw6IFJlY29yZDxzdHJpbmcsc3RyaW5nPiA9IHsKICBjb25qdW5jdGlvbjon7ZWpJywgb3Bwb3NpdGlvbjon64yA66a9Jywgc3F1YXJlOifsgqzqsIEnLCB0cmluZTon7IK86rCBJywgc2V4dGlsZTon7Jyh7ZWpJywgcXVpbmN1bng6JzE1MOuPhCDsobDsoJXqsIEnLAp9CmNvbnN0IERPTUFJTl9DT1BZOiBBcnJheTxbc3RyaW5nLHN0cmluZ10+ID0gWwogIFsnY29tbXVuaWNhdGlvbicsJ+yDneqwgcK366eQwrfsl7Drnb0g7KO87KCc6rCAIOyEnOuhnCDrp57rrLzrpqzripQg6re86rGw7JW8LiddLAogIFsnYWZmZWN0aW9uX2F0dHJhY3Rpb24nLCftmLjqsJDCt+yVoOyglSDtkZztmITCt+q0gOqzhCDrp6TroKXsnbQg64uk7IucIOydmOyLneuQmOq4sCDsiazsmrQg6re86rGw7JW8LiddLAogIFsnZW1vdGlvbmFsJywn6rCQ7KCVIOuwmOydkeqzvCDsoJXshJzsoIEg7Jew6rKw7J20IOyEnOuhnOulvCDqsbTrk5zrpqzripQg6re86rGw7JW8LiddLAogIFsnYWN0aW9uX21lZXRpbmcnLCftlonrj5nsnbTrgpgg7Iuk7KCcIOygkeygkOycvOuhnCDsmK7quLDripQg7Z6Y7J2EIOqxtOuTnOumrOuKlCDqt7zqsbDslbwuJ10sCiAgWydzdGFiaWxpdHlfY29tbWl0bWVudCcsJ+q0gOqzhOulvCDtmITsi6TsoIHsnLzroZwg7Jyg7KeA7ZWY6rGw64KYIOygleumrO2VmOuKlCDsobDqsbTsnYQg6rG065Oc66as64qUIOq3vOqxsOyVvC4nXSwKICBbJ2luc3RhYmlsaXR5X3VuY2VydGFpbnR5Jywn7ZmV7Iug6rO8IO2RnO2YhOydmCDsnbzqtIDshLHsnbQg7Z2U65Ok66a0IOyImCDsnojripQg6re86rGw7JW8LiddLAogIFsnaW50ZW5zaXR5X3RyYW5zZm9ybWF0aW9uJywn6rSA6rOE66W8IOqwgOuzjeqyjCDrhJjquLDquLDrs7Tri6Qg6rCV7ZWY6rKMIOydmOyLne2VmOqzoCDsnqzsoJXsnZjtlZjqsowg66eM65Oc64qUIOq3vOqxsOyVvC4nXSwKICBbJ3Zpc2liaWxpdHlfc3RhdHVzJywn6rSA6rOE7J2YIOyDge2DnOuCmCDrsJTquaXsnLzroZQg65Oc65+s64KY64qUIOuwqeyLneqzvCDsl7DqsrDrkJjripQg6re86rGw7JW8LiddLApdCgpmdW5jdGlvbiBhc3BlY3RMYWJlbChyb3c6IEFzcGVjdCkgewogIGNvbnN0IGEgPSBQTEFORVRfTEFCRUxbcm93LmFdID8/IHJvdy5hCiAgY29uc3QgYiA9IFBMQU5FVF9MQUJFTFtyb3cuYl0gPz8gcm93LmIKICBjb25zdCBhc3BlY3QgPSBBU1BFQ1RfTEFCRUxbcm93LmFzcGVjdF0gPz8gcm93LmFzcGVjdAogIGNvbnN0IG9yYiA9IE51bWJlci5pc0Zpbml0ZShOdW1iZXIocm93Lm9yYikpID8gTnVtYmVyKHJvdy5vcmIpLnRvRml4ZWQoMikgOiAn4oCUJwogIHJldHVybiBgJHthfSAke2FzcGVjdH0gJHtifSDCtyDsmKTruIwgJHtvcmJ9wrBgCn0KCmZ1bmN0aW9uIGV2aWRlbmNlUGhhc2Uocm93OiBBc3BlY3QpIHsKICBpZiAocm93LnBoYXNlID09PSAnZXhhY3QnKSByZXR1cm4gcm93LmV4YWN0X2F0ID8gYOq3vOygkSDsoJXsoJAgwrcg7KCV7ZmV7J28ICR7cm93LmV4YWN0X2F0fWAgOiAn6re87KCRIOygleygkCcKICBpZiAocm93LnBoYXNlID09PSAnYXBwbHlpbmcnKSByZXR1cm4gJ+yggeyaqSDspJEgwrcg7Jik67iM6rCAIOuNlCDsooHslYTsp4DripQg7Z2Q66aEJwogIGlmIChyb3cucGhhc2UgPT09ICdzZXBhcmF0aW5nJykgcmV0dXJuICfrtoTrpqwg7KSRIMK3IOqwgOyepSDqsIDquYzsmrQg6rWs6rCE7J2EIOyngOuCnCDtnZDrpoQnCiAgcmV0dXJuICfsi5zqsIQg67Cp7ZalIOuvuO2ZleyglScKfQoKZnVuY3Rpb24gZXZpZGVuY2VNZWFuaW5nKHJvdzogQXNwZWN0KSB7CiAgY29uc3QgZG9tYWlucyA9IEFycmF5LmlzQXJyYXkocm93LnJlbGF0aW9uc2hpcF9kb21haW5zKSA/IHJvdy5yZWxhdGlvbnNoaXBfZG9tYWlucyA6IFtdCiAgY29uc3QgYmFzZSA9IERPTUFJTl9DT1BZLmZpbmQoKFtrZXldKT0+ZG9tYWlucy5pbmNsdWRlcyhrZXkpKT8uWzFdCiAgICA/PyAoKHJvdy5hID09PSAnTWVyY3VyeScgfHwgcm93LmIgPT09ICdNZXJjdXJ5JykgPyAn64yA7ZmUwrfsg53qsIHCt+2RnO2YhCDrsKnsi53snbQg6rCV7ZWY6rKMIOunnuusvOumrOuKlCDqt7zqsbDslbwuJwogICAgICA6IChyb3cuYSA9PT0gJ1ZlbnVzJyB8fCByb3cuYiA9PT0gJ1ZlbnVzJykgPyAn7Zi46rCQ6rO8IOq0gOqzhCDrp6TroKUsIOyVoOyglSDtkZztmIQg67Cp7Iud7J2EIOqxtOuTnOumrOuKlCDqt7zqsbDslbwuJwogICAgICA6IChyb3cuYSA9PT0gJ01vb24nIHx8IHJvdy5iID09PSAnTW9vbicpID8gJ+qwkOyglSDrsJjsnZHqs7wg7KCV7ISc7KCBIOqzteqwkOuMgOulvCDqsbTrk5zrpqzripQg6re86rGw7JW8LicKICAgICAgOiAocm93LmEgPT09ICdNYXJzJyB8fCByb3cuYiA9PT0gJ01hcnMnKSA/ICftlonrj5kg7JqV6rWs7JmAIOyLpOygnCDsm4Dsp4HsnoTsnYQg6rG065Oc66as64qUIOq3vOqxsOyVvC4nCiAgICAgIDogJ+2YhOyerCDqtIDqs4TsnZgg67CY7J2R6rO8IOuwqe2WpeydhCDqsbTrk5zrpqzripQg6rOE7IKwIOq3vOqxsOyVvC4nKQogIGlmIChyb3cudG9uZSA9PT0gJ2NoYWxsZW5naW5nJykgcmV0dXJuIGAke2Jhc2V9IOuLpOunjCDstqnrj4zCt+yYpO2VtMK37KCc7JW9IOyqveycvOuhnOuPhCDrgpjtg4DrgqAg7IiYIOyeiOyWtOyEnCDri6Trpbgg6re86rGw7JmAIO2VqOq7mCDrtJDslbwg7ZW0LmAKICBpZiAocm93LnRvbmUgPT09ICdzdXBwb3J0aXZlJykgcmV0dXJuIGAke2Jhc2V9IO2dkOumhOydhCDrtoDrk5zrn73qsowg7J207Ja07KO864qUIOyqveydtOyngOunjCwg7J206rKD66eM7Jy866GcIOyLpOygnCDsl7Drnb3snbTrgpgg7J6s7ZqM66W8IO2Zleygle2VmOyngOuKlCDslYrslYQuYAogIHJldHVybiBgJHtiYXNlfSDsp4Dsp4DsmYAg6ri07J6l7J20IO2VqOq7mCDshJ7snbwg7IiYIOyeiOyWtOyEnCDtlZwg67Cp7Zal7Jy866GcIOuLqOygle2VmOyngCDslYrslYQuYAp9CgpmdW5jdGlvbiBob3VzZUxhYmVsKHJvdzogQXNwZWN0LCBkaXJlY3Rpb246IHN0cmluZykgewogIGNvbnN0IGhvdXNlID0gcm93LnRhcmdldF9ob3VzZQogIGlmICghaG91c2UpIHJldHVybiAnJwogIGNvbnN0IHdob2xlID0gTnVtYmVyKGhvdXNlLndob2xlX2hvdXNlKQogIGNvbnN0IHF1YWQgPSBOdW1iZXIoaG91c2UucXVhZHJhbnRfaG91c2UpCiAgY29uc3Qgb3duZXIgPSBkaXJlY3Rpb24gPT09ICdjb3VudGVycGFydF90b191c2VyJyA/ICfrgrQnIDogZGlyZWN0aW9uID09PSAndXNlcl90b19jb3VudGVycGFydCcgPyAn7IOB64yAJyA6ICfrjIDsg4EnCiAgaWYgKE51bWJlci5pc0Zpbml0ZSh3aG9sZSkgJiYgTnVtYmVyLmlzRmluaXRlKHF1YWQpICYmIHdob2xlID09PSBxdWFkKSByZXR1cm4gYCR7b3duZXJ9ICR7d2hvbGV97ZWY7Jqw7IqkIOykkeyyqWAKICBjb25zdCBwYXJ0czogc3RyaW5nW10gPSBbXQogIGlmIChOdW1iZXIuaXNGaW5pdGUod2hvbGUpKSBwYXJ0cy5wdXNoKGDtmYDsgqzsnbggJHt3aG9sZX3tlZjsmrDsiqRgKQogIGlmIChOdW1iZXIuaXNGaW5pdGUocXVhZCkpIHBhcnRzLnB1c2goYCR7aG91c2UucXVhZHJhbnRfc3lzdGVtIHx8ICfsgqzrtoTrqbQnfSAke3F1YWR97ZWY7Jqw7IqkYCkKICByZXR1cm4gcGFydHMubGVuZ3RoID8gYCR7b3duZXJ9IMK3ICR7cGFydHMuam9pbignIC8gJyl9YCA6ICcnCn0KCmZ1bmN0aW9uIGV2aWRlbmNlRGlzdGFuY2Uocm93OiBBc3BlY3QsIGFzT2Y6IHN0cmluZykgewogIGNvbnN0IGRhdGUgPSBTdHJpbmcocm93LnJlZmVyZW5jZV9kYXRlID8/ICcnKQogIGNvbnN0IHQgPSBEYXRlLnBhcnNlKGRhdGUgfHwgJzk5OTktMTItMzEnKQogIGNvbnN0IGJhc2UgPSBEYXRlLnBhcnNlKGFzT2YgfHwgJzk5OTktMTItMzEnKQogIHJldHVybiBOdW1iZXIuaXNGaW5pdGUodCkgJiYgTnVtYmVyLmlzRmluaXRlKGJhc2UpID8gTWF0aC5hYnModC1iYXNlKSA6IE51bWJlci5NQVhfU0FGRV9JTlRFR0VSCn0KCmZ1bmN0aW9uIHNlbGVjdEV2aWRlbmNlKGV2aWRlbmNlOiBBc3BlY3RbXSwgZGlyZWN0aW9uOiBzdHJpbmcsIGFzT2Y6IHN0cmluZywgbGltaXQgPSAzKSB7CiAgY29uc3QgcGlja2VkID0gbmV3IE1hcDxzdHJpbmcsQXNwZWN0PigpCiAgZm9yIChjb25zdCByb3cgb2YgZXZpZGVuY2UuZmlsdGVyKChpdGVtKT0+aXRlbS5kaXJlY3Rpb24gPT09IGRpcmVjdGlvbikpIHsKICAgIGNvbnN0IGtleSA9IGAke3Jvdy5hfXwke3Jvdy5hc3BlY3R9fCR7cm93LmJ9YAogICAgY29uc3QgY3VycmVudCA9IHBpY2tlZC5nZXQoa2V5KQogICAgaWYgKCFjdXJyZW50IHx8IGV2aWRlbmNlRGlzdGFuY2Uocm93LGFzT2YpIDwgZXZpZGVuY2VEaXN0YW5jZShjdXJyZW50LGFzT2YpIHx8CiAgICAgIChldmlkZW5jZURpc3RhbmNlKHJvdyxhc09mKSA9PT0gZXZpZGVuY2VEaXN0YW5jZShjdXJyZW50LGFzT2YpICYmIE51bWJlcihyb3cub3JiKSA8IE51bWJlcihjdXJyZW50Lm9yYikpKSBwaWNrZWQuc2V0KGtleSxyb3cpCiAgfQogIGNvbnN0IHBoYXNlUmFuayA9IChwaGFzZT86IHN0cmluZykgPT4gcGhhc2UgPT09ICdleGFjdCcgPyAwIDogcGhhc2UgPT09ICdhcHBseWluZycgPyAxIDogcGhhc2UgPT09ICdzZXBhcmF0aW5nJyA/IDIgOiAzCiAgcmV0dXJuIFsuLi5waWNrZWQudmFsdWVzKCldLnNvcnQoKGEsYik9PmV2aWRlbmNlRGlzdGFuY2UoYSxhc09mKS1ldmlkZW5jZURpc3RhbmNlKGIsYXNPZikgfHwgcGhhc2VSYW5rKGEucGhhc2UpLXBoYXNlUmFuayhiLnBoYXNlKSB8fCBOdW1iZXIoYS5vcmIpLU51bWJlcihiLm9yYikpLnNsaWNlKDAsbGltaXQpCn0KCmZ1bmN0aW9uIEV2aWRlbmNlUm93cyh7IGV2aWRlbmNlLCBkaXJlY3Rpb24sIGFzT2YsIHRpdGxlIH06IHsgZXZpZGVuY2U6IEFzcGVjdFtdOyBkaXJlY3Rpb246c3RyaW5nOyBhc09mOnN0cmluZzsgdGl0bGU6c3RyaW5nIH0pIHsKICBjb25zdCByb3dzID0gc2VsZWN0RXZpZGVuY2UoZXZpZGVuY2UsZGlyZWN0aW9uLGFzT2YpCiAgaWYgKCFyb3dzLmxlbmd0aCkgcmV0dXJuIG51bGwKICByZXR1cm4gPGRpdiBjbGFzc05hbWU9InJldW5pb24tbG9jYWwtZXZpZGVuY2UtZ3JvdXAiPjxiPnt0aXRsZX08L2I+e3Jvd3MubWFwKChyb3csaW5kZXgpPT48YXJ0aWNsZSBjbGFzc05hbWU9InJlbGF0aW9uc2hpcC1wYXR0ZXJuIHJldW5pb24tbG9jYWwtZXZpZGVuY2UiIGtleT17YCR7ZGlyZWN0aW9ufToke3Jvdy5hfToke3Jvdy5hc3BlY3R9OiR7cm93LmJ9OiR7aW5kZXh9YH0+CiAgICA8c3Ryb25nPnthc3BlY3RMYWJlbChyb3cpfTwvc3Ryb25nPgogICAgPHA+e2V2aWRlbmNlTWVhbmluZyhyb3cpfTwvcD4KICAgIDxzbWFsbD57W2V2aWRlbmNlUGhhc2Uocm93KSwgaG91c2VMYWJlbChyb3csZGlyZWN0aW9uKSwgcm93LnJlZmVyZW5jZV9kYXRlID8gYOqzhOyCsCDquLDspIAgJHtyb3cucmVmZXJlbmNlX2RhdGV9YCA6ICcnXS5maWx0ZXIoQm9vbGVhbikuam9pbignIMK3ICcpfTwvc21hbGw+CiAgPC9hcnRpY2xlPil9PC9kaXY+Cn0KJycnCnMgPSBzLnJlcGxhY2UoYW5jaG9yLCBhbmNob3IgKyBoZWxwZXJzLCAxKQpvbGQgPSAiICBoaWVyYXJjaHlEYXRhLFxuICByZXVuaW9uVjIsIgpuZXcgPSAiICBoaWVyYXJjaHlEYXRhLFxuICBldmlkZW5jZSxcbiAgcmV1bmlvblYyLCIKYXNzZXJ0IG9sZCBpbiBzLCAncGFuZWwgZGVzdHJ1Y3R1cmluZyBhbmNob3IgbWlzc2luZycKcyA9IHMucmVwbGFjZShvbGQsbmV3LDEpCm9sZCA9ICIgIGhpZXJhcmNoeURhdGE6IFJldW5pb25IaWVyYXJjaHlcbiAgcmV1bmlvblYyOiBSZXVuaW9uU3ludGhlc2lzIHwgbnVsbCIKbmV3ID0gIiAgaGllcmFyY2h5RGF0YTogUmV1bmlvbkhpZXJhcmNoeVxuICBldmlkZW5jZTogQXNwZWN0W11cbiAgcmV1bmlvblYyOiBSZXVuaW9uU3ludGhlc2lzIHwgbnVsbCIKYXNzZXJ0IG9sZCBpbiBzLCAncGFuZWwgcHJvcCB0eXBlIGFuY2hvciBtaXNzaW5nJwpzID0gcy5yZXBsYWNlKG9sZCxuZXcsMSkKb2xkID0gIiAgICAgICAgPFJlYWRpbmdEaXJlY3Rpb25zIHJvd3M9e2RpcmVjdGlvblJvd3N9Lz5cbiAgICAgICAge3JldW5pb25WMj8uaW5pdGlhdGl2ZSAmJiA8PiIKbmV3ID0gJycnICAgICAgICA8UmVhZGluZ0RpcmVjdGlvbnMgcm93cz17ZGlyZWN0aW9uUm93c30vPgogICAgICAgIDxkaXYgY2xhc3NOYW1lPSJyZXVuaW9uLWxvY2FsLWV2aWRlbmNlLWdyaWQiPgogICAgICAgICAgPEV2aWRlbmNlUm93cyBldmlkZW5jZT17ZXZpZGVuY2V9IGRpcmVjdGlvbj0iY291bnRlcnBhcnRfdG9fdXNlciIgYXNPZj17aGllcmFyY2h5RGF0YS5hc19vZl9kYXRlfSB0aXRsZT0i7IOB64yA7J2YIO2YhOyerCDsp4Ttlokg4oaSIOuCmCIvPgogICAgICAgICAgPEV2aWRlbmNlUm93cyBldmlkZW5jZT17ZXZpZGVuY2V9IGRpcmVjdGlvbj0idXNlcl90b19jb3VudGVycGFydCIgYXNPZj17aGllcmFyY2h5RGF0YS5hc19vZl9kYXRlfSB0aXRsZT0i64KY7J2YIO2YhOyerCDsp4Ttlokg4oaSIOyDgeuMgCIvPgogICAgICAgICAgPEV2aWRlbmNlUm93cyBldmlkZW5jZT17ZXZpZGVuY2V9IGRpcmVjdGlvbj0ic2hhcmVkIiBhc09mPXtoaWVyYXJjaHlEYXRhLmFzX29mX2RhdGV9IHRpdGxlPSLtmITsnqzsnZgg64KYIOKGlCDtmITsnqzsnZgg7IOB64yAIMK3IOynhO2WieKGlOynhO2WiSIvPgogICAgICAgIDwvZGl2PgogICAgICAgIHtyZXVuaW9uVjI/LmluaXRpYXRpdmUgJiYgPD4nJycKYXNzZXJ0IG9sZCBpbiBzLCAnZGlyZWN0aW9uIHJlbmRlciBhbmNob3IgbWlzc2luZycKcyA9IHMucmVwbGFjZShvbGQsbmV3LDEpCm9sZCA9ICcgICAgICAgIHtyZXVuaW9uVjI/LnRpbWluZz8uY29uY2x1c2lvbiA/IDxDb3B5IHZhbHVlPXtyZXVuaW9uVjIudGltaW5nLmNvbmNsdXNpb259Lz4gOiA8cD57c3VzdGFpbmFiaWxpdHlUZXh0fTwvcD59XG4gICAgICAgIDxwIGNsYXNzTmFtZT0icmV1bmlvbi1zY29yZS1tZWFuaW5nIj4nCm5ldyA9ICcgICAgICAgIHtyZXVuaW9uVjI/LnRpbWluZz8uY29uY2x1c2lvbiA/IDxDb3B5IHZhbHVlPXtyZXVuaW9uVjIudGltaW5nLmNvbmNsdXNpb259Lz4gOiA8cD57c3VzdGFpbmFiaWxpdHlUZXh0fTwvcD59XG4gICAgICAgIDxFdmlkZW5jZVJvd3MgZXZpZGVuY2U9e2V2aWRlbmNlfSBkaXJlY3Rpb249InJlbGF0aW9uc2hpcF9pdHNlbGYiIGFzT2Y9e2hpZXJhcmNoeURhdGEuYXNfb2ZfZGF0ZX0gdGl0bGU9IuynhO2WiSDsu7Ttj6zsp5Mgwrcg6rSA6rOEIOyekOyytCIvPlxuICAgICAgICA8cCBjbGFzc05hbWU9InJldW5pb24tc2NvcmUtbWVhbmluZyI+Jwphc3NlcnQgb2xkIGluIHMsICdyZWxhdGlvbnNoaXAgc3RhdGUgYW5jaG9yIG1pc3NpbmcnCnBhbmVsLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCxuZXcsMSkpCgp0ZXN0ID0gUGF0aCgnd2ViL3NyYy9saWIvcmV1bmlvbkxvY2FsRXZpZGVuY2VVaS50ZXN0Lm1qcycpCnRlc3Qud3JpdGVfdGV4dChyJycnaW1wb3J0IHRlc3QgZnJvbSAnbm9kZTp0ZXN0JwppbXBvcnQgdGVzdCBmcm9tICdub2RlOnRlc3QnCmltcG9ydCBhc3NlcnQgZnJvbSAnbm9kZTphc3NlcnQvc3RyaWN0JwppbXBvcnQgeyByZWFkRmlsZVN5bmMgfSBmcm9tICdub2RlOmZzJwoKY29uc3QgYXBwPXJlYWRGaWxlU3luYyhuZXcgVVJMKCcuLi9BcHBOZXh0LnRzeCcsaW1wb3J0Lm1ldGEudXJsKSwndXRmOCcpCmNvbnN0IGhvc3Q9cmVhZEZpbGVTeW5jKG5ldyBVUkwoJy4uL1JlbGF0aW9uc2hpcEludGVycHJldGF0aW9uUGFuZWwudHN4JyxpbXBvcnQubWV0YS51cmwpLCd1dGY4JykKY29uc3QgcGFuZWw9cmVhZEZpbGVTeW5jKG5ldyBVUkwoJy4uL1JldW5pb25IaWVyYXJjaHlQYW5lbC50c3gnLGltcG9ydC5tZXRhLnVybCksJ3V0ZjgnKQoKdGVzdCgncmV1bmlvbiByZW5kZXJzIG5vcm1hbGl6ZWQgcHJvZ3Jlc3Npb24gZXZpZGVuY2UgbG9jYWxseSB3aXRob3V0IHJlcXVpcmluZyBHZW1pbmkgcHJvc2UnLCgpPT57CiAgYXNzZXJ0Lm1hdGNoKGFwcCwvZXZpZGVuY2VDb250cmFjdD1ce3JlbGF0aW9uc2hpcFJlc3VsdFwucmVzdWx0XC5yZXVuaW9uX2V2aWRlbmNlX2NvbnRyYWN0IFw/XD8gbnVsbFx9LykKICBhc3NlcnQubWF0Y2goaG9zdCwvZXZpZGVuY2U9XHtlZXZpZGVuY2VDb250cmFjdFw/XC5ldmlkZW5jZSBcP1w/IFxbXF1cfS8pCiAgYXNzZXJ0Lm1hdGNoKHBhbmVsLC/sg4HrjIDsnZgg7ZiE7J6sIOynhO2WiSDihpIg64KYLykKICBhc3NlcnQubWF0Y2gocGFuZWwsL+uCmOydmCDtmITsnqwg7KeE7ZaJIOKGkiDsg4HrjIAvKQogIGFzc2VydC5tYXRjaChwYW5lbCwv7ZiE7J6s7J2YIOuCmCDihpQg7ZiE7J6s7J2YIOyDgeuMgCDCtyDsp4TtlonihpTsp4TtlokvKQogIGFzc2VydC5tYXRjaChwYW5lbCwv7KeE7ZaJIOy7tO2PrOynkyDCtyDqtIDqs4Qg7J6Q7LK0LykKICBhc3NlcnQubWF0Y2gocGFuZWwsL+yYpOu4jOqwgCDrjZQg7KKB7JWE7KeA64qUIO2dkOumhC8pCiAgYXNzZXJ0Lm1hdGNoKHBhbmVsLC/qsIDsnqUg6rCA6rmM7Jq0IOq1rOqwhOydhCDsp4Drgpwg7Z2Q66aELykKICBhc3NlcnQubWF0Y2gocGFuZWwsL+ygle2ZleydvC8pCiAgYXNzZXJ0Lm1hdGNoKHBhbmVsLC90YXJnZXRfaG91c2UvKQogIGFzc2VydC5kb2VzTm90TWF0Y2gocGFuZWwsL+yDgeuMgOqwgCDrgpjrpbwg7IOd6rCB7ZWY6rOgIOyeiOuLpC8pCiAgYXNzZXJ0LmRvZXNOb3RNYXRjaChwYW5lbCwv7J6s7ZqMIO2ZleuloC8pCn0pCicnJykK' | base64 -d > /tmp/patch.py
+          python /tmp/patch.py
       - name: Test targeted reunion UI
         working-directory: web
         run: node --test src/lib/reunionUiVnext.test.mjs src/lib/relationshipReunionV2.contract.test.mjs src/lib/reunionLocalEvidenceUi.test.mjs
@@ -190,11 +29,10 @@ test('reunion renders normalized progression evidence locally without requiring 
         working-directory: web
         run: npm ci && npm run build
       - name: Commit product changes and remove temporary workflow
-        shell: bash
         run: |
           rm .github/workflows/tmp-reunion-local-evidence.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add web/src/AppNext.tsx web/src/RelationshipInterpretationPanel.tsx web/src/ReunionHierarchyPanel.tsx web/src/lib/reunionLocalEvidenceUi.test.mjs .github/workflows/tmp-reunion-local-evidence.yml
-          git commit -m "feat: show local reunion progression evidence"
+          git commit -m 'feat: show local reunion progression evidence'
           git push origin HEAD:feat/reunion-local-evidence-reading
