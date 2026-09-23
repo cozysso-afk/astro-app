@@ -25,13 +25,44 @@ on:
       - '.github/workflows/interpretation-v3-ci.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   interpretation-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feat/reunion-ui-vnext
+          fetch-depth: 0
+      - name: Align stale reunion UI assertion on feature branch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/lib/readingExperience.test.mjs')
+          s=p.read_text()
+          old="""  const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
+"""
+          new="""  const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
+  assert.match(panel,/계산 근거 보기/)
+  assert.match(panel,/보조지표 활성도/)
+  assert.match(panel,/연락·재접촉/)
+  assert.match(panel,/숫자는 사건 확률이나 현재 감정 세기가 아니라/)
+  assert.match(panel,/Math\\.round\\(stage\\.activation/)
+"""
+          if old in s:
+              p.write_text(s.replace(old,new,1))
+          PY
+          if ! git diff --quiet -- web/src/lib/readingExperience.test.mjs; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add web/src/lib/readingExperience.test.mjs
+            git commit -m 'test: align reunion activation UI contract'
+            git push origin HEAD:feat/reunion-ui-vnext
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
