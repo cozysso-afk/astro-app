@@ -1,4 +1,4 @@
-import type { RelationshipAiResponse } from './appTypes'
+import type { Aspect, RelationshipAiResponse } from './appTypes'
 import { ReadingDirections, type DirectionRow } from './ReadingSignals'
 import type { ReunionHierarchy } from './lib/reunionHierarchy'
 
@@ -31,13 +31,104 @@ function Copy({ value }: { value?: string | null }) {
   return text ? <p>{text}</p> : null
 }
 
+
+const PLANET_LABEL: Record<string,string> = {
+  Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성',
+  Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성', 'True Node':'진북교점', Node:'교점', ASC:'상승점', DSC:'하강점', MC:'중천점', IC:'천저점',
+}
+const ASPECT_LABEL: Record<string,string> = {
+  conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
+}
+const DOMAIN_COPY: Array<[string,string]> = [
+  ['communication','생각·말·연락 주제가 서로 맞물리는 근거야.'],
+  ['affection_attraction','호감·애정 표현·관계 매력이 다시 의식되기 쉬운 근거야.'],
+  ['emotional','감정 반응과 정서적 연결이 서로를 건드리는 근거야.'],
+  ['action_meeting','행동이나 실제 접점으로 옮기는 힘을 건드리는 근거야.'],
+  ['stability_commitment','관계를 현실적으로 유지하거나 정리하는 조건을 건드리는 근거야.'],
+  ['instability_uncertainty','확신과 표현의 일관성이 흔들릴 수 있는 근거야.'],
+  ['intensity_transformation','관계를 가볍게 넘기기보다 강하게 의식하고 재정의하게 만드는 근거야.'],
+  ['visibility_status','관계의 상태나 바깥으롔 드러나는 방식과 연결되는 근거야.'],
+]
+
+function aspectLabel(row: Aspect) {
+  const a = PLANET_LABEL[row.a] ?? row.a
+  const b = PLANET_LABEL[row.b] ?? row.b
+  const aspect = ASPECT_LABEL[row.aspect] ?? row.aspect
+  const orb = Number.isFinite(Number(row.orb)) ? Number(row.orb).toFixed(2) : '—'
+  return `${a} ${aspect} ${b} · 오브 ${orb}°`
+}
+
+function evidencePhase(row: Aspect) {
+  if (row.phase === 'exact') return row.exact_at ? `근접 정점 · 정확일 ${row.exact_at}` : '근접 정점'
+  if (row.phase === 'applying') return '적용 중 · 오브가 더 좁아지는 흐름'
+  if (row.phase === 'separating') return '분리 중 · 가장 가까운 구간을 지난 흐름'
+  return '시간 방향 미확정'
+}
+
+function evidenceMeaning(row: Aspect) {
+  const domains = Array.isArray(row.relationship_domains) ? row.relationship_domains : []
+  const base = DOMAIN_COPY.find(([key])=>domains.includes(key))?.[1]
+    ?? ((row.a === 'Mercury' || row.b === 'Mercury') ? '대화·생각·표현 방식이 강하게 맞물리는 근거야.'
+      : (row.a === 'Venus' || row.b === 'Venus') ? '호감과 관계 매력, 애정 표현 방식을 건드리는 근거야.'
+      : (row.a === 'Moon' || row.b === 'Moon') ? '감정 반응과 정서적 공감대를 건드리는 근거야.'
+      : (row.a === 'Mars' || row.b === 'Mars') ? '행동 욕구와 실제 움직임을 건드리는 근거야.'
+      : '현재 관계의 반응과 방향을 건드리는 계산 근거야.')
+  if (row.tone === 'challenging') return `${base} 다만 충돌·오해·제약 쪽으로도 나타날 수 있어서 다른 근거와 함께 봐야 해.`
+  if (row.tone === 'supportive') return `${base} 흐름을 부드럽게 이어주는 쪽이지만, 이것만으로 실제 연락이나 재회를 확정하지는 않아.`
+  return `${base} 지지와 긴장이 함께 섞일 수 있어서 한 방향으로 단정하지 않아.`
+}
+
+function houseLabel(row: Aspect, direction: string) {
+  const house = row.target_house
+  if (!house) return ''
+  const whole = Number(house.whole_house)
+  const quad = Number(house.quadrant_house)
+  const owner = direction === 'counterpart_to_user' ? '내' : direction === 'user_to_counterpart' ? '상대' : '대상'
+  if (Number.isFinite(whole) && Number.isFinite(quad) && whole === quad) return `${owner} ${whole}하우스 중첩`
+  const parts: string[] = []
+  if (Number.isFinite(whole)) parts.push(`홀사인 ${whole}하우스`)
+  if (Number.isFinite(quad)) parts.push(`${house.quadrant_system || '사분면'} ${quad}하우스`)
+  return parts.length ? `${owner} · ${parts.join(' / ')}` : ''
+}
+
+function evidenceDistance(row: Aspect, asOf: string) {
+  const date = String(row.reference_date ?? '')
+  const t = Date.parse(date || '9999-12-31')
+  const base = Date.parse(asOf || '9999-12-31')
+  return Number.isFinite(t) && Number.isFinite(base) ? Math.abs(t-base) : Number.MAX_SAFE_INTEGER
+}
+
+function selectEvidence(evidence: Aspect[], direction: string, asOf: string, limit = 3) {
+  const picked = new Map<string,Aspect>()
+  for (const row of evidence.filter((item)=>item.direction === direction)) {
+    const key = `${row.a}|${row.aspect}|${row.b}`
+    const current = picked.get(key)
+    if (!current || evidenceDistance(row,asOf) < evidenceDistance(current,asOf) ||
+      (evidenceDistance(row,asOf) === evidenceDistance(current,asOf) && Number(row.orb) < Number(current.orb))) picked.set(key,row)
+  }
+  const phaseRank = (phase?: string) => phase === 'exact' ? 0 : phase === 'applying' ? 1 : phase === 'separating' ? 2 : 3
+  return [...picked.values()].sort((a,b)=>evidenceDistance(a,asOf)-evidenceDistance(b,asOf) || phaseRank(a.phase)-phaseRank(b.phase) || Number(a.orb)-Number(b.orb)).slice(0,limit)
+}
+
+function EvidenceRows({ evidence, direction, asOf, title }: { evidence: Aspect[]; direction:string; asOf:string; title:string }) {
+  const rows = selectEvidence(evidence,direction,asOf)
+  if (!rows.length) return null
+  return <div className="reunion-local-evidence-group"><b>{title}</b>{rows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${direction}:${row.a}:${row.aspect}:${row.b}:${index}`}>
+    <strong>{aspectLabel(row)}</strong>
+    <p>{evidenceMeaning(row)}</p>
+    <small>{[evidencePhase(row), houseLabel(row,direction), row.reference_date ? `계산 기준 ${row.reference_date}` : ''].filter(Boolean).join(' · ')}</small>
+  </article>)}</div>
+}
+
 export function ReunionHierarchyPanel({
   hierarchyData,
+  evidence,
   reunionV2,
   directionRows,
   sustainabilityText,
 }: {
   hierarchyData: ReunionHierarchy
+  evidence: Aspect[]
   reunionV2: ReunionSynthesis | null
   directionRows: DirectionRow[]
   sustainabilityText: string
@@ -64,6 +155,11 @@ export function ReunionHierarchyPanel({
       <section className="reunion-ai-block reunion-direction-layer">
         <h4>서로에게 걸리는 방향</h4>
         <ReadingDirections rows={directionRows}/>
+        <div className="reunion-local-evidence-grid">
+          <EvidenceRows evidence={evidence} direction="counterpart_to_user" asOf={hierarchyData.as_of_date} title="상대의 현재 진행 → 나"/>
+          <EvidenceRows evidence={evidence} direction="user_to_counterpart" asOf={hierarchyData.as_of_date} title="나의 현재 진행 → 상대"/>
+          <EvidenceRows evidence={evidence} direction="shared" asOf={hierarchyData.as_of_date} title="현재의 나 ↔ 현재의 상대 · 진행↔진행"/>
+        </div>
         {reunionV2?.initiative && <>
           <Copy value={reunionV2.initiative.conclusion}/>
           <Copy value={reunionV2.initiative.interpretation}/>
@@ -75,6 +171,7 @@ export function ReunionHierarchyPanel({
       <section className="reunion-ai-block reunion-relationship-state">
         <h4>관계 자체의 현재 단계</h4>
         {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}
+        <EvidenceRows evidence={evidence} direction="relationship_itself" asOf={hierarchyData.as_of_date} title="진행 컴포짓 · 관계 자체"/>
         <p className="reunion-score-meaning">개인의 숨은 마음을 단정하는 칸이 아니라, 진행 컴포짓을 포함한 관계층과 단계별 관문이 지금 어떻게 맞물리는지 보는 칸이야.</p>
       </section>
 
