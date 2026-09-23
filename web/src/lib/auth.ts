@@ -71,7 +71,7 @@ async function runAsyncReunionRelationship(
         status?: string
         status_code?: number
         error?: string
-        result?: unknown
+        result_ready?: boolean
       }
 
       if (pollResponse.status === 404) {
@@ -88,7 +88,13 @@ async function runAsyncReunionRelationship(
       }
 
       transientFailures = 0
-      if (job.status === 'done') return jsonResponse(job.result ?? {}, 200)
+      if (job.status === 'done') {
+        const resultResponse = await fetcher(
+          `${base}/v1/relationship/western/jobs/${encodeURIComponent(started.job_id)}/result`,
+          { method: 'GET', headers, signal: init.signal },
+        )
+        return resultResponse
+      }
       if (job.status === 'failed') {
         return jsonResponse({ detail: job.error || '재회운 계산이 실패했어.' }, job.status_code || 500)
       }
