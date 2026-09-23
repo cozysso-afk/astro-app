@@ -19,7 +19,7 @@ def run_contract() -> None:
     assert 'status_code=504' in backend
     assert "_can_reuse" in backend
     assert "return (now - anchor) <= (_HARD_TIMEOUT_SECONDS + 5)" in backend
-    assert '"phase": "reunion_hierarchy"' in backend
+    assert '_progress(job_id, "reunion_hierarchy", 58' in backend
     assert "build_relationship_western" in backend
     assert "augment_relationship_with_returns" in backend
     assert "apply_reunion_hierarchy" in backend
