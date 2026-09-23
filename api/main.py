@@ -19,6 +19,7 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 from relationship_return_v1 import ENGINE_VERSION as REL_RETURN_ENGINE_VERSION, augment_relationship_with_returns
+from relationship_evidence_contract_v1 import CONTRACT_VERSION as REUNION_EVIDENCE_CONTRACT_VERSION
 from reunion_hierarchy_v2 import apply_reunion_hierarchy
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
@@ -366,6 +367,8 @@ def meta() -> dict:
         "api_version": APP_VERSION,
         "relationship_engine": REL_ENGINE_VERSION,
         "relationship_return_engine": REL_RETURN_ENGINE_VERSION,
+        "reunion_evidence_contract": REUNION_EVIDENCE_CONTRACT_VERSION,
+        "runtime_git_sha": os.getenv("RENDER_GIT_COMMIT", ""),
         "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "location_engine": LOCATION_ENGINE_VERSION,
         "personal_marriage_engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
