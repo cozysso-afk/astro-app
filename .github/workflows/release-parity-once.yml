@@ -1,0 +1,89 @@
+name: Release parity one-shot
+
+on:
+  push:
+    branches: [fix/release-version-parity]
+    paths:
+      - '.github/workflows/release-parity-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/release-version-parity
+          fetch-depth: 0
+      - name: Apply release metadata and frontend guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p=Path(path); s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'{label} anchor missing')
+              p.write_text(s.replace(old,new,1))
+
+          replace_once('api/main.py',
+              'APP_VERSION = "api-fortune-v6.0-reunion-hierarchy"\n',
+              'APP_VERSION = "api-fortune-v6.1-release-parity"\nCALCULATION_SCHEMA_VERSION = "relationship-schema-v1.14-directional-evidence"\nINTERPRETATION_CONTRACT_VERSION = "relationship-v12.5-directional-evidence-narrative"\nGIT_SHA = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT_SHA") or "unknown"\n',
+              'api constants')
+          replace_once('api/main.py',
+              'def health() -> dict:\n    return {"status": "ok", "version": APP_VERSION}\n',
+              'def health() -> dict:\n    return {\n        "status": "ok",\n        "version": APP_VERSION,\n        "calculation_schema_version": CALCULATION_SCHEMA_VERSION,\n        "interpretation_version": INTERPRETATION_CONTRACT_VERSION,\n        "git_sha": GIT_SHA,\n    }\n',
+              'health metadata')
+          replace_once('api/main.py',
+              '        "api_version": APP_VERSION,\n        "engine": result.get("engine", REL_ENGINE_VERSION),\n        "relationship_status": request.relationship_status,\n',
+              '        "api_version": APP_VERSION,\n        "engine": result.get("engine", REL_ENGINE_VERSION),\n        "engine_version": result.get("engine", REL_ENGINE_VERSION),\n        "calculation_schema_version": CALCULATION_SCHEMA_VERSION,\n        "interpretation_version": INTERPRETATION_CONTRACT_VERSION,\n        "git_sha": GIT_SHA,\n        "relationship_status": request.relationship_status,\n',
+              'relationship release metadata')
+
+          replace_once('web/src/appTypes.ts',
+              '  api_version: string\n  engine: string\n  relationship_status: RelationshipStatus\n',
+              '  api_version: string\n  engine: string\n  engine_version?: string\n  calculation_schema_version?: string\n  interpretation_version?: string\n  git_sha?: string\n  relationship_status: RelationshipStatus\n',
+              'relationship response types')
+
+          replace_once('web/src/AppNext.tsx',
+              "import { relationshipAiSuccess, relationshipAiInvokeErrorMessage, relationshipAiCatchMessage, RelationshipAiPublicError } from './lib/relationshipAiPublicError'\n",
+              "import { relationshipAiSuccess, relationshipAiInvokeErrorMessage, relationshipAiCatchMessage, RelationshipAiPublicError } from './lib/relationshipAiPublicError'\nimport { reunionReleaseCompatibility } from './lib/releaseCompatibility'\n",
+              'release guard import')
+          replace_once('web/src/AppNext.tsx',
+              '      const typed = payload as RelationshipApiResponse\n      if (revision !== relationshipRevisionRef.current) return\n      setRelationshipResult(typed)\n',
+              '      const typed = payload as RelationshipApiResponse\n      if (revision !== relationshipRevisionRef.current) return\n      if (shouldRunReunionTiming) {\n        const releaseCompatibility = reunionReleaseCompatibility(typed)\n        if (!releaseCompatibility.ok) throw new Error(releaseCompatibility.message || \'재회 계산 서버 버전을 확인하지 못했어. 잠시 후 다시 시도해.\')\n      }\n      setRelationshipResult(typed)\n',
+              'relationship release guard')
+
+          replace_once('.github/workflows/calculation-audit-ci.yml',
+              "      - 'tests/test_personal_marriage_v1.py'\n      - '.github/workflows/calculation-audit-ci.yml'\n",
+              "      - 'tests/test_personal_marriage_v1.py'\n      - 'tests/test_release_parity_contract.py'\n      - '.github/workflows/calculation-audit-ci.yml'\n",
+              'calculation audit path')
+          replace_once('.github/workflows/calculation-audit-ci.yml',
+              '            tests/test_integrated_precision_v2.py \\\n            tests/test_personal_marriage_v1.py\n',
+              '            tests/test_integrated_precision_v2.py \\\n            tests/test_personal_marriage_v1.py \\\n            tests/test_release_parity_contract.py\n',
+              'calculation audit test')
+
+          replace_once('.github/workflows/interpretation-v3-ci.yml',
+              '          node --test web/src/lib/relationshipReunionV2.contract.test.mjs\n          node --test supabase/functions/relationship-interpret-v9-preview/jobStatusContract.test.mjs\n',
+              '          node --test web/src/lib/relationshipReunionV2.contract.test.mjs\n          node --experimental-strip-types --test web/src/lib/releaseCompatibility.test.mjs\n          node --test supabase/functions/relationship-interpret-v9-preview/jobStatusContract.test.mjs\n',
+              'interpretation release parity test')
+          PY
+      - name: Install and verify focused release contracts
+        run: |
+          python -m pip install -q -r api/requirements.txt pytest httpx
+          python -m pytest -q tests/test_release_parity_contract.py
+          cd web
+          npm ci --no-audit --no-fund
+          node --experimental-strip-types --test src/lib/releaseCompatibility.test.mjs
+          npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit release parity guard
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/main.py web/src/AppNext.tsx web/src/appTypes.ts .github/workflows/calculation-audit-ci.yml .github/workflows/interpretation-v3-ci.yml
+          git commit -m 'fix(release): block stale reunion backend results'
+          git push origin HEAD:fix/release-version-parity
