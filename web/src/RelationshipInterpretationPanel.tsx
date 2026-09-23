@@ -36,11 +36,12 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, evidenceContract, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
   aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
   hierarchy?: Record<string, unknown> | null;
+  evidenceContract?: { version?: string; available?: boolean; evidence?: Aspect[] } | null;
   timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
@@ -217,6 +218,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
     {reunion && hierarchyData && <ReunionHierarchyPanel
     hierarchyData={hierarchyData}
+    evidence={evidenceContract?.evidence ?? []}
     reunionV2={reunionV2}
     directionRows={[
       {kind:'incoming',label:'상대 → 나',...view.incoming},

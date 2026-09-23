@@ -1728,6 +1728,7 @@ export default function AppNext() {
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 returnSupport={relationshipResult.result.reunion_return_support ?? null}
                 hierarchy={relationshipResult.result.reunion_hierarchy ?? null}
+                evidenceContract={relationshipResult.result.reunion_evidence_contract ?? null}
                 technicalDetails={<>
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}
