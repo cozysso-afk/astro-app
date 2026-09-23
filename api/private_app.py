@@ -15,8 +15,15 @@ from fastapi.responses import JSONResponse
 
 try:
     from .main import app
+    from . import relationship_async_v1 as _relationship_async_v1
 except ImportError:  # Render runs with api/ as the working directory.
     from main import app
+    import relationship_async_v1 as _relationship_async_v1
+
+# Importing relationship_async_v1 registers the authenticated async relationship
+# start/job routes on the same FastAPI app. Keep a module reference so linters and
+# future refactors do not treat the import as accidental.
+assert _relationship_async_v1 is not None
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip()
