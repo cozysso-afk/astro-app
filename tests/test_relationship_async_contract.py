@@ -12,7 +12,17 @@ def run_contract() -> None:
     assert '@app.get("/v1/relationship/western/jobs/{job_id}")' in backend
     assert "threading.Semaphore" in backend
     assert "_request_index" in backend
-    assert "relationship_western(request)" in backend
+    assert "_HARD_TIMEOUT_SECONDS" in backend
+    assert "worker.join(timeout=_HARD_TIMEOUT_SECONDS)" in backend
+    assert "if worker.is_alive():" in backend
+    assert 'status="failed"' in backend
+    assert 'status_code=504' in backend
+    assert "_can_reuse" in backend
+    assert "return (now - anchor) <= (_HARD_TIMEOUT_SECONDS + 5)" in backend
+    assert '"phase": "reunion_hierarchy"' in backend
+    assert "build_relationship_western" in backend
+    assert "augment_relationship_with_returns" in backend
+    assert "apply_reunion_hierarchy" in backend
     assert "relationship_async_v1" in private_app
 
     assert "runAsyncReunionRelationship" in auth
