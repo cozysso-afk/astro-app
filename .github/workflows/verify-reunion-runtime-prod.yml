@@ -13,23 +13,31 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[prod-verify-cleanup]') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Render meta contract and SHA
+      - name: Verify Render public health contract and SHA
         shell: bash
         run: |
           set -euo pipefail
-          META=$(curl -fsS --retry 5 --retry-delay 3 --max-time 30 https://astro-app-api-f7fn.onrender.com/v1/meta)
-          echo "$META"
-          META="$META" python - <<'PY'
+          HEALTH=$(curl -fsS --retry 5 --retry-delay 3 --max-time 30 https://astro-app-api-f7fn.onrender.com/health)
+          echo "$HEALTH"
+          HEALTH="$HEALTH" python - <<'PY'
           import json, os
-          data=json.loads(os.environ['META'])
+          data=json.loads(os.environ['HEALTH'])
+          assert data.get('status') == 'ok', data
           assert data.get('reunion_evidence_contract') == 'reunion-evidence-contract-v1', data
-          assert data.get('runtime_git_sha') == '7f3a79dd0dd5054790638d7440fde036ee4a8fd2', data
-          print('RENDER_CONTRACT_OK')
+          assert data.get('runtime_git_sha') == '8d2c0b07e82f9bfc74dfa12bbe633d624d5d9ab0', data
+          print('RENDER_PUBLIC_HEALTH_CONTRACT_OK')
           PY
+      - name: Verify protected v1 remains protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://astro-app-api-f7fn.onrender.com/v1/meta)
+          test "$STATUS" = "401"
+          echo "RENDER_PRIVATE_V1_OK=$STATUS"
       - name: Verify Vercel production responds
         shell: bash
         run: |
           set -euo pipefail
-          STATUS=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 30 https://astro-app-9makxx449-cozysso.vercel.app)
+          STATUS=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 30 https://astro-app-5f0dytpe0-cozysso.vercel.app)
           test "$STATUS" = "200"
           echo "VERCEL_HTTP_OK=$STATUS"
