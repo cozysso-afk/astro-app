@@ -1,0 +1,201 @@
+name: Temporary reunion local evidence patch
+on:
+  push:
+    branches: [feat/reunion-local-evidence-reading]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'feat: show local reunion progression evidence') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/reunion-local-evidence-reading
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Patch UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('web/src/AppNext.tsx')
+          s = app.read_text()
+          old = "                hierarchy={relationshipResult.result.reunion_hierarchy ?? null}\n                technicalDetails={< >".replace('< >','<>')
+          new = "                hierarchy={relationshipResult.result.reunion_hierarchy ?? null}\n                evidenceContract={relationshipResult.result.reunion_evidence_contract ?? null}\n                technicalDetails={< >".replace('< >','<>')
+          assert old in s, 'AppNext relationship panel anchor missing'
+          app.write_text(s.replace(old, new, 1))
+
+          host = Path('web/src/RelationshipInterpretationPanel.tsx')
+          s = host.read_text()
+          old = "returnSupport, hierarchy, technicalDetails }: {"
+          new = "returnSupport, hierarchy, evidenceContract, technicalDetails }: {"
+          assert old in s, 'host destructuring anchor missing'
+          s = s.replace(old, new, 1)
+          old = "  hierarchy?: Record<string, unknown> | null;\n  timing?: ReunionTimingContext | null;"
+          new = "  hierarchy?: Record<string, unknown> | null;\n  evidenceContract?: { version?: string; available?: boolean; evidence?: Aspect[] } | null;\n  timing?: ReunionTimingContext | null;"
+          assert old in s, 'host prop type anchor missing'
+          s = s.replace(old, new, 1)
+          old = "    hierarchyData={hierarchyData}\n    reunionV2={reunionV2}"
+          new = "    hierarchyData={hierarchyData}\n    evidence={evidenceContract?.evidence ?? []}\n    reunionV2={reunionV2}"
+          assert old in s, 'host hierarchy invocation anchor missing'
+          host.write_text(s.replace(old, new, 1))
+
+          panel = Path('web/src/ReunionHierarchyPanel.tsx')
+          s = panel.read_text()
+          s = s.replace("import type { RelationshipAiResponse } from './appTypes'", "import type { Aspect, RelationshipAiResponse } from './appTypes'", 1)
+          anchor = "function Copy({ value }: { value?: string | null }) {\n  const text = String(value ?? '').trim()\n  return text ? <p>{text}</p> : null\n}\n"
+          assert anchor in s, 'local evidence helper anchor missing'
+          helpers = r'''
+
+const PLANET_LABEL: Record<string,string> = {
+  Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성',
+  Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성', 'True Node':'진북교점', Node:'교점', ASC:'상승점', DSC:'하강점', MC:'중천점', IC:'천저점',
+}
+const ASPECT_LABEL: Record<string,string> = {
+  conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
+}
+const DOMAIN_COPY: Array<[string,string]> = [
+  ['communication','생각·말·연락 주제가 서로 맞물리는 근거야.'],
+  ['affection_attraction','호감·애정 표현·관계 매력이 다시 의식되기 쉬운 근거야.'],
+  ['emotional','감정 반응과 정서적 연결이 서로를 건드리는 근거야.'],
+  ['action_meeting','행동이나 실제 접점으로 옮기는 힘을 건드리는 근거야.'],
+  ['stability_commitment','관계를 현실적으로 유지하거나 정리하는 조건을 건드리는 근거야.'],
+  ['instability_uncertainty','확신과 표현의 일관성이 흔들릴 수 있는 근거야.'],
+  ['intensity_transformation','관계를 가볍게 넘기기보다 강하게 의식하고 재정의하게 만드는 근거야.'],
+  ['visibility_status','관계의 상태나 바깥으로 드러나는 방식과 연결되는 근거야.'],
+]
+
+function aspectLabel(row: Aspect) {
+  const a = PLANET_LABEL[row.a] ?? row.a
+  const b = PLANET_LABEL[row.b] ?? row.b
+  const aspect = ASPECT_LABEL[row.aspect] ?? row.aspect
+  const orb = Number.isFinite(Number(row.orb)) ? Number(row.orb).toFixed(2) : '—'
+  return `${a} ${aspect} ${b} · 오브 ${orb}°`
+}
+
+function evidencePhase(row: Aspect) {
+  if (row.phase === 'exact') return row.exact_at ? `근접 정점 · 정확일 ${row.exact_at}` : '근접 정점'
+  if (row.phase === 'applying') return '적용 중 · 오브가 더 좁아지는 흐름'
+  if (row.phase === 'separating') return '분리 중 · 가장 가까운 구간을 지난 흐름'
+  return '시간 방향 미확정'
+}
+
+function evidenceMeaning(row: Aspect) {
+  const domains = Array.isArray(row.relationship_domains) ? row.relationship_domains : []
+  const base = DOMAIN_COPY.find(([key])=>domains.includes(key))?.[1]
+    ?? ((row.a === 'Mercury' || row.b === 'Mercury') ? '대화·생각·표현 방식이 강하게 맞물리는 근거야.'
+      : (row.a === 'Venus' || row.b === 'Venus') ? '호감과 관계 매력, 애정 표현 방식을 건드리는 근거야.'
+      : (row.a === 'Moon' || row.b === 'Moon') ? '감정 반응과 정서적 공감대를 건드리는 근거야.'
+      : (row.a === 'Mars' || row.b === 'Mars') ? '행동 욕구와 실제 움직임을 건드리는 근거야.'
+      : '현재 관계의 반응과 방향을 건드리는 계산 근거야.')
+  if (row.tone === 'challenging') return `${base} 다만 충돌·오해·제약 쪽으로도 나타날 수 있어서 다른 근거와 함께 봐야 해.`
+  if (row.tone === 'supportive') return `${base} 흐름을 부드럽게 이어주는 쪽이지만, 이것만으로 실제 연락이나 재회를 확정하지는 않아.`
+  return `${base} 지지와 긴장이 함께 섞일 수 있어서 한 방향으로 단정하지 않아.`
+}
+
+function houseLabel(row: Aspect, direction: string) {
+  const house = row.target_house
+  if (!house) return ''
+  const whole = Number(house.whole_house)
+  const quad = Number(house.quadrant_house)
+  const owner = direction === 'counterpart_to_user' ? '내' : direction === 'user_to_counterpart' ? '상대' : '대상'
+  if (Number.isFinite(whole) && Number.isFinite(quad) && whole === quad) return `${owner} ${whole}하우스 중첩`
+  const parts: string[] = []
+  if (Number.isFinite(whole)) parts.push(`홀사인 ${whole}하우스`)
+  if (Number.isFinite(quad)) parts.push(`${house.quadrant_system || '사분면'} ${quad}하우스`)
+  return parts.length ? `${owner} · ${parts.join(' / ')}` : ''
+}
+
+function evidenceDistance(row: Aspect, asOf: string) {
+  const date = String(row.reference_date ?? '')
+  const t = Date.parse(date || '9999-12-31')
+  const base = Date.parse(asOf || '9999-12-31')
+  return Number.isFinite(t) && Number.isFinite(base) ? Math.abs(t-base) : Number.MAX_SAFE_INTEGER
+}
+
+function selectEvidence(evidence: Aspect[], direction: string, asOf: string, limit = 3) {
+  const picked = new Map<string,Aspect>()
+  for (const row of evidence.filter((item)=>item.direction === direction)) {
+    const key = `${row.a}|${row.aspect}|${row.b}`
+    const current = picked.get(key)
+    if (!current || evidenceDistance(row,asOf) < evidenceDistance(current,asOf) ||
+      (evidenceDistance(row,asOf) === evidenceDistance(current,asOf) && Number(row.orb) < Number(current.orb))) picked.set(key,row)
+  }
+  const phaseRank = (phase?: string) => phase === 'exact' ? 0 : phase === 'applying' ? 1 : phase === 'separating' ? 2 : 3
+  return [...picked.values()].sort((a,b)=>evidenceDistance(a,asOf)-evidenceDistance(b,asOf) || phaseRank(a.phase)-phaseRank(b.phase) || Number(a.orb)-Number(b.orb)).slice(0,limit)
+}
+
+function EvidenceRows({ evidence, direction, asOf, title }: { evidence: Aspect[]; direction:string; asOf:string; title:string }) {
+  const rows = selectEvidence(evidence,direction,asOf)
+  if (!rows.length) return null
+  return <div className="reunion-local-evidence-group"><b>{title}</b>{rows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${direction}:${row.a}:${row.aspect}:${row.b}:${index}`}>
+    <strong>{aspectLabel(row)}</strong>
+    <p>{evidenceMeaning(row)}</p>
+    <small>{[evidencePhase(row), houseLabel(row,direction), row.reference_date ? `계산 기준 ${row.reference_date}` : '', row.exact_at ? `정확일 ${row.exact_at}` : ''].filter(Boolean).join(' · ')}</small>
+  </article>)}</div>
+}
+'''
+          s = s.replace(anchor, anchor + helpers, 1)
+          old = "  hierarchyData,\n  reunionV2,"
+          new = "  hierarchyData,\n  evidence,\n  reunionV2,"
+          assert old in s, 'panel destructuring anchor missing'
+          s = s.replace(old,new,1)
+          old = "  hierarchyData: ReunionHierarchy\n  reunionV2: ReunionSynthesis | null"
+          new = "  hierarchyData: ReunionHierarchy\n  evidence: Aspect[]\n  reunionV2: ReunionSynthesis | null"
+          assert old in s, 'panel prop type anchor missing'
+          s = s.replace(old,new,1)
+          old = "        <ReadingDirections rows={directionRows}/>\n        {reunionV2?.initiative && <>"
+          new = "        <ReadingDirections rows={directionRows}/>\n        <div className=\"reunion-local-evidence-grid\">\n          <EvidenceRows evidence={evidence} direction=\"counterpart_to_user\" asOf={hierarchyData.as_of_date} title=\"상대의 현재 진행 → 나\"/>\n          <EvidenceRows evidence={evidence} direction=\"user_to_counterpart\" asOf={hierarchyData.as_of_date} title=\"나의 현재 진행 → 상대\"/>\n          <EvidenceRows evidence={evidence} direction=\"shared\" asOf={hierarchyData.as_of_date} title=\"현재의 나 ↔ 현재의 상대 · 진행↔진행\"/>\n        </div>\n        {reunionV2?.initiative && <>"
+          assert old in s, 'direction render anchor missing'
+          s = s.replace(old,new,1)
+          old = "        {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}\n        <p className=\"reunion-score-meaning\">"
+          new = "        {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}\n        <EvidenceRows evidence={evidence} direction=\"relationship_itself\" asOf={hierarchyData.as_of_date} title=\"진행 컴포짓 · 관계 자체\"/>\n        <p className=\"reunion-score-meaning\">"
+          assert old in s, 'relationship state anchor missing'
+          panel.write_text(s.replace(old,new,1))
+
+          test = Path('web/src/lib/reunionLocalEvidenceUi.test.mjs')
+          test.write_text(r'''import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const app=readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8')
+const host=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
+
+test('reunion renders normalized progression evidence locally without requiring Gemini prose',()=>{
+  assert.match(app,/evidenceContract=\{relationshipResult\.result\.reunion_evidence_contract \?\? null\}/)
+  assert.match(host,/evidence=\{evidenceContract\?\.evidence \?\? \[\]\}/)
+  assert.match(panel,/상대의 현재 진행 → 나/)
+  assert.match(panel,/나의 현재 진행 → 상대/)
+  assert.match(panel,/현재의 나 ↔ 현재의 상대 · 진행↔진행/)
+  assert.match(panel,/진행 컴포짓 · 관계 자체/)
+  assert.match(panel,/오브가 더 좁아지는 흐름/)
+  assert.match(panel,/가장 가까운 구간을 지난 흐름/)
+  assert.match(panel,/정확일/)
+  assert.match(panel,/target_house/)
+  assert.doesNotMatch(panel,/상대가 나를 생각하고 있다/)
+  assert.doesNotMatch(panel,/재회 확률/)
+})
+''')
+          PY
+      - name: Test targeted reunion UI
+        working-directory: web
+        run: node --test src/lib/reunionUiVnext.test.mjs src/lib/relationshipReunionV2.contract.test.mjs src/lib/reunionLocalEvidenceUi.test.mjs
+      - name: Build web
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Commit product changes and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/tmp-reunion-local-evidence.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add web/src/AppNext.tsx web/src/RelationshipInterpretationPanel.tsx web/src/ReunionHierarchyPanel.tsx web/src/lib/reunionLocalEvidenceUi.test.mjs .github/workflows/tmp-reunion-local-evidence.yml
+          git commit -m "feat: show local reunion progression evidence"
+          git push origin HEAD:feat/reunion-local-evidence-reading
