@@ -73,6 +73,32 @@ def _progress(job_id: str, phase: str, percent: int, detail: str) -> None:
     )
 
 
+def _compact_public_response(response: dict) -> dict:
+    """Remove engine-audit arrays that the mobile UI never consumes.
+
+    The canonical engine still computes and tests these arrays. They are only
+    removed from the public async response after all selection/evidence work is
+    complete, preventing multi-megabyte 365-day payloads from freezing iOS.
+    """
+    result = response.get("result")
+    if not isinstance(result, dict):
+        return response
+
+    hierarchy = result.get("reunion_hierarchy")
+    if isinstance(hierarchy, dict):
+        omitted_counts: dict[str, int] = {}
+        for key in ("daily_trace", "long_term_daily", "saju_boundaries"):
+            value = hierarchy.pop(key, None)
+            if isinstance(value, list):
+                omitted_counts[key] = len(value)
+        hierarchy["mobile_payload_policy"] = {
+            "audit_arrays_omitted": True,
+            "omitted_counts": omitted_counts,
+            "reason": "full daily audit arrays remain engine-internal; mobile UI consumes selected windows/evidence only",
+        }
+    return response
+
+
 def _calculate_reunion(job_id: str, request: RelationshipRequest) -> dict:
     """Run the existing reunion semantics with stage heartbeats for production diagnostics."""
     if request.analysis_mode != "reunion":
@@ -144,7 +170,7 @@ def _calculate_reunion(job_id: str, request: RelationshipRequest) -> dict:
     )
 
     _progress(job_id, "finalizing", 96, "결과 정리")
-    return {
+    response = {
         "ok": bool(result.get("ok", True)),
         "api_version": APP_VERSION,
         "engine": result.get("engine", REL_ENGINE_VERSION),
@@ -161,6 +187,7 @@ def _calculate_reunion(job_id: str, request: RelationshipRequest) -> dict:
             "marriage_mode": "결혼 여부 예언이 아니라 장기 결속·관계 주기·협력/긴장 활성도를 해석하는 모드",
         },
     }
+    return _compact_public_response(response)
 
 
 def _run(job_id: str, request: RelationshipRequest) -> None:
@@ -339,6 +366,28 @@ def relationship_western_job(job_id: str) -> dict:
 
     created_ts = float(job.pop("created_ts", 0) or 0)
     job.pop("request_key", None)
+    result_ready = job.get("status") == "done" and isinstance(job.get("result"), dict)
+    job.pop("result", None)
     if job.get("status") in {"queued", "running"} and created_ts:
         job["elapsed_seconds"] = round(time.time() - created_ts, 3)
-    return {"job_id": job_id, **job}
+    return {"job_id": job_id, "result_ready": result_ready, **job}
+
+
+@app.get("/v1/relationship/western/jobs/{job_id}/result")
+def relationship_western_job_result(job_id: str) -> dict:
+    _prune()
+    with _lock:
+        job = dict(_jobs.get(job_id) or {})
+    if not job:
+        raise HTTPException(status_code=404, detail="relationship calculation job not found or expired")
+    if job.get("status") == "failed":
+        raise HTTPException(
+            status_code=int(job.get("status_code") or 500),
+            detail=str(job.get("error") or "재회운 계산이 실패했어."),
+        )
+    if job.get("status") != "done":
+        raise HTTPException(status_code=409, detail="relationship calculation is not finished yet")
+    result = job.get("result")
+    if not isinstance(result, dict):
+        raise HTTPException(status_code=500, detail="relationship calculation completed without a result")
+    return result
