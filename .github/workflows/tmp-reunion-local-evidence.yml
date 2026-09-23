@@ -29,9 +29,8 @@ jobs:
           match = re.search(r"echo '([^']+)' \| base64 -d > /tmp/patch\.py", previous)
           assert match, 'previous patch payload not found'
           script = base64.b64decode(match.group(1)).decode('utf-8')
-          duplicate = "import test from 'node:test'\nimport test from 'node:test'\n"
-          assert duplicate in script, 'duplicate test import not found in patch script'
-          script = script.replace(duplicate, "import test from 'node:test'\n", 1)
+          script = script.replace("import test from 'node:test'\nimport test from 'node:test'\n", "import test from 'node:test'\n", 1)
+          script = script.replace('eevidenceContract', 'evidenceContract')
           open('/tmp/patch.py','w',encoding='utf-8').write(script)
           PY
           python /tmp/patch.py
