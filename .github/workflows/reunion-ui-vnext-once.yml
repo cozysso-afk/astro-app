@@ -1,0 +1,114 @@
+name: Reunion UI vNext one-shot
+
+on:
+  push:
+    branches: [feat/reunion-ui-vnext]
+    paths:
+      - '.github/workflows/reunion-ui-vnext-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire present-first reunion hierarchy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/RelationshipInterpretationPanel.tsx')
+          s=p.read_text()
+          anchor="import { hierarchyView } from './lib/reunionHierarchy'\n"
+          imp="import { ReunionHierarchyPanel } from './ReunionHierarchyPanel'\n"
+          if imp not in s:
+              s=s.replace(anchor, anchor+imp, 1)
+          helper_start=s.index('const REUNION_STAGE_HUMAN:')
+          helper_end=s.index('export function RelationshipInterpretationPanel', helper_start)
+          s=s[:helper_start]+s[helper_end:]
+          start=s.index('    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy reunion-v211">')
+          end=s.index('\n\n    {ai?.ok && ai.data && (!reunion || !hierarchyData) ?', start)
+          block='''    {reunion && hierarchyData && <ReunionHierarchyPanel
+              hierarchyData={hierarchyData}
+              reunionV2={reunionV2}
+              directionRows={[
+                {kind:'incoming',label:'상대 → 나',...view.incoming},
+                {kind:'outgoing',label:'나 → 상대',...view.outgoing},
+                {kind:'reconnection',label:'과거 인연 재접점',...view.reconnection},
+              ]}
+              sustainabilityText={view.sustainabilityText}
+            />}'''
+          s=s[:start]+block+s[end:]
+          old=': <section className="reading-section relationship-natural-reading is-ready"><h3>Gemini 자연어 해설</h3><p>계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p>'
+          new=': !(reunion && hierarchyData && ai?.ok && ai.data) ? <section className="reading-section relationship-natural-reading is-ready"><h3>{reunion && hierarchyData ? \'추가 자연어 해설 · 선택\' : \'Gemini 자연어 해설\'}</h3><p>{reunion && hierarchyData ? \'위 계산 결과 확인에는 필요 없어. 더 긴 서술형 해설이 필요할 때만 생성해.\' : \'계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.\'}</p>'
+          if old not in s:
+              raise SystemExit('AI optional-card anchor missing')
+          s=s.replace(old,new,1)
+          tail="{aiError && <p className=\"reading-alert\" role=\"status\"><AlertTriangle size={16}/>{aiError}</p>}</section>}"
+          if tail not in s:
+              raise SystemExit('AI optional-card tail missing')
+          s=s.replace(tail, tail[:-1]+' : null}', 1)
+          p.write_text(s)
+          PY
+      - name: Add UI contract test
+        run: |
+          cat > web/src/lib/reunionUiVnext.test.mjs <<'EOF'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import test from 'node:test'
+
+          const panel = readFileSync(new URL('../ReunionHierarchyPanel.tsx', import.meta.url), 'utf8')
+          const host = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')
+
+          test('reunion vNext is present-first, directional, retrospective, future-gated, and rebuild-aware', () => {
+            const headings = ['지금 두 사람은 어디에 있나','서로에게 걸리는 방향','관계 자체의 현재 단계','지난 활성기 · 사후 확인용','앞으로의 후보 시기','연락 ≠ 재회','관계를 다시 이어가려면','계산 근거 보기']
+            let cursor = -1
+            for (const heading of headings) {
+              const next = panel.indexOf(heading)
+              assert.ok(next > cursor, `${heading} order`)
+              cursor = next
+            }
+            assert.match(panel, /실제 속마음이나 실제 선연락 행동을 관측한 값은 아니야/)
+            assert.match(panel, /과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
+            assert.match(panel, /사건 확정일 아님/)
+            assert.match(panel, /진행 컴포짓을 포함한 관계층/)
+          })
+
+          test('hierarchy reading does not require a paid AI call for base inspection', () => {
+            assert.match(host, /추가 자연어 해설 · 선택/)
+            assert.match(host, /위 계산 결과 확인에는 필요 없어/)
+            assert.match(host, /reunion && hierarchyData && ai\?\.ok && ai\.data/)
+            assert.match(host, /<ReunionHierarchyPanel/)
+          })
+          EOF
+      - name: Register targeted UI test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('web/package.json')
+          s=p.read_text()
+          # No package script change needed: CI discovers *.test.mjs through existing node test glob.
+          p.write_text(s)
+          PY
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: Targeted contract tests
+        working-directory: web
+        run: node --test src/lib/reunionUiVnext.test.mjs src/lib/relationshipModeContract.test.mjs
+      - name: Production build
+        working-directory: web
+        run: npm run build
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit UI vNext
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/RelationshipInterpretationPanel.tsx web/src/ReunionHierarchyPanel.tsx web/src/lib/reunionUiVnext.test.mjs
+          git commit -m 'feat(reunion): present-first relationship timeline UI'
+          git push origin HEAD:feat/reunion-ui-vnext
