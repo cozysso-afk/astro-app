@@ -1,4 +1,4 @@
-export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.6-prompt-budget-hardening'
+export const REUNION_EVIDENCE_VERSION = 'reunion-evidence-v2.7-directional-contract'
 
 type QuestionKey = 'why_reconnect' | 'initiative' | 'timing' | 'rebuild' | 'repeat_risks'
 type EvidenceRole = 'support' | 'counter' | 'context'
@@ -10,8 +10,9 @@ type Evidence = {
   family: string
   independence_group: string
   role: EvidenceRole
-  direction?: 'incoming' | 'outgoing' | 'shared' | null
+  direction?: 'incoming' | 'outgoing' | 'shared' | 'relationship_itself' | null
   period?: string | null
+  phase?: string | null
   date?: string | null
   aspect?: string | null
   orb?: number | null
@@ -269,6 +270,41 @@ function compactSecondarySupportForPrompt(raw: any) {
   }
 }
 
+function addNormalizedProgressionContract(items: Evidence[], packet: any) {
+  const rows = arr(packet?.reunion_evidence_contract?.evidence)
+  if (!rows.length) return false
+  const directionMap: Record<string,Evidence['direction']> = {user_to_counterpart:'outgoing',counterpart_to_user:'incoming',shared:'shared',relationship_itself:'relationship_itself'}
+  const questionsFor = (row:any): QuestionKey[] => {
+    const domains = new Set(arr(row?.relationship_domains).map(String))
+    const stages = new Set(arr(row?.stage_hints).map(String))
+    const out = new Set<QuestionKey>()
+    if (stages.has('emotional_reactivation') || ['emotion','affection_attraction','identity_direction','intensity_transformation'].some(x=>domains.has(x))) out.add('why_reconnect')
+    if (stages.has('contact_recontact') || domains.has('communication')) out.add('initiative')
+    if (stages.has('contact_recontact') || stages.has('in_person_meeting')) out.add('timing')
+    if (stages.has('relationship_rebuilding') || domains.has('commitment_structure') || row?.direction === 'relationship_itself') out.add('rebuild')
+    if (row?.tone === 'challenging' || domains.has('instability_uncertainty')) out.add('repeat_risks')
+    return [...out]
+  }
+  for (const row of rows.slice(0,48)) {
+    const text = aspectText(row)
+    if (!text) continue
+    const direction = directionMap[String(row?.direction ?? '')] ?? 'shared'
+    const group = row?.direction === 'relationship_itself' ? 'secondary_composite' : 'secondary_progression'
+    const house = row?.target_house && typeof row.target_house === 'object' ? `house=whole:${row.target_house.whole_house ?? '-'},quadrant:${row.target_house.quadrant_house ?? '-'}` : ''
+    const facts = [
+      `contract_direction=${short(row?.direction,32)}`, `phase=${short(row?.phase,20)}`, `phase_basis=${short(row?.phase_basis,32)}`,
+      `reference_date=${short(row?.reference_date,16)}`, row?.exact_at ? `exact_at=${short(row.exact_at,16)}` : 'exact_at=unresolved',
+      house, `domains=${arr(row?.relationship_domains).map((x:any)=>short(x,28)).join(',')}`, `stage_hints=${arr(row?.stage_hints).map((x:any)=>short(x,32)).join(',')}`,
+      'directional_activation_not_private_feeling=true',
+    ].filter(Boolean)
+    for (const q of questionsFor(row)) {
+      const role: EvidenceRole = q === 'initiative' ? 'context' : row?.tone === 'challenging' ? 'counter' : 'support'
+      items.push(makeEvidence({question:q,layer:short(row?.source_path,80)||'reunion_evidence_contract',family:'secondary',independence_group:group,role,direction,period:short(row?.calendar_month ?? row?.reference_date,16)||null,date:null,aspect:text,orb:num(row?.orb),tone:row?.tone??null,phase:short(row?.phase,20)||null,facts},items.length+1))
+    }
+  }
+  return true
+}
+
 function compact(items: Evidence[]) {
   const seen = new Set<string>(), out: Evidence[] = []
   for (const e of [...items].sort((a,b)=>priority(b)-priority(a))) {
@@ -281,6 +317,7 @@ function compact(items: Evidence[]) {
 
 export function buildReunionEvidenceV2(packet: any) {
   const items: Evidence[] = []
+  const normalizedProgressionAvailable = addNormalizedProgressionContract(items, packet)
   const focus = packet?.focus ?? {}
   const focusMap: Array<[string, QuestionKey, EvidenceRole]> = [
     ['core_identity_emotion','why_reconnect','support'],['attraction_romance','why_reconnect','support'],['sexual_intimacy','why_reconnect','support'],
@@ -316,13 +353,13 @@ export function buildReunionEvidenceV2(packet: any) {
   for (const m of arr(adv?.months)) {
     const period = m?.calendar_month ?? m?.representative_date ?? null
     const ps = m?.progressed_synastry
-    if (ps?.available) {
+    if (ps?.available && !normalizedProgressionAvailable) {
       for (const a of arr(ps.user_progressed_to_partner_natal).slice(0,3)) addAspect(items,'initiative','progressed_synastry.user_to_partner','secondary','secondary_progression',a,undefined,period,'outgoing')
       for (const a of arr(ps.partner_progressed_to_user_natal).slice(0,3)) addAspect(items,'initiative','progressed_synastry.partner_to_user','secondary','secondary_progression',a,undefined,period,'incoming')
       for (const a of arr(ps.progressed_to_progressed).slice(0,3)) addAspect(items,'timing','progressed_synastry.progressed_to_progressed','secondary','secondary_progression',a,undefined,period,'shared')
     }
     const pc = m?.progressed_composite
-    if (pc?.available) for (const a of arr(pc.to_natal_composite_aspects).slice(0,4)) addAspect(items,'rebuild','progressed_composite','secondary','secondary_composite',a,undefined,period,'shared')
+    if (pc?.available && !normalizedProgressionAvailable) for (const a of arr(pc.to_natal_composite_aspects).slice(0,4)) addAspect(items,'rebuild','progressed_composite','secondary','secondary_composite',a,undefined,period,'shared')
     const mt = m?.marks_tertiary
     if (mt?.available) {
       for (const a of arr(mt?.user?.to_base_marks_aspects).slice(0,2)) addAspect(items,'initiative','marks_tertiary.user','tertiary','marks_tertiary',a,undefined,period,'outgoing')
@@ -390,7 +427,7 @@ export function buildReunionEvidenceV2(packet: any) {
   const coverage = {
     natal_synastry: evidence.some(e=>e.independence_group==='natal_synastry'),
     house_overlays: Boolean(house?.available), midpoint_composite:Boolean(adv?.composite?.available), davison:Boolean(adv?.davison?.available), marks:Boolean(adv?.marks?.available),
-    progressed_synastry: arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite:arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
+    progressed_synastry: normalizedProgressionAvailable || arr(adv?.months).some(m=>m?.progressed_synastry?.available), progressed_composite: normalizedProgressionAvailable || arr(adv?.months).some(m=>m?.progressed_composite?.available), marks_tertiary:arr(adv?.months).some(m=>m?.marks_tertiary?.available), daily_transit:arr(packet?.transit_triggers?.top_days).length>0,
     solar_return: Boolean(packet?.reunion_return_support?.solar_return?.user?.available || packet?.reunion_return_support?.solar_return?.counterpart?.available),
     lunar_return: Boolean(packet?.reunion_return_support?.lunar_return?.user?.available || packet?.reunion_return_support?.lunar_return?.counterpart?.available),
   }
@@ -400,5 +437,5 @@ export function buildReunionEvidenceV2(packet: any) {
     if (packet.reunion_dimensions) packet.reunion_dimensions = compactDimensionsForPrompt(packet.reunion_dimensions)
     if (packet.reunion_secondary_support) packet.reunion_secondary_support = compactSecondarySupportForPrompt(packet.reunion_secondary_support)
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,36),convergence,initiative_gate}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Normalized reunion progression evidence preserves direction, monthly phase, house context, relationship domains, and stage hints without treating directional activation as observed private feeling or action.  Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,64),convergence,initiative_gate}
 }

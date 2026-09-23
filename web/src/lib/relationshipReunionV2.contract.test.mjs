@@ -9,7 +9,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.4-stage-grounded-narrative"/)
+  assert.match(server,/REUNION_VERSION="relationship-v12\.5-directional-evidence-narrative"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -62,7 +62,7 @@ test('reunion v2.14 keeps hierarchy timing deterministic while expanding stage-g
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v12\.4-stage-grounded-narrative-v1/)
+  assert.match(cache,/relationship-v12\.5-directional-evidence-narrative-v1/)
   assert.match(panel,/재회 흐름 타임라인/)
   assert.match(panel,/가장 가까운 활성창/)
   assert.match(panel,/지난 활성기 · 사후 확인용/)
@@ -90,6 +90,9 @@ test('reunion v2.14 keeps hierarchy timing deterministic while expanding stage-g
   assert.match(server,/카르마적 인연/)
   assert.match(server,/summary는 첫 2~3문장 안에서 현재 가장 가까운 단계/)
   assert.match(server,/repeat_risks는 현재 단계와 직접 연결되는 근거가 있는 문제만 최대 2개/)
+  assert.match(server,/counterpart_to_user=상대 진행차트가 사용자 출생차트를 자극하는 방향/)
+  assert.match(server,/계산 근거 → 쉬운 뜻 → 실제 관계에서 나타날 수 있는 장면 → 함께 걸리는 반대\/제약 근거 → 종합/)
+  assert.match(server,/applying은 앞으로 강해지는 배경/)
   assert.match(grounding,/카르마적 인연/)
 })
 

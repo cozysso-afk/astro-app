@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v12.4-stage-grounded-narrative";
+const REUNION_VERSION="relationship-v12.5-directional-evidence-narrative";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -85,6 +85,14 @@ function secondarySupportPacket(raw:any,n:number){
  const months=(Array.isArray(raw?.months)?raw.months:[]).slice(0,n).map((m:any)=>({calendar_month:m?.calendar_month??null,representative_date:m?.representative_date??null,dimensions:{emotional_reactivation:secondaryDimensionPacket(m?.dimensions?.emotional_reactivation,n),contact_recontact:secondaryDimensionPacket(m?.dimensions?.contact_recontact,n),in_person_meeting:secondaryDimensionPacket(m?.dimensions?.in_person_meeting,n),relationship_rebuilding:secondaryDimensionPacket(m?.dimensions?.relationship_rebuilding,n)}}));
  return {months,policy:raw?.policy??null,event_probability:"not_calculated"};
 }
+function reunionEvidenceContractPacket(raw:any,n:number){
+ if(!raw||typeof raw!=="object")return null;
+ const all=Array.isArray(raw?.evidence)?raw.evidence:[];
+ const dirs=["counterpart_to_user","user_to_counterpart","shared","relationship_itself"];
+ const per=Math.max(3,Math.min(12,n));
+ const chosen=dirs.flatMap(direction=>all.filter((x:any)=>x?.direction===direction).sort((a:any,b:any)=>Number(a?.orb??99)-Number(b?.orb??99)).slice(0,per));
+ return {version:raw?.version??null,available:Boolean(raw?.available),evidence:chosen.slice(0,48).map((x:any)=>({a:x?.a??null,aspect:x?.aspect??null,b:x?.b??null,orb:Number(x?.orb??99),tone:x?.tone??null,direction:x?.direction??null,phase:x?.phase??null,phase_basis:x?.phase_basis??null,exact_at:x?.exact_at??null,exact_at_basis:x?.exact_at_basis??null,reference_date:x?.reference_date??null,source_path:x?.source_path??null,relationship_domains:Array.isArray(x?.relationship_domains)?x.relationship_domains.slice(0,5):[],stage_hints:Array.isArray(x?.stage_hints)?x.stage_hints.slice(0,4):[],target_house:x?.target_house??null,event_probability:"not_calculated"})),policy:raw?.policy??null};
+}
 function compact(calc:any,ctx:any,purpose:Purpose,level=0){
  const r=calc?.result??{},n=r?.natal_synastry??{},exact=Boolean(n?.partner_time_exact),available=Boolean(n?.partner_time_available??exact);
  let aspects=(Array.isArray(n?.aspects)?n.aspects:[]).map(aspect).filter(Boolean).sort((a:any,b:any)=>a.orb-b.orb);
@@ -110,6 +118,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
    reunion_hierarchy:purpose==="reunion"?hierarchyPacket(r?.reunion_hierarchy):null,
    reunion_dimensions:purpose==="reunion"?reunionDimensionPacket(r?.reunion_dimensions,L.ranked):null,
    reunion_secondary_support:purpose==="reunion"?secondarySupportPacket(r?.reunion_secondary_support,L.months):null,
+   reunion_evidence_contract:purpose==="reunion"?reunionEvidenceContractPacket(r?.reunion_evidence_contract,L.months):null,
    reunion_timing_windows:purpose==="reunion"?r?.reunion_timing_windows??null:null,
    reunion_return_support:purpose==="reunion"?r?.reunion_return_support??null:null,
    transit_triggers:trans?{period:trans?.period,policy:trans?.policy,top_days:transitDays,top_months:transitMonths}:null,
@@ -147,6 +156,9 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - 점수와 접점 개수는 확률이 아니다. 좋은 말/나쁜 말을 억지로 균형 맞추지 않는다.
 - timing_contract의 fixed UTC offset·local noon 규칙을 그대로 따른다. IANA/DST를 임의 추정해 날짜를 바꾸지 않는다.
 - advanced.composite와 advanced.months의 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 계산층으로 읽고 signal_summary 하나로 뭉개지 않는다.
+- CALCULATED_DATA.reunion_evidence_contract가 있으면 진행 근거의 방향을 반드시 구분한다: counterpart_to_user=상대 진행차트가 사용자 출생차트를 자극하는 방향, user_to_counterpart=사용자 진행차트가 상대 출생차트를 자극하는 방향, shared=현재 두 진행차트의 상호 접점, relationship_itself=진행 컴포지트로 본 관계 자체의 현재 단계다. 이 방향은 실제 속마음이나 실제 행동의 관측값이 아니다.
+- reunion_evidence_contract.phase는 applying=월별 오브가 더 가까워지는 흐름, separating=가장 가까운 구간을 지나 멀어지는 흐름, exact=샘플 날짜에서 0.02° 이내인 근접 정점으로만 읽는다. exact_at이 null이면 정확일을 새로 만들지 않는다.
+- 전문용어를 전부 숨기지 않는다. 핵심 문단에는 실제 행성·각·오브 1~2개를 보여준 뒤 바로 사람 말로 뜻을 풀어 쓴다. 기술값만 나열하거나 기술값 없는 추상 요약만 쓰지 않는다.
 - 영어·한자·전문용어는 바로 뒤 괄호에 한글 읽기/뜻을 붙인다.
 - 서양점성술과 사주는 독립 근거로 읽고, 둘이 같은 주제를 가리킬 때만 '교차해서 보면'이라고 종합한다.
 - 사주는 CALCULATED_DATA.saju_relationship에 실제로 들어온 원주·day_master_relation(일간 상호관계·십성)·spouse_palace(일지·배우자궁 합충해파)·cross_branch_links(교차 지지관계)만 사용한다. 데이터에 없는 天干合(천간합: 갑기합·을경합·병신합·정임합·무계합), 신강·신약, 용신·희신·기신, 배우자성, 합혼점수, 도화/홍염은 절대 만들지 않는다.
@@ -175,6 +187,10 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
 - "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
 - 시기창은 기간 신호와 날짜 트리거를 분리한다. Secondary Progression은 기간 배경만 만들고, 특정 날짜는 reunion_timing_windows에 실제 fast transit trigger가 있을 때만 제시한다.
+- reunion_evidence_contract가 있으면 why_reconnect와 rebuild 해설 안에서 가능한 범위에 한해 네 층을 빠뜨리지 않는다: ① 나→상대 ② 상대→나 ③ 현재 두 사람의 진행차트끼리 ④ 진행 컴포지트로 본 관계 자체. 근거가 없는 층은 만들지 않는다.
+- 각 핵심 해설 단락은 '계산 근거 → 쉬운 뜻 → 실제 관계에서 나타날 수 있는 장면 → 함께 걸리는 반대/제약 근거 → 종합' 순서로 쓴다. 좋은 각 하나로 재회를 확정하거나 나쁜 각 하나로 종료를 확정하지 않는다.
+- applying과 separating을 문장에 반영한다. applying은 앞으로 강해지는 배경, separating은 최근 강했던 흐름의 흔적으로 설명하며, separating 근거를 미래 예고처럼 쓰지 않는다.
+- 진행 시너스트리의 counterpart_to_user는 '상대가 실제로 이렇게 느낀다'가 아니라 '상대의 현재 진행 흐름이 사용자의 어떤 영역을 자극하는 구도'라고 표현한다. 관측되지 않은 속마음·의도·행동을 사실처럼 쓰지 않는다.
 
 [미혼 결혼 marriage_unmarried]
 '결혼으로 공식화될 가능성·프러포즈/약혼/결혼 결정이 강해지는 시기'를 재미용 점성 해석으로 적극적으로 제시한다. 다만 통계적 확률이나 확정된 미래 사실처럼 단정하지 않는다. 이어서 '이 둘이 결혼생활로 들어가면 어떻게 작동하나'를 깊게 본다.
