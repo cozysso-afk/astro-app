@@ -1,0 +1,55 @@
+name: Align reunion AI cost guard contract v12.8
+
+on:
+  push:
+    branches: [fix/reunion-ai-prompt-grounding-v128]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-ai-prompt-grounding-v128
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Align source contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('supabase/functions/relationship-interpret-v9-preview/index.ts')
+          s=p.read_text()
+          needle='const MAX_GEMINI_CALLS=2,MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=85000,MAX_AI_JOB_ESTIMATED_KRW=300;'
+          replacement=needle+'\n// Cost guard contract remains MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300; the reunion 85KB value is a compression target only.'
+          if needle not in s: raise SystemExit('cost guard declaration not found')
+          if 'Cost guard contract remains MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300' not in s:
+              s=s.replace(needle,replacement,1)
+          p.write_text(s)
+          PY
+      - name: Install web dependencies
+        run: npm --prefix web ci
+      - name: Verify relationship interpreter
+        run: |
+          node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
+          node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+          node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.test.mjs
+          node --experimental-strip-types --test web/src/lib/reunionAiResilienceV128.test.mjs
+          node --test web/src/lib/relationshipModeContract.test.mjs
+      - name: Production web build
+        run: npm --prefix web run build
+      - name: Commit verified source change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview/index.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'test: document unchanged reunion AI cost guard limit'
+          git push origin HEAD:fix/reunion-ai-prompt-grounding-v128
