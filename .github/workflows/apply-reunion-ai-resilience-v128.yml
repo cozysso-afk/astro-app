@@ -27,6 +27,7 @@ jobs:
       - name: Apply targeted patch
         run: |
           python scripts/patch_reunion_ai_resilience_v128.py
+          python scripts/patch_reunion_prompt_target_soft_v128.py
           python scripts/patch_stale_grounding_test_v128.py
       - name: Install web dependencies
         run: npm --prefix web ci
