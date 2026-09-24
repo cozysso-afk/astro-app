@@ -493,7 +493,7 @@ body:has(.reading-experience), body:has(.fortune-experience) {
 
 /* Opal glass: static light fields and brief motion. */
 body:has(.app-shell){background:#f7f8fb!important}
-.app-shell{--reading-text:#303748;--reading-secondary:#626c7b;--reading-indigo:#46516b;--reading-gap:18px;--reading-border:#b8c9d94a;background:radial-gradient(ellipse at 0 8%,#c5eaf16b,transparent 37%),radial-gradient(ellipse at 100% 30%,#efd5e970,transparent 38%),radial-gradient(ellipse at 12% 70%,#cdeee37a,transparent 40%),#f7f8fb!important;color:var(--reading-text)}
+.app-shell{--reading-text:#303748;--reading-secondary:#626c7b;--reading-indigo:#46516b;--reading-gap:18px;--reading-border:#b8c9d94a;background:linear-gradient(90deg,#c5eaf13d 0%,transparent 25%),linear-gradient(270deg,#efd5e93d 0%,transparent 27%),linear-gradient(135deg,transparent 58%,#cdeee32f 100%),#f7f8fb!important;color:var(--reading-text)}
 .app-shell .page-content{background:transparent!important}
 .app-shell .hero-card,.app-shell .profile-card,.app-shell .date-card,.app-shell .fortune-field-hub,.app-shell .home-tool-card,.app-shell .reading-entry-grid>button,.app-shell .flow-tile,.app-shell .system-overview-grid>article,.app-shell .fortune-field-grid>button{--opal-tint:#e1eaf5;background:linear-gradient(135deg,#fffffff0 0%,#ffffffa8 44%,var(--opal-tint) 100%)!important;border:1px solid #fffffff2!important;box-shadow:inset 0 2px 1px #fff,inset 0 -2px 5px #ffffffb3,0 6px 18px #52688612,0 1px 3px #5268860c!important;color:#303748!important}
 .app-shell .hero-card{--opal-tint:#dcece9;position:relative;overflow:hidden}

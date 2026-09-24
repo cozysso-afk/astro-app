@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v12.5-directional-evidence-narrative";
+const REUNION_VERSION="relationship-v12.6-editorial-stage-story";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -186,6 +186,12 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - 사용자 본문에서는 Solar Return/Lunar Return 기술명을 앞세우지 말고 각각 '연간 배경', '월간 배경'으로 먼저 풀어 쓴다. 기술명은 정밀도·근거 설명에서만 병기한다.
 - 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
 - "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
+- 재회 해설은 독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라. 순서는 반드시 [현재 살아 있는 흐름] → [왜 다시 신경 쓰이는가] → [지금 어느 단계인가] → [누가/어떻게 움직일 여지] → [연락 창] → [만남 창] → [재구축 조건] → [반복 위험] 순서다.
+- 첫 2~3문장 안에서 감정 재활성화·연락/재접촉·실제 만남·관계 재구축 네 단계를 각각 현재 열림/미래 후보/후보 없음 중 무엇인지 구분해라.
+- "마음이 다시 움직이는 시기"와 "실제 관계가 움직이는 시기"를 반드시 분리해 설명해라. 감정 활성만으로 연락·만남·재구축을 승격하지 마라.
+- 같은 안전문구를 섹션마다 반복하지 마라. 각 섹션은 앞 섹션에 없던 새 정보를 추가해야 한다.
+- 현실 장면은 계산 근거가 허용할 때만 구체적으로 써라: 상대가 떠오름/예전 대화를 되짚음/메시지·답장·안부/대화가 며칠 이어짐/약속 제안/실제 만남/이전 문제를 다르게 다루는 합의. 근거 없는 속마음·행동은 만들지 마라.
+- 본문은 사람말이 먼저다. 행성명·각·오브·하우스·진행차트 기술어는 결론을 설명하는 데 꼭 필요한 1회만 쓰고 나머지는 기술 근거로 밀어라.
 - 시기창은 기간 신호와 날짜 트리거를 분리한다. Secondary Progression은 기간 배경만 만들고, 특정 날짜는 reunion_timing_windows에 실제 fast transit trigger가 있을 때만 제시한다.
 - reunion_evidence_contract가 있으면 why_reconnect와 rebuild 해설 안에서 가능한 범위에 한해 네 층을 빠뜨리지 않는다: ① 나→상대 ② 상대→나 ③ 현재 두 사람의 진행차트끼리 ④ 진행 컴포지트로 본 관계 자체. 근거가 없는 층은 만들지 않는다.
 - 각 핵심 해설 단락은 '계산 근거 → 쉬운 뜻 → 실제 관계에서 나타날 수 있는 장면 → 함께 걸리는 반대/제약 근거 → 종합' 순서로 쓴다. 좋은 각 하나로 재회를 확정하거나 나쁜 각 하나로 종료를 확정하지 않는다.
