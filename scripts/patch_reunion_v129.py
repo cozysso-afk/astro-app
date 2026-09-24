@@ -46,6 +46,7 @@ for path in [cache, *list((root / 'web/src/lib').glob('*.test.mjs')), *list((roo
     t = path.read_text()
     t = t.replace('relationship-v12.8-prompt-grounding-resilience-v1', 'relationship-v12.9-grounding-false-negative-v1')
     t = t.replace('relationship-v12.8-prompt-grounding-resilience', 'relationship-v12.9-grounding-false-negative')
+    t = t.replace('relationship-v12\\.8-prompt-grounding-resilience', 'relationship-v12\\.9-grounding-false-negative')
     path.write_text(t)
 
 print('patched reunion interpreter v12.9')
