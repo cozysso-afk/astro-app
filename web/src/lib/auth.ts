@@ -5,12 +5,20 @@ const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 export const PRIVATE_API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 const AUTH_SESSION_TIMEOUT_MS = 5_000
 const AUTH_SESSION_MIN_VALIDITY_MS = 30_000
-const DIRECT_REUNION_TIMEOUT_MS = 75_000
+const REUNION_JOB_MAX_AGE_MS = 29 * 60_000
+const REUNION_POLL_INTERVAL_MS = 1_500
+const REUNION_PENDING_STORAGE_PREFIX = 'astro.reunion.pending-job.v1'
 
 export type AppAccess = {
   allowed: boolean
   email?: string
   role?: string
+}
+
+type PendingReunionJob = {
+  jobId: string
+  requestFingerprint: string
+  createdAt: number
 }
 
 let originalFetch: typeof window.fetch | null = null
@@ -33,6 +41,70 @@ function sessionHasUsableToken(session: Session | null): session is Session {
   return !expiresAtMs || expiresAtMs - Date.now() > AUTH_SESSION_MIN_VALIDITY_MS
 }
 
+function reunionRequestFingerprint(body: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < body.length; index += 1) {
+    hash ^= body.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `${body.length}:${(hash >>> 0).toString(16)}`
+}
+
+function reunionStorageKey(): string {
+  return `${REUNION_PENDING_STORAGE_PREFIX}:${authorizedApiSession?.user.id ?? 'anonymous'}`
+}
+
+function readPendingReunionJob(body: string): PendingReunionJob | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(reunionStorageKey())
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<PendingReunionJob>
+    const valid = typeof parsed.jobId === 'string'
+      && parsed.jobId.length > 0
+      && parsed.requestFingerprint === reunionRequestFingerprint(body)
+      && typeof parsed.createdAt === 'number'
+      && Date.now() - parsed.createdAt < REUNION_JOB_MAX_AGE_MS
+    if (!valid) {
+      window.localStorage.removeItem(reunionStorageKey())
+      return null
+    }
+    return parsed as PendingReunionJob
+  } catch {
+    return null
+  }
+}
+
+function writePendingReunionJob(jobId: string, body: string): PendingReunionJob {
+  const pending: PendingReunionJob = {
+    jobId,
+    requestFingerprint: reunionRequestFingerprint(body),
+    createdAt: Date.now(),
+  }
+  try {
+    window.localStorage.setItem(reunionStorageKey(), JSON.stringify(pending))
+  } catch {
+    // localStorage can be unavailable in private/broken WebView contexts; the active page can still poll.
+  }
+  return pending
+}
+
+function clearPendingReunionJob(jobId?: string) {
+  if (typeof window === 'undefined') return
+  try {
+    if (!jobId) {
+      window.localStorage.removeItem(reunionStorageKey())
+      return
+    }
+    const raw = window.localStorage.getItem(reunionStorageKey())
+    if (!raw) return
+    const parsed = JSON.parse(raw) as Partial<PendingReunionJob>
+    if (parsed.jobId === jobId) window.localStorage.removeItem(reunionStorageKey())
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 export function getAuthorizedSessionSnapshot(): Session | null {
   return authorizedApiSession
 }
@@ -45,13 +117,10 @@ export async function fetchAuthorizedReunionRelationship(init: RequestInit): Pro
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${session.access_token}`)
   const fetcher = originalFetch ?? window.fetch.bind(window)
-  return runDirectReunionRelationship(fetcher, PRIVATE_API_BASE, init, headers)
+  return runAsyncReunionRelationship(fetcher, PRIVATE_API_BASE, init, headers)
 }
 
 async function getAuthorizedApiSession(): Promise<Session | null> {
-  // AuthGate has already verified this exact session against app_access before the
-  // private app renders. Reuse it while the access token is still comfortably valid
-  // instead of re-entering Supabase's browser auth lock on every Render API call.
   if (sessionHasUsableToken(authorizedApiSession)) return authorizedApiSession
 
   let timer: number | undefined
@@ -72,6 +141,78 @@ async function getAuthorizedApiSession(): Promise<Session | null> {
   }
 }
 
+async function pollReunionJob(
+  fetcher: typeof window.fetch,
+  base: string,
+  init: RequestInit,
+  headers: Headers,
+  pending: PendingReunionJob,
+): Promise<Response | 'lost'> {
+  let transientFailures = 0
+  while (Date.now() - pending.createdAt < REUNION_JOB_MAX_AGE_MS) {
+    if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+    let pollResponse: Response
+    try {
+      pollResponse = await fetcher(
+        `${base}/v1/relationship/western/jobs/${encodeURIComponent(pending.jobId)}`,
+        { method: 'GET', headers, signal: init.signal },
+      )
+    } catch (error) {
+      transientFailures += 1
+      if (transientFailures <= 4) {
+        await sleep(REUNION_POLL_INTERVAL_MS)
+        continue
+      }
+      throw error
+    }
+
+    const job = await pollResponse.json().catch(() => ({})) as {
+      status?: string
+      status_code?: number
+      error?: string
+      detail?: string
+      progress?: { phase?: string; percent?: number; detail?: string }
+    }
+
+    if (pollResponse.status === 404) {
+      clearPendingReunionJob(pending.jobId)
+      return 'lost'
+    }
+    if (!pollResponse.ok) {
+      if ([502, 503, 504].includes(pollResponse.status) && transientFailures < 4) {
+        transientFailures += 1
+        await sleep(REUNION_POLL_INTERVAL_MS)
+        continue
+      }
+      clearPendingReunionJob(pending.jobId)
+      return jsonResponse({ detail: job.error || job.detail || '재회운 계산 상태를 확인하지 못했어.' }, pollResponse.status)
+    }
+
+    transientFailures = 0
+    if (job.status === 'done') {
+      const resultResponse = await fetcher(
+        `${base}/v1/relationship/western/jobs/${encodeURIComponent(pending.jobId)}/result`,
+        { method: 'GET', headers, signal: init.signal },
+      )
+      if (resultResponse.ok) clearPendingReunionJob(pending.jobId)
+      return resultResponse
+    }
+    if (job.status === 'failed') {
+      clearPendingReunionJob(pending.jobId)
+      return jsonResponse({ detail: job.error || job.detail || '재회운 계산이 실패했어.' }, job.status_code || 500)
+    }
+
+    // iOS may suspend this timer while the PWA is backgrounded. That is intentional:
+    // the server job keeps running, and this loop resumes with an immediate status check
+    // when WebKit wakes the page again.
+    await sleep(REUNION_POLL_INTERVAL_MS)
+  }
+
+  clearPendingReunionJob(pending.jobId)
+  return jsonResponse({ detail: '재회운 계산 작업 보관 시간이 지나 종료됐어. 다시 계산해줘.' }, 504)
+}
+
 async function runAsyncReunionRelationship(
   fetcher: typeof window.fetch,
   base: string,
@@ -81,110 +222,30 @@ async function runAsyncReunionRelationship(
   const body = init.body
   if (typeof body !== 'string') return fetcher(`${base}/v1/relationship/western`, { ...init, headers })
 
-  const deadline = Date.now() + 120_000
-  let lastDetail = '재회운 계산 시간이 너무 길어졌어. 잠시 후 다시 시도해줘.'
-
+  let pending = readPendingReunionJob(body)
   for (let launch = 0; launch < 2; launch += 1) {
     if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
-    const startResponse = await fetcher(`${base}/v1/relationship/western/start`, {
-      ...init,
-      method: 'POST',
-      headers,
-      body,
-    })
-    if (!startResponse.ok) return startResponse
-
-    const started = await startResponse.json().catch(() => ({})) as { job_id?: string; status?: string }
-    if (!started.job_id) return jsonResponse({ detail: '재회운 계산 작업을 시작하지 못했어.' }, 502)
-
-    let lostJob = false
-    let transientFailures = 0
-
-    while (Date.now() < deadline) {
-      if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-      await sleep(launch === 0 && transientFailures === 0 ? 1000 : 1500)
-
-      let pollResponse: Response
-      try {
-        pollResponse = await fetcher(
-          `${base}/v1/relationship/western/jobs/${encodeURIComponent(started.job_id)}`,
-          { method: 'GET', headers, signal: init.signal },
-        )
-      } catch (error) {
-        transientFailures += 1
-        if (transientFailures <= 3) continue
-        throw error
-      }
-
-      const job = await pollResponse.json().catch(() => ({})) as {
-        status?: string
-        status_code?: number
-        error?: string
-        result_ready?: boolean
-      }
-
-      if (pollResponse.status === 404) {
-        lostJob = true
-        lastDetail = typeof job.error === 'string' ? job.error : '계산 중 서버가 재시작되어 작업이 사라졌어.'
-        break
-      }
-      if (!pollResponse.ok) {
-        if ([502, 503, 504].includes(pollResponse.status) && transientFailures < 3) {
-          transientFailures += 1
-          continue
-        }
-        return jsonResponse({ detail: job.error || '재회운 계산 상태를 확인하지 못했어.' }, pollResponse.status)
-      }
-
-      transientFailures = 0
-      if (job.status === 'done') {
-        const resultResponse = await fetcher(
-          `${base}/v1/relationship/western/jobs/${encodeURIComponent(started.job_id)}/result`,
-          { method: 'GET', headers, signal: init.signal },
-        )
-        return resultResponse
-      }
-      if (job.status === 'failed') {
-        return jsonResponse({ detail: job.error || '재회운 계산이 실패했어.' }, job.status_code || 500)
-      }
-    }
-
-    if (!lostJob) break
-  }
-
-  return jsonResponse({ detail: lastDetail }, 504)
-}
-
-async function runDirectReunionRelationship(
-  fetcher: typeof window.fetch,
-  base: string,
-  init: RequestInit,
-  headers: Headers,
-): Promise<Response> {
-  let timer: number | undefined
-  try {
-    const response = await Promise.race([
-      fetcher(`${base}/v1/relationship/western/direct`, {
+    if (!pending) {
+      const startResponse = await fetcher(`${base}/v1/relationship/western/start`, {
         ...init,
         method: 'POST',
         headers,
-      }),
-      new Promise<Response>((resolve) => {
-        timer = window.setTimeout(
-          () => resolve(jsonResponse({ detail: '재회운 계산 응답이 75초를 넘겼어. 서버 계산이 계속 지연되고 있어. 잠시 후 다시 시도해줘.' }, 504)),
-          DIRECT_REUNION_TIMEOUT_MS,
-        )
-      }),
-    ])
-    // Keep the proven job path as a deploy-skew fallback only.
-    if (response.status === 404 || response.status === 405) {
-      return runAsyncReunionRelationship(fetcher, base, init, headers)
+        body,
+      })
+      if (!startResponse.ok) return startResponse
+
+      const started = await startResponse.json().catch(() => ({})) as { job_id?: string; status?: string }
+      if (!started.job_id) return jsonResponse({ detail: '재회운 계산 작업을 시작하지 못했어.' }, 502)
+      pending = writePendingReunionJob(started.job_id, body)
     }
-    return response
-  } finally {
-    if (timer !== undefined) window.clearTimeout(timer)
+
+    const result = await pollReunionJob(fetcher, base, init, headers, pending)
+    if (result !== 'lost') return result
+    pending = null
   }
+
+  return jsonResponse({ detail: '계산 중 서버가 재시작되어 작업을 복구하지 못했어. 다시 눌러줘.' }, 503)
 }
 
 export async function checkAppAccess(session: Session): Promise<AppAccess> {
@@ -194,10 +255,6 @@ export async function checkAppAccess(session: Session): Promise<AppAccess> {
     return { allowed: false }
   }
 
-  // Login must not depend on the Render calculation API being awake or reachable.
-  // app_access has RLS that only exposes an enabled row for the authenticated
-  // email and, when bound, the exact auth.uid(). The calculation API still
-  // performs the same allowlist check on every /v1 request after login.
   const { data, error } = await supabase
     .from('app_access')
     .select('email,role,user_id')
@@ -220,7 +277,6 @@ export async function checkAppAccess(session: Session): Promise<AppAccess> {
     return { allowed: false }
   }
 
-  // Only a session that passed the private allowlist + UUID binding is cached.
   authorizedApiSession = session
   return {
     allowed: true,
@@ -280,7 +336,7 @@ export function installAuthenticatedApiFetch() {
     }
 
     if (reunionRequest && !(input instanceof Request)) {
-      return runDirectReunionRelationship(originalFetch!, base, init ?? {}, headers)
+      return runAsyncReunionRelationship(originalFetch!, base, init ?? {}, headers)
     }
 
     if (input instanceof Request) {
