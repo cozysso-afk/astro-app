@@ -10,6 +10,7 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 root = Path(__file__).resolve().parents[1]
 hierarchy_path = root / "reunion_hierarchy_v2.py"
+western_path = root / "relationship_western_v1.py"
 async_path = root / "api" / "relationship_async_v1.py"
 
 hierarchy = hierarchy_path.read_text(encoding="utf-8")
@@ -113,6 +114,27 @@ hierarchy = replace_once(
 
 hierarchy_path.write_text(hierarchy, encoding="utf-8")
 
+western = western_path.read_text(encoding="utf-8")
+western = replace_once(
+    western,
+    'def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility"):',
+    'def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility", *, include_reunion_daily_scan=True):',
+    "western optional daily scan flag",
+)
+western = replace_once(
+    western,
+    '    Daily two-person reunion transit scanning runs only for analysis_mode="reunion".\n',
+    '    Daily two-person reunion transit scanning runs only for analysis_mode="reunion". Async reunion jobs may defer this duplicate scan to the canonical reunion hierarchy.\n',
+    "western scan docstring",
+)
+western = replace_once(
+    western,
+    '    if month_segments and analysis_mode == "reunion":\n        transit_layer = _build_reunion_transits(',
+    '    if month_segments and analysis_mode == "reunion" and include_reunion_daily_scan:\n        transit_layer = _build_reunion_transits(',
+    "western duplicate daily scan guard",
+)
+western_path.write_text(western, encoding="utf-8")
+
 async_text = async_path.read_text(encoding="utf-8")
 async_text = replace_once(
     async_text,
@@ -158,6 +180,21 @@ async_text = replace_once(
     )
 """,
     "async progress logging",
+)
+async_text = replace_once(
+    async_text,
+    "    result = build_relationship_western(user_payload, cp_payload, segments, analysis_mode=request.analysis_mode)\n",
+    """    # The canonical v2 hierarchy performs the authoritative full-period daily scan below.
+    # Avoid paying for the legacy reunion daily scan here and immediately overwriting it.
+    result = build_relationship_western(
+        user_payload,
+        cp_payload,
+        segments,
+        analysis_mode=request.analysis_mode,
+        include_reunion_daily_scan=False,
+    )
+""",
+    "async duplicate reunion scan skip",
 )
 async_text = replace_once(
     async_text,
@@ -213,4 +250,4 @@ async_text = replace_once(
 )
 async_path.write_text(async_text, encoding="utf-8")
 
-print("patched reunion_hierarchy_v2.py and api/relationship_async_v1.py")
+print("patched reunion_hierarchy_v2.py, relationship_western_v1.py, and api/relationship_async_v1.py")
