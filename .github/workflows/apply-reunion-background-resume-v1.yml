@@ -26,8 +26,10 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Apply backend timeout patch
         run: python scripts/patch_reunion_background_resume_v1.py
-      - name: Install web dependencies
-        run: npm --prefix web ci
+      - name: Install verification dependencies
+        run: |
+          python -m pip install pytest
+          npm --prefix web ci
       - name: Focused reunion transport contracts
         run: |
           python tests/test_relationship_async_contract.py
