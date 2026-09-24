@@ -25,7 +25,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Apply targeted editorial patch
-        run: python scripts/patch_reunion_editorial_v126.py
+        run: |
+          python scripts/patch_reunion_editorial_v126.py
+          python scripts/patch_reunion_editorial_v126_followup.py
       - name: Install web dependencies
         run: npm --prefix web ci
       - name: Focused reunion contracts
