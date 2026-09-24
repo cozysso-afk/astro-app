@@ -3,7 +3,9 @@ name: Apply reunion AI v12.9 false-negative fix
 on:
   push:
     branches: [fix/reunion-grounding-false-negative-v129]
-    paths: ['.github/workflows/apply-reunion-v129.yml']
+    paths:
+      - '.github/workflows/apply-reunion-v129.yml'
+      - 'scripts/patch_reunion_v129.py'
 
 permissions:
   contents: write
