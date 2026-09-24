@@ -24,9 +24,12 @@ from timezone_provenance_v1 import resolve_local_datetime
 
 _JOB_TTL_SECONDS = 1800
 try:
-    _HARD_TIMEOUT_SECONDS = max(30, min(180, int(os.getenv("ASTRO_RELATIONSHIP_HARD_TIMEOUT_SECONDS", "75"))))
+    # Reunion full-year calculations run as server jobs so iOS backgrounding does not own
+    # the lifetime of the calculation. Keep a bounded server-side ceiling, but do not
+    # reuse the old 75-second browser-era cutoff for these background jobs.
+    _HARD_TIMEOUT_SECONDS = max(300, min(600, int(os.getenv("ASTRO_RELATIONSHIP_HARD_TIMEOUT_SECONDS", "300"))))
 except ValueError:
-    _HARD_TIMEOUT_SECONDS = 75
+    _HARD_TIMEOUT_SECONDS = 300
 try:
     _MAX_CONCURRENCY = max(1, min(2, int(os.getenv("ASTRO_MAX_RELATIONSHIP_CONCURRENCY", "1"))))
 except ValueError:

@@ -35,11 +35,14 @@ def run_contract() -> None:
     assert "/v1/relationship/western/jobs/" in auth
     assert "/result`" in auth
     assert "analysis_mode === 'reunion'" in auth
-    assert "120_000" in auth
+    assert "REUNION_JOB_MAX_AGE_MS = 29 * 60_000" in auth
+    assert "REUNION_PENDING_STORAGE_PREFIX" in auth
+    assert "readPendingReunionJob(body)" in auth
+    assert "writePendingReunionJob" in auth
+    assert "clearPendingReunionJob" in auth
+    assert "DIRECT_REUNION_TIMEOUT_MS" not in auth
     assert "job.result" not in auth
     assert "return resultResponse" in auth
-    assert "status: 504" not in auth  # timeout must go through the shared JSON response helper
-    assert "jsonResponse({ detail: lastDetail }, 504)" in auth
 
     print("relationship async contract: ok")
 

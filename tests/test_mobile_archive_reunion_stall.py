@@ -3,16 +3,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_direct_reunion_route_and_transport_contract():
+def test_background_resumable_reunion_transport_contract():
     backend = (ROOT / 'api/relationship_async_v1.py').read_text(encoding='utf-8')
     auth = (ROOT / 'web/src/lib/auth.ts').read_text(encoding='utf-8')
 
+    # Keep the direct route only for compatibility/diagnostics; the mobile client must use jobs.
     assert '@app.post("/v1/relationship/western/direct")' in backend
-    assert 'return _calculate_reunion(job_id, request)' in backend
-    assert 'DIRECT_REUNION_TIMEOUT_MS = 75_000' in auth
-    assert 'runDirectReunionRelationship' in auth
-    assert '/v1/relationship/western/direct' in auth
-    assert 'runAsyncReunionRelationship(fetcher, base, init, headers)' in auth
+    assert '@app.post("/v1/relationship/western/start")' in backend
+    assert '@app.get("/v1/relationship/western/jobs/{job_id}")' in backend
+    assert 'return runAsyncReunionRelationship(fetcher, PRIVATE_API_BASE, init, headers)' in auth
+    assert 'return runAsyncReunionRelationship(originalFetch!, base, init ?? {}, headers)' in auth
+    assert '/v1/relationship/western/direct' not in auth
+    assert 'DIRECT_REUNION_TIMEOUT_MS' not in auth
+    assert 'REUNION_PENDING_STORAGE_PREFIX' in auth
+    assert 'window.localStorage.setItem' in auth
+    assert 'readPendingReunionJob(body)' in auth
+    assert 'pollReunionJob' in auth
 
 
 def test_archive_local_first_and_bounded_cloud_contract():
