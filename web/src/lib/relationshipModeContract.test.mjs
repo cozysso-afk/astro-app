@@ -65,7 +65,7 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(relationshipFn, /결혼 가능성 표현은 금지/)
   assert.match(relationshipFn, /intimacy_resources/)
   assert.match(relationshipFn, /if\(!available\)aspects=aspects\.filter/)
-  assert.match(relationshipFn, /provisional\(잠정\) 참고 근거/)
+  assert.match(relationshipFn, /누락하거나 제외하지 말고 전부 분석한다/)
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
