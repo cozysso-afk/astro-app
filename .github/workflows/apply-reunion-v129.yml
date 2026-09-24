@@ -1,0 +1,43 @@
+name: Apply reunion AI v12.9 false-negative fix
+
+on:
+  push:
+    branches: [fix/reunion-grounding-false-negative-v129]
+    paths: ['.github/workflows/apply-reunion-v129.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-grounding-false-negative-v129
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply patch
+        run: python3 scripts/patch_reunion_v129.py
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Verify focused relationship contracts
+        working-directory: web
+        run: |
+          node --test src/lib/reunionAiResilienceV128.test.mjs
+          node --test src/lib/relationshipReunionV2.contract.test.mjs
+          node --test ../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.test.mjs
+          node --test ../supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+      - name: Production web build
+        working-directory: web
+        run: npm run build
+      - name: Commit verified patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/relationship-interpret-v9-preview web/src/lib
+          git commit -m 'fix: stop rejecting grounded reunion prose for length' || exit 0
+          git push
