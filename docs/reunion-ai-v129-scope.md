@@ -1,0 +1,1 @@
+Scope lock: interpretation validation only. Calculation semantics, reunion hierarchy, stage scoring, weights, thresholds, date generation, birth-time provenance, and visible UI structure are unchanged.
