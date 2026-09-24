@@ -87,7 +87,7 @@ test('relationship modes keep Gemini natural language primary and deterministic 
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
   assert.match(relationshipFn, /MAX_GEMINI_CALLS=2/)
-  assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300/)
+  assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=85000,MAX_AI_JOB_ESTIMATED_KRW=300/)
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)
@@ -96,7 +96,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.7-provisional-full-analysis-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.8-prompt-grounding-resilience-v1'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -109,7 +109,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v12\.7-provisional-full-analysis/)
+  assert.match(relationshipFn, /relationship-v12\.8-prompt-grounding-resilience/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

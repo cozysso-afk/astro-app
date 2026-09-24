@@ -28,8 +28,8 @@ test('hierarchy reunion shows a full human story before technical evidence',()=>
 })
 
 test('rich reunion prose has a new cache contract and explicit depth instruction',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.7-provisional-full-analysis"/)
-  assert.match(cache,/relationship-v12\.7-provisional-full-analysis-v1/)
+  assert.match(edge,/REUNION_VERSION="relationship-v12\.8-prompt-grounding-resilience"/)
+  assert.match(cache,/relationship-v12\.8-prompt-grounding-resilience-v1/)
   assert.match(edge,/summary는 5~7문장/)
   assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 6~9문장/)
   assert.match(edge,/오브와 전문용어 나열은 기술 근거로 밀어라/)

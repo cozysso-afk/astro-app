@@ -241,6 +241,19 @@ function polishV2(v2: any, provisional: boolean) {
   }
 }
 
+function sanitizeUnsupportedClaims(value: any): any {
+  if (typeof value === 'string') return value
+    .replace(/끊어지지 않는 인연|끊을 수 없는 인연|서로를 지울 수 없다/g, '쉽게 정리되지 않는 느낌이 들 수 있는 관계')
+    .replace(/카르마적 인연|운명적 인연|천생연분/g, '강하게 체감될 수 있는 관계')
+    .replace(/운명적으로 다시 만난다/g, '다시 접점이 생길 수 있는 흐름이 보인다')
+    .replace(/반드시 연락한다/g, '연락을 확정할 수는 없지만 관련 활성 신호가 있다')
+    .replace(/상대가 아직 사랑한다/g, '상대의 실제 감정은 차트만으로 확정할 수 없다')
+    .replace(/(연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/g, '$1 관련 활성 점수는 사건 확률이 아니다')
+  if (Array.isArray(value)) return value.map(sanitizeUnsupportedClaims)
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, sanitizeUnsupportedClaims(v)]))
+  return value
+}
+
 export function repairReunionGroundingV2(data: any, payload: any): RepairResult {
   const source = data?.reunion_synthesis_v2
   if (!source || typeof source !== 'object') return { ok: false, repaired: false, data, reason: 'missing_reunion_synthesis_v2' }
@@ -327,8 +340,9 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     limits: polishReunionNarrativeText(data?.limits, provisional),
     reunion_synthesis_v2: v2,
   }
-  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(next))) {
+  const safeNext = sanitizeUnsupportedClaims(next)
+  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(safeNext))) {
     return { ok:false, repaired:false, data, reason:'unsupported_deterministic_claim' }
   }
-  return { ok: true, repaired: before !== JSON.stringify(next), data: next }
+  return { ok: true, repaired: before !== JSON.stringify(safeNext), data: safeNext }
 }

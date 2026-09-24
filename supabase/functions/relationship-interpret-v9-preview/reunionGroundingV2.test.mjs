@@ -136,11 +136,12 @@ test('hierarchy rejects past dates and ungrounded month-only future windows', ()
   assert.deepEqual(out.data.reunion_synthesis_v2.timing.windows.map(x=>x.period),['2027-01-15'])
 })
 
-test('deterministic claims fail closed instead of being displayed as calculation facts',()=>{
+test('deterministic claims are repaired before display while grounded content survives',()=>{
   const x=reading(); x.headline='반드시 연락한다'
   const out=repairReunionGroundingV2(x,payload)
-  assert.equal(out.ok,false)
-  assert.equal(out.reason,'unsupported_deterministic_claim')
+  assert.equal(out.ok,true)
+  assert.doesNotMatch(JSON.stringify(out.data),/반드시 연락한다/)
+  assert.match(out.data.headline,/확정할 수는 없지만/)
 })
 
 test('canonical period endpoints survive without joining unrelated windows',()=>{

@@ -20,8 +20,8 @@ test('circled precision summaries have visible mobile inset and rhythm',()=>{
 })
 
 test('AI contract analyzes all entered-time layers while marking uncertainty',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.7-provisional-full-analysis"/)
+  assert.match(edge,/REUNION_VERSION="relationship-v12\.8-prompt-grounding-resilience"/)
   assert.match(edge,/누락하거나 제외하지 말고 전부 분석한다/)
   assert.match(edge,/exact\/provisional 모두 whole_house/)
-  assert.match(cache,/relationship-v12\.7-provisional-full-analysis-v1/)
+  assert.match(cache,/relationship-v12\.8-prompt-grounding-resilience-v1/)
 })
