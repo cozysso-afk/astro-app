@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const fortune=readFileSync(new URL('./fortuneUserSummary.ts',import.meta.url),'utf8')
 const fallback=readFileSync(new URL('./basicFortuneReading.ts',import.meta.url),'utf8')
-const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 const edge=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
 const qa=readFileSync(new URL('../EditorialQaPreview.tsx',import.meta.url),'utf8')
@@ -24,12 +24,12 @@ test('hierarchy reunion shows a full human story before technical evidence',()=>
   assert.match(panel,/연락이 닿은 뒤, 재회까지는 뭐가 남나/)
   assert.match(panel,/다시 멀어질 수 있는 지점/)
   assert.match(panel,/여러 근거가 같이 가리키는 부분/)
-  assert.ok(panel.indexOf('지금 두 사람 사이에서 살아 있는 흐름') < panel.indexOf('오늘 이후 후보 시기'))
+  assert.ok(panel.indexOf('지금 두 사람 사이에서 살아 있는 흐름') < panel.indexOf('앞으로의 후보 시기'))
 })
 
 test('rich reunion prose has a new cache contract and explicit depth instruction',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.4-stage-grounded-narrative"/)
-  assert.match(cache,/relationship-v12\.4-stage-grounded-narrative-v1/)
+  assert.match(edge,/REUNION_VERSION="relationship-v12\.6-editorial-stage-story"/)
+  assert.match(cache,/relationship-v12\.6-editorial-stage-story-v1/)
   assert.match(edge,/summary는 5~7문장/)
   assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 6~9문장/)
   assert.match(edge,/오브와 전문용어 나열은 기술 근거로 밀어라/)
@@ -45,7 +45,7 @@ test('display bands separate nearby scores without changing ranking thresholds',
 })
 
 test('reunion dates are framed as candidate windows and QA labels stay minimal',()=>{
-  assert.match(panel,/오늘 이후 후보 시기/)
+  assert.match(panel,/앞으로의 후보 시기/)
   assert.match(panel,/사건 확정일 아님/)
   assert.doesNotMatch(panel,/핵심 날짜 \{w\.date\}/)
   assert.match(qa,/2026-10-21 전후/)
@@ -61,10 +61,10 @@ test('daily and weekly hero copy never leaks internal shorthand or checklist nou
 })
 
 test('hierarchy numeric support uses stage-gated candidates rather than generic direction scores',()=>{
-  assert.match(panel,/단계별 활성도 · 보조지표/)
+  assert.match(panel,/reunion-stage-status/)
   assert.match(panel,/contact_recontact/)
   assert.match(panel,/미래 후보 \$\{stage\.candidate_count\}개/)
-  assert.match(panel,/현재 감정 세기나 사건 확률이 아니라/)
+  assert.match(panel,/사건 확률이나 현재 감정 세기가 아니라/)
   assert.doesNotMatch(panel,/재접촉 활성도<\/b><strong>\{view\.reconnection\.score/)
 })
 

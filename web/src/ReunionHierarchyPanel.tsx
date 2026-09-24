@@ -137,10 +137,56 @@ export function ReunionHierarchyPanel({
   const current = hierarchyData.current_windows
   const future = hierarchyData.top_periods
   const past = hierarchyData.past_windows
+  const stageRows = STAGE_ORDER.map(([stage,label]) => {
+    const currentRow = current.find((row)=>row.stage===stage)
+    const futureRows = future.filter((row)=>row.stage===stage)
+    const nearest = futureRows[0]
+    return { stage, label, current: Boolean(currentRow), currentRow, futureRows, nearest }
+  })
+  const nearestFuture = [...future].sort((a,b)=>a.date.localeCompare(b.date))[0]
+  const incoming = directionRows.find((row)=>row.kind==='incoming')
+  const outgoing = directionRows.find((row)=>row.kind==='outgoing')
+  const stageLine = stageRows.map((row)=>`${row.label} ${row.current?'현재 열림':row.futureRows.length?`후보 ${row.futureRows.length}개`:'후보 없음'}`).join(' · ')
+  const movementOrder = '감정이 다시 올라옴 → 메시지·답장·안부처럼 실제 접촉 → 대화가 이어짐 → 구체적인 약속 제안 → 실제 만남 → 이전 문제를 다르게 다루는 합의'
+  const currentStory = current.length
+    ? `지금 기준일에는 ${current.map((row)=>row.label).join(' · ')} 단계가 현재 창에 걸려 있어. ${stageLine}. 마음이 다시 움직이는 시기와 실제 관계가 움직이는 시기는 같은 단계가 아니므로, 현재 열린 단계보다 뒤의 일을 한꺼번에 재회로 묶어 읽지 않아.`
+    : `지금 기준일을 포함하는 공개 활성창은 없어. ${stageLine}. 이것은 감정이 없다는 뜻이 아니라, 현재 날짜가 감정·연락·만남·재구축 관문을 통과한 구간은 아니라는 뜻이야. 마음이 다시 움직이는 시기와 실제 관계가 움직이는 시기는 따로 봐.`
+  const whyStory = reunionV2?.why_reconnect
+    ? `${reunionV2.why_reconnect.conclusion} ${reunionV2.why_reconnect.interpretation}`
+    : `과거 인연이 다시 의식되는 층과 실제 접촉으로 넘어가는 층을 분리해서 보고 있어. 생각이 나거나 예전 대화가 다시 의미 있게 느껴지는 것만으로는 연락 단계가 열린 게 아니고, 메시지·답장·안부처럼 실제 상호작용으로 넘어가는 후보가 따로 잡혀야 해.`
+  const initiativeStory = reunionV2?.initiative
+    ? `${reunionV2.initiative.conclusion} ${reunionV2.initiative.interpretation}`
+    : `상대 → 나는 ${incoming?.band ?? '정보 부족'}, 나 → 상대는 ${outgoing?.band ?? '정보 부족'}으로 잡혀 있어. 이 값은 숨은 속마음이 아니라 어느 방향의 관계 자극이 더 도드라지는지 보는 보조근거라서, 독립된 행동 방향 근거가 없으면 누가 먼저 연락한다고 단정하지 않아.`
+  const timingStory = reunionV2?.timing?.conclusion
+    ? reunionV2.timing.conclusion
+    : nearestFuture
+      ? `가장 가까운 공개 후보는 ${nearestFuture.date} 전후의 ${nearestFuture.label} 단계야. 이 날짜는 사건 확정일이 아니라 해당 단계의 장기·중기·빠른 촉발 근거가 함께 관문을 통과한 후보 구간이야.`
+      : '현재 이후 공개할 단계 후보가 없어. 후보가 없는 단계를 억지로 날짜로 만들어내지 않아.'
+  const rebuildStory = reunionV2?.rebuild?.conclusion
+    ? `${reunionV2.rebuild.conclusion}${reunionV2.rebuild.conditions?.length ? ` ${reunionV2.rebuild.conditions.join(' ')}` : ''}`
+    : `연락이 다시 닿는 것과 관계를 다시 이어가는 것은 다른 단계야. 대화가 이어지고, 실제 약속과 만남으로 넘어가며, 이전에 관계를 끊게 만든 문제를 이번에는 어떻게 다르게 다룰지 합의가 생겨야 재구축 단계로 읽을 수 있어. ${sustainabilityText}`
+  const repeatStory = reunionV2?.repeat_risks?.conclusion
+    ? `${reunionV2.repeat_risks.conclusion}${reunionV2.repeat_risks.patterns?.length ? ` ${reunionV2.repeat_risks.patterns.join(' ')}` : ''}`
+    : '다시 연락이 닿더라도 예전과 같은 방식으로 대화가 끊기거나 약속이 흐려진다면 연락 단계에서 다시 멈출 수 있어. 재접촉 자체보다 연락 뒤의 대화 지속, 약속 제안, 실제 만남, 문제를 다루는 방식이 달라지는지를 확인해야 해.'
+  const convergenceStory = reunionV2?.convergence?.length
+    ? reunionV2.convergence.slice(0,3).map((row)=>`${row.theme}${row.period ? `(${row.period})` : ''}: ${row.meaning}`).join(' ')
+    : '서로 다른 계산층이 같은 단계와 시기를 함께 가리킬 때만 수렴 근거로 올려. 한 체계의 강한 신호 하나만으로 연락·만남·재구축을 다음 단계로 올리지 않아.'
 
   return <section className="reading-section reunion-hierarchy reunion-ui-vnext">
     <h3>지금 두 사람은 어디에 있나</h3>
     {!valid ? <p role="alert">계산 검증을 통과하지 못해서 현재·미래 판정을 보류했어.</p> : <>
+      <div className="reunion-story">
+        <section className="reunion-story-section reunion-story-current"><h4>지금 두 사람 사이에서 살아 있는 흐름</h4><p>{currentStory}</p></section>
+        <section className="reunion-story-section reunion-story-why"><h4>왜 다시 신경 쓰이거나 연결될 수 있나</h4><p>{whyStory}</p></section>
+        <section className="reunion-story-section reunion-story-stage"><h4>지금 어디까지 와 있나</h4><p>{stageLine}. 지금 열린 단계와 다음 후보 단계를 구분해서 봐야 해.</p></section>
+        <section className="reunion-story-section reunion-story-initiative"><h4>누가 먼저 움직일 흐름인가</h4><p>{initiativeStory}</p></section>
+        <section className="reunion-story-section reunion-story-order"><h4>다시 움직인다면 어떤 순서인가</h4><p>{movementOrder}. 각 화살표는 자동 승격이 아니야. 답장 하나가 생겼다고 만남이나 재회 단계까지 열린 것으로 보지 않아.</p><div className="reunion-stage-sequence">{movementOrder}</div></section>
+        <section className="reunion-story-section reunion-story-timing"><h4>실제 관계가 움직이는 후보 시기</h4><p>{timingStory}</p></section>
+        <section className="reunion-story-section reunion-story-rebuild"><h4>연락이 닿은 뒤, 재회까지는 뭐가 남나</h4><p>{rebuildStory}</p></section>
+        <section className="reunion-story-section reunion-story-repeat"><h4>다시 멀어질 수 있는 지점</h4><p>{repeatStory}</p></section>
+        <section className="reunion-story-section reunion-story-convergence"><h4>여러 근거가 같이 가리키는 부분</h4><p>{convergenceStory}</p></section>
+      </div>
+
       <section className="reunion-ai-block reunion-current-state">
         {reunionV2?.summary ? <Copy value={reunionV2.summary}/> : current.length ?
           <p>기준일 {hierarchyData.as_of_date}에는 {current.map((row)=>row.label).join(' · ')} 단계의 공개 활성창이 걸려 있어. 이것은 사건 확정이 아니라 현재 계층 관문을 통과한 흐름이 있다는 뜻이야.</p> :
@@ -155,11 +201,14 @@ export function ReunionHierarchyPanel({
       <section className="reunion-ai-block reunion-direction-layer">
         <h4>서로에게 걸리는 방향</h4>
         <ReadingDirections rows={directionRows}/>
-        <div className="reunion-local-evidence-grid">
-          <EvidenceRows evidence={evidence} direction="counterpart_to_user" asOf={hierarchyData.as_of_date} title="상대의 현재 진행 → 나"/>
-          <EvidenceRows evidence={evidence} direction="user_to_counterpart" asOf={hierarchyData.as_of_date} title="나의 현재 진행 → 상대"/>
-          <EvidenceRows evidence={evidence} direction="shared" asOf={hierarchyData.as_of_date} title="현재의 나 ↔ 현재의 상대 · 진행↔진행"/>
-        </div>
+        <details className="reading-more reunion-technical-evidence">
+          <summary>진행차트 근거 보기</summary>
+          <div className="reunion-local-evidence-grid">
+            <EvidenceRows evidence={evidence} direction="counterpart_to_user" asOf={hierarchyData.as_of_date} title="상대의 현재 진행 → 나"/>
+            <EvidenceRows evidence={evidence} direction="user_to_counterpart" asOf={hierarchyData.as_of_date} title="나의 현재 진행 → 상대"/>
+            <EvidenceRows evidence={evidence} direction="shared" asOf={hierarchyData.as_of_date} title="현재의 나 ↔ 현재의 상대 · 진행↔진행"/>
+          </div>
+        </details>
         {reunionV2?.initiative && <>
           <Copy value={reunionV2.initiative.conclusion}/>
           <Copy value={reunionV2.initiative.interpretation}/>
@@ -171,7 +220,7 @@ export function ReunionHierarchyPanel({
       <section className="reunion-ai-block reunion-relationship-state">
         <h4>관계 자체의 현재 단계</h4>
         {reunionV2?.timing?.conclusion ? <Copy value={reunionV2.timing.conclusion}/> : <p>{sustainabilityText}</p>}
-        <EvidenceRows evidence={evidence} direction="relationship_itself" asOf={hierarchyData.as_of_date} title="진행 컴포짓 · 관계 자체"/>
+        <details className="reading-more reunion-technical-evidence"><summary>진행 컴포짓 근거 보기</summary><EvidenceRows evidence={evidence} direction="relationship_itself" asOf={hierarchyData.as_of_date} title="진행 컴포짓 · 관계 자체"/></details>
         <p className="reunion-score-meaning">개인의 숨은 마음을 단정하는 칸이 아니라, 진행 컴포짓을 포함한 관계층과 단계별 관문이 지금 어떻게 맞물리는지 보는 칸이야.</p>
       </section>
 
