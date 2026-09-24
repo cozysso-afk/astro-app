@@ -1,0 +1,39 @@
+/* v60 — viewport-anchored app background.
+   Keep the aurora fixed to the viewport so form/content height changes cannot shift it. */
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #f7f8fb !important;
+}
+
+body {
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 300px at 8vw 7vh, rgba(226, 239, 242, .52), transparent 72%),
+    radial-gradient(circle 280px at 94vw 29vh, rgba(238, 226, 244, .50), transparent 72%),
+    radial-gradient(circle 320px at 9vw 78vh, rgba(224, 241, 235, .40), transparent 74%),
+    linear-gradient(180deg, #f8f8fb 0%, #f4f5f8 100%);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+.app-shell,
+.app-shell[data-view],
+.app-shell[data-mode] {
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+}
