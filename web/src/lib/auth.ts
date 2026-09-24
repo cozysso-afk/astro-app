@@ -15,6 +15,7 @@ export type AppAccess = {
 
 let originalFetch: typeof window.fetch | null = null
 let authenticatedFetchInstalled = false
+let authRefreshSubscriptionInstalled = false
 let authorizedApiSession: Session | null = null
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -30,6 +31,21 @@ function sessionHasUsableToken(session: Session | null): session is Session {
   if (!session?.access_token) return false
   const expiresAtMs = Number(session.expires_at ?? 0) * 1000
   return !expiresAtMs || expiresAtMs - Date.now() > AUTH_SESSION_MIN_VALIDITY_MS
+}
+
+export function getAuthorizedSessionSnapshot(): Session | null {
+  return authorizedApiSession
+}
+
+export async function fetchAuthorizedReunionRelationship(init: RequestInit): Promise<Response> {
+  const session = authorizedApiSession
+  if (!sessionHasUsableToken(session)) {
+    return jsonResponse({ detail: '로그인 세션을 다시 확인해야 해. 앱을 다시 열어줘.' }, 401)
+  }
+  const headers = new Headers(init.headers)
+  headers.set('Authorization', `Bearer ${session.access_token}`)
+  const fetcher = originalFetch ?? window.fetch.bind(window)
+  return runDirectReunionRelationship(fetcher, PRIVATE_API_BASE, init, headers)
 }
 
 async function getAuthorizedApiSession(): Promise<Session | null> {
@@ -217,6 +233,19 @@ export function installAuthenticatedApiFetch() {
   if (authenticatedFetchInstalled || typeof window === 'undefined') return
   originalFetch = window.fetch.bind(window)
   const base = PRIVATE_API_BASE
+
+  if (!authRefreshSubscriptionInstalled) {
+    supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'SIGNED_OUT') {
+        authorizedApiSession = null
+        return
+      }
+      if (nextSession && authorizedApiSession?.user.id === nextSession.user.id) {
+        authorizedApiSession = nextSession
+      }
+    })
+    authRefreshSubscriptionInstalled = true
+  }
 
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string'
