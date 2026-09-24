@@ -334,6 +334,22 @@ def _can_reuse(existing: dict, now: float) -> bool:
     return (now - anchor) <= (_HARD_TIMEOUT_SECONDS + 5)
 
 
+@app.post("/v1/relationship/western/direct")
+def relationship_western_direct(request: RelationshipRequest) -> dict:
+    """Single-request mobile path using the same optimized reunion semantics.
+
+    The async job endpoints remain available as a fallback/diagnostic path, but
+    iOS no longer has to keep a timer-driven polling loop alive for a calculation
+    that now completes in a few seconds after runtime v2.9 optimization.
+    """
+    job_id = f"direct-{uuid.uuid4().hex}"
+    try:
+        return _calculate_reunion(job_id, request)
+    finally:
+        with _lock:
+            _jobs.pop(job_id, None)
+
+
 @app.post("/v1/relationship/western/start")
 def relationship_western_start(request: RelationshipRequest) -> dict:
     _prune()

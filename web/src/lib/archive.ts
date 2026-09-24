@@ -40,7 +40,9 @@ export type ArchiveImportResult = {
 }
 
 const STORAGE_KEY = 'starlight-destiny.archive.v1'
-const CLOUD_PAGE_SIZE = 100
+const CLOUD_PAGE_SIZE = 10
+const ARCHIVE_AUTH_TIMEOUT_MS = 4_000
+const ARCHIVE_QUERY_TIMEOUT_MS = 8_000
 
 type LocalPersistResult = { ok: true } | { ok: false; error: string }
 type UploadLocalItemResult = { item: ArchiveItem; local: LocalPersistResult }
@@ -51,6 +53,22 @@ type SupabaseErrorLike = {
   message?: unknown
   details?: unknown
   hint?: unknown
+}
+
+function withArchiveTimeout<T>(promise: PromiseLike<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => reject(new Error(message)), timeoutMs)
+    Promise.resolve(promise).then(
+      (value) => {
+        globalThis.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        globalThis.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
 }
 
 function newId() {
@@ -68,6 +86,10 @@ function loadLocal(): ArchiveItem[] {
   } catch {
     return []
   }
+}
+
+export function listLocalArchive(): ArchiveItem[] {
+  return loadLocal().sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 function isQuotaExceeded(error: unknown) {
@@ -158,7 +180,11 @@ export function importArchiveItems(candidates: ArchiveItem[], knownItems: Archiv
 
 async function ensureArchiveUser() {
   try {
-    const session = await ensureSupabaseSession()
+    const session = await withArchiveTimeout(
+      ensureSupabaseSession(),
+      ARCHIVE_AUTH_TIMEOUT_MS,
+      '클라우드 로그인 세션 확인이 지연되고 있어.',
+    )
     const userId = session.user?.id
     if (!userId) {
       return { userId: null as string | null, error: '익명 사용자 세션에 사용자 ID가 없어.' }
@@ -328,10 +354,10 @@ async function fetchCloudTable(table: CloudArchiveTable, kindFallback: ArchiveKi
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(from, from + CLOUD_PAGE_SIZE - 1)
-    let page = await fetchPage()
+    let page = await withArchiveTimeout(fetchPage(), ARCHIVE_QUERY_TIMEOUT_MS, `${table} 기록 조회 시간이 길어지고 있어.`)
     if (page.error && isRetryableCloudAuthError(page.error)) {
       const session = await ensureSupabaseSession()
-      if (session.user.id === userId) page = await fetchPage()
+      if (session.user.id === userId) page = await withArchiveTimeout(fetchPage(), ARCHIVE_QUERY_TIMEOUT_MS, `${table} 기록 재조회 시간이 길어지고 있어.`)
     }
     if (page.error) throw page.error
 
@@ -391,26 +417,28 @@ export async function listArchive(): Promise<ArchiveListResult> {
     }
   }
 
-  let syncError: string | undefined
-  for (const item of local.filter((row) => !row.cloudId)) {
-    try {
-      await uploadLocalItem(item, auth.userId)
-    } catch (error) {
-      syncError = error instanceof Error ? error.message : '일부 기록 동기화에 실패했어.'
-      continue
-    }
+  const pendingUploads = local.filter((row) => !row.cloudId)
+  if (pendingUploads.length) {
+    void Promise.allSettled(pendingUploads.map((item) => withArchiveTimeout(
+      uploadLocalItem(item, auth.userId!),
+      ARCHIVE_QUERY_TIMEOUT_MS,
+      '로컬 기록의 클라우드 동기화가 지연되고 있어.',
+    )))
   }
-  local = loadLocal()
 
   try {
-    const cloud = await fetchCloudItems(auth.userId)
+    const cloud = await withArchiveTimeout(
+      fetchCloudItems(auth.userId),
+      ARCHIVE_QUERY_TIMEOUT_MS * 2,
+      '클라우드 기록 전체 조회가 지연되고 있어. 이 기기 기록을 먼저 보여줄게.',
+    )
+    local = loadLocal()
     const merged = new Map<string, ArchiveItem>()
     local.forEach((item) => merged.set(item.id, item))
     cloud.items.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }))
     const items = [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     const cache = persistLocal(items)
     const warnings = [
-      syncError,
       ...cloud.warnings,
       cache.ok ? undefined : `클라우드 기록은 불러왔지만 이 브라우저 캐시에는 저장하지 못했어: ${cache.error}`,
     ].filter(Boolean).join(' / ')

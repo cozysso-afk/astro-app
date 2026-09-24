@@ -12,7 +12,7 @@ import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
   LoaderCircle, MapPin, RefreshCw, RotateCcw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
-import { deleteArchive, importArchiveItems, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { deleteArchive, importArchiveItems, listArchive, listLocalArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
 import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, parseArchiveBackupText } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
@@ -1340,6 +1340,11 @@ export default function AppNext() {
   async function refreshArchive() {
     setArchiveLoading(true)
     setArchiveError('')
+    const localItems = listLocalArchive()
+    const initialPendingDeleteId = archiveUndoItemRef.current?.id
+    const visibleLocal = initialPendingDeleteId ? localItems.filter((item) => item.id !== initialPendingDeleteId) : localItems
+    setArchiveItems(visibleLocal)
+    setArchiveStatus(visibleLocal.length ? `이 기기 기록 ${visibleLocal.length}개 표시 · 클라우드 확인 중` : '클라우드 기록 확인 중')
     try {
       const data = await listArchive()
       const pendingDeleteId = archiveUndoItemRef.current?.id
