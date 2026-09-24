@@ -3,10 +3,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_reunion_direct_timeout_matches_production_runtime():
+def test_reunion_background_job_has_no_75_second_frontend_cutoff():
     auth = (ROOT / 'web/src/lib/auth.ts').read_text(encoding='utf-8')
-    assert 'const DIRECT_REUNION_TIMEOUT_MS = 75_000' in auth
-    assert '재회운 계산 응답이 75초를 넘겼어.' in auth
+    assert 'DIRECT_REUNION_TIMEOUT_MS' not in auth
+    assert '재회운 계산 응답이 75초를 넘겼어.' not in auth
+    assert 'REUNION_JOB_MAX_AGE_MS = 29 * 60_000' in auth
+    assert 'REUNION_PENDING_STORAGE_PREFIX' in auth
+    assert 'pollReunionJob' in auth
 
 
 def test_app_background_is_height_invariant():
