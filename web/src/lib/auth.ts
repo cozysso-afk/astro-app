@@ -5,7 +5,7 @@ const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 export const PRIVATE_API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 const AUTH_SESSION_TIMEOUT_MS = 5_000
 const AUTH_SESSION_MIN_VALIDITY_MS = 30_000
-const DIRECT_REUNION_TIMEOUT_MS = 30_000
+const DIRECT_REUNION_TIMEOUT_MS = 75_000
 
 export type AppAccess = {
   allowed: boolean
@@ -172,7 +172,7 @@ async function runDirectReunionRelationship(
       }),
       new Promise<Response>((resolve) => {
         timer = window.setTimeout(
-          () => resolve(jsonResponse({ detail: '재회운 계산 응답이 30초를 넘겼어. 잠시 후 다시 시도해줘.' }, 504)),
+          () => resolve(jsonResponse({ detail: '재회운 계산 응답이 75초를 넘겼어. 서버 계산이 계속 지연되고 있어. 잠시 후 다시 시도해줘.' }, 504)),
           DIRECT_REUNION_TIMEOUT_MS,
         )
       }),

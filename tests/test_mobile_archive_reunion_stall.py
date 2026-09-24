@@ -9,7 +9,7 @@ def test_direct_reunion_route_and_transport_contract():
 
     assert '@app.post("/v1/relationship/western/direct")' in backend
     assert 'return _calculate_reunion(job_id, request)' in backend
-    assert 'DIRECT_REUNION_TIMEOUT_MS = 30_000' in auth
+    assert 'DIRECT_REUNION_TIMEOUT_MS = 75_000' in auth
     assert 'runDirectReunionRelationship' in auth
     assert '/v1/relationship/western/direct' in auth
     assert 'runAsyncReunionRelationship(fetcher, base, init, headers)' in auth
