@@ -24,6 +24,7 @@ from reunion_dimension_v1 import (
 DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정의'}
 
 VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'
+RUNTIME_REVISION = 'reunion-runtime-v2.9-efficiency'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -106,6 +107,15 @@ MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
 }
 PRIMARY_TRIGGER_TARGETS_BY_STAGE = {stage: policy['targets'] for stage, policy in STAGE_TRIGGER_POLICY.items()}
 PRIMARY_TRIGGER_ASPECTS = DIRECT_TRIGGER_ASPECTS
+# Performance-only body subsets. They are derived from the canonical stage policies,
+# so changing a policy automatically widens the calculation set instead of silently
+# dropping a required body. Longitude math, sample hours, gates, weights and orbs stay unchanged.
+FAST_TRANSIT_BODIES = frozenset().union(*FAST_BY_STAGE.values())
+PROGRESSED_BODIES = frozenset(
+    set().union(*(policy['directed_planets'] for policy in STAGE_LONG_POLICY.values()))
+    | (set().union(*(policy['targets'] for policy in STAGE_TRIGGER_POLICY.values())) & set(rw.BODIES))
+    | {'Sun'}
+)
 DISCLAIMER = '점수는 해당 기간의 점성·명리적 상대 활성도를 비교하기 위한 값이며, 실제 연락·만남·재회의 확률을 의미하지 않습니다.'
 
 
@@ -193,6 +203,31 @@ def _contacts(source, target, stage, family, direction, *, sources=None, targets
                     'tone': 'challenging' if aspect in rw.CHALLENGING else 'supportive' if aspect in rw.SUPPORTIVE else 'mixed',
                 })
     return out
+
+
+def _selected_planet_points(jd, names):
+    """Return the same rounded Swiss longitudes as rw._planet_positions for selected bodies only."""
+    flags = swe.FLG_SWIEPH | swe.FLG_SPEED
+    wanted = set(names)
+    out = {}
+    # Preserve relationship_western_v1.BODIES iteration order for deterministic traces.
+    for name, pid in rw.BODIES.items():
+        if name not in wanted:
+            continue
+        xx, _ = swe.calc_ut(float(jd), pid, flags)
+        out[name] = round(rw._norm(xx[0]), 6)
+    missing = wanted - set(out)
+    if missing:
+        raise ValueError(f'unknown Swiss body names: {sorted(missing)}')
+    return out
+
+
+def _secondary_progressed_points(profile, target_dt, birth_utc, names=PROGRESSED_BODIES):
+    """Day-for-year progression equivalent to rw._secondary_progressed_chart without unused bodies."""
+    age_days = (target_dt.astimezone(timezone.utc) - birth_utc).total_seconds() / 86400.0
+    progressed_days = age_days / rw.YEAR_DAYS
+    jd = rw._jd_from_utc(birth_utc) + progressed_days
+    return jd, _selected_planet_points(jd, names)
 
 
 def _points(chart, allow_angles=True):
@@ -803,11 +838,10 @@ def apply_reunion_hierarchy(
         for side, p in profiles.items():
             if not p.get('birth_time') or not rw.resolve_birth_time_reliability(p)['time_available']:
                 continue
-            pc = rw._secondary_progressed_chart(p, instant, include_angles=False)
-            progression[side] = _points(pc, False)
             birth = birth_resolutions[side].utc
+            progressed_jd, progression[side] = _secondary_progressed_points(p, instant, birth)
             expected = rw._jd_from_utc(birth) + (instant - birth).total_seconds() / 86400 / rw.YEAR_DAYS
-            if abs(pc['jd_ut'] - expected) > 1e-6:
+            if abs(progressed_jd - expected) > 1e-6:
                 raise ValueError('secondary progression epoch mismatch')
             delta = (progression[side]['Sun'] - natal[side]['Sun']) % 360
             arc[side] = {k: (v + delta) % 360 for k, v in natal[side].items()}
@@ -864,8 +898,8 @@ def apply_reunion_hierarchy(
                 for hour in FAST_SAMPLE_HOURS:
                     if hour not in fast_transit_cache:
                         sample = datetime.combine(cursor, time(), tzinfo=tz) + timedelta(hours=hour)
-                        fast_transit_cache[hour] = _points(
-                            rw._chart_from_jd(rw._jd_from_utc(sample), include_angles=False)
+                        fast_transit_cache[hour] = _selected_planet_points(
+                            rw._jd_from_utc(sample), FAST_TRANSIT_BODIES
                         )
                     tr = fast_transit_cache[hour]
                     for side in ('user', 'counterpart'):
