@@ -16,6 +16,8 @@ jobs:
   patch-and-verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,9 +43,9 @@ jobs:
 
       - name: Verify longitude equivalence and hierarchy regression
         run: |
-          pytest -q tests/test_reunion_runtime_v29.py
-          pytest -q tests/test_reunion_hierarchy_v2.py
-          pytest -q tests/test_relationship_async_contract.py
+          python -m pytest -q tests/test_reunion_runtime_v29.py
+          python -m pytest -q tests/test_reunion_hierarchy_v2.py
+          python -m pytest -q tests/test_relationship_async_contract.py
 
       - name: Verify policy constants are unchanged
         run: |
