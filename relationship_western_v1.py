@@ -911,13 +911,13 @@ def _summary(aspect_sets):
     }
 
 
-def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility"):
+def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility", *, include_reunion_daily_scan=True):
     """Return static and monthly advanced relationship layers.
 
     month_segments: iterable of (segment_start: date, segment_end: date); midpoint local noon in the
     user profile's birth timezone is used as the representative timing instant. Exact partner birth
     time/place unlocks Davison and Marks layers.
-    Daily two-person reunion transit scanning runs only for analysis_mode="reunion".
+    Daily two-person reunion transit scanning runs only for analysis_mode="reunion". Async reunion jobs may defer this duplicate scan to the canonical reunion hierarchy.
     """
     month_segments = list(month_segments)
     result = {
@@ -1029,7 +1029,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "reunion_scan": "enabled" if analysis_mode == "reunion" else "skipped",
         "reason": "daily two-person reunion transit scan is purpose-specific; monthly progressed timing layers remain available for compatibility/marriage",
     }
-    if month_segments and analysis_mode == "reunion":
+    if month_segments and analysis_mode == "reunion" and include_reunion_daily_scan:
         transit_layer = _build_reunion_transits(
             user_natal, cp_natal, month_segments[0][0], month_segments[-1][1],
             user_profile.get("utc_offset_hours", 9.0), user_profile.get("timezone_id"),

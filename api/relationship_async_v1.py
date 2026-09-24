@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
 import time
@@ -35,6 +36,7 @@ _jobs: dict[str, dict] = {}
 _request_index: dict[str, str] = {}
 _lock = threading.Lock()
 _semaphore = threading.Semaphore(_MAX_CONCURRENCY)
+_logger = logging.getLogger('astro.relationship_async')
 
 
 def _prune() -> None:
@@ -70,6 +72,13 @@ def _progress(job_id: str, phase: str, percent: int, detail: str) -> None:
             "percent": max(0, min(99, int(percent))),
             "detail": detail,
         },
+    )
+    _logger.info(
+        "relationship_job_progress job=%s phase=%s percent=%s detail=%s",
+        job_id,
+        phase,
+        max(0, min(99, int(percent))),
+        detail,
     )
 
 
@@ -115,7 +124,15 @@ def _calculate_reunion(job_id: str, request: RelationshipRequest) -> dict:
     segments = _month_segments(request.start_date, request.end_date)
 
     _progress(job_id, "base_relationship", 8, "기본 관계·트랜짓 계산")
-    result = build_relationship_western(user_payload, cp_payload, segments, analysis_mode=request.analysis_mode)
+    # The canonical v2 hierarchy performs the authoritative full-period daily scan below.
+    # Avoid paying for the legacy reunion daily scan here and immediately overwriting it.
+    result = build_relationship_western(
+        user_payload,
+        cp_payload,
+        segments,
+        analysis_mode=request.analysis_mode,
+        include_reunion_daily_scan=False,
+    )
 
     _progress(job_id, "saju_crosscheck", 30, "사주 관계 교차검증")
     try:
@@ -232,11 +249,12 @@ def _run(job_id: str, request: RelationshipRequest) -> None:
             with _lock:
                 current = dict(_jobs.get(job_id) or {})
             phase = str((current.get("progress") or {}).get("phase") or "unknown")
+            elapsed = round(time.time() - started_at, 3)
             _set_job(
                 job_id,
                 status="failed",
                 finished_at=time.time(),
-                elapsed_seconds=round(time.time() - started_at, 3),
+                elapsed_seconds=elapsed,
                 status_code=504,
                 timed_out=True,
                 error=(
@@ -244,6 +262,17 @@ def _run(job_id: str, request: RelationshipRequest) -> None:
                     f"마지막 단계: {phase}. 같은 멈춘 작업을 다시 재사용하지 않도록 차단했어."
                 ),
             )
+            _logger.error(
+                "relationship_job_timeout job=%s phase=%s elapsed_seconds=%s; waiting for abandoned core before releasing semaphore",
+                job_id,
+                phase,
+                elapsed,
+            )
+            # Python threads cannot be force-killed safely. Keep the concurrency slot
+            # occupied until the abandoned calculation really exits, preventing a retry
+            # from stacking another CPU-heavy calculation on top of it.
+            worker.join()
+            _logger.info("relationship_job_abandoned_core_exited job=%s", job_id)
             return
 
         if "http_error" in box:
