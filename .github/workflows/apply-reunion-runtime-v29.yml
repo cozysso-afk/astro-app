@@ -46,7 +46,7 @@ jobs:
         run: |
           python -m pytest -q tests/test_reunion_runtime_v29.py
           python -m pytest -q tests/test_reunion_hierarchy_v2.py
-          python -m pytest -q tests/test_relationship_async_contract.py
+          python tests/test_relationship_async_contract.py
 
       - name: Verify policy constants are unchanged
         run: |
