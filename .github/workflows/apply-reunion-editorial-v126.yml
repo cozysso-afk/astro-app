@@ -1,0 +1,48 @@
+name: Apply reunion editorial v12.6
+
+on:
+  push:
+    branches: [fix/reunion-editorial-v1]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-editorial-v1
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply targeted editorial patch
+        run: python scripts/patch_reunion_editorial_v126.py
+      - name: Install web dependencies
+        run: npm --prefix web ci
+      - name: Focused reunion contracts
+        run: |
+          node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
+          node --test web/src/lib/reunionEditorialV126.test.mjs
+          node --test web/src/lib/reunionUiVnext.test.mjs
+          node --test web/src/lib/relationshipReunionV2.contract.test.mjs
+          node --test web/src/lib/humanLanguageV25.test.mjs
+          node --test web/src/lib/reunionLocalEvidenceUi.test.mjs
+      - name: Production web build
+        run: npm --prefix web run build
+      - name: Commit verified product changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/reading-experience.css web/src/reunion-reading-product-v13.css web/src/ReunionHierarchyPanel.tsx web/src/RelationshipInterpretationPanel.tsx web/src/lib/readingCache.ts web/src/lib/relationshipReunionV2.contract.test.mjs web/src/lib/humanLanguageV25.test.mjs web/src/lib/reunionEditorialV126.test.mjs supabase/functions/relationship-interpret-v9-preview/index.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: restore reunion editorial story and stable background'
+          git push origin HEAD:fix/reunion-editorial-v1
