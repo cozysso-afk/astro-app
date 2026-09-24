@@ -14,6 +14,7 @@ const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"au
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
 const MAX_GEMINI_CALLS=2,MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=85000,MAX_AI_JOB_ESTIMATED_KRW=300;
+// Cost guard contract remains MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300; the reunion 85KB value is a compression target only.
 const GEMINI_USD_KRW_ESTIMATE=1384,GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");
 const MAX_USER_NEW_JOBS_10M=6,MAX_USER_NEW_JOBS_24H=20,MAX_GLOBAL_NEW_JOBS_10M=18,MAX_GLOBAL_NEW_JOBS_24H=60;
 const enc=new TextEncoder();
