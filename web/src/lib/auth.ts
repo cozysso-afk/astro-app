@@ -5,6 +5,7 @@ const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 export const PRIVATE_API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
 const AUTH_SESSION_TIMEOUT_MS = 5_000
 const AUTH_SESSION_MIN_VALIDITY_MS = 30_000
+const DIRECT_REUNION_TIMEOUT_MS = 30_000
 
 export type AppAccess = {
   allowed: boolean
@@ -139,6 +140,37 @@ async function runAsyncReunionRelationship(
   return jsonResponse({ detail: lastDetail }, 504)
 }
 
+async function runDirectReunionRelationship(
+  fetcher: typeof window.fetch,
+  base: string,
+  init: RequestInit,
+  headers: Headers,
+): Promise<Response> {
+  let timer: number | undefined
+  try {
+    const response = await Promise.race([
+      fetcher(`${base}/v1/relationship/western/direct`, {
+        ...init,
+        method: 'POST',
+        headers,
+      }),
+      new Promise<Response>((resolve) => {
+        timer = window.setTimeout(
+          () => resolve(jsonResponse({ detail: '재회운 계산 응답이 30초를 넘겼어. 잠시 후 다시 시도해줘.' }, 504)),
+          DIRECT_REUNION_TIMEOUT_MS,
+        )
+      }),
+    ])
+    // Keep the proven job path as a deploy-skew fallback only.
+    if (response.status === 404 || response.status === 405) {
+      return runAsyncReunionRelationship(fetcher, base, init, headers)
+    }
+    return response
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer)
+  }
+}
+
 export async function checkAppAccess(session: Session): Promise<AppAccess> {
   const email = (session.user.email ?? '').trim().toLowerCase()
   if (!email || session.user.is_anonymous === true) {
@@ -219,7 +251,7 @@ export function installAuthenticatedApiFetch() {
     }
 
     if (reunionRequest && !(input instanceof Request)) {
-      return runAsyncReunionRelationship(originalFetch!, base, init ?? {}, headers)
+      return runDirectReunionRelationship(originalFetch!, base, init ?? {}, headers)
     }
 
     if (input instanceof Request) {
