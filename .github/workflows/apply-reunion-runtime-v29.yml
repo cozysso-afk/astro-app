@@ -53,7 +53,8 @@ jobs:
           grep -q "WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)" reunion_hierarchy_v2.py
           grep -q "THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)" reunion_hierarchy_v2.py
           grep -q "FAST_SAMPLE_HOURS = (0, 3, 6, 9, 12, 15, 18, 21, 23.999)" reunion_hierarchy_v2.py
-          grep -q "VERSION = 'reunion-hierarchy-v2.9-runtime-efficiency'" reunion_hierarchy_v2.py
+          grep -q "VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'" reunion_hierarchy_v2.py
+          grep -q "RUNTIME_REVISION = 'reunion-runtime-v2.9-efficiency'" reunion_hierarchy_v2.py
 
       - name: Commit verified runtime patch to branch
         run: |
