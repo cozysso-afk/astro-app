@@ -18,8 +18,8 @@ hierarchy = hierarchy_path.read_text(encoding="utf-8")
 hierarchy = replace_once(
     hierarchy,
     "VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'",
-    "VERSION = 'reunion-hierarchy-v2.9-runtime-efficiency'",
-    "hierarchy version",
+    "VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'\nRUNTIME_REVISION = 'reunion-runtime-v2.9-efficiency'",
+    "runtime revision without semantic version bump",
 )
 
 hierarchy = replace_once(
