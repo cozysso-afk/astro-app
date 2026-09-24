@@ -10,7 +10,7 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.8-prompt-grounding-resilience"/)
+  assert.match(server,/REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -63,7 +63,7 @@ test('reunion hierarchy vNext keeps deterministic timing and a present-first sta
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v12\.8-prompt-grounding-resilience-v1/)
+  assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
   const headings=['지금 두 사람은 어디에 있나','서로에게 걸리는 방향','관계 자체의 현재 단계','지난 활성기 · 사후 확인용','앞으로의 후보 시기','연락 ≠ 재회','관계를 다시 이어가려면','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){

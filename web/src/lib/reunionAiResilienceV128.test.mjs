@@ -10,13 +10,13 @@ test('reunion Gemini packet has a tighter target and compact hierarchy windows',
   assert.match(server,/REUNION_PROMPT_TARGET_BYTES=85000/)
   assert.match(server,/target_ok:bytes<=targetBytes/)
   assert.match(server,/purpose===\"reunion\"&&budget\.target_ok/)
-  assert.match(server,/relationship-v12\.8-prompt-grounding-resilience/)
+  assert.match(server,/relationship-v12\.9-grounding-false-negative/)
   assert.match(server,/slice\(0,limit\)\.map\(compactHierarchyWindow\)/)
   assert.match(server,/fast_evidence:compactList\(x\?\.fast_evidence,2\)/)
   assert.match(server,/period_support:compactList\(x\?\.period_support,2\)/)
   assert.doesNotMatch(server,/top_periods:h\.top_periods/)
   assert.doesNotMatch(server,/past_windows:h\.past_windows/)
-  assert.match(cache,/relationship-v12\.8-prompt-grounding-resilience-v1/)
+  assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
 })
 
 test('unsupported deterministic wording is repaired instead of discarding grounded result',()=>{
