@@ -3,6 +3,8 @@ import { getSupabaseSession, supabase } from './supabase'
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 export const PRIVATE_API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
+const AUTH_SESSION_TIMEOUT_MS = 5_000
+const AUTH_SESSION_MIN_VALIDITY_MS = 30_000
 
 export type AppAccess = {
   allowed: boolean
@@ -12,6 +14,7 @@ export type AppAccess = {
 
 let originalFetch: typeof window.fetch | null = null
 let authenticatedFetchInstalled = false
+let authorizedApiSession: Session | null = null
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
@@ -20,6 +23,36 @@ function jsonResponse(payload: unknown, status: number) {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+function sessionHasUsableToken(session: Session | null): session is Session {
+  if (!session?.access_token) return false
+  const expiresAtMs = Number(session.expires_at ?? 0) * 1000
+  return !expiresAtMs || expiresAtMs - Date.now() > AUTH_SESSION_MIN_VALIDITY_MS
+}
+
+async function getAuthorizedApiSession(): Promise<Session | null> {
+  // AuthGate has already verified this exact session against app_access before the
+  // private app renders. Reuse it while the access token is still comfortably valid
+  // instead of re-entering Supabase's browser auth lock on every Render API call.
+  if (sessionHasUsableToken(authorizedApiSession)) return authorizedApiSession
+
+  let timer: number | undefined
+  try {
+    const fresh = await Promise.race([
+      getSupabaseSession(),
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(
+          () => reject(new Error('로그인 세션 확인이 지연되고 있어. 네트워크를 확인하고 다시 시도해줘.')),
+          AUTH_SESSION_TIMEOUT_MS,
+        )
+      }),
+    ])
+    if (sessionHasUsableToken(fresh)) authorizedApiSession = fresh
+    return fresh
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer)
+  }
 }
 
 async function runAsyncReunionRelationship(
@@ -108,7 +141,10 @@ async function runAsyncReunionRelationship(
 
 export async function checkAppAccess(session: Session): Promise<AppAccess> {
   const email = (session.user.email ?? '').trim().toLowerCase()
-  if (!email || session.user.is_anonymous === true) return { allowed: false }
+  if (!email || session.user.is_anonymous === true) {
+    authorizedApiSession = null
+    return { allowed: false }
+  }
 
   // Login must not depend on the Render calculation API being awake or reachable.
   // app_access has RLS that only exposes an enabled row for the authenticated
@@ -122,13 +158,22 @@ export async function checkAppAccess(session: Session): Promise<AppAccess> {
     .maybeSingle()
 
   if (error) {
+    authorizedApiSession = null
     throw new Error('로그인 권한을 확인하는 중 연결이 끊겼어. 네트워크를 확인하고 다시 눌러줘.')
   }
-  if (!data) return { allowed: false }
+  if (!data) {
+    authorizedApiSession = null
+    return { allowed: false }
+  }
 
   const boundUserId = typeof data.user_id === 'string' ? data.user_id : ''
-  if (boundUserId && boundUserId !== session.user.id) return { allowed: false }
+  if (boundUserId && boundUserId !== session.user.id) {
+    authorizedApiSession = null
+    return { allowed: false }
+  }
 
+  // Only a session that passed the private allowlist + UUID binding is cached.
+  authorizedApiSession = session
   return {
     allowed: true,
     email: typeof data.email === 'string' ? data.email : email,
@@ -150,7 +195,7 @@ export function installAuthenticatedApiFetch() {
 
     if (!url.startsWith(base)) return originalFetch!(input, init)
 
-    const session = await getSupabaseSession()
+    const session = await getAuthorizedApiSession()
     if (!session?.access_token) {
       return new Response(JSON.stringify({ detail: '이메일 로그인이 필요해.' }), {
         status: 401,
