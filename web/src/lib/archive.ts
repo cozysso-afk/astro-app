@@ -1,4 +1,5 @@
 import { ensureSupabaseSession, supabase } from './supabase'
+import { getAuthorizedSessionSnapshot } from './auth'
 
 export type ArchiveKind = 'integrated' | 'compatibility' | 'marriage' | 'precision' | 'daily' | 'outcome'
 export type ArchivePeriod = 'today' | 'week' | 'month' | 'year'
@@ -17,6 +18,8 @@ export type ArchiveItem = {
   interpretation?: Record<string, unknown>
   createdAt: string
   syncState: 'local' | 'cloud'
+  hydrated?: boolean
+  cloudSource?: 'readings' | 'relationship_readings'
 }
 
 export type ArchiveSaveResult = {
@@ -179,6 +182,8 @@ export function importArchiveItems(candidates: ArchiveItem[], knownItems: Archiv
 }
 
 async function ensureArchiveUser() {
+  const cached = getAuthorizedSessionSnapshot()
+  if (cached?.user?.id) return { userId: cached.user.id, error: null as string | null }
   try {
     const session = await withArchiveTimeout(
       ensureSupabaseSession(),
@@ -342,6 +347,50 @@ function cloudRowToItem(
 }
 
 const cloudColumns = 'id, reading_type, period_start, period_end, engine_version, calculation_json, interpretation_json, summary, created_at'
+const archiveIndexColumns = 'id,user_id,source_table,reading_type,period_start,period_end,engine_version,summary,created_at,local_id,period_key,request_json,has_interpretation'
+
+function cloudIndexRowToItem(row: Record<string, unknown>): ArchiveItem | null {
+  const source = String(row.source_table ?? '')
+  if (source !== 'readings' && source !== 'relationship_readings') return null
+  const rawKind = String(row.reading_type ?? (source === 'readings' ? 'integrated' : 'compatibility'))
+  const kind: ArchiveKind = rawKind === 'marriage' || rawKind === 'compatibility' || rawKind === 'integrated' || rawKind === 'precision' || rawKind === 'daily' || rawKind === 'outcome'
+    ? rawKind
+    : source === 'readings' ? 'integrated' : 'compatibility'
+  const rawPeriod = String(row.period_key ?? 'today')
+  const periodKey: ArchivePeriod = rawPeriod === 'week' || rawPeriod === 'month' || rawPeriod === 'year' ? rawPeriod : 'today'
+  const request = row.request_json && typeof row.request_json === 'object' ? row.request_json as Record<string, unknown> : {}
+  return {
+    id: String(row.local_id || `cloud-${row.id}`),
+    cloudId: String(row.id),
+    cloudSource: source,
+    hydrated: false,
+    kind,
+    periodKey,
+    title: String(row.summary || '저장된 분석'),
+    periodStart: String(row.period_start || ''),
+    periodEnd: String(row.period_end || ''),
+    engine: String(row.engine_version || ''),
+    request,
+    result: {},
+    createdAt: String(row.created_at || new Date().toISOString()),
+    syncState: 'cloud',
+  }
+}
+
+async function fetchCloudIndex(userId: string): Promise<CloudFetchResult> {
+  const query = supabase
+    .from('archive_index_v1')
+    .select(archiveIndexColumns)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(500)
+  const response = await withArchiveTimeout(query, ARCHIVE_QUERY_TIMEOUT_MS, '클라우드 기록 목록 조회가 지연되고 있어.')
+  if (response.error) throw response.error
+  const items = (response.data ?? [])
+    .map((row) => cloudIndexRowToItem(row as Record<string, unknown>))
+    .filter((row): row is ArchiveItem => Boolean(row))
+  return { items, warnings: [] }
+}
 
 async function fetchCloudTable(table: CloudArchiveTable, kindFallback: ArchiveKind, userId: string): Promise<ArchiveItem[]> {
   const items: ArchiveItem[] = []
@@ -428,14 +477,22 @@ export async function listArchive(): Promise<ArchiveListResult> {
 
   try {
     const cloud = await withArchiveTimeout(
-      fetchCloudItems(auth.userId),
+      fetchCloudIndex(auth.userId),
       ARCHIVE_QUERY_TIMEOUT_MS * 2,
-      '클라우드 기록 전체 조회가 지연되고 있어. 이 기기 기록을 먼저 보여줄게.',
+      '클라우드 기록 목록 조회가 지연되고 있어. 이 기기 기록을 먼저 보여줄게.',
     )
     local = loadLocal()
     const merged = new Map<string, ArchiveItem>()
     local.forEach((item) => merged.set(item.id, item))
-    cloud.items.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }))
+    cloud.items.forEach((item) => {
+      const existing = merged.get(item.id)
+      const existingHasFullResult = Boolean(existing && existing.hydrated !== false && Object.keys(existing.result ?? {}).length > 0)
+      if (existingHasFullResult) {
+        merged.set(item.id, { ...item, ...existing, cloudId: item.cloudId, cloudSource: item.cloudSource, hydrated: true, syncState: 'cloud' })
+      } else {
+        merged.set(item.id, { ...existing, ...item })
+      }
+    })
     const items = [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     const cache = persistLocal(items)
     const warnings = [
@@ -450,6 +507,22 @@ export async function listArchive(): Promise<ArchiveListResult> {
       cloudError: error instanceof Error ? error.message : '클라우드 기록을 불러오지 못했어.',
     }
   }
+}
+
+export async function hydrateArchiveItem(item: ArchiveItem): Promise<ArchiveItem> {
+  if (item.hydrated !== false || !item.cloudId) return item
+  const auth = await ensureArchiveUser()
+  if (!auth.userId) throw new Error(auth.error || '클라우드 기록 로그인이 필요해.')
+  const table: CloudArchiveTable = item.cloudSource ?? (item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome' ? 'readings' : 'relationship_readings')
+  const fallback: ArchiveKind = table === 'readings' ? 'integrated' : 'compatibility'
+  const query = supabase.from(table).select(cloudColumns).eq('user_id', auth.userId).eq('id', item.cloudId).single()
+  const response = await withArchiveTimeout(query, ARCHIVE_QUERY_TIMEOUT_MS, '저장 기록 원문을 불러오는 시간이 길어지고 있어.')
+  if (response.error) throw response.error
+  const full = cloudRowToItem(response.data as Record<string, unknown>, fallback)
+  if (!full) throw new Error('저장 기록 원문 형식을 읽지 못했어.')
+  const hydrated: ArchiveItem = { ...full, cloudSource: table, hydrated: true }
+  upsertLocal(hydrated)
+  return hydrated
 }
 
 export async function deleteArchive(item: ArchiveItem) {

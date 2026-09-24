@@ -12,7 +12,8 @@ import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
   LoaderCircle, MapPin, RefreshCw, RotateCcw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
-import { deleteArchive, importArchiveItems, listArchive, listLocalArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { deleteArchive, hydrateArchiveItem, importArchiveItems, listArchive, listLocalArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { fetchAuthorizedReunionRelationship } from './lib/auth'
 import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, parseArchiveBackupText } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
@@ -1089,7 +1090,10 @@ export default function AppNext() {
     setRelationshipLoading(true)
     const shouldRunReunionTiming = reunionRequest
     try {
-      const response = await fetch(`${API_BASE}/v1/relationship/western`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+      const relationshipInit = { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
+      const response = reunionRequest
+        ? await fetchAuthorizedReunionRelationship(relationshipInit)
+        : await fetch(`${API_BASE}/v1/relationship/western`, relationshipInit)
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '관계 계산 요청에 실패했어.')
       const typed = payload as RelationshipApiResponse
@@ -1360,7 +1364,14 @@ export default function AppNext() {
     }
   }
 
-  function restoreArchive(item: ArchiveItem) {
+  async function restoreArchive(item: ArchiveItem) {
+    try {
+      item = await hydrateArchiveItem(item)
+      setArchiveItems((rows)=>rows.map((row)=>row.id === item.id ? item : row))
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : '저장 기록 원문을 불러오지 못했어.')
+      return
+    }
     const currentPeriodArchive = item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16'
     if ((item.kind === 'daily' && !currentPeriodArchive) || item.kind === 'outcome') {
       setLegacyArchiveOpen(item)
@@ -1440,6 +1451,13 @@ export default function AppNext() {
   }
 
   async function copyArchiveResult(item: ArchiveItem) {
+    try {
+      item = await hydrateArchiveItem(item)
+      setArchiveItems((rows)=>rows.map((row)=>row.id === item.id ? item : row))
+    } catch (error) {
+      setArchiveStatus(error instanceof Error ? error.message : '저장 기록 원문을 불러오지 못했어.')
+      return
+    }
     if (item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16') {
       await handleCopy('기간운세 전체복사', integratedResultText(item.result as unknown as IntegratedApiResponse))
       return
@@ -1459,9 +1477,15 @@ export default function AppNext() {
     }
   }
 
-  function exportArchive() {
+  async function exportArchive() {
     try {
-      const backup = createArchiveBackup(archiveItems)
+      setArchiveStatus('전체 기록 백업 준비 중…')
+      const resolved: ArchiveItem[] = []
+      for (let index = 0; index < archiveItems.length; index += 4) {
+        resolved.push(...await Promise.all(archiveItems.slice(index, index + 4).map(hydrateArchiveItem)))
+      }
+      setArchiveItems(resolved)
+      const backup = createArchiveBackup(resolved)
       downloadArchiveBackup(backup)
       setArchiveStatus(`전체 기록 ${backup.summary.total}건 백업 완료 · 로컬 전용 ${backup.summary.localOnly}건 · 클라우드 연결 ${backup.summary.cloudBacked}건`)
     } catch (error) {
