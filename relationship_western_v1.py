@@ -86,10 +86,9 @@ def _transit_hits(transit_chart, natal_chart, person):
         orb_limit = _transit_orb_limit(t_name)
         layer_class = "major_transit" if t_name in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else "daily_transit"
         for target, n_lon in targets.items():
-            # Entered-time angles are useful as provisional interpretation context, but
-            # they must not change deterministic reunion timing scores until exact.
-            if target in {"ASC", "DSC", "MC", "IC"} and not natal_exact:
-                continue
+            # If a concrete birth time was entered, keep time-sensitive points in the
+            # analysis even when provenance is not exact. Reliability is handled below
+            # by evidence_confidence/precision_weight instead of silently excluding them.
             target_weight = TRANSIT_TARGET_WEIGHTS.get(target, .35)
             dist = _angle_distance(t_lon, float(n_lon))
             for aspect, exact in ASPECTS.items():
@@ -106,6 +105,15 @@ def _transit_hits(transit_chart, natal_chart, person):
                     chart_b_exact=natal_exact,
                     orb_limit=orb_limit,
                 )
+                confidence = str(meta.get("evidence_confidence") or "moderate")
+                precision_weight = 1.0 if not meta.get("birth_time_dependency") else {
+                    "high": 1.0,
+                    "moderate-high": 0.92,
+                    "moderate": 0.82,
+                    "low-moderate": 0.70,
+                    "low": 0.55,
+                }.get(confidence, 0.75)
+                score = round(score * precision_weight, 1)
                 found.append({
                     "person": person,
                     "transit": t_name,
@@ -119,6 +127,7 @@ def _transit_hits(transit_chart, natal_chart, person):
                     "time_sensitivity": meta["time_sensitivity"],
                     "birth_time_dependency": meta["birth_time_dependency"],
                     "evidence_confidence": meta["evidence_confidence"],
+                    "precision_weight": precision_weight,
                     "layer_priority": meta["layer_priority"],
                     "event_probability": "not_calculated",
                 })

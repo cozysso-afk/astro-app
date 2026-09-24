@@ -98,7 +98,16 @@ def score_transit_hit(hit: dict[str, Any], dimension: str) -> float:
     target_weight = TARGET_WEIGHTS[dimension].get(target, 0.20)
     aspect_weight = ASPECT_WEIGHTS.get(aspect, 0.0)
     orb_factor = max(0.0, 1.0 - orb / limit)
-    return round(100.0 * transit_weight * target_weight * aspect_weight * orb_factor, 1)
+    confidence_weight = 1.0
+    if bool(hit.get("birth_time_dependency")):
+        confidence_weight = {
+            "high": 1.0,
+            "moderate-high": 0.92,
+            "moderate": 0.82,
+            "low-moderate": 0.70,
+            "low": 0.55,
+        }.get(str(hit.get("evidence_confidence") or "moderate"), 0.75)
+    return round(100.0 * transit_weight * target_weight * aspect_weight * orb_factor * confidence_weight, 1)
 
 
 def dimension_side_score(hits: list[dict[str, Any]], dimension: str) -> tuple[float, list[dict[str, Any]]]:

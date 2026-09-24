@@ -65,7 +65,7 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(relationshipFn, /결혼 가능성 표현은 금지/)
   assert.match(relationshipFn, /intimacy_resources/)
   assert.match(relationshipFn, /if\(!available\)aspects=aspects\.filter/)
-  assert.match(relationshipFn, /provisional\(잠정\) 참고 근거/)
+  assert.match(relationshipFn, /누락하거나 제외하지 말고 전부 분석한다/)
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
@@ -96,7 +96,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.6-editorial-stage-story-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.7-provisional-full-analysis-v1'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -109,7 +109,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v12\.6-editorial-stage-story/)
+  assert.match(relationshipFn, /relationship-v12\.7-provisional-full-analysis/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

@@ -36,8 +36,8 @@ test('modern hierarchy keeps generic appendix closed by default',()=>{
 })
 
 test('v12.6 invalidates shallow cache and enforces editorial stage story',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.6-editorial-stage-story"/)
-  assert.match(cache,/relationship-v12\.6-editorial-stage-story-v1/)
+  assert.match(edge,/REUNION_VERSION="relationship-v12\.7-provisional-full-analysis"/)
+  assert.match(cache,/relationship-v12\.7-provisional-full-analysis-v1/)
   assert.match(edge,/마음이 다시 움직이는 시기/)
   assert.match(edge,/실제 관계가 움직이는 시기/)
   assert.match(edge,/독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라/)
