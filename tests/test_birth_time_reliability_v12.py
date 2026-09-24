@@ -5,7 +5,7 @@ from datetime import date, datetime, time as dt_time, timezone
 from api.main import RelationshipProfile
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 from relationship_saju_v1 import _pillars
-from relationship_western_v1 import _profile_chart, build_relationship_western
+from relationship_western_v1 import _profile_chart, _transit_hits, build_relationship_western
 
 
 def _profile(
@@ -166,3 +166,18 @@ def test_api_profile_engine_payload_preserves_clock_value_and_provenance():
     assert payload["time_confidence"] == "low"
     assert payload["time_reliability"]["time_available"] is True
     assert payload["time_reliability"]["time_exact"] is False
+
+
+def test_entered_provisional_angle_is_analyzed_with_reduced_confidence():
+    transit = {"positions": {"Mercury": {"lon": 10.0}}}
+    natal = {
+        "positions": {"Sun": {"lon": 100.0}},
+        "angles": {"ASC": 10.0},
+        "time_reliability": {"time_exact": False},
+    }
+    hits = _transit_hits(transit, natal, "counterpart")
+    angle = next(row for row in hits if row["target"] == "ASC")
+    assert angle["birth_time_dependency"] is True
+    assert angle["evidence_confidence"] == "low"
+    assert 0 < angle["precision_weight"] < 1
+    assert angle["score"] > 0

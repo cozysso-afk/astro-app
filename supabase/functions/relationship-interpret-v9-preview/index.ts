@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v12.6-editorial-stage-story";
+const REUNION_VERSION="relationship-v12.7-provisional-full-analysis";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -142,7 +142,7 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - '끊어지지 않는 인연', '운명적으로 다시 만난다', '서로를 지울 수 없다', '반드시 연락한다', '상대가 아직 사랑한다'는 쓰지 않는다. 차트로 실제 행동이나 속마음을 확정하지 않는다.
 - 서양 내부 진행·회귀·트랜짓은 서양 한 체계다. 사주·자미두수와의 교차만 독립 체계로 센다. 자미두수 coverage가 false이면 자미 근거를 만들지 않는다.
 
-- 출생시간을 입력했다는 사실과 정밀 검증은 다르다. precision.birth_time_reliability를 우선 확인한다. exact가 아니어도 입력 생시 기반 Moon·ASC/DSC/MC/IC·하우스·Davison/Marks가 데이터에 제공되면 provisional(잠정) 참고 근거로 읽을 수 있지만, 확정·결정적 근거로 승격하지 않는다. sensitivity_scan 경고와 evidence_confidence를 함께 보고 흔들리는 각도/하우스는 보조 맥락으로만 쓴다.
+- 출생시간을 입력했다는 사실과 정밀 검증은 다르다. precision.birth_time_reliability를 우선 확인한다. 그러나 concrete entered time이 있으면 Moon·ASC/DSC/MC/IC·하우스·진행층·Davison·Marks를 해설에서 누락하거나 제외하지 말고 전부 분석한다. exact가 아닌 시간민감 근거는 provisional(잠정)이라고 명시하고 sensitivity_scan·evidence_confidence·precision_weight에 따라 강도를 낮춰 읽되, 단지 미검증이라는 이유만으로 본문에서 삭제하지 않는다. exact라고 표현하거나 확정 사실처럼 승격하는 것만 금지한다.
 - 오브가 좁은 실제 접점을 우선한다. 접점 개수보다 orb_grade·evidence_confidence·time_sensitivity를 우선한다.
 - 레이어 우선순위는 Natal structure > Secondary Progression > 주요/중장기 Transit > 빠른 Daily Transit > Tertiary/Marks 보조층이다. 하위 보조층 하나만으로 상위 레이어 결론을 뒤집지 않는다.
 - sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다.
@@ -152,7 +152,7 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - Return(회귀)이 Daily Transit과 같은 현상을 재표현한 경우 독립 근거로 중복 가산하지 않는다.
 - 각 핵심 문단마다 가능한 한 실제 애스펙트 이름과 오브를 1~3개 근거로 든다.
 - 생시 미상으로 제거된 Moon(달)·각도점·하우스는 추측하지 않는다. 사용 가능하지 않은 Davison(데이비슨)·Marks(마크스)도 추측 금지.
-- 정확 생시에서 house_overlays의 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
+- house_overlays.available=true이면 exact/provisional 모두 whole_house(홀사인)와 placidus_house(플라시두스)를 둘 다 읽는다. provisional이면 잠정 하우스라고 밝히고 신뢰도를 낮춰 해석하되 생략하지 않는다. 둘이 같은 하우스를 가리키면 중첩 근거로, 다르면 각 체계의 의미를 분리해 설명하며 한 체계로 덮어쓰거나 임의 평균하지 않는다.
 - 점수와 접점 개수는 확률이 아니다. 좋은 말/나쁜 말을 억지로 균형 맞추지 않는다.
 - timing_contract의 fixed UTC offset·local noon 규칙을 그대로 따른다. IANA/DST를 임의 추정해 날짜를 바꾸지 않는다.
 - advanced.composite와 advanced.months의 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 계산층으로 읽고 signal_summary 하나로 뭉개지 않는다.

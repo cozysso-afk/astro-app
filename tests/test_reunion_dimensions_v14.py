@@ -181,3 +181,16 @@ def test_compatibility_mode_does_not_emit_reunion_dimension_outputs():
     out = rw.build_relationship_western(user, counterpart, [], analysis_mode="compatibility")
     assert "reunion_dimensions" not in out
     assert "reunion_secondary_support" not in out
+
+
+def test_provisional_time_sensitive_hit_is_included_but_downweighted():
+    exact = _hit("Mercury", "ASC")
+    exact["birth_time_dependency"] = False
+    exact["evidence_confidence"] = "high"
+    provisional = dict(exact)
+    provisional["birth_time_dependency"] = True
+    provisional["time_sensitivity"] = "fragile"
+    provisional["evidence_confidence"] = "low"
+    exact_score = score_transit_hit(exact, "contact_recontact")
+    provisional_score = score_transit_hit(provisional, "contact_recontact")
+    assert exact_score > provisional_score > 0
