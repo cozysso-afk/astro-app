@@ -1,6 +1,7 @@
-/* v61 — visual-viewport-independent app background.
-   iOS changes the visual viewport while native selects, bars, and PWA chrome appear/disappear.
-   Never anchor the aurora to vh/dvh/svh or content height. Keep every vertical stop in px. */
+/* v62 — vertically invariant app background.
+   Native iOS selects can auto-scroll the document and resize the visual viewport.
+   A vertically varying background will therefore look like it moved even when fixed.
+   Keep the pastel atmosphere horizontal-only so every y coordinate has the same color profile. */
 html,
 body,
 #root {
@@ -19,10 +20,14 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-color: #f7f8fb;
-  background-image:
-    radial-gradient(circle 330px at 48px 82px, rgba(226, 239, 242, .52), transparent 72%),
-    radial-gradient(circle 300px at calc(100% - 24px) 330px, rgba(238, 226, 244, .50), transparent 72%),
-    radial-gradient(circle 350px at 54px 790px, rgba(224, 241, 235, .40), transparent 74%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(224, 241, 235, .44) 0,
+    rgba(247, 248, 251, .96) 112px,
+    #f7f8fb 50%,
+    rgba(247, 248, 251, .96) calc(100% - 112px),
+    rgba(238, 226, 244, .46) 100%
+  );
   background-repeat: no-repeat;
 }
 
@@ -34,8 +39,16 @@ body::before {
 
 .app-shell,
 .app-shell[data-view],
-.app-shell[data-mode] {
+.app-shell[data-mode],
+.app-shell .page-content {
   background: transparent !important;
   background-image: none !important;
   background-color: transparent !important;
+}
+
+/* Remove older decorative shell layers so there is one and only one page background owner. */
+.app-shell::before,
+.app-shell::after {
+  display: none !important;
+  content: none !important;
 }
