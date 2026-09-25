@@ -6,6 +6,7 @@ const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../viewport-background-v60.css', import.meta.url), 'utf8')
 const reliability = readFileSync(new URL('../BirthTimeReliabilityFields.tsx', import.meta.url), 'utf8')
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
+const auroraBlock = css.match(/#app-aurora-layer\s*\{([^}]*)\}/)?.[1] ?? ''
 
 test('viewport background is the final visual owner while font fix stays last overall', () => {
   const marker = "import './viewport-background-v60.css'"
@@ -21,11 +22,11 @@ test('viewport background is the final visual owner while font fix stays last ov
 test('aurora is a persistent DOM sibling outside the React root', () => {
   assert.match(html, /<div id="app-aurora-layer" aria-hidden="true"><\/div>\s*<div id="root"><\/div>/)
   assert.match(css, /#app-aurora-layer\s*\{[\s\S]*position:\s*fixed[\s\S]*inset:\s*0/)
-  assert.match(css, /#app-aurora-layer\s*\{[\s\S]*background-image:[\s\S]*radial-gradient/)
-  assert.match(css, /#app-aurora-layer\s*\{[\s\S]*animation:\s*astroAuroraViewportDriftV69\s+15s/)
-  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*filter:/)
-  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*transform:/)
-  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*will-change:/)
+  assert.match(auroraBlock, /background-image:[\s\S]*radial-gradient/)
+  assert.match(auroraBlock, /animation:\s*astroAuroraViewportDriftV69\s+15s/)
+  assert.doesNotMatch(auroraBlock, /(?:^|\s)filter\s*:/)
+  assert.doesNotMatch(auroraBlock, /(?:^|\s)transform\s*:/)
+  assert.doesNotMatch(auroraBlock, /will-change\s*:/)
 })
 
 test('scrollable app tree never owns the aurora surface', () => {
