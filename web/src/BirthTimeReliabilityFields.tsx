@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { BirthProfile, TimeConfidence, TimeSource } from './appTypes'
 import { rememberBirthTimeReliability } from './lib/precisionTransport'
 import {
@@ -25,6 +26,13 @@ type StableChoiceProps = {
   ariaLabel: string
 }
 
+type MenuPosition = {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+}
+
 const exactSources = new Set<TimeSource>(['official_record', 'rectified'])
 
 export const timeSourceLabels: Array<[TimeSource, string]> = [
@@ -46,18 +54,67 @@ export const timeConfidenceLabels: Array<[TimeConfidence, string]> = [
 
 function StableChoice({ value, options, onChange, disabled = false, ariaLabel }: StableChoiceProps) {
   const [open, setOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const [diagnostic, setDiagnostic] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const diagnosticBeforeRef = useRef<BackgroundDiagnosticSnapshot | null>(null)
   const listboxId = useId()
   const selectedLabel = options.find(([key]) => key === value)?.[1] ?? ''
   const diagnosticMode = backgroundDiagnosticsEnabled()
 
+  const updateMenuPosition = () => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const viewport = window.visualViewport
+    const viewportTop = viewport?.offsetTop ?? 0
+    const viewportLeft = viewport?.offsetLeft ?? 0
+    const viewportHeight = viewport?.height ?? window.innerHeight
+    const viewportWidth = viewport?.width ?? window.innerWidth
+    const viewportBottom = viewportTop + viewportHeight
+    const belowSpace = Math.max(0, viewportBottom - rect.bottom - 8)
+    const aboveSpace = Math.max(0, rect.top - viewportTop - 8)
+    const placeAbove = belowSpace < 220 && aboveSpace > belowSpace
+    const available = placeAbove ? aboveSpace : belowSpace
+    const maxHeight = Math.max(120, Math.min(320, available - 6))
+    const width = Math.min(rect.width, Math.max(0, viewportWidth - 16))
+    const left = Math.min(
+      Math.max(rect.left, viewportLeft + 8),
+      viewportLeft + viewportWidth - width - 8,
+    )
+    const top = placeAbove
+      ? Math.max(viewportTop + 8, rect.top - maxHeight - 6)
+      : Math.min(rect.bottom + 6, viewportBottom - 128)
+    setMenuPosition({ top, left, width, maxHeight })
+  }
+
+  useEffect(() => {
+    if (!open) {
+      setMenuPosition(null)
+      return
+    }
+    updateMenuPosition()
+    const update = () => updateMenuPosition()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -89,6 +146,49 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
     window.setTimeout(() => sample('t300'), 300)
   }
 
+  const menu = open && menuPosition && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        className="stable-choice-menu stable-choice-menu-portal"
+        id={listboxId}
+        role="listbox"
+        aria-label={ariaLabel}
+        style={{
+          position: 'fixed',
+          zIndex: 10000,
+          top: menuPosition.top,
+          left: menuPosition.left,
+          right: 'auto',
+          width: menuPosition.width,
+          maxHeight: menuPosition.maxHeight,
+        }}
+      >
+        {options.map(([key, label, optionDisabled]) => <button
+          key={key}
+          type="button"
+          className="stable-choice-option"
+          role="option"
+          aria-selected={key === value}
+          disabled={optionDisabled}
+          onPointerDown={(event) => {
+            event.preventDefault()
+            if (diagnosticMode) diagnosticBeforeRef.current = captureBackgroundDiagnostic()
+          }}
+          onClick={() => {
+            const before = diagnosticMode
+              ? diagnosticBeforeRef.current ?? captureBackgroundDiagnostic()
+              : null
+            onChange(key)
+            setOpen(false)
+            if (before) captureAfterSelection(before, key)
+          }}
+        >{label}</button>)}
+      </div>,
+      document.body,
+    )
+    : null
+
   return <div className={`stable-choice ${open ? 'is-open' : ''}`} ref={rootRef}>
     <button
       ref={triggerRef}
@@ -104,28 +204,7 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
       <span className="stable-choice-value">{selectedLabel}</span>
       <span className="stable-choice-chevron" aria-hidden="true">⌄</span>
     </button>
-    {open && <div className="stable-choice-menu" id={listboxId} role="listbox" aria-label={ariaLabel}>
-      {options.map(([key, label, optionDisabled]) => <button
-        key={key}
-        type="button"
-        className="stable-choice-option"
-        role="option"
-        aria-selected={key === value}
-        disabled={optionDisabled}
-        onPointerDown={(event) => {
-          event.preventDefault()
-          if (diagnosticMode) diagnosticBeforeRef.current = captureBackgroundDiagnostic()
-        }}
-        onClick={() => {
-          const before = diagnosticMode
-            ? diagnosticBeforeRef.current ?? captureBackgroundDiagnostic()
-            : null
-          onChange(key)
-          setOpen(false)
-          if (before) captureAfterSelection(before, key)
-        }}
-      >{label}</button>)}
-    </div>}
+    {menu}
     {diagnosticMode && diagnostic && <div
       data-bgdiag="v73"
       style={{
