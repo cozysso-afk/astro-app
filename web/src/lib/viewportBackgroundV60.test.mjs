@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../viewport-background-v60.css', import.meta.url), 'utf8')
 const reliability = readFileSync(new URL('../BirthTimeReliabilityFields.tsx', import.meta.url), 'utf8')
+const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 
 test('viewport background is the final visual owner while font fix stays last overall', () => {
   const marker = "import './viewport-background-v60.css'"
@@ -17,25 +18,30 @@ test('viewport background is the final visual owner while font fix stays last ov
   assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
-test('aurora motion stays on the app surface without fixed pseudo compositing', () => {
-  assert.match(css, /body\s*\{[\s\S]*background-image:\s*linear-gradient\(/)
-  assert.match(css, /body::before,[\s\S]*body::after[\s\S]*display:\s*none\s*!important/)
-  assert.match(css, /\.app-shell\.celestial-motion-on::before,[\s\S]*\.app-shell\.celestial-glow-off::after[\s\S]*display:\s*none\s*!important/)
-  assert.doesNotMatch(css, /body::before\s*\{[\s\S]*position:\s*fixed/)
-  assert.doesNotMatch(css, /\.app-shell::before\s*\{[\s\S]*position:\s*fixed/)
-  assert.match(css, /@keyframes\s+astroAuroraSurfaceDriftV68/)
-  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*astroAuroraSurfaceDriftV68\s+15s/)
-  assert.match(css, /\.app-shell\.celestial-motion-off[\s\S]*animation:\s*none\s*!important/)
-  assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
-  assert.doesNotMatch(css, /translate3d\(/i)
+test('aurora is a persistent DOM sibling outside the React root', () => {
+  assert.match(html, /<div id="app-aurora-layer" aria-hidden="true"><\/div>\s*<div id="root"><\/div>/)
+  assert.match(css, /#app-aurora-layer\s*\{[\s\S]*position:\s*fixed[\s\S]*inset:\s*0/)
+  assert.match(css, /#app-aurora-layer\s*\{[\s\S]*background-image:[\s\S]*radial-gradient/)
+  assert.match(css, /#app-aurora-layer\s*\{[\s\S]*animation:\s*astroAuroraViewportDriftV69\s+15s/)
+  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*filter:/)
+  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*transform:/)
+  assert.doesNotMatch(css, /#app-aurora-layer\s*\{[\s\S]*will-change:/)
 })
 
-test('aurora vertical geometry is invariant to viewport and form height changes', () => {
-  assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
+test('scrollable app tree never owns the aurora surface', () => {
+  assert.match(css, /\.app-shell,[\s\S]*\.app-shell \.page-content[\s\S]*background:\s*transparent\s*!important/)
+  assert.match(css, /\.app-shell,[\s\S]*\.app-shell \.page-content[\s\S]*background-image:\s*none\s*!important/)
+  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*none\s*!important/)
+  assert.match(css, /\.app-shell\.celestial-motion-on::before,[\s\S]*\.app-shell\.celestial-glow-off::after[\s\S]*display:\s*none\s*!important/)
+  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on[\s\S]*astroAuroraViewportDriftV69/)
+})
+
+test('fallback cannot flash to plain white and aurora geometry ignores document height', () => {
   assert.match(css, /body\s*\{[\s\S]*linear-gradient\(\s*90deg/)
+  assert.match(css, /body\s*\{[\s\S]*rgba\(214, 239, 230, \.58\)[\s\S]*rgba\(235, 218, 244, \.62\)/)
   assert.match(css, /background-position:[\s\S]*-11rem\s+760px[\s\S]*1120px/)
-  assert.doesNotMatch(css, /-11rem\s+\d+%/)
-  assert.doesNotMatch(css, /calc\(100% \+ 9rem\)\s+\d+%/)
+  assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
+  assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
 test('birth-time reliability choice does not use native select or force a focus scroll after selection', () => {
