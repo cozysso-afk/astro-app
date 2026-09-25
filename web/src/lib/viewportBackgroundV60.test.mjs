@@ -76,6 +76,16 @@ test('birth-time reliability menu is portaled outside the document scroll tree',
   assert.match(css, /\.stable-choice-menu[\s\S]*backdrop-filter:\s*none\s*!important/)
 })
 
+test('relationship reliability edits preserve an already-rendered result surface until explicit recalculation', () => {
+  assert.match(reliability, /function shouldPreserveRenderedResults\(root: HTMLElement \| null\)/)
+  assert.match(reliability, /root\?\.closest\('\.tool-panel'\)/)
+  assert.match(reliability, /document\.querySelector\('\.results-wrap'\)/)
+  assert.match(reliability, /preserveRenderedResults: shouldPreserveRenderedResults\(rootRef\.current\)/)
+  assert.match(reliability, /Object\.assign\(value, patch\)/)
+  assert.match(reliability, /setStagedForRecalculation\(true\)/)
+  assert.match(reliability, /현재 결과는 이전 계산 기준이야\. 실제 계산 실행을 누르면 새 설정으로 갱신돼\./)
+})
+
 test('birth and location form uses one readable type and control scale', () => {
   assert.match(css, /\.app-shell \.field > span[\s\S]*font-size:\s*14px\s*!important/)
   assert.match(css, /\.app-shell \.field input,[\s\S]*\.app-shell \.stable-choice-trigger[\s\S]*height:\s*52px\s*!important/)
