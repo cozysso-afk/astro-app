@@ -1,8 +1,6 @@
-/* v65 — preserve the pastel/aurora presentation and remove the native-select trigger instead of flattening iOS.
-   The previous iOS-only opaque background stopped the visible white shift by removing the atmosphere itself.
-   Birth-time reliability now uses an in-app custom listbox, so native select popover recomposition is no longer
-   part of that interaction. Keep one static page underlay, let celestial-motion own the animated aurora when
-   motion is enabled, and keep the new custom choice surfaces fully opaque without backdrop sampling. */
+/* v66 — iPhone background + birth-form visual owner.
+   Keep the page underlay stable, animate the aurora on the app surface itself (not a fixed pseudo layer),
+   keep birth-time reliability choices inside the app, and make all birth/location controls share one type scale. */
 
 html {
   min-height: 100%;
@@ -50,9 +48,10 @@ body::after {
   background-color: transparent !important;
 }
 
-/* Static/motion-off shells stay clean. Do not target .celestial-motion-on here: v23 owns its aurora. */
-.app-shell:not(.celestial-motion-on)::before,
-.app-shell:not(.celestial-motion-on)::after {
+/* Never use a fixed/composited shell pseudo-element for the atmosphere.
+   Native iOS controls can trigger layer recomposition; the aurora lives on .app-shell itself. */
+.app-shell::before,
+.app-shell::after {
   display: none !important;
   content: none !important;
   background: none !important;
@@ -63,8 +62,123 @@ body::after {
   will-change: auto !important;
 }
 
-/* Birth-time reliability choices intentionally avoid native <select> on iOS.
-   These controls are opaque themselves; the page behind them remains the normal animated/pastel UI. */
+@keyframes astroAuroraSurfaceDriftV66 {
+  0%, 100% {
+    background-position:
+      -9rem -10rem,
+      calc(100% + 10rem) 2rem,
+      -11rem 68%,
+      calc(100% + 9rem) 84%,
+      0 0;
+  }
+  38% {
+    background-position:
+      -5rem -7rem,
+      calc(100% + 6rem) 5rem,
+      -7rem 62%,
+      calc(100% + 6rem) 79%,
+      0 0;
+  }
+  72% {
+    background-position:
+      -11rem -5rem,
+      calc(100% + 12rem) 7rem,
+      -5rem 74%,
+      calc(100% + 11rem) 88%,
+      0 0;
+  }
+}
+
+.app-shell.celestial-motion-on,
+.app-shell.celestial-motion-on[data-view],
+.app-shell.celestial-motion-on[data-mode] {
+  background-color: #f7f8fb !important;
+  background-image:
+    radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .16) 31%, transparent 67%),
+    radial-gradient(circle, rgba(198, 228, 252, .46) 0, rgba(198, 228, 252, .14) 30%, transparent 66%),
+    radial-gradient(circle, rgba(203, 241, 229, .40) 0, rgba(203, 241, 229, .12) 31%, transparent 68%),
+    radial-gradient(circle, rgba(249, 209, 231, .36) 0, rgba(249, 209, 231, .10) 30%, transparent 66%),
+    linear-gradient(180deg, #f8f8fc 0%, #f6f8fb 48%, #f8f7fb 100%) !important;
+  background-size:
+    42rem 42rem,
+    40rem 40rem,
+    44rem 44rem,
+    39rem 39rem,
+    100% 100% !important;
+  background-repeat: no-repeat !important;
+  animation: astroAuroraSurfaceDriftV66 15s ease-in-out infinite !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.celestial-motion-on,
+  .app-shell.celestial-motion-on[data-view],
+  .app-shell.celestial-motion-on[data-mode] {
+    animation: none !important;
+  }
+}
+
+/* One predictable form scale on the birth/location surface.
+   Labels are 14px, controls are 16px, supporting copy is 14px. */
+.app-shell .subsection-title,
+.app-shell .field > span,
+.app-shell .field input,
+.app-shell .field select,
+.app-shell .stable-choice-trigger,
+.app-shell .stable-choice-option,
+.app-shell .check-field,
+.app-shell .birth-time-reliability-note,
+.app-shell .birth-time-reliability-note > span {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif !important;
+  letter-spacing: -0.01em !important;
+}
+
+.app-shell .subsection-title {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  font-weight: 800 !important;
+}
+
+.app-shell .field > span {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  font-weight: 750 !important;
+}
+
+.app-shell .field input,
+.app-shell .field select,
+.app-shell .stable-choice-trigger {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 14px !important;
+  border-radius: 16px !important;
+  color: #3e3028 !important;
+  background: #fff !important;
+  font-size: 16px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.app-shell .field input:disabled,
+.app-shell .field select:disabled,
+.app-shell .stable-choice-trigger:disabled {
+  opacity: .52 !important;
+  background: #f4efe9 !important;
+}
+
+.app-shell .check-field,
+.app-shell .birth-time-reliability-note,
+.app-shell .birth-time-reliability-note > span {
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+  font-weight: 500 !important;
+}
+
+/* Birth-time reliability choices intentionally avoid native <select> on iOS. */
 .stable-choice {
   position: relative;
   min-width: 0;
@@ -72,37 +186,19 @@ body::after {
 }
 
 .stable-choice-trigger {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   border: 1px solid rgba(92, 62, 43, 0.12);
-  border-radius: 13px;
-  padding: 0 11px;
-  color: #3e3028;
-  background: #fffefa;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 650;
   text-align: left;
   -webkit-appearance: none;
   appearance: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 .stable-choice-trigger:focus-visible {
   outline: 2px solid rgba(178, 125, 69, 0.45);
   outline-offset: 2px;
-}
-
-.stable-choice-trigger:disabled {
-  opacity: 0.52;
-  background: #f4efe9;
 }
 
 .stable-choice-value {
@@ -131,31 +227,31 @@ body::after {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  max-height: min(320px, 48vh);
+  max-height: 320px;
   overflow-y: auto;
   padding: 6px;
   border: 1px solid rgba(92, 62, 43, 0.14);
   border-radius: 15px;
-  background: #fffefa;
+  background: #fff !important;
   box-shadow: 0 18px 38px rgba(72, 55, 45, 0.18);
   -webkit-overflow-scrolling: touch;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 .stable-choice-option {
   width: 100%;
-  min-height: 42px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   border: 0;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   color: #3e3028;
   background: transparent;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 650;
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+  font-weight: 650 !important;
   text-align: left;
 }
 
@@ -172,8 +268,11 @@ body::after {
 }
 
 @media (max-width: 420px) {
-  .stable-choice-trigger {
-    height: 43px;
-    font-size: 0.75rem;
+  .app-shell .field input,
+  .app-shell .field select,
+  .app-shell .stable-choice-trigger {
+    height: 52px !important;
+    min-height: 52px !important;
+    font-size: 16px !important;
   }
 }
