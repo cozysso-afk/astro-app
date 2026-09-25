@@ -1,5 +1,6 @@
-/* v60 — viewport-anchored app background.
-   Keep the aurora fixed to the viewport so form/content height changes cannot shift it. */
+/* v61 — visual-viewport-independent app background.
+   iOS changes the visual viewport while native selects, bars, and PWA chrome appear/disappear.
+   Never anchor the aurora to vh/dvh/svh or content height. Keep every vertical stop in px. */
 html,
 body,
 #root {
@@ -17,11 +18,12 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle 300px at 8vw 7vh, rgba(226, 239, 242, .52), transparent 72%),
-    radial-gradient(circle 280px at 94vw 29vh, rgba(238, 226, 244, .50), transparent 72%),
-    radial-gradient(circle 320px at 9vw 78vh, rgba(224, 241, 235, .40), transparent 74%),
-    linear-gradient(180deg, #f8f8fb 0%, #f4f5f8 100%);
+  background-color: #f7f8fb;
+  background-image:
+    radial-gradient(circle 330px at 48px 82px, rgba(226, 239, 242, .52), transparent 72%),
+    radial-gradient(circle 300px at calc(100% - 24px) 330px, rgba(238, 226, 244, .50), transparent 72%),
+    radial-gradient(circle 350px at 54px 790px, rgba(224, 241, 235, .40), transparent 74%);
+  background-repeat: no-repeat;
 }
 
 #root {
