@@ -1,6 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { BirthProfile, TimeConfidence, TimeSource } from './appTypes'
 import { rememberBirthTimeReliability } from './lib/precisionTransport'
+import {
+  backgroundDiagnosticsEnabled,
+  captureBackgroundDiagnostic,
+  formatBackgroundDiagnostic,
+  type BackgroundDiagnosticSnapshot,
+} from './lib/backgroundDiagnostics'
 
 type ReliabilityValue = BirthProfile
 
@@ -40,10 +46,13 @@ export const timeConfidenceLabels: Array<[TimeConfidence, string]> = [
 
 function StableChoice({ value, options, onChange, disabled = false, ariaLabel }: StableChoiceProps) {
   const [open, setOpen] = useState(false)
+  const [diagnostic, setDiagnostic] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const diagnosticBeforeRef = useRef<BackgroundDiagnosticSnapshot | null>(null)
   const listboxId = useId()
   const selectedLabel = options.find(([key]) => key === value)?.[1] ?? ''
+  const diagnosticMode = backgroundDiagnosticsEnabled()
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +77,18 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
     if (disabled) setOpen(false)
   }, [disabled])
 
+  const captureAfterSelection = (before: BackgroundDiagnosticSnapshot, selectedKey: string) => {
+    const reports: string[] = []
+    const sample = (label: string) => {
+      reports.push(formatBackgroundDiagnostic(`${ariaLabel}/${selectedKey}/${label}`, before, captureBackgroundDiagnostic()))
+      setDiagnostic(reports.join('\n\n'))
+      try { localStorage.setItem('starlight-bgdiag-v73', reports.join('\n\n')) } catch { /* diagnostic only */ }
+    }
+    window.setTimeout(() => sample('t0'), 0)
+    window.setTimeout(() => sample('t60'), 60)
+    window.setTimeout(() => sample('t300'), 300)
+  }
+
   return <div className={`stable-choice ${open ? 'is-open' : ''}`} ref={rootRef}>
     <button
       ref={triggerRef}
@@ -91,12 +112,42 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
         role="option"
         aria-selected={key === value}
         disabled={optionDisabled}
-        onPointerDown={(event) => event.preventDefault()}
+        onPointerDown={(event) => {
+          event.preventDefault()
+          if (diagnosticMode) diagnosticBeforeRef.current = captureBackgroundDiagnostic()
+        }}
         onClick={() => {
+          const before = diagnosticMode
+            ? diagnosticBeforeRef.current ?? captureBackgroundDiagnostic()
+            : null
           onChange(key)
           setOpen(false)
+          if (before) captureAfterSelection(before, key)
         }}
       >{label}</button>)}
+    </div>}
+    {diagnosticMode && diagnostic && <div
+      data-bgdiag="v73"
+      style={{
+        marginTop: 8,
+        padding: 10,
+        borderRadius: 10,
+        border: '1px solid rgba(23, 32, 58, .18)',
+        background: '#fff',
+        color: '#17203a',
+        fontSize: 11,
+        lineHeight: 1.35,
+        position: 'relative',
+        zIndex: 30,
+      }}
+    >
+      <strong style={{display:'block', marginBottom:6}}>배경 진단 v73 · 캡처 완료</strong>
+      <button
+        type="button"
+        onClick={() => { void navigator.clipboard?.writeText(diagnostic) }}
+        style={{minHeight:34, padding:'6px 10px', marginBottom:6}}
+      >진단값 복사</button>
+      <pre style={{margin:0, maxHeight:160, overflow:'auto', whiteSpace:'pre-wrap', fontSize:10}}>{diagnostic}</pre>
     </div>}
   </div>
 }
