@@ -1,7 +1,8 @@
-/* v67 — iPhone background + birth-form visual owner.
-   The previous v66 reintroduced a 15s aurora animation, so the background necessarily kept changing.
-   Keep the aurora visible but fully static: no fixed/composited pseudo layer, no viewport units,
-   no background animation, no height-sensitive gradient layer, and no interaction-dependent mutation. */
+/* v68 — iPhone background + birth-form visual owner.
+   Keep the pastel aurora and motion, but remove the two interaction-sensitive paths:
+   1) no fixed/pseudo/filter/transform compositor layer for the page atmosphere;
+   2) no height-relative vertical gradient anchors that can remap when a form interaction changes layout.
+   The aurora moves only by background-position on .app-shell with pixel-anchored Y coordinates. */
 
 html {
   min-height: 100%;
@@ -44,14 +45,21 @@ body::after {
 .app-shell[data-view],
 .app-shell[data-mode],
 .app-shell .page-content {
-  background: transparent !important;
-  background-image: none !important;
   background-color: transparent !important;
 }
 
-/* Never use a fixed/composited shell pseudo-element for the atmosphere. */
+/* Kill every legacy shell pseudo atmosphere at matching/higher specificity.
+   This leaves the existing card/icon/result animations untouched. */
 .app-shell::before,
-.app-shell::after {
+.app-shell::after,
+.app-shell.celestial-motion-on::before,
+.app-shell.celestial-motion-on::after,
+.app-shell.celestial-motion-off::before,
+.app-shell.celestial-motion-off::after,
+.app-shell.celestial-glow-on::before,
+.app-shell.celestial-glow-on::after,
+.app-shell.celestial-glow-off::before,
+.app-shell.celestial-glow-off::after {
   display: none !important;
   content: none !important;
   background: none !important;
@@ -62,8 +70,32 @@ body::after {
   will-change: auto !important;
 }
 
-/* Static aurora. All vertical anchors are absolute pixels, so opening a menu or changing form height
-   cannot remap the colors. Motion settings still control other UI motion, not the page background. */
+@keyframes astroAuroraSurfaceDriftV68 {
+  0%, 100% {
+    background-position:
+      -9rem -160px,
+      calc(100% + 10rem) 32px,
+      -11rem 760px,
+      calc(100% + 9rem) 1120px;
+  }
+  38% {
+    background-position:
+      -5rem -136px,
+      calc(100% + 6rem) 54px,
+      -7rem 742px,
+      calc(100% + 6rem) 1102px;
+  }
+  72% {
+    background-position:
+      -11rem -122px,
+      calc(100% + 12rem) 72px,
+      -5rem 778px,
+      calc(100% + 11rem) 1140px;
+  }
+}
+
+/* Same aurora geometry in both motion states. The Y anchors are pixels, never percentages or viewport units.
+   Motion-on changes those fixed coordinates smoothly; opening/closing a form control cannot recalculate them. */
 .app-shell.celestial-motion-on,
 .app-shell.celestial-motion-on[data-view],
 .app-shell.celestial-motion-on[data-mode],
@@ -82,14 +114,33 @@ body::after {
     44rem 44rem,
     39rem 39rem !important;
   background-position:
-    -9rem -10rem,
-    calc(100% + 10rem) 2rem,
+    -9rem -160px,
+    calc(100% + 10rem) 32px,
     -11rem 760px,
     calc(100% + 9rem) 1120px !important;
   background-repeat: no-repeat !important;
-  animation: none !important;
   transition: none !important;
   will-change: auto !important;
+}
+
+.app-shell.celestial-motion-on,
+.app-shell.celestial-motion-on[data-view],
+.app-shell.celestial-motion-on[data-mode] {
+  animation: astroAuroraSurfaceDriftV68 15s ease-in-out infinite !important;
+}
+
+.app-shell.celestial-motion-off,
+.app-shell.celestial-motion-off[data-view],
+.app-shell.celestial-motion-off[data-mode] {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.celestial-motion-on,
+  .app-shell.celestial-motion-on[data-view],
+  .app-shell.celestial-motion-on[data-mode] {
+    animation: none !important;
+  }
 }
 
 /* One predictable form scale on the birth/location surface.
@@ -169,6 +220,7 @@ body::after {
   text-align: left;
   -webkit-appearance: none;
   appearance: none;
+  touch-action: manipulation;
 }
 
 .stable-choice-trigger:focus-visible {
@@ -229,6 +281,7 @@ body::after {
   line-height: 1.35 !important;
   font-weight: 650 !important;
   text-align: left;
+  touch-action: manipulation;
 }
 
 .stable-choice-option[aria-selected='true'] {
