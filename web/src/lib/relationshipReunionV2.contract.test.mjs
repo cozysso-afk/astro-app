@@ -60,23 +60,21 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion hierarchy keeps deterministic timing and a present-first stage-grounded UI',()=>{
+test('reunion hierarchy puts consultation answers before engine state',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['지금 두 사람은 어디에 있나','지금 살아 있는 흐름','왜 다시 신경 쓰이거나 연결될 수 있나','서로에게 걸리는 방향','가장 가까운 후보 시기','연락 뒤 재회까지 남은 조건','다시 멀어질 수 있는 지점','관계 자체의 현재 단계','앞으로의 후보 시기','관계를 다시 이어가려면','연락 ≠ 재회 · 단계 기준 보기','지난 활성기 · 사후 확인용','계산 근거 보기']
+  const headings=['결론부터 보면','지금 관계는 어디까지 와 있나','그래서 연락이 올 가능성은?','왜 아직 서로를 신경 쓰기 쉬운가','언제가 중요한가','연락이 오면 무엇을 봐야 하나','다시 멀어질 수 있는 패턴','한 줄로 정리하면','단계와 후보 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 활성기 · 사후 확인용','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){
     const next=hierarchyPanel.indexOf(heading)
     assert.ok(next>cursor,`${heading} order`)
     cursor=next
   }
-  assert.match(hierarchyPanel,/가장 가까운 후보/)
   assert.match(hierarchyPanel,/실제 기록과 비교하는 개인 사후 확인용/)
   assert.match(hierarchyPanel,/과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
-  assert.match(hierarchyPanel,/실제 속마음이나 실제 선연락 행동을 관측한 값은 아니야/)
-  assert.match(hierarchyPanel,/사건 확정일 아님/)
+  assert.match(hierarchyPanel,/이 값은 관계 자극의 방향이지 실제 속마음이나 선연락 행동을 관측한 값이 아니야/)
   assert.match(panel,/이전 계산 저장본/)
   assert.match(panel,/AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기/)
   assert.match(panel,/이전 저장본 시기 해설 · 현재\/미래 판단용 아님/)
@@ -98,23 +96,22 @@ test('reunion hierarchy keeps deterministic timing and a present-first stage-gro
   assert.match(grounding,/카르마적 인연/)
 })
 
-test('relationship reading quality guard blocks repetitive stage filler and first-contact contradictions',()=>{
-  assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
-  assert.match(hierarchyPanel,/function stageWindowCopy/)
-  assert.match(hierarchyPanel,/function componentStory/)
-  assert.match(hierarchyPanel,/componentStory\(row\)/)
-  assert.match(hierarchyPanel,/stageWindowCopy\(row,'current'\)/)
-  assert.match(hierarchyPanel,/stageWindowCopy\(row,'past'\)/)
-  assert.match(hierarchyPanel,/stageWindowCopy\(row,'future'\)/)
+test('reunion quality guard answers contact question and gives observable decision rules',()=>{
+  assert.match(hierarchyPanel,/function phaseVerdict/)
+  assert.match(hierarchyPanel,/function contactOutlook/)
+  assert.match(hierarchyPanel,/“상대에게서 연락이 올 가능성이 높다”고 말할 수는 없어/)
+  assert.match(hierarchyPanel,/지금 결과를 “연락이 올 흐름”이라고 읽으면 과장이야/)
+  assert.match(hierarchyPanel,/안부·추억 이야기만 반복/)
+  assert.match(hierarchyPanel,/구체적인 만남을 잡음/)
+  assert.match(hierarchyPanel,/예전 문제와 앞으로의 관계를 피하지 않고 말함/)
+  assert.match(hierarchyPanel,/말은 다정한데 행동이 이어지지 않음/)
   assert.match(hierarchyPanel,/const neutralDirectionRows = directionRows\.map/)
   assert.match(hierarchyPanel,/<ReadingDirections rows=\{neutralDirectionRows\}/)
-  assert.match(hierarchyPanel,/상대가 실제로 먼저 연락한다는 판정은 아니야/)
-  assert.match(hierarchyPanel,/내가 먼저 연락해야 한다는 지시는 아니야/)
-  assert.equal((hierarchyPanel.match(/\{movementOrder\}/g)||[]).length,1,'movement order must not be printed twice')
   assert.match(hierarchyPanel,/<details className="reading-more reunion-retrospective">/)
   assert.match(hierarchyPanel,/<details className="reading-more reunion-contact-is-not-reunion">/)
-  assert.doesNotMatch(hierarchyPanel,/감정과 기억이 다시 올라오는 단계야\. 아직 실제 연락이 생겼다는 뜻은 아니야\./)
-  assert.doesNotMatch(hierarchyPanel,/메시지·답장·안부처럼 실제 상호작용이 다시 시작되는 단계야\. 연락이 닿아도 재회를 뜻하지는 않아\./)
+  assert.doesNotMatch(hierarchyPanel,/단계가 현재 창에 걸려 있어/)
+  assert.doesNotMatch(hierarchyPanel,/현재 열린 단계보다 뒤의 일을 한꺼번에 재회로 묶어 읽지 않아/)
+  assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
 })
 
 test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
