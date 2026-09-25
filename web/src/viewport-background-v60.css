@@ -1,25 +1,25 @@
-/* v68 — iPhone background + birth-form visual owner.
-   Keep the pastel aurora and motion, but remove the two interaction-sensitive paths:
-   1) no fixed/pseudo/filter/transform compositor layer for the page atmosphere;
-   2) no height-relative vertical gradient anchors that can remap when a form interaction changes layout.
-   The aurora moves only by background-position on .app-shell with pixel-anchored Y coordinates. */
+/* v69 — isolate the moving aurora from React/form repainting on iPhone.
+   The visible atmosphere now lives in #app-aurora-layer, a DOM sibling of #root.
+   React state changes, form menu open/close, profile rerenders and document scrolling therefore do not
+   recreate or reposition the aurora surface. The body keeps a colored, vertically-invariant fallback
+   so an iOS compositor refresh cannot flash to plain white. */
 
 html {
   min-height: 100%;
-  background: #f7f8fb !important;
+  background: #f4f5f8 !important;
 }
 
 body {
   min-height: 100%;
   position: relative;
-  background-color: #f7f8fb !important;
+  background-color: #f4f5f8 !important;
   background-image: linear-gradient(
     90deg,
-    rgba(224, 241, 235, .44) 0,
-    rgba(247, 248, 251, .96) 112px,
+    rgba(214, 239, 230, .58) 0%,
+    rgba(241, 245, 247, .96) 24%,
     #f7f8fb 50%,
-    rgba(247, 248, 251, .96) calc(100% - 112px),
-    rgba(238, 226, 244, .46) 100%
+    rgba(245, 241, 248, .96) 76%,
+    rgba(235, 218, 244, .62) 100%
   ) !important;
   background-repeat: repeat-y !important;
 }
@@ -34,43 +34,7 @@ body::after {
   opacity: 0 !important;
 }
 
-#root {
-  min-height: 100%;
-  position: relative;
-  z-index: 1;
-  background: transparent !important;
-}
-
-.app-shell,
-.app-shell[data-view],
-.app-shell[data-mode],
-.app-shell .page-content {
-  background-color: transparent !important;
-}
-
-/* Kill every legacy shell pseudo atmosphere at matching/higher specificity.
-   This leaves the existing card/icon/result animations untouched. */
-.app-shell::before,
-.app-shell::after,
-.app-shell.celestial-motion-on::before,
-.app-shell.celestial-motion-on::after,
-.app-shell.celestial-motion-off::before,
-.app-shell.celestial-motion-off::after,
-.app-shell.celestial-glow-on::before,
-.app-shell.celestial-glow-on::after,
-.app-shell.celestial-glow-off::before,
-.app-shell.celestial-glow-off::after {
-  display: none !important;
-  content: none !important;
-  background: none !important;
-  animation: none !important;
-  filter: none !important;
-  opacity: 0 !important;
-  transform: none !important;
-  will-change: auto !important;
-}
-
-@keyframes astroAuroraSurfaceDriftV68 {
+@keyframes astroAuroraViewportDriftV69 {
   0%, 100% {
     background-position:
       -9rem -160px,
@@ -94,53 +58,93 @@ body::after {
   }
 }
 
-/* Same aurora geometry in both motion states. The Y anchors are pixels, never percentages or viewport units.
-   Motion-on changes those fixed coordinates smoothly; opening/closing a form control cannot recalculate them. */
+/* Persistent viewport atmosphere. This element is outside #root, so React profile changes cannot
+   unmount, rerender or reflow it. It is fixed to the visual viewport and has no filter/transform/
+   backdrop-filter/will-change compositor triggers. */
+#app-aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  touch-action: none;
+  overflow: hidden;
+  contain: paint;
+  background-color: transparent;
+  background-image:
+    radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .18) 31%, transparent 67%),
+    radial-gradient(circle, rgba(198, 228, 252, .48) 0, rgba(198, 228, 252, .16) 30%, transparent 66%),
+    radial-gradient(circle, rgba(203, 241, 229, .43) 0, rgba(203, 241, 229, .14) 31%, transparent 68%),
+    radial-gradient(circle, rgba(249, 209, 231, .38) 0, rgba(249, 209, 231, .12) 30%, transparent 66%);
+  background-size:
+    42rem 42rem,
+    40rem 40rem,
+    44rem 44rem,
+    39rem 39rem;
+  background-position:
+    -9rem -160px,
+    calc(100% + 10rem) 32px,
+    -11rem 760px,
+    calc(100% + 9rem) 1120px;
+  background-repeat: no-repeat;
+  animation: astroAuroraViewportDriftV69 15s ease-in-out infinite;
+}
+
+html[data-celestial-motion='off'] #app-aurora-layer {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app-aurora-layer {
+    animation: none;
+  }
+}
+
+#root {
+  min-height: 100%;
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* The scrollable React tree is content-only. It never owns the page atmosphere anymore. */
+.app-shell,
+.app-shell[data-view],
+.app-shell[data-mode],
 .app-shell.celestial-motion-on,
 .app-shell.celestial-motion-on[data-view],
 .app-shell.celestial-motion-on[data-mode],
 .app-shell.celestial-motion-off,
 .app-shell.celestial-motion-off[data-view],
-.app-shell.celestial-motion-off[data-mode] {
-  background-color: #f7f8fb !important;
-  background-image:
-    radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .16) 31%, transparent 67%),
-    radial-gradient(circle, rgba(198, 228, 252, .46) 0, rgba(198, 228, 252, .14) 30%, transparent 66%),
-    radial-gradient(circle, rgba(203, 241, 229, .40) 0, rgba(203, 241, 229, .12) 31%, transparent 68%),
-    radial-gradient(circle, rgba(249, 209, 231, .36) 0, rgba(249, 209, 231, .10) 30%, transparent 66%) !important;
-  background-size:
-    42rem 42rem,
-    40rem 40rem,
-    44rem 44rem,
-    39rem 39rem !important;
-  background-position:
-    -9rem -160px,
-    calc(100% + 10rem) 32px,
-    -11rem 760px,
-    calc(100% + 9rem) 1120px !important;
-  background-repeat: no-repeat !important;
-  transition: none !important;
-  will-change: auto !important;
-}
-
-.app-shell.celestial-motion-on,
-.app-shell.celestial-motion-on[data-view],
-.app-shell.celestial-motion-on[data-mode] {
-  animation: astroAuroraSurfaceDriftV68 15s ease-in-out infinite !important;
-}
-
-.app-shell.celestial-motion-off,
-.app-shell.celestial-motion-off[data-view],
-.app-shell.celestial-motion-off[data-mode] {
+.app-shell.celestial-motion-off[data-mode],
+.app-shell.celestial-glow-on,
+.app-shell.celestial-glow-off,
+.app-shell .page-content {
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
   animation: none !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .app-shell.celestial-motion-on,
-  .app-shell.celestial-motion-on[data-view],
-  .app-shell.celestial-motion-on[data-mode] {
-    animation: none !important;
-  }
+/* Kill every legacy shell pseudo atmosphere at matching/higher specificity while preserving
+   card/icon/result animations on descendants. */
+.app-shell::before,
+.app-shell::after,
+.app-shell.celestial-motion-on::before,
+.app-shell.celestial-motion-on::after,
+.app-shell.celestial-motion-off::before,
+.app-shell.celestial-motion-off::after,
+.app-shell.celestial-glow-on::before,
+.app-shell.celestial-glow-on::after,
+.app-shell.celestial-glow-off::before,
+.app-shell.celestial-glow-off::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  animation: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+  transform: none !important;
+  will-change: auto !important;
 }
 
 /* One predictable form scale on the birth/location surface.
