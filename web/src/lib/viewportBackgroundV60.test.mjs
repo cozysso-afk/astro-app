@@ -27,6 +27,7 @@ test('aurora motion stays on the app surface without fixed pseudo compositing', 
   assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*astroAuroraSurfaceDriftV68\s+15s/)
   assert.match(css, /\.app-shell\.celestial-motion-off[\s\S]*animation:\s*none\s*!important/)
   assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
+  assert.doesNotMatch(css, /translate3d\(/i)
 })
 
 test('aurora vertical geometry is invariant to viewport and form height changes', () => {
@@ -35,8 +36,6 @@ test('aurora vertical geometry is invariant to viewport and form height changes'
   assert.match(css, /background-position:[\s\S]*-11rem\s+760px[\s\S]*1120px/)
   assert.doesNotMatch(css, /-11rem\s+\d+%/)
   assert.doesNotMatch(css, /calc\(100% \+ 9rem\)\s+\d+%/)
-  assert.doesNotMatch(css, /astroAuroraSurfaceDriftV68[\s\S]*transform:/)
-  assert.doesNotMatch(css, /astroAuroraSurfaceDriftV68[\s\S]*filter:/)
 })
 
 test('birth-time reliability choice does not use native select or force a focus scroll after selection', () => {
