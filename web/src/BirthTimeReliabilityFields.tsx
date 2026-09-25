@@ -53,7 +53,7 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false)
-        triggerRef.current?.focus()
+        triggerRef.current?.focus({ preventScroll: true })
       }
     }
     document.addEventListener('pointerdown', handlePointerDown)
@@ -91,10 +91,10 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
         role="option"
         aria-selected={key === value}
         disabled={optionDisabled}
+        onPointerDown={(event) => event.preventDefault()}
         onClick={() => {
           onChange(key)
           setOpen(false)
-          requestAnimationFrame(() => triggerRef.current?.focus())
         }}
       >{label}</button>)}
     </div>}
