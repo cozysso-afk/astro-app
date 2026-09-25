@@ -1,0 +1,31 @@
+/* v71 — keep the birth-profile surface visually transparent during iOS control recomposition.
+   The user-visible failure was not the viewport aurora disappearing: the profile form card itself
+   became an opaque white slab after choosing a birth-time source. Keep only the actual controls
+   opaque; the form container must always reveal the moving aurora behind it. */
+
+.app-shell .form-card.profile-form-card,
+.app-shell .form-card.profile-form-card:focus-within,
+.app-shell .form-card.profile-form-card:has(.stable-choice.is-open) {
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  isolation: auto !important;
+  transform: none !important;
+  will-change: auto !important;
+  contain: none !important;
+}
+
+.app-shell .form-card.profile-form-card::before,
+.app-shell .form-card.profile-form-card::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+}
