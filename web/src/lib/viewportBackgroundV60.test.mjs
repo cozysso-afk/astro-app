@@ -16,17 +16,18 @@ test('viewport background is the final background owner while font fix stays las
   assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
-test('aurora is fixed to viewport and app shell cannot repaint it', () => {
+test('page background has exactly one visible owner', () => {
   assert.match(css, /body::before[\s\S]*position:\s*fixed/)
   assert.match(css, /body::before[\s\S]*inset:\s*0/)
   assert.match(css, /\.app-shell[\s\S]*background:\s*transparent\s*!important/)
-  assert.match(css, /background-image:\s*none\s*!important/)
+  assert.match(css, /\.app-shell \.page-content[\s\S]*background:\s*transparent\s*!important/)
+  assert.match(css, /\.app-shell::before,[\s\S]*\.app-shell::after[\s\S]*display:\s*none\s*!important/)
 })
 
-test('iOS visual viewport changes cannot move vertical aurora anchors', () => {
+test('background is vertically invariant across iOS auto-scroll and viewport changes', () => {
   assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
-  assert.match(css, /at 48px 82px/)
-  assert.match(css, /at calc\(100% - 24px\) 330px/)
-  assert.match(css, /at 54px 790px/)
-  assert.doesNotMatch(css, /linear-gradient\([^)]*180deg/)
+  assert.doesNotMatch(css, /radial-gradient/i)
+  assert.match(css, /linear-gradient\(\s*90deg/)
+  assert.doesNotMatch(css, /linear-gradient\(\s*180deg/)
+  assert.doesNotMatch(css, /\bat\s+[^,;]+\s+\d+px/i)
 })
