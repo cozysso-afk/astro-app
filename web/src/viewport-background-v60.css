@@ -1,7 +1,7 @@
-/* v62 — vertically invariant app background.
-   Native iOS selects can auto-scroll the document and resize the visual viewport.
-   A vertically varying background will therefore look like it moved even when fixed.
-   Keep the pastel atmosphere horizontal-only so every y coordinate has the same color profile. */
+/* v63 — single, vertically invariant app background owner.
+   iOS native selects can auto-scroll and resize the visual viewport.
+   The final background must not vary by y and older shell pseudo-elements must stay disabled,
+   including the higher-specificity celestial-motion-on rules from celestial-motion-v23.css. */
 html,
 body,
 #root {
@@ -46,9 +46,22 @@ body::before {
   background-color: transparent !important;
 }
 
-/* Remove older decorative shell layers so there is one and only one page background owner. */
+/* Remove every legacy shell atmosphere layer. The celestial-motion selector is intentionally
+   repeated at equal/higher specificity so its display:block!important + animation cannot revive it. */
 .app-shell::before,
-.app-shell::after {
+.app-shell::after,
+.app-shell.celestial-motion-on::before,
+.app-shell.celestial-motion-on::after,
+html[data-celestial-glow='on'] .app-shell::before,
+html[data-celestial-glow='on'] .app-shell::after,
+html[data-celestial-glow='off'] .app-shell::before,
+html[data-celestial-glow='off'] .app-shell::after {
   display: none !important;
   content: none !important;
+  background: none !important;
+  animation: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+  transform: none !important;
+  will-change: auto !important;
 }
