@@ -1,7 +1,7 @@
 /* v67 — iPhone background + birth-form visual owner.
    The previous v66 reintroduced a 15s aurora animation, so the background necessarily kept changing.
    Keep the aurora visible but fully static: no fixed/composited pseudo layer, no viewport units,
-   no background animation, and no interaction-dependent background mutation. */
+   no background animation, no height-sensitive gradient layer, and no interaction-dependent mutation. */
 
 html {
   min-height: 100%;
@@ -62,8 +62,8 @@ body::after {
   will-change: auto !important;
 }
 
-/* Static aurora. Pixel-anchored vertical positions avoid percentage reflow when controls open/close.
-   Motion setting no longer changes the page background; it may still control other UI motion. */
+/* Static aurora. All vertical anchors are absolute pixels, so opening a menu or changing form height
+   cannot remap the colors. Motion settings still control other UI motion, not the page background. */
 .app-shell.celestial-motion-on,
 .app-shell.celestial-motion-on[data-view],
 .app-shell.celestial-motion-on[data-mode],
@@ -75,20 +75,17 @@ body::after {
     radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .16) 31%, transparent 67%),
     radial-gradient(circle, rgba(198, 228, 252, .46) 0, rgba(198, 228, 252, .14) 30%, transparent 66%),
     radial-gradient(circle, rgba(203, 241, 229, .40) 0, rgba(203, 241, 229, .12) 31%, transparent 68%),
-    radial-gradient(circle, rgba(249, 209, 231, .36) 0, rgba(249, 209, 231, .10) 30%, transparent 66%),
-    linear-gradient(180deg, #f8f8fc 0%, #f6f8fb 48%, #f8f7fb 100%) !important;
+    radial-gradient(circle, rgba(249, 209, 231, .36) 0, rgba(249, 209, 231, .10) 30%, transparent 66%) !important;
   background-size:
     42rem 42rem,
     40rem 40rem,
     44rem 44rem,
-    39rem 39rem,
-    100% 100% !important;
+    39rem 39rem !important;
   background-position:
     -9rem -10rem,
     calc(100% + 10rem) 2rem,
     -11rem 760px,
-    calc(100% + 9rem) 1120px,
-    0 0 !important;
+    calc(100% + 9rem) 1120px !important;
   background-repeat: no-repeat !important;
   animation: none !important;
   transition: none !important;
