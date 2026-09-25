@@ -121,7 +121,7 @@ test('all relationship modes keep distinct decision questions instead of one swa
   for(const marker of ['궁합 전체 해설','결혼궁합 전체 해설','결혼생활 전체 해설','재회 흐름 전체 해설']) assert.match(panel,new RegExp(marker))
   assert.match(relationshipSummary,/함께 쓰는 돈과 혼자 보내는 시간, 집안일/)
   assert.match(relationshipSummary,/같은 다툼이 시작되는 말과 시간을 함께 적어봐/)
-  assert.match(relationshipSummary,/이전에는 대화가 끊긴 문제를 한 가지씩/)
+  assert.match(relationshipSummary,/이전에 대화가 끊긴 문제를 한 가지씩/)
   assert.match(relationshipSummary,/편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐/)
   assert.match(panel,/생활비, 집안일, 가족 관계, 혼자 쉴 시간/)
   assert.match(panel,/오래 함께했다는 사실과 지금 편안하게 유지되고 있다는 건 같은 뜻이 아니야/)
