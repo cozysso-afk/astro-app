@@ -1,6 +1,7 @@
-/* v66 — iPhone background + birth-form visual owner.
-   Keep the page underlay stable, animate the aurora on the app surface itself (not a fixed pseudo layer),
-   keep birth-time reliability choices inside the app, and make all birth/location controls share one type scale. */
+/* v67 — iPhone background + birth-form visual owner.
+   The previous v66 reintroduced a 15s aurora animation, so the background necessarily kept changing.
+   Keep the aurora visible but fully static: no fixed/composited pseudo layer, no viewport units,
+   no background animation, and no interaction-dependent background mutation. */
 
 html {
   min-height: 100%;
@@ -48,8 +49,7 @@ body::after {
   background-color: transparent !important;
 }
 
-/* Never use a fixed/composited shell pseudo-element for the atmosphere.
-   Native iOS controls can trigger layer recomposition; the aurora lives on .app-shell itself. */
+/* Never use a fixed/composited shell pseudo-element for the atmosphere. */
 .app-shell::before,
 .app-shell::after {
   display: none !important;
@@ -62,36 +62,14 @@ body::after {
   will-change: auto !important;
 }
 
-@keyframes astroAuroraSurfaceDriftV66 {
-  0%, 100% {
-    background-position:
-      -9rem -10rem,
-      calc(100% + 10rem) 2rem,
-      -11rem 68%,
-      calc(100% + 9rem) 84%,
-      0 0;
-  }
-  38% {
-    background-position:
-      -5rem -7rem,
-      calc(100% + 6rem) 5rem,
-      -7rem 62%,
-      calc(100% + 6rem) 79%,
-      0 0;
-  }
-  72% {
-    background-position:
-      -11rem -5rem,
-      calc(100% + 12rem) 7rem,
-      -5rem 74%,
-      calc(100% + 11rem) 88%,
-      0 0;
-  }
-}
-
+/* Static aurora. Pixel-anchored vertical positions avoid percentage reflow when controls open/close.
+   Motion setting no longer changes the page background; it may still control other UI motion. */
 .app-shell.celestial-motion-on,
 .app-shell.celestial-motion-on[data-view],
-.app-shell.celestial-motion-on[data-mode] {
+.app-shell.celestial-motion-on[data-mode],
+.app-shell.celestial-motion-off,
+.app-shell.celestial-motion-off[data-view],
+.app-shell.celestial-motion-off[data-mode] {
   background-color: #f7f8fb !important;
   background-image:
     radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .16) 31%, transparent 67%),
@@ -105,16 +83,16 @@ body::after {
     44rem 44rem,
     39rem 39rem,
     100% 100% !important;
+  background-position:
+    -9rem -10rem,
+    calc(100% + 10rem) 2rem,
+    -11rem 760px,
+    calc(100% + 9rem) 1120px,
+    0 0 !important;
   background-repeat: no-repeat !important;
-  animation: astroAuroraSurfaceDriftV66 15s ease-in-out infinite !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-shell.celestial-motion-on,
-  .app-shell.celestial-motion-on[data-view],
-  .app-shell.celestial-motion-on[data-mode] {
-    animation: none !important;
-  }
+  animation: none !important;
+  transition: none !important;
+  will-change: auto !important;
 }
 
 /* One predictable form scale on the birth/location surface.
@@ -234,7 +212,8 @@ body::after {
   border-radius: 15px;
   background: #fff !important;
   box-shadow: 0 18px 38px rgba(72, 55, 45, 0.18);
-  -webkit-overflow-scrolling: touch;
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior: contain;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
