@@ -22,3 +22,11 @@ test('aurora is fixed to viewport and app shell cannot repaint it', () => {
   assert.match(css, /\.app-shell[\s\S]*background:\s*transparent\s*!important/)
   assert.match(css, /background-image:\s*none\s*!important/)
 })
+
+test('iOS visual viewport changes cannot move vertical aurora anchors', () => {
+  assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
+  assert.match(css, /at 48px 82px/)
+  assert.match(css, /at calc\(100% - 24px\) 330px/)
+  assert.match(css, /at 54px 790px/)
+  assert.doesNotMatch(css, /linear-gradient\([^)]*180deg/)
+})
