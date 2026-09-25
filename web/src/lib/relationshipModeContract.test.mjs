@@ -8,6 +8,7 @@ const personalPanel = readFileSync(new URL('../PersonalMarriagePanel.tsx', impor
 const cache = readFileSync(new URL('./readingCache.ts', import.meta.url), 'utf8')
 const relationshipFn = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
 const formatters = readFileSync(new URL('./resultFormatters.ts', import.meta.url), 'utf8')
+const relationshipSummary = readFileSync(new URL('./relationshipUserSummary.ts', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../api/main.py', import.meta.url), 'utf8')
 const personalEngine = readFileSync(new URL('../../../personal_marriage_v1.py', import.meta.url), 'utf8')
 
@@ -76,6 +77,21 @@ test('marriage UI uses mode-specific deterministic view and preserves validated 
   assert.match(panel, /ai\.data\.marriage_reading\?\.bottom_line/)
   assert.match(panel, /<summary>기술 근거 자세히 보기<\/summary>/)
   assert.match(panel, /JSON\.stringify\(ai\.data/)
+})
+
+test('compatibility and both marriage modes prioritize different real-life questions', () => {
+  assert.match(relationshipSummary, /const sectionOrder: Role\[\] = married/)
+  assert.match(relationshipSummary, /\['communication','stability','attraction','power','perspective'\]/)
+  assert.match(relationshipSummary, /\['stability','communication','attraction','power','perspective'\]/)
+  assert.match(relationshipSummary, /반복 갈등 · 회복 방식/)
+  assert.match(relationshipSummary, /생활 책임 · 돌봄 분담/)
+  assert.match(relationshipSummary, /생활비 · 집안일 · 책임/)
+  assert.match(relationshipSummary, /결정권 · 가족 경계/)
+  assert.match(relationshipSummary, /결혼 전 합의할 것/)
+  assert.match(relationshipSummary, /이번에 함께 바꿀 것/)
+  assert.match(relationshipSummary, /생활비·집안일·돌봄·가족행사·혼자 쉴 시간/)
+  assert.match(relationshipSummary, /말이 꼬였을 때 서로 뜻을 확인하고 다시 대화를 이어갈 수 있는지가 핵심/)
+  assert.match(panel, /index<2/)
 })
 
 test('relationship modes keep Gemini natural language primary and deterministic prose as fallback', () => {
