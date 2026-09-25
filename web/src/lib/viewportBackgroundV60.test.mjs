@@ -17,34 +17,35 @@ test('viewport background is the final visual owner while font fix stays last ov
   assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
-test('aurora stays static on the app surface without fixed pseudo compositing', () => {
+test('aurora motion stays on the app surface without fixed pseudo compositing', () => {
   assert.match(css, /body\s*\{[\s\S]*background-image:\s*linear-gradient\(/)
   assert.match(css, /body::before,[\s\S]*body::after[\s\S]*display:\s*none\s*!important/)
-  assert.match(css, /\.app-shell::before,[\s\S]*\.app-shell::after[\s\S]*display:\s*none\s*!important/)
+  assert.match(css, /\.app-shell\.celestial-motion-on::before,[\s\S]*\.app-shell\.celestial-glow-off::after[\s\S]*display:\s*none\s*!important/)
   assert.doesNotMatch(css, /body::before\s*\{[\s\S]*position:\s*fixed/)
   assert.doesNotMatch(css, /\.app-shell::before\s*\{[\s\S]*position:\s*fixed/)
-  assert.doesNotMatch(css, /@keyframes\s+astroAuroraSurfaceDrift/i)
-  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*\.app-shell\.celestial-motion-off[\s\S]*background-image:[\s\S]*radial-gradient/)
-  assert.match(css, /background-position:[\s\S]*-11rem\s+760px[\s\S]*1120px/)
-  assert.match(css, /animation:\s*none\s*!important/)
-  assert.match(css, /transition:\s*none\s*!important/)
+  assert.match(css, /@keyframes\s+astroAuroraSurfaceDriftV68/)
+  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*astroAuroraSurfaceDriftV68\s+15s/)
+  assert.match(css, /\.app-shell\.celestial-motion-off[\s\S]*animation:\s*none\s*!important/)
   assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
-test('background geometry is invariant to viewport and form height changes', () => {
+test('aurora vertical geometry is invariant to viewport and form height changes', () => {
   assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
   assert.match(css, /body\s*\{[\s\S]*linear-gradient\(\s*90deg/)
-  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on[\s\S]*linear-gradient\(\s*180deg/)
-  assert.doesNotMatch(css, /@supports\s*\(-webkit-touch-callout:\s*none\)/)
+  assert.match(css, /background-position:[\s\S]*-11rem\s+760px[\s\S]*1120px/)
   assert.doesNotMatch(css, /-11rem\s+\d+%/)
   assert.doesNotMatch(css, /calc\(100% \+ 9rem\)\s+\d+%/)
+  assert.doesNotMatch(css, /astroAuroraSurfaceDriftV68[\s\S]*transform:/)
+  assert.doesNotMatch(css, /astroAuroraSurfaceDriftV68[\s\S]*filter:/)
 })
 
-test('birth-time reliability choices avoid the iOS native select popover', () => {
+test('birth-time reliability choice does not use native select or force a focus scroll after selection', () => {
   assert.doesNotMatch(reliability, /<select\b/)
   assert.match(reliability, /aria-haspopup="listbox"/)
   assert.match(reliability, /role="listbox"/)
-  assert.match(reliability, /stable-choice-trigger/)
+  assert.match(reliability, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/)
+  assert.doesNotMatch(reliability, /requestAnimationFrame\([\s\S]*focus/)
+  assert.match(reliability, /focus\(\{ preventScroll: true \}\)/)
   assert.match(css, /\.stable-choice-menu[\s\S]*background:\s*#fff\s*!important/)
   assert.match(css, /\.stable-choice-menu[\s\S]*-webkit-overflow-scrolling:\s*auto/)
   assert.match(css, /\.stable-choice-menu[\s\S]*backdrop-filter:\s*none\s*!important/)
