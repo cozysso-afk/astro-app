@@ -58,11 +58,17 @@ test('fallback cannot flash to plain white and aurora geometry ignores document 
   assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
-test('birth-time reliability choice does not use native select or force a focus scroll after selection', () => {
+test('birth-time reliability menu is portaled outside the document scroll tree', () => {
   assert.doesNotMatch(reliability, /<select\b/)
-  assert.match(reliability, /aria-haspopup="listbox"/)
-  assert.match(reliability, /role="listbox"/)
-  assert.match(reliability, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/)
+  assert.match(reliability, /import \{ createPortal \} from 'react-dom'/)
+  assert.match(reliability, /createPortal\(/)
+  assert.match(reliability, /document\.body/)
+  assert.match(reliability, /className="stable-choice-menu stable-choice-menu-portal"/)
+  assert.match(reliability, /position:\s*'fixed'/)
+  assert.match(reliability, /zIndex:\s*10000/)
+  assert.match(reliability, /menuRef\.current\?\.contains\(target\)/)
+  assert.match(reliability, /window\.visualViewport\?\.addEventListener\('resize', update\)/)
+  assert.match(reliability, /event\.preventDefault\(\)/)
   assert.doesNotMatch(reliability, /requestAnimationFrame\([\s\S]*focus/)
   assert.match(reliability, /focus\(\{ preventScroll: true \}\)/)
   assert.match(css, /\.stable-choice-menu[\s\S]*background:\s*#fff\s*!important/)
