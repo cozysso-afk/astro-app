@@ -6,6 +6,7 @@ const server=readFileSync(new URL('../../../supabase/functions/relationship-inte
 const publicError=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const hierarchyPanel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
+const relationshipSummary=readFileSync(new URL('./relationshipUserSummary.ts',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
 
@@ -59,12 +60,12 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion hierarchy vNext keeps deterministic timing and a present-first stage-grounded UI',()=>{
+test('reunion hierarchy keeps deterministic timing and a present-first stage-grounded UI',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['지금 두 사람은 어디에 있나','서로에게 걸리는 방향','관계 자체의 현재 단계','지난 활성기 · 사후 확인용','앞으로의 후보 시기','연락 ≠ 재회','관계를 다시 이어가려면','계산 근거 보기']
+  const headings=['지금 두 사람은 어디에 있나','지금 살아 있는 흐름','왜 다시 신경 쓰이거나 연결될 수 있나','서로에게 걸리는 방향','가장 가까운 후보 시기','연락 뒤 재회까지 남은 조건','다시 멀어질 수 있는 지점','관계 자체의 현재 단계','앞으로의 후보 시기','관계를 다시 이어가려면','연락 ≠ 재회 · 단계 기준 보기','지난 활성기 · 사후 확인용','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){
     const next=hierarchyPanel.indexOf(heading)
@@ -72,12 +73,9 @@ test('reunion hierarchy vNext keeps deterministic timing and a present-first sta
     cursor=next
   }
   assert.match(hierarchyPanel,/가장 가까운 후보/)
-  assert.match(hierarchyPanel,/실제 메시지·만남·관계 변화 기록과 비교하는 개인 사후 확인용/)
+  assert.match(hierarchyPanel,/실제 기록과 비교하는 개인 사후 확인용/)
   assert.match(hierarchyPanel,/과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
   assert.match(hierarchyPanel,/실제 속마음이나 실제 선연락 행동을 관측한 값은 아니야/)
-  assert.match(hierarchyPanel,/진행 컴포짓을 포함한 관계층/)
-  assert.match(hierarchyPanel,/다시 멀어질 수 있는 지점/)
-  assert.match(hierarchyPanel,/보조지표 활성도/)
   assert.match(hierarchyPanel,/사건 확정일 아님/)
   assert.match(panel,/이전 계산 저장본/)
   assert.match(panel,/AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기/)
@@ -98,6 +96,36 @@ test('reunion hierarchy vNext keeps deterministic timing and a present-first sta
   assert.match(server,/계산 근거 → 쉬운 뜻 → 실제 관계에서 나타날 수 있는 장면 → 함께 걸리는 반대\/제약 근거 → 종합/)
   assert.match(server,/applying은 앞으로 강해지는 배경/)
   assert.match(grounding,/카르마적 인연/)
+})
+
+test('relationship reading quality guard blocks repetitive stage filler and first-contact contradictions',()=>{
+  assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
+  assert.match(hierarchyPanel,/function stageWindowCopy/)
+  assert.match(hierarchyPanel,/function componentStory/)
+  assert.match(hierarchyPanel,/componentStory\(row\)/)
+  assert.match(hierarchyPanel,/stageWindowCopy\(row,'current'\)/)
+  assert.match(hierarchyPanel,/stageWindowCopy\(row,'past'\)/)
+  assert.match(hierarchyPanel,/stageWindowCopy\(row,'future'\)/)
+  assert.match(hierarchyPanel,/const neutralDirectionRows = directionRows\.map/)
+  assert.match(hierarchyPanel,/<ReadingDirections rows=\{neutralDirectionRows\}/)
+  assert.match(hierarchyPanel,/상대가 실제로 먼저 연락한다는 판정은 아니야/)
+  assert.match(hierarchyPanel,/내가 먼저 연락해야 한다는 지시는 아니야/)
+  assert.equal((hierarchyPanel.match(/\{movementOrder\}/g)||[]).length,1,'movement order must not be printed twice')
+  assert.match(hierarchyPanel,/<details className="reading-more reunion-retrospective">/)
+  assert.match(hierarchyPanel,/<details className="reading-more reunion-contact-is-not-reunion">/)
+  assert.doesNotMatch(hierarchyPanel,/감정과 기억이 다시 올라오는 단계야\. 아직 실제 연락이 생겼다는 뜻은 아니야\./)
+  assert.doesNotMatch(hierarchyPanel,/메시지·답장·안부처럼 실제 상호작용이 다시 시작되는 단계야\. 연락이 닿아도 재회를 뜻하지는 않아\./)
+})
+
+test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
+  for(const marker of ['궁합 전체 해설','결혼궁합 전체 해설','결혼생활 전체 해설','재회 흐름 전체 해설']) assert.match(panel,new RegExp(marker))
+  assert.match(relationshipSummary,/함께 쓰는 돈과 혼자 보내는 시간, 집안일/)
+  assert.match(relationshipSummary,/같은 다툼이 시작되는 말과 시간을 함께 적어봐/)
+  assert.match(relationshipSummary,/이전에는 대화가 끊긴 문제를 한 가지씩/)
+  assert.match(relationshipSummary,/편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐/)
+  assert.match(panel,/생활비, 집안일, 가족 관계, 혼자 쉴 시간/)
+  assert.match(panel,/오래 함께했다는 사실과 지금 편안하게 유지되고 있다는 건 같은 뜻이 아니야/)
+  assert.match(panel,/연락이 다시 닿았다는 사실만으로 재결합이나 관계 회복이 확정됐다고 읽지는 마/)
 })
 
 test('archive filter guards iOS date controls from widening the page',()=>{
