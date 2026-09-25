@@ -31,9 +31,10 @@ test('aurora stays static on the app surface without fixed pseudo compositing', 
   assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
-test('static fallback avoids visual-viewport units and interaction-sensitive vertical percentages', () => {
+test('background geometry is invariant to viewport and form height changes', () => {
   assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
-  assert.match(css, /linear-gradient\(\s*90deg/)
+  assert.match(css, /body\s*\{[\s\S]*linear-gradient\(\s*90deg/)
+  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on[\s\S]*linear-gradient\(\s*180deg/)
   assert.doesNotMatch(css, /@supports\s*\(-webkit-touch-callout:\s*none\)/)
   assert.doesNotMatch(css, /-11rem\s+\d+%/)
   assert.doesNotMatch(css, /calc\(100% \+ 9rem\)\s+\d+%/)
