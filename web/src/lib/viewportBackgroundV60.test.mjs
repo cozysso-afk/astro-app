@@ -4,10 +4,9 @@ import { readFileSync } from 'node:fs'
 
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../viewport-background-v60.css', import.meta.url), 'utf8')
-const motion = readFileSync(new URL('../celestial-motion-v23.css', import.meta.url), 'utf8')
 const reliability = readFileSync(new URL('../BirthTimeReliabilityFields.tsx', import.meta.url), 'utf8')
 
-test('viewport background is the final background owner while font fix stays last overall', () => {
+test('viewport background is the final visual owner while font fix stays last overall', () => {
   const marker = "import './viewport-background-v60.css'"
   const fontOwner = "import './reading-font-fix-v54.css'"
   assert.ok(main.includes(marker))
@@ -18,29 +17,23 @@ test('viewport background is the final background owner while font fix stays las
   assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
-test('page underlay stays non-fixed while motion layer remains available', () => {
+test('aurora animates on the app surface without fixed pseudo compositing', () => {
   assert.match(css, /body\s*\{[\s\S]*background-image:\s*linear-gradient\(/)
   assert.match(css, /body::before,[\s\S]*body::after[\s\S]*display:\s*none\s*!important/)
+  assert.match(css, /\.app-shell::before,[\s\S]*\.app-shell::after[\s\S]*display:\s*none\s*!important/)
   assert.doesNotMatch(css, /body::before\s*\{[\s\S]*position:\s*fixed/)
-  assert.match(css, /\.app-shell[\s\S]*background:\s*transparent\s*!important/)
-  assert.match(css, /\.app-shell:not\(\.celestial-motion-on\)::before/)
-  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on::before[\s\S]*display:\s*none\s*!important/)
+  assert.doesNotMatch(css, /\.app-shell::before\s*\{[\s\S]*position:\s*fixed/)
+  assert.match(css, /@keyframes\s+astroAuroraSurfaceDriftV66/)
+  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*background-image:[\s\S]*radial-gradient/)
+  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*astroAuroraSurfaceDriftV66\s+15s/)
+  assert.match(css, /background-position:/)
+  assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
-test('celestial motion owns the animated aurora when motion is enabled', () => {
-  assert.match(motion, /\.app-shell\.celestial-motion-on::before[\s\S]*display:block!important/)
-  assert.match(motion, /animation:astroAuroraDrift/)
-  assert.match(motion, /radial-gradient/)
-  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on::before/)
-  assert.doesNotMatch(css, /@supports\s*\(-webkit-touch-callout:\s*none\)/)
-})
-
-test('static page background is vertically invariant across auto-scroll and viewport changes', () => {
+test('static fallback avoids visual-viewport units', () => {
   assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
-  assert.doesNotMatch(css, /radial-gradient/i)
   assert.match(css, /linear-gradient\(\s*90deg/)
-  assert.doesNotMatch(css, /linear-gradient\(\s*180deg/)
-  assert.doesNotMatch(css, /\bat\s+[^,;]+\s+\d+px/i)
+  assert.doesNotMatch(css, /@supports\s*\(-webkit-touch-callout:\s*none\)/)
 })
 
 test('birth-time reliability choices avoid the iOS native select popover', () => {
@@ -48,6 +41,14 @@ test('birth-time reliability choices avoid the iOS native select popover', () =>
   assert.match(reliability, /aria-haspopup="listbox"/)
   assert.match(reliability, /role="listbox"/)
   assert.match(reliability, /stable-choice-trigger/)
-  assert.match(css, /\.stable-choice-menu[\s\S]*background:\s*#fffefa/)
-  assert.match(css, /\.stable-choice-menu[\s\S]*backdrop-filter:\s*none/)
+  assert.match(css, /\.stable-choice-menu[\s\S]*background:\s*#fff\s*!important/)
+  assert.match(css, /\.stable-choice-menu[\s\S]*backdrop-filter:\s*none\s*!important/)
+})
+
+test('birth and location form uses one readable type and control scale', () => {
+  assert.match(css, /\.app-shell \.field > span[\s\S]*font-size:\s*14px\s*!important/)
+  assert.match(css, /\.app-shell \.field input,[\s\S]*\.app-shell \.stable-choice-trigger[\s\S]*height:\s*52px\s*!important/)
+  assert.match(css, /\.app-shell \.field input,[\s\S]*\.app-shell \.stable-choice-trigger[\s\S]*font-size:\s*16px\s*!important/)
+  assert.match(css, /\.stable-choice-option[\s\S]*font-size:\s*16px\s*!important/)
+  assert.match(css, /\.app-shell \.birth-time-reliability-note[\s\S]*font-size:\s*14px\s*!important/)
 })
