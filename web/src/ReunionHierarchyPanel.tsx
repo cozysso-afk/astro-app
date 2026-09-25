@@ -196,7 +196,9 @@ export function ReunionHierarchyPanel({
       <details className="reading-more reunion-calculation-basis">
         <summary>계산 근거 보기</summary>
         <p>{hierarchyData.score_meaning}</p>
-        <p>활성도 숫자는 사건 확률이나 현재 감정의 세기가 아니라, 조회 범위에서 각 단계 기준을 통과한 후보의 상대 비교값이야.</p>
+        <h5>보조지표 활성도</h5>
+        <div className="reunion-stage-activation-list">{hierarchyData.stages.map((stage)=><p key={stage.stage}><b>{stage.label}</b> {Math.round(stage.activation)}</p>)}</div>
+        <p>숫자는 사건 확률이나 현재 감정 세기가 아니라, 조회 범위에서 각 단계 기준을 통과한 후보의 상대 비교값이야.</p>
         {!!evidenceRows.length && <div className="reunion-local-evidence-grid">{evidenceRows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${row.a}:${row.aspect}:${row.b}:${index}`}><strong>{evidenceLabel(row)}</strong><p>{Array.isArray(row.relationship_domains) && row.relationship_domains.length ? `관계 해석 영역: ${row.relationship_domains.join(' · ')}` : '관계 해석에 사용된 계산 근거야.'}</p></article>)}</div>}
         {hierarchyData.stability_structure && <p>고정 관계 구조 · 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수 자체는 재결합 확률이 아니야.</p>}
         {reunionV2?.precision_note && <Copy value={reunionV2.precision_note}/>} 
