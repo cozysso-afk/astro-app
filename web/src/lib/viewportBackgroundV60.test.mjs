@@ -17,23 +17,27 @@ test('viewport background is the final visual owner while font fix stays last ov
   assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
 })
 
-test('aurora animates on the app surface without fixed pseudo compositing', () => {
+test('aurora stays static on the app surface without fixed pseudo compositing', () => {
   assert.match(css, /body\s*\{[\s\S]*background-image:\s*linear-gradient\(/)
   assert.match(css, /body::before,[\s\S]*body::after[\s\S]*display:\s*none\s*!important/)
   assert.match(css, /\.app-shell::before,[\s\S]*\.app-shell::after[\s\S]*display:\s*none\s*!important/)
   assert.doesNotMatch(css, /body::before\s*\{[\s\S]*position:\s*fixed/)
   assert.doesNotMatch(css, /\.app-shell::before\s*\{[\s\S]*position:\s*fixed/)
-  assert.match(css, /@keyframes\s+astroAuroraSurfaceDriftV66/)
-  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*background-image:[\s\S]*radial-gradient/)
-  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*animation:\s*astroAuroraSurfaceDriftV66\s+15s/)
-  assert.match(css, /background-position:/)
+  assert.doesNotMatch(css, /@keyframes\s+astroAuroraSurfaceDrift/i)
+  assert.match(css, /\.app-shell\.celestial-motion-on[\s\S]*\.app-shell\.celestial-motion-off[\s\S]*background-image:[\s\S]*radial-gradient/)
+  assert.match(css, /background-position:[\s\S]*-11rem\s+760px[\s\S]*1120px/)
+  assert.match(css, /animation:\s*none\s*!important/)
+  assert.match(css, /transition:\s*none\s*!important/)
   assert.doesNotMatch(css, /background-attachment:\s*fixed/i)
 })
 
-test('static fallback avoids visual-viewport units', () => {
+test('background geometry is invariant to viewport and form height changes', () => {
   assert.doesNotMatch(css, /\b\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)\b/i)
-  assert.match(css, /linear-gradient\(\s*90deg/)
+  assert.match(css, /body\s*\{[\s\S]*linear-gradient\(\s*90deg/)
+  assert.doesNotMatch(css, /\.app-shell\.celestial-motion-on[\s\S]*linear-gradient\(\s*180deg/)
   assert.doesNotMatch(css, /@supports\s*\(-webkit-touch-callout:\s*none\)/)
+  assert.doesNotMatch(css, /-11rem\s+\d+%/)
+  assert.doesNotMatch(css, /calc\(100% \+ 9rem\)\s+\d+%/)
 })
 
 test('birth-time reliability choices avoid the iOS native select popover', () => {
@@ -42,6 +46,7 @@ test('birth-time reliability choices avoid the iOS native select popover', () =>
   assert.match(reliability, /role="listbox"/)
   assert.match(reliability, /stable-choice-trigger/)
   assert.match(css, /\.stable-choice-menu[\s\S]*background:\s*#fff\s*!important/)
+  assert.match(css, /\.stable-choice-menu[\s\S]*-webkit-overflow-scrolling:\s*auto/)
   assert.match(css, /\.stable-choice-menu[\s\S]*backdrop-filter:\s*none\s*!important/)
 })
 
