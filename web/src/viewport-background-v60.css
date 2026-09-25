@@ -1,25 +1,46 @@
-/* v69 — isolate the moving aurora from React/form repainting on iPhone.
-   The visible atmosphere now lives in #app-aurora-layer, a DOM sibling of #root.
-   React state changes, form menu open/close, profile rerenders and document scrolling therefore do not
-   recreate or reposition the aurora surface. The body keeps a colored, vertically-invariant fallback
-   so an iOS compositor refresh cannot flash to plain white. */
+/* v70 — iPhone aurora fallback cascade owner.
+   Production inspection exposed a higher-specificity legacy rule in reading-experience.css:
+     body:has(.app-shell) { background:#f7f8fb!important; }
+   That rule beat the former plain `body` fallback even though this file loads later, because both
+   declarations are !important and selector specificity wins first. When iOS recomposited the fixed
+   aurora layer, the visible surface underneath was therefore still the plain near-white legacy color.
+
+   v70 keeps the moving aurora outside React, but makes both the persistent layer and the fallback
+   independently non-white. body:has(#root) deliberately carries ID specificity so it wins over the
+   legacy body:has(.app-shell) rule. No calculation/API/AI behavior is touched. */
 
 html {
   min-height: 100%;
-  background: #f4f5f8 !important;
+  background: #eef3f4 !important;
 }
 
+/* Generic pre-app fallback. */
 body {
   min-height: 100%;
   position: relative;
-  background-color: #f4f5f8 !important;
+  background-color: #eef3f4 !important;
   background-image: linear-gradient(
     90deg,
-    rgba(214, 239, 230, .58) 0%,
+    rgba(214, 239, 230, .62) 0%,
     rgba(241, 245, 247, .96) 24%,
-    #f7f8fb 50%,
+    #f4f5f8 50%,
     rgba(245, 241, 248, .96) 76%,
-    rgba(235, 218, 244, .62) 100%
+    rgba(235, 218, 244, .64) 100%
+  ) !important;
+  background-repeat: repeat-y !important;
+}
+
+/* IMPORTANT: this selector intentionally outranks reading-experience.css's
+   `body:has(.app-shell)` !important shorthand. This is the actual production fallback owner. */
+body:has(#root) {
+  background-color: #eef3f4 !important;
+  background-image: linear-gradient(
+    90deg,
+    rgba(214, 239, 230, .62) 0%,
+    rgba(241, 245, 247, .96) 24%,
+    #f4f5f8 50%,
+    rgba(245, 241, 248, .96) 76%,
+    rgba(235, 218, 244, .64) 100%
   ) !important;
   background-repeat: repeat-y !important;
 }
@@ -34,33 +55,35 @@ body::after {
   opacity: 0 !important;
 }
 
-@keyframes astroAuroraViewportDriftV69 {
+@keyframes astroAuroraViewportDriftV70 {
   0%, 100% {
     background-position:
       -9rem -160px,
       calc(100% + 10rem) 32px,
       -11rem 760px,
-      calc(100% + 9rem) 1120px;
+      calc(100% + 9rem) 1120px,
+      0 0;
   }
   38% {
     background-position:
       -5rem -136px,
       calc(100% + 6rem) 54px,
       -7rem 742px,
-      calc(100% + 6rem) 1102px;
+      calc(100% + 6rem) 1102px,
+      0 0;
   }
   72% {
     background-position:
       -11rem -122px,
       calc(100% + 12rem) 72px,
       -5rem 778px,
-      calc(100% + 11rem) 1140px;
+      calc(100% + 11rem) 1140px,
+      0 0;
   }
 }
 
-/* Persistent viewport atmosphere. This element is outside #root, so React profile changes cannot
-   unmount, rerender or reflow it. It is fixed to the visual viewport and has no filter/transform/
-   backdrop-filter/will-change compositor triggers. */
+/* Persistent viewport atmosphere, outside #root. The fifth background is an opaque pastel base,
+   so the layer itself no longer depends on a transparent backing surface during iOS recomposition. */
 #app-aurora-layer {
   position: fixed;
   inset: 0;
@@ -68,25 +91,34 @@ body::after {
   pointer-events: none;
   touch-action: none;
   overflow: hidden;
-  contain: paint;
-  background-color: transparent;
+  background-color: #eef3f4;
   background-image:
     radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .18) 31%, transparent 67%),
     radial-gradient(circle, rgba(198, 228, 252, .48) 0, rgba(198, 228, 252, .16) 30%, transparent 66%),
     radial-gradient(circle, rgba(203, 241, 229, .43) 0, rgba(203, 241, 229, .14) 31%, transparent 68%),
-    radial-gradient(circle, rgba(249, 209, 231, .38) 0, rgba(249, 209, 231, .12) 30%, transparent 66%);
+    radial-gradient(circle, rgba(249, 209, 231, .38) 0, rgba(249, 209, 231, .12) 30%, transparent 66%),
+    linear-gradient(
+      90deg,
+      rgba(214, 239, 230, .62) 0%,
+      rgba(241, 245, 247, .96) 24%,
+      #f4f5f8 50%,
+      rgba(245, 241, 248, .96) 76%,
+      rgba(235, 218, 244, .64) 100%
+    );
   background-size:
     42rem 42rem,
     40rem 40rem,
     44rem 44rem,
-    39rem 39rem;
+    39rem 39rem,
+    100% 100%;
   background-position:
     -9rem -160px,
     calc(100% + 10rem) 32px,
     -11rem 760px,
-    calc(100% + 9rem) 1120px;
+    calc(100% + 9rem) 1120px,
+    0 0;
   background-repeat: no-repeat;
-  animation: astroAuroraViewportDriftV69 15s ease-in-out infinite;
+  animation: astroAuroraViewportDriftV70 15s ease-in-out infinite;
 }
 
 html[data-celestial-motion='off'] #app-aurora-layer {
@@ -106,7 +138,7 @@ html[data-celestial-motion='off'] #app-aurora-layer {
   background: transparent !important;
 }
 
-/* The scrollable React tree is content-only. It never owns the page atmosphere anymore. */
+/* The scrollable React tree is content-only. It never owns the page atmosphere. */
 .app-shell,
 .app-shell[data-view],
 .app-shell[data-mode],
