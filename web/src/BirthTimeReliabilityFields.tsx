@@ -18,10 +18,14 @@ type Props = {
   compact?: boolean
 }
 
+type StableChoiceChangeContext = {
+  preserveRenderedResults: boolean
+}
+
 type StableChoiceProps = {
   value: string
   options: ReadonlyArray<readonly [string, string, boolean?]>
-  onChange: (value: string) => void
+  onChange: (value: string, context: StableChoiceChangeContext) => void
   disabled?: boolean
   ariaLabel: string
 }
@@ -51,6 +55,11 @@ export const timeConfidenceLabels: Array<[TimeConfidence, string]> = [
   ['low', 'Low · 낮음'],
   ['unknown', 'Unknown · 확인 안 됨'],
 ]
+
+function shouldPreserveRenderedResults(root: HTMLElement | null) {
+  if (!root?.closest('.tool-panel')) return false
+  return Boolean(document.querySelector('.results-wrap'))
+}
 
 function StableChoice({ value, options, onChange, disabled = false, ariaLabel }: StableChoiceProps) {
   const [open, setOpen] = useState(false)
@@ -179,7 +188,9 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
             const before = diagnosticMode
               ? diagnosticBeforeRef.current ?? captureBackgroundDiagnostic()
               : null
-            onChange(key)
+            onChange(key, {
+              preserveRenderedResults: shouldPreserveRenderedResults(rootRef.current),
+            })
             setOpen(false)
             if (before) captureAfterSelection(before, key)
           }}
@@ -232,26 +243,60 @@ function StableChoice({ value, options, onChange, disabled = false, ariaLabel }:
 }
 
 export function BirthTimeReliabilityFields({ value, onChange, disabled = false, compact = false }: Props) {
+  const [, forceLocalRender] = useState(0)
+  const firstFieldRef = useRef<HTMLDivElement>(null)
+  const [stagedForRecalculation, setStagedForRecalculation] = useState(false)
   const exactAllowed = exactSources.has(value.timeSource)
+
   useEffect(() => { rememberBirthTimeReliability(value) }, [value])
-  const emit = (patch: Partial<Pick<BirthProfile, 'timeSource' | 'timeConfidence' | 'rectifiedWindowStart' | 'rectifiedWindowEnd'>>) => {
+
+  useEffect(() => {
+    if (!stagedForRecalculation) return
+    const handlePrimaryAction = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const button = target.closest('button.primary-button')
+      if (!button) return
+      const ownPanel = firstFieldRef.current?.closest('.tool-panel')
+      if (ownPanel && button.closest('.tool-panel') === ownPanel) setStagedForRecalculation(false)
+    }
+    document.addEventListener('click', handlePrimaryAction, true)
+    return () => document.removeEventListener('click', handlePrimaryAction, true)
+  }, [stagedForRecalculation])
+
+  const emit = (
+    patch: Partial<Pick<BirthProfile, 'timeSource' | 'timeConfidence' | 'rectifiedWindowStart' | 'rectifiedWindowEnd'>>,
+    preserveRenderedResults = false,
+  ) => {
     rememberBirthTimeReliability({ ...value, ...patch })
+    if (preserveRenderedResults) {
+      /* AppNext intentionally invalidates relationship outputs whenever the counterpart object is replaced.
+         On iPhone that removed ~6-7kpx of rendered results about 60ms after selecting this control,
+         which forced the fixed aurora through a visible recomposition. Keep the already-rendered result
+         surface mounted, stage only these reliability fields in the existing counterpart object, and let
+         the next explicit calculation read the updated fields from that same object. */
+      Object.assign(value, patch)
+      setStagedForRecalculation(true)
+      forceLocalRender((revision) => revision + 1)
+      return
+    }
     onChange(patch)
   }
+
   return <>
-    <div className={`field ${compact ? '' : 'field-wide'}`}>
+    <div ref={firstFieldRef} className={`field ${compact ? '' : 'field-wide'}`}>
       <span>출생시간 출처</span>
       <StableChoice
         value={value.timeSource}
         disabled={disabled}
         ariaLabel="출생시간 출처"
         options={timeSourceLabels}
-        onChange={(nextValue) => {
+        onChange={(nextValue, context) => {
           const source = nextValue as TimeSource
           emit({
             timeSource: source,
             ...(value.timeConfidence === 'exact' && !exactSources.has(source) ? { timeConfidence: 'unknown' as TimeConfidence } : {}),
-          })
+          }, context.preserveRenderedResults)
         }}
       />
     </div>
@@ -262,13 +307,14 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
         disabled={disabled}
         ariaLabel="출생시간 신뢰도"
         options={timeConfidenceLabels.map(([key, label]) => [key, label, key === 'exact' && !exactAllowed] as const)}
-        onChange={(nextValue) => emit({ timeConfidence: nextValue as TimeConfidence })}
+        onChange={(nextValue, context) => emit({ timeConfidence: nextValue as TimeConfidence }, context.preserveRenderedResults)}
       />
     </div>
     {value.timeSource === 'rectified' && <>
-      <label className="field"><span>보정 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value})}/></label>
-      <label className="field"><span>보정 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value})}/></label>
+      <label className="field"><span>보정 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field"><span>보정 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
     </>}
+    {stagedForRecalculation && <div className="privacy-note field-wide birth-time-reliability-note"><span>출생시간 설정이 바뀌었어. 현재 결과는 이전 계산 기준이야. 실제 계산 실행을 누르면 새 설정으로 갱신돼.</span></div>}
     {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>시각을 입력했다는 사실만으로 exact(정확 생시)로 보지 않아. 공식기록 또는 검증된 보정시각 + Exact일 때만 ASC(상승점)·하우스 등 생시 민감층을 exact로 사용해.</span></div>}
   </>
 }
