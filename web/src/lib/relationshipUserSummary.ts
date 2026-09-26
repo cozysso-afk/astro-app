@@ -3,7 +3,7 @@ import type { Aspect, FortuneStat, RelationshipAnalysisMode, ReunionTimingContex
 const PERSONAL = new Set(['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'])
 const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
 const SENSITIVE = new Set(['ASC', 'DSC', 'MC', 'IC', 'Vertex'])
-const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점', ASC: '상승점', DSC: '하강점', MC: '중천', IC: '천저', Vertex: '버텍스' }
+const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '진북교점', 'North Node': '진북교점', ASC: '상승점', DSC: '하강점', MC: '중천', IC: '천저', Vertex: '버텍스' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
 export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
 
@@ -127,9 +127,21 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     const score = stat?.average
     const band = typeof score !== 'number' || !Number.isFinite(score) ? '정보 부족' : score >= 60 ? '강함' : score < 40 ? '약함' : '보통'
     const copy = {
-      incoming: { 강함: '상대 쪽 움직임이 비교적 강하게 잡혀 있어. 실제 연락이 오면 대화를 이어갈 의지가 있는지 봐.', 약함: '상대가 먼저 연락할 흐름은 약한 편이야. 기다림만으로 일정을 비워 두지는 마.', 보통: '상대의 반응은 열려 있지만 먼저 연락이 온다고 기대하기엔 뚜렷하지 않아.' },
-      outgoing: { 강함: '내가 먼저 짧게 말을 꺼내기 좋은 편이야. 답이 애매하면 더 밀지는 마.', 약함: '지금은 먼저 밀어붙이기보다 하고 싶은 말을 정리해 두는 편이 좋아.', 보통: '가벼운 안부 정도는 생각해볼 수 있어. 답장의 구체성을 보고 다음을 정해.' },
-      reconnection: { 강함: '다시 대화가 시작되는 움직임을 살펴볼 때야. 재회가 확정된다는 뜻은 아니야.', 약함: '과거 인연과 다시 이어질 신호는 약해. 추억을 현재의 의사로 읽지는 마.', 보통: '재접촉의 여지는 있지만 관계 회복까지 이어질지는 실제 행동을 더 봐야 해.' },
+      incoming: {
+        강함: '상대 → 나 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 상대가 먼저 연락한다는 뜻은 아니야.',
+        약함: '상대 → 나 방향의 관계 자극은 약한 편이야. 상대가 먼저 연락하지 않는다는 예측으로 읽지는 마.',
+        보통: '상대 → 나 방향의 관계 자극은 중간대야. 실제 선연락 여부는 별도 행동 근거가 필요해.',
+      },
+      outgoing: {
+        강함: '나 → 상대 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 내가 먼저 연락해야 한다는 뜻은 아니야.',
+        약함: '나 → 상대 방향의 관계 자극은 약한 편이야. 연락을 미루라는 행동 지시로 읽지는 마.',
+        보통: '나 → 상대 방향의 관계 자극은 중간대야. 먼저 연락할지 여부와는 별개로 봐.',
+      },
+      reconnection: {
+        강함: '과거 인연 재접점 지표가 비교적 강해. 실제 대화 재개나 재회 성사와는 별도로 확인해야 해.',
+        약함: '과거 인연 재접점 지표는 약한 편이야. 현재 감정이나 실제 연락 여부를 대신 판정하지 않아.',
+        보통: '과거 인연 재접점 지표는 중간대야. 실제 재접촉과 관계 회복은 행동 근거를 더 봐야 해.',
+      },
     }
     const point = band === '약함' ? stat?.caution_days?.[0] : stat?.best_days?.[0]
     const timing = stat && stat.spread > 0 && point && input.timing && point.date >= input.timing.period.start && point.date <= input.timing.period.end ? point.date : undefined
@@ -145,7 +157,7 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
       const point=stat[source]?.[0]
       if(!point || point.date<input.timing!.period.start || point.date>input.timing!.period.end)return []
       const caution=source==='caution_days'
-      return [{date:point.date,kind,label:{incoming:'상대 쪽 반응을 살펴볼 때',outgoing:'내가 말을 꺼낼 속도를 정할 때',reconnection:'과거 인연과 접점이 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
+      return [{date:point.date,kind,label:{incoming:'상대 → 나 관계 자극이 상대적으로 두드러지는 때',outgoing:'나 → 상대 관계 자극이 상대적으로 두드러지는 때',reconnection:'과거 인연 재접점 지표가 상대적으로 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
     })
   })
 
@@ -163,10 +175,10 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
       : stability.length ? '결혼 상대로서의 안정성은 끌림과 따로 봐야 해. 함께 감당할 책임과 생활 방식을 실제 조건으로 맞춰봐.'
       : '함께 살 때의 안정성을 단정할 근거는 부족해. 결혼을 결정하기 전에 생활과 책임을 구체적으로 이야기해봐.'
     : reunion
-    ? reconnection.band === '강함' ? `재접촉의 움직임은 살아 있어. ${friction.length ? '다만 다시 만나기 전에 반복되는 갈등을 풀 방법부터 맞춰야 해.' : '다시 이어진 뒤에도 약속이 지켜지는지 천천히 봐.'}`
-      : reconnection.band === '약함' ? '지금은 재접촉을 크게 기대하기보다, 다시 대화할 때 달라져야 할 점을 정리하는 편이 좋아.'
-      : reconnection.band === '정보 부족' ? '재접촉 시기는 판단할 정보가 부족해. 두 사람 사이에서 반복되기 쉬운 패턴부터 살펴볼게.'
-      : '다시 대화할 여지는 열려 있지만, 관계 회복은 그 뒤의 행동을 보고 판단하는 편이 좋아.'
+    ? reconnection.band === '강함' ? `과거 인연 재접점 지표는 강한 편이야. 실제 연락이나 재회 여부는 단계 계산과 행동을 따로 봐야 해. ${friction.length ? '다시 연락이 닿는다면 반복되는 갈등을 다르게 풀 수 있는지도 함께 확인해.' : '연락이 생기면 그 뒤의 지속 행동이 붙는지를 천천히 봐.'}`
+      : reconnection.band === '약함' ? '과거 인연 재접점 지표는 약한 편이야. 실제 연락 가능성은 단계 계산과 현실 행동을 따로 봐야 해.'
+      : reconnection.band === '정보 부족' ? '과거 인연 재접점 지표를 판단할 정보가 부족해. 실제 연락 가능성은 다른 단계 근거와 행동을 따로 봐야 해.'
+      : '과거 인연 재접점 지표는 중간대야. 실제 연락이나 관계 회복이 열린다는 뜻은 아니야.'
     : communicationFriction ? '이 관계는 끌림의 크기보다 말이 꼬였을 때 서로 뜻을 확인하고 다시 대화를 이어갈 수 있는지가 핵심이야.'
       : powerFriction ? '강하게 끌리더라도 서로의 선택권과 사생활을 존중할 수 있는지가 이 관계의 중요한 기준이야.'
       : attractionFriction ? '끌림은 있어도 서로 편안한 거리와 애정 표현 속도가 맞는지는 따로 확인해야 해.'
