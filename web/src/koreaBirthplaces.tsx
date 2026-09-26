@@ -144,6 +144,10 @@ function splitKey(placeKey: string) {
   return { region, district }
 }
 
+function sameBirthplaceValue(a: BirthplaceValue, b: BirthplaceValue) {
+  return a.placeKey === b.placeKey && a.latitude === b.latitude && a.longitude === b.longitude && a.utcOffset === b.utcOffset
+}
+
 function shouldPreserveRenderedResults(root: HTMLElement | null) {
   if (!root?.closest('.tool-panel')) return false
   return Boolean(document.querySelector('.results-wrap'))
@@ -276,6 +280,9 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
   const [district, setDistrict] = useState(initial.district)
   const [coordinateMap, setCoordinateMap] = useState<Record<string, Coordinate>>(FALLBACK_COORDINATES)
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading')
+  const stagedSelectionRef = useRef<{ region: string; district: string } | null>(null)
+  const stagedValueRef = useRef<BirthplaceValue | null>(null)
+  const sourceValueRef = useRef(value)
 
   useEffect(() => {
     let cancelled = false
@@ -288,34 +295,46 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
   }, [])
 
   useEffect(() => {
+    if (sourceValueRef.current !== value) {
+      sourceValueRef.current = value
+      if (!stagedValueRef.current || !sameBirthplaceValue(value, stagedValueRef.current)) {
+        stagedValueRef.current = null
+        stagedSelectionRef.current = null
+      }
+    }
+    if (stagedSelectionRef.current) return
     const parsed = splitKey(value.placeKey)
     if (parsed.region !== region) setRegion(parsed.region)
     if (parsed.district !== district) setDistrict(parsed.district)
-  }, [value.placeKey, region, district])
+  }, [value, value.placeKey, value.latitude, value.longitude, value.utcOffset, region, district])
 
   const districts = useMemo(() => region ? KOREA_ADMIN_20260701[region] ?? [] : [], [region])
 
-  const commit = (next: BirthplaceValue, context: ChoiceContext) => {
+  const commit = (next: BirthplaceValue, context: ChoiceContext, selection: { region: string; district: string }) => {
     if (context.preserveRenderedResults) {
       // Keep the rendered reading mounted on iOS. Removing a several-thousand-pixel result tree
       // while the picker closes forces the fixed aurora through a visible recomposition. The next
       // explicit calculation reads these staged values from the same profile object.
+      stagedSelectionRef.current = selection
+      stagedValueRef.current = next
       Object.assign(value, next)
       return
     }
+    stagedSelectionRef.current = null
+    stagedValueRef.current = null
     onChange(next)
   }
 
   const chooseRegion = (nextRegion: string, context: ChoiceContext) => {
     setRegion(nextRegion)
     setDistrict('')
-    commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context)
+    commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context, { region: nextRegion, district: '' })
   }
 
   const chooseDistrict = (nextDistrict: string, context: ChoiceContext) => {
     setDistrict(nextDistrict)
     if (!region || !nextDistrict) {
-      commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context)
+      commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context, { region, district: nextDistrict })
       return
     }
     const placeKey = `${region}::${nextDistrict}`
@@ -325,7 +344,7 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
       latitude: point?.lat ?? '',
       longitude: point?.lon ?? '',
       utcOffset: '9',
-    }, context)
+    }, context, { region, district: nextDistrict })
   }
 
   return (
