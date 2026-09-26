@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 type Coordinate = { lat: string; lon: string }
 
@@ -13,6 +14,27 @@ type Props = {
   value: BirthplaceValue
   onChange: (next: BirthplaceValue) => void
   disabled?: boolean
+}
+
+type ChoiceContext = {
+  preserveRenderedResults: boolean
+}
+
+type ChoicePosition = {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+}
+
+type PlacePreset = never
+
+type LocationChoiceProps = {
+  value: string
+  options: ReadonlyArray<readonly [string, string]>
+  onChange: (value: string, context: ChoiceContext) => void
+  disabled?: boolean
+  ariaLabel: string
 }
 
 export const KOREA_ADMIN_VERSION = '20260701'
@@ -122,9 +144,136 @@ function splitKey(placeKey: string) {
   return { region, district }
 }
 
+function shouldPreserveRenderedResults(root: HTMLElement | null) {
+  if (!root?.closest('.tool-panel')) return false
+  return Boolean(document.querySelector('.results-wrap'))
+}
+
+function LocationChoice({ value, options, onChange, disabled = false, ariaLabel }: LocationChoiceProps) {
+  const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState<ChoicePosition | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const listboxId = useId()
+  const selectedLabel = options.find(([key]) => key === value)?.[1] ?? ''
+
+  const updatePosition = () => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const viewport = window.visualViewport
+    const viewportTop = viewport?.offsetTop ?? 0
+    const viewportLeft = viewport?.offsetLeft ?? 0
+    const viewportHeight = viewport?.height ?? window.innerHeight
+    const viewportWidth = viewport?.width ?? window.innerWidth
+    const viewportBottom = viewportTop + viewportHeight
+    const belowSpace = Math.max(0, viewportBottom - rect.bottom - 8)
+    const aboveSpace = Math.max(0, rect.top - viewportTop - 8)
+    const placeAbove = belowSpace < 220 && aboveSpace > belowSpace
+    const available = placeAbove ? aboveSpace : belowSpace
+    const maxHeight = Math.max(120, Math.min(320, available - 6))
+    const width = Math.min(rect.width, Math.max(0, viewportWidth - 16))
+    const left = Math.min(Math.max(rect.left, viewportLeft + 8), viewportLeft + viewportWidth - width - 8)
+    const top = placeAbove
+      ? Math.max(viewportTop + 8, rect.top - maxHeight - 6)
+      : Math.min(rect.bottom + 6, viewportBottom - 128)
+    setPosition({ top, left, width, maxHeight })
+  }
+
+  useEffect(() => {
+    if (!open) {
+      setPosition(null)
+      return
+    }
+    updatePosition()
+    const update = () => updatePosition()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      triggerRef.current?.focus({ preventScroll: true })
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    document.addEventListener('keydown', closeEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside)
+      document.removeEventListener('keydown', closeEscape)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
+
+  const menu = open && position && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        className="stable-choice-menu stable-choice-menu-portal birthplace-choice-menu"
+        id={listboxId}
+        role="listbox"
+        aria-label={ariaLabel}
+        style={{ position: 'fixed', zIndex: 10000, top: position.top, left: position.left, right: 'auto', width: position.width, maxHeight: position.maxHeight }}
+      >
+        {options.map(([key, label]) => <button
+          key={key || '__empty__'}
+          type="button"
+          className="stable-choice-option"
+          role="option"
+          aria-selected={key === value}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            onChange(key, { preserveRenderedResults: shouldPreserveRenderedResults(rootRef.current) })
+            setOpen(false)
+          }}
+        >{label}</button>)}
+      </div>,
+      document.body,
+    )
+    : null
+
+  return <div className={`stable-choice birthplace-stable-choice ${open ? 'is-open' : ''}`} ref={rootRef}>
+    <button
+      ref={triggerRef}
+      type="button"
+      className="stable-choice-trigger"
+      aria-label={ariaLabel}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-controls={listboxId}
+      disabled={disabled}
+      onClick={() => setOpen((current) => !current)}
+    >
+      <span className="stable-choice-value">{selectedLabel}</span>
+      <span className="stable-choice-chevron" aria-hidden="true">⌄</span>
+    </button>
+    {menu}
+  </div>
+}
+
 export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: Props) {
   const initial = splitKey(value.placeKey)
   const [region, setRegion] = useState(initial.region)
+  const [district, setDistrict] = useState(initial.district)
   const [coordinateMap, setCoordinateMap] = useState<Record<string, Coordinate>>(FALLBACK_COORDINATES)
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading')
 
@@ -140,49 +289,68 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
 
   useEffect(() => {
     const parsed = splitKey(value.placeKey)
-    if (parsed.region && parsed.region !== region) setRegion(parsed.region)
-  }, [value.placeKey, region])
+    if (parsed.region !== region) setRegion(parsed.region)
+    if (parsed.district !== district) setDistrict(parsed.district)
+  }, [value.placeKey, region, district])
 
   const districts = useMemo(() => region ? KOREA_ADMIN_20260701[region] ?? [] : [], [region])
-  const selected = splitKey(value.placeKey)
 
-  const chooseRegion = (nextRegion: string) => {
-    setRegion(nextRegion)
-    onChange({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' })
-  }
-
-  const chooseDistrict = (district: string) => {
-    if (!region || !district) {
-      onChange({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' })
+  const commit = (next: BirthplaceValue, context: ChoiceContext) => {
+    if (context.preserveRenderedResults) {
+      // Keep the rendered reading mounted on iOS. Removing a several-thousand-pixel result tree
+      // while the picker closes forces the fixed aurora through a visible recomposition. The next
+      // explicit calculation reads these staged values from the same profile object.
+      Object.assign(value, next)
       return
     }
-    const placeKey = `${region}::${district}`
+    onChange(next)
+  }
+
+  const chooseRegion = (nextRegion: string, context: ChoiceContext) => {
+    setRegion(nextRegion)
+    setDistrict('')
+    commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context)
+  }
+
+  const chooseDistrict = (nextDistrict: string, context: ChoiceContext) => {
+    setDistrict(nextDistrict)
+    if (!region || !nextDistrict) {
+      commit({ placeKey: '', latitude: '', longitude: '', utcOffset: '9' }, context)
+      return
+    }
+    const placeKey = `${region}::${nextDistrict}`
     const point = coordinateMap[placeKey] ?? FALLBACK_COORDINATES[placeKey]
-    onChange({
+    commit({
       placeKey,
       latitude: point?.lat ?? '',
       longitude: point?.lon ?? '',
       utcOffset: '9',
-    })
+    }, context)
   }
 
   return (
     <div className="birthplace-selector field-wide">
       <div className="birthplace-two-step">
-        <label className="field">
+        <div className="field">
           <span>시·도</span>
-          <select value={region} disabled={disabled} onChange={(event) => chooseRegion(event.target.value)}>
-            <option value="">시·도 선택</option>
-            {Object.keys(KOREA_ADMIN_20260701).map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
-        <label className="field">
+          <LocationChoice
+            value={region}
+            disabled={disabled}
+            ariaLabel="출생 시·도"
+            options={[["", "시·도 선택"], ...Object.keys(KOREA_ADMIN_20260701).map((name) => [name, name] as const)]}
+            onChange={chooseRegion}
+          />
+        </div>
+        <div className="field">
           <span>시·군·구</span>
-          <select value={selected.region === region ? selected.district : ''} disabled={disabled || !region} onChange={(event) => chooseDistrict(event.target.value)}>
-            <option value="">시·군·구 선택</option>
-            {districts.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
+          <LocationChoice
+            value={district}
+            disabled={disabled || !region}
+            ariaLabel="출생 시·군·구"
+            options={[["", "시·군·구 선택"], ...districts.map((name) => [name, name] as const)]}
+            onChange={chooseDistrict}
+          />
+        </div>
       </div>
       <div className={`location-data-status ${status}`}>
         <span>2026.07.01 현행 행정체계 · {KOREA_ADMIN_COUNT}개 시·군·구</span>
