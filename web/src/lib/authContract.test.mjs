@@ -33,6 +33,11 @@ assert.equal(gate.includes('onAuthStateChange'), false, 'auth-state callbacks mu
 assert.equal(main.includes('<AuthGate>'), true, 'AppNext must stay behind the authorization gate')
 assert.equal(main.indexOf('installIntegratedPrecisionFetch()') < main.indexOf('ReactDOM.createRoot'), true, 'precision transport must install before React/auth bootstrap')
 assert.equal(supabase.includes('global: { fetch: dynamicFetch }'), true, 'Supabase calls must resolve the invocation-time global fetch chain')
+assert.equal(supabase.includes("REUNION_NARRATIVE_CONTRACT = 'reunion-consultation-v3'"), true, 'reunion requests must carry the v3 narrative cache identity')
+assert.equal(supabase.includes("body.purpose !== 'reunion'"), true, 'narrative cache rewrite must be reunion-only')
+assert.equal(supabase.includes("url.includes('/functions/v1/relationship-interpret-v9-preview')"), true, 'narrative cache rewrite must be scoped to the relationship edge endpoint')
+assert.equal(supabase.includes('period: { ...period, narrative_contract: REUNION_NARRATIVE_CONTRACT }'), true, 'reunion narrative contract must survive inside the server-hashed period payload')
+assert.equal(supabase.includes('return {\n      ...init,\n      body: JSON.stringify'), true, 'reunion request rewrite must preserve method headers and other fetch init fields')
 
 assert.equal(app.includes("const FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'"), true, 'current fortune AI must use the guarded v21 endpoint')
 assert.equal(app.includes("functions.invoke('relationship-interpret-v9-preview'"), true, 'current relationship AI must use the guarded v9 endpoint')
