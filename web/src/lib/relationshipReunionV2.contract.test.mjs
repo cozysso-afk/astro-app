@@ -140,6 +140,17 @@ test('reunion grounding deduplicates locally and closes initiative claims across
   assert.match(grounding,/v2\.summary = safeInitiativeDetail\(v2\?\.summary, provisional\)/)
 })
 
+test('legacy calculated reunion fallback never turns directional activation into first-contact prediction',()=>{
+  assert.match(relationshipSummary,/상대 → 나 방향의 관계 자극이 비교적 강하게 잡혀 있어/)
+  assert.match(relationshipSummary,/나 → 상대 방향의 관계 자극이 비교적 강하게 잡혀 있어/)
+  assert.match(relationshipSummary,/과거 인연 재접점 지표는 강한 편이야/)
+  assert.match(relationshipSummary,/상대 → 나 관계 자극이 상대적으로 두드러지는 때/)
+  assert.match(relationshipSummary,/나 → 상대 관계 자극이 상대적으로 두드러지는 때/)
+  for(const legacy of ['상대가 먼저 연락할 흐름은 약한 편이야','내가 먼저 짧게 말을 꺼내기 좋은 편이야','재접촉의 움직임은 살아 있어','다시 대화할 여지는 열려 있지만']) {
+    assert.equal(relationshipSummary.includes(legacy),false,`legacy directional copy must stay removed: ${legacy}`)
+  }
+})
+
 test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
   for(const marker of ['궁합 전체 해설','결혼궁합 전체 해설','결혼생활 전체 해설','재회 흐름 전체 해설']) assert.match(panel,new RegExp(marker))
   assert.match(relationshipSummary,/함께 쓰는 돈, 집안일, 돌봄, 애정 표현, 혼자 쉬는 시간/)
