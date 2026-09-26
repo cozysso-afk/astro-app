@@ -11,6 +11,8 @@ const STAGE_ORDER = [
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
 type ContactSignalBand = '낮음' | '보통' | '높음'
+type ScoredDirectionRow = DirectionRow & { score?: number }
+type InitiativeLabel = '상대 쪽 우세' | '상대 쪽 약우세' | '나 쪽 우세' | '나 쪽 약우세' | '비슷함' | '판정 보류'
 
 const PLANET_LABEL: Record<string,string> = {
   Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성',
@@ -22,6 +24,8 @@ const ASPECT_LABEL: Record<string,string> = {
 
 const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|\b(?:emotional_reactivation|contact_recontact|in_person_meeting|relationship_rebuilding|initiative_gate)\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|상대측\s*활성|내측\s*활성|재접점\s*활성|보조지표|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
 const READER_SCENE_START_RE = /(?:예전|과거|근황|궁금|신경|호의|정서|감정|미련|연락|메시지|답장|대화|약속|만남|다시|서로|행동|갈등|책임|합의|유지|회복|재회|관계가|관계를|관계에서|관계는)/g
+const RELATIVE_DIRECTION_MARGIN = 5
+const CLEAR_DIRECTION_MARGIN = 10
 
 function Copy({ value }: { value?: string | null }) {
   const text = String(value ?? '').trim()
@@ -122,37 +126,147 @@ function phaseVerdict(hierarchyData: ReunionHierarchy) {
   return '지금은 실제 연락이나 만남이 가까워졌다고 말할 만큼 뚜렷한 흐름이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 현재 날짜에서 행동으로 이어질 근거가 부족하다는 뜻이야. 새로운 연락이나 구체적인 만남이 생기기 전에는 재회를 앞당겨 해석하지 않는 게 맞아.'
 }
 
-function contactSignalBand(hierarchyData: ReunionHierarchy): ContactSignalBand {
-  const hasContactWindow = hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact') || hierarchyData.top_periods.some((row)=>row.stage==='contact_recontact')
+function directionRow(directionRows: DirectionRow[], kind: 'incoming'|'outgoing') {
+  return directionRows.find((row)=>row.kind===kind) as ScoredDirectionRow | undefined
+}
+
+function directionScore(row?: ScoredDirectionRow) {
+  const score = row?.score
+  return typeof score === 'number' && Number.isFinite(score) ? score : null
+}
+
+function directionRank(row?: DirectionRow) {
+  if (row?.band === '강함') return 3
+  if (row?.band === '보통') return 2
+  if (row?.band === '약함') return 1
+  return 0
+}
+
+function hasContactWindow(hierarchyData: ReunionHierarchy) {
+  return hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact') || hierarchyData.top_periods.some((row)=>row.stage==='contact_recontact')
+}
+
+function bothDirectionsWeak(directionRows: DirectionRow[]) {
+  const incoming = directionRow(directionRows, 'incoming')
+  const outgoing = directionRow(directionRows, 'outgoing')
+  const incomingScore = directionScore(incoming)
+  const outgoingScore = directionScore(outgoing)
+  if (incomingScore != null && outgoingScore != null) return incomingScore < 40 && outgoingScore < 40
+  return incoming?.band === '약함' && outgoing?.band === '약함'
+}
+
+function contactSignalBand(hierarchyData: ReunionHierarchy, directionRows: DirectionRow[]): ContactSignalBand {
+  const contactWindow = hasContactWindow(hierarchyData)
+  if (!contactWindow) return '낮음'
+
+  const incoming = directionRow(directionRows, 'incoming')
+  const outgoing = directionRow(directionRows, 'outgoing')
+  const incomingScore = directionScore(incoming)
+  const outgoingScore = directionScore(outgoing)
+  const maxDirectionScore = Math.max(incomingScore ?? -Infinity, outgoingScore ?? -Infinity)
   const rawActivation = hierarchyData.stages?.contact_recontact?.activation
   const activation = typeof rawActivation === 'number' && Number.isFinite(rawActivation) ? rawActivation : null
-  if (hasContactWindow && activation != null && activation >= 60) return '높음'
-  if (hasContactWindow) return '보통'
-  if (activation != null && activation >= 60) return '보통'
+
+  // A contact timing window can open the period gate, but it must not upgrade two weak
+  // directional axes into a medium contact reading by itself.
+  if (bothDirectionsWeak(directionRows)) return '낮음'
+  if (activation != null && activation >= 60 && maxDirectionScore >= 60) return '높음'
+  if (maxDirectionScore >= 40 || directionRank(incoming) >= 2 || directionRank(outgoing) >= 2) return '보통'
   return '낮음'
 }
 
-function contactOutlook(hierarchyData: ReunionHierarchy, signalBand: ContactSignalBand) {
+function contactOutlook(hierarchyData: ReunionHierarchy, signalBand: ContactSignalBand, directionRows: DirectionRow[]) {
   const currentContact = hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact')
   const futureContact = hierarchyData.top_periods.filter((row)=>row.stage==='contact_recontact')
   const meeting = hierarchyData.current_windows.some((row)=>row.stage==='in_person_meeting') || hierarchyData.top_periods.some((row)=>row.stage==='in_person_meeting')
   const rebuilding = hierarchyData.current_windows.some((row)=>row.stage==='relationship_rebuilding') || hierarchyData.top_periods.some((row)=>row.stage==='relationship_rebuilding')
-  const scaleNote = `연락 가능성 신호는 ${signalBand}으로 읽혀. 이 평가는 통계적 연락 확률이 아니라, 조회 범위에서 연락으로 이어질 수 있는 시기·단계 근거의 상대 강도야.`
-  if (currentContact) return `${scaleNote} 현재에는 연락이나 대화 재개 여부를 눈여겨볼 시기 신호도 잡혀 있어. 즉 연락과 관련된 자극이 두드러지는 때라는 뜻이지, 메시지가 실제로 온다고 확정하는 뜻은 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어질 시기는 아직 뚜렷하지 않아.' : ''}`
-  if (futureContact.length) return `${scaleNote} ${futureContact[0].start}~${futureContact[0].end}은 연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간이야. 그때 실제 연락이 생기는지와 단순히 다시 생각나는지는 따로 확인해야 해.`
-  return `${scaleNote} 현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 시기 창이 잡히지 않았어. 배경 신호가 있더라도 실제 연락 가능성으로 올려 읽지는 않아.`
+  const weakDirections = bothDirectionsWeak(directionRows)
+  const scaleNote = `연락 가능성 신호는 ${signalBand}으로 읽혀. 이 평가는 통계적 연락 확률이 아니라, 연락 시기 신호와 상대 → 나·나 → 상대 방향 자극을 함께 본 상대 강도야.`
+  const directionNote = weakDirections ? ' 상대 → 나와 나 → 상대 방향 자극이 모두 약해서, 연락 시기 신호가 있어도 실제 연락 쪽 근거는 낮게 읽어.' : ''
+  if (currentContact) return `${scaleNote}${directionNote} 현재에는 연락이나 대화 재개 여부를 눈여겨볼 시기 신호가 잡혀 있어. 즉 연락과 관련된 자극이 두드러지는 때라는 뜻이지, 메시지가 실제로 온다고 확정하는 뜻은 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어질 시기는 아직 뚜렷하지 않아.' : ''}`
+  if (futureContact.length) return `${scaleNote}${directionNote} ${futureContact[0].start}~${futureContact[0].end}은 연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간이야. 그때 실제 연락이 생기는지와 단순히 다시 생각나는지는 따로 확인해야 해.`
+  return `${scaleNote} 현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 시기 창이 잡히지 않았어. 방향 자극만으로 실제 연락 가능성을 올려 읽지는 않아.`
+}
+
+function initiativeOutlook(hierarchyData: ReunionHierarchy, directionRows: DirectionRow[]) {
+  const contactWindow = hasContactWindow(hierarchyData)
+  const incoming = directionRow(directionRows, 'incoming')
+  const outgoing = directionRow(directionRows, 'outgoing')
+  const incomingScore = directionScore(incoming)
+  const outgoingScore = directionScore(outgoing)
+
+  if (!contactWindow) return {
+    label: '판정 보류' as InitiativeLabel,
+    text: '현재 조회 범위에는 연락 흐름을 따로 강조할 시기 창이 없어. 상대 → 나나 나 → 상대 방향 자극만으로 누가 먼저 연락할지를 정하지 않아.',
+  }
+
+  if (incomingScore != null && outgoingScore != null) {
+    const diff = incomingScore - outgoingScore
+    const gap = Math.abs(diff)
+    if (gap < RELATIVE_DIRECTION_MARGIN) return {
+      label: '비슷함' as InitiativeLabel,
+      text: `연락 시기 신호는 있지만 두 방향의 차이가 작아. 상대 → 나와 나 → 상대가 비슷하게 잡혀 있어서 어느 쪽이 먼저라고 밀어 읽기 어렵다.`,
+    }
+    const incomingLeads = diff > 0
+    const bothWeak = incomingScore < 40 && outgoingScore < 40
+    const clear = gap >= CLEAR_DIRECTION_MARGIN && !bothWeak
+    const label: InitiativeLabel = incomingLeads
+      ? (clear ? '상대 쪽 우세' : '상대 쪽 약우세')
+      : (clear ? '나 쪽 우세' : '나 쪽 약우세')
+    const leadText = incomingLeads ? '상대 → 나' : '나 → 상대'
+    const actorText = incomingLeads ? '상대가 먼저 움직이는 쪽' : '내가 먼저 움직이는 쪽'
+    const absoluteNote = bothWeak
+      ? '양쪽 모두 절대 강도는 약하지만, '
+      : ''
+    const caution = bothWeak
+      ? ' 전체 연락 가능성 자체는 낮게 읽어야 하고, 이건 연락이 생긴다는 보장이 아니라 연락이 생긴다면 어느 쪽이 상대적으로 앞서는지를 본 값이야.'
+      : ' 이 방향 우세도 실제 선연락을 보장하지는 않고, 연락 시기 신호가 열린 구간 안에서의 상대 비교야.'
+    return {
+      label,
+      text: `${absoluteNote}${leadText} 방향이 반대쪽보다 상대적으로 더 강해. 그래서 연락이 실제로 생긴다면 ${actorText}으로 읽을 근거가 조금 더 있어.${caution}`,
+    }
+  }
+
+  const incomingRank = directionRank(incoming)
+  const outgoingRank = directionRank(outgoing)
+  if (incomingRank !== outgoingRank && incomingRank > 0 && outgoingRank > 0) {
+    const incomingLeads = incomingRank > outgoingRank
+    return {
+      label: incomingLeads ? '상대 쪽 약우세' : '나 쪽 약우세',
+      text: `${incomingLeads ? '상대 → 나' : '나 → 상대'} 방향이 반대쪽보다 한 단계 강해. 연락 시기 신호가 있는 구간에서는 이쪽을 상대적 선연락 우세로 읽되, 실제 연락 성립과는 분리해서 봐야 해.`,
+    }
+  }
+
+  return {
+    label: '판정 보류' as InitiativeLabel,
+    text: '연락 시기 신호는 있지만 두 방향을 비교할 계산값이 충분하지 않아. 한쪽 자극만으로 누가 먼저 연락한다고 만들지는 않아.',
+  }
 }
 
 function changeOutlook(hierarchyData: ReunionHierarchy) {
   const current = new Set(hierarchyData.current_windows.map((row)=>row.stage))
   const future = new Set(hierarchyData.top_periods.map((row)=>row.stage))
   const hasAny = (stage:string)=>current.has(stage) || future.has(stage)
-  const observationLimit = '현재 계산은 상대의 실제 행동 이력이나 성격 변화를 관측하지 않아서, 상대가 예전과 달라졌다고 확정할 수는 없어.'
-  if (hasAny('relationship_rebuilding')) return `${observationLimit} 다만 예전 문제를 다시 다루고 관계를 다른 방식으로 운영할 여지를 살펴볼 근거는 있어. 실제 변화는 불편한 문제를 피하지 않는지, 구체적인 약속을 잡고 지키는지, 말과 행동이 며칠 이상 이어지는지로 확인해야 해.`
-  if (hasAny('in_person_meeting')) return `${observationLimit} 그래도 생각이나 감정이 실제 만남으로 넘어갈 여지는 따로 보여. 변화가 진짜인지 보려면 만남을 실제로 잡는지뿐 아니라, 만난 뒤에도 예전 문제를 피하지 않고 책임 있는 대화를 이어가는지를 봐야 해.`
-  if (hasAny('contact_recontact')) return `${observationLimit} 지금 보이는 것은 연락 흐름 쪽 신호라서 성격이나 관계 태도의 변화와는 별개야. 예전처럼 안부와 추억만 반복하는지, 아니면 구체적인 만남·사과·조율 같은 행동이 새로 붙는지를 비교해야 해.`
-  if (hasAny('emotional_reactivation')) return `${observationLimit} 지금은 다시 의식하거나 감정이 올라오는 흐름이 행동 변화보다 앞서 있어. 그리움이나 관심이 생기는 것만으로는 예전 패턴에서 벗어났다고 볼 수 없어.`
-  return `${observationLimit} 현재 조회 범위에서는 상대가 예전 패턴에서 벗어났다고 읽을 만한 행동 단계 신호도 뚜렷하지 않아. 변화 여부는 실제 연락 이후의 책임감, 약속, 갈등 대처 방식으로 확인하는 게 맞아.`
+  if (hasAny('relationship_rebuilding')) return {
+    label: '비교적 있음',
+    text: '관계를 다시 운영하고 예전 문제를 다르게 다룰 수 있는 흐름까지는 잡혀 있어. 다만 이것이 상대의 성격 변화 자체를 증명하는 것은 아니야. 실제로 달라졌는지는 불편한 문제를 피하지 않는지, 구체적인 약속을 잡고 지키는지, 말과 행동이 이어지는지로 확인해야 해.',
+  }
+  if (hasAny('in_person_meeting')) return {
+    label: '일부 있음',
+    text: '생각이나 감정이 실제 만남으로 넘어갈 여지는 보여. 그래도 예전과 달라졌다고 읽으려면 만남 자체보다, 만난 뒤 예전 문제를 피하지 않고 책임 있는 대화를 이어가는지가 더 중요해.',
+  }
+  if (hasAny('contact_recontact')) return {
+    label: '아직 약함',
+    text: '지금 계산에서 확인되는 건 연락 흐름까지야. 실제 만남이나 관계 회복 단계가 뚜렷하지 않아서, 상대가 예전과 다르게 행동할 근거는 아직 약해. 연락이 생긴다면 안부·추억만 반복하는지, 아니면 구체적인 만남·사과·조율 같은 새로운 행동이 붙는지를 비교해야 해.',
+  }
+  if (hasAny('emotional_reactivation')) return {
+    label: '약함',
+    text: '다시 의식하거나 감정이 올라오는 흐름이 행동 변화보다 앞서 있어. 그리움이나 관심이 생기는 것만으로는 상대가 예전 패턴에서 벗어났다고 읽기 어려워.',
+  }
+  return {
+    label: '근거 부족',
+    text: '현재 조회 범위에서는 상대가 예전과 다르게 행동할 흐름까지 올라온 근거가 부족해. 변화 여부는 실제 연락 이후의 책임감, 약속, 갈등 대처 방식으로 확인하는 게 맞아.',
+  }
 }
 
 function finalTakeaway(hierarchyData: ReunionHierarchy) {
@@ -232,13 +346,10 @@ export function ReunionHierarchyPanel({
   const valid = hierarchyData.validation?.status === 'PASS'
   const rows = stageRows(hierarchyData)
   const neutralDirectionRows = directionRows.map((row)=>({...row,text:directionCopy(row)}))
-  const contactSignal = contactSignalBand(hierarchyData)
-  const contact = contactOutlook(hierarchyData, contactSignal)
+  const contactSignal = contactSignalBand(hierarchyData, directionRows)
+  const contact = contactOutlook(hierarchyData, contactSignal, directionRows)
+  const initiative = initiativeOutlook(hierarchyData, directionRows)
   const change = changeOutlook(hierarchyData)
-  const initiative = readerText(
-    reunionV2?.initiative ? `${reunionV2.initiative.conclusion} ${reunionV2.initiative.interpretation}` : '',
-    '누가 먼저 연락할지는 현재 계산만으로 정하기 어려워. 먼저 연락하는 사람이 누구인지보다 연락 뒤 대화가 이어지고 실제 만남으로 넘어가는지를 보는 편이 더 정확해.',
-  )
   const why = readerText(
     reunionV2?.why_reconnect ? `${reunionV2.why_reconnect.conclusion} ${reunionV2.why_reconnect.interpretation}` : '',
     '이 관계가 다시 신경 쓰이는 것과 실제 연락이 생기는 것은 같은 일이 아니야. 예전 기억이나 감정이 올라오더라도 행동으로 이어지는지는 따로 봐야 해.',
@@ -275,7 +386,8 @@ export function ReunionHierarchyPanel({
 
         <div className="reunion-story-section reunion-story-initiative">
           <h4>누가 먼저 움직일지는?</h4>
-          <p>{initiative}</p>
+          <p><b>상대적 선연락 방향: {initiative.label}</b></p>
+          <p>{initiative.text}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-why">
@@ -284,8 +396,9 @@ export function ReunionHierarchyPanel({
         </div>
 
         <div className="reunion-story-section reunion-story-change">
-          <h4>상대는 예전과 달라졌을까?</h4>
-          <p>{change}</p>
+          <h4>상대가 예전과 다르게 움직일 여지가 있나?</h4>
+          <p><b>변화 행동 신호: {change.label}</b></p>
+          <p>{change.text}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-timing">
@@ -329,7 +442,7 @@ export function ReunionHierarchyPanel({
       <details className="reading-more reunion-direction-layer">
         <summary>상대 → 나 / 나 → 상대 보조지표 보기</summary>
         <ReadingDirections rows={neutralDirectionRows}/>
-        <p>이 값은 관계 자극의 방향이지 실제 속마음이나 선연락 행동을 관측한 값이 아니야.</p>
+        <p>이 값은 관계 자극의 방향이지 실제 속마음이나 선연락 행동을 관측한 값이 아니야. 메인 선연락 방향은 연락 시기 신호가 열린 경우에만 이 두 방향의 상대 차이를 함께 읽어.</p>
       </details>
 
       <details className="reading-more reunion-retrospective">
