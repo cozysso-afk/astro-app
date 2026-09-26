@@ -89,9 +89,9 @@ function contactOutlook(hierarchyData: ReunionHierarchy) {
   const futureContact = hierarchyData.top_periods.filter((row)=>row.stage==='contact_recontact')
   const meeting = hierarchyData.current_windows.some((row)=>row.stage==='in_person_meeting') || hierarchyData.top_periods.some((row)=>row.stage==='in_person_meeting')
   const rebuilding = hierarchyData.current_windows.some((row)=>row.stage==='relationship_rebuilding') || hierarchyData.top_periods.some((row)=>row.stage==='relationship_rebuilding')
-  if (currentContact) return `연락이나 대화 재개와 관련된 시기 신호는 지금 잡혀 있어. 하지만 실제 메시지가 온다고 강하게 말할 정도의 근거는 아직 부족해.${!meeting && !rebuilding ? ' 특히 실제 만남이나 관계 회복으로 이어지는 흐름은 아직 뚜렷하지 않아.' : ''}`
-  if (futureContact.length) return `지금 당장 연락이 올 가능성이 높다고 말할 근거는 부족해. 다음으로 연락 여부를 눈여겨볼 시기는 ${futureContact[0].start}~${futureContact[0].end}야. 이때도 실제 연락이 생기는지와 단순히 다시 생각나는지를 구분해서 봐야 해.`
-  return '현재 조회 범위에서는 실제 연락이 가까워졌다고 볼 만한 흐름이 따로 잡히지 않았어. 지금 결과를 연락이 곧 온다는 뜻으로 읽는 것은 과해.'
+  if (currentContact) return `연락 가능성 자체는 열려 있어. 이번 계산에서는 연락이나 대화가 다시 이어질 수 있는 흐름이 현재 시기에 잡혀 있어. 다만 이것이 실제 메시지 도착을 높은 확률로 확정한다는 뜻은 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어지는 흐름은 아직 뚜렷하지 않아.' : ''}`
+  if (futureContact.length) return `지금 당장보다 ${futureContact[0].start}~${futureContact[0].end}에 연락 가능성을 상대적으로 더 살펴볼 수 있어. 현재 시점에서 곧 연락이 온다고 말할 정도로 강한 근거는 아니지만, 그 시기에는 실제 연락이 생기는지와 단순히 다시 생각나는지를 구분해서 보는 게 좋아.`
+  return '현재 계산에서는 연락 가능성을 높게 볼 근거가 부족해. 조회 범위 안에 연락이나 대화 재개를 따로 강조할 만한 시기가 잡히지 않았기 때문에, 지금 결과를 연락이 곧 온다는 뜻으로 읽는 것은 과해.'
 }
 
 function finalTakeaway(hierarchyData: ReunionHierarchy) {
