@@ -100,9 +100,15 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   assert.match(hierarchyPanel,/function phaseVerdict/)
   assert.match(hierarchyPanel,/function contactOutlook/)
   assert.match(hierarchyPanel,/function readerText/)
+  assert.match(hierarchyPanel,/function plainReaderSentence/)
   assert.match(hierarchyPanel,/MAIN_TECHNICAL_RE/)
+  assert.match(hierarchyPanel,/READER_SCENE_START_RE/)
+  assert.match(hierarchyPanel,/sentence\.slice\(index\)\.trim\(\)/)
+  assert.match(hierarchyPanel,/!MAIN_TECHNICAL_RE\.test\(candidate\)/)
   assert.match(hierarchyPanel,/const summary = readerText\(reunionV2\?\.summary, verdict\)/)
   assert.doesNotMatch(hierarchyPanel,/function firstSentence/)
+  assert.doesNotMatch(hierarchyPanel,/<p>\{verdict\}<\/p>/)
+  assert.match(hierarchyPanel,/이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어/)
   assert.match(hierarchyPanel,/연락이나 대화 재개와 관련된 시기 신호는 지금 잡혀 있어/)
   assert.match(hierarchyPanel,/실제 메시지가 온다고 강하게 말할 정도의 근거는 아직 부족해/)
   assert.match(hierarchyPanel,/안부·추억 이야기만 반복/)
@@ -119,7 +125,7 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
 })
 
-test('reunion grounding deduplicates locally instead of deleting later-question depth and repairs bogus terminology',()=>{
+test('reunion grounding deduplicates locally and closes initiative claims across section and summary',()=>{
   assert.match(grounding,/function localText/)
   assert.match(grounding,/function sectionPair/)
   assert.match(grounding,/const why = sectionPair/)
@@ -128,6 +134,8 @@ test('reunion grounding deduplicates locally instead of deleting later-question 
   assert.match(grounding,/replace\(\/용수자리\/g, '진북교점'\)/)
   assert.match(grounding,/누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다/)
   assert.match(grounding,/실제 만남을 잡는지/)
+  assert.match(grounding,/시작\\s\*압력/)
+  assert.match(grounding,/v2\.summary = safeInitiativeDetail\(v2\?\.summary, provisional\)/)
 })
 
 test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
