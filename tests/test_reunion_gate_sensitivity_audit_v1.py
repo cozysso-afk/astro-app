@@ -1,6 +1,11 @@
+from types import SimpleNamespace
+
 from scripts.reunion_gate_sensitivity_audit import (
+    _reset_policy,
+    apply_policy_variant,
     bottleneck,
     compare_to_baseline,
+    policy_variant_specs,
     stage_snapshot,
     threshold_variants,
 )
@@ -15,6 +20,38 @@ def test_threshold_variants_shift_one_gate_at_a_time():
     assert variants["mid_term+5"] == {"long_term": 35.0, "mid_term": 30.0, "event_trigger": 12.0}
     assert variants["event_trigger+10"] == {"long_term": 35.0, "mid_term": 25.0, "event_trigger": 22.0}
     assert base == {"long_term": 35.0, "mid_term": 25.0, "event_trigger": 12.0}
+
+
+def test_policy_variants_target_meeting_trigger_and_medium_return_bottlenecks():
+    specs = dict(policy_variant_specs())
+    assert set(specs) == {
+        "meeting_trigger_mars_or_venus",
+        "medium_gate_add_solar_return",
+        "medium_gate_add_venus_return",
+    }
+    assert specs["meeting_trigger_mars_or_venus"]["meeting_primary_planets"] == ("Mars", "Venus")
+    assert specs["medium_gate_add_solar_return"]["mid_gate_return_keys"] == (
+        "lunar_return", "solar_return",
+    )
+    assert specs["medium_gate_add_venus_return"]["mid_gate_return_keys"] == (
+        "lunar_return", "venus_return",
+    )
+
+
+def test_policy_variant_mutation_is_reversible():
+    engine = SimpleNamespace(
+        STAGE_TRIGGER_POLICY={"in_person_meeting": {"primary_planets": {"Mars"}}},
+        MID_GATE_RETURN_KEYS={"lunar_return"},
+    )
+    specs = dict(policy_variant_specs())
+    apply_policy_variant(engine, specs["meeting_trigger_mars_or_venus"])
+    assert engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"] == {"Mars", "Venus"}
+    _reset_policy(engine, {"Mars"}, {"lunar_return"})
+    assert engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"] == {"Mars"}
+    apply_policy_variant(engine, specs["medium_gate_add_solar_return"])
+    assert engine.MID_GATE_RETURN_KEYS == {"lunar_return", "solar_return"}
+    _reset_policy(engine, {"Mars"}, {"lunar_return"})
+    assert engine.MID_GATE_RETURN_KEYS == {"lunar_return"}
 
 
 def test_stage_snapshot_uses_future_sequential_gate_counts_only():
@@ -65,19 +102,20 @@ def test_compare_to_baseline_reports_count_deltas_without_dates_or_profiles():
     baseline = {
         "contact_recontact": {
             "long_pass": 97, "mid_pass": 97, "numeric_pass": 97,
-            "hierarchy_pass": 20, "peaks": 6, "candidate_count": 6,
+            "trigger_pass": 20, "hierarchy_pass": 20, "peaks": 6, "candidate_count": 6,
         }
     }
     current = {
         "contact_recontact": {
             "long_pass": 97, "mid_pass": 97, "numeric_pass": 97,
-            "hierarchy_pass": 24, "peaks": 7, "candidate_count": 7,
+            "trigger_pass": 24, "hierarchy_pass": 24, "peaks": 7, "candidate_count": 7,
         }
     }
     assert compare_to_baseline(baseline, current)["contact_recontact"] == {
         "long_pass": 0,
         "mid_pass": 0,
         "numeric_pass": 0,
+        "trigger_pass": 4,
         "hierarchy_pass": 4,
         "peaks": 1,
         "candidate_count": 1,
