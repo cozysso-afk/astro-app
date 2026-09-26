@@ -43,7 +43,10 @@ test('repairs invalid refs only from the server evidence matrix and expands a sh
   assert.equal(json.includes('NOPE'), false)
   assert.ok(out.data.reunion_synthesis_v2.why_reconnect.evidence_refs.every(x => ['E1','E2'].includes(x)))
   assert.ok(out.data.reunion_synthesis_v2.initiative.evidence_refs.length > 0)
-  assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /판정하지 않는다/)
+  assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /정하기 어렵다/)
+  assert.match(out.data.reunion_synthesis_v2.initiative.interpretation, /대화가 이어지는지/)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.interpretation.includes('내 쪽 움직임이 조금 더 먼저'), false)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.interpretation.includes('시작 압력'), false)
   assert.equal(out.data.reunion_synthesis_v2.convergence.length, 0)
 })
 
@@ -55,13 +58,15 @@ test('does not manufacture prose when a core generated section is missing', () =
   assert.equal(out.reason, 'missing_core_section_text')
 })
 
-test('turns technical English annotations into natural Korean and displays tiny orbs without misleading 0.0 degree rounding', () => {
-  const raw = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 오차 0.002° 수준의 극도로 정밀한 각을 형성해.'
+test('turns technical English annotations into Korean, repairs the bogus node label, and displays tiny orbs without misleading 0.0 degree rounding', () => {
+  const raw = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 오차 0.002° 수준의 극도로 정밀한 각을 형성해. 진행 용수자리는 별도 근거야.'
   const out = polishReunionNarrativeText(raw, true)
   assert.match(out, /진행 금성/)
   assert.match(out, /육십분위/)
   assert.match(out, /태양/)
   assert.match(out, /0\.01° 미만/)
+  assert.match(out, /진북교점/)
+  assert.equal(out.includes('용수자리'), false)
   assert.equal(out.includes('Progressed'), false)
   assert.equal(out.includes('Venus('), false)
   assert.equal(out.includes('sextile('), false)
@@ -69,9 +74,9 @@ test('turns technical English annotations into natural Korean and displays tiny 
   assert.equal(out.includes('극도로 정밀한'), false)
 })
 
-test('suppresses repeated technical evidence and refuses a first-contact direction when the server direction gate is closed or absent', () => {
+test('deduplicates inside each question without deleting useful explanation from later questions, and refuses unsupported first-contact direction', () => {
   const x = reading()
-  x.reunion_synthesis_v2.summary = '재접촉 문은 열려 있지만 실제 관계 회복은 별도 조건이 필요해. 누가 먼저 움직이는지와 언제 접점이 강해지는지를 나눠 봐야 하고, 다시 붙은 뒤의 유지력도 따로 확인해야 해. 같은 계산 근거를 여러 섹션에서 반복해 강도를 부풀리지는 않을게.'
+  x.reunion_synthesis_v2.summary = '재접촉 가능성을 살펴볼 신호는 있지만 실제 관계 회복은 별도 조건이 필요해. 누가 먼저 움직이는지와 언제 접점이 강해지는지를 나눠 봐야 하고, 다시 붙은 뒤의 유지력도 따로 확인해야 해. 같은 계산 근거라도 질문이 다르면 현실에서 뜻하는 바를 다시 설명할 수 있어.'
   x.reunion_synthesis_v2.why_reconnect.interpretation = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 orb 0.021°로 가까워 과거의 호의적 정서를 다시 자극해. 이 접점은 재연결 동기를 설명하는 근거야.'
   x.reunion_synthesis_v2.initiative.interpretation = 'Progressed Venus(금성) sextile(육십분위) Sun(태양)이 orb 0.021°로 가까워 과거의 호의적 정서를 다시 자극해. 다만 먼저 움직이는 방향은 별도의 수신·발신 지표에서 내 쪽이 조금 앞서.'
   const out = repairReunionGroundingV2(x, { ...payload, precision: { partner_time_exact: false } })
@@ -79,10 +84,26 @@ test('suppresses repeated technical evidence and refuses a first-contact directi
   const why = out.data.reunion_synthesis_v2.why_reconnect.interpretation
   const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
   assert.match(why, /진행 금성/)
-  assert.equal(initiative.includes('진행 금성'), false)
-  assert.match(initiative, /판정 불가/)
+  assert.match(initiative, /진행 금성/)
+  assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /정하기 어렵다/)
+  assert.match(initiative, /실제 만남을 잡는지/)
   assert.equal(initiative.includes('내 쪽이 조금 앞서'), false)
   assert.equal(`${why} ${initiative}`.includes('0.021°'), false)
+})
+
+test('closed initiative gate removes directional paraphrases from both initiative and top summary', () => {
+  const x = reading()
+  x.reunion_synthesis_v2.summary = '상대보다 내 방향이 앞서는 흐름이야. 다시 연결될 여지는 있지만 실제 관계 회복은 만남과 대화가 이어지는지 따로 봐야 해.'
+  x.reunion_synthesis_v2.initiative.conclusion = '상대보다 내 방향이 앞서는 흐름이야.'
+  x.reunion_synthesis_v2.initiative.interpretation = '내 쪽 움직임이 더 먼저 잡히고 시작 압력도 내 방향에서 올라와. 다만 연락 뒤에는 대화가 이어지는지 확인해야 해.'
+  const out = repairReunionGroundingV2(x, payload)
+  assert.equal(out.ok, true)
+  const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
+  const summary = out.data.reunion_synthesis_v2.summary
+  assert.equal(/내 방향이 앞서|내 쪽 움직임이 더 먼저|시작 압력/.test(initiative), false)
+  assert.equal(/내 방향이 앞서|내 쪽 움직임이 더 먼저|시작 압력/.test(summary), false)
+  assert.match(initiative, /대화가 이어지는지/)
+  assert.match(summary, /관계|연락|접점/)
 })
 
 test('keeps a directional conclusion only when the server initiative gate is explicitly open', () => {
@@ -97,7 +118,7 @@ test('keeps a directional conclusion only when the server initiative gate is exp
   const out = repairReunionGroundingV2(x, gatedPayload)
   assert.equal(out.ok, true)
   assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /내 쪽 움직임/)
-  assert.equal(out.data.reunion_synthesis_v2.initiative.conclusion.includes('판정하지 않는다'), false)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.conclusion.includes('정하기 어렵다'), false)
 })
 
 test('exact dates fail closed when there is no fast-trigger allowlist while broad progression periods remain', () => {

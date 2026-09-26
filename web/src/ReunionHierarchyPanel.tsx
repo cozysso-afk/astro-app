@@ -19,15 +19,42 @@ const ASPECT_LABEL: Record<string,string> = {
   conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
 }
 
+const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|상대측\s*활성|내측\s*활성|재접점\s*활성|보조지표|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
+const READER_SCENE_START_RE = /(?:예전|과거|근황|궁금|신경|호의|정서|감정|미련|연락|메시지|답장|대화|약속|만남|다시|서로|행동|갈등|책임|합의|유지|회복|재회|관계가|관계를|관계에서|관계는)/g
+
 function Copy({ value }: { value?: string | null }) {
   const text = String(value ?? '').trim()
   return text ? <p>{text}</p> : null
 }
 
-function firstSentence(value?: string | null) {
+function splitSentences(value?: string | null) {
   const text = String(value ?? '').trim()
-  if (!text) return ''
-  return text.split(/(?<=[.!?])\s+/)[0] ?? text
+  if (!text) return []
+  return text.replace(/([.!?])\s+/g, '$1\n').split('\n').map((row)=>row.trim()).filter(Boolean)
+}
+
+function plainReaderSentence(sentence: string) {
+  if (!MAIN_TECHNICAL_RE.test(sentence)) return sentence
+  for (const match of sentence.matchAll(READER_SCENE_START_RE)) {
+    const index = match.index ?? -1
+    if (index < 0) continue
+    const candidate = sentence.slice(index).trim()
+    if (candidate.length >= 10 && !MAIN_TECHNICAL_RE.test(candidate)) return candidate
+  }
+  return ''
+}
+
+function readerText(value?: string | null, fallback='') {
+  const normalized = String(value ?? '')
+    .replace(/용수자리/g, '진북교점')
+    .replace(/감정 활성(?:화)?/g, '과거 관계를 다시 의식하는 흐름')
+    .replace(/연락·재접촉 단계/g, '연락이나 대화가 다시 이어질 수 있는 흐름')
+    .replace(/관계 재구축 단계/g, '관계를 다시 이어 가는 흐름')
+    .replace(/현재 열림/g, '현재 관련 신호가 있음')
+    .trim()
+  if (!normalized) return fallback
+  const plain = splitSentences(normalized).map(plainReaderSentence).filter(Boolean)
+  return plain.length ? plain.join(' ') : fallback
 }
 
 function stageRows(hierarchyData: ReunionHierarchy) {
@@ -41,36 +68,44 @@ function stageRows(hierarchyData: ReunionHierarchy) {
 
 function stageSummary(rows: ReturnType<typeof stageRows>) {
   return rows.map((row)=>{
-    if (row.current) return `${row.label}: 지금 확인 구간`
-    if (row.future.length) return `${row.label}: 앞으로 후보 ${row.future.length}개`
-    return `${row.label}: 현재 공개 후보 없음`
+    if (row.current) return `${row.label}: 기준일이 관련 시기 안에 있음`
+    if (row.future.length) return `${row.label}: 앞으로 살펴볼 시기 ${row.future.length}개`
+    return `${row.label}: 현재 조회 범위에서는 뚜렷한 시기 없음`
   }).join(' · ')
 }
 
 function phaseVerdict(hierarchyData: ReunionHierarchy) {
   const current = new Set(hierarchyData.current_windows.map((row)=>row.stage))
   const has = (stage:string)=>current.has(stage)
-  if (has('relationship_rebuilding')) return '지금은 연락 여부보다, 이미 다시 이어진 관계가 이전과 다른 방식으로 유지될 수 있는지를 보는 구간이야.'
-  if (has('in_person_meeting')) return '지금은 단순한 연락보다 실제 약속이나 만남으로 이어지는지를 확인할 수 있는 구간이야. 다만 만났다는 사실만으로 재회를 뜻하지는 않아.'
-  if (has('contact_recontact')) return '지금 계산에는 연락·재접촉 단계의 후보가 잡혀 있어. 하지만 이 값만으로 “상대에게서 연락이 올 가능성이 높다”고 말할 수는 없어. 실제 선연락 방향 근거와 만남·재구축 근거는 따로 확인해야 해.'
-  if (has('emotional_reactivation')) return '지금은 서로를 다시 떠올리거나 과거 관계를 의식하기 쉬운 흐름이 먼저야. 실제 연락·만남·재회는 아직 별도의 행동 근거가 필요해.'
-  return '지금 기준일에는 관계가 실제로 움직인다고 볼 만큼 강한 현재 구간이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 지금 날짜에서 공개할 행동 단계 근거가 부족하다는 뜻이야.'
+  if (has('relationship_rebuilding')) return '지금은 연락이 다시 닿느냐보다, 다시 이어진 관계를 예전과 다른 방식으로 유지할 수 있는지가 더 중요해.'
+  if (has('in_person_meeting')) return '지금은 단순히 연락이 오가느냐보다 실제 약속이나 만남으로 이어지는지가 더 중요해. 다만 만났다는 사실만으로 다시 연인이 된다고 볼 수는 없어.'
+  if (has('contact_recontact')) return '지금은 연락이나 대화가 다시 이어질 수 있는 시기 신호가 일부 잡혀 있어. 다만 이것만으로 상대에게서 실제 연락이 온다고 말할 수는 없어. 만남이나 관계 회복으로 이어질 근거는 따로 확인해야 해.'
+  if (has('emotional_reactivation')) return '지금은 예전 관계를 다시 떠올리거나 상대의 근황이 궁금해지기 쉬운 흐름이 먼저 보여. 실제 연락이나 만남으로 이어지는지는 한 단계 더 확인해야 해.'
+  return '지금은 실제 연락이나 만남이 가까워졌다고 말할 만큼 뚜렷한 흐름이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 현재 날짜에서 행동으로 이어질 근거가 부족하다는 뜻이야.'
 }
 
-function contactOutlook(hierarchyData: ReunionHierarchy, initiative?: ReunionSynthesis['initiative'] | null) {
+function contactOutlook(hierarchyData: ReunionHierarchy) {
   const currentContact = hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact')
   const futureContact = hierarchyData.top_periods.filter((row)=>row.stage==='contact_recontact')
   const meeting = hierarchyData.current_windows.some((row)=>row.stage==='in_person_meeting') || hierarchyData.top_periods.some((row)=>row.stage==='in_person_meeting')
   const rebuilding = hierarchyData.current_windows.some((row)=>row.stage==='relationship_rebuilding') || hierarchyData.top_periods.some((row)=>row.stage==='relationship_rebuilding')
-  const direction = initiative ? `${initiative.conclusion} ${initiative.interpretation}`.trim() : '현재 계산만으로는 누가 먼저 연락할지 판정할 수 없어.'
-  if (currentContact) return `${direction} 연락과 관련된 후보 구간은 현재에 걸려 있지만, 그 자체가 실제 메시지 도착 확률은 아니야.${!meeting && !rebuilding ? ' 현재 계산에서는 그 뒤의 실제 만남이나 관계 재구축 후보까지 이어지지 않았어.' : ''}`
-  if (futureContact.length) return `${direction} 지금 당장 연락 가능성이 높다고 볼 근거는 부족하고, 다음 연락·재접촉 후보는 ${futureContact[0].start}~${futureContact[0].end}야. 이 날짜도 사건 확정일이 아니라 연락 단계가 상대적으로 두드러지는 후보 구간이야.`
-  return `${direction} 현재와 앞으로의 공개 후보 안에서 연락·재접촉 단계가 따로 잡히지 않았기 때문에, 지금 결과를 “연락이 올 흐름”이라고 읽으면 과장이야.`
+  if (currentContact) return `실제 연락 가능성이 높다고 말할 근거는 아직 부족해. 다만 이번 계산에서는 연락이나 대화 재개와 관련된 시기 신호가 현재에 잡혀 있어. 즉 지금은 연락 여부를 눈여겨볼 때이지, 메시지가 실제로 온다고 확정할 수 있는 때는 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어지는 흐름은 아직 뚜렷하지 않아.' : ''}`
+  if (futureContact.length) return `지금 당장 실제 연락 가능성이 높다고 말할 근거는 부족해. 다만 ${futureContact[0].start}~${futureContact[0].end}은 연락 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간이야. 그때도 실제 연락이 생기는지와 단순히 다시 생각나는지를 구분해서 봐야 해.`
+  return '현재 계산에서는 실제 연락이 가까워졌다고 볼 근거가 부족해. 조회 범위 안에 연락이나 대화 재개를 따로 강조할 만한 시기가 잡히지 않았기 때문에, 지금 결과를 연락이 곧 온다는 뜻으로 읽는 것은 과해.'
+}
+
+function finalTakeaway(hierarchyData: ReunionHierarchy) {
+  const current = new Set(hierarchyData.current_windows.map((row)=>row.stage))
+  if (current.has('relationship_rebuilding')) return '지금은 다시 연락하느냐보다 관계를 실제로 다시 운영할 준비가 있는지가 핵심이야. 예전 문제를 다르게 다루는 행동이 이어져야 재회가 유지될 수 있어.'
+  if (current.has('in_person_meeting')) return '지금은 연락보다 실제 만남과 그 이후의 행동이 더 중요한 시기야. 만난 뒤 관계 이야기를 피하지 않는지가 재회 여부를 가를 가능성이 커.'
+  if (current.has('contact_recontact')) return '지금은 연락이나 대화가 다시 이어질 여지를 살펴볼 수 있지만, 실제 만남과 관계 회복까지 확인된 것은 아니야. 연락이 생기면 말의 온도보다 만남과 지속 행동이 붙는지를 봐.'
+  if (current.has('emotional_reactivation')) return '지금은 서로를 다시 의식하는 흐름이 실제 행동보다 앞서 있어. 연락이 생기기 전까지는 마음의 움직임과 현실의 재회를 같은 것으로 보지 않는 게 맞아.'
+  return '지금은 관계가 실제로 다시 움직인다고 말하기보다 서로의 행동을 확인해야 하는 쪽에 가까워. 새로운 연락이나 만남이 생기기 전에는 재회를 앞당겨 해석하지 않는 게 맞아.'
 }
 
 function timingFallback(rows: ReunionPeriod[]) {
-  if (!rows.length) return '현재 이후 공개할 만한 후보 시기가 없어. 없는 날짜를 억지로 만들어내지 않을게.'
-  return rows.map((row)=>`${row.start}~${row.end}: ${row.label} 단계가 상대적으로 두드러지는 후보야.`).join(' ')
+  if (!rows.length) return '현재 이후에 따로 강조할 만한 시기가 잡히지 않았어. 없는 날짜를 억지로 만들어내지 않을게.'
+  return rows.map((row)=>`${row.start}~${row.end}에는 ${row.label}과 관련된 흐름을 눈여겨볼 수 있어.`).join(' ')
 }
 
 function directionCopy(row: DirectionRow) {
@@ -112,14 +147,31 @@ export function ReunionHierarchyPanel({
   const rows = stageRows(hierarchyData)
   const neutralDirectionRows = directionRows.map((row)=>({...row,text:directionCopy(row)}))
   const verdict = phaseVerdict(hierarchyData)
-  const contact = contactOutlook(hierarchyData,reunionV2?.initiative)
-  const why = reunionV2?.why_reconnect
-    ? `${reunionV2.why_reconnect.conclusion} ${reunionV2.why_reconnect.interpretation}`.trim()
-    : '이 관계가 다시 신경 쓰이는 이유와 실제 연락이 생기는 이유는 같은 것으로 처리하지 않아. 감정이 남는 구조와 행동으로 옮기는 구조를 따로 봐.'
-  const timing = reunionV2?.timing?.conclusion || timingFallback(hierarchyData.top_periods)
-  const rebuild = reunionV2?.rebuild?.conclusion || `연락이 다시 닿는 것과 재회는 달라. 실제 만남이 잡히고, 이전에 끊겼던 문제를 다르게 다루는 합의가 이어져야 관계 재구축 단계로 읽을 수 있어. ${sustainabilityText}`
-  const repeat = reunionV2?.repeat_risks?.conclusion || '연락은 이어지는데 만남을 계속 미루거나, 관계 이야기를 피하고, 예전과 같은 지점에서 대화가 끊기면 이번 흐름도 미련 확인이나 일시적 재접촉에서 멈출 수 있어.'
-  const summary = firstSentence(reunionV2?.summary) || verdict
+  const contact = contactOutlook(hierarchyData)
+  const initiative = readerText(
+    reunionV2?.initiative ? `${reunionV2.initiative.conclusion} ${reunionV2.initiative.interpretation}` : '',
+    '누가 먼저 연락할지는 현재 계산만으로 정하기 어려워. 먼저 연락하는 사람이 누구인지보다 연락 뒤 대화가 이어지고 실제 만남으로 넘어가는지를 보는 편이 더 정확해.',
+  )
+  const why = readerText(
+    reunionV2?.why_reconnect ? `${reunionV2.why_reconnect.conclusion} ${reunionV2.why_reconnect.interpretation}` : '',
+    '이 관계가 다시 신경 쓰이는 것과 실제 연락이 생기는 것은 같은 일이 아니야. 예전 기억이나 감정이 올라오더라도 행동으로 이어지는지는 따로 봐야 해.',
+  )
+  const timing = readerText(reunionV2?.timing?.conclusion, timingFallback(hierarchyData.top_periods))
+  const rebuild = readerText(
+    reunionV2?.rebuild?.conclusion,
+    `연락이 다시 닿는 것과 재회는 달라. 실제 만남이 잡히고, 이전에 끊겼던 문제를 다르게 다루는 대화가 이어져야 관계 회복 쪽으로 볼 수 있어. ${sustainabilityText}`,
+  )
+  const repeat = readerText(
+    reunionV2?.repeat_risks?.conclusion,
+    '연락은 이어지는데 만남을 계속 미루거나, 관계 이야기를 피하고, 예전과 같은 지점에서 대화가 끊기면 이번 흐름도 미련 확인이나 일시적인 재접촉에서 멈출 수 있어.',
+  )
+  const summary = readerText(reunionV2?.summary, verdict)
+  const timingWindows = (reunionV2?.timing?.windows ?? []).map((window)=>({
+    ...window,
+    meaning: readerText(window.meaning, '이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어.'),
+  }))
+  const conditions = (reunionV2?.rebuild?.conditions ?? []).map((item)=>readerText(item)).filter(Boolean)
+  const patterns = (reunionV2?.repeat_risks?.patterns ?? []).map((item)=>readerText(item)).filter(Boolean)
   const evidenceRows = topEvidence(evidence)
 
   return <section className="reading-section reunion-hierarchy reunion-ui-vnext">
@@ -127,14 +179,18 @@ export function ReunionHierarchyPanel({
     {!valid ? <p role="alert">계산 검증을 통과하지 못해서 현재·미래 해설을 보류했어.</p> : <>
       <section className="reunion-story reunion-consultation-lead">
         <div className="reunion-story-section reunion-story-current">
-          <h4>지금 관계는 어디까지 와 있나</h4>
+          <h4>지금 두 사람의 흐름</h4>
           <p className="reading-conclusion">{summary}</p>
-          <p>{verdict}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-contact">
-          <h4>그래서 연락이 올 가능성은?</h4>
+          <h4>실제 연락 가능성은?</h4>
           <p>{contact}</p>
+        </div>
+
+        <div className="reunion-story-section reunion-story-initiative">
+          <h4>누가 먼저 움직일지는?</h4>
+          <p>{initiative}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-why">
@@ -145,39 +201,39 @@ export function ReunionHierarchyPanel({
         <div className="reunion-story-section reunion-story-timing">
           <h4>언제가 중요한가</h4>
           <p>{timing}</p>
-          {!!reunionV2?.timing?.windows?.length && <div className="reunion-consultation-windows">{reunionV2.timing.windows.map((window,index)=><article className="relationship-pattern reunion-v2-window" key={`${window.period}:${index}`}><b>{window.period}</b><p>{window.meaning}</p></article>)}</div>}
+          {!!timingWindows.length && <div className="reunion-consultation-windows">{timingWindows.map((window,index)=><article className="relationship-pattern reunion-v2-window" key={`${window.period}:${index}`}><b>{window.period}</b><p>{window.meaning}</p></article>)}</div>}
         </div>
 
         <div className="reunion-story-section reunion-story-rebuild">
-          <h4>연락이 오면 무엇을 봐야 하나</h4>
+          <h4>연락이 오면 무엇으로 진심을 구분하나</h4>
           <p>{rebuild}</p>
-          {!!reunionV2?.rebuild?.conditions?.length && <ul>{reunionV2.rebuild.conditions.map((item,index)=><li key={index}>{item}</li>)}</ul>}
+          {!!conditions.length && <ul>{conditions.map((item,index)=><li key={index}>{item}</li>)}</ul>}
           <div className="reunion-behavior-guide">
             <p><b>안부·추억 이야기만 반복</b> → 아직은 미련 확인이나 반응 탐색에 가까울 수 있어.</p>
-            <p><b>구체적인 만남을 잡음</b> → 감정이나 생각이 실제 행동 단계로 넘어가는 신호로 볼 수 있어.</p>
-            <p><b>예전 문제와 앞으로의 관계를 피하지 않고 말함</b> → 그때부터 재회 의사와 관계 재구축 가능성을 따로 볼 수 있어.</p>
+            <p><b>구체적인 만남을 잡음</b> → 생각이나 감정이 실제 행동으로 넘어가는 신호로 볼 수 있어.</p>
+            <p><b>예전 문제와 앞으로의 관계를 피하지 않고 말함</b> → 그때부터 실제 재회 의사가 있는지 따로 볼 수 있어.</p>
             <p><b>말은 다정한데 행동이 이어지지 않음</b> → 말의 온도보다 지속 행동을 더 중요하게 봐야 해.</p>
           </div>
         </div>
 
         <div className="reunion-story-section reunion-story-repeat">
-          <h4>다시 멀어질 수 있는 패턴</h4>
+          <h4>다시 만나도 반복되기 쉬운 문제</h4>
           <p>{repeat}</p>
-          {!!reunionV2?.repeat_risks?.patterns?.length && <ul>{reunionV2.repeat_risks.patterns.map((item,index)=><li key={index}>{item}</li>)}</ul>}
+          {!!patterns.length && <ul>{patterns.map((item,index)=><li key={index}>{item}</li>)}</ul>}
         </div>
       </section>
 
       <section className="reunion-final-takeaway">
-        <h4>한 줄로 정리하면</h4>
-        <p>{summary}</p>
+        <h4>이번 리딩의 결론</h4>
+        <p>{finalTakeaway(hierarchyData)}</p>
       </section>
 
       <details className="reading-more reunion-contact-is-not-reunion">
-        <summary>단계와 후보 시기 자세히 보기</summary>
-        <p>다시 의식함 → 실제 연락·재접촉 → 실제 만남 → 관계 재구축은 서로 다른 관문이야. 앞 단계가 강하다고 다음 단계가 자동으로 성립하지 않아.</p>
+        <summary>계산된 흐름과 시기 자세히 보기</summary>
+        <p>다시 의식함 → 실제 연락·재접촉 → 실제 만남 → 관계 재구축은 서로 다른 관문이야. 앞쪽 신호가 강하다고 뒤의 일이 자동으로 생기는 것은 아니야.</p>
         <p>{stageSummary(rows)}</p>
-        {hierarchyData.current_windows.map((row)=><article className="relationship-pattern" key={`current:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>기준일이 이 후보 구간 안에 있어. 사건 확정이 아니라 해당 단계가 상대적으로 두드러진다는 뜻이야.</p></article>)}
-        {hierarchyData.top_periods.map((row)=><article className="relationship-pattern" key={`future:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>앞으로의 후보 구간이야. 실제 사건은 별도 행동 신호가 붙는지 확인해야 해.</p></article>)}
+        {hierarchyData.current_windows.map((row)=><article className="relationship-pattern" key={`current:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>기준일이 이 시기 안에 있어. 사건 확정이 아니라 해당 흐름을 다른 시기보다 더 살펴볼 수 있다는 뜻이야.</p></article>)}
+        {hierarchyData.top_periods.map((row)=><article className="relationship-pattern" key={`future:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>앞으로 살펴볼 시기야. 실제 사건은 연락·만남 같은 행동이 붙는지 확인해야 해.</p></article>)}
       </details>
 
       <details className="reading-more reunion-direction-layer">
@@ -187,10 +243,10 @@ export function ReunionHierarchyPanel({
       </details>
 
       <details className="reading-more reunion-retrospective">
-        <summary>지난 활성기 · 사후 확인용</summary>
-        <p>기준일 이전에 같은 관문을 통과했던 구간이야. 실제 기록과 비교하는 개인 사후 확인용이며, 과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야.</p>
-        {hierarchyData.past_windows.map((row)=><article className="relationship-pattern" key={`past:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>이미 지난 후보 구간이야. 현재나 미래의 예고로 다시 쓰지 않아.</p></article>)}
-        {!hierarchyData.past_windows.length && <p>조회 범위 안에서 따로 비교할 지난 활성기가 없어.</p>}
+        <summary>지난 시기 · 사후 확인용</summary>
+        <p>기준일 이전에 비슷한 흐름이 두드러졌던 구간이야. 실제 기록과 비교하는 개인 사후 확인용이며, 과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야.</p>
+        {hierarchyData.past_windows.map((row)=><article className="relationship-pattern" key={`past:${row.start}:${row.stage}`}><b>{row.start} ~ {row.end} · {row.label}</b><p>이미 지난 시기야. 현재나 미래의 예고로 다시 쓰지 않아.</p></article>)}
+        {!hierarchyData.past_windows.length && <p>조회 범위 안에서 따로 비교할 지난 시기가 없어.</p>}
       </details>
 
       <details className="reading-more reunion-calculation-basis">
@@ -198,7 +254,7 @@ export function ReunionHierarchyPanel({
         <p>{hierarchyData.score_meaning}</p>
         <h5>보조지표 활성도</h5>
         <div className="reunion-stage-activation-list">{Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stageKey}><b>{stage.label}</b> {stage.activation == null ? '—' : Math.round(stage.activation)}</p>)}</div>
-        <p>숫자는 사건 확률이나 현재 감정 세기가 아니라, 조회 범위에서 각 단계 기준을 통과한 후보의 상대 비교값이야.</p>
+        <p>숫자는 사건 확률이나 현재 감정 세기가 아니라, 조회 범위에서 각 기준을 통과한 시기들의 상대 비교값이야.</p>
         {!!evidenceRows.length && <div className="reunion-local-evidence-grid">{evidenceRows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${row.a}:${row.aspect}:${row.b}:${index}`}><strong>{evidenceLabel(row)}</strong><p>{Array.isArray(row.relationship_domains) && row.relationship_domains.length ? `관계 해석 영역: ${row.relationship_domains.join(' · ')}` : '관계 해석에 사용된 계산 근거야.'}</p></article>)}</div>}
         {hierarchyData.stability_structure && <p>고정 관계 구조 · 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수 자체는 재결합 확률이 아니야.</p>}
         {reunionV2?.precision_note && <Copy value={reunionV2.precision_note}/>} 
