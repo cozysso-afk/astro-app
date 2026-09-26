@@ -321,11 +321,13 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     })).filter((x: any) => x.evidence_refs.length >= 2),
   }
 
+  const provisional = payload?.precision?.partner_time_exact === false
   const timingDateGate = allowedTimingDateGate(payload)
   v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, timingDateGate)) }
   const gate = payload?.reunion_evidence_v2?.initiative_gate
   if (gate?.available !== true) {
-    const preserved = safeInitiativeDetail(`${v2?.initiative?.conclusion ?? ''} ${v2?.initiative?.interpretation ?? ''}`, payload?.precision?.partner_time_exact === false)
+    v2.summary = safeInitiativeDetail(v2?.summary, provisional)
+    const preserved = safeInitiativeDetail(`${v2?.initiative?.conclusion ?? ''} ${v2?.initiative?.interpretation ?? ''}`, provisional)
     v2.initiative = {
       ...v2.initiative,
       conclusion: '누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다.',
@@ -335,7 +337,6 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
   }
 
   if (text(v2.summary).length < 180) v2.summary = composeSummary(v2)
-  const provisional = payload?.precision?.partner_time_exact === false
   v2 = polishV2(v2, provisional)
 
   const allRefs = uniq([
