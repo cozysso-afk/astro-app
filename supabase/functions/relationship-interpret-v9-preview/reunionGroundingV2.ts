@@ -171,7 +171,7 @@ function sectionPair(section: any, provisional: boolean) {
 
 function safeInitiativeDetail(value: unknown, provisional: boolean) {
   const polished = polishReunionNarrativeText(value, provisional)
-  const blocked = /(?:누가\s*먼저|먼저\s*(?:연락|움직)|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합)/
+  const blocked = /(?:누가\s*먼저|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합|시작\s*압력|(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?[^.!?]{0,32}(?:먼저|앞서|우세)|(?:먼저|앞서|우세)[^.!?]{0,32}(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?)/
   return splitSentences(polished).filter(sentence => !blocked.test(sentence)).join(' ')
 }
 
