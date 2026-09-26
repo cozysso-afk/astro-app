@@ -9,6 +9,7 @@ const hierarchyPanel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.
 const relationshipSummary=readFileSync(new URL('./relationshipUserSummary.ts',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
+const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
   assert.match(server,/REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
@@ -60,12 +61,11 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion hierarchy puts consultation answers before engine state',()=>{
+test('reunion hierarchy puts full consultation answers before engine state',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
-  const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['결론부터 보면','지금 관계는 어디까지 와 있나','그래서 연락이 올 가능성은?','왜 아직 서로를 신경 쓰기 쉬운가','언제가 중요한가','연락이 오면 무엇을 봐야 하나','다시 멀어질 수 있는 패턴','한 줄로 정리하면','단계와 후보 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 활성기 · 사후 확인용','계산 근거 보기']
+  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){
     const next=hierarchyPanel.indexOf(heading)
@@ -96,11 +96,15 @@ test('reunion hierarchy puts consultation answers before engine state',()=>{
   assert.match(grounding,/카르마적 인연/)
 })
 
-test('reunion quality guard answers contact question and gives observable decision rules',()=>{
+test('reunion quality guard preserves narrative depth and keeps technical language out of the main consultation',()=>{
   assert.match(hierarchyPanel,/function phaseVerdict/)
   assert.match(hierarchyPanel,/function contactOutlook/)
-  assert.match(hierarchyPanel,/“상대에게서 연락이 올 가능성이 높다”고 말할 수는 없어/)
-  assert.match(hierarchyPanel,/지금 결과를 “연락이 올 흐름”이라고 읽으면 과장이야/)
+  assert.match(hierarchyPanel,/function readerText/)
+  assert.match(hierarchyPanel,/MAIN_TECHNICAL_RE/)
+  assert.match(hierarchyPanel,/const summary = readerText\(reunionV2\?\.summary, verdict\)/)
+  assert.doesNotMatch(hierarchyPanel,/function firstSentence/)
+  assert.match(hierarchyPanel,/연락이나 대화 재개와 관련된 시기 신호는 지금 잡혀 있어/)
+  assert.match(hierarchyPanel,/실제 메시지가 온다고 강하게 말할 정도의 근거는 아직 부족해/)
   assert.match(hierarchyPanel,/안부·추억 이야기만 반복/)
   assert.match(hierarchyPanel,/구체적인 만남을 잡음/)
   assert.match(hierarchyPanel,/예전 문제와 앞으로의 관계를 피하지 않고 말함/)
@@ -109,9 +113,21 @@ test('reunion quality guard answers contact question and gives observable decisi
   assert.match(hierarchyPanel,/<ReadingDirections rows=\{neutralDirectionRows\}/)
   assert.match(hierarchyPanel,/<details className="reading-more reunion-retrospective">/)
   assert.match(hierarchyPanel,/<details className="reading-more reunion-contact-is-not-reunion">/)
+  assert.doesNotMatch(hierarchyPanel,/감정 활성과 연락 단계는 운의 흐름이 열려/)
   assert.doesNotMatch(hierarchyPanel,/단계가 현재 창에 걸려 있어/)
   assert.doesNotMatch(hierarchyPanel,/현재 열린 단계보다 뒤의 일을 한꺼번에 재회로 묶어 읽지 않아/)
   assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
+})
+
+test('reunion grounding deduplicates locally instead of deleting later-question depth and repairs bogus terminology',()=>{
+  assert.match(grounding,/function localText/)
+  assert.match(grounding,/function sectionPair/)
+  assert.match(grounding,/const why = sectionPair/)
+  assert.match(grounding,/const initiative = sectionPair/)
+  assert.doesNotMatch(grounding,/const state: DedupState = \{ sentences: new Set\(\), evidence: new Set\(\) \}\n  const whyConclusion/)
+  assert.match(grounding,/replace\(\/용수자리\/g, '진북교점'\)/)
+  assert.match(grounding,/누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다/)
+  assert.match(grounding,/실제 만남을 잡는지/)
 })
 
 test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
