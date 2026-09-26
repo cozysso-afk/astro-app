@@ -10,6 +10,7 @@ const STAGE_ORDER = [
 ] as const
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
+type ContactSignalBand = '낮음' | '보통' | '높음'
 
 const PLANET_LABEL: Record<string,string> = {
   Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성',
@@ -121,15 +122,37 @@ function phaseVerdict(hierarchyData: ReunionHierarchy) {
   return '지금은 실제 연락이나 만남이 가까워졌다고 말할 만큼 뚜렷한 흐름이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 현재 날짜에서 행동으로 이어질 근거가 부족하다는 뜻이야. 새로운 연락이나 구체적인 만남이 생기기 전에는 재회를 앞당겨 해석하지 않는 게 맞아.'
 }
 
-function contactOutlook(hierarchyData: ReunionHierarchy) {
+function contactSignalBand(hierarchyData: ReunionHierarchy): ContactSignalBand {
+  const hasContactWindow = hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact') || hierarchyData.top_periods.some((row)=>row.stage==='contact_recontact')
+  const rawActivation = hierarchyData.stages?.contact_recontact?.activation
+  const activation = typeof rawActivation === 'number' && Number.isFinite(rawActivation) ? rawActivation : null
+  if (hasContactWindow && activation != null && activation >= 60) return '높음'
+  if (hasContactWindow) return '보통'
+  if (activation != null && activation >= 60) return '보통'
+  return '낮음'
+}
+
+function contactOutlook(hierarchyData: ReunionHierarchy, signalBand: ContactSignalBand) {
   const currentContact = hierarchyData.current_windows.some((row)=>row.stage==='contact_recontact')
   const futureContact = hierarchyData.top_periods.filter((row)=>row.stage==='contact_recontact')
   const meeting = hierarchyData.current_windows.some((row)=>row.stage==='in_person_meeting') || hierarchyData.top_periods.some((row)=>row.stage==='in_person_meeting')
   const rebuilding = hierarchyData.current_windows.some((row)=>row.stage==='relationship_rebuilding') || hierarchyData.top_periods.some((row)=>row.stage==='relationship_rebuilding')
-  const probabilityNote = '이 계산은 실제 연락 확률을 높음·낮음으로 산출하지 않아.'
-  if (currentContact) return `${probabilityNote} 다만 현재에는 연락이나 대화 재개 여부를 눈여겨볼 시기 신호가 잡혀 있어. 즉 연락과 관련된 자극이 두드러지는 때라는 뜻이지, 메시지가 실제로 온다고 확정하는 뜻은 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어질 시기는 아직 뚜렷하지 않아.' : ''}`
-  if (futureContact.length) return `${probabilityNote} 다만 ${futureContact[0].start}~${futureContact[0].end}은 연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간이야. 그때 실제 연락이 생기는지와 단순히 다시 생각나는지는 따로 확인해야 해.`
-  return `${probabilityNote} 현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 시기 신호도 잡히지 않았어. 이는 연락 확률을 낮게 계산했다는 뜻이 아니라, 이 엔진의 시기 기준에서 별도 신호를 잡지 못했다는 뜻이야.`
+  const scaleNote = `연락 가능성 신호는 ${signalBand}으로 읽혀. 이 평가는 통계적 연락 확률이 아니라, 조회 범위에서 연락으로 이어질 수 있는 시기·단계 근거의 상대 강도야.`
+  if (currentContact) return `${scaleNote} 현재에는 연락이나 대화 재개 여부를 눈여겨볼 시기 신호도 잡혀 있어. 즉 연락과 관련된 자극이 두드러지는 때라는 뜻이지, 메시지가 실제로 온다고 확정하는 뜻은 아니야.${!meeting && !rebuilding ? ' 특히 연락 뒤 실제 만남이나 관계 회복으로 이어질 시기는 아직 뚜렷하지 않아.' : ''}`
+  if (futureContact.length) return `${scaleNote} ${futureContact[0].start}~${futureContact[0].end}은 연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간이야. 그때 실제 연락이 생기는지와 단순히 다시 생각나는지는 따로 확인해야 해.`
+  return `${scaleNote} 현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 시기 창이 잡히지 않았어. 배경 신호가 있더라도 실제 연락 가능성으로 올려 읽지는 않아.`
+}
+
+function changeOutlook(hierarchyData: ReunionHierarchy) {
+  const current = new Set(hierarchyData.current_windows.map((row)=>row.stage))
+  const future = new Set(hierarchyData.top_periods.map((row)=>row.stage))
+  const hasAny = (stage:string)=>current.has(stage) || future.has(stage)
+  const observationLimit = '현재 계산은 상대의 실제 행동 이력이나 성격 변화를 관측하지 않아서, 상대가 예전과 달라졌다고 확정할 수는 없어.'
+  if (hasAny('relationship_rebuilding')) return `${observationLimit} 다만 예전 문제를 다시 다루고 관계를 다른 방식으로 운영할 여지를 살펴볼 근거는 있어. 실제 변화는 불편한 문제를 피하지 않는지, 구체적인 약속을 잡고 지키는지, 말과 행동이 며칠 이상 이어지는지로 확인해야 해.`
+  if (hasAny('in_person_meeting')) return `${observationLimit} 그래도 생각이나 감정이 실제 만남으로 넘어갈 여지는 따로 보여. 변화가 진짜인지 보려면 만남을 실제로 잡는지뿐 아니라, 만난 뒤에도 예전 문제를 피하지 않고 책임 있는 대화를 이어가는지를 봐야 해.`
+  if (hasAny('contact_recontact')) return `${observationLimit} 지금 보이는 것은 연락 흐름 쪽 신호라서 성격이나 관계 태도의 변화와는 별개야. 예전처럼 안부와 추억만 반복하는지, 아니면 구체적인 만남·사과·조율 같은 행동이 새로 붙는지를 비교해야 해.`
+  if (hasAny('emotional_reactivation')) return `${observationLimit} 지금은 다시 의식하거나 감정이 올라오는 흐름이 행동 변화보다 앞서 있어. 그리움이나 관심이 생기는 것만으로는 예전 패턴에서 벗어났다고 볼 수 없어.`
+  return `${observationLimit} 현재 조회 범위에서는 상대가 예전 패턴에서 벗어났다고 읽을 만한 행동 단계 신호도 뚜렷하지 않아. 변화 여부는 실제 연락 이후의 책임감, 약속, 갈등 대처 방식으로 확인하는 게 맞아.`
 }
 
 function finalTakeaway(hierarchyData: ReunionHierarchy) {
@@ -209,7 +232,9 @@ export function ReunionHierarchyPanel({
   const valid = hierarchyData.validation?.status === 'PASS'
   const rows = stageRows(hierarchyData)
   const neutralDirectionRows = directionRows.map((row)=>({...row,text:directionCopy(row)}))
-  const contact = contactOutlook(hierarchyData)
+  const contactSignal = contactSignalBand(hierarchyData)
+  const contact = contactOutlook(hierarchyData, contactSignal)
+  const change = changeOutlook(hierarchyData)
   const initiative = readerText(
     reunionV2?.initiative ? `${reunionV2.initiative.conclusion} ${reunionV2.initiative.interpretation}` : '',
     '누가 먼저 연락할지는 현재 계산만으로 정하기 어려워. 먼저 연락하는 사람이 누구인지보다 연락 뒤 대화가 이어지고 실제 만남으로 넘어가는지를 보는 편이 더 정확해.',
@@ -244,6 +269,7 @@ export function ReunionHierarchyPanel({
 
         <div className="reunion-story-section reunion-story-contact">
           <h4>실제 연락 가능성은?</h4>
+          <p><b>연락 가능성 신호: {contactSignal}</b></p>
           <p>{contact}</p>
         </div>
 
@@ -255,6 +281,11 @@ export function ReunionHierarchyPanel({
         <div className="reunion-story-section reunion-story-why">
           <h4>왜 아직 서로를 신경 쓰기 쉬운가</h4>
           <p>{why}</p>
+        </div>
+
+        <div className="reunion-story-section reunion-story-change">
+          <h4>상대는 예전과 달라졌을까?</h4>
+          <p>{change}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-timing">
