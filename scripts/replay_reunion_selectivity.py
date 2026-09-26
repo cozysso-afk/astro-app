@@ -13,6 +13,6 @@ if __name__ == '__main__':
         if not isinstance(requests, list) or not requests:
             raise ValueError('expected non-empty request list')
         print(json.dumps(replay(sys.argv[1], requests), ensure_ascii=False, indent=2))
-    except Exception:
-        print('{"status":"FAILED","detail":"private sensitivity replay failed; raw exception suppressed"}')
+    except Exception as exc:
+        print(json.dumps({"status":"FAILED","error_type":type(exc).__name__,"detail":"raw exception suppressed"}))
         sys.exit(1)
