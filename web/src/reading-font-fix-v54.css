@@ -142,3 +142,21 @@
     will-change: auto !important;
   }
 }
+
+/* V62 · reunion consultation typography
+ * The first reunion paragraph already inherited the editorial serif through
+ * .reading-conclusion, while the remaining answer paragraphs were forced back
+ * to system sans by reunion-reading-product-v13.css. Keep headings/controls in
+ * sans, but make the actual consultation prose one continuous reading voice.
+ */
+html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunion-story-section > p,
+html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunion-story-section > ul > li,
+html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunion-behavior-guide > p,
+html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunion-consultation-windows .reunion-v2-window > p,
+html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunion-final-takeaway > p {
+  font-family: var(--reading-display, 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif) !important;
+  font-synthesis: none !important;
+  font-weight: 500 !important;
+  letter-spacing: -.018em !important;
+  word-break: keep-all !important;
+}
