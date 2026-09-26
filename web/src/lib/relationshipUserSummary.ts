@@ -3,7 +3,7 @@ import type { Aspect, FortuneStat, RelationshipAnalysisMode, ReunionTimingContex
 const PERSONAL = new Set(['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'])
 const OUTER = new Set(['Uranus', 'Neptune', 'Pluto'])
 const SENSITIVE = new Set(['ASC', 'DSC', 'MC', 'IC', 'Vertex'])
-const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '교점', 'North Node': '교점' }
+const PLANETS: Record<string, string> = { Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성', Jupiter: '목성', Saturn: '토성', Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성', 'True Node': '진북교점', 'North Node': '진북교점', ASC: '상승점', DSC: '하강점', MC: '중천', IC: '천저', Vertex: '버텍스' }
 type Role = 'communication' | 'attraction' | 'stability' | 'power' | 'perspective'
 export type RelationshipPattern = { key: string; role: Role; title: string; conclusion: string; caution: string; reason: string; action: string; challenging: boolean; supportive: boolean }
 
@@ -18,11 +18,11 @@ export function aspectRole(aspect: Aspect): Role {
 
 function aspectKey(aspect: Aspect) { return `${aspect.a}:${aspect.aspect}:${aspect.b}:${aspect.layer ?? 'natal'}` }
 
-export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = SENSITIVE) {
+export function rankRelationshipAspects(aspects: Aspect[], partnerExact: boolean, sensitive: ReadonlySet<string> = SENSITIVE, angleTimeAvailable = partnerExact) {
   const seen = new Set<string>()
   const safe = aspects.filter(aspect => {
     if (!PLANETS[aspect.a] || !PLANETS[aspect.b] || !Number.isFinite(aspect.orb)) return false
-    if (!partnerExact && [aspect.a, aspect.b].some(p => SENSITIVE.has(p) || sensitive.has(p))) return false
+    if (!angleTimeAvailable && [aspect.a, aspect.b].some(p => SENSITIVE.has(p) || sensitive.has(p))) return false
     const key = aspectKey(aspect)
     if (seen.has(key)) return false
     seen.add(key)
@@ -74,9 +74,14 @@ function pattern(a: Aspect): RelationshipPattern {
   return { key: aspectKey(a), role, title: copy.title, conclusion: `${copy.reason} ${{ communication: '대화가 어긋난 뒤 서로 설명할 여유를 주는지가 관계의 차이를 만들어.', attraction: '좋았던 만남 하나보다 그 뒤에도 서로 편안한 태도가 이어지는지를 봐.', stability: '작은 약속을 지속적으로 지키는 과정에서 이 차이가 드러나기 쉬워.', power: '한쪽만 관계의 속도와 규칙을 정하지 않는지가 중요한 기준이야.', perspective: '서로 원하는 방향을 구체적인 생활 선택에 놓고 비교해봐.' }[role]}`, caution, reason: `${names}의 ${geometry}가 잡혀 있어. ${detail}`, action: copy.action, challenging: tense, supportive: positive }
 }
 
-export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
-  const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive)
-  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).map(pattern).map(p => {
+export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; sensitive?: ReadonlySet<string>; timing?: ReunionTimingContext | null; mode: RelationshipAnalysisMode }) {
+  const angleTimeAvailable = input.angleTimeAvailable ?? input.partnerExact
+  const ranked = rankRelationshipAspects(input.aspects, input.partnerExact, input.sensitive, angleTimeAvailable)
+  const individualPatterns = ranked.filter(a => !(OUTER.has(a.a) && OUTER.has(a.b))).map(a => {
+    const p = pattern(a)
+    const provisionalSensitive = !input.partnerExact && angleTimeAvailable && [a.a, a.b].some(point => SENSITIVE.has(point) || input.sensitive?.has(point))
+    return provisionalSensitive ? { ...p, reason: `${p.reason} 입력한 추정 생시 기준으로 보이는 시간 민감 근거라 실제 생시가 달라지면 하우스·각도나 오브가 움직일 수 있어.` } : p
+  }).map(p => {
     if (!input.mode.startsWith('marriage_')) return p
     if (p.role === 'attraction') return { ...p, conclusion: input.mode === 'marriage_married' ? `${p.challenging ? '애정이 있어도 편안함을 느끼는 방식은 다를 수 있어.' : '익숙한 사이에서도 애정을 주고받는 방식이 관계의 온도를 바꿔.'} 함께 있을 때의 거리와 혼자 회복할 시간을 같이 살펴봐.` : p.conclusion, action: input.mode === 'marriage_married' ? '익숙함에 기대지 말고 서로 편안하게 느끼는 애정 표현과 혼자 쉴 시간을 이야기해봐.' : '호감뿐 아니라 함께 지낼 때 필요한 거리와 애정 표현을 이야기해봐.' }
     if (p.role === 'stability') return { ...p, action: '생활비와 집안일, 돌봄을 누가 얼마나 맡을지 구체적으로 나눠봐.' }
@@ -106,6 +111,11 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
   }
   const stability = patterns.filter(p => p.role === 'stability')
   const friction = patterns.filter(p => p.challenging)
+  const byRole = (role: Role) => patterns.find(p => p.role === role)
+  const communicationPattern = byRole('communication')
+  const communicationFriction = friction.some(p => p.role === 'communication')
+  const attractionFriction = friction.some(p => p.role === 'attraction')
+  const powerFriction = friction.some(p => p.role === 'power')
   const positiveStructure = ranked.some(a => aspectRole(a) === 'stability' && a.tone === 'supportive')
   const negativeStructure = ranked.some(a => aspectRole(a) === 'stability' && a.tone === 'challenging')
   const sustainability = !stability.length ? '정보 부족' : positiveStructure && !negativeStructure && !friction.length ? '안정적' : negativeStructure && !positiveStructure ? '불안정' : '혼합'
@@ -117,13 +127,25 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     const score = stat?.average
     const band = typeof score !== 'number' || !Number.isFinite(score) ? '정보 부족' : score >= 60 ? '강함' : score < 40 ? '약함' : '보통'
     const copy = {
-      incoming: { 강함: '상대 쪽 움직임이 비교적 강하게 잡혀 있어. 실제 연락이 오면 대화를 이어갈 의지가 있는지 봐.', 약함: '상대가 먼저 연락할 흐름은 약한 편이야. 기다림만으로 일정을 비워 두지는 마.', 보통: '상대의 반응은 열려 있지만 먼저 연락이 온다고 기대하기엔 뚜렷하지 않아.' },
-      outgoing: { 강함: '내가 먼저 짧게 말을 꺼내기 좋은 편이야. 답이 애매하면 더 밀지는 마.', 약함: '지금은 먼저 밀어붙이기보다 하고 싶은 말을 정리해 두는 편이 좋아.', 보통: '가벼운 안부 정도는 생각해볼 수 있어. 답장의 구체성을 보고 다음을 정해.' },
-      reconnection: { 강함: '다시 대화가 시작되는 움직임을 살펴볼 때야. 재회가 확정된다는 뜻은 아니야.', 약함: '과거 인연과 다시 이어질 신호는 약해. 추억을 현재의 의사로 읽지는 마.', 보통: '재접촉의 여지는 있지만 관계 회복까지 이어질지는 실제 행동을 더 봐야 해.' },
+      incoming: {
+        강함: '상대 → 나 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 상대가 먼저 연락한다는 뜻은 아니야.',
+        약함: '상대 → 나 방향의 관계 자극은 약한 편이야. 상대가 먼저 연락하지 않는다는 예측으로 읽지는 마.',
+        보통: '상대 → 나 방향의 관계 자극은 중간대야. 실제 선연락 여부는 별도 행동 근거가 필요해.',
+      },
+      outgoing: {
+        강함: '나 → 상대 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 내가 먼저 연락해야 한다는 뜻은 아니야.',
+        약함: '나 → 상대 방향의 관계 자극은 약한 편이야. 연락을 미루라는 행동 지시로 읽지는 마.',
+        보통: '나 → 상대 방향의 관계 자극은 중간대야. 먼저 연락할지 여부와는 별개로 봐.',
+      },
+      reconnection: {
+        강함: '과거 인연 재접점 지표가 비교적 강해. 실제 대화 재개나 재회 성사와는 별도로 확인해야 해.',
+        약함: '과거 인연 재접점 지표는 약한 편이야. 현재 감정이나 실제 연락 여부를 대신 판정하지 않아.',
+        보통: '과거 인연 재접점 지표는 중간대야. 실제 재접촉과 관계 회복은 행동 근거를 더 봐야 해.',
+      },
     }
     const point = band === '약함' ? stat?.caution_days?.[0] : stat?.best_days?.[0]
     const timing = stat && stat.spread > 0 && point && input.timing && point.date >= input.timing.period.start && point.date <= input.timing.period.end ? point.date : undefined
-    return { band, text: band === '정보 부족' ? '이 방향을 판단할 계산 정보가 없어. 다른 방향의 점수로 대신하지 않을게.' : copy[kind][band], timing }
+    return { score: typeof score === 'number' && Number.isFinite(score) ? Math.round(score) : undefined, band, text: band === '정보 부족' ? '이 방향을 판단할 계산 정보가 없어. 다른 방향의 점수로 대신하지 않을게.' : copy[kind][band], timing }
   }
   const incoming = direction(input.timing?.incoming, 'incoming')
   const outgoing = direction(input.timing?.outgoing, 'outgoing')
@@ -135,21 +157,33 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
       const point=stat[source]?.[0]
       if(!point || point.date<input.timing!.period.start || point.date>input.timing!.period.end)return []
       const caution=source==='caution_days'
-      return [{date:point.date,kind,label:{incoming:'상대 쪽 반응을 살펴볼 때',outgoing:'내가 말을 꺼낼 속도를 정할 때',reconnection:'과거 인연과 접점이 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
+      return [{date:point.date,kind,label:{incoming:'상대 → 나 관계 자극이 상대적으로 두드러지는 때',outgoing:'나 → 상대 관계 자극이 상대적으로 두드러지는 때',reconnection:'과거 인연 재접점 지표가 상대적으로 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
     })
   })
 
   const reunion = input.mode === 'reunion'
-  const headline = !patterns.length && input.mode !== 'reunion' ? '현재 입력으로 확정할 수 있는 관계 접점이 부족해. 감정과 생활의 궁합을 단정하지 않을게.' : input.mode === 'marriage_married'
-    ? friction.length ? '현재 부부관계에서는 반복되는 부담을 나눠 갖는 게 중요해. 책임과 대화 방식을 함께 조정해봐.' : '현재 부부관계의 꾸준함을 살리는 쪽으로 봐. 서로 지키는 작은 약속과 생활 리듬이 중요해.'
+  const marriage = input.mode.startsWith('marriage_')
+  const married = input.mode === 'marriage_married'
+  const headline = !patterns.length && input.mode !== 'reunion' ? '현재 입력으로 확정할 수 있는 관계 접점이 부족해. 감정과 생활의 궁합을 단정하지 않을게.' : married
+    ? communicationFriction ? '현재 부부관계의 핵심은 같은 갈등이 반복될 때 대화를 멈추고 다시 시작하는 방식을 함께 만드는 거야.'
+      : negativeStructure ? '현재 부부관계에서는 애정의 크기보다 생활 책임과 돌봄이 한쪽에 쏠리지 않는지가 더 중요해.'
+      : friction.length ? '현재 부부관계에서는 반복되는 부담을 누가 참을지보다 어떻게 함께 줄일지를 먼저 봐야 해.'
+      : '현재 부부관계의 강점은 유지하되, 익숙함 때문에 애정 표현과 생활 합의를 생략하지 않는 게 중요해.'
     : input.mode === 'marriage_unmarried'
-    ? stability.length ? '결혼 상대로서의 안정성은 끌림과 따로 봐야 해. 함께 감당할 책임과 생활 방식을 먼저 맞춰봐.' : '함께 살 때의 안정성을 단정할 근거는 부족해. 결혼을 결정하기 전에 생활과 책임을 구체적으로 이야기해봐.'
+    ? negativeStructure ? '결혼 상대로서의 안정성을 볼 때 가장 먼저 확인할 건 끌림보다 함께 사는 책임 구조를 실제로 나눌 수 있는지야.'
+      : communicationFriction ? '결혼 전에는 좋아하는 마음보다 갈등이 생겼을 때 끝까지 대화를 복구할 수 있는지를 먼저 확인해.'
+      : stability.length ? '결혼 상대로서의 안정성은 끌림과 따로 봐야 해. 함께 감당할 책임과 생활 방식을 실제 조건으로 맞춰봐.'
+      : '함께 살 때의 안정성을 단정할 근거는 부족해. 결혼을 결정하기 전에 생활과 책임을 구체적으로 이야기해봐.'
     : reunion
-    ? reconnection.band === '강함' ? `재접촉의 움직임은 살아 있어. ${friction.length ? '다만 다시 만나기 전에 반복되는 갈등을 풀 방법부터 맞춰야 해.' : '다시 이어진 뒤에도 약속이 지켜지는지 천천히 봐.'}`
-      : reconnection.band === '약함' ? '지금은 재접촉을 크게 기대하기보다, 다시 대화할 때 달라져야 할 점을 정리하는 편이 좋아.'
-      : reconnection.band === '정보 부족' ? '재접촉 시기는 판단할 정보가 부족해. 두 사람 사이에서 반복되기 쉬운 패턴부터 살펴볼게.'
-      : '다시 대화할 여지는 열려 있지만, 관계 회복은 그 뒤의 행동을 보고 판단하는 편이 좋아.'
-    : friction.length ? '서로 자극하는 힘이 있어도 편안함과는 다를 수 있어. 반복해서 부딪히는 부분을 어떻게 조율하는지가 중요해.' : patterns.length ? '서로 맞물리는 부분을 살릴 수 있어. 호감보다 약속과 대화가 꾸준히 이어지는지를 봐.' : '확정할 수 있는 접점이 적어 관계 전체를 단정하기 어려워.'
+    ? reconnection.band === '강함' ? `과거 인연 재접점 지표는 강한 편이야. 이 지표만으로 실제 재접촉이나 재회 여부를 판단할 수는 없어. ${friction.length ? '다시 연락이 닿는다면 반복되는 갈등을 다르게 풀 수 있는지도 함께 확인해.' : '연락이 생기면 그 뒤의 지속 행동이 붙는지를 천천히 봐.'}`
+      : reconnection.band === '약함' ? '과거 인연 재접점 지표는 약한 편이야. 실제 연락 가능성은 단계 계산과 현실 행동을 따로 봐야 해.'
+      : reconnection.band === '정보 부족' ? '과거 인연 재접점 지표를 판단할 정보가 부족해. 실제 연락 가능성은 다른 단계 근거와 행동을 따로 봐야 해.'
+      : '과거 인연 재접점 지표는 중간대야. 실제 연락이나 관계 회복이 열린다는 뜻은 아니야.'
+    : communicationFriction ? '이 관계는 끌림의 크기보다 말이 꼬였을 때 서로 뜻을 확인하고 다시 대화를 이어갈 수 있는지가 핵심이야.'
+      : powerFriction ? '강하게 끌리더라도 서로의 선택권과 사생활을 존중할 수 있는지가 이 관계의 중요한 기준이야.'
+      : attractionFriction ? '끌림은 있어도 서로 편안한 거리와 애정 표현 속도가 맞는지는 따로 확인해야 해.'
+      : friction.length ? '서로 자극하는 힘이 있어도 편안함과는 다를 수 있어. 반복해서 부딪히는 부분을 어떻게 조율하는지가 중요해.'
+      : patterns.length ? '서로 맞물리는 부분을 살릴 수 있어. 호감보다 약속과 대화가 꾸준히 이어지는지를 봐.' : '확정할 수 있는 접점이 적어 관계 전체를 단정하기 어려워.'
   const roleLabel: Record<Role, string> = { communication: '서로 말을 이해하는 방식', attraction: '애정을 주고받는 방식', stability: '약속과 책임의 분담', power: '서로의 선택권', perspective: '함께 기대하는 방향' }
   const supportive = patterns.find(p => p.supportive)
   const difficult = friction[0]
@@ -157,23 +191,42 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     ? `${roleLabel[supportive.role]}에는 도움을 주는 접점이 있고, ${roleLabel[difficult.role]}에는 조정이 필요해.`
     : difficult ? `${roleLabel[difficult.role]}에서 생기는 부담을 먼저 다뤄야 해.`
     : supportive ? `${roleLabel[supportive.role]}에서 서로를 돕는 접점부터 살려봐.` : ''
-  const marriage = input.mode.startsWith('marriage_')
-  const married = input.mode === 'marriage_married'
-  const sections = [
-    { id: 'attraction', title: '감정 · 친밀감', rows: patterns.filter(p => p.role === 'attraction'), empty: '감정과 친밀감을 구체적으로 풀어낼 접점이 부족해. 실제 표현 방식은 대화로 알아가는 게 좋아.' },
-    { id: 'communication', title: marriage ? '갈등 해결' : '대화 · 소통', rows: patterns.filter(p => p.role === 'communication'), empty: '대화 방식을 단정할 접점이 부족해. 서로 불편했던 말을 구체적으로 묻는 데서 시작해봐.' },
-    { id: 'stability', title: marriage ? '책임 · 현실 생활' : '관계의 약속', rows: patterns.filter(p => p.role === 'stability'), empty: '책임과 생활 리듬을 판단할 접점이 부족해. 역할 분담과 시간 사용을 실제로 맞춰봐야 해.' },
-    { id: 'power', title: '관계의 힘의 균형', rows: patterns.filter(p => p.role === 'power'), empty: '주도권이나 통제 문제를 단정할 근거는 없어. 한쪽만 결정하거나 양보하는지는 현실에서 별도로 봐.' },
-    { id: 'perspective', title: '기대와 현실', rows: patterns.filter(p => p.role === 'perspective'), empty: '' },
-  ]
-  const practical = marriage
-    ? negativeStructure ? '한 사람이 집안일과 책임을 떠안지 않도록 분담 범위와 쉴 시간을 구체적으로 정해봐.' : '함께 쓰는 돈과 혼자 보내는 시간, 집안일을 어떻게 나눌지 이야기해봐.'
-    : friction.some(p => p.role === 'communication') ? '말이 엇갈릴 때 바로 결론 내리지 말고, 각자 받아들인 뜻을 한 번씩 말해봐.' : '편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐.'
+  const sectionByRole: Record<Role,{id:Role;title:string;rows:RelationshipPattern[];empty:string}> = {
+    attraction: { id: 'attraction', title: married ? '감정 · 친밀감 회복' : input.mode === 'marriage_unmarried' ? '감정 · 친밀감 · 함께 살 거리감' : '감정 · 친밀감', rows: patterns.filter(p => p.role === 'attraction'), empty: '감정과 친밀감을 구체적으로 풀어낼 접점이 부족해. 실제 표현 방식은 대화로 알아가는 게 좋아.' },
+    communication: { id: 'communication', title: married ? '반복 갈등 · 회복 방식' : input.mode === 'marriage_unmarried' ? '갈등 해결' : '대화 · 소통', rows: patterns.filter(p => p.role === 'communication'), empty: '대화 방식을 단정할 접점이 부족해. 서로 불편했던 말을 구체적으로 묻는 데서 시작해봐.' },
+    stability: { id: 'stability', title: married ? '생활 책임 · 돌봄 분담' : input.mode === 'marriage_unmarried' ? '책임 · 현실 생활' : '관계의 약속', rows: patterns.filter(p => p.role === 'stability'), empty: '책임과 생활 리듬을 판단할 접점이 부족해. 역할 분담과 시간 사용을 실제로 맞춰봐야 해.' },
+    power: { id: 'power', title: married ? '관계의 힘의 균형 · 개인 경계' : input.mode === 'marriage_unmarried' ? '관계의 힘의 균형 · 결정권 · 가족 경계' : '관계의 힘의 균형', rows: patterns.filter(p => p.role === 'power'), empty: '주도권이나 통제 문제를 단정할 근거는 없어. 한쪽만 결정하거나 양보하는지는 현실에서 별도로 봐.' },
+    perspective: { id: 'perspective', title: marriage ? '앞으로의 생활 방향' : '기대와 현실', rows: patterns.filter(p => p.role === 'perspective'), empty: '' },
+  }
+  const sectionOrder: Role[] = married
+    ? ['communication','stability','attraction','power','perspective']
+    : input.mode === 'marriage_unmarried'
+    ? ['stability','communication','attraction','power','perspective']
+    : ['attraction','communication','stability','power','perspective']
+  const sections = sectionOrder.map(role => sectionByRole[role])
+  const practical = married
+    ? communicationFriction ? '이번에 함께 바꿀 것: 같은 다툼이 시작되는 말과 시간을 하나씩 적고, 감정이 올라오면 잠시 멈춘 뒤 언제 다시 이야기할지까지 같이 정해봐.'
+      : negativeStructure ? '이번에 함께 바꿀 것: 생활비·집안일·돌봄·가족행사·혼자 쉴 시간을 항목별로 나눠서 한 사람이 계속 떠안는 일이 없는지 확인해봐.'
+      : '이번에 함께 바꿀 것: 함께 쓰는 돈, 집안일, 돌봄, 애정 표현, 혼자 쉬는 시간을 한 항목씩 점검해서 말하지 않은 기대를 줄여봐.'
+    : input.mode === 'marriage_unmarried'
+    ? negativeStructure ? '결혼 전 합의할 것: 생활비 · 집안일 · 책임 · 돌봄 · 가족행사 · 혼자 쉴 시간을 실제 일정과 금액 수준까지 나눠서 이야기해봐.'
+      : communicationFriction ? '결혼 전 합의할 것: 싸움을 피하는 약속보다, 대화를 멈춰야 할 신호와 다시 시작할 시간, 사과 뒤 바꿀 행동을 함께 정해봐.'
+      : '결혼 전 합의할 것: 생활비, 집안일, 가족 관계, 혼자 쉴 시간, 애정 표현을 항목으로 두고 서로의 기준을 구체적으로 비교해봐.'
+    : reunion
+    ? communicationPattern?.action ?? '다시 연락이 닿는다면 안부 자체보다 예전에 끊겼던 대화를 이번에는 어떻게 다르게 풀지 확인해봐.'
+    : communicationFriction ? '말이 엇갈릴 때 바로 결론 내리지 말고, 각자 받아들인 뜻을 한 번씩 말해봐.'
+      : powerFriction ? '연락 빈도와 만나는 횟수뿐 아니라 사생활, 거절, 혼자 보내는 시간의 경계를 서로 같은 기준으로 이해하는지 확인해봐.'
+      : attractionFriction ? '애정 표현의 양과 혼자 있고 싶은 시간을 각각 말해보고, 한쪽의 속도를 상대의 마음 크기로 해석하지 마.'
+      : '편안한 연락 빈도와 함께 보내고 싶은 시간을 서로 맞춰봐.'
+  const timePrecisionNote = !input.partnerExact && angleTimeAvailable
+    ? '입력한 추정 생시를 기준으로 하우스와 각도까지 읽었어. 주변 생시에서 달라질 수 있는 시간 민감 근거는 확정값이 아니라 참고 범위로 봐줘.'
+    : ''
   return { mode: input.mode, title: reunion ? '재회 흐름 한눈에' : married ? '지금 우리 부부' : marriage ? '결혼 궁합 한눈에' : '한눈에 궁합',
-    strengthsTitle: marriage ? '함께 살 때 강점' : '잘 맞는 점', frictionTitle: marriage ? '생활에서 부딪힐 점' : '부딪히기 쉬운 점',
+    strengthsTitle: married ? '지금 유지되는 힘' : input.mode === 'marriage_unmarried' ? '결혼 생활에서 강점' : marriage ? '함께 살 때 강점' : '잘 맞는 점',
+    frictionTitle: married ? '지금 반복되는 부담' : input.mode === 'marriage_unmarried' ? '결혼 후 부딪힐 점' : marriage ? '생활에서 부딪힐 점' : '부딪히기 쉬운 점',
     stabilityTitle: reunion ? '다시 붙었을 때 유지력' : married ? '관계 회복력 · 장기 안정성' : marriage ? '결혼 유지력' : '장기 유지력',
     practicalTitle: married ? '지금 함께 바꿔볼 것' : marriage ? '결혼 전 확인할 것' : '현실에서 맞춰야 할 것',
     practical, sections, strengths: patterns.filter(p => p.supportive).map(p => p.title),
     headline: [headline, orientation].filter(Boolean).join(' '), incoming, outgoing, reconnection, sustainability, sustainabilityText, windows,
-    friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked }
+    friction, patterns: patterns.filter(p => !friction.some(f => f.key === p.key)), ranked, timePrecisionNote }
 }

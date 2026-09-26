@@ -13,6 +13,11 @@ function exactPacket(){return {
     conflict_reactivity:[asp('Mars','square','Uranus',.22,'challenging')],
   },
   house_overlays:{available:true,user_in_counterpart:{relationship_houses:[{planet:'Venus',whole_house:7,placidus_house:7}]},counterpart_in_user:{relationship_houses:[{planet:'Moon',whole_house:4,placidus_house:4}]}},
+  reunion_evidence_contract:{version:'reunion-evidence-contract-v1',available:true,evidence:[
+    {...asp('Mercury','conjunction','Sun',.10),direction:'counterpart_to_user',phase:'applying',phase_basis:'monthly_orb_trend',reference_date:'2027-01-15',calendar_month:'2027-01',source_path:'progressed_synastry.counterpart_to_user',relationship_domains:['communication','identity_direction'],stage_hints:['contact_recontact'],target_house:{whole_house:12,quadrant_house:12}},
+    {...asp('Venus','sextile','Sun',.01),direction:'shared',phase:'exact',phase_basis:'sampled_near_exact',reference_date:'2027-01-15',calendar_month:'2027-01',source_path:'progressed_synastry.progressed_to_progressed',relationship_domains:['affection_attraction','identity_direction'],stage_hints:['emotional_reactivation','contact_recontact']},
+    {...asp('Moon','square','Mercury',.07,'challenging'),direction:'relationship_itself',phase:'applying',phase_basis:'monthly_orb_trend',reference_date:'2027-01-15',calendar_month:'2027-01',source_path:'progressed_composite.to_natal_composite',relationship_domains:['emotion','communication'],stage_hints:['emotional_reactivation','contact_recontact','relationship_rebuilding']},
+  ]},
   advanced:{
     composite:{available:true,chart:{positions:{Sun:{lon:100,sign:'Cancer'},Venus:{lon:120,sign:'Leo'},Saturn:{lon:280,sign:'Capricorn'}}}},
     davison:{available:true,chart:{positions:{Sun:{lon:101,sign:'Cancer'},Mercury:{lon:130,sign:'Leo'},Saturn:{lon:281,sign:'Capricorn'}}}},
@@ -27,7 +32,7 @@ function exactPacket(){return {
 
 test('maps every available relationship layer into question-first four-stage evidence',()=>{
   const out=buildReunionEvidenceV2(exactPacket())
-  assert.equal(out.version,'reunion-evidence-v2.6-prompt-budget-hardening')
+  assert.equal(out.version,'reunion-evidence-v2.7-directional-contract')
   assert.match(out.policy,/Emotion, contact, meeting, and reunion are separate stages/i)
   for(const key of ['natal_synastry','house_overlays','midpoint_composite','davison','marks','progressed_synastry','progressed_composite','marks_tertiary','daily_transit']) assert.equal(out.coverage[key],true,key)
   for(const q of ['why_reconnect','initiative','timing','rebuild','repeat_risks']) assert.ok(out.questions[q].evidence_refs.length>0,q)
@@ -37,6 +42,12 @@ test('maps every available relationship layer into question-first four-stage evi
   assert.equal(out.initiative_gate.available,false)
   assert.equal(out.initiative_gate.verdict,'undetermined')
   assert.ok(out.evidence.some(e=>e.layer==='dimension.in_person_meeting'))
+  const directional=out.evidence.find(e=>e.layer==='progressed_synastry.counterpart_to_user')
+  assert.equal(directional?.direction,'incoming')
+  assert.equal(directional?.phase,'applying')
+  assert.ok(directional?.facts.some(x=>x.includes('house=whole:12')) )
+  assert.ok(directional?.facts.some(x=>x.includes('directional_activation_not_private_feeling=true')))
+  assert.ok(out.evidence.some(e=>e.direction==='relationship_itself'&&e.layer==='progressed_composite.to_natal_composite'))
 })
 
 test('solar and lunar returns stay context-only and prompt copies shed duplicated bulk',()=>{
@@ -115,6 +126,7 @@ test('side activation metrics alone never open the first-contact direction gate'
 
 test('progression and derived Marks activation do not establish first-contact direction',()=>{
   const p=exactPacket()
+  delete p.reunion_evidence_contract
   p.advanced.months[0].marks_tertiary.counterpart.to_base_marks_aspects=[]
   const out=buildReunionEvidenceV2(p)
   assert.equal(out.initiative_gate.available,false)
@@ -131,6 +143,7 @@ test('keeps conflicting natal evidence as counter evidence instead of averaging 
 
 test('convergence requires independent evidence aligned to the same role',()=>{
   const p=exactPacket()
+  delete p.reunion_evidence_contract
   p.house_overlays={available:false}
   p.advanced.composite={available:false}
   p.reunion_secondary_support.months[0].dimensions.emotional_reactivation.evidence=[asp('Venus','square','Moon',.4,'challenging')]

@@ -201,4 +201,29 @@ def test_full_relationship_build_threads_uncorrected_davison_into_marks_and_tert
     assert out["marks"]["counterpart"]["variant"] == "uncorrected"
     assert len(out["months"]) == 1
     assert out["months"][0]["progressed_composite"]["available"] is True
+    assert out["months"][0]["progressed_house_overlays"]["available"] is True
     assert out["months"][0]["marks_tertiary"]["available"] is True
+
+
+def test_reunion_build_emits_normalized_directional_evidence_contract():
+    user = _profile(
+        birth_date=date(1991, 3, 21), birth_time=dt_time(9, 30), utc_offset_hours=9,
+        latitude=37.5665, longitude=126.9780,
+    )
+    counterpart = _profile(
+        birth_date=date(1992, 2, 29), birth_time=dt_time(18, 20), utc_offset_hours=9,
+        latitude=37.5665, longitude=126.9780,
+    )
+    out = build_relationship_western(
+        user, counterpart,
+        [(date(2026, 9, 1), date(2026, 9, 30)), (date(2026, 10, 1), date(2026, 10, 31))],
+        analysis_mode="reunion",
+    )
+    contract = out["reunion_evidence_contract"]
+    assert contract["version"] == "reunion-evidence-contract-v1"
+    assert contract["available"] is True
+    assert contract["evidence"]
+    assert {row["direction"] for row in contract["evidence"]} & {"user_to_counterpart", "counterpart_to_user", "shared", "relationship_itself"}
+    assert all(row["phase"] in {"applying", "separating", "exact", "indeterminate"} for row in contract["evidence"])
+    assert all("relationship_domains" in row for row in contract["evidence"])
+    assert all(row.get("event_probability") == "not_calculated" for row in contract["evidence"])

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './AppNext'
 import { AuthGate } from './AuthGate'
+import { EditorialQaPreview } from './EditorialQaPreview'
 import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
 import './styles.css'
 import './relationship.css'
@@ -23,6 +24,7 @@ import './fortune-ux-v14.css'
 import './period-ai-v18.css'
 import './ux-readability-v22.css'
 import './mobile-design-v27.css'
+import './background-stability-v1.css'
 import './mobile-type-v28.css'
 import './mobile-density-v29.css'
 import './auth.css'
@@ -43,14 +45,19 @@ import './reunion-reading-product-v13.css'
 import './redline-layout-v55.css'
 import './archive-mobile-polish-v57.css'
 import './archive-mobile-polish-v59.css'
+import './profile-form-aurora-v71.css'
+import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
 
-installIntegratedPrecisionFetch()
+const qaHost = typeof window !== 'undefined'
+  && window.location.hostname.endsWith('.vercel.app')
+  && window.location.hostname.includes('git-fix-reunion-hierarchy-v2')
+const qaPreview = qaHost && new URLSearchParams(window.location.search).get('qa') === 'editorial'
+
+if (!qaPreview) installIntegratedPrecisionFetch()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthGate>
-      <App />
-    </AuthGate>
+    {qaPreview ? <EditorialQaPreview/> : <AuthGate><App /></AuthGate>}
   </React.StrictMode>,
 )

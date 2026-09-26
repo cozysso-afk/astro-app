@@ -129,7 +129,7 @@ def sensitivity_scan_spec(reliability: dict[str, Any]) -> dict[str, Any] | None:
         "window_minutes": window,
         "step_minutes": step,
         "shifts_minutes": shifts,
-        "policy": "diagnostic birth-time sensitivity only; scan candidates never become exact birth times and never unlock production angle/house scoring",
+        "policy": "diagnostic birth-time sensitivity only; entered-time Moon/angles/houses stay in analysis with provisional confidence weighting. Scan candidates never become exact birth times.",
     }
 
 

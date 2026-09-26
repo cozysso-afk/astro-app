@@ -12,7 +12,8 @@ import {
   AlertTriangle, CalendarDays, CheckCircle2, Cloud, Copy, Gem, Heart,
   LoaderCircle, MapPin, RefreshCw, RotateCcw, Save, Search, Sparkles, Sun, Trash2,
 } from 'lucide-react'
-import { deleteArchive, importArchiveItems, listArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { deleteArchive, hydrateArchiveItem, importArchiveItems, listArchive, listLocalArchive, saveArchive, type ArchiveItem, type ArchiveSaveResult } from './lib/archive'
+import { fetchAuthorizedReunionRelationship } from './lib/auth'
 import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, parseArchiveBackupText } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
@@ -78,6 +79,7 @@ const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
 const ARCHIVE_DELETE_UNDO_MS = 8000
+const REQUIRED_REUNION_EVIDENCE_CONTRACT = 'reunion-evidence-contract-v1'
 
 const PERIOD_CACHE_TTL_DAYS: Record<PeriodKey, number> = {
   today: 180,
@@ -375,6 +377,7 @@ export default function AppNext() {
   const [integratedCalendarYear, setIntegratedCalendarYear] = useState<number | null>(null)
   const [queryDate, setQueryDate] = useState(() => initialDateFromUrl())
   const [apiStatus, setApiStatus] = useState<ApiStatus>('warming')
+  const [reunionContractStatus, setReunionContractStatus] = useState<'checking'|'ready'|'stale'>('checking')
   const [pushState, setPushState] = useState<PushSnapshot | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
   const [mainView, setMainView] = useState<MainView>('home')
@@ -445,9 +448,18 @@ export default function AppNext() {
     fetch(`${API_BASE}/health`)
       .then((response) => {
         if (!response.ok) throw new Error('health check failed')
-        if (!cancelled) setApiStatus('online')
+        return response.json()
       })
-      .catch(() => { if (!cancelled) setApiStatus('offline') })
+      .then((payload) => {
+        if (cancelled) return
+        setApiStatus('online')
+        setReunionContractStatus(payload?.reunion_evidence_contract === REQUIRED_REUNION_EVIDENCE_CONTRACT ? 'ready' : 'stale')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setApiStatus('offline')
+        setReunionContractStatus('checking')
+      })
     return () => { cancelled = true }
   }, [])
 
@@ -1042,6 +1054,11 @@ export default function AppNext() {
     const revision = relationshipRevisionRef.current + 1
     relationshipRevisionRef.current = revision
     setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError(''); setReunionTiming(null); setReunionTimingError('')
+    const reunionRequest = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
+    if (reunionRequest && reunionContractStatus !== 'ready') {
+      setRelationshipError(reunionContractStatus === 'stale' ? '재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 비용이 드는 AI 해설은 시작하지 않아. 잠시 후 다시 시도해줘.' : '재회 계산 서버 버전을 확인 중이야. 확인이 끝난 뒤 다시 시도해줘.')
+      return
+    }
     if (!birthProfile.birthDate || !birthProfile.birthTime) { setRelationshipError('먼저 내정보에서 본인 생년월일과 출생시간을 저장해줘.'); return }
     const userLatitude = parseOptionalNumber(birthProfile.latitude)
     const userLongitude = parseOptionalNumber(birthProfile.longitude)
@@ -1071,9 +1088,12 @@ export default function AppNext() {
       analysis_mode: selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose,
     }
     setRelationshipLoading(true)
-    const shouldRunReunionTiming = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
+    const shouldRunReunionTiming = reunionRequest
     try {
-      const response = await fetch(`${API_BASE}/v1/relationship/western`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+      const relationshipInit = { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
+      const response = reunionRequest
+        ? await fetchAuthorizedReunionRelationship(relationshipInit)
+        : await fetch(`${API_BASE}/v1/relationship/western`, relationshipInit)
       const payload = await response.json()
       if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '관계 계산 요청에 실패했어.')
       const typed = payload as RelationshipApiResponse
@@ -1105,6 +1125,10 @@ export default function AppNext() {
     const currentMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
     const snapshotMode = String(relationshipRequestSnapshot?.analysis_mode ?? '')
     const analysisMode = (snapshotMode || currentMode) as RelationshipAnalysisMode
+    if (analysisMode === 'reunion' && relationshipResult.result.reunion_evidence_contract?.version !== REQUIRED_REUNION_EVIDENCE_CONTRACT) {
+      setRelationshipAiError('이 계산본은 현재 재회 해설 계약보다 오래된 결과야. 유료 AI 해설을 새로 호출하지 않아. 최신 재회 계산을 먼저 실행해줘.')
+      return
+    }
     if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
     const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, reunionTiming)
     setRelationshipAiLoading(true); setRelationshipAiError('')
@@ -1320,6 +1344,11 @@ export default function AppNext() {
   async function refreshArchive() {
     setArchiveLoading(true)
     setArchiveError('')
+    const localItems = listLocalArchive()
+    const initialPendingDeleteId = archiveUndoItemRef.current?.id
+    const visibleLocal = initialPendingDeleteId ? localItems.filter((item) => item.id !== initialPendingDeleteId) : localItems
+    setArchiveItems(visibleLocal)
+    setArchiveStatus(visibleLocal.length ? `이 기기 기록 ${visibleLocal.length}개 표시 · 클라우드 확인 중` : '클라우드 기록 확인 중')
     try {
       const data = await listArchive()
       const pendingDeleteId = archiveUndoItemRef.current?.id
@@ -1335,7 +1364,14 @@ export default function AppNext() {
     }
   }
 
-  function restoreArchive(item: ArchiveItem) {
+  async function restoreArchive(item: ArchiveItem) {
+    try {
+      item = await hydrateArchiveItem(item)
+      setArchiveItems((rows)=>rows.map((row)=>row.id === item.id ? item : row))
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : '저장 기록 원문을 불러오지 못했어.')
+      return
+    }
     const currentPeriodArchive = item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16'
     if ((item.kind === 'daily' && !currentPeriodArchive) || item.kind === 'outcome') {
       setLegacyArchiveOpen(item)
@@ -1415,6 +1451,13 @@ export default function AppNext() {
   }
 
   async function copyArchiveResult(item: ArchiveItem) {
+    try {
+      item = await hydrateArchiveItem(item)
+      setArchiveItems((rows)=>rows.map((row)=>row.id === item.id ? item : row))
+    } catch (error) {
+      setArchiveStatus(error instanceof Error ? error.message : '저장 기록 원문을 불러오지 못했어.')
+      return
+    }
     if (item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16') {
       await handleCopy('기간운세 전체복사', integratedResultText(item.result as unknown as IntegratedApiResponse))
       return
@@ -1434,9 +1477,15 @@ export default function AppNext() {
     }
   }
 
-  function exportArchive() {
+  async function exportArchive() {
     try {
-      const backup = createArchiveBackup(archiveItems)
+      setArchiveStatus('전체 기록 백업 준비 중…')
+      const resolved: ArchiveItem[] = []
+      for (let index = 0; index < archiveItems.length; index += 4) {
+        resolved.push(...await Promise.all(archiveItems.slice(index, index + 4).map(hydrateArchiveItem)))
+      }
+      setArchiveItems(resolved)
+      const backup = createArchiveBackup(resolved)
       downloadArchiveBackup(backup)
       setArchiveStatus(`전체 기록 ${backup.summary.total}건 백업 완료 · 로컬 전용 ${backup.summary.localOnly}건 · 클라우드 연결 ${backup.summary.cloudBacked}건`)
     } catch (error) {
@@ -1670,6 +1719,7 @@ export default function AppNext() {
             {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='married'?'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·공유자원·갈등과 회복 흐름을 봐.':marriageScope==='personal'?'상대가 없어도 내 차트로 결혼 가능성 지수·강한 시기·배우자 외모/성향/직업군·만남 경로를 적극적으로 봐. 0~100은 점성 엔터테인먼트 지수이고 실제 이름·주소·회사처럼 특정 신원만 만들어내지 않아.':'이 특정 상대와 결혼생활로 들어갈 때의 결속·생활·친밀감·돈/공유자원·갈등·지속성과 결혼 흐름을 깊게 봐.'}</span></div>}
             {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
+            {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&reunionContractStatus!=='ready'&&<div className="status-banner error"><AlertTriangle size={16}/><span>{reunionContractStatus==='stale'?'재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 최신 서버 확인 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.':'재회 계산 서버 버전을 확인 중이야. 확인이 끝나기 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.'}</span></div>}
             {needsCounterpart&&<>
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
@@ -1689,7 +1739,7 @@ export default function AppNext() {
             </>}
             <div className="calculation-range"><CalendarDays size={17}/><span>{isPersonalMarriage?'개인 결혼운':'관계'} 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
             {(isPersonalMarriage?personalMarriageError:relationshipError) && <div className="status-banner error"><AlertTriangle size={17}/><span>{isPersonalMarriage?personalMarriageError:relationshipError}</span></div>}
-            <button className="primary-button" type="button" onClick={isPersonalMarriage?runPersonalMarriage:runRelationship} disabled={personalMarriageLoading||relationshipLoading||reunionTimingLoading||apiStatus==='offline'}>{(personalMarriageLoading||relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{personalMarriageLoading?'개인 결혼운 계산 중…':(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):isPersonalMarriage?'상대 없이 개인 결혼운 계산':selectedTool==='marriage'?(marriageMode==='unmarried'?'특정 상대와 결혼궁합 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산'}</span></button>
+            <button className="primary-button" type="button" onClick={isPersonalMarriage?runPersonalMarriage:runRelationship} disabled={personalMarriageLoading||relationshipLoading||reunionTimingLoading||apiStatus==='offline'||(selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&reunionContractStatus!=='ready')}>{(personalMarriageLoading||relationshipLoading||reunionTimingLoading)?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{personalMarriageLoading?'개인 결혼운 계산 중…':(relationshipLoading||reunionTimingLoading)?(selectedTool==='marriage'?'결혼운 계산 중…':relationshipPurpose==='reunion'?'재회운 계산 중…':'궁합 계산 중…'):isPersonalMarriage?'상대 없이 개인 결혼운 계산':selectedTool==='marriage'?(marriageMode==='unmarried'?'특정 상대와 결혼궁합 정밀 계산':'기혼 결혼운 정밀 계산'):relationshipPurpose==='reunion'?'재회운 정밀 계산':'궁합 정밀 계산'}</span></button>
 
             {isPersonalMarriage&&personalMarriage&&<div className="results-wrap"><div className="result-headline"><CheckCircle2 size={20}/><div><strong>개인 결혼운 계산 완료</strong><span>{personalMarriage.period.start} ~ {personalMarriage.period.end} · {personalMarriage.period.day_count}일</span></div></div><PersonalMarriagePanel data={personalMarriage}/></div>}
 
@@ -1702,11 +1752,12 @@ export default function AppNext() {
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
+              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} angleTimeAvailable={Boolean(relationshipResult.result.natal_synastry?.user_time_available && relationshipResult.result.natal_synastry?.partner_time_available)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
                 sajuContext={relationshipResult.result.saju_relationship}
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 returnSupport={relationshipResult.result.reunion_return_support ?? null}
                 hierarchy={relationshipResult.result.reunion_hierarchy ?? null}
+                evidenceContract={relationshipResult.result.reunion_evidence_contract ?? null}
                 technicalDetails={<>
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTransitPanel result={relationshipResult}/>}

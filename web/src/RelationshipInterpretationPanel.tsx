@@ -1,4 +1,5 @@
 import { hierarchyView } from './lib/reunionHierarchy'
+import { ReunionHierarchyPanel } from './ReunionHierarchyPanel'
 import { tenGodLens } from './lib/systemReading'
 import { ReadingBadge, ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ReadingExplanation } from './ReadingExplanation'
@@ -35,11 +36,12 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, evidenceContract, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
-  aspects: Aspect[]; partnerExact: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
+  aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
   hierarchy?: Record<string, unknown> | null;
+  evidenceContract?: { version?: string; available?: boolean; evidence?: Aspect[] } | null;
   timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
@@ -61,7 +63,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       setImageExporting(false)
     }
   }
-  const view = buildRelationshipUserSummary({ aspects, partnerExact, mode: analysisMode, sensitive: timeSensitivePoints, timing: reunion ? timing : null })
+  const view = buildRelationshipUserSummary({ aspects, partnerExact, angleTimeAvailable, mode: analysisMode, sensitive: timeSensitivePoints, timing: reunion ? timing : null })
   const relation = sajuContext?.available === true && sajuContext.day_master_relation && typeof sajuContext.day_master_relation === 'object' ? sajuContext.day_master_relation as Record<string, unknown> : {}
   const sajuRows = [['내가 상대를 대할 때',relation.user_to_counterpart_ten_god],['상대가 나를 대할 때',relation.counterpart_to_user_ten_god]].flatMap(([label,value])=>typeof value === 'string' && tenGodLens(value) ? [{label:String(label),value,lens:tenGodLens(value)!}] : [])
 
@@ -199,7 +201,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
   return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
-    <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p></header>
+    <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>
     <div className="reading-export-toolbar" data-reading-export-ignore="true">
       <button type="button" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>
         {imageExporting ? <LoaderCircle className="reading-export-spinner" size={17} aria-hidden="true"/> : <ImageDown size={17} aria-hidden="true"/>}
@@ -208,36 +210,33 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       {!!imageExportStatus && <small role="status">{imageExportStatus}</small>}
     </div>
 
-    {reunion && hierarchyData && <section className="reading-section reunion-hierarchy">
-      <h3>최종 결론</h3>
-      <p>재접점 활성도: {String(hierarchyData.stages?.contact_recontact?.activation ?? '유효 후보 없음')} · 재결합 지원 활성도: {String(hierarchyData.stages?.relationship_rebuilding?.activation ?? '유효 후보 없음')}</p>
-      <p>선연락 주체: 판정 불가</p>
-      <p>{Object.values(hierarchyData.stages).map(s=>`${s.label}: ${s.activation ?? '유효 후보 없음'}`).join(' · ')}</p>
-      {hierarchyData.stability_structure && <p>안정적 관계 유지 구조: 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개. 접촉 수는 재결합 확률이나 관계의 지속 여부를 뜻하지 않습니다.</p>}
-      {hierarchyData.validation?.status !== 'PASS' && <p role="alert">계산 검증에 실패해 후보 날짜와 해석 생성을 보류했습니다.</p>}
-      <h4>오늘 이후 가장 강한 기간 TOP 3</h4>
-      {hierarchyData.top_periods.map((w)=><article className="relationship-pattern" key={`${w.start}:${w.stage}`}>
-        <b>{w.start} ~ {w.end} · {w.label}</b><p>핵심 날짜 {w.date} · 상대 활성도 {w.final}점</p>
-        <details><summary>점수 근거</summary><p>장기 {w.components.long_term} · 중기 {w.components.mid_term} · 촉발점 {w.components.event_trigger} · 체계 교차 {w.components.cross_system} · 최종 {w.components.final}</p></details>
-      </article>)}
-      {!hierarchyData.top_periods.length && <p>조회 기간에 장기·중기·단기 조건을 모두 통과한 미래 후보가 없습니다.</p>}
-      {hierarchyData.nearest_window?.date && <p>가장 가까운 활성창: {hierarchyData.nearest_window.start} ~ {hierarchyData.nearest_window.end} · 핵심 날짜 {hierarchyData.nearest_window.date}</p>}
-      <p>반복 패턴: {leadFriction?.caution ?? '긴장과 끌림을 구분하고, 연락 이후 실제 행동이 지속되는지 확인하세요.'}</p>
-      <p>{hierarchyData.score_meaning}</p>
-      <details className="reading-more"><summary>왜 이렇게 나왔는지 — 쉬운 설명</summary><p>먼저 장기 관계 활성과 중기 배경이 겹치는 기간을 찾고, 그 안에서 연락·감정·만남·관계 재정의의 촉발점을 따로 계산했습니다. 정확한 각 하나만으로 재회 날짜를 정하지 않습니다.</p><p>감정 활성 ≠ 연락 ≠ 만남 ≠ 재결합 ≠ 안정적 관계 유지</p></details>
-      <details className="reading-more"><summary>이미 지나간 활성기</summary>{hierarchyData.past_windows.map((w)=><p key={`${w.start}:${w.stage}`}>{w.start} ~ {w.end} · {w.label} · {w.final}점</p>)}</details>
-      <details className="reading-more"><summary>전문 근거·검증 범위</summary><p>Secondary Progression(세컨더리 프로그레션/2차 진행) · Solar Arc(솔라아크/태양호) · Transit(트랜짓/경과) · 다섯 행성 회귀 · 사주 절입</p>{hierarchyData.limitations.map(x=><p key={x}>{x}</p>)}{(hierarchyData.validation?.checks ?? []).filter((x)=>x.status!=='PASS').map((x)=><p key={x.name}>{x.name}: {x.status} — {x.detail}</p>)}</details>
+    {reunion && !hierarchyData && <section className="reading-section reunion-legacy-result" role="status">
+      <h3>이전 계산 저장본</h3>
+      <p>이 결과는 단계별 사후검증 엔진이 포함되기 전 계산본이야. 아래에 보이는 과거 날짜를 현재나 미래의 추천 시기처럼 해석하지 마.</p>
+      <p>재회운 정밀 계산을 다시 실행하면 AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기가 새 계산값으로 분리돼.</p>
     </section>}
 
-    {ai?.ok && ai.data ? <section className="reading-section relationship-natural-reading">
-      <h3>{ai.data.headline}</h3>
+    {reunion && hierarchyData && <ReunionHierarchyPanel
+    hierarchyData={hierarchyData}
+    evidence={evidenceContract?.evidence ?? []}
+    reunionV2={reunionV2}
+    directionRows={[
+      {kind:'incoming',label:'상대 → 나',...view.incoming},
+      {kind:'outgoing',label:'나 → 상대',...view.outgoing},
+      {kind:'reconnection',label:'과거 인연 재접점',...view.reconnection},
+    ]}
+    sustainabilityText={view.sustainabilityText}
+  />}
+
+    {ai?.ok && ai.data && (!reunion || !hierarchyData) ? <section className="reading-section relationship-natural-reading">
+      <h3>{reunion && !hierarchyData ? '이전 저장 해설 · 참고용' : ai.data.headline}</h3>
       {reunion ? <ReadableCopy className="reading-conclusion" text={reunionV2?.summary || reunionAi?.bottom || ai.data.overview}/> : <p className="reading-conclusion">{analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview}</p>}
       {!!generatedCost && <p className="ai-generated-cost">{generatedCost}</p>}
       {reunion && reunionV2 ? <>
         <section className="reunion-ai-block"><h4>다시 연결될 여지가 있는 이유</h4><ReadableCopy text={reunionV2.why_reconnect.conclusion}/><ReadableCopy text={reunionV2.why_reconnect.interpretation}/></section>
         {returnContextBlock}
         <section className="reunion-ai-snapshot"><h4>누가 먼저 움직일 흐름인가</h4><ReadableCopy className="reunion-initiative-summary" text={reunionV2.initiative.conclusion}/><ReadableCopy text={reunionV2.initiative.interpretation}/><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
-        <section className="reunion-ai-block"><h4>접점이 강해지는 시기</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
+        <section className="reunion-ai-block"><h4>{!hierarchyData ? '이전 저장본 시기 해설 · 현재/미래 판단용 아님' : '접점이 강해지는 시기'}</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
         <section className="reunion-ai-block"><h4>다시 붙었을 때 관계 구조</h4><ReadableCopy text={reunionV2.rebuild.conclusion}/>{reunionV2.rebuild.conditions.length>0&&<ul>{reunionV2.rebuild.conditions.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
         <section className="reunion-ai-block"><h4>다시 깨뜨릴 수 있는 반복 패턴</h4><ReadableCopy text={reunionV2.repeat_risks.conclusion}/>{reunionV2.repeat_risks.patterns.length>0&&<ul>{reunionV2.repeat_risks.patterns.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
         {reunionV2.convergence.length>0&&<details className="reunion-precision-note"><summary>여러 차트가 함께 가리키는 수렴 근거</summary>{reunionV2.convergence.map((x,i)=><div key={i}><b>{x.theme}{x.period?` · ${x.period}`:''}</b><p>{x.meaning}</p></div>)}</details>}
@@ -257,9 +256,9 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         {!!reunionAi.filter && <section className="reunion-ai-block"><h4>연락 이후 관계 유지력</h4><p>{reunionAi.filter}</p></section>}
         {!!reunionAi.precision && <details className="reunion-precision-note"><summary>정밀도·제외 근거</summary><p>{reunionAi.precision}</p></details>}
       </> : analysisMode.startsWith('marriage_') ? <><ReadingExplanation kind="reason">{[ai.data.marriage_reading?.bond,ai.data.marriage_reading?.emotional_home].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.marriage_reading?.daily_life,ai.data.marriage_reading?.intimacy_resources,ai.data.marriage_reading?.conflict_repair].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.marriage_reading?.commitment_or_current_cycle,ai.data.marriage_reading?.timing].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.marriage_reading?.caution,ai.data.marriage_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : <><ReadingExplanation kind="reason">{[ai.data.chemistry,ai.data.emotional_dynamic,ai.data.communication].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.long_term,...(ai.data.practical_advice??[])].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{ai.data.timing}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.conflict_pattern,ai.data.power_boundaries].filter(Boolean).join(' ')}</ReadingExplanation></>}
-    </section> : <section className="reading-section relationship-natural-reading is-ready"><h3>Gemini 자연어 해설</h3><p>계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section>}
+    </section> : !(reunion && hierarchyData && ai?.ok && ai.data) ? <section className="reading-section relationship-natural-reading is-ready"><h3>{reunion && hierarchyData ? '추가 자연어 해설 · 선택' : 'Gemini 자연어 해설'}</h3><p>{reunion && hierarchyData ? '위 계산 결과 확인에는 필요 없어. 더 긴 서술형 해설이 필요할 때만 생성해.' : '계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.'}</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section> : null}
 
-    <details className="relationship-calculated-fallback" open={!(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
+    <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
         <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>

@@ -1,0 +1,49 @@
+/* v72 — birth-profile structure owner.
+   The profile editor no longer carries the shared `form-card` class at all. That removes the
+   translucent/blurred card surface from this screen structurally instead of trying to override it
+   after iOS recomposition. Only the dedicated profile editor wrapper is styled here; actual inputs
+   remain opaque white through viewport-background-v60.css. */
+
+.profile-editor-surface,
+.profile-editor-surface:focus-within,
+.profile-editor-surface:has(.stable-choice.is-open) {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 18px 16px;
+  overflow: visible !important;
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  isolation: auto !important;
+  transform: none !important;
+  will-change: auto !important;
+  contain: none !important;
+}
+
+.profile-editor-surface::before,
+.profile-editor-surface::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+}
+
+@media (max-width: 600px) {
+  .profile-editor-surface,
+  .profile-editor-surface:focus-within,
+  .profile-editor-surface:has(.stable-choice.is-open) {
+    padding: 17px 14px;
+  }
+}

@@ -340,3 +340,38 @@ details.period-ai-meta:not([open])>.period-ai-cost{
   .relationship-precision-summary>small{grid-column:1/2;white-space:normal}
   .relationship-precision-summary::after{grid-column:2;grid-row:2}
 }
+
+
+/* V29.1 · relationship precision cards need breathing room on iPhone. */
+@media(max-width:430px){
+  .relationship-precision-card>.relationship-precision-summary{
+    padding:17px 18px 16px!important;
+    row-gap:8px!important;
+    column-gap:12px!important;
+  }
+  .relationship-precision-summary>span{
+    margin:0 0 1px!important;
+    padding:0!important;
+  }
+  .relationship-precision-summary>strong{
+    margin:0!important;
+  }
+  .relationship-precision-summary>small{
+    margin-top:1px!important;
+    padding:0!important;
+  }
+  .relationship-time-reliability-card{
+    padding:18px 18px 17px!important;
+  }
+  .relationship-time-reliability-card .result-card-title{
+    display:grid!important;
+    gap:6px!important;
+    margin-bottom:13px!important;
+  }
+  .relationship-time-reliability-card .status-banner{
+    margin:0 0 12px!important;
+  }
+  .relationship-time-reliability-card>.result-note{
+    margin:0!important;
+  }
+}

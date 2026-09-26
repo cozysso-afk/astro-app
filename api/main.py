@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from integrated_fortune_precision_v2 import ENGINE_VERSION as INTEGRATED_ENGINE_VERSION
 from integrated_fortune_precision_v2 import build_integrated_fortune_precision_v2, build_precision_contract
@@ -19,12 +19,14 @@ from ai_interpret_v1 import AI_DEFAULT_MODEL, ai_status, interpret_integrated_fo
 from relationship_western_v1 import ENGINE_VERSION as REL_ENGINE_VERSION
 from relationship_western_v1 import build_relationship_western
 from relationship_return_v1 import ENGINE_VERSION as REL_RETURN_ENGINE_VERSION, augment_relationship_with_returns
+from relationship_evidence_contract_v1 import CONTRACT_VERSION as REUNION_EVIDENCE_CONTRACT_VERSION
 from reunion_hierarchy_v2 import apply_reunion_hierarchy
 from relationship_saju_v1 import ENGINE_VERSION as REL_SAJU_ENGINE_VERSION, build_relationship_saju
 from astrocartography_v1 import ENGINE_VERSION as LOCATION_ENGINE_VERSION, build_location_fit
 from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERSION, build_personal_marriage
 from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
+from timezone_provenance_v1 import resolve_local_datetime
 
 APP_VERSION = "api-fortune-v6.0-reunion-hierarchy"
 
@@ -73,6 +75,41 @@ class RectifiedWindow(BaseModel):
     end: dt_time | None = None
 
 
+class ForecastLocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    place_id: str | None = None
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    timezone_id: str
+
+    @model_validator(mode="after")
+    def validate_timezone(self):
+        resolve_local_datetime(
+            date(2000, 1, 1), dt_time(12, 0),
+            timezone_id=self.timezone_id,
+            utc_offset_hours=None,
+        )
+        return self
+
+
+class ForecastLocationInterval(ForecastLocation):
+    start_utc: datetime
+    end_utc: datetime
+
+    @model_validator(mode="after")
+    def validate_interval(self):
+        if self.start_utc.tzinfo is None or self.start_utc.utcoffset() is None:
+            raise ValueError("forecast_location_timeline start_utc must be timezone-aware")
+        if self.end_utc.tzinfo is None or self.end_utc.utcoffset() is None:
+            raise ValueError("forecast_location_timeline end_utc must be timezone-aware")
+        self.start_utc = self.start_utc.astimezone(timezone.utc)
+        self.end_utc = self.end_utc.astimezone(timezone.utc)
+        if self.end_utc <= self.start_utc:
+            raise ValueError("forecast_location_timeline end_utc must be after start_utc")
+        return self
+
+
 class RelationshipProfile(BaseModel):
     name: str | None = None
     birth_date: date
@@ -84,6 +121,26 @@ class RelationshipProfile(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     utc_offset_hours: float = Field(default=9.0, ge=-14, le=14)
+    timezone_id: str | None = None
+    timezone_fold: int | None = Field(default=None, ge=0, le=1)
+    forecast_location: ForecastLocation | None = None
+    forecast_location_timeline: list[ForecastLocationInterval] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_birth_timezone(self):
+        resolve_local_datetime(
+            self.birth_date,
+            self.birth_time or dt_time(12, 0),
+            timezone_id=self.timezone_id,
+            utc_offset_hours=self.utc_offset_hours,
+            fold=self.timezone_fold,
+        )
+        timeline = sorted(self.forecast_location_timeline, key=lambda entry: entry.start_utc)
+        for previous, current in zip(timeline, timeline[1:]):
+            if current.start_utc < previous.end_utc:
+                raise ValueError("forecast_location_timeline intervals must not overlap")
+        self.forecast_location_timeline = timeline
+        return self
 
     def engine_payload(self) -> dict:
         normalized_time_known = self.time_known if self.time_known is not None else self.birth_time is not None
@@ -107,6 +164,10 @@ class RelationshipProfile(BaseModel):
             "latitude": self.latitude,
             "longitude": self.longitude,
             "utc_offset_hours": self.utc_offset_hours,
+            "timezone_id": self.timezone_id,
+            "timezone_fold": self.timezone_fold,
+            "forecast_location": self.forecast_location.model_dump() if self.forecast_location else None,
+            "forecast_location_timeline": [entry.model_dump() for entry in self.forecast_location_timeline],
         }
 
 
@@ -115,10 +176,22 @@ class RelationshipRequest(BaseModel):
     counterpart: RelationshipProfile
     as_of_date: date | None = None
     query_utc_offset_hours: float | None = Field(default=None, ge=-14, le=14)
+    query_timezone_id: str | None = None
     start_date: date
     end_date: date
     relationship_status: RelationshipStatus = "dating"
     analysis_mode: Literal["compatibility", "reunion", "marriage_unmarried", "marriage_married"] = "compatibility"
+
+    @model_validator(mode="after")
+    def validate_query_timezone(self):
+        offset = self.user.utc_offset_hours if self.query_utc_offset_hours is None else self.query_utc_offset_hours
+        resolve_local_datetime(
+            self.start_date,
+            dt_time(12, 0),
+            timezone_id=self.query_timezone_id,
+            utc_offset_hours=offset,
+        )
+        return self
 
 
 class PersonalLoveProfile(RelationshipProfile):
@@ -285,7 +358,12 @@ def _run_calc_job(job_id: str, payload: dict):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "version": APP_VERSION}
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "reunion_evidence_contract": REUNION_EVIDENCE_CONTRACT_VERSION,
+        "runtime_git_sha": os.getenv("RENDER_GIT_COMMIT", ""),
+    }
 
 
 @app.get("/v1/meta")
@@ -294,6 +372,8 @@ def meta() -> dict:
         "api_version": APP_VERSION,
         "relationship_engine": REL_ENGINE_VERSION,
         "relationship_return_engine": REL_RETURN_ENGINE_VERSION,
+        "reunion_evidence_contract": REUNION_EVIDENCE_CONTRACT_VERSION,
+        "runtime_git_sha": os.getenv("RENDER_GIT_COMMIT", ""),
         "integrated_engine": INTEGRATED_ENGINE_VERSION,
         "location_engine": LOCATION_ENGINE_VERSION,
         "personal_marriage_engine": PERSONAL_MARRIAGE_ENGINE_VERSION,
@@ -481,9 +561,15 @@ def relationship_western(request: RelationshipRequest) -> dict:
                     "event_probability": "not_calculated",
                 }
             query_offset = request.query_utc_offset_hours if request.query_utc_offset_hours is not None else request.user.utc_offset_hours
-            as_of = request.as_of_date or datetime.now(timezone(timedelta(hours=query_offset))).date()
+            query_resolution = resolve_local_datetime(
+                request.start_date, dt_time(12, 0),
+                timezone_id=request.query_timezone_id,
+                utc_offset_hours=query_offset,
+            )
+            as_of = request.as_of_date or datetime.now(query_resolution.tzinfo).date()
             result = apply_reunion_hierarchy(result, user_payload, cp_payload, request.start_date, request.end_date,
-                as_of_date=as_of, query_utc_offset_hours=query_offset)
+                as_of_date=as_of, query_utc_offset_hours=query_offset,
+                query_timezone_id=request.query_timezone_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"relationship calculation failed: {exc}") from exc
 

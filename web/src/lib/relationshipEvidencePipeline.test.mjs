@@ -10,7 +10,7 @@ const formatters = readFileSync(new URL('./resultFormatters.ts', import.meta.url
 const cache = readFileSync(new URL('./readingCache.ts', import.meta.url), 'utf8')
 
 test('calculation evidence survives API to internal Gemini and external-AI prompt contracts', () => {
-  for (const field of ['composite','progressed_synastry','progressed_composite','marks_tertiary','timing_timezone_policy']) {
+  for (const field of ['composite','progressed_synastry','progressed_composite','marks_tertiary','timing_timezone_policy','reunion_evidence_contract']) {
     assert.match(engine, new RegExp(`[\"']${field}[\"']`), `engine must emit ${field}`)
     assert.match(edge, new RegExp(field), `internal Gemini packet must retain ${field}`)
     assert.match(formatters, new RegExp(field), `external AI packet must retain ${field}`)
@@ -32,12 +32,13 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
   assert.doesNotMatch(formatters, /reunion_dimensions: rawResult\.reunion_dimensions \?\? null/)
   assert.doesNotMatch(formatters, /reunion_secondary_support: rawResult\.reunion_secondary_support \?\? null/)
   assert.match(edge, /secondaryDimensionPacket/)
+  assert.match(edge, /reunion_evidence_contract:base\.reunion_evidence_contract/)
   assert.match(edge, /reunion_timing_windows:base\.reunion_timing_windows/)
 })
 
-test('relationship interpretation cache versions track the provisional-time and solar-lunar return reunion contracts', () => {
+test('relationship interpretation cache versions track the provisional-time and current reunion narrative contracts', () => {
   assert.match(edge, /VERSION="relationship-v11\.8-provisional-time-reference"/)
-  assert.match(edge, /REUNION_VERSION="relationship-v12\.0-hierarchical-timing"/)
+  assert.match(edge, /REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.0-hierarchical-timing-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.9-grounding-false-negative-v1-consultation-depth-v3'/)
 })

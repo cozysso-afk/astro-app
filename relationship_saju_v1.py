@@ -11,6 +11,7 @@ from lunar_python import Solar
 
 from integrated_fortune_v1 import _natal_saju_components, _ten_god
 from birth_time_reliability_v1 import resolve_birth_time_reliability
+from timezone_provenance_v1 import resolve_profile_birth_datetime
 
 ENGINE_VERSION = "relationship-saju-v1.1-birth-time-provenance"
 
@@ -32,7 +33,9 @@ def _pillars(profile: dict) -> dict:
     bt = profile.get("birth_time") or dt_time(12, 0)
     bd: date = profile["birth_date"]
     lon = profile.get("longitude")
-    offset = float(profile.get("utc_offset_hours", 9.0))
+    # Saju retains local civil date/time and its existing true-solar rules.  IANA
+    # provenance supplies only the historical legal offset used by that formula.
+    offset = resolve_profile_birth_datetime(profile, noon_proxy=not known).resolved_utc_offset_hours
     effective_lon = float(lon) if known and lon is not None else None
     natal = _natal_saju_components(bd, bt, offset, effective_lon)
     pillars = natal["pillars"]

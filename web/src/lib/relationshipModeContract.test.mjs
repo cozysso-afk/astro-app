@@ -8,6 +8,7 @@ const personalPanel = readFileSync(new URL('../PersonalMarriagePanel.tsx', impor
 const cache = readFileSync(new URL('./readingCache.ts', import.meta.url), 'utf8')
 const relationshipFn = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
 const formatters = readFileSync(new URL('./resultFormatters.ts', import.meta.url), 'utf8')
+const relationshipSummary = readFileSync(new URL('./relationshipUserSummary.ts', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../api/main.py', import.meta.url), 'utf8')
 const personalEngine = readFileSync(new URL('../../../personal_marriage_v1.py', import.meta.url), 'utf8')
 
@@ -65,7 +66,7 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(relationshipFn, /결혼 가능성 표현은 금지/)
   assert.match(relationshipFn, /intimacy_resources/)
   assert.match(relationshipFn, /if\(!available\)aspects=aspects\.filter/)
-  assert.match(relationshipFn, /provisional\(잠정\) 참고 근거/)
+  assert.match(relationshipFn, /누락하거나 제외하지 말고 전부 분석한다/)
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
@@ -78,6 +79,21 @@ test('marriage UI uses mode-specific deterministic view and preserves validated 
   assert.match(panel, /JSON\.stringify\(ai\.data/)
 })
 
+test('compatibility and both marriage modes prioritize different real-life questions', () => {
+  assert.match(relationshipSummary, /const sectionOrder: Role\[\] = married/)
+  assert.match(relationshipSummary, /\['communication','stability','attraction','power','perspective'\]/)
+  assert.match(relationshipSummary, /\['stability','communication','attraction','power','perspective'\]/)
+  assert.match(relationshipSummary, /반복 갈등 · 회복 방식/)
+  assert.match(relationshipSummary, /생활 책임 · 돌봄 분담/)
+  assert.match(relationshipSummary, /생활비 · 집안일 · 책임/)
+  assert.match(relationshipSummary, /결정권 · 가족 경계/)
+  assert.match(relationshipSummary, /결혼 전 합의할 것/)
+  assert.match(relationshipSummary, /이번에 함께 바꿀 것/)
+  assert.match(relationshipSummary, /생활비·집안일·돌봄·가족행사·혼자 쉴 시간/)
+  assert.match(relationshipSummary, /말이 꼬였을 때 서로 뜻을 확인하고 다시 대화를 이어갈 수 있는지가 핵심/)
+  assert.match(panel, /index<2/)
+})
+
 test('relationship modes keep Gemini natural language primary and deterministic prose as fallback', () => {
   assert.match(panel, /relationship-natural-reading/)
   assert.match(panel, /Gemini 자연어 해설/)
@@ -87,7 +103,7 @@ test('relationship modes keep Gemini natural language primary and deterministic 
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
   assert.match(relationshipFn, /MAX_GEMINI_CALLS=2/)
-  assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300/)
+  assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=85000,MAX_AI_JOB_ESTIMATED_KRW=300/)
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)
@@ -96,7 +112,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.0-hierarchical-timing-v1'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12\.9-grounding-false-negative-v1-consultation-depth-v3'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -109,7 +125,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v12\.0-hierarchical-timing/)
+  assert.match(relationshipFn, /relationship-v12\.9-grounding-false-negative/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

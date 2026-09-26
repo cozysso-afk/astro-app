@@ -1,0 +1,8 @@
+/* Stable app background: do not move aurora centers when form height changes. */
+.app-shell {
+  background:
+    radial-gradient(circle 260px at 14% 0px, rgba(231,223,240,.52), transparent 100%),
+    radial-gradient(circle 240px at 88% 170px, rgba(223,233,240,.42), transparent 100%),
+    linear-gradient(180deg,#f7f5f9 0%,#f4f2f6 100%) !important;
+  background-color: #f5f3f8 !important;
+}

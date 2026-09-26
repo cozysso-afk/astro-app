@@ -20,10 +20,12 @@ import swisseph as swe
 
 from western_house_system_v1 import calculate_quadrant_houses
 from birth_time_reliability_v1 import resolve_birth_time_reliability
+from timezone_provenance_v1 import resolve_local_datetime, resolve_profile_birth_datetime
 from relationship_reliability_v1 import aspect_signature, classify_scan_ratio, decorate_aspect, sensitivity_scan_spec
 from reunion_dimension_v1 import DIMENSIONS, FAST_TRIGGER_PLANETS, daily_dimension_scores, secondary_support
+from relationship_evidence_contract_v1 import build_reunion_evidence_contract
 
-ENGINE_VERSION = "relationship-western-v1.13-four-stage-gated-dates"
+ENGINE_VERSION = "relationship-western-v1.14-reunion-evidence-contract"
 TROPICAL_MONTH_DAYS = 27.32158218
 YEAR_DAYS = 365.2422
 
@@ -84,10 +86,9 @@ def _transit_hits(transit_chart, natal_chart, person):
         orb_limit = _transit_orb_limit(t_name)
         layer_class = "major_transit" if t_name in {"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"} else "daily_transit"
         for target, n_lon in targets.items():
-            # Entered-time angles are useful as provisional interpretation context, but
-            # they must not change deterministic reunion timing scores until exact.
-            if target in {"ASC", "DSC", "MC", "IC"} and not natal_exact:
-                continue
+            # If a concrete birth time was entered, keep time-sensitive points in the
+            # analysis even when provenance is not exact. Reliability is handled below
+            # by evidence_confidence/precision_weight instead of silently excluding them.
             target_weight = TRANSIT_TARGET_WEIGHTS.get(target, .35)
             dist = _angle_distance(t_lon, float(n_lon))
             for aspect, exact in ASPECTS.items():
@@ -104,6 +105,15 @@ def _transit_hits(transit_chart, natal_chart, person):
                     chart_b_exact=natal_exact,
                     orb_limit=orb_limit,
                 )
+                confidence = str(meta.get("evidence_confidence") or "moderate")
+                precision_weight = 1.0 if not meta.get("birth_time_dependency") else {
+                    "high": 1.0,
+                    "moderate-high": 0.92,
+                    "moderate": 0.82,
+                    "low-moderate": 0.70,
+                    "low": 0.55,
+                }.get(confidence, 0.75)
+                score = round(score * precision_weight, 1)
                 found.append({
                     "person": person,
                     "transit": t_name,
@@ -117,6 +127,7 @@ def _transit_hits(transit_chart, natal_chart, person):
                     "time_sensitivity": meta["time_sensitivity"],
                     "birth_time_dependency": meta["birth_time_dependency"],
                     "evidence_confidence": meta["evidence_confidence"],
+                    "precision_weight": precision_weight,
                     "layer_priority": meta["layer_priority"],
                     "event_probability": "not_calculated",
                 })
@@ -275,11 +286,14 @@ def _reunion_dimension_context(rows, start_date, end_date):
     }
 
 
-def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours):
+def _build_reunion_transits(user_natal, cp_natal, start_date, end_date, utc_offset_hours, timezone_id=None):
     rows = []
     cursor = start_date
     while cursor <= end_date:
-        target_utc = _local_noon_utc(cursor, utc_offset_hours)
+        target_utc = (
+            _local_noon_utc(cursor, utc_offset_hours, timezone_id)
+            if timezone_id else _local_noon_utc(cursor, utc_offset_hours)
+        )
         transit_chart = _chart_from_jd(_jd_from_utc(target_utc), include_moon=False, include_angles=False)
         user_hits = _transit_hits(transit_chart, user_natal, "user")
         cp_hits = _transit_hits(transit_chart, cp_natal, "counterpart")
@@ -407,9 +421,14 @@ def _mid_angle(a, b):
     return _norm(a + d / 2.0)
 
 
-def _utc_datetime(birth_date, birth_time, utc_offset_hours):
-    local = datetime.combine(birth_date, birth_time)
-    return (local - timedelta(hours=float(utc_offset_hours))).replace(tzinfo=timezone.utc)
+def _utc_datetime(birth_date, birth_time, utc_offset_hours, timezone_id=None, timezone_fold=None):
+    return resolve_local_datetime(
+        birth_date,
+        birth_time,
+        timezone_id=timezone_id,
+        utc_offset_hours=utc_offset_hours,
+        fold=timezone_fold,
+    ).utc
 
 
 def _utc_offset_value(value, default=9.0):
@@ -417,11 +436,25 @@ def _utc_offset_value(value, default=9.0):
     return float(default if value is None else value)
 
 
-def _local_noon_utc(day, utc_offset_hours):
+def _local_noon_utc(day, utc_offset_hours, timezone_id=None, timezone_fold=None):
     """Map a user-facing local calendar date to local noon, then UTC."""
-    offset = _utc_offset_value(utc_offset_hours)
-    local_tz = timezone(timedelta(hours=offset))
-    return datetime.combine(day, dt_time(12, 0), tzinfo=local_tz).astimezone(timezone.utc)
+    return resolve_local_datetime(
+        day,
+        dt_time(12, 0),
+        timezone_id=timezone_id,
+        utc_offset_hours=utc_offset_hours,
+        fold=timezone_fold,
+    ).utc
+
+
+def _profile_birth_resolution(profile, *, noon_proxy=False):
+    if not noon_proxy and profile.get("_resolved_birth_datetime") is not None:
+        return profile["_resolved_birth_datetime"]
+    resolved = resolve_profile_birth_datetime(profile, noon_proxy=noon_proxy)
+    if not noon_proxy:
+        profile["_resolved_birth_datetime"] = resolved
+        profile["timezone_provenance"] = resolved.provenance()
+    return resolved
 
 
 def _jd_from_utc(dt):
@@ -488,7 +521,16 @@ def _profile_chart(profile, allow_unknown_time=False):
             return None
         bt = dt_time(12, 0)
         using_noon_proxy = True
-    jd = _jd_from_utc(_utc_datetime(profile["birth_date"], bt, profile.get("utc_offset_hours", 9.0)))
+    if not using_noon_proxy:
+        birth_utc = _profile_birth_resolution(profile).utc
+    else:
+        birth_utc = resolve_local_datetime(
+            profile["birth_date"], bt,
+            timezone_id=profile.get("timezone_id"),
+            utc_offset_hours=profile.get("utc_offset_hours"),
+            fold=profile.get("timezone_fold"),
+        ).utc
+    jd = _jd_from_utc(birth_utc)
     chart = _chart_from_jd(
         jd,
         profile.get("latitude"), profile.get("longitude"),
@@ -519,7 +561,10 @@ def _diagnostic_profile_chart(profile, shift_minutes):
     if not reliability.get("time_available") or profile.get("birth_time") is None:
         return None
     base = datetime.combine(profile["birth_date"], profile["birth_time"]) + timedelta(minutes=int(shift_minutes))
-    jd = _jd_from_utc(_utc_datetime(base.date(), base.time(), profile.get("utc_offset_hours", 9.0)))
+    jd = _jd_from_utc(_utc_datetime(
+        base.date(), base.time(), profile.get("utc_offset_hours", 9.0),
+        profile.get("timezone_id"), profile.get("timezone_fold"),
+    ))
     chart = _chart_from_jd(
         jd,
         profile.get("latitude"),
@@ -691,7 +736,7 @@ def _midpoint_chart(chart_a, chart_b):
 
 
 def _secondary_progressed_chart(profile, target_dt, include_angles=False):
-    birth_utc = _utc_datetime(profile["birth_date"], profile["birth_time"], profile.get("utc_offset_hours", 9.0))
+    birth_utc = _profile_birth_resolution(profile).utc
     age_days = (target_dt.astimezone(timezone.utc) - birth_utc).total_seconds() / 86400.0
     progressed_days = age_days / YEAR_DAYS
     jd = _jd_from_utc(birth_utc) + progressed_days
@@ -730,8 +775,8 @@ def _geo_midpoint(lat1, lon1, lat2, lon2, variant="uncorrected"):
 
 
 def _davison_from_profiles(a, b, variant="uncorrected"):
-    a_utc = _utc_datetime(a["birth_date"], a["birth_time"], a.get("utc_offset_hours", 9.0))
-    b_utc = _utc_datetime(b["birth_date"], b["birth_time"], b.get("utc_offset_hours", 9.0))
+    a_utc = _profile_birth_resolution(a).utc
+    b_utc = _profile_birth_resolution(b).utc
     mid_ts = (a_utc.timestamp() + b_utc.timestamp()) / 2.0
     mid_utc = datetime.fromtimestamp(mid_ts, tz=timezone.utc)
     lat, lon = _geo_midpoint(
@@ -875,13 +920,13 @@ def _summary(aspect_sets):
     }
 
 
-def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility"):
+def build_relationship_western(user_profile, counterpart_profile, month_segments, analysis_mode="compatibility", *, include_reunion_daily_scan=True):
     """Return static and monthly advanced relationship layers.
 
     month_segments: iterable of (segment_start: date, segment_end: date); midpoint local noon in the
-    user profile's fixed UTC offset is used as the representative timing instant. Exact partner birth
+    user profile's birth timezone is used as the representative timing instant. Exact partner birth
     time/place unlocks Davison and Marks layers.
-    Daily two-person reunion transit scanning runs only for analysis_mode="reunion".
+    Daily two-person reunion transit scanning runs only for analysis_mode="reunion". Async reunion jobs may defer this duplicate scan to the canonical reunion hierarchy.
     """
     month_segments = list(month_segments)
     result = {
@@ -893,7 +938,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "tertiary_key": f"Tertiary I: 1 ephemeris day = {TROPICAL_MONTH_DAYS} life days; completed lunar months",
         "orb_policy": "natal 3-6° by point with very_tight/strong/background grades; secondary 1.5° with narrow-orb priority; tertiary 1.0° supplementary; major aspects + quincunx",
         "layer_priority": ["natal", "secondary", "major_transit", "daily_transit", "tertiary"],
-        "timing_timezone_policy": "user-facing calendar dates use local noon in the user profile fixed utc_offset_hours; numeric 0 is preserved; IANA/DST inference is not performed",
+        "timing_timezone_policy": "user-facing calendar dates use local noon; a valid IANA timezone_id takes priority, otherwise the legacy fixed utc_offset_hours is applied exactly once",
         "limitations": [],
     }
 
@@ -906,6 +951,16 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     user_clock_ready = bool(user_available and user_profile.get("latitude") is not None and user_profile.get("longitude") is not None)
     cp_clock_ready = bool(cp_available and counterpart_profile.get("latitude") is not None and counterpart_profile.get("longitude") is not None)
     result["birth_time_reliability"] = {"user": user_reliability, "counterpart": cp_reliability}
+
+    user_resolution = _profile_birth_resolution(user_profile, noon_proxy=not user_available)
+    cp_resolution = _profile_birth_resolution(counterpart_profile, noon_proxy=not cp_available)
+    user_profile["timezone_provenance"] = user_resolution.provenance()
+    counterpart_profile["timezone_provenance"] = cp_resolution.provenance()
+    result["timezone_provenance"] = {
+        "user": user_resolution.provenance(),
+        "counterpart": cp_resolution.provenance(),
+        "policy": "birth local civil time is converted to UTC once; IANA overrides fixed offset; invalid zones and nonexistent wall times fail closed",
+    }
 
     user_natal = _profile_chart(user_profile, allow_unknown_time=True)
     cp_natal = _profile_chart(counterpart_profile, allow_unknown_time=True)
@@ -983,9 +1038,10 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "reunion_scan": "enabled" if analysis_mode == "reunion" else "skipped",
         "reason": "daily two-person reunion transit scan is purpose-specific; monthly progressed timing layers remain available for compatibility/marriage",
     }
-    if month_segments and analysis_mode == "reunion":
+    if month_segments and analysis_mode == "reunion" and include_reunion_daily_scan:
         transit_layer = _build_reunion_transits(
-            user_natal, cp_natal, month_segments[0][0], month_segments[-1][1], user_profile.get("utc_offset_hours", 9.0)
+            user_natal, cp_natal, month_segments[0][0], month_segments[-1][1],
+            user_profile.get("utc_offset_hours", 9.0), user_profile.get("timezone_id"),
         )
         result["relationship_transits"] = transit_layer
         result["reunion_transits"] = transit_layer
@@ -1021,7 +1077,9 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
     monthly = []
     for seg_start, seg_end in month_segments:
         rep_date = seg_start + (seg_end - seg_start) // 2
-        target = _local_noon_utc(rep_date, user_profile.get("utc_offset_hours", 9.0))
+        target = _local_noon_utc(
+            rep_date, user_profile.get("utc_offset_hours", 9.0), user_profile.get("timezone_id")
+        )
         row = {"calendar_month": f"{seg_start.year}-{seg_start.month:02d}", "representative_date": rep_date.isoformat()}
         layer_aspects = {}
 
@@ -1035,6 +1093,13 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
                 "progressed_to_progressed": _aspects(up, cp, mode="secondary", limit=500 if analysis_mode == "reunion" else 24),
             }
             row["progressed_synastry"] = {"available": True, "precision": progressed_precision, **ps}
+            row["progressed_house_overlays"] = {
+                "available": bool(user_clock_ready and cp_clock_ready),
+                "precision": progressed_precision if user_clock_ready and cp_clock_ready else "unavailable",
+                "user_progressed_in_counterpart": _house_overlays(up, cp_natal, "user_progressed", "counterpart") if cp_clock_ready else {"available": False, "reason": "counterpart entered birth time/place required"},
+                "counterpart_progressed_in_user": _house_overlays(cp, user_natal, "counterpart_progressed", "user") if user_clock_ready else {"available": False, "reason": "user entered birth time/place required"},
+                "policy": "Progressed planets are placed into the other person's natal Whole Sign + quadrant houses. House labels inherit the target person's birth-time precision and are provisional unless provenance-verified exact.",
+            }
             layer_aspects.update({f"progressed_synastry.{k}": v for k, v in ps.items()})
 
             prog_comp = _midpoint_chart(up, cp)
@@ -1050,6 +1115,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
             layer_aspects["progressed_composite_to_natal_composite"] = pc_aspects
         else:
             row["progressed_synastry"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed synastry."}
+            row["progressed_house_overlays"] = {"available": False, "reason": "Progressed house overlays require concrete entered birth times and coordinates."}
             row["progressed_composite"] = {"available": False, "reason": "A concrete birth time is required for both people; unknown-time noon proxies are not used for progressed composite."}
 
         if marks_a is not None and marks_b is not None:
@@ -1079,6 +1145,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
 
     result["months"] = monthly
     if analysis_mode == "reunion":
+        result["reunion_evidence_contract"] = build_reunion_evidence_contract(monthly)
         result["reunion_secondary_support"] = {
             "months": [
                 {"calendar_month": row["calendar_month"], "representative_date": row["representative_date"], "dimensions": row.get("reunion_secondary_support")}
@@ -1096,6 +1163,7 @@ def build_relationship_western(user_profile, counterpart_profile, month_segments
         "evidence": "Prioritize orb_grade, evidence_confidence, time_sensitivity and independent-layer repetition over raw aspect counts.",
         "reunion_dimensions": "For reunion mode keep four orthogonal stages separate: emotional activation, contact/recontact, in-person meeting, and relationship rebuilding/reunion. One stage never auto-escalates to the next. Legacy incoming/outgoing fields are counterpart-side/user-side activation only, never who contacts first.",
         "reunion_dates": "Secondary progression is period context. Exact dates require fast Sun/Mercury/Venus/Mars transit evidence. Planetary return is deduplicated from the same transit phenomenon and cannot add an independent convergence vote.",
+        "reunion_evidence_contract": "Progressed synastry is kept directional (user→counterpart, counterpart→user, progressed↔progressed) and progressed composite is relationship-level. Monthly orb trend may label applying/separating, but unresolved exact dates remain null; progressed house overlays inherit birth-time precision.",
         "birth_time": "An entered clock time is not automatically exact. When a concrete time and coordinates exist, Moon/angles/houses/Davison/Marks may be calculated as provisional reference layers; only provenance-verified time may be labelled exact or treated as decisive. Provisional angles do not alter deterministic timing scores.",
         "privacy": "No chart layer proves another person's private feelings, intention, contact, or reconciliation.",
     }

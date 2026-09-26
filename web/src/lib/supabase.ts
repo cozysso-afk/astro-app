@@ -4,13 +4,39 @@ const DEFAULT_SUPABASE_URL = 'https://dbynfabwfcakxayyggzi.supabase.co'
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_IEf9R9oJ5kbn513DdeqODQ_DwLeF35r'
 const PENDING_ANONYMOUS_LINK_KEY = 'astro_private_pending_anonymous_link_v1'
 const PENDING_ANONYMOUS_LINK_TTL_MS = 60 * 60 * 1000
+const REUNION_NARRATIVE_CONTRACT = 'reunion-consultation-v3'
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? DEFAULT_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? DEFAULT_SUPABASE_PUBLISHABLE_KEY
 
+function reunionNarrativeFetchInit(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (!url.includes('/functions/v1/relationship-interpret-v9-preview') || typeof init?.body !== 'string') return init
+  try {
+    const body = JSON.parse(init.body) as Record<string, unknown>
+    if (body.purpose !== 'reunion' || !body.calculation || typeof body.calculation !== 'object') return init
+    const calculation = body.calculation as Record<string, unknown>
+    const period = calculation.period && typeof calculation.period === 'object' ? calculation.period as Record<string, unknown> : {}
+    return {
+      ...init,
+      body: JSON.stringify({
+        ...body,
+        calculation: {
+          ...calculation,
+          period: { ...period, narrative_contract: REUNION_NARRATIVE_CONTRACT },
+        },
+      }),
+    }
+  } catch {
+    return init
+  }
+}
+
 // Resolve the browser fetch at invocation time so the narrow precision transport
 // guard installed before React render also applies to Supabase Edge calls.
-const dynamicFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)
+// Reunion adds a presentation-only narrative contract inside the period packet so
+// the server cache hash cannot reuse the shallower pre-v3 interpretation.
+const dynamicFetch: typeof fetch = (input, init) => globalThis.fetch(input, reunionNarrativeFetchInit(input, init))
 
 // Only the browser-safe publishable key is used here. Never put a secret/service-role key in Vite client code.
 export const supabase = createClient(supabaseUrl, supabaseKey, {

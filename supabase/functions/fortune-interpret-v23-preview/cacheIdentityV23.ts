@@ -1,4 +1,4 @@
-export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v3'
+export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
 
 function periodKind(source: any): string {
   const raw = String(source?.period_kind ?? source?.period?.kind ?? source?.kind ?? '').trim().toLowerCase()

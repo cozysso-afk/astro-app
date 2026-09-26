@@ -1,0 +1,343 @@
+/* v70 — iPhone aurora fallback cascade owner.
+   Production inspection exposed a higher-specificity legacy rule in reading-experience.css:
+     body:has(.app-shell) { background:#f7f8fb!important; }
+   That rule beat the former plain `body` fallback even though this file loads later, because both
+   declarations are !important and selector specificity wins first. When iOS recomposited the fixed
+   aurora layer, the visible surface underneath was therefore still the plain near-white legacy color.
+
+   v70 keeps the moving aurora outside React, but makes both the persistent layer and the fallback
+   independently non-white. body:has(#root) deliberately carries ID specificity so it wins over the
+   legacy body:has(.app-shell) rule. No calculation/API/AI behavior is touched. */
+
+html {
+  min-height: 100%;
+  background: #eef3f4 !important;
+}
+
+/* Generic pre-app fallback. */
+body {
+  min-height: 100%;
+  position: relative;
+  background-color: #eef3f4 !important;
+  background-image: linear-gradient(
+    90deg,
+    rgba(214, 239, 230, .62) 0%,
+    rgba(241, 245, 247, .96) 24%,
+    #f4f5f8 50%,
+    rgba(245, 241, 248, .96) 76%,
+    rgba(235, 218, 244, .64) 100%
+  ) !important;
+  background-repeat: repeat-y !important;
+}
+
+/* IMPORTANT: this selector intentionally outranks reading-experience.css's
+   `body:has(.app-shell)` !important shorthand. This is the actual production fallback owner. */
+body:has(#root) {
+  background-color: #eef3f4 !important;
+  background-image: linear-gradient(
+    90deg,
+    rgba(214, 239, 230, .62) 0%,
+    rgba(241, 245, 247, .96) 24%,
+    #f4f5f8 50%,
+    rgba(245, 241, 248, .96) 76%,
+    rgba(235, 218, 244, .64) 100%
+  ) !important;
+  background-repeat: repeat-y !important;
+}
+
+body::before,
+body::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  animation: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+}
+
+@keyframes astroAuroraViewportDriftV70 {
+  0%, 100% {
+    background-position:
+      -9rem -160px,
+      calc(100% + 10rem) 32px,
+      -11rem 760px,
+      calc(100% + 9rem) 1120px,
+      0 0;
+  }
+  38% {
+    background-position:
+      -5rem -136px,
+      calc(100% + 6rem) 54px,
+      -7rem 742px,
+      calc(100% + 6rem) 1102px,
+      0 0;
+  }
+  72% {
+    background-position:
+      -11rem -122px,
+      calc(100% + 12rem) 72px,
+      -5rem 778px,
+      calc(100% + 11rem) 1140px,
+      0 0;
+  }
+}
+
+/* Persistent viewport atmosphere, outside #root. The fifth background is an opaque pastel base,
+   so the layer itself no longer depends on a transparent backing surface during iOS recomposition. */
+#app-aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  touch-action: none;
+  overflow: hidden;
+  background-color: #eef3f4;
+  background-image:
+    radial-gradient(circle, rgba(226, 207, 251, .50) 0, rgba(226, 207, 251, .18) 31%, transparent 67%),
+    radial-gradient(circle, rgba(198, 228, 252, .48) 0, rgba(198, 228, 252, .16) 30%, transparent 66%),
+    radial-gradient(circle, rgba(203, 241, 229, .43) 0, rgba(203, 241, 229, .14) 31%, transparent 68%),
+    radial-gradient(circle, rgba(249, 209, 231, .38) 0, rgba(249, 209, 231, .12) 30%, transparent 66%),
+    linear-gradient(
+      90deg,
+      rgba(214, 239, 230, .62) 0%,
+      rgba(241, 245, 247, .96) 24%,
+      #f4f5f8 50%,
+      rgba(245, 241, 248, .96) 76%,
+      rgba(235, 218, 244, .64) 100%
+    );
+  background-size:
+    42rem 42rem,
+    40rem 40rem,
+    44rem 44rem,
+    39rem 39rem,
+    100% 100%;
+  background-position:
+    -9rem -160px,
+    calc(100% + 10rem) 32px,
+    -11rem 760px,
+    calc(100% + 9rem) 1120px,
+    0 0;
+  background-repeat: no-repeat;
+  animation: astroAuroraViewportDriftV70 15s ease-in-out infinite;
+}
+
+html[data-celestial-motion='off'] #app-aurora-layer {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app-aurora-layer {
+    animation: none;
+  }
+}
+
+#root {
+  min-height: 100%;
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* The scrollable React tree is content-only. It never owns the page atmosphere. */
+.app-shell,
+.app-shell[data-view],
+.app-shell[data-mode],
+.app-shell.celestial-motion-on,
+.app-shell.celestial-motion-on[data-view],
+.app-shell.celestial-motion-on[data-mode],
+.app-shell.celestial-motion-off,
+.app-shell.celestial-motion-off[data-view],
+.app-shell.celestial-motion-off[data-mode],
+.app-shell.celestial-glow-on,
+.app-shell.celestial-glow-off,
+.app-shell .page-content {
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  animation: none !important;
+}
+
+/* Kill every legacy shell pseudo atmosphere at matching/higher specificity while preserving
+   card/icon/result animations on descendants. */
+.app-shell::before,
+.app-shell::after,
+.app-shell.celestial-motion-on::before,
+.app-shell.celestial-motion-on::after,
+.app-shell.celestial-motion-off::before,
+.app-shell.celestial-motion-off::after,
+.app-shell.celestial-glow-on::before,
+.app-shell.celestial-glow-on::after,
+.app-shell.celestial-glow-off::before,
+.app-shell.celestial-glow-off::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  animation: none !important;
+  filter: none !important;
+  opacity: 0 !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* One predictable form scale on the birth/location surface.
+   Labels are 14px, controls are 16px, supporting copy is 14px. */
+.app-shell .subsection-title,
+.app-shell .field > span,
+.app-shell .field input,
+.app-shell .field select,
+.app-shell .stable-choice-trigger,
+.app-shell .stable-choice-option,
+.app-shell .check-field,
+.app-shell .birth-time-reliability-note,
+.app-shell .birth-time-reliability-note > span {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif !important;
+  letter-spacing: -0.01em !important;
+}
+
+.app-shell .subsection-title {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  font-weight: 800 !important;
+}
+
+.app-shell .field > span {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  font-weight: 750 !important;
+}
+
+.app-shell .field input,
+.app-shell .field select,
+.app-shell .stable-choice-trigger {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 14px !important;
+  border-radius: 16px !important;
+  color: #3e3028 !important;
+  background: #fff !important;
+  font-size: 16px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.app-shell .field input:disabled,
+.app-shell .field select:disabled,
+.app-shell .stable-choice-trigger:disabled {
+  opacity: .52 !important;
+  background: #f4efe9 !important;
+}
+
+.app-shell .check-field,
+.app-shell .birth-time-reliability-note,
+.app-shell .birth-time-reliability-note > span {
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+  font-weight: 500 !important;
+}
+
+/* Birth-time reliability choices intentionally avoid native <select> on iOS. */
+.stable-choice {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.stable-choice-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(92, 62, 43, 0.12);
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+}
+
+.stable-choice-trigger:focus-visible {
+  outline: 2px solid rgba(178, 125, 69, 0.45);
+  outline-offset: 2px;
+}
+
+.stable-choice-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stable-choice-chevron {
+  flex: 0 0 auto;
+  color: #9b7c66;
+  font-size: 1rem;
+  line-height: 1;
+  transform: translateY(-1px);
+  transition: transform .16s ease;
+}
+
+.stable-choice.is-open .stable-choice-chevron {
+  transform: translateY(1px) rotate(180deg);
+}
+
+.stable-choice-menu {
+  position: absolute;
+  z-index: 180;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgba(92, 62, 43, 0.14);
+  border-radius: 15px;
+  background: #fff !important;
+  box-shadow: 0 18px 38px rgba(72, 55, 45, 0.18);
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior: contain;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.stable-choice-option {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: #3e3028;
+  background: transparent;
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+  font-weight: 650 !important;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+.stable-choice-option[aria-selected='true'] {
+  background: #f3ece4;
+}
+
+.stable-choice-option:active:not(:disabled) {
+  background: #eee4da;
+}
+
+.stable-choice-option:disabled {
+  opacity: .42;
+}
+
+@media (max-width: 420px) {
+  .app-shell .field input,
+  .app-shell .field select,
+  .app-shell .stable-choice-trigger {
+    height: 52px !important;
+    min-height: 52px !important;
+    font-size: 16px !important;
+  }
+}

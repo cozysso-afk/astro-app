@@ -18,13 +18,16 @@ Important policy:
 """
 
 from datetime import date, datetime, time as dt_time, timedelta, timezone
+import math
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import swisseph as swe
 
 from birth_time_reliability_v1 import resolve_birth_time_reliability
+from timezone_provenance_v1 import TimezoneResolutionError, resolve_profile_birth_datetime
 
-ENGINE_VERSION = "relationship-return-v2-five-body-exact-crossings"
+ENGINE_VERSION = "relationship-return-v2.2-five-body-relocation-timeline"
 FAST_TRIGGER_WEIGHT = 0.85
 RETURN_CONTEXT_WEIGHT = 0.15
 
@@ -115,17 +118,17 @@ def _positions(jd: float) -> dict[str, float]:
 
 
 def _birth_utc(profile: dict[str, Any], *, noon_proxy: bool = False) -> datetime:
-    birth_time = profile.get("birth_time")
-    if birth_time is None:
-        if not noon_proxy:
-            raise ValueError("birth_time unavailable")
-        birth_time = dt_time(12, 0)
-    local = datetime.combine(profile["birth_date"], birth_time)
-    return (local - timedelta(hours=float(profile.get("utc_offset_hours", 9.0)))).replace(tzinfo=timezone.utc)
+    if not noon_proxy and profile.get("_resolved_birth_datetime") is not None:
+        return profile["_resolved_birth_datetime"].utc
+    resolved = resolve_profile_birth_datetime(profile, noon_proxy=noon_proxy)
+    if not noon_proxy:
+        profile["_resolved_birth_datetime"] = resolved
+        profile["timezone_provenance"] = resolved.provenance()
+    return resolved.utc
 
 
-def _local_iso_date(dt: datetime, offset_hours: float) -> str:
-    local = dt.astimezone(timezone(timedelta(hours=float(offset_hours))))
+def _local_iso_date(dt: datetime, local_tz) -> str:
+    local = dt.astimezone(local_tz)
     return local.date().isoformat()
 
 
@@ -249,9 +252,206 @@ def _activation_summary(hits: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
+def _coerce_utc(value: Any, label: str) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"{label} must be an ISO-8601 datetime") from exc
+    else:
+        raise ValueError(f"{label} must be a datetime or ISO-8601 string")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{label} must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def _normalize_forecast_timeline(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_timeline = profile.get("forecast_location_timeline") or []
+    if not isinstance(raw_timeline, list):
+        raise ValueError("forecast_location_timeline must be an array")
+    normalized: list[dict[str, Any]] = []
+    for index, raw in enumerate(raw_timeline):
+        if not isinstance(raw, dict):
+            raise ValueError("forecast_location_timeline entries must be objects")
+        start = _coerce_utc(raw.get("start_utc"), f"forecast_location_timeline[{index}].start_utc")
+        end = _coerce_utc(raw.get("end_utc"), f"forecast_location_timeline[{index}].end_utc")
+        if end <= start:
+            raise ValueError("forecast_location_timeline end_utc must be after start_utc")
+        normalized.append({**raw, "start_utc": start, "end_utc": end, "timeline_index": index})
+    normalized.sort(key=lambda entry: entry["start_utc"])
+    for previous, current in zip(normalized, normalized[1:]):
+        if current["start_utc"] < previous["end_utc"]:
+            raise ValueError("forecast_location_timeline intervals must not overlap")
+    return normalized
+
+
+def _build_return_location(
+    raw: dict[str, Any], birth_resolution, *, source: str, timeline_index: int | None = None
+) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("forecast location must be an object")
+    try:
+        lat = float(raw["latitude"])
+        lon = float(raw["longitude"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("forecast location requires numeric latitude/longitude") from exc
+    if not math.isfinite(lat) or not -90 <= lat <= 90:
+        raise ValueError("forecast location latitude must be finite and between -90 and 90")
+    if not math.isfinite(lon) or not -180 <= lon <= 180:
+        raise ValueError("forecast location longitude must be finite and between -180 and 180")
+    zone_name = str(raw.get("timezone_id") or "").strip()
+    if not zone_name:
+        raise TimezoneResolutionError("forecast location timezone_id is required")
+    try:
+        zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError as exc:
+        raise TimezoneResolutionError(f"unknown forecast location timezone_id: {zone_name}") from exc
+    calendar_basis = (
+        "forecast_location_timeline_timezone"
+        if source == "forecast_location_timeline"
+        else "forecast_location_timezone"
+    )
+    provenance = {
+        "source": source,
+        "timezone_id": zone_name,
+        "coordinates_available": True,
+        "place_id_present": bool(raw.get("place_id")),
+        "calendar_timezone_basis": calendar_basis,
+        "angles_policy": (
+            "timeline_location_when_birth_time_exact"
+            if source == "forecast_location_timeline"
+            else "forecast_location_when_birth_time_exact"
+        ),
+    }
+    if timeline_index is not None:
+        provenance["timeline_index"] = timeline_index
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "tzinfo": zone,
+        "angles_available": True,
+        "source": source,
+        "calendar_timezone_basis": calendar_basis,
+        "provenance": provenance,
+    }
+
+
+def _unavailable_return_location(birth_resolution) -> dict[str, Any]:
+    return {
+        "latitude": None,
+        "longitude": None,
+        "tzinfo": birth_resolution.tzinfo,
+        "angles_available": False,
+        "source": "unavailable",
+        "calendar_timezone_basis": "birth_timezone_fallback",
+        "provenance": {
+            "source": "unavailable",
+            "timezone_id": getattr(birth_resolution.tzinfo, "key", None),
+            "coordinates_available": False,
+            "place_id_present": False,
+            "calendar_timezone_basis": "birth_timezone_fallback",
+            "angles_policy": "omitted_without_forecast_location",
+        },
+    }
+
+
+def _resolve_return_location(
+    profile: dict[str, Any], birth_resolution, *, instant: datetime | str | None = None,
+    timeline: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Resolve event-specific return geometry with half-open timeline intervals.
+
+    Priority is timeline match -> static forecast_location -> no-angle birth-timezone
+    calendar fallback.  Birthplace coordinates are never used as a location proxy.
+    """
+    normalized = _normalize_forecast_timeline(profile) if timeline is None else timeline
+    if instant is not None and normalized:
+        target = _coerce_utc(instant, "return instant")
+        for entry in normalized:
+            if entry["start_utc"] <= target < entry["end_utc"]:
+                return _build_return_location(
+                    entry, birth_resolution, source="forecast_location_timeline",
+                    timeline_index=int(entry["timeline_index"]),
+                )
+    raw = profile.get("forecast_location")
+    if raw is not None:
+        return _build_return_location(raw, birth_resolution, source="forecast_location")
+    return _unavailable_return_location(birth_resolution)
+
+
+def _return_location_policy_provenance(
+    profile: dict[str, Any], birth_resolution, timeline: list[dict[str, Any]]
+) -> dict[str, Any]:
+    if not timeline:
+        return _resolve_return_location(profile, birth_resolution, timeline=[])["provenance"]
+    return {
+        "source": "forecast_location_timeline",
+        "timeline_interval_count": len(timeline),
+        "static_fallback_available": profile.get("forecast_location") is not None,
+        "coordinates_available": True,
+        "event_dependent": True,
+        "place_id_present": any(bool(entry.get("place_id")) for entry in timeline),
+        "calendar_timezone_basis": "timeline_match_then_static_forecast_location_then_birth_timezone",
+        "angles_policy": "event_specific_timeline_then_static_fallback_when_birth_time_exact; omitted otherwise",
+    }
+
+
+def _attach_return_geometry(
+    event: dict[str, Any], profile: dict[str, Any], reliability: dict[str, Any], return_location: dict[str, Any]
+) -> None:
+    from relationship_western_v1 import _chart_from_jd, _whole_sign_house, _house_of_longitude
+
+    jd = _jd(datetime.fromisoformat(event["exact_utc"]))
+    admit_angles = bool(reliability["time_exact"] and return_location["angles_available"])
+    chart = _chart_from_jd(
+        jd,
+        return_location["latitude"] if admit_angles else None,
+        return_location["longitude"] if admit_angles else None,
+    )
+    angles = chart["angles"] if admit_angles else {}
+    event["angles"] = angles
+    event["positions"] = {k: v["lon"] for k, v in chart["positions"].items()}
+    event["house_activations"] = [
+        {
+            "planet": k,
+            "whole_sign": _whole_sign_house(angles["ASC"], v["lon"]),
+            "quadrant": _house_of_longitude(angles["cusps"], v["lon"]),
+        }
+        for k, v in chart["positions"].items()
+        if angles and k in {"Moon", "Mercury", "Venus", "Mars"}
+    ]
+    provenance = dict(return_location["provenance"])
+    provenance["angles_admitted"] = admit_angles
+    provenance["angle_reason"] = (
+        "forecast_location_and_exact_birth_time"
+        if admit_angles
+        else "birth_time_not_exact"
+        if return_location["angles_available"]
+        else "forecast_location_not_supplied"
+    )
+    event["return_location_provenance"] = provenance
+    event["location_basis"] = (
+        return_location["source"]
+        if return_location["source"] in {"forecast_location", "forecast_location_timeline"}
+        else "unavailable; forecast_location_not_supplied"
+    )
+
+
 def _person_return_context(profile: dict[str, Any], start_date: date, end_date: date, label: str) -> dict[str, Any]:
     reliability = resolve_birth_time_reliability(profile)
-    offset = float(profile.get("utc_offset_hours", 9.0))
+    birth_resolution = resolve_profile_birth_datetime(
+        profile, noon_proxy=not reliability["time_available"] or profile.get("birth_time") is None
+    )
+    timeline = _normalize_forecast_timeline(profile)
+
+    def event_location(instant: datetime | str) -> dict[str, Any]:
+        return _resolve_return_location(
+            profile, birth_resolution, instant=instant, timeline=timeline
+        )
+
     solar_birth_utc = _birth_utc(profile, noon_proxy=True)
     solar_natal_positions = _positions(_jd(solar_birth_utc))
 
@@ -267,7 +467,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
             "person": label,
             "return_type": "solar_return",
             "exact_utc": return_dt.isoformat(),
-            "local_date": _local_iso_date(return_dt, offset),
+            "local_date": _local_iso_date(return_dt, event_location(return_dt)["tzinfo"]),
             "orb": round(float(item["orb"]), 5),
             "precision": "exact" if reliability["time_exact"] else ("provisional" if reliability["time_available"] else "date_noon_proxy"),
             "birth_time_reliability": reliability,
@@ -296,7 +496,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 "person": label,
                 "return_type": "lunar_return",
                 "exact_utc": return_dt.isoformat(),
-                "local_date": _local_iso_date(return_dt, offset),
+                "local_date": _local_iso_date(return_dt, event_location(return_dt)["tzinfo"]),
                 "orb": round(float(item["orb"]), 5),
                 "precision": "exact" if reliability["time_exact"] else "provisional",
                 "birth_time_reliability": reliability,
@@ -319,7 +519,7 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 instant = _datetime_from_jd(item["jd"])
                 events.append({
                     "person": label, "return_type": key, "exact_utc": instant.isoformat(),
-                    "local_date": _local_iso_date(instant, offset), "orb": item["orb"],
+                    "local_date": _local_iso_date(instant, event_location(instant)["tzinfo"]), "orb": item["orb"],
                     "precision": "exact" if reliability["time_exact"] else "provisional",
                     **_activation_summary(_aspect_hits(_positions(item["jd"]), solar_natal_positions, body)),
                     "independent_bonus_eligible": False,
@@ -329,22 +529,13 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
                 event["window_end_exclusive"] = events[idx+1]["local_date"] if idx+1 < len(events) else None
         planetary[key] = {"available": bool(events), "events": events, "role": "medium_term_context"}
 
-    # Keep exact UTC cycle boundaries and separated house systems. Birthplace is
-    # the explicit return-location fallback; it is not a claimed current residence.
-    from relationship_western_v1 import _chart_from_jd, _whole_sign_house, _house_of_longitude
+    # Return planetary positions are location-independent.  ASC/houses are
+    # admitted only with an explicit forecast/current-location proxy; birthplace
+    # is not silently treated as the person's location at the return instant.
     for event in solar_events + lunar_events + [e for v in planetary.values() for e in v["events"]]:
-        jd = _jd(datetime.fromisoformat(event["exact_utc"]))
-        chart = _chart_from_jd(jd, profile.get("latitude"), profile.get("longitude"))
-        angles = chart["angles"]
-        event["angles"] = angles if reliability["time_exact"] else {}
-        event["location_basis"] = "entered_birthplace; current return location unavailable"
-        event["positions"] = {k: v["lon"] for k, v in chart["positions"].items()}
-        event["house_activations"] = [
-            {"planet": k, "whole_sign": _whole_sign_house(angles["ASC"], v["lon"]),
-             "quadrant": _house_of_longitude(angles["cusps"], v["lon"])}
-            for k,v in chart["positions"].items()
-            if angles and reliability["time_exact"] and k in {"Moon", "Mercury", "Venus", "Mars"}
-        ]
+        _attach_return_geometry(
+            event, profile, reliability, event_location(event["exact_utc"])
+        )
     for events in [solar_events, lunar_events] + [v["events"] for v in planetary.values()]:
         for idx, event in enumerate(events):
             event["next_exact_utc"] = events[idx+1]["exact_utc"] if idx+1 < len(events) else None
@@ -364,6 +555,10 @@ def _person_return_context(profile: dict[str, Any], start_date: date, end_date: 
             "policy": "monthly/emotional background context only; does not create exact event dates",
         },
         "birth_time_reliability": reliability,
+        "timezone_provenance": birth_resolution.provenance(),
+        "return_location_provenance": _return_location_policy_provenance(
+            profile, birth_resolution, timeline
+        ),
     }
 
 

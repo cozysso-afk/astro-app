@@ -1,0 +1,1480 @@
+{
+  "baseline_commit": "deb9e29628fe10bb39c57e0298bc159db554f580",
+  "v23_code_commit": "cc6a9a9a5e7e5d3a3867d9bdc29ee07133dd04e0",
+  "as_of_date": "2026-09-19",
+  "executed_date_utc": "2026-09-20",
+  "python": "3.12.14",
+  "runtime_scope": "same isolated runner, sequential full API calls, without profiling; excludes input transport and JSON output serialization",
+  "v22": [
+    {
+      "case_index": 1,
+      "version": "reunion-hierarchy-v2.2-selectivity-boundaries",
+      "requested_range": [
+        "2027-01-01",
+        "2027-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 6.227,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": null,
+        "raw_numeric_gate_pass": 1460,
+        "semantic_stage_trigger_pass": 1345,
+        "hierarchy_eligible": 1345,
+        "local_peaks": 99,
+        "future_local_peaks": 99
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 365,
+          "hierarchy_eligible": 365,
+          "local_peaks": 25,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 365,
+          "future_hierarchy_eligible": 365,
+          "future_local_peaks": 25,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 1.0,
+          "future_hierarchy_score_median": 75.39
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 317,
+          "hierarchy_eligible": 317,
+          "local_peaks": 21,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 317,
+          "future_hierarchy_eligible": 317,
+          "future_local_peaks": 21,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.8685,
+          "future_hierarchy_score_median": 65.56
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 319,
+          "hierarchy_eligible": 319,
+          "local_peaks": 25,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 319,
+          "future_hierarchy_eligible": 319,
+          "future_local_peaks": 25,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.874,
+          "future_hierarchy_score_median": 69.47
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 344,
+          "hierarchy_eligible": 344,
+          "local_peaks": 28,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 344,
+          "future_hierarchy_eligible": 344,
+          "future_local_peaks": 28,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.9425,
+          "future_hierarchy_score_median": 55.715
+        }
+      },
+      "top3": [
+        {
+          "date": "2027-03-12",
+          "start": "2027-03-11",
+          "end": "2027-03-13",
+          "stage": "emotional_reactivation",
+          "final": 82.66,
+          "components": {
+            "long_term": 94.2,
+            "mid_term": 78.76,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.66,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.66,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 121.655,
+            "primary_trigger_strength": 95.527,
+            "primary_trigger_orb": 0.044731
+          }
+        },
+        {
+          "date": "2027-02-25",
+          "start": "2027-02-24",
+          "end": "2027-02-26",
+          "stage": "emotional_reactivation",
+          "final": 82.65,
+          "components": {
+            "long_term": 94.17,
+            "mid_term": 78.76,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.65,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.65,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 124.809,
+            "primary_trigger_strength": 96.841,
+            "primary_trigger_orb": 0.03159
+          }
+        },
+        {
+          "date": "2027-02-01",
+          "start": "2027-01-31",
+          "end": "2027-02-02",
+          "stage": "emotional_reactivation",
+          "final": 82.56,
+          "components": {
+            "long_term": 94.47,
+            "mid_term": 78.0,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.56,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.56,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 118.316,
+            "primary_trigger_strength": 93.401,
+            "primary_trigger_orb": 0.016829
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2027-01-02",
+        "start": "2027-01-01",
+        "end": "2027-01-03",
+        "stage": "emotional_reactivation",
+        "final": 81.48,
+        "components": {
+          "long_term": 92.79,
+          "mid_term": 76.0,
+          "event_trigger": 100,
+          "cross_system": 0.0,
+          "weighted_sum": 76.48,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 81.48,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "event_trigger_raw": 122.967,
+          "primary_trigger_strength": 93.789,
+          "primary_trigger_orb": 0.012745
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "4bc83f7d71bd99a24857fc4202c46c73859b61494f2de2fe319f117e7d8b7642"
+    },
+    {
+      "case_index": 2,
+      "version": "reunion-hierarchy-v2.2-selectivity-boundaries",
+      "requested_range": [
+        "2027-01-01",
+        "2027-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 6.222,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": null,
+        "raw_numeric_gate_pass": 1460,
+        "semantic_stage_trigger_pass": 1345,
+        "hierarchy_eligible": 1345,
+        "local_peaks": 99,
+        "future_local_peaks": 99
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 365,
+          "hierarchy_eligible": 365,
+          "local_peaks": 25,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 365,
+          "future_hierarchy_eligible": 365,
+          "future_local_peaks": 25,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 1.0,
+          "future_hierarchy_score_median": 75.39
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 317,
+          "hierarchy_eligible": 317,
+          "local_peaks": 21,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 317,
+          "future_hierarchy_eligible": 317,
+          "future_local_peaks": 21,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.8685,
+          "future_hierarchy_score_median": 65.56
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 319,
+          "hierarchy_eligible": 319,
+          "local_peaks": 25,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 319,
+          "future_hierarchy_eligible": 319,
+          "future_local_peaks": 25,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.874,
+          "future_hierarchy_score_median": 69.47
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 344,
+          "hierarchy_eligible": 344,
+          "local_peaks": 28,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 365,
+          "future_semantic_stage_trigger_pass": 344,
+          "future_hierarchy_eligible": 344,
+          "future_local_peaks": 28,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.9425,
+          "future_hierarchy_score_median": 55.715
+        }
+      },
+      "top3": [
+        {
+          "date": "2027-03-12",
+          "start": "2027-03-11",
+          "end": "2027-03-13",
+          "stage": "emotional_reactivation",
+          "final": 82.66,
+          "components": {
+            "long_term": 94.2,
+            "mid_term": 78.76,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.66,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.66,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 121.655,
+            "primary_trigger_strength": 95.527,
+            "primary_trigger_orb": 0.044731
+          }
+        },
+        {
+          "date": "2027-02-25",
+          "start": "2027-02-24",
+          "end": "2027-02-26",
+          "stage": "emotional_reactivation",
+          "final": 82.65,
+          "components": {
+            "long_term": 94.17,
+            "mid_term": 78.76,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.65,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.65,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 124.809,
+            "primary_trigger_strength": 96.841,
+            "primary_trigger_orb": 0.03159
+          }
+        },
+        {
+          "date": "2027-02-01",
+          "start": "2027-01-31",
+          "end": "2027-02-02",
+          "stage": "emotional_reactivation",
+          "final": 82.56,
+          "components": {
+            "long_term": 94.47,
+            "mid_term": 78.0,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.56,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.56,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 118.316,
+            "primary_trigger_strength": 93.401,
+            "primary_trigger_orb": 0.016829
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2027-01-02",
+        "start": "2027-01-01",
+        "end": "2027-01-03",
+        "stage": "emotional_reactivation",
+        "final": 81.48,
+        "components": {
+          "long_term": 92.79,
+          "mid_term": 76.0,
+          "event_trigger": 100,
+          "cross_system": 0.0,
+          "weighted_sum": 76.48,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 81.48,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "event_trigger_raw": 122.967,
+          "primary_trigger_strength": 93.789,
+          "primary_trigger_orb": 0.012745
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "4bc83f7d71bd99a24857fc4202c46c73859b61494f2de2fe319f117e7d8b7642"
+    },
+    {
+      "case_index": 3,
+      "version": "reunion-hierarchy-v2.2-selectivity-boundaries",
+      "requested_range": [
+        "2026-01-01",
+        "2026-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 6.204,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": null,
+        "raw_numeric_gate_pass": 1460,
+        "semantic_stage_trigger_pass": 1356,
+        "hierarchy_eligible": 1356,
+        "local_peaks": 25,
+        "future_local_peaks": 25
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 365,
+          "hierarchy_eligible": 365,
+          "local_peaks": 7,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 104,
+          "future_semantic_stage_trigger_pass": 104,
+          "future_hierarchy_eligible": 104,
+          "future_local_peaks": 7,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 1.0,
+          "future_hierarchy_score_median": 80.545
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 322,
+          "hierarchy_eligible": 322,
+          "local_peaks": 6,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 104,
+          "future_semantic_stage_trigger_pass": 91,
+          "future_hierarchy_eligible": 91,
+          "future_local_peaks": 6,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.8822,
+          "future_hierarchy_score_median": 64.03
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 319,
+          "hierarchy_eligible": 319,
+          "local_peaks": 5,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 104,
+          "future_semantic_stage_trigger_pass": 94,
+          "future_hierarchy_eligible": 94,
+          "future_local_peaks": 5,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.874,
+          "future_hierarchy_score_median": 68.495
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": null,
+          "raw_numeric_gate_pass": 365,
+          "semantic_stage_trigger_pass": 350,
+          "hierarchy_eligible": 350,
+          "local_peaks": 7,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": null,
+          "future_raw_numeric_gate_pass": 104,
+          "future_semantic_stage_trigger_pass": 103,
+          "future_hierarchy_eligible": 103,
+          "future_local_peaks": 7,
+          "raw_pass_ratio": 1.0,
+          "hierarchy_pass_ratio": 0.9589,
+          "future_hierarchy_score_median": 55.7
+        }
+      },
+      "top3": [
+        {
+          "date": "2026-12-08",
+          "start": "2026-12-07",
+          "end": "2026-12-09",
+          "stage": "emotional_reactivation",
+          "final": 83.69,
+          "components": {
+            "long_term": 91.36,
+            "mid_term": 86.87,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 78.69,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 83.69,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 112.69,
+            "primary_trigger_strength": 94.105,
+            "primary_trigger_orb": 0.009418
+          }
+        },
+        {
+          "date": "2026-11-02",
+          "start": "2026-11-01",
+          "end": "2026-11-03",
+          "stage": "emotional_reactivation",
+          "final": 83.57,
+          "components": {
+            "long_term": 95.89,
+            "mid_term": 80.02,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 78.57,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 83.57,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 122.227,
+            "primary_trigger_strength": 93.016,
+            "primary_trigger_orb": 0.020879
+          }
+        },
+        {
+          "date": "2026-11-28",
+          "start": "2026-11-27",
+          "end": "2026-11-29",
+          "stage": "emotional_reactivation",
+          "final": 83.49,
+          "components": {
+            "long_term": 90.78,
+            "mid_term": 86.87,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 78.49,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 83.49,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "event_trigger_raw": 117.75,
+            "primary_trigger_strength": 93.625,
+            "primary_trigger_orb": 0.014478
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2026-09-19",
+        "start": "2026-09-19",
+        "end": "2026-09-20",
+        "stage": "relationship_rebuilding",
+        "final": 59.44,
+        "components": {
+          "long_term": 81.71,
+          "mid_term": 42.41,
+          "event_trigger": 60.96,
+          "cross_system": 0.0,
+          "weighted_sum": 54.44,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 59.44,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "event_trigger_raw": 60.957,
+          "primary_trigger_strength": 49.185,
+          "primary_trigger_orb": 0.013835
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "1688ef119b42f2b4724446e6e0721925dbd9e78ff213da3cd495a9e8e942846a"
+    }
+  ],
+  "v23": [
+    {
+      "case_index": 1,
+      "version": "reunion-hierarchy-v2.3-medium-anchor",
+      "requested_range": [
+        "2027-01-01",
+        "2027-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 4.945,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": 786,
+        "raw_numeric_gate_pass": 785,
+        "semantic_stage_trigger_pass": 547,
+        "hierarchy_eligible": 547,
+        "local_peaks": 57,
+        "future_local_peaks": 57
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 256,
+          "raw_numeric_gate_pass": 256,
+          "semantic_stage_trigger_pass": 256,
+          "hierarchy_eligible": 256,
+          "local_peaks": 20,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 256,
+          "future_raw_numeric_gate_pass": 256,
+          "future_semantic_stage_trigger_pass": 256,
+          "future_hierarchy_eligible": 256,
+          "future_local_peaks": 20,
+          "raw_pass_ratio": 0.7014,
+          "hierarchy_pass_ratio": 0.7014,
+          "future_hierarchy_score_median": 69.905
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 209,
+          "raw_numeric_gate_pass": 209,
+          "semantic_stage_trigger_pass": 120,
+          "hierarchy_eligible": 120,
+          "local_peaks": 14,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 209,
+          "future_raw_numeric_gate_pass": 209,
+          "future_semantic_stage_trigger_pass": 120,
+          "future_hierarchy_eligible": 120,
+          "future_local_peaks": 14,
+          "raw_pass_ratio": 0.5726,
+          "hierarchy_pass_ratio": 0.3288,
+          "future_hierarchy_score_median": 58.545
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 274,
+          "raw_numeric_gate_pass": 273,
+          "semantic_stage_trigger_pass": 134,
+          "hierarchy_eligible": 134,
+          "local_peaks": 19,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 274,
+          "future_raw_numeric_gate_pass": 273,
+          "future_semantic_stage_trigger_pass": 134,
+          "future_hierarchy_eligible": 134,
+          "future_local_peaks": 19,
+          "raw_pass_ratio": 0.7479,
+          "hierarchy_pass_ratio": 0.3671,
+          "future_hierarchy_score_median": 62.43
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 47,
+          "raw_numeric_gate_pass": 47,
+          "semantic_stage_trigger_pass": 37,
+          "hierarchy_eligible": 37,
+          "local_peaks": 4,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 47,
+          "future_raw_numeric_gate_pass": 47,
+          "future_semantic_stage_trigger_pass": 37,
+          "future_hierarchy_eligible": 37,
+          "future_local_peaks": 4,
+          "raw_pass_ratio": 0.1288,
+          "hierarchy_pass_ratio": 0.1014,
+          "future_hierarchy_score_median": 53.21
+        }
+      },
+      "top3": [
+        {
+          "date": "2027-03-12",
+          "start": "2027-03-11",
+          "end": "2027-03-13",
+          "stage": "emotional_reactivation",
+          "final": 77.04,
+          "components": {
+            "long_term": 94.2,
+            "mid_term": 56.29,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 72.04,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 77.04,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 56.79,
+            "event_trigger_raw": 121.344,
+            "primary_trigger_strength": 95.527,
+            "primary_trigger_orb": 0.044731
+          }
+        },
+        {
+          "date": "2027-02-25",
+          "start": "2027-02-24",
+          "end": "2027-02-26",
+          "stage": "emotional_reactivation",
+          "final": 76.26,
+          "components": {
+            "long_term": 94.17,
+            "mid_term": 53.19,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 71.26,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 76.26,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 54.43,
+            "event_trigger_raw": 124.809,
+            "primary_trigger_strength": 96.841,
+            "primary_trigger_orb": 0.03159
+          }
+        },
+        {
+          "date": "2027-02-01",
+          "start": "2027-01-31",
+          "end": "2027-02-02",
+          "stage": "emotional_reactivation",
+          "final": 75.6,
+          "components": {
+            "long_term": 94.47,
+            "mid_term": 50.14,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 70.6,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 75.6,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 51.37,
+            "event_trigger_raw": 118.316,
+            "primary_trigger_strength": 93.401,
+            "primary_trigger_orb": 0.016829
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2027-01-02",
+        "start": "2027-01-01",
+        "end": "2027-01-03",
+        "stage": "emotional_reactivation",
+        "final": 73.44,
+        "components": {
+          "long_term": 92.79,
+          "mid_term": 43.87,
+          "event_trigger": 100,
+          "cross_system": 0.0,
+          "weighted_sum": 68.44,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 73.44,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "mid_context_score": 44.96,
+          "event_trigger_raw": 122.967,
+          "primary_trigger_strength": 93.789,
+          "primary_trigger_orb": 0.012745
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "80f4ddc21306ad3b37ad80a8eb8963e3ae8ccb31bafd15b7aca11ee79f2f1475"
+    },
+    {
+      "case_index": 2,
+      "version": "reunion-hierarchy-v2.3-medium-anchor",
+      "requested_range": [
+        "2027-01-01",
+        "2027-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 4.825,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": 786,
+        "raw_numeric_gate_pass": 785,
+        "semantic_stage_trigger_pass": 547,
+        "hierarchy_eligible": 547,
+        "local_peaks": 57,
+        "future_local_peaks": 57
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 256,
+          "raw_numeric_gate_pass": 256,
+          "semantic_stage_trigger_pass": 256,
+          "hierarchy_eligible": 256,
+          "local_peaks": 20,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 256,
+          "future_raw_numeric_gate_pass": 256,
+          "future_semantic_stage_trigger_pass": 256,
+          "future_hierarchy_eligible": 256,
+          "future_local_peaks": 20,
+          "raw_pass_ratio": 0.7014,
+          "hierarchy_pass_ratio": 0.7014,
+          "future_hierarchy_score_median": 69.905
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 209,
+          "raw_numeric_gate_pass": 209,
+          "semantic_stage_trigger_pass": 120,
+          "hierarchy_eligible": 120,
+          "local_peaks": 14,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 209,
+          "future_raw_numeric_gate_pass": 209,
+          "future_semantic_stage_trigger_pass": 120,
+          "future_hierarchy_eligible": 120,
+          "future_local_peaks": 14,
+          "raw_pass_ratio": 0.5726,
+          "hierarchy_pass_ratio": 0.3288,
+          "future_hierarchy_score_median": 58.545
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 274,
+          "raw_numeric_gate_pass": 273,
+          "semantic_stage_trigger_pass": 134,
+          "hierarchy_eligible": 134,
+          "local_peaks": 19,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 274,
+          "future_raw_numeric_gate_pass": 273,
+          "future_semantic_stage_trigger_pass": 134,
+          "future_hierarchy_eligible": 134,
+          "future_local_peaks": 19,
+          "raw_pass_ratio": 0.7479,
+          "hierarchy_pass_ratio": 0.3671,
+          "future_hierarchy_score_median": 62.43
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 47,
+          "raw_numeric_gate_pass": 47,
+          "semantic_stage_trigger_pass": 37,
+          "hierarchy_eligible": 37,
+          "local_peaks": 4,
+          "future_total_days": 365,
+          "future_long_term_pass": 365,
+          "future_medium_anchor_pass": 47,
+          "future_raw_numeric_gate_pass": 47,
+          "future_semantic_stage_trigger_pass": 37,
+          "future_hierarchy_eligible": 37,
+          "future_local_peaks": 4,
+          "raw_pass_ratio": 0.1288,
+          "hierarchy_pass_ratio": 0.1014,
+          "future_hierarchy_score_median": 53.21
+        }
+      },
+      "top3": [
+        {
+          "date": "2027-03-12",
+          "start": "2027-03-11",
+          "end": "2027-03-13",
+          "stage": "emotional_reactivation",
+          "final": 77.04,
+          "components": {
+            "long_term": 94.2,
+            "mid_term": 56.29,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 72.04,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 77.04,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 56.79,
+            "event_trigger_raw": 121.344,
+            "primary_trigger_strength": 95.527,
+            "primary_trigger_orb": 0.044731
+          }
+        },
+        {
+          "date": "2027-02-25",
+          "start": "2027-02-24",
+          "end": "2027-02-26",
+          "stage": "emotional_reactivation",
+          "final": 76.26,
+          "components": {
+            "long_term": 94.17,
+            "mid_term": 53.19,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 71.26,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 76.26,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 54.43,
+            "event_trigger_raw": 124.809,
+            "primary_trigger_strength": 96.841,
+            "primary_trigger_orb": 0.03159
+          }
+        },
+        {
+          "date": "2027-02-01",
+          "start": "2027-01-31",
+          "end": "2027-02-02",
+          "stage": "emotional_reactivation",
+          "final": 75.6,
+          "components": {
+            "long_term": 94.47,
+            "mid_term": 50.14,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 70.6,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 75.6,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 51.37,
+            "event_trigger_raw": 118.316,
+            "primary_trigger_strength": 93.401,
+            "primary_trigger_orb": 0.016829
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2027-01-02",
+        "start": "2027-01-01",
+        "end": "2027-01-03",
+        "stage": "emotional_reactivation",
+        "final": 73.44,
+        "components": {
+          "long_term": 92.79,
+          "mid_term": 43.87,
+          "event_trigger": 100,
+          "cross_system": 0.0,
+          "weighted_sum": 68.44,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 73.44,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "mid_context_score": 44.96,
+          "event_trigger_raw": 122.967,
+          "primary_trigger_strength": 93.789,
+          "primary_trigger_orb": 0.012745
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "80f4ddc21306ad3b37ad80a8eb8963e3ae8ccb31bafd15b7aca11ee79f2f1475"
+    },
+    {
+      "case_index": 3,
+      "version": "reunion-hierarchy-v2.3-medium-anchor",
+      "requested_range": [
+        "2026-01-01",
+        "2026-12-31"
+      ],
+      "as_of_date": "2026-09-19",
+      "runtime_seconds": 5.202,
+      "validation_status": "PASS",
+      "totals": {
+        "total_days": 1460,
+        "long_term_pass": 1460,
+        "medium_anchor_pass": 1076,
+        "raw_numeric_gate_pass": 1073,
+        "semantic_stage_trigger_pass": 790,
+        "hierarchy_eligible": 790,
+        "local_peaks": 19,
+        "future_local_peaks": 19
+      },
+      "by_stage": {
+        "emotional_reactivation": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 301,
+          "raw_numeric_gate_pass": 301,
+          "semantic_stage_trigger_pass": 301,
+          "hierarchy_eligible": 301,
+          "local_peaks": 6,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": 101,
+          "future_raw_numeric_gate_pass": 101,
+          "future_semantic_stage_trigger_pass": 101,
+          "future_hierarchy_eligible": 101,
+          "future_local_peaks": 6,
+          "raw_pass_ratio": 0.8247,
+          "hierarchy_pass_ratio": 0.8247,
+          "future_hierarchy_score_median": 74.5
+        },
+        "contact_recontact": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 310,
+          "raw_numeric_gate_pass": 310,
+          "semantic_stage_trigger_pass": 202,
+          "hierarchy_eligible": 202,
+          "local_peaks": 6,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": 104,
+          "future_raw_numeric_gate_pass": 104,
+          "future_semantic_stage_trigger_pass": 53,
+          "future_hierarchy_eligible": 53,
+          "future_local_peaks": 6,
+          "raw_pass_ratio": 0.8493,
+          "hierarchy_pass_ratio": 0.5534,
+          "future_hierarchy_score_median": 61.15
+        },
+        "in_person_meeting": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 310,
+          "raw_numeric_gate_pass": 307,
+          "semantic_stage_trigger_pass": 172,
+          "hierarchy_eligible": 172,
+          "local_peaks": 7,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": 101,
+          "future_raw_numeric_gate_pass": 100,
+          "future_semantic_stage_trigger_pass": 53,
+          "future_hierarchy_eligible": 53,
+          "future_local_peaks": 7,
+          "raw_pass_ratio": 0.8411,
+          "hierarchy_pass_ratio": 0.4712,
+          "future_hierarchy_score_median": 64.34
+        },
+        "relationship_rebuilding": {
+          "total_days": 365,
+          "long_term_pass": 365,
+          "medium_anchor_pass": 155,
+          "raw_numeric_gate_pass": 155,
+          "semantic_stage_trigger_pass": 115,
+          "hierarchy_eligible": 115,
+          "local_peaks": 0,
+          "future_total_days": 104,
+          "future_long_term_pass": 104,
+          "future_medium_anchor_pass": 0,
+          "future_raw_numeric_gate_pass": 0,
+          "future_semantic_stage_trigger_pass": 0,
+          "future_hierarchy_eligible": 0,
+          "future_local_peaks": 0,
+          "raw_pass_ratio": 0.4247,
+          "hierarchy_pass_ratio": 0.3151,
+          "future_hierarchy_score_median": null
+        }
+      },
+      "top3": [
+        {
+          "date": "2026-12-08",
+          "start": "2026-12-07",
+          "end": "2026-12-09",
+          "stage": "emotional_reactivation",
+          "final": 82.37,
+          "components": {
+            "long_term": 91.36,
+            "mid_term": 81.58,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.37,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.37,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 81.58,
+            "event_trigger_raw": 112.69,
+            "primary_trigger_strength": 94.105,
+            "primary_trigger_orb": 0.009418
+          }
+        },
+        {
+          "date": "2026-11-28",
+          "start": "2026-11-27",
+          "end": "2026-11-29",
+          "stage": "emotional_reactivation",
+          "final": 82.17,
+          "components": {
+            "long_term": 90.78,
+            "mid_term": 81.58,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 77.17,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 82.17,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 81.58,
+            "event_trigger_raw": 117.75,
+            "primary_trigger_strength": 93.625,
+            "primary_trigger_orb": 0.014478
+          }
+        },
+        {
+          "date": "2026-11-02",
+          "start": "2026-11-01",
+          "end": "2026-11-03",
+          "stage": "emotional_reactivation",
+          "final": 79.22,
+          "components": {
+            "long_term": 95.89,
+            "mid_term": 62.65,
+            "event_trigger": 100,
+            "cross_system": 0.0,
+            "weighted_sum": 74.22,
+            "gate_multiplier": 1,
+            "convergence_bonus": 5.0,
+            "final": 79.22,
+            "gates": {
+              "long_term": true,
+              "mid_term": true,
+              "event_trigger": true
+            },
+            "eligible": true,
+            "independent_systems": [
+              "western"
+            ],
+            "event_probability": "not_calculated",
+            "mid_context_score": 62.79,
+            "event_trigger_raw": 122.227,
+            "primary_trigger_strength": 93.016,
+            "primary_trigger_orb": 0.020879
+          }
+        }
+      ],
+      "nearest": {
+        "date": "2026-09-22",
+        "start": "2026-09-21",
+        "end": "2026-09-23",
+        "stage": "contact_recontact",
+        "final": 71.64,
+        "components": {
+          "long_term": 95.74,
+          "mid_term": 32.54,
+          "event_trigger": 100,
+          "cross_system": 0.0,
+          "weighted_sum": 66.64,
+          "gate_multiplier": 1,
+          "convergence_bonus": 5.0,
+          "final": 71.64,
+          "gates": {
+            "long_term": true,
+            "mid_term": true,
+            "event_trigger": true
+          },
+          "eligible": true,
+          "independent_systems": [
+            "western"
+          ],
+          "event_probability": "not_calculated",
+          "mid_context_score": 51.67,
+          "event_trigger_raw": 114.677,
+          "primary_trigger_strength": 93.578,
+          "primary_trigger_orb": 0.014968
+        }
+      },
+      "nearest_in_public": true,
+      "selection_implies_hierarchy_and_numeric": true,
+      "determinism_digest": "0cd7f392942f1fa7555c2fa777ac0d6bc0490ddc2e68c9297559fe39a5300fa2"
+    }
+  ],
+  "boundary_probe": {
+    "expanded_start": "2026-12-25",
+    "original_nearest_still_selected": true,
+    "neighbors": [
+      {
+        "date": "2026-12-26",
+        "raw_trigger": 88.102,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2026-12-27",
+        "raw_trigger": 95.597,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2026-12-28",
+        "raw_trigger": 114.459,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2026-12-29",
+        "raw_trigger": 89.64,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2026-12-30",
+        "raw_trigger": 94.967,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2026-12-31",
+        "raw_trigger": 91.545,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-01",
+        "raw_trigger": 122.38,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-02",
+        "raw_trigger": 122.967,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": true
+      },
+      {
+        "date": "2027-01-03",
+        "raw_trigger": 98.86,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-04",
+        "raw_trigger": 96.157,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-05",
+        "raw_trigger": 103.652,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-06",
+        "raw_trigger": 110.144,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-07",
+        "raw_trigger": 112.211,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-08",
+        "raw_trigger": 94.026,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      },
+      {
+        "date": "2027-01-09",
+        "raw_trigger": 117.567,
+        "numeric": true,
+        "hierarchy": true,
+        "selected": false
+      }
+    ]
+  },
+  "duplicate_deterministic": true
+}

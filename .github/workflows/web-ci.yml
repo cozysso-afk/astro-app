@@ -5,9 +5,11 @@ on:
     paths:
       - "web/**"
       - "api/private_app.py"
+      - "api/relationship_async_v1.py"
       - "supabase/migrations/20260905_private_app*.sql"
       - "supabase/migrations/20260906_private_app*.sql"
       - "tests/test_private_app_auth_contract.py"
+      - "tests/test_relationship_async_contract.py"
       - "vercel.json"
       - ".github/workflows/web-ci.yml"
   push:
@@ -16,9 +18,11 @@ on:
     paths:
       - "web/**"
       - "api/private_app.py"
+      - "api/relationship_async_v1.py"
       - "supabase/migrations/20260905_private_app*.sql"
       - "supabase/migrations/20260906_private_app*.sql"
       - "tests/test_private_app_auth_contract.py"
+      - "tests/test_relationship_async_contract.py"
       - "vercel.json"
       - ".github/workflows/web-ci.yml"
   workflow_dispatch:
@@ -43,7 +47,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -60,8 +64,9 @@ jobs:
 
       - name: Verify private API and DB contract
         run: |
-          python -m py_compile ../api/private_app.py
+          python -m py_compile ../api/private_app.py ../api/relationship_async_v1.py
           python ../tests/test_private_app_auth_contract.py
+          python ../tests/test_relationship_async_contract.py
 
       - name: Type-check and build
         run: npm run build
