@@ -19,8 +19,8 @@ const ASPECT_LABEL: Record<string,string> = {
   conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
 }
 
-const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
-const READER_MEANING_RE = /(?:떠올|기억|근황|궁금|신경|호의|정서|감정|관심|미련|연락|메시지|답장|대화|약속|만남|관계|거리|행동|반복|갈등|책임|합의|유지|회복|재회|이어|피하|확인|실제|현실|정리)/
+const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|상대측\s*활성|내측\s*활성|재접점\s*활성|보조지표|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
+const READER_SCENE_START_RE = /(?:예전|과거|근황|궁금|신경|호의|정서|감정|미련|연락|메시지|답장|대화|약속|만남|다시|서로|행동|갈등|책임|합의|유지|회복|재회|관계가|관계를|관계에서|관계는)/g
 
 function Copy({ value }: { value?: string | null }) {
   const text = String(value ?? '').trim()
@@ -33,6 +33,17 @@ function splitSentences(value?: string | null) {
   return text.replace(/([.!?])\s+/g, '$1\n').split('\n').map((row)=>row.trim()).filter(Boolean)
 }
 
+function plainReaderSentence(sentence: string) {
+  if (!MAIN_TECHNICAL_RE.test(sentence)) return sentence
+  for (const match of sentence.matchAll(READER_SCENE_START_RE)) {
+    const index = match.index ?? -1
+    if (index < 0) continue
+    const candidate = sentence.slice(index).trim()
+    if (candidate.length >= 10 && !MAIN_TECHNICAL_RE.test(candidate)) return candidate
+  }
+  return ''
+}
+
 function readerText(value?: string | null, fallback='') {
   const normalized = String(value ?? '')
     .replace(/용수자리/g, '진북교점')
@@ -42,8 +53,7 @@ function readerText(value?: string | null, fallback='') {
     .replace(/현재 열림/g, '현재 관련 신호가 있음')
     .trim()
   if (!normalized) return fallback
-  const sentences = splitSentences(normalized)
-  const plain = sentences.filter((sentence)=>!MAIN_TECHNICAL_RE.test(sentence) || READER_MEANING_RE.test(sentence))
+  const plain = splitSentences(normalized).map(plainReaderSentence).filter(Boolean)
   return plain.length ? plain.join(' ') : fallback
 }
 
