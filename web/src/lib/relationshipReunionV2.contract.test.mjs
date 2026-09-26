@@ -65,7 +65,7 @@ test('reunion hierarchy puts full consultation answers before engine state',()=>
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
+  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','상대는 예전과 달라졌을까?','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){
     const next=hierarchyPanel.indexOf(heading)
@@ -122,7 +122,7 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   assert.doesNotMatch(hierarchyPanel,/<p>\{verdict\}<\/p>/)
   assert.match(hierarchyPanel,/이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성 자체는 열려 있어/)
-  assert.match(hierarchyPanel,/실제 연락 확률을 높음·낮음으로 산출하지 않아/)
+  assert.match(hierarchyPanel,/통계적 연락 확률이 아니라/)
   assert.match(hierarchyPanel,/연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간/)
   assert.match(hierarchyPanel,/이 신호는 실제 연락 확률 판정이 아니야/)
   assert.match(hierarchyPanel,/메시지가 실제로 온다고 확정하는 뜻은 아니야/)
@@ -139,6 +139,19 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   assert.doesNotMatch(hierarchyPanel,/단계가 현재 창에 걸려 있어/)
   assert.doesNotMatch(hierarchyPanel,/현재 열린 단계보다 뒤의 일을 한꺼번에 재회로 묶어 읽지 않아/)
   assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
+})
+
+test('reunion exposes relative contact signal and change checks without pretending statistical probability',()=>{
+  assert.match(hierarchyPanel,/function contactSignalBand/)
+  assert.match(hierarchyPanel,/activation >= 60/)
+  assert.match(hierarchyPanel,/연락 가능성 신호: \{contactSignal\}/)
+  assert.match(hierarchyPanel,/시기·단계 근거의 상대 강도/)
+  assert.match(hierarchyPanel,/function changeOutlook/)
+  assert.match(hierarchyPanel,/상대는 예전과 달라졌을까\?/)
+  assert.match(hierarchyPanel,/실제 행동 이력이나 성격 변화를 관측하지 않아서/)
+  assert.match(hierarchyPanel,/구체적인 약속을 잡고 지키는지/)
+  assert.match(hierarchyPanel,/예전처럼 안부와 추억만 반복하는지/)
+  assert.doesNotMatch(hierarchyPanel,/연락 가능성[^\n]{0,40}\d+%/)
 })
 
 test('reunion grounding deduplicates locally and closes initiative claims across section and summary',()=>{
