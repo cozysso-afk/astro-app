@@ -19,7 +19,7 @@ const ASPECT_LABEL: Record<string,string> = {
   conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
 }
 
-const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|상대측\s*활성|내측\s*활성|재접점\s*활성|보조지표|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
+const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|\b(?:emotional_reactivation|contact_recontact|in_person_meeting|relationship_rebuilding|initiative_gate)\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|상대측\s*활성|내측\s*활성|재접점\s*활성|보조지표|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
 const READER_SCENE_START_RE = /(?:예전|과거|근황|궁금|신경|호의|정서|감정|미련|연락|메시지|답장|대화|약속|만남|다시|서로|행동|갈등|책임|합의|유지|회복|재회|관계가|관계를|관계에서|관계는)/g
 
 function Copy({ value }: { value?: string | null }) {
@@ -44,14 +44,35 @@ function plainReaderSentence(sentence: string) {
   return ''
 }
 
-function readerText(value?: string | null, fallback='') {
-  const normalized = String(value ?? '')
+function normalizeReaderLanguage(value?: string | null) {
+  return String(value ?? '')
+    .replace(/\bemotional_reactivation\b/g, '다시 의식하는 흐름')
+    .replace(/\bcontact_recontact\b/g, '연락이나 대화 재개')
+    .replace(/\bin_person_meeting\b/g, '실제 만남')
+    .replace(/\brelationship_rebuilding\b/g, '관계 회복')
+    .replace(/\binitiative_gate\b/g, '선연락 방향 근거')
+    .replace(/\((다시 의식하는 흐름|연락이나 대화 재개|실제 만남|관계 회복|선연락 방향 근거)\)/g, '$1')
     .replace(/용수자리/g, '진북교점')
-    .replace(/감정 활성(?:화)?/g, '과거 관계를 다시 의식하는 흐름')
+    .replace(/감정 활성(?:화)?/g, '다시 의식하는 흐름')
     .replace(/연락·재접촉 단계/g, '연락이나 대화가 다시 이어질 수 있는 흐름')
     .replace(/관계 재구축 단계/g, '관계를 다시 이어 가는 흐름')
     .replace(/현재 열림/g, '현재 관련 신호가 있음')
+    .replace(/현재 조회 시점 기준으로\s*/g, '지금 ')
+    .replace(/가장 먼저 활성화되는 단계는/g, '가장 먼저 눈여겨볼 흐름은')
+    .replace(/가장 먼저 도달하는\s*연락·재접촉\s*(?:국소\s*)?피크(?:\s*구간)?/g, '가장 먼저 눈여겨볼 연락·대화 재개 시기')
+    .replace(/상위 관문/g, '다음 단계')
+    .replace(/미충족 상태(?:야|다)?/g, '아직 뚜렷한 근거가 없어')
+    .replace(/국소\s*피크(?:\s*구간)?/g, '두드러지는 시기')
+    .replace(/피크\s*구간/g, '두드러지는 시기')
+    .replace(/유효 후보/g, '살펴볼 시기')
+    .replace(/후보가 형성되어 있(?:어|다)/g, '살펴볼 시기가 잡혀 있어')
+    .replace(/오프라인 대면/g, '실제 만남')
+    .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+function readerText(value?: string | null, fallback='') {
+  const normalized = normalizeReaderLanguage(value)
   if (!normalized) return fallback
   const plain = splitSentences(normalized).map(plainReaderSentence).filter(Boolean)
   return plain.length ? plain.join(' ') : fallback
@@ -76,12 +97,14 @@ function stageSummary(rows: ReturnType<typeof stageRows>) {
 
 function phaseVerdict(hierarchyData: ReunionHierarchy) {
   const current = new Set(hierarchyData.current_windows.map((row)=>row.stage))
+  const future = new Set(hierarchyData.top_periods.map((row)=>row.stage))
   const has = (stage:string)=>current.has(stage)
-  if (has('relationship_rebuilding')) return '지금은 연락이 다시 닿느냐보다, 다시 이어진 관계를 예전과 다른 방식으로 유지할 수 있는지가 더 중요해.'
-  if (has('in_person_meeting')) return '지금은 단순히 연락이 오가느냐보다 실제 약속이나 만남으로 이어지는지가 더 중요해. 다만 만났다는 사실만으로 다시 연인이 된다고 볼 수는 없어.'
-  if (has('contact_recontact')) return '지금은 연락이나 대화가 다시 이어질 수 있는 시기 신호가 일부 잡혀 있어. 다만 이것만으로 상대에게서 실제 연락이 온다고 말할 수는 없어. 만남이나 관계 회복으로 이어질 근거는 따로 확인해야 해.'
-  if (has('emotional_reactivation')) return '지금은 예전 관계를 다시 떠올리거나 상대의 근황이 궁금해지기 쉬운 흐름이 먼저 보여. 실제 연락이나 만남으로 이어지는지는 한 단계 더 확인해야 해.'
-  return '지금은 실제 연락이나 만남이 가까워졌다고 말할 만큼 뚜렷한 흐름이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 현재 날짜에서 행동으로 이어질 근거가 부족하다는 뜻이야.'
+  const hasAny = (stage:string)=>current.has(stage) || future.has(stage)
+  if (has('relationship_rebuilding')) return '지금은 연락이 다시 닿느냐보다, 다시 이어진 관계를 예전과 다른 방식으로 유지할 수 있는지가 더 중요해. 실제로 관계 이야기를 피하지 않고, 이전에 끊겼던 문제를 다르게 다루는 행동이 이어지는지를 봐야 해. 다시 만났다는 사실만으로 관계가 안정됐다고 보기는 어려워.'
+  if (has('in_person_meeting')) return '지금은 단순히 연락이 오가느냐보다 실제 약속이나 만남으로 이어지는지가 더 중요해. 만남이 잡히면 감정이 현실 행동으로 넘어온 신호로 볼 수 있지만, 그것만으로 다시 연인이 된다고 보기는 어려워. 만난 뒤 관계 이야기를 피하지 않는지가 다음 판단 기준이야.'
+  if (has('contact_recontact')) return `지금은 연락이나 대화가 다시 이어질 수 있는 시기 신호가 일부 잡혀 있어. 다만 이것만으로 상대에게서 실제 연락이 온다고 말할 수는 없어.${!hasAny('in_person_meeting') && !hasAny('relationship_rebuilding') ? ' 현재 조회 범위에서는 실제 만남이나 관계 회복으로 이어질 시기도 뚜렷하지 않아.' : ' 연락이 생기더라도 실제 만남과 관계 회복은 다음 단계로 따로 확인해야 해.'} 그래서 이번 결과는 재회가 가까워졌다고 단정하기보다, 연락이 생기는지와 그 뒤 행동이 이어지는지를 보는 쪽에 가까워.`
+  if (has('emotional_reactivation')) return `지금은 예전 관계를 다시 떠올리거나 상대의 근황이 궁금해지기 쉬운 흐름이 먼저 보여. 생각이나 감정이 올라오는 것과 실제 연락이 생기는 것은 같은 일이 아니야.${!hasAny('contact_recontact') ? ' 현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 만한 시기도 뚜렷하지 않아.' : ' 앞으로 연락이나 대화 재개를 살펴볼 시기는 따로 잡혀 있어.'}`
+  return '지금은 실제 연락이나 만남이 가까워졌다고 말할 만큼 뚜렷한 흐름이 잡히지 않았어. 감정이 없다는 뜻이 아니라, 현재 날짜에서 행동으로 이어질 근거가 부족하다는 뜻이야. 새로운 연락이나 구체적인 만남이 생기기 전에는 재회를 앞당겨 해석하지 않는 게 맞아.'
 }
 
 function contactOutlook(hierarchyData: ReunionHierarchy) {
@@ -105,7 +128,16 @@ function finalTakeaway(hierarchyData: ReunionHierarchy) {
 
 function timingFallback(rows: ReunionPeriod[]) {
   if (!rows.length) return '현재 이후에 따로 강조할 만한 시기가 잡히지 않았어. 없는 날짜를 억지로 만들어내지 않을게.'
-  return rows.map((row)=>`${row.start}~${row.end}에는 ${row.label}과 관련된 흐름을 눈여겨볼 수 있어.`).join(' ')
+  const grouped = new Map<string, ReunionPeriod[]>()
+  for (const row of rows) grouped.set(row.stage, [...(grouped.get(row.stage) ?? []), row])
+  return [...grouped.entries()].map(([stage, group])=>{
+    const dates = group.map((row)=>`${row.start}~${row.end}`).join(', ')
+    if (stage === 'emotional_reactivation') return `${dates}에는 예전 관계가 다시 신경 쓰이거나 감정이 올라오는 흐름을 살펴볼 수 있어. 같은 종류의 신호라 날짜마다 서로 다른 사건을 뜻하는 것은 아니야.`
+    if (stage === 'contact_recontact') return `${dates}에는 연락이나 대화가 실제로 다시 이어지는지를 다른 때보다 더 눈여겨볼 수 있어. 시기 신호와 실제 메시지 도착은 같은 뜻이 아니야.`
+    if (stage === 'in_person_meeting') return `${dates}에는 연락이 실제 약속이나 만남으로 넘어가는지를 살펴볼 수 있어.`
+    if (stage === 'relationship_rebuilding') return `${dates}에는 다시 만난 뒤 관계를 실제로 이어 갈 행동과 합의가 붙는지를 살펴볼 수 있어.`
+    return `${dates}에는 관계 흐름의 변화를 다른 때보다 더 눈여겨볼 수 있어.`
+  }).join(' ')
 }
 
 function directionCopy(row: DirectionRow) {
@@ -130,6 +162,22 @@ function topEvidence(evidence: Aspect[], limit=8) {
     .slice(0,limit)
 }
 
+function dedupeTimingWindows(windows: ReunionSynthesis['timing']['windows']) {
+  const seen = new Set<string>()
+  return windows.map((window)=>({
+    ...window,
+    meaning: readerText(window.meaning, '이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어.'),
+  })).filter((window)=>{
+    const fingerprint = window.meaning
+      .replace(/\d{4}-\d{2}-\d{2}/g, '#')
+      .replace(/[\s·,.!?~→-]+/g, '')
+      .toLowerCase()
+    if (seen.has(fingerprint)) return false
+    seen.add(fingerprint)
+    return true
+  })
+}
+
 export function ReunionHierarchyPanel({
   hierarchyData,
   evidence,
@@ -146,7 +194,6 @@ export function ReunionHierarchyPanel({
   const valid = hierarchyData.validation?.status === 'PASS'
   const rows = stageRows(hierarchyData)
   const neutralDirectionRows = directionRows.map((row)=>({...row,text:directionCopy(row)}))
-  const verdict = phaseVerdict(hierarchyData)
   const contact = contactOutlook(hierarchyData)
   const initiative = readerText(
     reunionV2?.initiative ? `${reunionV2.initiative.conclusion} ${reunionV2.initiative.interpretation}` : '',
@@ -165,11 +212,8 @@ export function ReunionHierarchyPanel({
     reunionV2?.repeat_risks?.conclusion,
     '연락은 이어지는데 만남을 계속 미루거나, 관계 이야기를 피하고, 예전과 같은 지점에서 대화가 끊기면 이번 흐름도 미련 확인이나 일시적인 재접촉에서 멈출 수 있어.',
   )
-  const summary = readerText(reunionV2?.summary, verdict)
-  const timingWindows = (reunionV2?.timing?.windows ?? []).map((window)=>({
-    ...window,
-    meaning: readerText(window.meaning, '이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어.'),
-  }))
+  const summary = phaseVerdict(hierarchyData)
+  const timingWindows = reunionV2?.timing?.windows?.length ? dedupeTimingWindows(reunionV2.timing.windows) : []
   const conditions = (reunionV2?.rebuild?.conditions ?? []).map((item)=>readerText(item)).filter(Boolean)
   const patterns = (reunionV2?.repeat_risks?.patterns ?? []).map((item)=>readerText(item)).filter(Boolean)
   const evidenceRows = topEvidence(evidence)
