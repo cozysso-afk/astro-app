@@ -65,7 +65,7 @@ test('reunion hierarchy puts full consultation answers before engine state',()=>
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','상대는 예전과 달라졌을까?','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
+  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','상대가 예전과 다르게 움직일 여지가 있나?','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
   let cursor=-1
   for(const heading of headings){
     const next=hierarchyPanel.indexOf(heading)
@@ -145,12 +145,17 @@ test('reunion exposes relative contact signal and change checks without pretendi
   assert.match(hierarchyPanel,/function contactSignalBand/)
   assert.match(hierarchyPanel,/activation >= 60/)
   assert.match(hierarchyPanel,/연락 가능성 신호: \{contactSignal\}/)
-  assert.match(hierarchyPanel,/시기·단계 근거의 상대 강도/)
+  assert.match(hierarchyPanel,/연락 시기 신호와 상대 → 나·나 → 상대 방향 자극을 함께 본 상대 강도/)
+  assert.match(hierarchyPanel,/if \(bothDirectionsWeak\(directionRows\)\) return '낮음'/)
+  assert.match(hierarchyPanel,/function initiativeOutlook/)
+  assert.match(hierarchyPanel,/상대적 선연락 방향: \{initiative\.label\}/)
+  assert.match(hierarchyPanel,/양쪽 모두 절대 강도는 약하지만/)
+  assert.match(hierarchyPanel,/연락이 생긴다면 어느 쪽이 상대적으로 앞서는지를 본 값/)
   assert.match(hierarchyPanel,/function changeOutlook/)
-  assert.match(hierarchyPanel,/상대는 예전과 달라졌을까\?/)
-  assert.match(hierarchyPanel,/실제 행동 이력이나 성격 변화를 관측하지 않아서/)
+  assert.match(hierarchyPanel,/상대가 예전과 다르게 움직일 여지가 있나\?/)
+  assert.match(hierarchyPanel,/변화 행동 신호: \{change\.label\}/)
+  assert.match(hierarchyPanel,/실제 만남이나 관계 회복 단계가 뚜렷하지 않아서/)
   assert.match(hierarchyPanel,/구체적인 약속을 잡고 지키는지/)
-  assert.match(hierarchyPanel,/예전처럼 안부와 추억만 반복하는지/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성[^\n]{0,40}\d+%/)
 })
 
