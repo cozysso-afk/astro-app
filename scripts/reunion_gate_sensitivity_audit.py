@@ -1,10 +1,10 @@
-"""Privacy-preserving reunion gate sensitivity replay.
+"""Privacy-preserving reunion gate and stage-policy sensitivity replay.
 
 Reads private relationship requests from stdin and emits aggregate gate counts only.
-The calculation is rerun for each threshold variant so sequentially skipped medium/
-fast layers are genuinely recomputed instead of treating stored zeroes as scores.
+The calculation is rerun for each variant so sequentially skipped medium/fast layers
+are genuinely recomputed instead of treating stored zeroes as scores.
 
-This is validation infrastructure. It never changes production thresholds.
+This is validation infrastructure. It never changes production thresholds or policy.
 """
 from __future__ import annotations
 
@@ -26,6 +26,44 @@ def threshold_variants(base: dict[str, float]):
             sign = "+" if delta > 0 else ""
             variants.append((f"{gate}{sign}{int(delta)}", thresholds))
     return variants
+
+
+def policy_variant_specs():
+    """Counterfactuals only; none of these are production recommendations."""
+    return [
+        (
+            "meeting_trigger_mars_or_venus",
+            {
+                "meeting_primary_planets": ("Mars", "Venus"),
+                "description": (
+                    "Keep meeting long/mid gates and targets unchanged, but allow Venus "
+                    "or Mars to be the stage-defining exact trigger."
+                ),
+            },
+        ),
+        (
+            "medium_gate_add_solar_return",
+            {
+                "mid_gate_return_keys": ("lunar_return", "solar_return"),
+                "description": (
+                    "Add Solar Return to the medium gate. In the current stage-context map "
+                    "Solar Return is present only for relationship_rebuilding, so this is an "
+                    "effectively rebuilding-specific counterfactual."
+                ),
+            },
+        ),
+        (
+            "medium_gate_add_venus_return",
+            {
+                "mid_gate_return_keys": ("lunar_return", "venus_return"),
+                "description": (
+                    "Add Venus Return to the medium gate as a broad stress test. Current context "
+                    "maps expose it to emotional, meeting, and rebuilding stages, so this variant "
+                    "must not be read as a stage-specific production proposal."
+                ),
+            },
+        ),
+    ]
 
 
 def stage_snapshot(hierarchy: dict):
@@ -68,9 +106,30 @@ def compare_to_baseline(baseline: dict, current: dict):
         base = baseline.get(stage) or {}
         out[stage] = {
             key: int(values.get(key, 0)) - int(base.get(key, 0))
-            for key in ("long_pass", "mid_pass", "numeric_pass", "hierarchy_pass", "peaks", "candidate_count")
+            for key in (
+                "long_pass", "mid_pass", "numeric_pass", "trigger_pass",
+                "hierarchy_pass", "peaks", "candidate_count",
+            )
         }
     return out
+
+
+def _reset_policy(engine, base_meeting_primary, base_mid_gate_keys):
+    meeting = engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"]
+    meeting.clear()
+    meeting.update(base_meeting_primary)
+    engine.MID_GATE_RETURN_KEYS.clear()
+    engine.MID_GATE_RETURN_KEYS.update(base_mid_gate_keys)
+
+
+def apply_policy_variant(engine, spec):
+    if "meeting_primary_planets" in spec:
+        meeting = engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"]
+        meeting.clear()
+        meeting.update(spec["meeting_primary_planets"])
+    if "mid_gate_return_keys" in spec:
+        engine.MID_GATE_RETURN_KEYS.clear()
+        engine.MID_GATE_RETURN_KEYS.update(spec["mid_gate_return_keys"])
 
 
 def replay(checkout: str, requests: list[dict]):
@@ -83,22 +142,32 @@ def replay(checkout: str, requests: list[dict]):
         "query_utc_offset_hours", "query_timezone_id", "analysis_mode", "relationship_status",
     )
     base_thresholds = dict(hierarchy_engine.THRESHOLDS)
-    variants = threshold_variants(base_thresholds)
+    base_meeting_primary = set(
+        hierarchy_engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"]
+    )
+    base_mid_gate_keys = set(hierarchy_engine.MID_GATE_RETURN_KEYS)
+    threshold_specs = threshold_variants(base_thresholds)
+    policy_specs = policy_variant_specs()
     output = []
+
+    def run(body):
+        result = relationship_western(RelationshipRequest(**body))["result"]
+        hierarchy = result["reunion_hierarchy"]
+        return hierarchy.get("version"), stage_snapshot(hierarchy)
+
     try:
         for index, request in enumerate(requests):
             body = {key: request[key] for key in allowed if key in request}
-            variant_rows = {}
+            threshold_rows = {}
             engine_version = None
-            for name, thresholds in variants:
+
+            for name, thresholds in threshold_specs:
+                _reset_policy(hierarchy_engine, base_meeting_primary, base_mid_gate_keys)
                 hierarchy_engine.THRESHOLDS.clear()
                 hierarchy_engine.THRESHOLDS.update(thresholds)
-                result = relationship_western(RelationshipRequest(**body))["result"]
-                hierarchy = result["reunion_hierarchy"]
-                engine_version = hierarchy.get("version")
-                variant_rows[name] = stage_snapshot(hierarchy)
+                engine_version, threshold_rows[name] = run(body)
 
-            baseline = variant_rows["baseline"]
+            baseline = threshold_rows["baseline"]
             baseline_bottlenecks = {}
             for stage, values in baseline.items():
                 primary, drops = bottleneck(values)
@@ -107,16 +176,30 @@ def replay(checkout: str, requests: list[dict]):
             sensitivity = {
                 name: {
                     "thresholds": thresholds,
-                    "delta_vs_baseline": compare_to_baseline(baseline, variant_rows[name]),
+                    "delta_vs_baseline": compare_to_baseline(baseline, threshold_rows[name]),
                 }
-                for name, thresholds in variants
+                for name, thresholds in threshold_specs
                 if name != "baseline"
             }
+
+            policy_counterfactuals = {}
+            for name, spec in policy_specs:
+                hierarchy_engine.THRESHOLDS.clear()
+                hierarchy_engine.THRESHOLDS.update(base_thresholds)
+                _reset_policy(hierarchy_engine, base_meeting_primary, base_mid_gate_keys)
+                apply_policy_variant(hierarchy_engine, spec)
+                _, current = run(body)
+                policy_counterfactuals[name] = {
+                    "description": spec["description"],
+                    "delta_vs_baseline": compare_to_baseline(baseline, current),
+                }
+
             digest_payload = {
                 "engine_version": engine_version,
                 "base_thresholds": base_thresholds,
                 "baseline": baseline,
                 "sensitivity": sensitivity,
+                "policy_counterfactuals": policy_counterfactuals,
             }
             output.append({
                 "case_index": index + 1,
@@ -125,6 +208,7 @@ def replay(checkout: str, requests: list[dict]):
                 "baseline": baseline,
                 "baseline_bottlenecks": baseline_bottlenecks,
                 "sensitivity": sensitivity,
+                "policy_counterfactuals": policy_counterfactuals,
                 "determinism_digest": hashlib.sha256(
                     json.dumps(digest_payload, sort_keys=True, ensure_ascii=False).encode()
                 ).hexdigest(),
@@ -133,6 +217,7 @@ def replay(checkout: str, requests: list[dict]):
     finally:
         hierarchy_engine.THRESHOLDS.clear()
         hierarchy_engine.THRESHOLDS.update(base_thresholds)
+        _reset_policy(hierarchy_engine, base_meeting_primary, base_mid_gate_keys)
     return output
 
 
