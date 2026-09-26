@@ -45,6 +45,8 @@ test('repairs invalid refs only from the server evidence matrix and expands a sh
   assert.ok(out.data.reunion_synthesis_v2.initiative.evidence_refs.length > 0)
   assert.match(out.data.reunion_synthesis_v2.initiative.conclusion, /정하기 어렵다/)
   assert.match(out.data.reunion_synthesis_v2.initiative.interpretation, /대화가 이어지는지/)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.interpretation.includes('내 쪽 움직임이 조금 더 먼저'), false)
+  assert.equal(out.data.reunion_synthesis_v2.initiative.interpretation.includes('시작 압력'), false)
   assert.equal(out.data.reunion_synthesis_v2.convergence.length, 0)
 })
 
@@ -87,6 +89,17 @@ test('deduplicates inside each question without deleting useful explanation from
   assert.match(initiative, /실제 만남을 잡는지/)
   assert.equal(initiative.includes('내 쪽이 조금 앞서'), false)
   assert.equal(`${why} ${initiative}`.includes('0.021°'), false)
+})
+
+test('closed initiative gate removes directional paraphrases, not only literal first-contact wording', () => {
+  const x = reading()
+  x.reunion_synthesis_v2.initiative.conclusion = '상대보다 내 방향이 앞서는 흐름이야.'
+  x.reunion_synthesis_v2.initiative.interpretation = '내 쪽 움직임이 더 먼저 잡히고 시작 압력도 내 방향에서 올라와. 다만 연락 뒤에는 대화가 이어지는지 확인해야 해.'
+  const out = repairReunionGroundingV2(x, payload)
+  assert.equal(out.ok, true)
+  const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
+  assert.equal(/내 방향이 앞서|내 쪽 움직임이 더 먼저|시작 압력/.test(initiative), false)
+  assert.match(initiative, /대화가 이어지는지/)
 })
 
 test('keeps a directional conclusion only when the server initiative gate is explicitly open', () => {
