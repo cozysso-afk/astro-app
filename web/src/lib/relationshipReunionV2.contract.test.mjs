@@ -123,7 +123,7 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   assert.match(hierarchyPanel,/이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성 자체는 열려 있어/)
   assert.match(hierarchyPanel,/실제 연락 확률을 높음·낮음으로 산출하지 않아/)
-  assert.match(hierarchyPanel,/연락 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간/)
+  assert.match(hierarchyPanel,/연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간/)
   assert.match(hierarchyPanel,/이 신호는 실제 연락 확률 판정이 아니야/)
   assert.match(hierarchyPanel,/메시지가 실제로 온다고 확정하는 뜻은 아니야/)
   assert.doesNotMatch(hierarchyPanel,/실제 연락 가능성이 높다고 말할 근거는 아직 부족해/)
