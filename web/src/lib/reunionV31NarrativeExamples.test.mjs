@@ -14,6 +14,10 @@ test('known awkward engine phrases have explicit reader-language replacements', 
     '유효 후보',
     '오프라인 대면',
   ]) assert.match(panel, new RegExp(`replace\\(\\/${phrase}`))
+  assert.match(panel, /replace\(\/\\\(\(\?:emotional_reactivation\|contact_recontact\|in_person_meeting\|relationship_rebuilding\|initiative_gate\)\\\)\/g, ''\)/)
+  assert.match(panel, /강한 후보들이 형성되어 있/)
+  assert.match(panel, /실제 대면 만남/)
+  assert.match(panel, /관계 재정의/)
 })
 
 test('calculated timing fallback groups same-stage dates instead of repeating one sentence per date', () => {
