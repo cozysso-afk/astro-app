@@ -45,6 +45,13 @@ export function polishReunionNarrativeText(value: unknown, provisional = false) 
   if (!out) return ''
 
   out = out
+    .replace(/용수자리/g, '진북교점')
+    .replace(/감정 활성(?:화)?/g, '과거 관계를 다시 의식하는 흐름')
+    .replace(/연락·재접촉 단계/g, '연락이나 대화가 다시 이어질 수 있는 흐름')
+    .replace(/관계 재구축 단계/g, '관계를 다시 이어 가는 흐름')
+    .replace(/현재 열림/g, '현재 관련 신호가 있음')
+    .replace(/후보 창/g, '시기')
+    .replace(/후보 구간/g, '시기')
     .replace(/\bSecondary\s+Progression(?:\(2차 진행\))?/gi, '2차 진행')
     .replace(/\bDaily\s+transit(?:\(트랜짓·현재 행성 이동\))?/gi, '일일 트랜짓')
     .replace(/\bprogressed\s+synastry(?:\(시너스트리·궁합차트\))?/gi, '진행 시너스트리')
@@ -71,6 +78,7 @@ export function polishReunionNarrativeText(value: unknown, provisional = false) 
     .replace(/\bincoming\b/gi, '상대측 활성')
     .replace(/\boutgoing\b/gi, '내측 활성')
     .replace(/\breconnection\b/gi, '재접점')
+    .replace(/\bsecondary\b/gi, '보조')
 
   out = normalizeDegreePrecision(out)
   out = out
@@ -148,6 +156,25 @@ function dedupeNarrative(value: unknown, state: DedupState, provisional: boolean
   return finalRows.map(row => row.sentence).join(' ')
 }
 
+function localText(value: unknown, provisional: boolean, trackEvidence = true) {
+  return dedupeNarrative(value, { sentences: new Set(), evidence: new Set() }, provisional, trackEvidence)
+}
+
+function sectionPair(section: any, provisional: boolean) {
+  const state: DedupState = { sentences: new Set(), evidence: new Set() }
+  return {
+    ...section,
+    conclusion: dedupeNarrative(section?.conclusion, state, provisional, false),
+    interpretation: dedupeNarrative(section?.interpretation, state, provisional, true),
+  }
+}
+
+function safeInitiativeDetail(value: unknown, provisional: boolean) {
+  const polished = polishReunionNarrativeText(value, provisional)
+  const blocked = /(?:누가\s*먼저|먼저\s*(?:연락|움직)|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합)/
+  return splitSentences(polished).filter(sentence => !blocked.test(sentence)).join(' ')
+}
+
 function validSet(payload: any) {
   return new Set(arr(payload?.reunion_evidence_v2?.evidence).map((x: any) => text(x?.id)).filter(Boolean))
 }
@@ -208,27 +235,24 @@ function composeSummary(v2: any) {
 }
 
 function polishV2(v2: any, provisional: boolean) {
-  const state: DedupState = { sentences: new Set(), evidence: new Set() }
-  const whyConclusion = dedupeNarrative(v2?.why_reconnect?.conclusion, state, provisional, false)
-  const whyInterpretation = dedupeNarrative(v2?.why_reconnect?.interpretation, state, provisional, true)
-  const initiativeConclusion = dedupeNarrative(v2?.initiative?.conclusion, state, provisional, false)
-  const initiativeInterpretation = dedupeNarrative(v2?.initiative?.interpretation, state, provisional, true)
-  const timingConclusion = dedupeNarrative(v2?.timing?.conclusion, state, provisional, false)
+  const why = sectionPair(v2?.why_reconnect, provisional)
+  const initiative = sectionPair(v2?.initiative, provisional)
+  const timingConclusion = localText(v2?.timing?.conclusion, provisional, false)
   const timingWindows = arr(v2?.timing?.windows).map((w: any) => ({
     ...w,
     period: text(w?.period),
-    meaning: dedupeNarrative(w?.meaning, state, provisional, true),
+    meaning: localText(w?.meaning, provisional, true),
   }))
-  const rebuildConclusion = dedupeNarrative(v2?.rebuild?.conclusion, state, provisional, false)
-  const rebuildConditions = arr(v2?.rebuild?.conditions).map((x: any) => dedupeNarrative(x, state, provisional, true)).filter(Boolean)
-  const repeatConclusion = dedupeNarrative(v2?.repeat_risks?.conclusion, state, provisional, false)
-  const repeatPatterns = arr(v2?.repeat_risks?.patterns).map((x: any) => dedupeNarrative(x, state, provisional, true)).filter(Boolean)
+  const rebuildConclusion = localText(v2?.rebuild?.conclusion, provisional, false)
+  const rebuildConditions = arr(v2?.rebuild?.conditions).map((x: any) => localText(x, provisional, true)).filter(Boolean)
+  const repeatConclusion = localText(v2?.repeat_risks?.conclusion, provisional, false)
+  const repeatPatterns = arr(v2?.repeat_risks?.patterns).map((x: any) => localText(x, provisional, true)).filter(Boolean)
 
   return {
     ...v2,
     summary: polishReunionNarrativeText(v2?.summary, provisional),
-    why_reconnect: { ...v2.why_reconnect, conclusion: whyConclusion, interpretation: whyInterpretation },
-    initiative: { ...v2.initiative, conclusion: initiativeConclusion, interpretation: initiativeInterpretation },
+    why_reconnect: why,
+    initiative,
     timing: { ...v2.timing, conclusion: timingConclusion, windows: timingWindows },
     rebuild: { ...v2.rebuild, conclusion: rebuildConclusion, conditions: uniq(rebuildConditions) },
     repeat_risks: { ...v2.repeat_risks, conclusion: repeatConclusion, patterns: uniq(repeatPatterns) },
@@ -246,9 +270,9 @@ function sanitizeUnsupportedClaims(value: any): any {
     .replace(/끊어지지 않는 인연|끊을 수 없는 인연|서로를 지울 수 없다/g, '쉽게 정리되지 않는 느낌이 들 수 있는 관계')
     .replace(/카르마적 인연|운명적 인연|천생연분/g, '강하게 체감될 수 있는 관계')
     .replace(/운명적으로 다시 만난다/g, '다시 접점이 생길 수 있는 흐름이 보인다')
-    .replace(/반드시 연락한다/g, '연락을 확정할 수는 없지만 관련 활성 신호가 있다')
+    .replace(/반드시 연락한다/g, '연락을 확정할 수는 없지만 관련 신호가 있다')
     .replace(/상대가 아직 사랑한다/g, '상대의 실제 감정은 차트만으로 확정할 수 없다')
-    .replace(/(연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/g, '$1 관련 활성 점수는 사건 확률이 아니다')
+    .replace(/(연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/g, '$1 관련 점수는 사건 확률이 아니다')
   if (Array.isArray(value)) return value.map(sanitizeUnsupportedClaims)
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, sanitizeUnsupportedClaims(v)]))
   return value
@@ -301,10 +325,11 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
   v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, timingDateGate)) }
   const gate = payload?.reunion_evidence_v2?.initiative_gate
   if (gate?.available !== true) {
+    const preserved = safeInitiativeDetail(`${v2?.initiative?.conclusion ?? ''} ${v2?.initiative?.interpretation ?? ''}`, payload?.precision?.partner_time_exact === false)
     v2.initiative = {
       ...v2.initiative,
-      conclusion: '현재 계산만으로 누가 먼저 연락한다고 판정하지 않는다.',
-      interpretation: '상대측 활성과 내측 활성은 각 차트가 자극받는 정도일 뿐 실제 행동 방향이 아니다. 서로 독립된 방향성 행동 근거가 충분히 겹치지 않아 선연락 주체는 판정 불가다.',
+      conclusion: '누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다.',
+      interpretation: `${preserved ? `${preserved} ` : ''}누가 먼저냐보다 연락이 생긴 뒤 대화가 이어지는지, 실제 만남을 잡는지, 예전 문제를 피하지 않는지를 보는 편이 더 중요하다.`.trim(),
       evidence_refs: normalizeRefs(v2?.initiative?.evidence_refs, fallbacks.initiative, valid),
     }
   }
