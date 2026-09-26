@@ -91,15 +91,19 @@ test('deduplicates inside each question without deleting useful explanation from
   assert.equal(`${why} ${initiative}`.includes('0.021°'), false)
 })
 
-test('closed initiative gate removes directional paraphrases, not only literal first-contact wording', () => {
+test('closed initiative gate removes directional paraphrases from both initiative and top summary', () => {
   const x = reading()
+  x.reunion_synthesis_v2.summary = '상대보다 내 방향이 앞서는 흐름이야. 다시 연결될 여지는 있지만 실제 관계 회복은 만남과 대화가 이어지는지 따로 봐야 해.'
   x.reunion_synthesis_v2.initiative.conclusion = '상대보다 내 방향이 앞서는 흐름이야.'
   x.reunion_synthesis_v2.initiative.interpretation = '내 쪽 움직임이 더 먼저 잡히고 시작 압력도 내 방향에서 올라와. 다만 연락 뒤에는 대화가 이어지는지 확인해야 해.'
   const out = repairReunionGroundingV2(x, payload)
   assert.equal(out.ok, true)
   const initiative = out.data.reunion_synthesis_v2.initiative.interpretation
+  const summary = out.data.reunion_synthesis_v2.summary
   assert.equal(/내 방향이 앞서|내 쪽 움직임이 더 먼저|시작 압력/.test(initiative), false)
+  assert.equal(/내 방향이 앞서|내 쪽 움직임이 더 먼저|시작 압력/.test(summary), false)
   assert.match(initiative, /대화가 이어지는지/)
+  assert.match(summary, /관계|연락|접점/)
 })
 
 test('keeps a directional conclusion only when the server initiative gate is explicitly open', () => {
