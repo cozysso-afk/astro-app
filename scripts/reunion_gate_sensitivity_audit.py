@@ -1,11 +1,4 @@
-"""Privacy-preserving reunion gate and stage-policy sensitivity replay.
-
-Reads private relationship requests from stdin and emits aggregate gate counts only.
-The calculation is rerun for each variant so sequentially skipped medium/fast layers
-are genuinely recomputed instead of treating stored zeroes as scores.
-
-This is validation infrastructure. It never changes production thresholds or policy.
-"""
+"""Privacy-preserving reunion gate and stage-policy sensitivity replay."""
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +10,7 @@ GATES = ("long_term", "mid_term", "event_trigger")
 DELTAS = (-10.0, -5.0, 5.0, 10.0)
 
 
-def threshold_variants(base: dict[str, float]):
+def threshold_variants(base):
     variants = [("baseline", dict(base))]
     for gate in GATES:
         for delta in DELTAS:
@@ -36,7 +29,7 @@ def policy_variant_specs():
     ]
 
 
-def stage_snapshot(hierarchy: dict):
+def stage_snapshot(hierarchy):
     out = {}
     selectivity = hierarchy.get("selectivity") or {}
     stages = hierarchy.get("stages") or {}
@@ -55,7 +48,7 @@ def stage_snapshot(hierarchy: dict):
     return out
 
 
-def bottleneck(snapshot: dict):
+def bottleneck(snapshot):
     total = snapshot.get("future_days", 0)
     long_pass = snapshot.get("long_pass", 0)
     mid_pass = snapshot.get("mid_pass", 0)
@@ -70,7 +63,7 @@ def bottleneck(snapshot: dict):
     return max(drops, key=lambda key: (drops[key], key)), drops
 
 
-def compare_to_baseline(baseline: dict, current: dict):
+def compare_to_baseline(baseline, current):
     out = {}
     for stage, values in current.items():
         base = baseline.get(stage) or {}
@@ -95,17 +88,22 @@ def apply_policy_variant(engine, spec):
         engine.MID_GATE_RETURN_KEYS.clear(); engine.MID_GATE_RETURN_KEYS.update(spec["mid_gate_return_keys"])
 
 
-def replay(checkout: str, requests: list[dict]):
+def _phase(name, fn):
+    try:
+        return fn()
+    except Exception as exc:
+        raise RuntimeError(f"audit_phase={name};error_type={type(exc).__name__}") from None
+
+
+def replay(checkout, requests):
     sys.path.insert(0, str(Path(checkout).resolve()))
     from api.main import RelationshipRequest, relationship_western
     import reunion_hierarchy_v2 as hierarchy_engine
 
-    allowed = ("user", "counterpart", "start_date", "end_date", "as_of_date", "query_utc_offset_hours", "query_timezone_id", "analysis_mode", "relationship_status")
+    allowed = ("user", "counterpart", "start_date", "end_date", "as_of_date", "query_utc_offset_hours", "analysis_mode", "relationship_status")
     base_thresholds = dict(hierarchy_engine.THRESHOLDS)
     base_meeting_primary = set(hierarchy_engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"])
     base_mid_gate_keys = set(hierarchy_engine.MID_GATE_RETURN_KEYS)
-    threshold_specs = threshold_variants(base_thresholds)
-    policy_specs = policy_variant_specs()
     output = []
 
     def run(body):
@@ -118,10 +116,11 @@ def replay(checkout: str, requests: list[dict]):
             body = {key: request[key] for key in allowed if key in request}
             threshold_rows = {}
             engine_version = None
+            threshold_specs = threshold_variants(base_thresholds)
             for name, thresholds in threshold_specs:
                 _reset_policy(hierarchy_engine, base_meeting_primary, base_mid_gate_keys)
                 hierarchy_engine.THRESHOLDS.clear(); hierarchy_engine.THRESHOLDS.update(thresholds)
-                engine_version, threshold_rows[name] = run(body)
+                engine_version, threshold_rows[name] = _phase(f"case{index+1}:threshold:{name}", lambda: run(body))
             baseline = threshold_rows["baseline"]
             baseline_bottlenecks = {}
             for stage, values in baseline.items():
@@ -132,11 +131,11 @@ def replay(checkout: str, requests: list[dict]):
                 for name, thresholds in threshold_specs if name != "baseline"
             }
             policy_counterfactuals = {}
-            for name, spec in policy_specs:
+            for name, spec in policy_variant_specs():
                 hierarchy_engine.THRESHOLDS.clear(); hierarchy_engine.THRESHOLDS.update(base_thresholds)
                 _reset_policy(hierarchy_engine, base_meeting_primary, base_mid_gate_keys)
                 apply_policy_variant(hierarchy_engine, spec)
-                _, current = run(body)
+                _, current = _phase(f"case{index+1}:policy:{name}", lambda: run(body))
                 policy_counterfactuals[name] = {"description": spec["description"], "delta_vs_baseline": compare_to_baseline(baseline, current)}
             digest_payload = {"engine_version": engine_version, "base_thresholds": base_thresholds, "baseline": baseline, "sensitivity": sensitivity, "policy_counterfactuals": policy_counterfactuals}
             output.append({
