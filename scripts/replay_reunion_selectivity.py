@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sys
 
-from scripts.reunion_gate_sensitivity_audit import replay
+from reunion_gate_sensitivity_audit import replay
 
 
 if __name__ == '__main__':
