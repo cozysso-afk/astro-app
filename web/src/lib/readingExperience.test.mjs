@@ -59,7 +59,8 @@ test('personal aspects outrank tighter outer/outer; meaningful roles and no muta
 })
 test('reunion has independent directions, stability, friction, timing and unique paragraphs', () => {
   const view=relationship('reunion')
-  assert.match(view.headline,/재접촉/)
+  assert.match(view.headline,/재접점/)
+  assert.doesNotMatch(view.headline,/재접촉의 움직임은 살아 있어|다시 대화할 여지는 열려/)
   assert.equal(view.incoming.band,'약함')
   assert.equal(view.outgoing.band,'강함')
   assert.equal(view.reconnection.band,'강함')
