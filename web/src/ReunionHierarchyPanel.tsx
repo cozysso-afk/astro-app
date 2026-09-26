@@ -19,7 +19,8 @@ const ASPECT_LABEL: Record<string,string> = {
   conjunction:'합', opposition:'대립', square:'사각', trine:'삼각', sextile:'육합', quincunx:'150도 조정각',
 }
 
-const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?|삼각(?:각)?|육파|활성도\s*\d|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
+const MAIN_TECHNICAL_RE = /(?:\bsecondary\b|오브|\d+(?:\.\d+)?\s*°|트랜짓|컴포지트|시너스트리|육십분위|대립각|사각(?:각)?(?!지대)|삼각(?:각)?(?!관계)|육파|활성도\s*\d|진행\s+(?:태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|진북교점|용수자리))/i
+const READER_MEANING_RE = /(?:떠올|기억|근황|궁금|신경|호의|정서|감정|관심|미련|연락|메시지|답장|대화|약속|만남|관계|거리|행동|반복|갈등|책임|합의|유지|회복|재회|이어|피하|확인|실제|현실|정리)/
 
 function Copy({ value }: { value?: string | null }) {
   const text = String(value ?? '').trim()
@@ -42,7 +43,7 @@ function readerText(value?: string | null, fallback='') {
     .trim()
   if (!normalized) return fallback
   const sentences = splitSentences(normalized)
-  const plain = sentences.filter((sentence)=>!MAIN_TECHNICAL_RE.test(sentence))
+  const plain = sentences.filter((sentence)=>!MAIN_TECHNICAL_RE.test(sentence) || READER_MEANING_RE.test(sentence))
   return plain.length ? plain.join(' ') : fallback
 }
 
@@ -155,7 +156,10 @@ export function ReunionHierarchyPanel({
     '연락은 이어지는데 만남을 계속 미루거나, 관계 이야기를 피하고, 예전과 같은 지점에서 대화가 끊기면 이번 흐름도 미련 확인이나 일시적인 재접촉에서 멈출 수 있어.',
   )
   const summary = readerText(reunionV2?.summary, verdict)
-  const timingWindows = (reunionV2?.timing?.windows ?? []).map((window)=>({ ...window, meaning: readerText(window.meaning) })).filter((window)=>window.meaning)
+  const timingWindows = (reunionV2?.timing?.windows ?? []).map((window)=>({
+    ...window,
+    meaning: readerText(window.meaning, '이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어.'),
+  }))
   const conditions = (reunionV2?.rebuild?.conditions ?? []).map((item)=>readerText(item)).filter(Boolean)
   const patterns = (reunionV2?.repeat_risks?.patterns ?? []).map((item)=>readerText(item)).filter(Boolean)
   const evidenceRows = topEvidence(evidence)
@@ -167,7 +171,6 @@ export function ReunionHierarchyPanel({
         <div className="reunion-story-section reunion-story-current">
           <h4>지금 두 사람의 흐름</h4>
           <p className="reading-conclusion">{summary}</p>
-          <p>{verdict}</p>
         </div>
 
         <div className="reunion-story-section reunion-story-contact">
