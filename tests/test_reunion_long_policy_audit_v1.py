@@ -20,6 +20,10 @@ def test_long_policy_variants_are_narrow_and_stage_specific():
         "rebuilding_core_targets_only",
         "rebuilding_mercury_core_targets",
         "rebuilding_mercury_pair_targets",
+        "rebuilding_mercury_without_moon_target",
+        "rebuilding_mercury_without_sun_target",
+        "rebuilding_mercury_moon_target_only",
+        "rebuilding_mercury_sun_target_only",
         "rebuilding_target_add_mercury",
         "targeted_long_candidate_v1",
     }
@@ -39,6 +43,18 @@ def test_long_policy_variants_are_narrow_and_stage_specific():
         "relationship_rebuilding": {
             "directed_planets_add": ("Mercury",),
             "directed_targets_remove": ("Moon", "Sun", "Saturn"),
+        },
+    }
+    assert specs["rebuilding_mercury_without_moon_target"]["changes"] == {
+        "relationship_rebuilding": {
+            "directed_planets_add": ("Mercury",),
+            "directed_targets_remove": ("Moon",),
+        },
+    }
+    assert specs["rebuilding_mercury_without_sun_target"]["changes"] == {
+        "relationship_rebuilding": {
+            "directed_planets_add": ("Mercury",),
+            "directed_targets_remove": ("Sun",),
         },
     }
 
@@ -79,12 +95,31 @@ def test_narrow_rebuilding_target_variants_remove_only_requested_targets():
     })
     baseline = capture_long_policy(engine)
     specs = dict(long_policy_variant_specs())
+
     apply_long_policy_variant(engine, specs["rebuilding_mercury_core_targets"])
     assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_planets"] == {"Venus", "Sun", "Mercury"}
     assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Venus", "DSC", "Saturn"}
+
     restore_long_policy(engine, baseline)
     apply_long_policy_variant(engine, specs["rebuilding_mercury_pair_targets"])
     assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Venus", "DSC"}
+
+    restore_long_policy(engine, baseline)
+    apply_long_policy_variant(engine, specs["rebuilding_mercury_without_moon_target"])
+    assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Venus", "Sun", "DSC", "Saturn"}
+
+    restore_long_policy(engine, baseline)
+    apply_long_policy_variant(engine, specs["rebuilding_mercury_without_sun_target"])
+    assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Moon", "Venus", "DSC", "Saturn"}
+
+    restore_long_policy(engine, baseline)
+    apply_long_policy_variant(engine, specs["rebuilding_mercury_moon_target_only"])
+    assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Moon"}
+
+    restore_long_policy(engine, baseline)
+    apply_long_policy_variant(engine, specs["rebuilding_mercury_sun_target_only"])
+    assert engine.STAGE_LONG_POLICY["relationship_rebuilding"]["directed_targets"] == {"Sun"}
+
     restore_long_policy(engine, baseline)
     assert capture_long_policy(engine) == baseline
 
@@ -117,6 +152,22 @@ def test_rebuilding_mercury_source_and_target_counterfactuals_are_independent():
     )
     assert source_only and source_only[0]["a"] == "Mercury" and source_only[0]["b"] == "DSC"
     assert target_only and target_only[0]["a"] == "Venus" and target_only[0]["b"] == "Mercury"
+
+
+def test_rebuilding_mercury_target_attribution_variants_keep_source_change_constant():
+    specs = dict(long_policy_variant_specs())
+    names = (
+        "rebuilding_mercury_without_moon_target",
+        "rebuilding_mercury_without_sun_target",
+        "rebuilding_mercury_moon_target_only",
+        "rebuilding_mercury_sun_target_only",
+    )
+    for name in names:
+        changes = specs[name]["changes"]["relationship_rebuilding"]
+        assert changes["directed_planets_add"] == ("Mercury",)
+        assert "directed_targets_add" not in changes
+        assert "slow_planets_add" not in changes
+        assert "slow_targets_add" not in changes
 
 
 def test_production_long_policy_is_not_changed_by_audit_files():
