@@ -8,6 +8,7 @@ import { CheckCircle2, ImageDown, LoaderCircle } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
+import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
 import { BasicFortuneReading } from './BasicFortuneReading'
 import { exportReadingImages } from './lib/readingImageExport'
 import './reading-image-export.css'
@@ -147,9 +148,9 @@ export function PeriodFortuneResults({
     {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="연애 상태">{LOVE_STATUS_OPTIONS.map(option=><button key={option.value} type="button" aria-pressed={loveStatus===option.value} onClick={()=>onLoveStatusChange?.(option.value)}>{option.label}</button>)}</div>}
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 점수만으로 누가 어떤 소식을 보낼지는 알 수 없어. 기다리는 연락이 없다면 답장을 기다리라는 뜻으로 받아들이지 않아도 돼. 수신·발신은 관계 방향성의 참고값이며, 공식 발표 여부는 알려주지 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
-      <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
+      {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>} 
       <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>
-        <summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'Gemini 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>
+        <summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'AI 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>
         <BasicFortuneReading calculation={result} period={period} field={field}/>
       </details>
     </></SystemReadingViews>
