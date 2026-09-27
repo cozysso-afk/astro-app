@@ -86,11 +86,9 @@ function polishTopic(topic: FortuneUserTopic): FortuneUserTopic {
   let observe = polishSentence(topic.observe, topic.topic)
   let caution = polishSentence(topic.caution, topic.topic)
 
-  if (topic.topic === '직장') {
-    if (/요청|마감|협의|책임/.test(`${action} ${observe}`)) {
-      action = '말로만 오가던 요청은 담당자를 정하고, 마감일과 완료 기준까지 분명하게 정리해.'
-      observe = '담당자와 마감일이 실제로 정해지고, 완료 기준까지 합의되는지 봐.'
-    }
+  if (topic.topic === '직장' && /요청|마감|협의|책임/.test(`${action} ${observe}`)) {
+    action = '말로만 오가던 요청은 담당자를 정하고, 마감일과 완료 기준까지 분명하게 정리해.'
+    observe = '담당자와 마감일이 실제로 정해지고, 완료 기준까지 합의되는지 봐.'
   }
   if (topic.topic === '이직' && /직무|보상|조건|이직/.test(action)) {
     action = '이직을 고민한다면 직무, 보상, 근무 방식, 시작 일정을 실제 제안 조건으로 나눠 비교해.'
@@ -120,19 +118,24 @@ function uniqueSentences(items: string[]) {
 }
 
 export function polishFortuneUserSummary(summary: FortuneUserSummary): FortuneUserSummary {
-  const leadTopic = summary.focusTopics[0]?.topic ?? summary.favorableCards[0]?.topic ?? summary.cautionCards[0]?.topic ?? ''
-  const focusTopics = summary.focusTopics.map(polishTopic)
-  const referenceTopics = summary.referenceTopics.map(item => ({
-    ...item,
-    summary: polishSentence(item.summary, item.topic),
-    detail: item.detail ? polishTopic(item.detail) : item.detail,
-  }))
+  const loveView = /애정운\s*·/.test(summary.headline)
+  const visibleTopic = (topic: string) => !loveView || topic !== '연락'
+  const leadTopic = summary.focusTopics.find(topic => visibleTopic(topic.topic))?.topic ?? summary.favorableCards.find(card => visibleTopic(card.topic))?.topic ?? summary.cautionCards.find(card => visibleTopic(card.topic))?.topic ?? ''
+  const focusTopics = summary.focusTopics.filter(topic => visibleTopic(topic.topic)).map(polishTopic)
+  const focusNames = new Set(focusTopics.map(topic => topic.topic))
+  const referenceTopics = summary.referenceTopics
+    .filter(item => visibleTopic(item.topic) && !focusNames.has(item.topic))
+    .map(item => ({
+      ...item,
+      summary: polishSentence(item.summary, item.topic),
+      detail: item.detail ? polishTopic(item.detail) : item.detail,
+    }))
 
   let headline = polishSentence(summary.headline, leadTopic)
   let summaryText = polishSentence(summary.summary, leadTopic)
   if (isNearDuplicate(headline, summaryText)) {
-    const best = summary.favorableCards[0]?.topic
-    const caution = summary.cautionCards[0]?.topic
+    const best = summary.favorableCards.find(card => visibleTopic(card.topic))?.topic
+    const caution = summary.cautionCards.find(card => visibleTopic(card.topic))?.topic
     summaryText = best && caution
       ? `${best}${objectParticle(best)} 활용하되, ${caution}${objectParticle(caution)} 무리해서 밀어붙이지 않는 식으로 우선순위를 나눠.`
       : best
@@ -142,18 +145,22 @@ export function polishFortuneUserSummary(summary: FortuneUserSummary): FortuneUs
           : '한 가지 반응으로 하루 전체를 정하지 말고, 실제로 달라지는 장면만 골라 봐.'
   }
 
+  const importantWindows = summary.importantWindows
+    .filter(window => !loveView || window.semantic === 'reconnection' || !/(?:연락|답장|메시지)/.test(window.guidance))
+    .map(window => ({...window, guidance: polishSentence(window.guidance)}))
+
   return {
     ...summary,
     headline,
     summary: summaryText,
     doItems: uniqueSentences(summary.doItems),
     cautionItems: uniqueSentences(summary.cautionItems),
-    favorableCards: summary.favorableCards.map(card => ({...card, meaning: polishSentence(card.meaning, card.topic)})),
-    cautionCards: summary.cautionCards.map(card => ({...card, meaning: polishSentence(card.meaning, card.topic)})),
+    favorableCards: summary.favorableCards.filter(card => visibleTopic(card.topic)).map(card => ({...card, meaning: polishSentence(card.meaning, card.topic)})),
+    cautionCards: summary.cautionCards.filter(card => visibleTopic(card.topic)).map(card => ({...card, meaning: polishSentence(card.meaning, card.topic)})),
     focusTopics,
     referenceTopics,
-    importantWindows: summary.importantWindows.map(window => ({...window, guidance: polishSentence(window.guidance)})),
-    relationship: summary.relationship ? {
+    importantWindows,
+    relationship: loveView ? undefined : summary.relationship ? {
       ...summary.relationship,
       summary: polishSentence(summary.relationship.summary),
       incoming: polishSentence(summary.relationship.incoming) || undefined,
