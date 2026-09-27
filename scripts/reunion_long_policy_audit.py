@@ -53,6 +53,48 @@ def long_policy_variant_specs():
             },
         ),
         (
+            "rebuilding_core_targets_only",
+            {
+                "changes": {
+                    "relationship_rebuilding": {"directed_targets_remove": ("Moon", "Sun")},
+                },
+                "description": (
+                    "Keep the current rebuilding directed sources but narrow directed targets to the core "
+                    "Venus/DSC/Saturn set used by the rebuilding semantic policy."
+                ),
+            },
+        ),
+        (
+            "rebuilding_mercury_core_targets",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Moon", "Sun"),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source while narrowing directed targets to "
+                    "Venus/DSC/Saturn, to test whether the broad Mercury source saturation comes from soft targets."
+                ),
+            },
+        ),
+        (
+            "rebuilding_mercury_pair_targets",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Moon", "Sun", "Saturn"),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source but admit only Venus/DSC directed targets. "
+                    "This is a stricter relationship-pair stress test, not a production proposal."
+                ),
+            },
+        ),
+        (
             "rebuilding_target_add_mercury",
             {
                 "changes": {
