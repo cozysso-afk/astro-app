@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import reunion_hierarchy_v2 as hierarchy_engine
 from scripts.reunion_gate_sensitivity_audit import (
     _reset_policy,
     apply_policy_variant,
@@ -52,6 +53,50 @@ def test_policy_variant_mutation_is_reversible():
     assert engine.MID_GATE_RETURN_KEYS == {"lunar_return", "solar_return"}
     _reset_policy(engine, {"Mars"}, {"lunar_return"})
     assert engine.MID_GATE_RETURN_KEYS == {"lunar_return"}
+
+
+def test_meeting_venus_exact_hit_is_rejected_now_but_admitted_by_counterfactual():
+    base_meeting = set(hierarchy_engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"])
+    base_mid = set(hierarchy_engine.MID_GATE_RETURN_KEYS)
+    specs = dict(policy_variant_specs())
+    evidence = [{
+        "event_id": "synthetic:venus:meeting",
+        "a": "Venus",
+        "b": "DSC",
+        "family": "natal_trigger",
+        "aspect": "conjunction",
+        "strength": 80.0,
+        "orb": 0.2,
+    }]
+    try:
+        current = hierarchy_engine._stage_policy_evaluation("in_person_meeting", evidence)
+        assert current["primary"] is None
+        assert current["rejection_counts"].get("primary_planet_mismatch") == 1
+
+        apply_policy_variant(hierarchy_engine, specs["meeting_trigger_mars_or_venus"])
+        counterfactual = hierarchy_engine._stage_policy_evaluation("in_person_meeting", evidence)
+        assert counterfactual["primary"] is not None
+        assert counterfactual["primary"]["a"] == "Venus"
+    finally:
+        _reset_policy(hierarchy_engine, base_meeting, base_mid)
+
+
+def test_solar_return_medium_evidence_is_excluded_now_but_admitted_by_counterfactual():
+    base_meeting = set(hierarchy_engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"])
+    base_mid = set(hierarchy_engine.MID_GATE_RETURN_KEYS)
+    specs = dict(policy_variant_specs())
+    rows = [{
+        "event_id": "synthetic:solar:return",
+        "return_type": "solar_return",
+        "mid_gate": True,
+        "strength": 60.0,
+    }]
+    try:
+        assert hierarchy_engine._mid_gate_evidence(rows) == []
+        apply_policy_variant(hierarchy_engine, specs["medium_gate_add_solar_return"])
+        assert hierarchy_engine._mid_gate_evidence(rows) == rows
+    finally:
+        _reset_policy(hierarchy_engine, base_meeting, base_mid)
 
 
 def test_stage_snapshot_uses_future_sequential_gate_counts_only():
