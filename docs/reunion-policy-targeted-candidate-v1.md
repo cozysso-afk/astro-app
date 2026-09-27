@@ -2,7 +2,7 @@
 
 ## 목적
 
-PR #234의 gate sensitivity audit에서 확인된 두 개의 후단 병목을 실제 계산 정책 후보로 구현한다. 이 변경은 결과를 낙관적으로 만들기 위한 global threshold 완화가 아니며, 독립 outcome cohort가 없는 상태에서 predictive accuracy를 주장하지 않는다.
+PR #234의 gate sensitivity audit과 후속 private replay에서 확인된 후단 병목을 실제 계산 정책 후보로 구현한다. 이 변경은 결과를 낙관적으로 만들기 위한 global threshold 완화가 아니며, 독립 outcome cohort가 없는 상태에서 predictive accuracy를 주장하지 않는다.
 
 ## 변경
 
@@ -24,12 +24,14 @@ PR #234의 gate sensitivity audit에서 확인된 두 개의 후단 병목을 �
 
 - Lunar Return only
 
-후보 정책:
+최종 후보 정책:
 
 - Lunar Return
-- Solar Return, 단 `relationship_rebuilding` stage에서만
+- Venus Return, 단 `relationship_rebuilding` stage에서만
 
-Solar Return은 이미 rebuilding의 medium context에 포함되어 있던 계산 근거다. 이번 후보는 그 기존 context를 medium gate anchor로도 허용한다. 감정/연락/실제 만남 stage에는 Solar Return을 추가하지 않는다.
+Venus Return은 이미 rebuilding의 medium context에 포함되어 있던 계산 근거다. 후속 medium-anchor private replay에서 기존 Lunar+Solar 후보는 long-pass 6~7일 모두 medium 0에 머물렀고 max gate score도 23.33으로 threshold 25를 넘지 못했다. 반면 Lunar+Venus는 세 저장 snapshot 모두 medium-pass 2일, hierarchy-pass 1일을 만들며 좁게 병목을 해소했다.
+
+Solar+Venus 또는 Lunar+Solar+Venus 조합은 각 snapshot의 모든 long-pass day를 medium-pass로 열어 더 넓게 작동했으므로 production 후보에서 제외한다. Solar Return은 rebuilding context에는 계속 남지만 medium gate를 여는 key로는 사용하지 않는다.
 
 ## 변경하지 않는 것
 
@@ -52,8 +54,6 @@ Solar Return은 이미 rebuilding의 medium context에 포함되어 있던 계�
 
 ## 해석 주의
 
-이 후보는 PR #234에서 확인된 두 개의 후단 병목만 완화한다. 같은 audit에서 실제 만남과 관계 재정의 모두 long-term policy가 더 큰 1차 병목으로 확인됐다.
+후속 long-policy audit에서 rebuilding에 Mercury directed source를 추가한 broad variant는 사실상 Mercury→Sun contact 때문에 long gate를 거의 전 기간 통과시키는 포화가 확인되어 production 후보에서 제외했다. 현재 후보는 long policy를 건드리지 않는다.
 
-따라서 이 후보에서 public candidate가 거의 늘지 않는다면 다음 검토 대상은 global threshold가 아니라 stage-specific long-term policy다.
-
-이 변경만으로 실제 사건 예측 정확도가 개선됐다고 결론내리지 않는다. 독립 outcome-labelled holdout 없이는 descriptive candidate behavior만 비교한다.
+이 후보가 실제 사건 예측 정확도를 개선했다고 결론내리지 않는다. 독립 outcome-labelled holdout 없이는 descriptive candidate behavior/selectivity만 비교한다.
