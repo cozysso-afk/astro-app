@@ -25,6 +25,7 @@ DIMENSION_LABELS = {**LEGACY_LABELS, 'relationship_rebuilding': '관계 재정�
 
 VERSION = 'reunion-hierarchy-v2.8-birth-time-precision-audit'
 RUNTIME_REVISION = 'reunion-runtime-v2.9-efficiency'
+POLICY_REVISION = 'reunion-policy-targeted-candidate-v1'
 WEIGHTS = dict(long_term=.35, mid_term=.25, event_trigger=.25, cross_system=.15)
 THRESHOLDS = dict(long_term=35.0, mid_term=25.0, event_trigger=12.0)
 PEAK_RADIUS_DAYS = 7
@@ -84,7 +85,7 @@ STAGE_TRIGGER_POLICY = {
         'exact_families': EXACT_TRIGGER_FAMILIES,
     },
     'in_person_meeting': {
-        'primary_planets': {'Mars'},
+        'primary_planets': {'Mars', 'Venus'},
         'targets': {'ASC', 'DSC', 'Venus', 'Mars'},
         'direct_aspects': DIRECT_TRIGGER_ASPECTS,
         'exact_families': EXACT_TRIGGER_FAMILIES,
@@ -99,6 +100,7 @@ STAGE_TRIGGER_POLICY = {
 }
 PRIMARY_TRIGGER_BY_STAGE = {stage: policy['primary_planets'] for stage, policy in STAGE_TRIGGER_POLICY.items()}
 MID_GATE_RETURN_KEYS = {'lunar_return'}
+REBUILDING_MID_GATE_EXTRA_KEYS = {'solar_return'}
 MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
     'emotional_reactivation': ('lunar_return', 'venus_return'),
     'contact_recontact': ('lunar_return', 'mercury_return'),
@@ -246,6 +248,13 @@ def _active_return(events, instant):
     return None
 
 
+def _medium_gate_keys(stage):
+    keys = set(MID_GATE_RETURN_KEYS)
+    if stage == 'relationship_rebuilding':
+        keys.update(REBUILDING_MID_GATE_EXTRA_KEYS)
+    return keys
+
+
 def _return_evidence(support, instant, stage, natal, cache=None):
     # Request-scoped: a return chart and its natal contacts are invariant until
     # the exact UTC cycle boundary. Never cache across profiles or requests.
@@ -260,14 +269,15 @@ def _return_evidence(support, instant, stage, natal, cache=None):
         if cache_key not in cache:
             cache[cache_key] = _return_evidence(support, instant, stage, natal)
         return cache[cache_key]
-    """Return stage-relevant context; Lunar Return is the required medium-window anchor."""
+    """Return stage-relevant context with stage-specific medium-window anchors."""
     rows, active = [], []
+    gate_keys = _medium_gate_keys(stage)
     for key in MID_CONTEXT_RETURN_KEYS_BY_STAGE[stage]:
         for side in ('user', 'counterpart'):
             e = _active_return(support.get(key, {}).get(side, {}).get('events', []), instant)
             if not e or e.get('precision') == 'date_noon_proxy':
                 continue
-            if key in MID_GATE_RETURN_KEYS:
+            if key in gate_keys:
                 active.append((key, side, e))
             anchor = {
                 'solar_return': 'Sun',
@@ -289,7 +299,7 @@ def _return_evidence(support, instant, stage, natal, cache=None):
             )
             for hit in hits:
                 hit['return_type'] = key
-                hit['mid_gate'] = key in MID_GATE_RETURN_KEYS
+                hit['mid_gate'] = key in gate_keys
                 hit['return_precision'] = e.get('precision') or 'unknown'
                 hit['return_side'] = side
             rows.extend(hits)
@@ -301,7 +311,7 @@ def _return_evidence(support, instant, stage, natal, cache=None):
                         'system': 'western',
                         'a': h['planet'],
                         'return_type': key,
-                        'mid_gate': key in MID_GATE_RETURN_KEYS,
+                        'mid_gate': key in gate_keys,
                         'return_precision': e.get('precision') or 'unknown',
                         'return_side': side,
                         'house_system': 'Whole Sign',
@@ -313,8 +323,8 @@ def _return_evidence(support, instant, stage, natal, cache=None):
 
 
 def _mid_gate_evidence(rows):
-    """Only Lunar Return evidence opens the medium-term gate; other returns remain context."""
-    return [row for row in rows if row.get('mid_gate') and row.get('return_type') in MID_GATE_RETURN_KEYS]
+    """Use only rows explicitly admitted by the stage-specific medium-gate policy."""
+    return [row for row in rows if row.get('mid_gate')]
 
 
 def _medium_precision_audit(rows):
@@ -338,7 +348,7 @@ def _medium_precision_audit(rows):
     elif gate_rows:
         status = 'exact_only'
     else:
-        status = 'no_lunar_anchor'
+        status = 'no_medium_anchor'
     return {
         'status': status,
         'all_score': all_score,
@@ -348,7 +358,7 @@ def _medium_precision_audit(rows):
         'exact_evidence_count': len(exact_rows),
         'provisional_evidence_count': len(provisional_rows),
         'unknown_precision_evidence_count': len(unknown_rows),
-        'policy': 'audit_only; provisional evidence is not reweighted or suppressed in v2.8',
+        'policy': 'audit_only; provisional medium-gate evidence is not reweighted or suppressed in this candidate',
     }
 
 
@@ -1046,6 +1056,7 @@ def apply_reunion_hierarchy(
         'weights': WEIGHTS,
         'thresholds': THRESHOLDS,
         'selection_policy': {
+            'policy_revision': POLICY_REVISION,
             'local_peak_radius_days': PEAK_RADIUS_DAYS,
             'public_peak_start': public_start.isoformat(),
             'guard_band_days': PEAK_RADIUS_DAYS,
@@ -1066,8 +1077,8 @@ def apply_reunion_hierarchy(
                 for stage, policy in STAGE_TRIGGER_POLICY.items()
             },
             'primary_trigger_min_strength': THRESHOLDS['event_trigger'],
-            'medium_gate_return': 'lunar_return',
-            'birth_time_precision_policy': 'provisional Lunar Return remains calculable; each candidate reports exact-only gate counterfactual without reweighting or suppressing evidence',
+            'medium_gate_return': 'lunar_return; relationship_rebuilding also admits solar_return',
+            'birth_time_precision_policy': 'provisional medium-return evidence remains calculable; each candidate reports exact-only gate counterfactual without reweighting or suppressing evidence',
             'gate_evaluation': 'sequential: medium only after long; fast only after medium; skipped scores are zero, not measured counterfactuals',
             'medium_context_returns': {k: list(v) for k, v in MID_CONTEXT_RETURN_KEYS_BY_STAGE.items()},
             'fast_sample_hours': FAST_SAMPLE_HOURS,
@@ -1097,8 +1108,8 @@ def apply_reunion_hierarchy(
             '자미두수 계산기 미구현: 교차검증에서 제외',
             '회귀 위치는 입력 출생지 기준이며 현재 거주지와 다를 수 있음',
             '일별 빠른 촉발점은 3시간 간격 표본이며 정확한 사건 발생 시각을 뜻하지 않음',
-            '중기 관문은 월 단위 Lunar Return을 필수 앵커로 사용하며 다른 행성 회귀는 단계별 배경 문맥으로만 유지',
-            '추정 출생시간의 Lunar Return은 provisional 근거로 계산하되 public candidate에 exact-only gate 비교를 함께 기록하며 v2.8에서는 임의 감점하지 않음',
+            '중기 관문은 기본 Lunar Return 앵커를 사용하며 관계 재정의 단계만 기존 Solar Return 문맥을 추가 앵커로 허용',
+            '추정 출생시간의 medium-return 근거는 provisional로 계산하되 public candidate에 exact-only gate 비교를 함께 기록하며 임의 감점하지 않음',
             '조회 범위 밖 ±7일을 내부 비교하되 과거 피크는 미래 후보를 억제하지 않고 표시 날짜는 요청 범위로 제한',
             '문턱·가중치는 버전 관리되는 비교 규칙이며 적중률로 보정하지 않음',
             '장기·중기 관문 통과 후 단계별 관련 대상의 직접 촉발각이 실제 문턱 이상 기여한 ±7일 국소 피크만 공개 후보로 사용',
@@ -1119,7 +1130,7 @@ def apply_reunion_hierarchy(
             'rank_weight': w['final'],
             'independent_system_count': len(w['independent_systems']),
             'convergence': len(w['independent_systems']) >= 2,
-            'exact_date_basis': 'stage_specific_long_gate_then_lunar_anchor_then_direct_semantic_trigger_then_future_local_peak',
+            'exact_date_basis': 'stage_specific_long_gate_then_stage_specific_return_anchor_then_direct_semantic_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in public24
@@ -1128,7 +1139,7 @@ def apply_reunion_hierarchy(
         'windows': canonical,
         'as_of_date': as_of_date.isoformat(),
         'validation': validation['status'],
-        'policy': 'long term → medium window → materially contributing stage-specific event trigger → future-only local peak → independent-system support; past excluded; score is not probability',
+        'policy': 'long term → stage-specific medium window → materially contributing stage-specific event trigger → future-only local peak → independent-system support; past excluded; score is not probability',
     }
 
     tr = result.get('reunion_transits') or {}
@@ -1157,7 +1168,7 @@ def apply_reunion_hierarchy(
             'stages': [w['stage']],
             'priority_index': w['final'],
             'components': w['components'],
-            'exact_date_basis': 'stage_specific_long_gate_then_lunar_anchor_then_direct_semantic_trigger_then_future_local_peak',
+            'exact_date_basis': 'stage_specific_long_gate_then_stage_specific_return_anchor_then_direct_semantic_trigger_then_future_local_peak',
             'event_probability': 'not_calculated',
         }
         for w in candidate_windows
@@ -1165,9 +1176,9 @@ def apply_reunion_hierarchy(
     support['weight_policy'] = {
         'weights': WEIGHTS,
         'thresholds': THRESHOLDS,
-        'meaning': 'long gate + Lunar Return medium anchor precede materially contributing semantic stage triggers; other returns stay context; public dates are future-only local peaks',
+        'meaning': 'long gate + stage-specific medium return anchor precede materially contributing semantic stage triggers; non-gate returns stay context; public dates are future-only local peaks',
     }
-    support['policy'] = '장기 관문 뒤 Lunar Return을 월 단위 중기 앵커로 사용하고, 단계별 관련 대상·주요 각의 필수 촉발이 실제 문턱 이상 기여한 뒤 기준일 이후 국소 피크만 최종 후보. 다른 행성 회귀는 배경 문맥이며 독립 체계로 중복 가산하지 않음.'
+    support['policy'] = '장기 관문 뒤 단계별 중기 회귀 앵커를 사용하고, 단계별 관련 대상·주요 각의 필수 촉발이 실제 문턱 이상 기여한 뒤 기준일 이후 국소 피크만 최종 후보. 관계 재정의는 기존 Solar Return 문맥을 Lunar Return과 함께 중기 앵커로 허용하며, 그 외 비관문 행성 회귀는 배경 문맥으로 유지.'
     support['as_of_date'] = as_of_date.isoformat()
     result['reunion_return_support'] = support
     return result
