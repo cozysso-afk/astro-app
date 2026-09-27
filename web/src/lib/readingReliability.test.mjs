@@ -27,9 +27,9 @@ try {
   const before=JSON.stringify(f)
   for(const status of ['single','couple','flirting','intimate_uncommitted']) {
    const love=applyLoveContext(v,f.calculation,status)
-   assert.equal(love.relationship.incoming,v.relationship.incoming)
-   assert.equal(love.relationship.outgoing,v.relationship.outgoing)
-   assert.equal(love.focusTopics.find(t=>t.topic==='연락').conclusion,v.focusTopics.find(t=>t.topic==='연락').conclusion)
+   assert.equal(love.relationship,undefined)
+   assert.equal(love.focusTopics.some(t=>t.topic==='연락'),false)
+   assert.doesNotMatch(love.summary,/답장 속도|상대가 먼저 오는 흐름/)
   }
   assert.equal(JSON.stringify(f),before)
   const row=f.data.topic_analysis['대인관계']
