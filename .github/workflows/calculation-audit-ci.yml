@@ -26,6 +26,7 @@ on:
       - 'scripts/reunion_generalization_audit.py'
       - 'scripts/reunion_outcome_blind_validation.py'
       - 'scripts/reunion_long_policy_audit.py'
+      - 'scripts/reunion_long_policy_fixture_probe.py'
       - 'tests/test_western_calculation_audit_v1.py'
       - 'tests/test_saju_calculation_gold_v1.py'
       - 'tests/test_saju_natal_boundary_v5.py'
@@ -113,6 +114,7 @@ jobs:
           scripts/reunion_generalization_audit.py
           scripts/reunion_outcome_blind_validation.py
           scripts/reunion_long_policy_audit.py
+          scripts/reunion_long_policy_fixture_probe.py
           api/main.py
 
       - name: Western, Saju, and relationship calculation audit
@@ -145,6 +147,9 @@ jobs:
             tests/test_personal_love_api_v16.py \
             tests/test_integrated_precision_v2.py \
             tests/test_personal_marriage_v1.py
+
+      - name: Public reunion long-policy fixture probe
+        run: python scripts/reunion_long_policy_fixture_probe.py
 
       - name: Thai independent gold corpus
         run: |
