@@ -10,6 +10,7 @@ import { estimateGeminiUsage } from './lib/aiUsage'
 import { periodAiCostPreview } from './lib/aiCostPreview'
 import { topicOrder } from './lib/fortuneTopics'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
+import { polishFortuneUserSummary } from './lib/interpretationEditorialV2'
 import { normalizeTopicEntries, interpretationHeroEligible, interpretationQualityPassed } from './lib/interpretationTopics'
 import { FortuneFlowCards } from './FortuneFlowCards'
 import type { ReactNode } from 'react'
@@ -87,7 +88,8 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const narrativeValidation = result.usage?.quality_validation
   const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && interpretationHeroEligible(narrativeValidation, result.usage)
   const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
-  const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
+  const contextualSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
+  const userSummary = polishFortuneUserSummary(contextualSummary)
   const referenceFlowCards = relationshipReferenceFlowCards(userSummary, calculation)
   const usage = estimateGeminiUsage(result.usage)
   const cached = cacheSource === 'local' || cacheSource === 'server'
