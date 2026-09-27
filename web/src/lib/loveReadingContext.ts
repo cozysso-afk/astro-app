@@ -41,12 +41,12 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
   }
   if (status === 'flirting') {
     const conclusion = level === 'low'
-      ? '지금은 호감의 크기보다 질문과 다음 약속이 실제로 이어지는지 확인하는 편이 좋아.'
+      ? '썸 단계라면 호감의 크기보다 질문과 다음 약속이 실제로 이어지는지 확인하는 편이 좋아.'
       : level === 'high'
-        ? '서로를 더 알아가려는 움직임이 살아 있어. 다음 약속과 관계 기대가 같은 방향인지 확인해.'
+        ? '썸이 이어지는 동안 서로를 더 알아가려는 움직임이 살아 있어. 다음 약속과 관계 기대가 같은 방향인지 확인해.'
         : level === 'unknown'
           ? '썸의 강약을 판단할 계산 정보가 부족해. 실제 대화와 약속이 이어지는지를 기준으로 봐.'
-          : '대화가 이어지는 것과 관계가 정해지는 것은 별개야. 다음 약속과 서로의 기대를 같이 확인해.'
+          : '썸에서 대화가 이어지는 것과 연인으로 합의하는 것은 별개야. 다음 약속과 서로의 기대를 같이 확인해.'
     return {
       title: '썸과 관계 확인',
       conclusion,
@@ -72,12 +72,12 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
     }
   }
   const conclusion = level === 'low'
-    ? '오늘은 애정 확인을 재촉하기보다 서로의 일정과 피로, 필요한 거리를 맞추는 편이 좋아.'
+    ? '현재 관계에서는 애정 확인을 재촉하기보다 서로의 일정과 피로, 필요한 거리를 맞추는 편이 좋아.'
     : level === 'high'
-      ? '함께 시간을 보내고 애정을 표현하기 좋은 편이야. 서로 원하는 방식이 같은지도 확인해.'
+      ? '현재 연인과 함께 시간을 보내고 애정을 표현하기 좋은 편이야. 서로 원하는 방식이 같은지도 확인해.'
       : level === 'unknown'
         ? '현재 관계의 강약을 판단할 계산 정보가 부족해. 실제 대화와 생활 리듬을 기준으로 봐.'
-        : '큰 결론보다 함께 보내는 시간과 대화 방식이 편안한지 살펴보는 게 좋아.'
+        : '현재 연인과는 큰 결론보다 함께 보내는 시간과 대화 방식이 편안한지 살펴보는 게 좋아.'
   return {
     title: '현재 관계',
     conclusion,
@@ -87,12 +87,26 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
   }
 }
 
+function periodLead(periodKind: FortuneUserSummary['periodKind']) {
+  if (periodKind === 'day') return '오늘은'
+  if (periodKind === 'week') return '이번 주에는'
+  if (periodKind === 'month') return '이번 달에는'
+  return '올해는'
+}
+
 function periodAction(periodKind: FortuneUserSummary['periodKind'], status: LoveStatus) {
-  const period = periodKind === 'day' ? '오늘' : periodKind === 'week' ? '이번 주' : periodKind === 'month' ? '이번 달' : '올해'
-  if (status === 'single') return `${period}은 사람을 만날 기회를 억지로 만들기보다, 실제 제안이나 만남이 생겼을 때 내 관심이 이어지는지를 보는 쪽이 좋아.`
-  if (status === 'flirting') return `${period}은 한 번의 대화보다 다음 약속과 질문이 반복해서 이어지는지를 봐.`
-  if (status === 'intimate_uncommitted') return `${period}은 신체적 친밀감보다 서로 원하는 관계와 경계가 일관되게 존중되는지를 봐.`
-  return `${period}은 연락 빈도보다 함께 보내는 시간, 약속, 갈등 뒤 회복을 중심으로 봐.`
+  const period = periodLead(periodKind)
+  if (status === 'single') return `${period} 사람을 만날 기회를 억지로 만들기보다, 실제 제안이나 만남이 생겼을 때 내 관심이 이어지는지를 보는 쪽이 좋아.`
+  if (status === 'flirting') return `${period} 한 번의 대화보다 다음 약속과 질문이 반복해서 이어지는지를 봐.`
+  if (status === 'intimate_uncommitted') return `${period} 신체적 친밀감보다 서로 원하는 관계와 경계가 일관되게 존중되는지를 봐.`
+  return `${period} 연락 빈도보다 함께 보내는 시간, 약속, 갈등 뒤 회복을 중심으로 봐.`
+}
+
+function loveCardMeaning(status: LoveStatus, caution: boolean) {
+  if (status === 'single') return caution ? '호감 하나로 관계를 미리 정하지 마.' : '첫인상보다 다시 만나고 싶은지가 더 중요해.'
+  if (status === 'flirting') return caution ? '대화가 잦아도 교제 의사로 확정하지 마.' : '질문과 다음 약속이 이어지는지를 봐.'
+  if (status === 'intimate_uncommitted') return caution ? '신체적 친밀감을 관계 약속으로 바꾸지 마.' : '만남과 경계가 일관되게 존중되는지를 봐.'
+  return caution ? '답장 하나로 관계 전체를 판단하지 마.' : '함께 보내는 시간과 회복 과정을 봐.'
 }
 
 function pastEvidenceAvailable(calculation: IntegratedApiResponse) {
@@ -125,7 +139,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
   const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows
     .filter(row => ['연애','연락',...(includeReunion ? ['재회'] : [])].includes(row.topic))
     .map(row => row.topic === '연애'
-      ? {...row, meaning: caution ? love.caution.slice(0, 48) : love.observe.slice(0, 48)}
+      ? {...row, meaning: loveCardMeaning(status, caution)}
       : row.topic === '재회'
         ? {...row, meaning: '재접촉과 관계 회복을 구분해'}
         : {...row, meaning: '받는 연락과 먼저 보내는 연락을 나눠 읽어'})
