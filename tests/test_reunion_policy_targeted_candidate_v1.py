@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import reunion_hierarchy_v2 as h
 
 
@@ -44,6 +46,38 @@ def test_rebuilding_alone_adds_solar_return_to_medium_gate():
     }
     for stage in ("emotional_reactivation", "contact_recontact", "in_person_meeting"):
         assert h._medium_gate_keys(stage) == {"lunar_return"}
+
+
+def test_rebuilding_solar_return_is_admitted_through_real_return_evidence_path():
+    event = {
+        "exact_utc": "2026-01-01T00:00:00+00:00",
+        "next_exact_utc": "2026-02-01T00:00:00+00:00",
+        "precision": "exact",
+        "positions": {"Sun": 0.0, "Venus": 10.0},
+        "angles": {},
+        "house_activations": [],
+    }
+    support = {
+        "solar_return": {
+            "user": {"events": [event]},
+            "counterpart": {"events": []},
+        }
+    }
+    natal = {
+        "user": {"Venus": 10.0},
+        "counterpart": {"Venus": 20.0},
+    }
+    rows, active = h._return_evidence(
+        support,
+        datetime(2026, 1, 15, tzinfo=timezone.utc),
+        "relationship_rebuilding",
+        natal,
+    )
+    gate = h._mid_gate_evidence(rows)
+    assert gate
+    assert all(row["return_type"] == "solar_return" and row["mid_gate"] for row in gate)
+    assert h._ranked_score(gate)[0] >= h.THRESHOLDS["mid_term"]
+    assert active and active[0][0] == "solar_return"
 
 
 def test_mid_gate_filter_uses_stage_admission_flag_not_global_return_name():
