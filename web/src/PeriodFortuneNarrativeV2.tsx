@@ -56,7 +56,7 @@ export function PeriodFortuneNarrativeV2({
     ? {
         ...data,
         key_windows: data.key_windows?.filter(window => window.topics?.some(topic => field.topics.includes(topic)))
-          .map(window => ({ ...window, topics: window.topics.filter(topic => field.topics.includes(topic)) })),
+          .map(window => ({ ...window, topics: (window.topics ?? []).filter(topic => field.topics.includes(topic)) })),
       }
     : data
   const base = buildFortuneUserSummary(scopedData, {
@@ -70,6 +70,11 @@ export function PeriodFortuneNarrativeV2({
   const contextual = field?.id === 'love' ? applyLoveContext(base, calculation, loveStatus ?? 'single') : base
   const summary = polishFortuneSummary(contextual)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
+  const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
+    ? 'caution'
+    : summary.bestFlow.includes(topic)
+      ? 'favorable'
+      : ['연애','연락','재회'].includes(topic) ? 'love' : 'system'
 
   return <section className="period-ai-card period-ai-v18 period-ai-v2" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
@@ -119,7 +124,7 @@ export function PeriodFortuneNarrativeV2({
 
     {!!summary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>분야별로 한 번씩만</strong></div>
-      <div className="period-ai-topic-list">{summary.focusTopics.map(item => <article className="period-ai-topic" key={`v2-${item.topic}`}>
+      <div className="period-ai-topic-list">{summary.focusTopics.map(item => <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v2-${item.topic}`}>
         <strong>{item.topic}</strong>
         <b>{item.conclusion}</b>
         {item.action && <p><em>실제로는</em> {item.action}</p>}
@@ -135,7 +140,7 @@ export function PeriodFortuneNarrativeV2({
 
     {!!summary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
       <summary>다른 분야 보기</summary>
-      <div className="period-ai-topic-list">{summary.referenceTopics.map(item => <article className="period-ai-topic is-reference" key={`v2-ref-${item.topic}`}>
+      <div className="period-ai-topic-list">{summary.referenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v2-ref-${item.topic}`}>
         <strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion ?? item.summary}</p>
       </article>)}</div>
     </details>}
