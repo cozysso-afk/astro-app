@@ -124,7 +124,7 @@ function dailyHero(summary: FortuneUserSummary) {
   return firstSentences(polishKoreanSentence(summary.headline), 2)
 }
 
-function dedupeTopicDetails(topics: FortuneUserTopic[]) {
+function dedupeTopicDetails(topics: FortuneUserTopic[]): FortuneUserTopic[] {
   const seen: string[] = []
   return topics.map(raw => {
     const topic = polishTopic(raw)
@@ -138,7 +138,7 @@ function dedupeTopicDetails(topics: FortuneUserTopic[]) {
     return {
       ...topic,
       conclusion: keep(topic.conclusion, true) ?? topic.conclusion,
-      action: keep(topic.action),
+      action: keep(topic.action) ?? '',
       observe: keep(topic.observe),
       caution: keep(topic.caution),
     }
