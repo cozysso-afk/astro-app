@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { LOVE_STATUS_OPTIONS, type LoveStatus } from './lib/loveReadingContext'
+import type { LoveStatus } from './lib/loveReadingContext'
 import { DatingArchetypePanel } from './DatingArchetypePanel'
 import { fortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
@@ -58,7 +58,7 @@ function periodExportTitle(period: PeriodKey, label: string | undefined, result:
 
 export function PeriodFortuneResults({
   initialSystem='integrated',
-  loveStatus = 'single', onLoveStatusChange,
+  loveStatus = 'single',
   datingProfile,
   datingApiBase,
   profileGender,
@@ -145,8 +145,8 @@ export function PeriodFortuneResults({
       <button type="button" onClick={saveImages} disabled={exporting}>{exporting ? <LoaderCircle className="reading-export-spinner" size={17}/> : <ImageDown size={17}/>} {exporting ? '이미지 만드는 중' : '결과 이미지 저장'}</button>
       {exportNotice && <small>{exportNotice}</small>}
     </div>
-    {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="연애 상태">{LOVE_STATUS_OPTIONS.map(option=><button key={option.value} type="button" aria-pressed={loveStatus===option.value} onClick={()=>onLoveStatusChange?.(option.value)}>{option.label}</button>)}</div>}
-    {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 점수만으로 누가 어떤 소식을 보낼지는 알 수 없어. 기다리는 연락이 없다면 답장을 기다리라는 뜻으로 받아들이지 않아도 돼. 수신·발신은 관계 방향성의 참고값이며, 공식 발표 여부는 알려주지 않아.</p></aside>}
+    {field?.id==='love'&&<aside className="love-context-note-v3"><strong>애정운은 관계 상태를 하나로 가정하지 않아.</strong><p>솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심을 각각 나눠 보여줘. 내 상황에 맞는 부분만 골라 읽으면 돼.</p></aside>}
+    {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 전체 활성도와 상대→나·나→상대 방향은 서로 다른 값이야. 선연락 방향이 연락 지수 전체를 대신하지 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>} 
       <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>
@@ -154,7 +154,7 @@ export function PeriodFortuneResults({
         <BasicFortuneReading calculation={result} period={period} field={field}/>
       </details>
     </></SystemReadingViews>
-    {field?.id==='love'&&loveStatus!=='couple'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
+    {field?.id==='love'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
     {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
       draft={outcomeDraft}
