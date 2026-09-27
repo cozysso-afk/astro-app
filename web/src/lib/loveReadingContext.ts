@@ -107,11 +107,17 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
     .map(row => row.topic === '재회'
       ? {...row, meaning: '과거 인연은 실제 재접촉과 관계 회복을 나눠서 봐'}
       : {...row, meaning: caution ? love.caution : love.observe})
-  const focusTopics = summary.focusTopics
+
+  let focusTopics = summary.focusTopics
     .filter(topic => allowedTopics.has(topic.topic))
     .map(topic => topic.topic === '재회' ? topic : {...topic, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution})
+  if (!focusTopics.some(topic => topic.topic === '연애')) {
+    const referenceLove = summary.referenceTopics.find(topic => topic.topic === '연애')?.detail
+    if (referenceLove) focusTopics = [{...referenceLove, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution}, ...focusTopics]
+  }
+  const focusNames = new Set(focusTopics.map(topic => topic.topic))
   const referenceTopics = summary.referenceTopics
-    .filter(topic => allowedTopics.has(topic.topic))
+    .filter(topic => allowedTopics.has(topic.topic) && !focusNames.has(topic.topic))
     .map(topic => topic.topic === '재회' ? topic : {...topic, summary: love.conclusion, detail: topic.detail ? {...topic.detail, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution} : topic.detail})
 
   return {
@@ -126,7 +132,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
     relationship: undefined,
     focusTopics,
     referenceTopics,
-    importantWindows: summary.importantWindows.filter(window => !window.semantic || window.semantic === 'reconnection' || includeReunion),
+    importantWindows: summary.importantWindows.filter(window => !window.semantic || (window.semantic === 'reconnection' && includeReunion)),
   }
 }
 
