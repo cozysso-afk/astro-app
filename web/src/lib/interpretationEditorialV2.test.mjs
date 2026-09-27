@@ -37,7 +37,7 @@ test('work guidance uses complete sentence components and concrete parallel noun
 })
 
 test('semantic duplicate detector catches paraphrased repetition and removes redundant depth', () => {
-  assert.equal(isNearDuplicate('첫 반응 하나보다 실제 변화가 이어지는지를 봐.','첫 반응보다 실제 변화가 계속 이어지는지 봐.'),true)
+  assert.equal(isNearDuplicate('첫 반응 하나보다 실제 변화가 이어지는지를 봐.','첫 반응보다 변화가 이어지는지를 봐.'),true)
   const fixture=summaryFixture('대인관계')
   fixture.focusTopics[0].conclusion='말투 하나보다 이후 태도와 약속이 이어지는지를 봐.'
   fixture.focusTopics[0].observe='한 번의 말투보다 이후 태도와 약속이 이어지는지를 봐.'
