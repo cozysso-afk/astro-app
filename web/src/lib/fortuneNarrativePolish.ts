@@ -35,7 +35,7 @@ export function narrativeClaimFamily(value: string) {
   if (!text) return ''
   if (/확률|보장|단정|확정|뜻은 아니|뜻이 아니|예측하지|미리 결론/.test(text)) return 'non-determinism'
   if (/첫 반응|한 번의 반응|답장 속도|말투 하나|표정 하나/.test(text)) return 'single-reaction'
-  if (/실제 변화|행동이 이어|약속.*이어|대화.*이어|만남.*이어|지속 행동/.test(text)) return 'follow-through'
+  if (/실제 변화|행동이 이어|약속.*이어|약속.*잡|다음 약속|대화.*이어|만남.*이어|지속 행동/.test(text)) return 'follow-through'
   if (/담당자|마감일|완료 기준|책임 범위/.test(text)) return 'work-terms'
   if (/직무|보상|시작 일정|제안 조건/.test(text)) return 'job-conditions'
   if (/원문|확정된 답|다음 절차|공식 안내/.test(text)) return 'verified-info'
