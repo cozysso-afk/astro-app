@@ -353,7 +353,7 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
       <details className="reading-more reunion-calculation-basis" data-reading-export-ignore="true">
         <summary>계산 근거 보기</summary>
         <p>{hierarchyData.score_meaning}</p>
-        <div className="reunion-stage-activation-list">{Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stageKey}><b>{stageDisplayLabel(stageKey,stage.label)}</b> {stage.activation == null ? '—' : Math.round(stage.activation)}</p>)}</div>
+        <div className="reunion-stage-activation-list">{Object.entries(hierarchyData.stages).map(([stageKey,stage])=><p key={stageKey}><b>보조지표 활성도 · {stageDisplayLabel(stageKey,stage.label)}</b> {stage.activation == null ? '—' : Math.round(stage.activation)}</p>)}</div>
         {!!evidenceRows.length && <div className="reunion-local-evidence-grid">{evidenceRows.map((row,index)=><article className="relationship-pattern reunion-local-evidence" key={`${row.a}:${row.aspect}:${row.b}:${index}`}><strong>{evidenceLabel(row)}</strong><p>{Array.isArray(row.relationship_domains) && row.relationship_domains.length ? `관계 해석 영역: ${row.relationship_domains.join(' · ')}` : '관계 해석에 사용된 계산 근거야.'}</p></article>)}</div>}
         {hierarchyData.stability_structure && <p>고정 관계 구조 · 지지 접촉 {hierarchyData.stability_structure.support.length}개 · 긴장 접촉 {hierarchyData.stability_structure.obstacles.length}개.</p>}
         {reunionV2?.precision_note && <Copy value={reunionV2.precision_note}/>} 
