@@ -66,7 +66,7 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
     return {
       title: '친밀감과 관계 기준',
       conclusion,
-      action: '연애를 원하는지, 부담 없는 만남을 원하는지, 지금 방식이 서로 편안한지 말로 맞춰봐.',
+      action: '서로 원하는 관계가 무엇인지, 부담 없는 만남을 원하는지, 지금 방식이 둘 다 편안한지 말로 맞춰봐.',
       observe: '만남 전후의 태도와 약속이 일관되는지, 불편한 경계를 서로 존중하는지 봐.',
       caution: '신체적 친밀감을 사랑이나 독점적 관계의 증거로 삼지 마.',
     }
@@ -120,7 +120,8 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
   const love = loveCopy(status, calculation.western.overall['연애'])
   const contextLabel = status === 'single' ? '새 인연과 관계 탐색' : status === 'flirting' ? '썸과 관계 확인' : status === 'intimate_uncommitted' ? '친밀감과 관계 기준' : '현재 관계'
   const includeReunion = single && pastEvidenceAvailable(calculation)
-  const sourceFocus = summary.focusTopics.filter(topic => ['연애','연락','재회'].includes(topic.topic))
+  const allowedSourceTopics = new Set(['연애', '연락', ...(includeReunion ? ['재회'] : [])])
+  const sourceFocus = summary.focusTopics.filter(topic => allowedSourceTopics.has(topic.topic))
   let focusTopics = sourceFocus.map(topic => topic.topic === '연애'
     ? {...topic, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution}
     : topic)
