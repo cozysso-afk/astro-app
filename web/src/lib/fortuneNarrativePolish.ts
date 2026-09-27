@@ -33,9 +33,9 @@ export function polishKoreanSentence(value: string) {
 export function narrativeClaimFamily(value: string) {
   const text = polishKoreanSentence(value)
   if (!text) return ''
-  if (/확률|보장|단정|확정|뜻은 아니|뜻이 아니|예측하지|미리 결론/.test(text)) return 'non-determinism'
   if (/첫 반응|한 번의 반응|답장 속도|말투 하나|표정 하나/.test(text)) return 'single-reaction'
   if (/실제 변화|행동이 이어|약속.*이어|약속.*잡|다음 약속|대화.*이어|만남.*이어|지속 행동/.test(text)) return 'follow-through'
+  if (/확률|보장|확정|뜻은 아니|뜻이 아니|예측하지|미리 결론|단정/.test(text)) return 'non-determinism'
   if (/담당자|마감일|완료 기준|책임 범위/.test(text)) return 'work-terms'
   if (/직무|보상|시작 일정|제안 조건/.test(text)) return 'job-conditions'
   if (/원문|확정된 답|다음 절차|공식 안내/.test(text)) return 'verified-info'
@@ -132,7 +132,16 @@ export function polishFortuneSummary(summary: FortuneUserSummary): FortuneUserSu
 
 export function inspectKoreanNarrative(values: string[]) {
   const issues: string[] = []
-  const texts = values.map(polishKoreanSentence).filter(Boolean)
+  const rawTexts = values.map(collapseSpaces).filter(Boolean)
+  for (const text of rawTexts) {
+    for (const sentence of text.split(/(?<=[.!?])\s+/).filter(Boolean)) {
+      if (/변화 욕구를 .*비교로 바꾸/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
+      if (/시기가 .*이어/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
+      if (/근거를 (?:낮|높)게 읽/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
+    }
+  }
+
+  const texts = rawTexts.map(polishKoreanSentence).filter(Boolean)
   const familyCount = new Map<string, number>()
   for (const text of texts) {
     const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
@@ -140,9 +149,6 @@ export function inspectKoreanNarrative(values: string[]) {
       if (sentence.length > 105) issues.push(`긴 문장: ${sentence.slice(0, 48)}…`)
       const abstractCount = ABSTRACT_WORDS.filter(word => sentence.includes(word)).length
       if (abstractCount >= 4) issues.push(`추상명사 과다: ${sentence.slice(0, 48)}…`)
-      if (/변화 욕구를 .*비교로 바꾸/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
-      if (/시기가 .*이어/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
-      if (/근거를 (?:낮|높)게 읽/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
     }
     const family = narrativeClaimFamily(text)
     if (family) familyCount.set(family, (familyCount.get(family) ?? 0) + 1)
