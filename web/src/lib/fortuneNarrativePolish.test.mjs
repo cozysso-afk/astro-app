@@ -10,7 +10,7 @@ import {
 
 const periodResults = readFileSync(new URL('../PeriodFortuneResults.tsx', import.meta.url), 'utf8')
 const narrativeV2 = readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx', import.meta.url), 'utf8')
-const loveContext = readFileSync(new URL('./loveReadingContext.ts', import.meta.url), 'utf8')
+const editorialV3 = readFileSync(new URL('./fortuneEditorialV3.ts', import.meta.url), 'utf8')
 
 test('work headline is rewritten into natural subject-predicate Korean', () => {
   const source = '말로만 오가던 요청을 담당자·마감·완료 기준까지 구체화하기 좋은 날이야.'
@@ -49,19 +49,21 @@ test('Korean QA catches semantic predicate mismatch and repeated claims', () => 
   assert.ok(issues.some(issue => /동일 의미 반복/.test(issue)))
 })
 
-test('love UI exposes all four relationship states instead of reducing love to contact', () => {
-  for (const value of ['single','flirting','intimate_uncommitted','couple']) {
-    assert.match(loveContext, new RegExp(`value: '${value}'`))
+test('love UI exposes six conditional contexts at once instead of requiring a preselected status', () => {
+  for (const marker of ['솔로 · 새 인연','짝사랑 · 마음 가는 사람','썸 · 알아가는 중','관계가 애매한 사이','연애 중','재회를 생각하는 경우']) {
+    assert.match(editorialV3, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
-  assert.match(periodResults, /LOVE_STATUS_OPTIONS\.map/)
-  assert.match(loveContext, /새 사람을 만나거나 소개·모임/)
-  assert.match(loveContext, /함께 보내는 시간, 애정 표현, 갈등 뒤 회복과 생활 리듬/)
+  assert.doesNotMatch(periodResults, /LOVE_STATUS_OPTIONS\.map/)
+  assert.match(periodResults, /솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심/)
+  assert.match(narrativeV2, /editorial\.loveContexts\.map/)
+  assert.match(narrativeV2, /내 상황에 맞춰 읽기/)
 })
 
-test('completed period results route through narrative v2 and remain exportable', () => {
+test('completed period results route through editorial v3 and remain exportable', () => {
   assert.match(periodResults, /PeriodFortuneNarrativeV2/)
   assert.match(periodResults, /data-reading-export-root="period-fortune"/)
   assert.match(periodResults, /결과 이미지 저장/)
-  assert.match(narrativeV2, /분야별로 한 번씩만/)
+  assert.match(narrativeV2, /buildFortuneEditorialV3/)
+  assert.match(narrativeV2, /전 분야를 통틀어 보면/)
   assert.match(narrativeV2, /기억할 시기/)
 })
