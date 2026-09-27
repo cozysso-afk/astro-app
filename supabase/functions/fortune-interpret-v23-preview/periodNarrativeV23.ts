@@ -1,4 +1,4 @@
-export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.1-distinct-period-shapes'
+export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.2-editorial-v3'
 
 export type PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
@@ -123,8 +123,6 @@ function normalizedObservationLabel(row: EvidenceRow): string {
 
 function phenomenonKey(row: EvidenceRow): string {
   const o = row.observation ?? {}
-  // Topic is deliberately NOT part of the primary key. The same astronomical
-  // phenomenon may manifest across several life topics and should be interpreted once.
   if (o.transit && o.target && o.aspect) {
     return [text(row.system), text(o.transit), text(o.aspect), text(o.target)].join('|')
   }
@@ -185,21 +183,14 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
 function periodSpecificClusterScore(kind: PeriodKind, cluster: PhenomenonCluster): number {
   let score = cluster.salience
   if (kind === 'day') {
-    // A day reading should be dominated by one-day triggers, not the same
-    // multi-day background that will also lead the weekly reading.
     if (cluster.role === 'trigger') score += 28
     if (cluster.distinct_dates === 1) score += 18
     if (cluster.role === 'background') score -= 18
     if (cluster.distinct_dates >= 3) score -= 22
   } else if (kind === 'week') {
-    // A week reading should prefer movement across several dates. A single-day
-    // trigger can still appear as a turning point, but it must not own the week.
     if (cluster.distinct_dates >= 2 && cluster.distinct_dates <= 7) score += 18
     if (cluster.role === 'background') score += 4
     if (cluster.role === 'tension') score += 6
-    // Keep a one-day trigger available as a weekly turning point, but below
-    // genuinely multi-day movement. This preserves direct evidence without
-    // letting one day become the whole weekly narrative.
     if (cluster.distinct_dates === 1) score -= 4
     if (cluster.role === 'trigger' && cluster.distinct_dates <= 1) score -= 4
   } else if (kind === 'month') {
@@ -245,13 +236,62 @@ export function buildPeriodNarrativeContext(payload: any) {
   }
 }
 
+function editorialV3Instruction(kind: PeriodKind) {
+  const periodWord = kind === 'day' ? '오늘' : kind === 'week' ? '이번 주' : kind === 'month' ? '이번 달' : '올해'
+  return `[EDITORIAL_V3 · 사용자에게 실제로 보이는 해설 계약]
+- overall.summary는 ${periodWord} 전 섹터를 통틀어 읽은 총평이다. 가장 강한 한 섹터의 verdict를 복사하거나 조금 바꿔 쓰면 실패다.
+- overall.summary에는 근거가 있는 한 최소 두 개 이상의 서로 다른 생활 분야를 연결해라. 받쳐주는 분야와 조심할 분야가 함께 있으면 둘의 대비와 ${periodWord} 전체 운영 원칙을 한 문단으로 종합해라.
+- headline 역시 한 섹터의 verdict 복사본이 아니라 전 기간의 핵심 대비나 공통 테마를 새 문장으로 만들어라.
+- clusters.relationship은 아래 태그를 정확히 이 순서로 포함한 사용자용 편집 원고다. 태그별 1~2문장만 쓰고 같은 조언을 반복하지 마.
+[대인관계] 친구·동료·가족·협업·부탁과 거절·경계·갈등·약속·사회적 피로·새 인맥 중 실제 근거에 맞는 장면을 설명한다. 연락/답장 이야기를 기본값으로 삼지 마.
+[애정 공통] 애정 전반에서 공통으로 볼 핵심만 쓴다. 연애를 연락운으로 축약하지 마.
+[애정·솔로] 특정 상대가 없다고 가정하고 새 만남·소개·모임·호감 형성·관계를 받아들일 여유를 읽는다.
+[애정·짝사랑] 마음 가는 사람이 있는 경우로만 읽되 상대의 속마음은 만들지 않는다. 접근 속도·상호 반응·과해석 주의를 다룬다.
+[애정·썸] 알아가는 중인 경우로 읽고 상호 질문·다음 약속·실제 만남·관계 기대의 일치를 다룬다.
+[애정·관계 미정] 친밀하거나 애매하지만 합의된 관계가 아닌 경우로 읽고 기대치·경계·만남 전후의 일관성·관계 정의를 다룬다.
+[애정·연애 중] 현재 연인이 있는 경우로 읽고 함께 보내는 시간·애정 표현·갈등 회복·일정과 생활 리듬을 다룬다.
+[애정·재회 관심] 과거 인연을 다시 생각하는 경우로 읽고 재접점·연락·실제 만남·관계 회복을 서로 다른 단계로 구분한다.
+[연락 전체] 연락 지수의 부모 의미다. 직접 연락·메시지·대화가 얼마나 활성화되는지와 대화가 이어질 여지를 설명한다. 누가 먼저 보내는지로 이 문단을 대신하지 마.
+[연락 지속] 연락이 생겼을 때 한 번의 반응으로 끝나는지, 질문·답변·약속 등 실제 대화가 이어지는지를 설명한다.
+- contact_flow.incoming은 오직 상대→나 방향, contact_flow.outgoing은 오직 나→상대 방향을 설명한다. 둘은 [연락 전체]의 하위 방향축이며 전체 연락 활성도를 대신하지 않는다.
+- incoming/outgoing 차이가 작으면 억지로 승자를 만들지 말고 '뚜렷한 우세 없음'이라고 짧게 끝내라.
+- 사용자가 솔로/짝사랑/썸/연애 중이라고 실제 입력했다고 가정하지 마. 위 애정 태그들은 각 상황에 해당하는 사람이 골라 읽는 조건부 해설이다.
+- 대인관계, 애정, 연락은 서로 다른 분야다. 같은 '답장·반응·다음 행동을 봐' 문장을 세 분야에 반복하면 실패다.
+- '~하는 편이 좋아', '흐름', '신호', '확인해'를 문단마다 반복하지 말고 자연스러운 생활 한국어로 문형을 바꿔라.`
+}
+
 export function buildPeriodNarrativeInstruction(payload: any): string {
   const ctx = buildPeriodNarrativeContext(payload)
   const phenomena = ctx.phenomena.map((p, i) =>
     `${i + 1}. ${p.label} | role=${p.role} | dates=${p.dates.join(',') || '-'} | topics=${p.topics.join(',') || '-'} | refs=${p.evidence_refs.join(',')}`
   ).join('\n') || '직접 현상 묶음 없음'
 
-  return `[PERIOD_NARRATIVE_V23]\n기간유형=${ctx.kind}\n목표=${ctx.objective}\n시간해상도=${ctx.granularity}\n\n[반드시 따를 서사 순서]\n${ctx.required_sequence.map((x, i) => `${i + 1}. ${x}`).join('\n')}\n\n[근거 우선순위]\n${ctx.evidence_priority.map(x => `- ${x}`).join('\n')}\n\n[기간 차별화 필수]\n${ctx.distinctive_requirements.map(x => `- ${x}`).join('\n')}\n\n[금지]\n${ctx.forbidden_patterns.map(x => `- ${x}`).join('\n')}\n\n[핵심 현상 묶음]\n${phenomena}\n\n[해석 원칙]\n${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}\n\n중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
+  return `[PERIOD_NARRATIVE_V23]
+기간유형=${ctx.kind}
+목표=${ctx.objective}
+시간해상도=${ctx.granularity}
+
+[반드시 따를 서사 순서]
+${ctx.required_sequence.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+
+[근거 우선순위]
+${ctx.evidence_priority.map(x => `- ${x}`).join('\n')}
+
+[기간 차별화 필수]
+${ctx.distinctive_requirements.map(x => `- ${x}`).join('\n')}
+
+[금지]
+${ctx.forbidden_patterns.map(x => `- ${x}`).join('\n')}
+
+[핵심 현상 묶음]
+${phenomena}
+
+[해석 원칙]
+${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}
+
+${editorialV3Instruction(ctx.kind)}
+
+중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
 }
 
 function tokens(value: string): Set<string> {
