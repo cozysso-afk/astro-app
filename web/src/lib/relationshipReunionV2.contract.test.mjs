@@ -65,11 +65,11 @@ test('reunion hierarchy puts concise consultation answers before technical engin
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['결론부터 보면','지금 두 사람의 흐름','연락 흐름','누가 먼저 움직일 가능성이 더 큰가','기억할 시기','과거 관계를 다시 떠올리기 쉬운 배경','연락 뒤 실제 변화가 있는지','연락 뒤 무엇을 확인할까','다시 만나면 조심할 반복 패턴','계산된 단계와 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
+  const headingMarkup=['<h3>결론부터 보면</h3>','<h4>지금 두 사람의 흐름</h4>','<h4>연락 흐름</h4>','<h4>누가 먼저 움직일 가능성이 더 큰가</h4>','<h4>기억할 시기</h4>','<h4>과거 관계를 다시 떠올리기 쉬운 배경</h4>','<h4>연락 뒤 실제 변화가 있는지</h4>','<h4>연락 뒤 무엇을 확인할까</h4>','<h4>다시 만나면 조심할 반복 패턴</h4>','<summary>계산된 단계와 시기 자세히 보기</summary>','<summary>상대 → 나 / 나 → 상대 보조지표 보기</summary>','<summary>지난 시기 · 사후 확인용</summary>','<summary>계산 근거 보기</summary>']
   let cursor=-1
-  for(const heading of headings){
-    const next=hierarchyPanel.indexOf(heading)
-    assert.ok(next>cursor,`${heading} order`)
+  for(const markup of headingMarkup){
+    const next=hierarchyPanel.indexOf(markup)
+    assert.ok(next>cursor,`${markup} order`)
     cursor=next
   }
   assert.doesNotMatch(hierarchyPanel,/왜 아직 서로를 신경 쓰기 쉬운가/)
