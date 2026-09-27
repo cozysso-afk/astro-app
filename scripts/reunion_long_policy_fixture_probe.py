@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 
-from scripts.reunion_long_policy_audit import replay
+from reunion_long_policy_audit import replay
 
 
 FIXTURE = {
