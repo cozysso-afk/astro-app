@@ -1,17 +1,24 @@
 import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.2-human-scene-first'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.3-korean-editorial-contract'
 const enc = new TextEncoder()
 
 const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 해설의 첫 문장과 headline은 점수·등급·추상적인 운세평이 아니라, 이 기간에 실제 생활에서 체감할 수 있는 구체적인 장면이나 변화로 시작해.
+- 한국어 문장은 주어와 서술어가 무엇을 가리키는지 분명하게 맞춰. 주어가 바뀌면 억지로 한 문장에 붙이지 말고 문장을 나눠.
+- 목적어와 서술어의 의미 호응을 확인해. "변화 욕구를 비교로 바꾼다", "시기가 관계 회복으로 이어진다", "근거를 낮게 읽는다"처럼 문법 형식은 맞아도 뜻이 어색한 결합은 쓰지 마.
+- 병렬 항목은 같은 문법 단위로 맞춰. 담당자·마감·완료처럼 모호하게 명사를 붙이지 말고 필요하면 "담당자를 정하고, 마감일과 완료 기준을 확인한다"처럼 각각의 동작을 밝혀.
+- 한 문장에는 핵심 주장 하나를 우선해. 수식어와 명사구가 길어져 두 번 읽어야 이해되는 문장은 둘로 나눠.
+- "흐름·신호·구조·자극·배경·접점·활성" 같은 추상명사를 연속해서 쌓지 마. 가능하면 사람·일·돈·일정·대화·만남·행동처럼 실제 대상을 주어 또는 목적어로 써.
 - "좋은 흐름", "무난한 편", "균형이 중요", "신중하게", "성찰", "성장", "에너지", "조율", "변화의 기회" 같은 말만으로 문장을 완성하지 마. 이런 추상어를 쓰면 반드시 누가/무엇을/어떻게 체감하는지 현실 장면을 같은 문장 또는 바로 다음 문장에 붙여.
 - headline은 다른 날짜나 다른 사람에게 그대로 붙여도 말이 되는 범용 조언이면 실패야. 선택된 phenomenon의 대상·작용·생활 분야 중 최소 하나가 드러나야 해.
 - supportive와 caution이 동시에 강하면 하나를 지우지 말고 "기회는 열리지만 ○○ 때문에 속도가 달라진다"처럼 모순과 긴장을 사람말 한 문장 안에 살려.
 - 천체명·aspect·오브·점수는 본문을 시작하는 말이 아니야. 먼저 현실 장면을 말하고, 전문 근거는 reason/세부 근거에서 뒤에 설명해.
 - 점수는 확률이 아니다. 숫자가 결론의 주어가 되지 않게 하고, 이미 말한 해석의 강약을 보조하는 경우에만 사용해.
 - 같은 뜻의 조언을 동의어로 바꿔 반복하지 마. "서두르지 마/신중해/천천히 봐"는 같은 의미로 취급해 한 번만 써.
+- headline·overall·topic verdict·action은 각자 다른 역할을 맡아. headline에서 말한 결론을 topic에서 다시 풀어 쓰지 말고, topic은 그 분야에서 새로 확인할 장면이나 행동을 추가해.
+- 연애와 연락은 같은 분야가 아니야. 연애는 만남·호감·관계의 속도·현재 관계의 교류를 다루고, 연락은 메시지·질문·답변·약속을 주고받는 커뮤니케이션을 다뤄. 연애 해설을 답장과 연락 여부만으로 채우지 마.
 - 실제 근거가 없는 사건, 상대의 속마음, 연락 주체, 결과 확정, 금전 수익, 건강 진단은 만들지 마.
 - day면 headline은 오늘만의 촉발·시간대·현실 장면 중 하나를 반드시 포함해. "오늘은 ○○에 힘을 쓰기 좋은 편" 같은 분야 점수 요약만 쓰지 마.
 - week면 headline은 7일의 이동이나 전환을 말해. 하루짜리 문장을 기간만 "이번 주"로 바꿔 재사용하지 마. 가능하면 초반→중반→후반 중 실제 근거가 있는 두 구간 이상의 차이를 연결해.
@@ -29,17 +36,12 @@ export function buildV23PromptPacket(payload:any) {
 }
 
 export function buildV23PromptBudget(payload:any) {
-  // This private runtime marker is intentionally kept out of the prompt packet.
-  // It lets the shared quality validator safely prune unsupported V23 timing
-  // claims without changing the legacy V21 validation contract.
   if (payload && typeof payload === 'object') payload.__v23_evidence_timing_repair = true
   const base = promptBudget(payload)
   const packet = buildV23PromptPacket(payload)
   const bytes = enc.encode(JSON.stringify(packet)).byteLength
   const estimated_input_tokens = Math.ceil(bytes / 2.6)
   const ratio = estimated_input_tokens / Math.max(1, Number(base.estimated_input_tokens ?? 1))
-  // Scaling the full V21 job estimate is deliberately conservative because it
-  // also scales the output reserve when V23 adds prompt context.
   const estimated_max_job_krw = Math.max(
     Number(base.estimated_max_job_krw ?? 0),
     Number(base.estimated_max_job_krw ?? 0) * ratio,

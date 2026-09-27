@@ -61,20 +61,23 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(reunionCss,/\.reunion-date-focus-list/)
 })
 
-test('reunion hierarchy puts full consultation answers before engine state',()=>{
+test('reunion hierarchy puts concise consultation answers before technical engine state',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
-  const headings=['결론부터 보면','지금 두 사람의 흐름','실제 연락 가능성은?','누가 먼저 움직일지는?','왜 아직 서로를 신경 쓰기 쉬운가','상대가 예전과 다르게 움직일 여지가 있나?','언제가 중요한가','연락이 오면 무엇으로 진심을 구분하나','다시 만나도 반복되기 쉬운 문제','이번 리딩의 결론','계산된 흐름과 시기 자세히 보기','상대 → 나 / 나 → 상대 보조지표 보기','지난 시기 · 사후 확인용','계산 근거 보기']
+  const headingMarkup=['<h3>결론부터 보면</h3>','<h4>지금 두 사람의 흐름</h4>','<h4>연락 흐름</h4>','<h4>누가 먼저 움직일 가능성이 더 큰가</h4>','<h4>기억할 시기</h4>','<h4>과거 관계를 다시 떠올리기 쉬운 배경</h4>','<h4>연락 뒤 실제 변화가 있는지</h4>','<h4>연락 뒤 무엇을 확인할까</h4>','<h4>다시 만나면 조심할 반복 패턴</h4>','<summary>계산된 단계와 시기 자세히 보기</summary>','<summary>상대 → 나 / 나 → 상대 보조지표 보기</summary>','<summary>지난 시기 · 사후 확인용</summary>','<summary>계산 근거 보기</summary>']
   let cursor=-1
-  for(const heading of headings){
-    const next=hierarchyPanel.indexOf(heading)
-    assert.ok(next>cursor,`${heading} order`)
+  for(const markup of headingMarkup){
+    const next=hierarchyPanel.indexOf(markup)
+    assert.ok(next>cursor,`${markup} order`)
     cursor=next
   }
+  assert.doesNotMatch(hierarchyPanel,/왜 아직 서로를 신경 쓰기 쉬운가/)
+  assert.doesNotMatch(hierarchyPanel,/이번 리딩의 결론/)
+  assert.match(hierarchyPanel,/과거 관계가 다시 떠오르는 배경과 실제 연락은 다른 단계야/)
   assert.match(hierarchyPanel,/실제 기록과 비교하는 개인 사후 확인용/)
   assert.match(hierarchyPanel,/과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
-  assert.match(hierarchyPanel,/이 값은 관계 자극의 방향이지 실제 속마음이나 선연락 행동을 관측한 값이 아니야/)
+  assert.match(hierarchyPanel,/이 값은 관계 자극의 방향이야\. 실제 속마음이나 선연락 행동을 관측한 값은 아니야/)
   assert.match(panel,/이전 계산 저장본/)
   assert.match(panel,/AI 해설 생성 없이도 지난 활성기 · 현재 흐름 · 앞으로의 후보 시기/)
   assert.match(panel,/이전 저장본 시기 해설 · 현재\/미래 판단용 아님/)
@@ -96,7 +99,7 @@ test('reunion hierarchy puts full consultation answers before engine state',()=>
   assert.match(grounding,/카르마적 인연/)
 })
 
-test('reunion quality guard preserves narrative depth and keeps technical language out of the main consultation',()=>{
+test('reunion quality guard preserves depth while moving technical detail behind disclosures',()=>{
   assert.match(hierarchyPanel,/function phaseVerdict/)
   assert.match(hierarchyPanel,/function contactOutlook/)
   assert.match(hierarchyPanel,/function readerText/)
@@ -111,51 +114,42 @@ test('reunion quality guard preserves narrative depth and keeps technical langua
   for (const marker of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding','initiative_gate']) {
     assert.match(hierarchyPanel,new RegExp(`replace\\(/.*${marker}`))
   }
-  assert.match(hierarchyPanel,/가장 먼저 눈여겨볼 흐름은/)
-  assert.match(hierarchyPanel,/다음 단계/)
-  assert.match(hierarchyPanel,/아직 뚜렷한 근거가 없어/)
   assert.match(hierarchyPanel,/두드러지는 시기/)
-  assert.match(hierarchyPanel,/const grouped = new Map<string, ReunionPeriod\[\]>/)
-  assert.match(hierarchyPanel,/같은 종류의 신호라 날짜마다 서로 다른 사건을 뜻하는 것은 아니야/)
   assert.match(hierarchyPanel,/function dedupeTimingWindows/)
   assert.doesNotMatch(hierarchyPanel,/function firstSentence/)
   assert.doesNotMatch(hierarchyPanel,/<p>\{verdict\}<\/p>/)
-  assert.match(hierarchyPanel,/이 시기에는 관계 흐름의 변화를 눈여겨볼 수 있어/)
-  assert.doesNotMatch(hierarchyPanel,/연락 가능성 자체는 열려 있어/)
-  assert.match(hierarchyPanel,/통계적 연락 확률이 아니라/)
-  assert.match(hierarchyPanel,/연락이나 대화 재개 여부를 다른 시기보다 더 눈여겨볼 수 있는 구간/)
-  assert.match(hierarchyPanel,/이 신호는 실제 연락 확률 판정이 아니야/)
-  assert.match(hierarchyPanel,/메시지가 실제로 온다고 확정하는 뜻은 아니야/)
-  assert.doesNotMatch(hierarchyPanel,/실제 연락 가능성이 높다고 말할 근거는 아직 부족해/)
+  assert.match(hierarchyPanel,/현재 조회 범위에서는 연락이나 대화 재개를 따로 강조할 시기가 없어/)
+  assert.match(hierarchyPanel,/가장 먼저 볼 구간은/)
+  assert.doesNotMatch(hierarchyPanel,/메시지가 실제로 온다고 확정하는 뜻은 아니야/)
   assert.match(hierarchyPanel,/안부·추억 이야기만 반복/)
   assert.match(hierarchyPanel,/구체적인 만남을 잡음/)
   assert.match(hierarchyPanel,/예전 문제와 앞으로의 관계를 피하지 않고 말함/)
   assert.match(hierarchyPanel,/말은 다정한데 행동이 이어지지 않음/)
   assert.match(hierarchyPanel,/const neutralDirectionRows = directionRows\.map/)
   assert.match(hierarchyPanel,/<ReadingDirections rows=\{neutralDirectionRows\}/)
-  assert.match(hierarchyPanel,/<details className="reading-more reunion-retrospective">/)
-  assert.match(hierarchyPanel,/<details className="reading-more reunion-contact-is-not-reunion">/)
+  assert.match(hierarchyPanel,/<details className="reading-more reunion-retrospective" data-reading-export-ignore="true">/)
+  assert.match(hierarchyPanel,/<details className="reading-more reunion-contact-is-not-reunion" data-reading-export-ignore="true">/)
+  assert.match(hierarchyPanel,/강약은 조회 기간 안의 상대적 활성도야\. 실제 연락·만남·재회 확률이나 상대의 속마음을 뜻하지 않아/)
+  assert.equal((hierarchyPanel.match(/실제 연락·만남·재회 확률/g)||[]).length,1,'shared disclaimer should appear once')
   assert.doesNotMatch(hierarchyPanel,/감정 활성과 연락 단계는 운의 흐름이 열려/)
   assert.doesNotMatch(hierarchyPanel,/단계가 현재 창에 걸려 있어/)
   assert.doesNotMatch(hierarchyPanel,/현재 열린 단계보다 뒤의 일을 한꺼번에 재회로 묶어 읽지 않아/)
   assert.doesNotMatch(hierarchyPanel,/const STAGE_COPY/)
 })
 
-test('reunion exposes relative contact signal and change checks without pretending statistical probability',()=>{
+test('reunion exposes relative contact direction and behavioral change without statistical probability',()=>{
   assert.match(hierarchyPanel,/function contactSignalBand/)
   assert.match(hierarchyPanel,/activation >= 60/)
-  assert.match(hierarchyPanel,/연락 가능성 신호: \{contactSignal\}/)
-  assert.match(hierarchyPanel,/연락 시기 신호와 상대 → 나·나 → 상대 방향 자극을 함께 본 상대 강도/)
+  assert.match(hierarchyPanel,/현재 강도: \{contactSignal\}/)
   assert.match(hierarchyPanel,/if \(bothDirectionsWeak\(directionRows\)\) return '낮음'/)
   assert.match(hierarchyPanel,/function initiativeOutlook/)
-  assert.match(hierarchyPanel,/상대적 선연락 방향: \{initiative\.label\}/)
-  assert.match(hierarchyPanel,/양쪽 모두 절대 강도는 약하지만/)
-  assert.match(hierarchyPanel,/연락이 생긴다면 어느 쪽이 상대적으로 앞서는지를 본 값/)
+  assert.match(hierarchyPanel,/상대적 방향: \{initiative\.label\}/)
+  assert.match(hierarchyPanel,/두 방향 모두 약하지만 상대 비교에서는/)
   assert.match(hierarchyPanel,/function changeOutlook/)
-  assert.match(hierarchyPanel,/상대가 예전과 다르게 움직일 여지가 있나\?/)
-  assert.match(hierarchyPanel,/변화 행동 신호: \{change\.label\}/)
-  assert.match(hierarchyPanel,/실제 만남이나 관계 회복 단계가 뚜렷하지 않아서/)
-  assert.match(hierarchyPanel,/구체적인 약속을 잡고 지키는지/)
+  assert.match(hierarchyPanel,/연락 뒤 실제 변화가 있는지/)
+  assert.match(hierarchyPanel,/행동 변화 신호: \{change\.label\}/)
+  assert.match(hierarchyPanel,/구체적인 만남·사과·조율 같은 새 행동/)
+  assert.match(hierarchyPanel,/약속을 잡고 지키는지/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성[^\n]{0,40}\d+%/)
 })
 

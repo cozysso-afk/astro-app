@@ -6,9 +6,12 @@ const exporter = readFileSync(new URL('./readingImageExport.ts', import.meta.url
 const panel = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../reading-image-export.css', import.meta.url), 'utf8')
 
-test('reading export renders bounded multi-page PNGs instead of one giant screenshot', () => {
-  assert.match(exporter, /PAGE_WIDTH = 1080/)
-  assert.match(exporter, /PAGE_HEIGHT = 1440/)
+test('reading export renders iPhone-friendly 4:5 multi-page PNGs instead of one giant screenshot', () => {
+  assert.match(exporter, /PAGE_WIDTH = 1206/)
+  assert.match(exporter, /PAGE_HEIGHT = 1508/)
+  assert.match(exporter, /size: 46/)
+  assert.match(exporter, /size: 68/)
+  assert.match(exporter, /toneFill/)
   assert.match(exporter, /canvas\.toBlob/)
   assert.match(exporter, /new File\(/)
   assert.match(exporter, /navigator\.share/)
