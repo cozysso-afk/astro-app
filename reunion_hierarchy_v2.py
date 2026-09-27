@@ -100,7 +100,7 @@ STAGE_TRIGGER_POLICY = {
 }
 PRIMARY_TRIGGER_BY_STAGE = {stage: policy['primary_planets'] for stage, policy in STAGE_TRIGGER_POLICY.items()}
 MID_GATE_RETURN_KEYS = {'lunar_return'}
-REBUILDING_MID_GATE_EXTRA_KEYS = {'solar_return'}
+REBUILDING_MID_GATE_EXTRA_KEYS = {'venus_return'}
 MID_CONTEXT_RETURN_KEYS_BY_STAGE = {
     'emotional_reactivation': ('lunar_return', 'venus_return'),
     'contact_recontact': ('lunar_return', 'mercury_return'),
@@ -1077,7 +1077,7 @@ def apply_reunion_hierarchy(
                 for stage, policy in STAGE_TRIGGER_POLICY.items()
             },
             'primary_trigger_min_strength': THRESHOLDS['event_trigger'],
-            'medium_gate_return': 'lunar_return; relationship_rebuilding also admits solar_return',
+            'medium_gate_return': 'lunar_return; relationship_rebuilding also admits venus_return',
             'birth_time_precision_policy': 'provisional medium-return evidence remains calculable; each candidate reports exact-only gate counterfactual without reweighting or suppressing evidence',
             'gate_evaluation': 'sequential: medium only after long; fast only after medium; skipped scores are zero, not measured counterfactuals',
             'medium_context_returns': {k: list(v) for k, v in MID_CONTEXT_RETURN_KEYS_BY_STAGE.items()},
