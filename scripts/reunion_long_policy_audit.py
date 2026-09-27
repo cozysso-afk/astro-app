@@ -95,6 +95,66 @@ def long_policy_variant_specs():
             },
         ),
         (
+            "rebuilding_mercury_without_moon_target",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Moon",),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source while removing only Moon as a target. "
+                    "This isolates whether Moon contacts drive the broad-source saturation."
+                ),
+            },
+        ),
+        (
+            "rebuilding_mercury_without_sun_target",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Sun",),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source while removing only Sun as a target. "
+                    "This isolates whether Sun contacts drive the broad-source saturation."
+                ),
+            },
+        ),
+        (
+            "rebuilding_mercury_moon_target_only",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Venus", "Sun", "DSC", "Saturn"),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source and keep Moon as the only directed target. "
+                    "This is an audit-only attribution probe, not a production proposal."
+                ),
+            },
+        ),
+        (
+            "rebuilding_mercury_sun_target_only",
+            {
+                "changes": {
+                    "relationship_rebuilding": {
+                        "directed_planets_add": ("Mercury",),
+                        "directed_targets_remove": ("Moon", "Venus", "DSC", "Saturn"),
+                    },
+                },
+                "description": (
+                    "Add Mercury as a rebuilding directed source and keep Sun as the only directed target. "
+                    "This is an audit-only attribution probe, not a production proposal."
+                ),
+            },
+        ),
+        (
             "rebuilding_target_add_mercury",
             {
                 "changes": {
