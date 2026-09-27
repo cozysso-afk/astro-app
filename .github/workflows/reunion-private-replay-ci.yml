@@ -41,6 +41,19 @@ jobs:
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=reunion-audit-supabase")"
           oidc_token="$(python -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"${oidc_json}")"
           unset oidc_json
+          python - "${oidc_token}" <<'PY'
+          import base64
+          import json
+          import sys
+          payload = sys.argv[1].split('.')[1]
+          payload += '=' * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+          for key in (
+              'repository', 'repository_id', 'event_name', 'ref', 'sub',
+              'head_ref', 'base_ref', 'job_workflow_ref', 'workflow_ref',
+          ):
+              print(f'OIDC {key}={claims.get(key)}')
+          PY
           curl -fsS -X POST \
             -H "Authorization: Bearer ${oidc_token}" \
             -H 'Content-Type: application/json' \
@@ -72,7 +85,6 @@ jobs:
           import json
           from pathlib import Path
           rows = json.loads(Path('/tmp/reunion_private_result.json').read_text())
-          # The audit contract emits aggregate counts only; fail closed if the shape drifts.
           allowed_top = {
               'case_index', 'engine_version', 'policy_revision', 'baseline', 'variants',
               'determinism_digest', 'privacy',
