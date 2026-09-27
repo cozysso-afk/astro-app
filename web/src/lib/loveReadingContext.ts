@@ -5,7 +5,7 @@ export type LoveStatus = 'single' | 'flirting' | 'intimate_uncommitted' | 'coupl
 
 export function lovePromptContext(status: LoveStatus) {
   return `LOVE_STATUS=${status}\n${status === 'single'
-    ? '특정 상대가 없는 싱글의 애정운이다. 연락을 기본 소재로 삼지 말고 새 인연을 만날 환경, 호감 형성, 첫 만남 뒤 다시 보고 싶은지, 관계를 시작할 준비를 중심으로 읽는다. 실제 소개·만남이 있다는 근거가 없으면 사건을 만들지 않는다. 과거 인연은 과거인연접점 계산이 있을 때만 별도 항목으로 다룬다.'
+    ? '특정 상대가 없는 싱글의 애정운이다. 현재 연인이 있다고 전제하지 말고, 연락을 기본 소재로 삼지 않는다. 새 인연을 만날 환경, 호감 형성, 첫 만남 뒤 다시 보고 싶은지, 관계를 시작할 준비를 중심으로 읽는다. 새 인연·썸·친밀하지만 관계 미정·과거 인연처럼 여러 상황이 동시에 있을 수 있으며 실제 소개·만남이 있다는 근거가 없으면 사건을 만들지 않는다. 과거 인연은 과거인연접점 계산이 있을 때만 별도 항목으로 다룬다.'
     : status === 'flirting'
       ? '썸·알아가는 상대가 있는 애정운이다. 호감의 크기를 단정하지 말고 서로 질문을 주고받는지, 다음 약속이 구체화되는지, 관계 기대를 확인하는 대화가 가능한지를 중심으로 읽는다.'
       : status === 'intimate_uncommitted'
@@ -34,7 +34,7 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
     return {
       title: '새 인연과 관계 탐색',
       conclusion,
-      action: '사람을 만나고 싶다면 소개를 부탁하거나 부담 없는 모임에 시간을 낼지 정해. 실제 제안이 있다면 일정과 만남 방식이 편안한지부터 확인해.',
+      action: '사람을 만나고 싶다면 소개를 부탁하거나 부담 없는 모임에 시간을 낼지 정해. 소개팅 제의나 실제 만남 제안이 있다면 일정과 만남 방식이 편안한지부터 확인해.',
       observe: '첫 만남 뒤에도 서로 다시 볼 이유와 의지가 생기는지, 내가 그 관계를 더 알아가고 싶은지 봐.',
       caution: '누군가 반드시 나타난다는 뜻으로 읽지는 마. 호감이 생겨도 첫인상 하나로 관계를 미리 정하지 않는 게 좋아.',
     }
@@ -57,12 +57,12 @@ function loveCopy(status: LoveStatus, stat?: FortuneStat | null) {
   }
   if (status === 'intimate_uncommitted') {
     const conclusion = level === 'low'
-      ? '친밀감의 강도보다 서로 원하는 관계와 경계가 맞는지부터 확인하는 편이 좋아.'
+      ? '신체적 친밀감의 강도보다 서로 원하는 관계와 경계가 맞는지부터 확인하는 편이 좋아.'
       : level === 'high'
-        ? '가까워지는 움직임은 있어도 관계의 이름과 기대는 따로 맞춰야 해.'
+        ? '신체적 친밀감과 가까워지는 움직임은 있어도 관계의 이름과 기대는 따로 맞춰야 해.'
         : level === 'unknown'
-          ? '관계의 강약을 판단할 계산 정보가 부족해. 친밀감보다 합의와 경계를 기준으로 봐.'
-          : '몸이 가까운 것과 같은 관계를 원한다는 것은 별개야. 만남의 방식과 기대를 분명히 확인해.'
+          ? '신체적 친밀감과 관계의 강약을 판단할 계산 정보가 부족해. 합의와 경계를 기준으로 봐.'
+          : '신체적 친밀감이 있다는 것과 같은 관계를 원한다는 것은 별개야. 만남의 방식과 기대를 분명히 확인해.'
     return {
       title: '친밀감과 관계 기준',
       conclusion,
@@ -91,34 +91,53 @@ function periodAction(periodKind: FortuneUserSummary['periodKind'], status: Love
   const period = periodKind === 'day' ? '오늘' : periodKind === 'week' ? '이번 주' : periodKind === 'month' ? '이번 달' : '올해'
   if (status === 'single') return `${period}은 사람을 만날 기회를 억지로 만들기보다, 실제 제안이나 만남이 생겼을 때 내 관심이 이어지는지를 보는 쪽이 좋아.`
   if (status === 'flirting') return `${period}은 한 번의 대화보다 다음 약속과 질문이 반복해서 이어지는지를 봐.`
-  if (status === 'intimate_uncommitted') return `${period}은 친밀감보다 서로 원하는 관계와 경계가 일관되게 존중되는지를 봐.`
+  if (status === 'intimate_uncommitted') return `${period}은 신체적 친밀감보다 서로 원하는 관계와 경계가 일관되게 존중되는지를 봐.`
   return `${period}은 연락 빈도보다 함께 보내는 시간, 약속, 갈등 뒤 회복을 중심으로 봐.`
 }
 
-// A presentation lens over existing scores/evidence. No additional calculation or request.
-export function applyLoveContext(summary: FortuneUserSummary, calculation: IntegratedApiResponse, status: LoveStatus): FortuneUserSummary {
+function pastEvidenceAvailable(calculation: IntegratedApiResponse) {
+  return Number.isFinite(calculation.western.relationship_signals?.['과거인연접점']?.average)
+}
+
+// Keep the calculation/evidence contract intact for system views and copied prompts. The final
+// boolean selects the user-visible love lens, where 연락 is deliberately not promoted as 애정.
+export function applyLoveContext(summary: FortuneUserSummary, calculation: IntegratedApiResponse, status: LoveStatus, visibleOnly = false): FortuneUserSummary {
   const single = status === 'single'
   const love = loveCopy(status, calculation.western.overall['연애'])
   const contextLabel = status === 'single' ? '새 인연과 관계 탐색' : status === 'flirting' ? '썸과 관계 확인' : status === 'intimate_uncommitted' ? '친밀감과 관계 기준' : '현재 관계'
-  const includeReunion = single && Number.isFinite(calculation.western.relationship_signals?.['과거인연접점']?.average)
-  const allowedTopics = new Set(['연애', ...(includeReunion ? ['재회'] : [])])
-  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows
-    .filter(row => allowedTopics.has(row.topic))
-    .map(row => row.topic === '재회'
-      ? {...row, meaning: '과거 인연은 실제 재접촉과 관계 회복을 나눠서 봐'}
-      : {...row, meaning: caution ? love.caution : love.observe})
-
-  let focusTopics = summary.focusTopics
-    .filter(topic => allowedTopics.has(topic.topic))
-    .map(topic => topic.topic === '재회' ? topic : {...topic, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution})
+  const includeReunion = single && pastEvidenceAvailable(calculation)
+  const sourceFocus = summary.focusTopics.filter(topic => ['연애','연락','재회'].includes(topic.topic))
+  let focusTopics = sourceFocus.map(topic => topic.topic === '연애'
+    ? {...topic, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution}
+    : topic)
   if (!focusTopics.some(topic => topic.topic === '연애')) {
     const referenceLove = summary.referenceTopics.find(topic => topic.topic === '연애')?.detail
     if (referenceLove) focusTopics = [{...referenceLove, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution}, ...focusTopics]
   }
-  const focusNames = new Set(focusTopics.map(topic => topic.topic))
-  const referenceTopics = summary.referenceTopics
-    .filter(topic => allowedTopics.has(topic.topic) && !focusNames.has(topic.topic))
-    .map(topic => topic.topic === '재회' ? topic : {...topic, summary: love.conclusion, detail: topic.detail ? {...topic.detail, conclusion: love.conclusion, action: love.action, observe: love.observe, caution: love.caution} : topic.detail})
+
+  let relationship = summary.relationship ? {...summary.relationship} : undefined
+  if (relationship && !includeReunion) {
+    relationship.reconnection = undefined
+    relationship.reconnectionBand = undefined
+    relationship.reconnectionTiming = undefined
+  }
+
+  const cards = (rows: FortuneUserSummary['favorableCards'], caution: boolean) => rows
+    .filter(row => ['연애','연락',...(includeReunion ? ['재회'] : [])].includes(row.topic))
+    .map(row => row.topic === '연애'
+      ? {...row, meaning: caution ? love.caution.slice(0, 48) : love.observe.slice(0, 48)}
+      : row.topic === '재회'
+        ? {...row, meaning: '재접촉과 관계 회복을 구분해'}
+        : {...row, meaning: '받는 연락과 먼저 보내는 연락을 나눠 읽어'})
+
+  let referenceTopics = summary.referenceTopics.filter(topic => ['연애','연락',...(includeReunion ? ['재회'] : [])].includes(topic.topic))
+  if (visibleOnly) {
+    const visibleTopics = new Set(['연애', ...(includeReunion ? ['재회'] : [])])
+    focusTopics = focusTopics.filter(topic => visibleTopics.has(topic.topic))
+    const focusNames = new Set(focusTopics.map(topic => topic.topic))
+    referenceTopics = referenceTopics.filter(topic => visibleTopics.has(topic.topic) && !focusNames.has(topic.topic))
+    relationship = undefined
+  }
 
   return {
     ...summary,
@@ -126,13 +145,14 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
     summary: `${love.conclusion} ${periodAction(summary.periodKind, status)}`,
     doItems: [love.action],
     cautionItems: [love.caution],
-    favorableCards: cards(summary.favorableCards, false),
-    cautionCards: cards(summary.cautionCards, true),
-    // 연락은 독립 섹터다. 애정 화면의 큰 방향 카드로 끌어올리지 않는다.
-    relationship: undefined,
+    favorableCards: visibleOnly ? cards(summary.favorableCards, false).filter(row => row.topic !== '연락') : cards(summary.favorableCards, false),
+    cautionCards: visibleOnly ? cards(summary.cautionCards, true).filter(row => row.topic !== '연락') : cards(summary.cautionCards, true),
+    relationship,
     focusTopics,
     referenceTopics,
-    importantWindows: summary.importantWindows.filter(window => !window.semantic || (window.semantic === 'reconnection' && includeReunion)),
+    importantWindows: visibleOnly
+      ? summary.importantWindows.filter(window => !window.semantic || (window.semantic === 'reconnection' && includeReunion))
+      : summary.importantWindows,
   }
 }
 
