@@ -1,0 +1,48 @@
+name: Apply audited reunion medium candidate
+
+on:
+  push:
+    branches:
+      - fix/reunion-policy-calibration-v1
+    paths:
+      - '.github/workflows/patch-reunion-medium-candidate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-policy-calibration-v1
+
+      - name: Apply audited policy replacement
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('reunion_hierarchy_v2.py')
+          text = path.read_text()
+          replacements = {
+              "REBUILDING_MID_GATE_EXTRA_KEYS = {'solar_return'}": "REBUILDING_MID_GATE_EXTRA_KEYS = {'venus_return'}",
+              "'medium_gate_return': 'lunar_return; relationship_rebuilding also admits solar_return',": "'medium_gate_return': 'lunar_return; relationship_rebuilding also admits venus_return',",
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected exactly one occurrence: {old}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+          git diff --check
+
+      - name: Commit branch-only policy change
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add reunion_hierarchy_v2.py
+          git commit -m 'fix: use Venus return for rebuilding medium gate'
+          git push origin HEAD:fix/reunion-policy-calibration-v1
