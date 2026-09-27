@@ -26,7 +26,7 @@ try {
   assert.match(v.focusTopics.find(t=>t.topic==='연락').conclusion,/온다는 뜻은 아니야/)
   const before=JSON.stringify(f)
   for(const status of ['single','couple','flirting','intimate_uncommitted']) {
-   const love=applyLoveContext(v,f.calculation,status)
+   const love=applyLoveContext(v,f.calculation,status,true)
    assert.equal(love.relationship,undefined)
    assert.equal(love.focusTopics.some(t=>t.topic==='연락'),false)
    assert.doesNotMatch(love.summary,/답장 속도|상대가 먼저 오는 흐름/)
