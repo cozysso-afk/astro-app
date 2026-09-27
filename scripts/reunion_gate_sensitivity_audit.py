@@ -63,6 +63,19 @@ def policy_variant_specs():
                 ),
             },
         ),
+        (
+            "targeted_candidate_v1",
+            {
+                "meeting_primary_planets": ("Mars", "Venus"),
+                "mid_gate_return_keys": ("lunar_return", "solar_return"),
+                "description": (
+                    "Combined narrow candidate: allow Mars-or-Venus as the meeting exact trigger "
+                    "and let Solar Return join Lunar Return as a medium gate only where Solar Return "
+                    "already exists in the stage context (currently relationship_rebuilding). "
+                    "Thresholds, targets, aspects, orbs, long-term policy, and peak selection stay unchanged."
+                ),
+            },
+        ),
     ]
 
 
