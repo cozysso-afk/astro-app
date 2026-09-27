@@ -33,8 +33,8 @@ function hidden(element: HTMLElement) {
   return style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0
 }
 
-function directText(element: HTMLElement, selector: string) {
-  const node = Array.from(element.children).find(child => child.matches(selector))
+function directText(element: HTMLElement, tag: 'strong' | 'b') {
+  const node = Array.from(element.children).find(child => child.tagName.toLowerCase() === tag)
   return node instanceof HTMLElement ? node.innerText : ''
 }
 
@@ -62,12 +62,12 @@ export function collectReadingExportBlocks(root: HTMLElement): ExportBlock[] {
       return
     }
     if (element.tagName === 'ARTICLE') {
-      const heading = directText(element, ':scope > strong')
-      const lead = directText(element, ':scope > b')
+      const heading = directText(element, 'strong')
+      const lead = directText(element, 'b')
       if (heading) push('heading', heading)
       if (lead) push('body', lead)
       for (const child of Array.from(element.children)) {
-        if (!(child instanceof HTMLElement) || child.matches(':scope > strong, :scope > b')) continue
+        if (!(child instanceof HTMLElement) || child.matches('strong, b')) continue
         walk(child)
       }
       return
@@ -224,7 +224,8 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
 
   const blobs = await Promise.all(canvases.map(canvasToBlob))
   const stem = `별빛의운명-${safeFileName(label)}-${localDateStamp()}`
-  const files = blobs.map((blob, index) => new File([blob], `${stem}-${String(index + 1).padStart(2, '0')}of${String(filesLengthPlaceholder(canvases.length)).padStart(2, '0')}.png`, { type: 'image/png' }))
+  const pageCount = String(canvases.length).padStart(2, '0')
+  const files = blobs.map((blob, index) => new File([blob], `${stem}-${String(index + 1).padStart(2, '0')}of${pageCount}.png`, { type: 'image/png' }))
 
   if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files })) {
     try {
@@ -249,8 +250,4 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
     }, index * 180)
   })
   return { pages: files.length, shared: false, cancelled: false }
-}
-
-function filesLengthPlaceholder(value: number) {
-  return value
 }
