@@ -21,40 +21,149 @@
   font: inherit;
   font-weight: 700;
   box-shadow: 0 8px 22px rgba(60, 78, 103, 0.08);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
 }
 
-.reading-export-toolbar button:disabled {
-  opacity: 0.62;
+.reading-export-toolbar button:disabled { opacity: 0.62; }
+.reading-export-toolbar small { min-width: 0; color: #737b8a; line-height: 1.45; }
+.reading-export-spinner { animation: reading-export-spin 0.9s linear infinite; }
+
+/* Editorial V3: airy transparent-jelly cards, not flat beige report boxes. */
+.period-ai-v3 {
+  --v3-ink: #34435f;
+  --v3-muted: #71809a;
+  --v3-line: rgba(134, 150, 184, .20);
+  --v3-glass: rgba(255, 255, 255, .62);
+  --v3-lilac: rgba(232, 223, 255, .54);
+  --v3-mint: rgba(220, 248, 240, .54);
+  --v3-sky: rgba(220, 238, 255, .56);
+  --v3-blush: rgba(255, 229, 239, .54);
+  --v3-lemon: rgba(255, 247, 205, .46);
 }
 
-.reading-export-toolbar small {
-  min-width: 0;
-  color: #737b8a;
-  line-height: 1.45;
+.period-ai-v3 .period-ai-head,
+.love-context-note-v3,
+.period-ai-v3 .love-context-grid-v3,
+.period-ai-v3 .interpersonal-reading-v3,
+.period-ai-v3 .contact-reading-v3 {
+  border: 1px solid var(--v3-line) !important;
+  background:
+    radial-gradient(circle at 18% 4%, rgba(255,255,255,.86), transparent 38%),
+    linear-gradient(135deg, rgba(239,246,255,.62), rgba(241,233,255,.52) 48%, rgba(228,249,242,.56)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -1px 0 rgba(126,143,181,.08),
+    0 12px 30px rgba(79, 92, 128, .08) !important;
+  backdrop-filter: blur(22px) saturate(1.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08);
 }
 
-.reading-export-spinner {
-  animation: reading-export-spin 0.9s linear infinite;
+.love-context-note-v3 {
+  margin: 14px 0 20px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  color: var(--v3-ink, #34435f);
+}
+.love-context-note-v3 strong { display:block; margin-bottom:6px; font-size:.95rem; }
+.love-context-note-v3 p { margin:0; color:#6c7890; line-height:1.65; }
+
+.period-ai-v3 .love-context-grid-v3,
+.period-ai-v3 .interpersonal-reading-v3,
+.period-ai-v3 .contact-reading-v3 {
+  margin: 20px 0 26px;
+  padding: 20px;
+  border-radius: 26px;
 }
 
-@keyframes reading-export-spin {
-  to { transform: rotate(360deg); }
+.period-ai-v3 .period-ai-section-title {
+  margin-bottom: 16px;
+  gap: 7px;
 }
+.period-ai-v3 .period-ai-section-title > span { color:#7b6ca8; font-weight:800; letter-spacing:.01em; }
+.period-ai-v3 .period-ai-section-title > strong { color:var(--v3-ink); line-height:1.45; }
+
+.love-context-general-v3 {
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border-radius: 17px;
+  background: rgba(255,255,255,.54);
+  color:#65728a;
+  line-height:1.7;
+}
+
+.love-context-cards-v3 {
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+.love-context-card-v3,
+.editorial-focus-card-v3 {
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(145, 154, 190, .16);
+  border-radius:22px;
+  background:rgba(255,255,255,.64);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 8px 18px rgba(74,86,120,.06);
+}
+.love-context-card-v3::before,
+.editorial-focus-card-v3::before {
+  content:'';
+  position:absolute;
+  inset:0 0 auto 0;
+  height:42%;
+  pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.52), rgba(255,255,255,0));
+}
+.love-context-card-v3:nth-child(6n+1) { background:linear-gradient(145deg, var(--v3-sky), rgba(255,255,255,.66)); }
+.love-context-card-v3:nth-child(6n+2) { background:linear-gradient(145deg, var(--v3-blush), rgba(255,255,255,.66)); }
+.love-context-card-v3:nth-child(6n+3) { background:linear-gradient(145deg, var(--v3-lilac), rgba(255,255,255,.66)); }
+.love-context-card-v3:nth-child(6n+4) { background:linear-gradient(145deg, var(--v3-lemon), rgba(255,255,255,.68)); }
+.love-context-card-v3:nth-child(6n+5) { background:linear-gradient(145deg, var(--v3-mint), rgba(255,255,255,.66)); }
+.love-context-card-v3:nth-child(6n+6) { background:linear-gradient(145deg, rgba(236,228,255,.58), rgba(255,235,244,.54)); }
+.love-context-card-v3 { padding:17px 18px 18px; min-height:142px; }
+.love-context-card-v3 strong { position:relative; display:block; margin-bottom:9px; color:#53617c; font-size:.96rem; }
+.love-context-card-v3 p { position:relative; margin:0; color:#4f5f77; line-height:1.68; }
+
+.editorial-focus-card-v3 { margin: 0 0 14px; padding:18px 19px; }
+.editorial-focus-card-v3 > strong { position:relative; display:block; color:#66758f; margin-bottom:8px; }
+.editorial-focus-card-v3 > b { position:relative; display:block; color:var(--v3-ink); line-height:1.62; font-size:1rem; }
+.editorial-focus-card-v3 p { position:relative; margin:11px 0 0; color:#627087; line-height:1.65; }
+.editorial-focus-card-v3 p em { color:#7a6ead; font-style:normal; font-weight:800; margin-right:5px; }
+.editorial-focus-card-v3 time { position:relative; display:inline-block; margin-top:12px; color:#6280a5; font-size:.88rem; font-weight:700; }
+.contact-activation-v3 { background:linear-gradient(145deg, var(--v3-sky), rgba(255,255,255,.68)); }
+.contact-direction-summary-v3 { background:linear-gradient(145deg, var(--v3-lilac), rgba(255,255,255,.68)); }
+.interpersonal-reading-v3 .editorial-focus-card-v3 { background:linear-gradient(145deg, var(--v3-mint), rgba(255,255,255,.68)); }
+
+.period-ai-v3 .reading-direction-panel { gap:12px; }
+.period-ai-v3 .reading-direction {
+  border-color:rgba(132,148,184,.16) !important;
+  background:rgba(255,255,255,.58) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 7px 16px rgba(72,86,118,.05) !important;
+}
+
+.period-ai-v3 .period-ai-user-windows,
+.period-ai-v3 .period-ai-user-focus,
+.period-ai-v3 .period-ai-relationship-section {
+  margin-top:24px;
+  margin-bottom:26px;
+}
+.period-ai-v3 .period-ai-topic-list,
+.period-ai-v3 .reading-event-list { gap:14px; }
+.period-ai-v3 .period-ai-topic { margin-bottom:0 !important; }
+
+@keyframes reading-export-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 640px) {
-  .reading-export-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-    margin-top: 0;
-  }
-
-  .reading-export-toolbar button {
-    width: 100%;
-  }
-
-  .reading-export-toolbar small {
-    text-align: center;
-  }
+  .reading-export-toolbar { align-items: stretch; flex-direction: column; margin-top: 0; }
+  .reading-export-toolbar button { width: 100%; }
+  .reading-export-toolbar small { text-align: center; }
+  .period-ai-v3 .love-context-grid-v3,
+  .period-ai-v3 .interpersonal-reading-v3,
+  .period-ai-v3 .contact-reading-v3 { padding:17px; border-radius:23px; }
+  .love-context-cards-v3 { grid-template-columns:1fr; gap:12px; }
+  .love-context-card-v3 { min-height:0; padding:16px 17px; }
+  .period-ai-v3 .period-ai-section-title { margin-bottom:14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
