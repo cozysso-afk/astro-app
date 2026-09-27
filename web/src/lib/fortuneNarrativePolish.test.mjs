@@ -41,9 +41,9 @@ test('semantic families dedupe paraphrased repetition, not only exact strings', 
 test('Korean QA catches semantic predicate mismatch and repeated claims', () => {
   const issues = inspectKoreanNarrative([
     '변화 욕구를 직무·보상·일정 비교로 바꾸는 것이야.',
-    '첫 반응 하나보다 실제 변화가 이어지는지를 봐.',
     '답장 뒤 실제 변화가 이어지는지를 봐.',
     '말보다 실제 행동이 이어지는지를 봐.',
+    '다음 약속이 실제 만남으로 이어지는지를 봐.',
   ])
   assert.ok(issues.some(issue => /의미 호응 오류/.test(issue)))
   assert.ok(issues.some(issue => /동일 의미 반복/.test(issue)))
