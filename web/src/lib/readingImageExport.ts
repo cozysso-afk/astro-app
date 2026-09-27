@@ -11,10 +11,12 @@ type ExportResult = {
   cancelled: boolean
 }
 
-const PAGE_WIDTH = 1080
-const PAGE_HEIGHT = 1440
-const PAGE_PADDING = 76
-const FOOTER_HEIGHT = 72
+// iPhone 17 Pro screenshots are 1206 px wide. Keep the export near a 4:5 card
+// so iOS does not shrink a very tall document until the Korean body copy becomes tiny.
+const PAGE_WIDTH = 1206
+const PAGE_HEIGHT = 1508
+const PAGE_PADDING = 84
+const FOOTER_HEIGHT = 92
 const TEXT_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2
 
 function normalizeText(value: string) {
@@ -22,13 +24,18 @@ function normalizeText(value: string) {
 }
 
 function ignored(element: HTMLElement) {
-  return Boolean(element.closest('[data-reading-export-ignore="true"], .relationship-technical, .ai-generated-cost, .ai-preflight-cost'))
+  return Boolean(element.closest('[data-reading-export-ignore="true"], .relationship-technical, .ai-generated-cost, .ai-preflight-cost, .reading-image-export-controls'))
 }
 
 function hidden(element: HTMLElement) {
   if (element.hidden || element.getAttribute('aria-hidden') === 'true') return true
   const style = window.getComputedStyle(element)
   return style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0
+}
+
+function directText(element: HTMLElement, selector: string) {
+  const node = Array.from(element.children).find(child => child.matches(selector))
+  return node instanceof HTMLElement ? node.innerText : ''
 }
 
 export function collectReadingExportBlocks(root: HTMLElement): ExportBlock[] {
@@ -43,6 +50,26 @@ export function collectReadingExportBlocks(root: HTMLElement): ExportBlock[] {
     if (element.tagName === 'DETAILS' && !(element as HTMLDetailsElement).open) return
     if (element.matches('.reunion-date-focus-list article')) {
       push('meta', element.innerText)
+      return
+    }
+    if (element.matches('.flow-tile')) {
+      const topic = element.querySelector('.flow-tile-heading strong')?.textContent ?? ''
+      const score = element.querySelector('.flow-score')?.textContent ?? ''
+      const band = element.querySelector('.flow-band')?.textContent ?? ''
+      const body = element.querySelector('p')?.textContent ?? ''
+      push('heading', [topic, score && `${score}점`, band].filter(Boolean).join(' · '))
+      push('body', body)
+      return
+    }
+    if (element.tagName === 'ARTICLE') {
+      const heading = directText(element, ':scope > strong')
+      const lead = directText(element, ':scope > b')
+      if (heading) push('heading', heading)
+      if (lead) push('body', lead)
+      for (const child of Array.from(element.children)) {
+        if (!(child instanceof HTMLElement) || child.matches(':scope > strong, :scope > b')) continue
+        walk(child)
+      }
       return
     }
     if (/^H[1-4]$/.test(element.tagName)) {
@@ -96,7 +123,7 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 }
 
 function safeFileName(value: string) {
-  return normalizeText(value).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').slice(0, 48) || '결과'
+  return normalizeText(value).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').slice(0, 56) || '결과'
 }
 
 function localDateStamp() {
@@ -124,34 +151,38 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
     ctx.fillStyle = '#f8fbfc'
     ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
     const wash = ctx.createLinearGradient(0, 0, PAGE_WIDTH, 0)
-    wash.addColorStop(0, '#eef8f7')
+    wash.addColorStop(0, '#eaf8f5')
     wash.addColorStop(0.52, '#f8fbfc')
-    wash.addColorStop(1, '#f6effb')
+    wash.addColorStop(1, '#f4ecfb')
     ctx.fillStyle = wash
-    ctx.fillRect(0, 0, PAGE_WIDTH, 190)
+    ctx.fillRect(0, 0, PAGE_WIDTH, 232)
     ctx.fillStyle = '#59677e'
-    ctx.font = '600 26px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
-    ctx.fillText('별빛의 운명', PAGE_PADDING, 72)
+    ctx.font = '700 31px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    ctx.fillText('별빛의 운명', PAGE_PADDING, 68)
+    ctx.fillStyle = '#7b5b93'
+    ctx.font = '600 35px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    const labelLine = wrapText(ctx, label, TEXT_WIDTH)[0]
+    if (labelLine) ctx.fillText(labelLine, PAGE_PADDING, 120)
     canvases.push(canvas)
-    y = 124
+    y = 176
   }
 
   const styleFor = (kind: ExportBlockKind) => {
-    if (kind === 'title') return { size: 50, weight: 700, line: 70, before: 24, after: 28, color: '#26344a', indent: 0 }
-    if (kind === 'heading') return { size: 39, weight: 700, line: 58, before: 28, after: 14, color: '#32415b', indent: 0 }
-    if (kind === 'list') return { size: 31, weight: 400, line: 50, before: 8, after: 18, color: '#344154', indent: 24 }
-    if (kind === 'meta') return { size: 27, weight: 500, line: 44, before: 8, after: 16, color: '#6a7282', indent: 0 }
-    return { size: 32, weight: 400, line: 52, before: 8, after: 22, color: '#344154', indent: 0 }
+    if (kind === 'title') return { size: 66, weight: 750, line: 88, before: 26, after: 30, color: '#26344a', indent: 0 }
+    if (kind === 'heading') return { size: 50, weight: 750, line: 68, before: 32, after: 16, color: '#32415b', indent: 18 }
+    if (kind === 'list') return { size: 46, weight: 430, line: 68, before: 10, after: 20, color: '#344154', indent: 30 }
+    if (kind === 'meta') return { size: 38, weight: 600, line: 58, before: 10, after: 18, color: '#667085', indent: 0 }
+    return { size: 48, weight: 430, line: 70, before: 10, after: 26, color: '#344154', indent: 0 }
   }
 
   newPage()
-  ctx.font = '700 54px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+  ctx.font = '750 72px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
   ctx.fillStyle = '#26344a'
   for (const line of wrapText(ctx, label, TEXT_WIDTH)) {
     ctx.fillText(line, PAGE_PADDING, y)
-    y += 72
+    y += 94
   }
-  y += 18
+  y += 14
 
   for (const block of blocks) {
     const style = styleFor(block.kind)
@@ -161,6 +192,19 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
     if (!lines.length) continue
     if ((block.kind === 'title' || block.kind === 'heading') && y + style.before + style.line * Math.min(2, lines.length) > PAGE_HEIGHT - FOOTER_HEIGHT) newPage()
     y += style.before
+
+    const dateLike = block.kind === 'meta' && /\b20\d{2}-\d{2}-\d{2}\b/.test(block.text)
+    if (dateLike) {
+      const boxHeight = style.line * lines.length + 22
+      if (y + boxHeight > PAGE_HEIGHT - FOOTER_HEIGHT) newPage()
+      ctx.fillStyle = '#fff6bf'
+      ctx.fillRect(PAGE_PADDING - 14, y - 42, TEXT_WIDTH + 28, boxHeight)
+    }
+    if (block.kind === 'heading') {
+      ctx.fillStyle = '#9bded6'
+      ctx.fillRect(PAGE_PADDING, y - 44, 8, Math.max(48, style.line * Math.min(2, lines.length)))
+    }
+
     for (const line of lines) {
       if (y + style.line > PAGE_HEIGHT - FOOTER_HEIGHT) newPage()
       ctx.font = `${style.weight} ${style.size}px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`
@@ -174,13 +218,13 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
   canvases.forEach((page, index) => {
     const pageCtx = page.getContext('2d')!
     pageCtx.fillStyle = '#8a91a0'
-    pageCtx.font = '500 23px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
-    pageCtx.fillText(`별빛의 운명 · ${index + 1}/${canvases.length}`, PAGE_PADDING, PAGE_HEIGHT - 34)
+    pageCtx.font = '600 29px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    pageCtx.fillText(`별빛의 운명 · ${index + 1}/${canvases.length}`, PAGE_PADDING, PAGE_HEIGHT - 38)
   })
 
   const blobs = await Promise.all(canvases.map(canvasToBlob))
   const stem = `별빛의운명-${safeFileName(label)}-${localDateStamp()}`
-  const files = blobs.map((blob, index) => new File([blob], `${stem}-${String(index + 1).padStart(2, '0')}.png`, { type: 'image/png' }))
+  const files = blobs.map((blob, index) => new File([blob], `${stem}-${String(index + 1).padStart(2, '0')}of${String(filesLengthPlaceholder(canvases.length)).padStart(2, '0')}.png`, { type: 'image/png' }))
 
   if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files })) {
     try {
@@ -205,4 +249,8 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
     }, index * 180)
   })
   return { pages: files.length, shared: false, cancelled: false }
+}
+
+function filesLengthPlaceholder(value: number) {
+  return value
 }
