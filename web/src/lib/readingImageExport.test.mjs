@@ -6,17 +6,30 @@ const exporter = readFileSync(new URL('./readingImageExport.ts', import.meta.url
 const panel = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../reading-image-export.css', import.meta.url), 'utf8')
 
-test('reading export renders iPhone-friendly 4:5 multi-page PNGs instead of one giant screenshot', () => {
+test('period fortune export uses a structured iPhone-friendly card renderer instead of raw DOM pagination', () => {
   assert.match(exporter, /PAGE_WIDTH = 1206/)
   assert.match(exporter, /PAGE_HEIGHT = 1508/)
-  assert.match(exporter, /size: 46/)
-  assert.match(exporter, /size: 68/)
-  assert.match(exporter, /toneFill/)
+  assert.match(exporter, /collectPeriodExportModel/)
+  assert.match(exporter, /renderPeriodPages/)
+  assert.match(exporter, /오늘 핵심/)
+  assert.match(exporter, /한눈에 보는 흐름/)
+  assert.match(exporter, /분야별 핵심/)
+  assert.match(exporter, /기억할 시기/)
+  assert.match(exporter, /data\.readingExportRoot === 'period-fortune'|dataset\.readingExportRoot === 'period-fortune'/)
+  assert.match(exporter, /점수는 상대적 강도이며 사건 확률이 아님/)
   assert.match(exporter, /canvas\.toBlob/)
   assert.match(exporter, /new File\(/)
   assert.match(exporter, /navigator\.share/)
   assert.match(exporter, /navigator\.canShare/)
-  assert.match(exporter, /anchor\.download = file\.name/)
+  assert.match(exporter, /anchor\.download=file\.name|anchor\.download = file\.name/)
+})
+
+test('period export groups heading and content inside cards rather than drawing empty highlight bars', () => {
+  assert.match(exporter, /drawCard/)
+  assert.match(exporter, /drawFlow/)
+  assert.match(exporter, /drawTopic/)
+  assert.match(exporter, /drawDate/)
+  assert.doesNotMatch(exporter, /drawHighlight\(/)
 })
 
 test('relationship result exposes image save and excludes its toolbar from exported content', () => {

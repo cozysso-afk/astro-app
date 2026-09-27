@@ -1,4 +1,4 @@
-import type { FortuneUserSummary, FortuneUserTopic } from './fortuneUserSummary'
+import type { FortuneFlowCard, FortuneUserSummary, FortuneUserTopic } from './fortuneUserSummary'
 
 const ABSTRACT_WORDS = ['흐름','신호','구조','자극','배경','접점','활성도','맥락']
 
@@ -6,22 +6,38 @@ function collapseSpaces(value: string) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+function ensureSentence(value: string) {
+  const text = collapseSpaces(value)
+  if (!text) return ''
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
+function firstSentences(value: string, limit = 2) {
+  const text = collapseSpaces(value)
+  if (!text) return ''
+  const parts = text.match(/[^.!?]+[.!?]?/g)?.map(part => part.trim()).filter(Boolean) ?? [text]
+  return parts.slice(0, limit).map(ensureSentence).join(' ')
+}
+
 export function polishKoreanSentence(value: string) {
   let text = collapseSpaces(value)
   if (!text) return ''
 
   text = text
-    .replace(/오늘 전체 흐름에서 가장 먼저 볼 건 ([^.!?]+)이야\.?/g, '오늘은 $1부터 봐.')
+    .replace(/오늘 전체 흐름에서 가장 먼저 볼 건 ([^.!?]+)이야\.?/g, '오늘은 $1부터 확인해.')
     .replace(/말로만 오가던 요청을 담당자·마감·완료 기준까지 구체화하기 좋은 날이야\.?/g, '말로만 오가던 요청은 담당자를 정하고, 마감일과 완료 기준까지 분명하게 정리하는 게 좋아.')
     .replace(/변화 욕구를 직무·보상·일정 비교로 바꾸는 것/g, '이직을 생각한다면 직무·보상·시작 일정을 실제 조건으로 비교하는 것')
     .replace(/전해 들은 말보다 확정된 답과 다음 절차를 확인하는 것/g, '전해 들은 말보다 확정된 답과 다음 절차를 직접 확인하는 것')
     .replace(/이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐\.?/g, '')
     .replace(/오늘은 이 흐름의 영향이 이어지는 구간이야\.?/g, '')
-    .replace(/오늘은 이 주제가 가장 또렷하게 드러나는 구간이야\.?/g, '오늘 특히 눈여겨볼 장면이야.')
+    .replace(/오늘은 이 주제가 가장 또렷하게 드러나는 구간이야\.?/g, '')
     .replace(/점수 순위보다 위 한줄과 아래 실제 상황 설명을 먼저 봐\.?/g, '')
     .replace(/아래에서 왜 그런지와 현실에서 뭘 확인할지 이어서 봐\.?/g, '')
     .replace(/아래에서 어떤 장면을 특히 확인해야 하는지 이어서 봐\.?/g, '')
     .replace(/아래 실제 장면을 기준으로 읽어봐\.?/g, '')
+    .replace(/오늘은 ([^.!?]+)에서 움직일 장면과 ([^.!?]+)에서 한 번 더 확인할 장면이 갈려\.?/g, '')
+    .replace(/오늘은 ([^.!?]+) 쪽 장면이 가장 또렷해\.?/g, '')
+    .replace(/오늘은 ([^.!?]+) 쪽에서 무리하지 않는 게 핵심이야\.?/g, '')
     .replace(/\s+([,.!?])/g, '$1')
     .replace(/\.\s*\./g, '.')
     .replace(/\s{2,}/g, ' ')
@@ -41,6 +57,8 @@ export function narrativeClaimFamily(value: string) {
   if (/원문|확정된 답|다음 절차|공식 안내/.test(text)) return 'verified-info'
   if (/예산|지출|결제|정산/.test(text)) return 'money-plan'
   if (/집중|과제|진도|복습/.test(text)) return 'study-focus'
+  if (/휴식|쉬|피로|체력|컨디션/.test(text)) return 'condition-pace'
+  if (/호감|만남|연애|관계의 의미/.test(text)) return 'love-relation'
   return ''
 }
 
@@ -68,7 +86,7 @@ export function distinctNarrativeParts(parts: Array<string | undefined>, max = p
     if (!text) continue
     const family = narrativeClaimFamily(text)
     if (family && families.has(family)) continue
-    if (kept.some(previous => previous === text || narrativeSimilarity(previous, text) >= 0.72)) continue
+    if (kept.some(previous => previous === text || narrativeSimilarity(previous, text) >= 0.68)) continue
     kept.push(text)
     if (family) families.add(family)
     if (kept.length >= max) break
@@ -78,31 +96,64 @@ export function distinctNarrativeParts(parts: Array<string | undefined>, max = p
 
 function polishTopic(topic: FortuneUserTopic): FortuneUserTopic {
   const [conclusion, action, observe, caution] = distinctNarrativeParts([
-    topic.conclusion,
-    topic.action,
-    topic.observe,
-    topic.caution,
+    firstSentences(topic.conclusion, 2),
+    firstSentences(topic.action, 1),
+    firstSentences(topic.observe ?? '', 1),
+    firstSentences(topic.caution ?? '', 1),
   ], 4)
   return {
     ...topic,
-    conclusion: conclusion || polishKoreanSentence(topic.conclusion),
-    action: action || polishKoreanSentence(topic.action),
+    conclusion: conclusion || firstSentences(polishKoreanSentence(topic.conclusion), 2),
+    action: action || firstSentences(polishKoreanSentence(topic.action), 1),
     observe,
     caution,
-    reason: polishKoreanSentence(topic.reason),
-    timing: topic.timing ? polishKoreanSentence(topic.timing) : undefined,
+    reason: firstSentences(polishKoreanSentence(topic.reason), 2),
+    timing: topic.timing ? firstSentences(polishKoreanSentence(topic.timing), 2) : undefined,
   }
 }
 
+function concreteCardText(card: FortuneFlowCard | undefined) {
+  return card ? firstSentences(polishKoreanSentence(card.meaning), 1) : ''
+}
+
+function dailyHero(summary: FortuneUserSummary) {
+  const best = concreteCardText(summary.favorableCards[0])
+  const caution = concreteCardText(summary.cautionCards[0])
+  const parts = distinctNarrativeParts([best, caution], 2)
+  if (parts.length) return parts.map(ensureSentence).join(' ')
+  return firstSentences(polishKoreanSentence(summary.headline), 2)
+}
+
+function dedupeTopicDetails(topics: FortuneUserTopic[]): FortuneUserTopic[] {
+  const seen: string[] = []
+  return topics.map(raw => {
+    const topic = polishTopic(raw)
+    const keep = (value?: string, required = false) => {
+      const text = polishKoreanSentence(value ?? '')
+      if (!text) return undefined
+      if (!required && seen.some(previous => narrativeSimilarity(previous, text) >= 0.68 || (narrativeClaimFamily(previous) && narrativeClaimFamily(previous) === narrativeClaimFamily(text)))) return undefined
+      seen.push(text)
+      return text
+    }
+    return {
+      ...topic,
+      conclusion: keep(topic.conclusion, true) ?? topic.conclusion,
+      action: keep(topic.action) ?? '',
+      observe: keep(topic.observe),
+      caution: keep(topic.caution),
+    }
+  })
+}
+
 export function polishFortuneSummary(summary: FortuneUserSummary): FortuneUserSummary {
-  const headline = polishKoreanSentence(summary.headline)
-  const summaryText = polishKoreanSentence(summary.summary)
+  const headline = summary.periodKind === 'day' ? dailyHero(summary) : firstSentences(polishKoreanSentence(summary.headline), 2)
+  const summaryText = summary.periodKind === 'day' ? '' : firstSentences(polishKoreanSentence(summary.summary), 2)
   const headlineFamily = narrativeClaimFamily(headline)
   const summaryFamily = narrativeClaimFamily(summaryText)
   const summaryDuplicate = Boolean(
     summaryText && (
       summaryText === headline ||
-      narrativeSimilarity(headline, summaryText) >= 0.72 ||
+      narrativeSimilarity(headline, summaryText) >= 0.68 ||
       (headlineFamily && headlineFamily === summaryFamily)
     )
   )
@@ -113,19 +164,19 @@ export function polishFortuneSummary(summary: FortuneUserSummary): FortuneUserSu
     summary: summaryDuplicate ? '' : summaryText,
     doItems: distinctNarrativeParts(summary.doItems),
     cautionItems: distinctNarrativeParts(summary.cautionItems),
-    focusTopics: summary.focusTopics.map(polishTopic),
+    focusTopics: dedupeTopicDetails(summary.focusTopics),
     referenceTopics: summary.referenceTopics.map(item => ({
       ...item,
-      summary: polishKoreanSentence(item.summary),
+      summary: firstSentences(polishKoreanSentence(item.summary), 1),
       detail: item.detail ? polishTopic(item.detail) : item.detail,
     })),
-    importantWindows: summary.importantWindows.map(item => ({ ...item, guidance: polishKoreanSentence(item.guidance) })),
+    importantWindows: summary.importantWindows.map(item => ({ ...item, guidance: firstSentences(polishKoreanSentence(item.guidance), 1) })),
     relationship: summary.relationship ? {
       ...summary.relationship,
-      summary: polishKoreanSentence(summary.relationship.summary),
-      incoming: summary.relationship.incoming ? polishKoreanSentence(summary.relationship.incoming) : undefined,
-      outgoing: summary.relationship.outgoing ? polishKoreanSentence(summary.relationship.outgoing) : undefined,
-      reconnection: summary.relationship.reconnection ? polishKoreanSentence(summary.relationship.reconnection) : undefined,
+      summary: firstSentences(polishKoreanSentence(summary.relationship.summary), 2),
+      incoming: summary.relationship.incoming ? firstSentences(polishKoreanSentence(summary.relationship.incoming), 2) : undefined,
+      outgoing: summary.relationship.outgoing ? firstSentences(polishKoreanSentence(summary.relationship.outgoing), 2) : undefined,
+      reconnection: summary.relationship.reconnection ? firstSentences(polishKoreanSentence(summary.relationship.reconnection), 2) : undefined,
     } : undefined,
   }
 }
@@ -138,6 +189,7 @@ export function inspectKoreanNarrative(values: string[]) {
       if (/변화 욕구를 .*비교로 바꾸/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
       if (/시기가 .*이어/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
       if (/근거를 (?:낮|높)게 읽/.test(sentence)) issues.push(`의미 호응 오류: ${sentence}`)
+      if (/움직일 장면/.test(sentence)) issues.push(`추상 표현: ${sentence}`)
     }
   }
 
@@ -146,16 +198,16 @@ export function inspectKoreanNarrative(values: string[]) {
   for (const text of texts) {
     const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
     for (const sentence of sentences) {
-      if (sentence.length > 105) issues.push(`긴 문장: ${sentence.slice(0, 48)}…`)
+      if (sentence.length > 95) issues.push(`긴 문장: ${sentence.slice(0, 48)}…`)
       const abstractCount = ABSTRACT_WORDS.filter(word => sentence.includes(word)).length
-      if (abstractCount >= 4) issues.push(`추상명사 과다: ${sentence.slice(0, 48)}…`)
+      if (abstractCount >= 3) issues.push(`추상명사 과다: ${sentence.slice(0, 48)}…`)
     }
     const family = narrativeClaimFamily(text)
     if (family) familyCount.set(family, (familyCount.get(family) ?? 0) + 1)
   }
   for (const [family, count] of familyCount) if (count >= 3) issues.push(`동일 의미 반복: ${family} ${count}회`)
   for (let i = 0; i < texts.length; i++) for (let j = i + 1; j < texts.length; j++) {
-    if (narrativeSimilarity(texts[i], texts[j]) >= 0.8) issues.push(`유사 문장 반복: ${texts[i].slice(0, 36)}… / ${texts[j].slice(0, 36)}…`)
+    if (narrativeSimilarity(texts[i], texts[j]) >= 0.76) issues.push(`유사 문장 반복: ${texts[i].slice(0, 36)}… / ${texts[j].slice(0, 36)}…`)
   }
   return [...new Set(issues)]
 }
