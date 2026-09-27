@@ -29,6 +29,7 @@ def test_policy_variants_target_meeting_trigger_and_medium_return_bottlenecks():
         "meeting_trigger_mars_or_venus",
         "medium_gate_add_solar_return",
         "medium_gate_add_venus_return",
+        "targeted_candidate_v1",
     }
     assert specs["meeting_trigger_mars_or_venus"]["meeting_primary_planets"] == ("Mars", "Venus")
     assert specs["medium_gate_add_solar_return"]["mid_gate_return_keys"] == (
@@ -36,6 +37,10 @@ def test_policy_variants_target_meeting_trigger_and_medium_return_bottlenecks():
     )
     assert specs["medium_gate_add_venus_return"]["mid_gate_return_keys"] == (
         "lunar_return", "venus_return",
+    )
+    assert specs["targeted_candidate_v1"]["meeting_primary_planets"] == ("Mars", "Venus")
+    assert specs["targeted_candidate_v1"]["mid_gate_return_keys"] == (
+        "lunar_return", "solar_return",
     )
 
 
@@ -52,6 +57,13 @@ def test_policy_variant_mutation_is_reversible():
     apply_policy_variant(engine, specs["medium_gate_add_solar_return"])
     assert engine.MID_GATE_RETURN_KEYS == {"lunar_return", "solar_return"}
     _reset_policy(engine, {"Mars"}, {"lunar_return"})
+    assert engine.MID_GATE_RETURN_KEYS == {"lunar_return"}
+
+    apply_policy_variant(engine, specs["targeted_candidate_v1"])
+    assert engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"] == {"Mars", "Venus"}
+    assert engine.MID_GATE_RETURN_KEYS == {"lunar_return", "solar_return"}
+    _reset_policy(engine, {"Mars"}, {"lunar_return"})
+    assert engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"] == {"Mars"}
     assert engine.MID_GATE_RETURN_KEYS == {"lunar_return"}
 
 
@@ -95,6 +107,35 @@ def test_solar_return_medium_evidence_is_excluded_now_but_admitted_by_counterfac
         assert hierarchy_engine._mid_gate_evidence(rows) == []
         apply_policy_variant(hierarchy_engine, specs["medium_gate_add_solar_return"])
         assert hierarchy_engine._mid_gate_evidence(rows) == rows
+    finally:
+        _reset_policy(hierarchy_engine, base_meeting, base_mid)
+
+
+def test_combined_targeted_candidate_changes_both_policy_seams_without_threshold_changes():
+    base_meeting = set(hierarchy_engine.STAGE_TRIGGER_POLICY["in_person_meeting"]["primary_planets"])
+    base_mid = set(hierarchy_engine.MID_GATE_RETURN_KEYS)
+    base_thresholds = dict(hierarchy_engine.THRESHOLDS)
+    specs = dict(policy_variant_specs())
+    venus_meeting = [{
+        "event_id": "synthetic:venus:meeting:combined",
+        "a": "Venus",
+        "b": "DSC",
+        "family": "natal_trigger",
+        "aspect": "conjunction",
+        "strength": 80.0,
+        "orb": 0.2,
+    }]
+    solar_rows = [{
+        "event_id": "synthetic:solar:return:combined",
+        "return_type": "solar_return",
+        "mid_gate": True,
+        "strength": 60.0,
+    }]
+    try:
+        apply_policy_variant(hierarchy_engine, specs["targeted_candidate_v1"])
+        assert hierarchy_engine._stage_policy_evaluation("in_person_meeting", venus_meeting)["primary"] is not None
+        assert hierarchy_engine._mid_gate_evidence(solar_rows) == solar_rows
+        assert hierarchy_engine.THRESHOLDS == base_thresholds
     finally:
         _reset_policy(hierarchy_engine, base_meeting, base_mid)
 
