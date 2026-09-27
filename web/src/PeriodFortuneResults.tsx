@@ -3,11 +3,14 @@ import { DatingArchetypePanel } from './DatingArchetypePanel'
 import { fortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Download } from 'lucide-react'
+import { useRef, useState } from 'react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { BasicFortuneReading } from './BasicFortuneReading'
+import { exportReadingImages } from './lib/readingImageExport'
+import './reading-image-export.css'
 
 type TopicRow = { topic: string; stat: FortuneStat }
 type HighlightPoint = FortunePoint & { topic: string }
@@ -78,6 +81,24 @@ export function PeriodFortuneResults({
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
   const field = fortuneField(fieldId)
+  const exportRef = useRef<HTMLDivElement | null>(null)
+  const [imageExporting, setImageExporting] = useState(false)
+  const [imageExportStatus, setImageExportStatus] = useState('')
+  const periodTitle = period === 'today' ? '오늘 운세' : period === 'week' ? '주간 운세' : period === 'month' ? '월간 운세' : '연간 운세'
+  const imageExportLabel = `${field?.label ? `${field.label} · ` : ''}${periodTitle} · ${result.period.start}${result.period.start !== result.period.end ? `~${result.period.end}` : ''}`
+  const saveReadingImages = async () => {
+    if (!exportRef.current || imageExporting) return
+    setImageExporting(true)
+    setImageExportStatus('')
+    try {
+      const exported = await exportReadingImages(exportRef.current, imageExportLabel)
+      if (!exported.cancelled) setImageExportStatus(exported.shared ? `${exported.pages}장 공유 화면을 열었어.` : `${exported.pages}장 PNG로 저장했어.`)
+    } catch (error) {
+      setImageExportStatus(error instanceof Error ? error.message : '이미지 저장 중 문제가 생겼어.')
+    } finally {
+      setImageExporting(false)
+    }
+  }
   const technicalDetails = <>
     <section className="result-card">
       <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>
@@ -110,9 +131,10 @@ export function PeriodFortuneResults({
 
   </>
   const hasNaturalReading = Boolean(aiInterpretation?.ok && aiInterpretation.data)
-  return <div className={`fortune-experience period-${period}`}>
+  return <div ref={exportRef} className={`fortune-experience period-${period}`}>
     <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
-    {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="미혼 연애 상태"><button type="button" aria-pressed={loveStatus==='single'} onClick={()=>onLoveStatusChange?.('single')}>싱글 · 새 인연·썸·과거 인연</button><button type="button" aria-pressed={loveStatus==='couple'} onClick={()=>onLoveStatusChange?.('couple')}>커플 · 현재 관계</button></div>}
+    <div className="reading-export-toolbar reading-image-export-controls" data-reading-export-ignore="true"><button type="button" onClick={saveReadingImages} disabled={imageExporting}><Download size={17}/>{imageExporting ? 'PNG 만드는 중…' : 'PNG 저장'}</button>{imageExportStatus&&<small>{imageExportStatus}</small>}</div>
+    {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="애정 관계 상태"><button type="button" aria-pressed={loveStatus==='single'} onClick={()=>onLoveStatusChange?.('single')}>솔로 · 새 인연</button><button type="button" aria-pressed={loveStatus==='flirting'} onClick={()=>onLoveStatusChange?.('flirting')}>썸 · 알아가는 중</button><button type="button" aria-pressed={loveStatus==='intimate_uncommitted'} onClick={()=>onLoveStatusChange?.('intimate_uncommitted')}>친밀하지만 관계 미정</button><button type="button" aria-pressed={loveStatus==='couple'} onClick={()=>onLoveStatusChange?.('couple')}>커플 · 현재 관계</button></div>}
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 점수만으로 누가 어떤 소식을 보낼지는 알 수 없어. 기다리는 연락이 없다면 답장을 기다리라는 뜻으로 받아들이지 않아도 돼. 수신·발신은 관계 방향성의 참고값이며, 공식 발표 여부는 알려주지 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>
