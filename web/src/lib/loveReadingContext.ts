@@ -127,7 +127,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
     : status === 'flirting'
       ? '썸의 분위기와 관계 진전은 같은 뜻이 아니야. 상호 질문, 다음 약속, 관계 기대를 따로 확인해.'
       : status === 'intimate_uncommitted'
-        ? '친밀감과 관계 약속을 분리해서 봐. 만남 전후의 일관성과 서로 원하는 관계가 맞는지가 핵심이야.'
+        ? '신체적 친밀감과 관계 약속을 분리해서 봐. 만남 전후의 일관성과 서로 원하는 관계가 맞는지가 핵심이야.'
         : '현재 연인과의 관계는 연락 횟수보다 함께 보내는 시간, 애정 표현, 갈등 뒤 회복과 생활 리듬을 중심으로 봐.'
 
   const allowedTopics = ['연애', '연락', ...(single ? ['재회'] : [])]
