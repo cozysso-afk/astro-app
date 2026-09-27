@@ -1,13 +1,16 @@
+import { useRef, useState } from 'react'
 import { LOVE_STATUS_OPTIONS, type LoveStatus } from './lib/loveReadingContext'
 import { DatingArchetypePanel } from './DatingArchetypePanel'
 import { fortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ImageDown, LoaderCircle } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { BasicFortuneReading } from './BasicFortuneReading'
+import { exportReadingImages } from './lib/readingImageExport'
+import './reading-image-export.css'
 
 type TopicRow = { topic: string; stat: FortuneStat }
 type HighlightPoint = FortunePoint & { topic: string }
@@ -46,6 +49,12 @@ type PeriodFortuneResultsProps = {
   onSaveOutcome: () => void
 }
 
+function periodExportTitle(period: PeriodKey, label: string | undefined, result: IntegratedApiResponse, fieldLabel?: string) {
+  const base = label || (period === 'today' ? '오늘' : period === 'week' ? '주간' : period === 'month' ? '월간' : '연간')
+  const range = result.period.start === result.period.end ? result.period.start : `${result.period.start}~${result.period.end}`
+  return `${fieldLabel ? `${fieldLabel} · ` : ''}${base} 운세 · ${range}`
+}
+
 export function PeriodFortuneResults({
   initialSystem='integrated',
   loveStatus = 'single', onLoveStatusChange,
@@ -78,6 +87,25 @@ export function PeriodFortuneResults({
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
   const field = fortuneField(fieldId)
+  const exportRootRef = useRef<HTMLDivElement | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportNotice, setExportNotice] = useState('')
+  const exportTitle = periodExportTitle(period, periodLabel, result, field?.label)
+
+  const saveImages = async () => {
+    if (!exportRootRef.current || exporting) return
+    setExporting(true)
+    setExportNotice('')
+    try {
+      const saved = await exportReadingImages(exportRootRef.current, exportTitle)
+      if (!saved.cancelled) setExportNotice(saved.shared ? `${saved.pages}장 공유 준비 완료` : `${saved.pages}장 PNG 저장 완료`)
+    } catch (error) {
+      setExportNotice(error instanceof Error ? error.message : '이미지 저장에 실패했어.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const technicalDetails = <>
     <section className="result-card">
       <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>
@@ -107,11 +135,15 @@ export function PeriodFortuneResults({
         <span>Thai(태국점성술) <b>{result.thai.thai_day}</b> · {result.thai.ruler}</span>
       </div>
     </section>
-
   </>
+
   const hasNaturalReading = Boolean(aiInterpretation?.ok && aiInterpretation.data)
-  return <div className={`fortune-experience period-${period}`}>
-    <div className="result-headline"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
+  return <div ref={exportRootRef} data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
+    <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
+    <div className="reading-export-toolbar" data-reading-export-ignore="true">
+      <button type="button" onClick={saveImages} disabled={exporting}>{exporting ? <LoaderCircle className="reading-export-spinner" size={17}/> : <ImageDown size={17}/>} {exporting ? '이미지 만드는 중' : '결과 이미지 저장'}</button>
+      {exportNotice && <small>{exportNotice}</small>}
+    </div>
     {field?.id==='love'&&<div className="system-context-chips love-context-selector" role="group" aria-label="연애 상태">{LOVE_STATUS_OPTIONS.map(option=><button key={option.value} type="button" aria-pressed={loveStatus===option.value} onClick={()=>onLoveStatusChange?.(option.value)}>{option.label}</button>)}</div>}
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 점수만으로 누가 어떤 소식을 보낼지는 알 수 없어. 기다리는 연락이 없다면 답장을 기다리라는 뜻으로 받아들이지 않아도 돼. 수신·발신은 관계 방향성의 참고값이며, 공식 발표 여부는 알려주지 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
