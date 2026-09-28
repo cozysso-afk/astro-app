@@ -1,0 +1,105 @@
+name: Interpretation V3 Live QA
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/interpretation-v3-live-qa.yml'
+      - 'web/src/lib/readingImageExport.ts'
+      - 'supabase/functions/fortune-interpret-v23-preview/**'
+
+permissions:
+  contents: read
+
+jobs:
+  live-qa:
+    if: github.head_ref == 'feat/interpretation-engine-v3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Call fixed live Gemini V3 QA probe
+        shell: bash
+        run: |
+          mkdir -p qa-artifacts web/public
+          ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRieW5mYWJ3ZmNha3hheXlnZ3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4NzMxNjksImV4cCI6MjEwMzQ0OTE2OX0.0svmSBhgNYO_XMPPYmQOqQMdda5FwlhqSBTshsRusQE'
+          curl --fail-with-body --silent --show-error -X POST \
+            'https://dbynfabwfcakxayyggzi.supabase.co/functions/v1/fortune-v3-editorial-qa-probe' \
+            -H "Authorization: Bearer ${ANON}" \
+            -H "apikey: ${ANON}" \
+            -H 'Content-Type: application/json' \
+            -d '{}' | tee qa-artifacts/live-gemini.json
+          cp qa-artifacts/live-gemini.json web/public/v3-live-gemini.json
+          node -e "const x=require('./qa-artifacts/live-gemini.json'); if(!x.ok||!x.data) process.exit(1); console.log(JSON.stringify(x.data,null,2))" | tee qa-artifacts/live-gemini-readable.txt
+      - name: Install web and browser QA dependencies
+        working-directory: web
+        run: |
+          npm ci
+          npm install --no-save playwright@1.55.0
+      - name: Build temporary browser fixture using actual V3 renderer
+        working-directory: web
+        shell: bash
+        run: |
+          cat > v3-qa.html <<'HTML'
+          <!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>V3 QA</title></head><body>
+          <main id="root" data-reading-export-root="period-fortune">
+            <div class="reading-period-date">2026-09-28</div>
+            <section class="period-ai-head"><h3 id="overall"></h3><p class="reading-hero-subtitle" id="headline"></p></section>
+            <section class="flow-section"><h4>한눈에 보는 흐름</h4>
+              <article class="flow-tile" data-reading-export-tone="favorable"><div class="flow-tile-heading"><strong>컨디션</strong></div><span class="flow-band">다소 강함</span><span class="flow-score">56</span><p>오전 집중력은 받쳐주지만 무리하면 저녁 피로가 커질 수 있어.</p></article>
+              <article class="flow-tile" data-reading-export-tone="caution"><div class="flow-tile-heading"><strong>금전</strong></div><span class="flow-band">약함</span><span class="flow-score">35</span><p>충동구매와 예상 밖 지출은 금액을 한 번 더 확인해.</p></article>
+            </section>
+            <section class="interpersonal-reading-v3"><article class="editorial-focus-card-v3" data-reading-export-tone="system"><b>대인관계</b><p id="interpersonal"></p></article></section>
+            <section id="love"></section>
+            <section class="contact-activation-v3" data-reading-export-tone="date"><strong>연락 전체 활성도</strong><b>보통 하단</b><p id="contactOverall"></p></section>
+            <section class="contact-direction-summary-v3" data-reading-export-tone="love"><strong>선연락 방향</strong><b id="contactSummary"></b></section>
+            <section class="contact-reading-v3">
+              <article class="reading-direction" data-reading-export-tone="love"><span class="reading-state">상대 → 나</span><span class="reading-badge">수신 방향</span><p id="incoming"></p></article>
+              <article class="reading-direction" data-reading-export-tone="love"><span class="reading-state">나 → 상대</span><span class="reading-badge">발신 방향</span><p id="outgoing"></p></article>
+            </section>
+          </main>
+          <button id="save">EXPORT</button>
+          <script type="module">
+            import { exportReadingImages } from './src/lib/readingImageExport.ts'
+            const raw=await fetch('/v3-live-gemini.json').then(r=>r.json()); const d=raw.data;
+            document.querySelector('#overall').textContent=d.overall_summary;
+            document.querySelector('#headline').textContent=d.headline;
+            document.querySelector('#interpersonal').textContent=d.interpersonal;
+            const labels=[['솔로 · 새 인연','love_single'],['짝사랑 · 마음 가는 사람','love_crush'],['썸 · 알아가는 중','love_flirting'],['관계가 애매한 사이','love_ambiguous'],['연애 중','love_couple'],['재회를 생각하는 경우','love_reunion']];
+            const love=document.querySelector('#love'); labels.forEach(([label,key])=>{const a=document.createElement('article');a.className='love-context-card-v3';a.dataset.readingExportTone='love';a.innerHTML=`<strong>${label}</strong><p></p>`;a.querySelector('p').textContent=d[key];love.appendChild(a)});
+            document.querySelector('#contactOverall').textContent=d.contact_overall;
+            document.querySelector('#contactSummary').textContent=d.contact_direction_summary;
+            document.querySelector('#incoming').textContent=d.contact_incoming;
+            document.querySelector('#outgoing').textContent=d.contact_outgoing;
+            document.querySelector('#save').addEventListener('click',()=>exportReadingImages(document.querySelector('#root'),'오늘 운세 · 2026-09-28'));
+            window.__qaReady=true;
+          </script></body></html>
+          HTML
+          cat > v3-qa-playwright.mjs <<'JS'
+          import { chromium } from 'playwright'; import fs from 'node:fs'; import path from 'node:path';
+          const out=path.resolve('../qa-artifacts'); fs.mkdirSync(out,{recursive:true});
+          const browser=await chromium.launch({channel:'chrome',headless:true}); const context=await browser.newContext({acceptDownloads:true,viewport:{width:430,height:932}}); const page=await context.newPage();
+          const downloads=[]; page.on('download',d=>downloads.push(d));
+          await page.goto('http://127.0.0.1:4173/v3-qa.html',{waitUntil:'networkidle'}); await page.waitForFunction(()=>window.__qaReady===true); await page.screenshot({path:path.join(out,'live-preview-page.png'),fullPage:true});
+          await page.click('#save'); let stable=0,last=-1; for(let i=0;i<30;i++){await page.waitForTimeout(400); if(downloads.length===last&&downloads.length>0)stable++;else stable=0; last=downloads.length;if(stable>=4)break;}
+          let i=0; for(const d of downloads){i++; await d.saveAs(path.join(out,`export-${String(i).padStart(2,'0')}.png`));}
+          fs.writeFileSync(path.join(out,'download-count.txt'),String(downloads.length)); if(downloads.length<2)throw new Error(`expected multiple export pages, got ${downloads.length}`); await browser.close();
+          JS
+      - name: Run actual canvas PNG export in Chrome
+        working-directory: web
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/v3-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/v3-qa.html >/dev/null && break; sleep 1; done
+          node v3-qa-playwright.mjs
+          cat ../qa-artifacts/download-count.txt
+      - name: Upload live text and PNG QA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: interpretation-v3-live-qa
+          path: qa-artifacts/
+          if-no-files-found: error
+          retention-days: 2
