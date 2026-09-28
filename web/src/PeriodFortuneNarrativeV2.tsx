@@ -78,9 +78,9 @@ export function PeriodFortuneNarrativeV2({
       : ['연애','연락','재회'].includes(topic) ? 'love' : 'system'
   const dedicatedRelationshipField = field?.id === 'love' || field?.id === 'social' || field?.id === 'contact'
   const showContactDirectionDetails = Boolean(editorial.contact)
-    && !/뚜렷한 우세(?:가|는) 없어|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
+    && !/동률권|같은 값|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
-  return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
+  return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3 period-ai-v4" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
       <div>
         <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {summary.when} 핵심</span>
@@ -105,12 +105,12 @@ export function PeriodFortuneNarrativeV2({
       </article>)}</div>
     </section>}
 
-    {field?.id === 'social' && editorial.interpersonal && <section className="interpersonal-reading-v3" data-reading-export-tone="system">
-      <div className="period-ai-section-title"><span>대인관계</span><strong>연락 횟수가 아니라 사람 사이의 역할·거리·협력을 봐</strong></div>
-      <article className="editorial-focus-card-v3"><b>{editorial.interpersonal.summary}</b>
-        <p><em>실제로는</em> {editorial.interpersonal.action}</p>
-        <p><em>확인할 것</em> {editorial.interpersonal.watch}</p>
-      </article>
+    {field?.id === 'social' && editorial.interpersonal && <section className="interpersonal-reading-v3 interpersonal-reading-v4" data-reading-export-tone="system">
+      <div className="period-ai-section-title"><span>대인관계</span><strong>친구·지인, 직장동료, 가족·가까운 사람을 따로 읽어</strong></div>
+      <article className="editorial-focus-card-v3"><b>{editorial.interpersonal.summary}</b></article>
+      {!!editorial.interpersonalContexts?.length && <div className="love-context-cards-v3 interpersonal-context-cards-v4">{editorial.interpersonalContexts.map(item => <article className="love-context-card-v3 interpersonal-context-card-v4" key={item.key}>
+        <strong>{item.label}</strong><p>{item.text}</p>
+      </article>)}</div>}
     </section>}
 
     {field?.id === 'contact' && editorial.contact && <section className="contact-reading-v3" data-reading-export-tone="date">
@@ -140,7 +140,7 @@ export function PeriodFortuneNarrativeV2({
 
     {!dedicatedRelationshipField && summary.relationship && <section className="period-ai-window-section period-ai-relationship-section" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
-      <article className="period-ai-window period-ai-relationship-summary"><p>{summary.relationship.summary}</p>
+      <article className="period-ai-window period-ai-relationship-summary"><p>{editorial.topicEditorial['연락'] || summary.relationship.summary}</p>
         <ReadingDirections rows={[
           { kind: 'incoming', label: '상대가 먼저 오는 흐름', band: summary.relationship.incomingBand, text: summary.relationship.incoming, timing: summary.relationship.incomingTiming },
           { kind: 'outgoing', label: '내가 먼저 연락하기', band: summary.relationship.outgoingBand, text: summary.relationship.outgoing, timing: summary.relationship.outgoingTiming },
@@ -150,25 +150,30 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {!dedicatedRelationshipField && !!summary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
-      <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>분야별로 한 번씩만</strong></div>
-      <div className="period-ai-topic-list">{summary.focusTopics.map(item => <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v3-${item.topic}`}>
-        <strong>{item.topic}</strong>
-        <b>{item.conclusion}</b>
-        {item.action && <p><em>실제로는</em> {item.action}</p>}
-        {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
-        <details className="reading-topic-depth">
-          <summary>왜 이렇게 보나</summary>
-          <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
-          {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
-          {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
-        </details>
-      </article>)}</div>
+      <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>Gemini 편집 원고 우선</strong></div>
+      <div className="period-ai-topic-list">{summary.focusTopics.map(item => {
+        const aiEditorial = editorial.topicEditorial[item.topic]
+        return <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
+          <strong>{item.topic}</strong>
+          {aiEditorial ? <p className="period-ai-topic-editorial-v4">{aiEditorial}</p> : <>
+            <b>{item.conclusion}</b>
+            {item.action && <p><em>실제로는</em> {item.action}</p>}
+            {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
+          </>}
+          <details className="reading-topic-depth">
+            <summary>왜 이렇게 보나</summary>
+            <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
+            {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
+            {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
+          </details>
+        </article>
+      })}</div>
     </section>}
 
     {!dedicatedRelationshipField && !!summary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
       <summary>다른 분야 보기</summary>
-      <div className="period-ai-topic-list">{summary.referenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v3-ref-${item.topic}`}>
-        <strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion ?? item.summary}</p>
+      <div className="period-ai-topic-list">{summary.referenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v4-ref-${item.topic}`}>
+        <strong>{item.topic} · {item.band}</strong><p>{editorial.topicEditorial[item.topic] || item.detail?.conclusion || item.summary}</p>
       </article>)}</div>
     </details>}
 
