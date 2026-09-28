@@ -44,7 +44,9 @@ test('export keeps section title with its first card, redistributes sparse tail 
 })
 
 test('canvas wrapping never leaves common closing punctuation orphaned at a new line',()=>{
-  assert.match(exporter,/\^\[,\.;:\!?%\)\\\]}/)
+  assert.match(exporter,/function wrap\(/)
+  assert.match(exporter,/\.test\(ch\)/)
+  assert.match(exporter,/line\+=ch;out\.push\(line\.trimEnd\(\)\);line=''/)
 })
 
 test('relationship result still exposes image save and excludes its toolbar from exported content',()=>{
