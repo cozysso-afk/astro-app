@@ -25,7 +25,7 @@ function packet(kind='week') {
 }
 
 function periodOnly(instruction) {
-  return instruction.replace(/\[EDITORIAL_V3 · 사용자에게 실제로 보이는 해설 계약\][\s\S]*?(?=\n중요: day\/week\/month\/annual)/, '')
+  return instruction.replace(/\[EDITORIAL_V4 · 최종 사용자에게 보이는 원고\][\s\S]*?(?=\n중요: day\/week\/month\/annual)/, '')
 }
 
 test('normalizes year to annual without changing the public four-mode model', () => {
@@ -57,15 +57,28 @@ test('period instructions remain distinct after excluding the intentionally shar
   assert.equal(auditPeriodDistinctness(instructions,0.78).ok,true)
 })
 
-test('shared editorial contract makes Gemini write a real cross-sector summary and separates relationship domains', () => {
+test('editorial v4 makes Gemini write cross-sector summary and real relationship contexts', () => {
   const text=buildPeriodNarrativeInstruction(packet('day'))
   assert.match(text,/전 섹터를 통틀어 읽은 총평/)
   assert.match(text,/가장 강한 한 섹터의 verdict를 복사/)
+  assert.match(text,/\[대인·친구지인\]/)
+  assert.match(text,/\[대인·직장동료\]/)
+  assert.match(text,/\[대인·가족가까운사람\]/)
+  assert.match(text,/\[대인·새인맥\]/)
+  assert.match(text,/\[대인·갈등경계\]/)
   assert.match(text,/\[애정·짝사랑\]/)
   assert.match(text,/\[애정·연애 중\]/)
-  assert.match(text,/\[대인관계\]/)
   assert.match(text,/\[연락 전체\]/)
   assert.match(text,/전체 연락 활성도를 대신하지 않는다/)
+})
+
+test('editorial v4 supplies Gemini-authored user prose tags for non-relationship sectors', () => {
+  const text=buildPeriodNarrativeInstruction(packet('day'))
+  for (const tag of ['직장','이직','시험','학업','컨디션','금전','소식','투자심리','수익실현','신규진입']) {
+    assert.match(text,new RegExp(`\\[${tag}\\]`),`missing ${tag} editorial tag`)
+  }
+  assert.match(text,/deterministic topic 문장의 재진술이 아니다/)
+  assert.match(text,/장면·판단 기준·행동을 추가/)
 })
 
 test('day favors triggers while annual favors recurring background patterns', () => {
