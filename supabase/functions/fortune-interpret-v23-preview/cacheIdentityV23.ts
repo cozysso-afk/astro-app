@@ -1,5 +1,10 @@
+import { V23_PROMPT_VERSION } from './promptV23.ts'
+import { PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
+
 export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
-export const EDITORIAL_V3_CACHE_VERSION = 'editorial-v3-cross-sector'
+// Cache identity follows the actual prompt + narrative contracts so an editorial
+// release cannot silently reuse an older completed Gemini result.
+export const EDITORIAL_CACHE_VERSION = `editorial-runtime:${V23_PROMPT_VERSION}:${PERIOD_NARRATIVE_VERSION}`
 
 function periodKind(source: any): string {
   const raw = String(source?.period_kind ?? source?.period?.kind ?? source?.kind ?? '').trim().toLowerCase()
@@ -27,12 +32,12 @@ function isDayWeek(source: any): boolean {
 export function exactV23JobKind(version: string, payload: any, hash: string): string {
   const hashPart = hash.slice(0, 32)
   const narrative = isDayWeek(payload) ? `:${DAY_WEEK_NARRATIVE_CACHE_VERSION}` : ''
-  return `${version}:${EDITORIAL_V3_CACHE_VERSION}${narrative}:${hashPart}`
+  return `${version}:${EDITORIAL_CACHE_VERSION}${narrative}:${hashPart}`
 }
 
 export function provisionalV23JobKind(version: string, packet: any, hash: string): string {
   const hashPart = hash.slice(0, 32)
-  const base = `${version}:v23-period-aware:${EDITORIAL_V3_CACHE_VERSION}`
+  const base = `${version}:v23-period-aware:${EDITORIAL_CACHE_VERSION}`
   return isDayWeek(packet)
     ? `${base}:${DAY_WEEK_NARRATIVE_CACHE_VERSION}:${hashPart}`
     : `${base}:${hashPart}`
