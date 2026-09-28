@@ -1,0 +1,66 @@
+.reunion-ui-v3 {
+  --rv3-ink:#34435f;
+  --rv3-muted:#71809a;
+  --rv3-line:rgba(132,148,184,.18);
+  --rv3-lilac:rgba(234,224,255,.58);
+  --rv3-mint:rgba(218,249,239,.58);
+  --rv3-sky:rgba(220,240,255,.60);
+  --rv3-blush:rgba(255,230,240,.58);
+  --rv3-lemon:rgba(255,247,207,.48);
+}
+.reunion-ui-v3 .reunion-v3-hero,
+.reunion-ui-v3 .reunion-v3-card,
+.reunion-ui-v3 .reunion-v3-timing,
+.reunion-ui-v3 .reunion-v3-situations {
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--rv3-line)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.94),0 11px 28px rgba(68,82,118,.07)!important;
+  backdrop-filter:blur(22px) saturate(1.08);
+  -webkit-backdrop-filter:blur(22px) saturate(1.08);
+}
+.reunion-ui-v3 .reunion-v3-hero::before,
+.reunion-ui-v3 .reunion-v3-card::before,
+.reunion-ui-v3 .reunion-v3-timing::before,
+.reunion-ui-v3 .reunion-v3-situations::before {
+  content:'';position:absolute;inset:0 0 auto 0;height:42%;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,0));
+}
+.reunion-ui-v3 .reunion-v3-hero {
+  margin:14px 0 20px;padding:20px;border-radius:26px;background:radial-gradient(circle at 12% 0,rgba(255,255,255,.9),transparent 38%),linear-gradient(135deg,var(--rv3-sky),var(--rv3-lilac) 52%,var(--rv3-mint))!important;
+}
+.reunion-ui-v3 .reunion-v3-hero>*{position:relative}
+.reunion-ui-v3 .reunion-v3-hero>span{display:block;margin-bottom:7px;color:#7c6fa6;font-size:.72rem;font-weight:850;letter-spacing:.08em}
+.reunion-ui-v3 .reunion-v3-hero h3{margin:0 0 10px;color:var(--rv3-ink);font-size:1.06rem}
+.reunion-ui-v3 .reunion-v3-hero p{margin:0;color:#53617a;line-height:1.72}
+.reunion-v3-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 14px}
+.reunion-ui-v3 .reunion-v3-card{margin:0;padding:18px 19px;border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.68),rgba(239,245,255,.56))!important}
+.reunion-ui-v3 .reunion-v3-card[data-reading-export-tone="caution"]{background:linear-gradient(145deg,var(--rv3-blush),rgba(255,249,238,.62))!important}
+.reunion-ui-v3 .reunion-v3-card[data-reading-export-tone="love"]{background:linear-gradient(145deg,var(--rv3-lilac),rgba(255,239,247,.62))!important}
+.reunion-ui-v3 .reunion-v3-card[data-reading-export-tone="favorable"]{background:linear-gradient(145deg,var(--rv3-mint),rgba(239,250,255,.62))!important}
+.reunion-ui-v3 .reunion-v3-card>*{position:relative}
+.reunion-ui-v3 .reunion-v3-card small{display:block;margin-bottom:7px;color:#7b88a0;font-size:.7rem;font-weight:850;letter-spacing:.08em}
+.reunion-ui-v3 .reunion-v3-card h4{margin:0 0 9px;color:var(--rv3-ink);font-size:.98rem;line-height:1.48}
+.reunion-ui-v3 .reunion-v3-card>b{display:block;margin-bottom:8px;color:#66558f;font-size:1rem}
+.reunion-ui-v3 .reunion-v3-card p{margin:0;color:#56647b;line-height:1.7}
+.reunion-ui-v3 .reunion-v3-card time{display:block;margin-top:11px;color:#5f7fa2;font-size:.84rem;font-weight:750}
+.reunion-ui-v3 .reunion-v3-change{margin-bottom:22px!important}
+.reunion-ui-v3 .reunion-v3-timing,
+.reunion-ui-v3 .reunion-v3-situations{margin:22px 0;padding:19px;border-radius:25px;background:linear-gradient(145deg,rgba(225,241,255,.56),rgba(255,255,255,.62))!important}
+.reunion-ui-v3 .period-ai-section-title{position:relative;margin-bottom:14px}
+.reunion-ui-v3 .period-ai-section-title>span{color:#7082a2;font-weight:820}
+.reunion-ui-v3 .period-ai-section-title>strong{color:var(--rv3-ink);line-height:1.48}
+.reunion-v3-meaning{display:grid;gap:14px;margin:22px 0}
+.reunion-v3-situations{display:grid;gap:12px}
+.reunion-v3-situation{position:relative;padding:15px 16px;border:1px solid rgba(137,151,186,.14);border-radius:18px;background:rgba(255,255,255,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.reunion-v3-situation strong{display:block;margin-bottom:7px;color:#586781;font-size:.92rem}
+.reunion-v3-situation p{margin:0;color:#5e6c82;line-height:1.67}
+.reunion-ui-v3 .reading-event-list{position:relative;gap:12px}
+.reunion-ui-v3 .reading-event{background:rgba(255,255,255,.58)!important;border-color:rgba(132,148,184,.14)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important}
+.reunion-ui-v3 .reunion-single-disclaimer{margin-top:22px!important;padding-top:14px;border-top:1px solid rgba(132,148,184,.12);color:#8993a5;font-size:.78rem;line-height:1.58}
+@media(max-width:640px){
+  .reunion-v3-grid{grid-template-columns:1fr;gap:12px}
+  .reunion-ui-v3 .reunion-v3-hero{padding:18px;border-radius:23px}
+  .reunion-ui-v3 .reunion-v3-card{padding:16px 17px;border-radius:20px}
+  .reunion-ui-v3 .reunion-v3-timing,.reunion-ui-v3 .reunion-v3-situations{padding:16px;border-radius:22px;margin:18px 0}
+  .reunion-v3-meaning{gap:12px;margin:18px 0}
+}

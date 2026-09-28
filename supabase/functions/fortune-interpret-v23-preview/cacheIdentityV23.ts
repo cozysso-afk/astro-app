@@ -1,4 +1,5 @@
 export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
+export const EDITORIAL_V3_CACHE_VERSION = 'editorial-v3-cross-sector'
 
 function periodKind(source: any): string {
   const raw = String(source?.period_kind ?? source?.period?.kind ?? source?.kind ?? '').trim().toLowerCase()
@@ -25,14 +26,13 @@ function isDayWeek(source: any): boolean {
 
 export function exactV23JobKind(version: string, payload: any, hash: string): string {
   const hashPart = hash.slice(0, 32)
-  return isDayWeek(payload)
-    ? `${version}:${DAY_WEEK_NARRATIVE_CACHE_VERSION}:${hashPart}`
-    : `${version}:${hashPart}`
+  const narrative = isDayWeek(payload) ? `:${DAY_WEEK_NARRATIVE_CACHE_VERSION}` : ''
+  return `${version}:${EDITORIAL_V3_CACHE_VERSION}${narrative}:${hashPart}`
 }
 
 export function provisionalV23JobKind(version: string, packet: any, hash: string): string {
   const hashPart = hash.slice(0, 32)
-  const base = `${version}:v23-period-aware`
+  const base = `${version}:v23-period-aware:${EDITORIAL_V3_CACHE_VERSION}`
   return isDayWeek(packet)
     ? `${base}:${DAY_WEEK_NARRATIVE_CACHE_VERSION}:${hashPart}`
     : `${base}:${hashPart}`

@@ -34,11 +34,11 @@ test('active exact start prompt and inspect opt into V23 while status stays comp
   assert.equal(status.body.narrative_engine,undefined)
 })
 
-test('browser Fortune cache keeps V21 interpreter identity but adds a V23 narrative identity to invalidate old prose',()=>{
+test('browser Fortune cache keeps interpreter identity but invalidates every period under editorial v3',()=>{
   const source=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   assert.match(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21\.4-e2e-evidence'/)
-  assert.match(source,/FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v1'/)
-  assert.match(source,/FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v3'/)
+  assert.match(source,/FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v3'/)
+  assert.match(source,/FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v4-editorial-v3'/)
   assert.match(source,/periodKind === 'day' \|\| periodKind === 'week'/)
   assert.match(source,/narrative_contract: narrativeContract/)
 })
