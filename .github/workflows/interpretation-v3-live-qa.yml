@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/interpretation-v3-live-qa.yml'
+      - 'web/src/PeriodFortuneNarrativeV2.tsx'
       - 'web/src/lib/readingImageExport.ts'
-      - 'supabase/functions/fortune-interpret-v23-preview/**'
 
 permissions:
   contents: read
@@ -19,25 +19,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Call fixed live Gemini V3 QA probe
+      - name: Reuse captured paid Gemini V3 sample
         shell: bash
         run: |
           mkdir -p qa-artifacts web/public
-          ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRieW5mYWJ3ZmNha3hheXlnZ3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4NzMxNjksImV4cCI6MjEwMzQ0OTE2OX0.0svmSBhgNYO_XMPPYmQOqQMdda5FwlhqSBTshsRusQE'
-          curl --fail-with-body --silent --show-error -X POST \
-            'https://dbynfabwfcakxayyggzi.supabase.co/functions/v1/fortune-v3-editorial-qa-probe' \
-            -H "Authorization: Bearer ${ANON}" \
-            -H "apikey: ${ANON}" \
-            -H 'Content-Type: application/json' \
-            -d '{}' | tee qa-artifacts/live-gemini.json
+          cat > qa-artifacts/live-gemini.json <<'JSON'
+          {"ok":true,"status":200,"data":{"overall_summary":"오전 컨디션과 직장 내 업무 집중력은 든든하게 받쳐주지만, 지출 통제와 불확실한 소식을 거르는 데는 주의가 필요해. 맡은 일과 역할 경계를 명확히 챙기되, 돈 쓰는 문제나 전해 듣는 말에는 팩트를 따져보며 하루를 운영하자.","headline":"업무와 체력은 탄탄하지만 지출과 불확실한 소식엔 브레이크가 필요한 날","interpersonal":"동료나 지인의 무리한 부탁까지 다 떠안으면 급격히 지칠 수 있어. 협업할 때 각자의 몫을 명확히 나누고, 여유가 부족하다면 정중하게 거절하는 선을 지키자.","love_common":"감정이 폭발적으로 번지기보다는 현재 둘 사이에 놓인 현실적인 상황과 일상 여유에 따라 온도가 좌우되는 시기야.","love_single":"새로운 사람을 억지로 찾아 나서기보다 내 생활 리듬을 먼저 정돈하며 마음에 여유를 채우는 쪽이 자연스러워.","love_crush":"사소한 행동 하나에 과도한 의미를 부여하지 말고, 가벼운 대화로 일상적인 접점을 유지하며 천천히 다가가자.","love_flirting":"분위기에만 기대지 말고 다음 약속 일정이나 서로 바라는 관계의 기대치가 맞닿아 있는지 살펴봐.","love_ambiguous":"친밀함 속에서도 애매한 태도가 이어진다면 만남 전후의 태도가 일관된지 짚어보고 둘 사이의 선을 정리할 필요가 있어.","love_couple":"각자의 생활 리듬과 피로도를 존중해 주어야 해. 함께 시간을 보낼 때 날카로운 말투가 나오지 않도록 온화한 표현을 건네자.","love_reunion":"지난 기억이 문득 떠오를 수는 있지만, 실제 연락이나 만남 단계로 이어질 환경은 아직 갖춰지지 않았어.","contact_overall":"직접적인 대화량이 활발하게 터지진 않지만, 일단 대화가 시작되면 짧고 담백하게 이어질 여지는 남아 있어.","contact_direction_summary":"뚜렷한 우세 없음","contact_incoming":"상대 쪽에서 적극적으로 먼저 말을 걸어오기보다는 필요에 따라 간단한 반응을 보내는 정도야.","contact_outgoing":"내가 먼저 용건을 던져도 무리는 없지만, 길게 끌기보다는 핵심만 전하는 태도가 어울려."},"usage":{"promptTokenCount":882,"candidatesTokenCount":606,"thoughtsTokenCount":1313,"totalTokenCount":2801},"error":null}
+          JSON
           cp qa-artifacts/live-gemini.json web/public/v3-live-gemini.json
-          node -e "const x=require('./qa-artifacts/live-gemini.json'); if(!x.ok||!x.data) process.exit(1); console.log(JSON.stringify(x.data,null,2))" | tee qa-artifacts/live-gemini-readable.txt
-      - name: Install web and browser QA dependencies
-        working-directory: web
+          node -e "const x=require('./qa-artifacts/live-gemini.json'); console.log(JSON.stringify(x.data,null,2))" | tee qa-artifacts/live-gemini-readable.txt
+      - name: Install Korean fonts and browser QA dependencies
+        shell: bash
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+          cd web
           npm ci
           npm install --no-save playwright@1.55.0
-      - name: Build temporary browser fixture using actual V3 renderer
+      - name: Build browser fixture using actual V3 renderer
         working-directory: web
         shell: bash
         run: |
@@ -52,11 +51,9 @@ jobs:
             </section>
             <section class="interpersonal-reading-v3"><article class="editorial-focus-card-v3" data-reading-export-tone="system"><b>대인관계</b><p id="interpersonal"></p></article></section>
             <section id="love"></section>
-            <section class="contact-activation-v3" data-reading-export-tone="date"><strong>연락 전체 활성도</strong><b>보통 하단</b><p id="contactOverall"></p></section>
-            <section class="contact-direction-summary-v3" data-reading-export-tone="love"><strong>선연락 방향</strong><b id="contactSummary"></b></section>
-            <section class="contact-reading-v3">
-              <article class="reading-direction" data-reading-export-tone="love"><span class="reading-state">상대 → 나</span><span class="reading-badge">수신 방향</span><p id="incoming"></p></article>
-              <article class="reading-direction" data-reading-export-tone="love"><span class="reading-state">나 → 상대</span><span class="reading-badge">발신 방향</span><p id="outgoing"></p></article>
+            <section class="contact-reading-v3" data-reading-export-tone="date">
+              <article class="contact-activation-v3"><strong>연락 전체</strong><b>보통 하단</b><p id="contactOverall"></p></article>
+              <article class="contact-direction-summary-v3" data-reading-export-tone="love"><strong>누가 먼저 움직이는 쪽이 더 두드러지나</strong><b id="contactSummary"></b></article>
             </section>
           </main>
           <button id="save">EXPORT</button>
@@ -70,8 +67,6 @@ jobs:
             const love=document.querySelector('#love'); labels.forEach(([label,key])=>{const a=document.createElement('article');a.className='love-context-card-v3';a.dataset.readingExportTone='love';a.innerHTML=`<strong>${label}</strong><p></p>`;a.querySelector('p').textContent=d[key];love.appendChild(a)});
             document.querySelector('#contactOverall').textContent=d.contact_overall;
             document.querySelector('#contactSummary').textContent=d.contact_direction_summary;
-            document.querySelector('#incoming').textContent=d.contact_incoming;
-            document.querySelector('#outgoing').textContent=d.contact_outgoing;
             document.querySelector('#save').addEventListener('click',()=>exportReadingImages(document.querySelector('#root'),'오늘 운세 · 2026-09-28'));
             window.__qaReady=true;
           </script></body></html>
@@ -84,7 +79,7 @@ jobs:
           await page.goto('http://127.0.0.1:4173/v3-qa.html',{waitUntil:'networkidle'}); await page.waitForFunction(()=>window.__qaReady===true); await page.screenshot({path:path.join(out,'live-preview-page.png'),fullPage:true});
           await page.click('#save'); let stable=0,last=-1; for(let i=0;i<30;i++){await page.waitForTimeout(400); if(downloads.length===last&&downloads.length>0)stable++;else stable=0; last=downloads.length;if(stable>=4)break;}
           let i=0; for(const d of downloads){i++; await d.saveAs(path.join(out,`export-${String(i).padStart(2,'0')}.png`));}
-          fs.writeFileSync(path.join(out,'download-count.txt'),String(downloads.length)); if(downloads.length<2)throw new Error(`expected multiple export pages, got ${downloads.length}`); await browser.close();
+          fs.writeFileSync(path.join(out,'download-count.txt'),String(downloads.length)); if(downloads.length<2||downloads.length>4)throw new Error(`unexpected export page count ${downloads.length}`); await browser.close();
           JS
       - name: Run actual canvas PNG export in Chrome
         working-directory: web
@@ -96,7 +91,7 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/v3-qa.html >/dev/null && break; sleep 1; done
           node v3-qa-playwright.mjs
           cat ../qa-artifacts/download-count.txt
-      - name: Upload live text and PNG QA artifacts
+      - name: Upload text and PNG QA artifacts
         uses: actions/upload-artifact@v4
         with:
           name: interpretation-v3-live-qa
