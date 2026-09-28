@@ -36,7 +36,9 @@ test('contact overall activation is separate from incoming and outgoing directio
   const relationship='[연락 전체] 직접 연락과 대화의 전체 활성도는 보통이야. [연락 지속] 대화가 이어지는지가 핵심이야.'
   const result=buildFortuneEditorialV3(data({clusters:{relationship,work_study:'',money_news:'',investment:'',condition:''}}),calc(),base(),{id:'contact',label:'연락·소식',topics:['연락','소식']})
   assert.match(result.contact.activation,/전체 활성도/)
-  assert.match(result.contact.directionSummary,/뚜렷한 우세가 없어/)
+  assert.match(result.contact.directionSummary,/뚜렷한 우세(?:가|는) 없어/)
+  assert.match(result.contact.directionSummary,/상대 → 나 43/)
+  assert.match(result.contact.directionSummary,/나 → 상대 45/)
   assert.match(result.contact.incoming,/상대 → 나/)
   assert.match(result.contact.outgoing,/나 → 상대/)
 })
@@ -44,6 +46,6 @@ test('contact overall activation is separate from incoming and outgoing directio
 test('contact UI collapses verbose direction rows when both direction scores are effectively tied',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/showContactDirectionDetails/)
-  assert.match(panel,/뚜렷한 우세가 없어\|비교할 계산 정보가 충분하지 않아/)
+  assert.match(panel,/뚜렷한 우세\(\?:가\|는\) 없어\|비교할 계산 정보가 충분하지 않아/)
   assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
 })

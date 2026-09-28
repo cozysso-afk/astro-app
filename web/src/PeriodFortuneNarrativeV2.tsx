@@ -78,7 +78,7 @@ export function PeriodFortuneNarrativeV2({
       : ['연애','연락','재회'].includes(topic) ? 'love' : 'system'
   const dedicatedRelationshipField = field?.id === 'love' || field?.id === 'social' || field?.id === 'contact'
   const showContactDirectionDetails = Boolean(editorial.contact)
-    && !/뚜렷한 우세가 없어|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
+    && !/뚜렷한 우세(?:가|는) 없어|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
   return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
