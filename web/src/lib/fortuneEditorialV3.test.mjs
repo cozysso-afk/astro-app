@@ -74,3 +74,11 @@ test('overall topic cards prefer Gemini editorial prose over deterministic topic
   assert.match(panel,/period-ai-topic-editorial-v4/)
   assert.match(panel,/Gemini 편집 원고 우선/)
 })
+
+test('hero subtitle removes the sentence already promoted into the headline',()=>{
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+  assert.match(panel,/export function dedupeHeroSubtitle/)
+  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(editorial\.heroSummary, editorial\.heroHeadline\)/)
+  assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
+  assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
+})
