@@ -251,6 +251,20 @@ function polishV2(v2: any, provisional: boolean) {
   return {
     ...v2,
     summary: polishReunionNarrativeText(v2?.summary, provisional),
+    consultation_answer: {
+      ...v2?.consultation_answer,
+      current_stage: localText(v2?.consultation_answer?.current_stage, provisional, false),
+      contact_type_if_any: localText(v2?.consultation_answer?.contact_type_if_any, provisional, false),
+      initiative: localText(v2?.consultation_answer?.initiative, provisional, false),
+      continuity: localText(v2?.consultation_answer?.continuity, provisional, false),
+      meeting_gate: localText(v2?.consultation_answer?.meeting_gate, provisional, false),
+      rebuild_gate: localText(v2?.consultation_answer?.rebuild_gate, provisional, false),
+      behavior_change_evidence: localText(v2?.consultation_answer?.behavior_change_evidence, provisional, false),
+      next_stage_up_conditions: arr(v2?.consultation_answer?.next_stage_up_conditions).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
+      down_conditions: arr(v2?.consultation_answer?.down_conditions).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
+      repeat_risks: arr(v2?.consultation_answer?.repeat_risks).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
+      contextual_application: Object.fromEntries(Object.entries(v2?.consultation_answer?.contextual_application??{}).map(([key,value])=>[key,localText(value,provisional,false)])),
+    },
     why_reconnect: why,
     initiative,
     timing: { ...v2.timing, conclusion: timingConclusion, windows: timingWindows },
@@ -300,9 +314,25 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     repeat_risks: fallbackRefs(payload, 'repeat_risks', valid),
   }
 
+  const rawConsultation=source?.consultation_answer&&typeof source.consultation_answer==='object'&&text(source.consultation_answer.current_stage).length>=12?source.consultation_answer:{
+    current_stage:text(source?.timing?.conclusion)||'현재 단계와 다음 단계는 연락·만남·재구축을 분리해서 확인해야 한다.',
+    contact_type_if_any:text(source?.initiative?.conclusion)||'연락 후보가 있더라도 안부와 대화 재개, 구체적 약속을 서로 다른 단계로 봐야 한다.',
+    initiative:text(source?.initiative?.interpretation)||'누가 먼저냐보다 실제 대화가 이어지고 다음 행동이 구체화되는지가 더 중요하다.',
+    continuity:'한 번의 연락보다 질문과 답이 이어지고 후속 대화나 약속이 구체화되는지를 확인해야 한다.',
+    meeting_gate:text(source?.rebuild?.conclusion)||'연락 뒤 구체적인 약속 제안과 실제 만남이 생겨야 만남 단계로 올려 읽을 수 있다.',
+    rebuild_gate:'만남 뒤 관계 정의, 이전 문제를 다루는 대화, 약속을 지키는 행동이 이어져야 재구축 단계로 올려 읽을 수 있다.',
+    behavior_change_evidence:'상대가 바뀌었는지는 연락 자체가 아니라 불편한 문제를 피하지 않는 대화, 구체적 약속의 이행, 말과 행동의 일관성으로 판단해야 한다.',
+    next_stage_up_conditions:arr(source?.rebuild?.conditions).length?arr(source.rebuild.conditions):['질문과 답이 이어지고 구체적인 만남 제안이 실제 행동으로 연결된다.'],
+    down_conditions:['안부와 추억 이야기만 반복되고 구체적인 약속이나 이전 문제에 대한 대화가 생기지 않는다.'],
+    repeat_risks:arr(source?.repeat_risks?.patterns).length?arr(source.repeat_risks.patterns):['예전 갈등을 피한 채 연락 횟수만 늘어나면 같은 문제가 반복될 수 있다.'],
+    contextual_application:{complete_cutoff:'완전 단절 상태라면 차단 해제나 직접 접촉이 생기기 전까지는 관계 단계가 올라갔다고 보지 않는다.',no_contact:'무연락 상태라면 생각나는 배경과 실제 연락을 분리하고 직접 접촉이 생기는지부터 본다.',occasional_contact:'가끔 연락한다면 횟수보다 질문 지속과 구체적 약속이 생기는지를 본다.',meeting_again:'다시 만나고 있다면 만남 뒤 관계 정의와 약속 이행이 이어지는지를 본다.',ambiguous_relationship:'관계가 애매하다면 친밀감보다 서로 원하는 관계를 말로 합의하고 행동이 일치하는지를 본다.'},
+    evidence_refs:[],
+  }
+
   const before = JSON.stringify(data)
   let v2: any = {
     ...source,
+    consultation_answer: {...rawConsultation,evidence_refs:normalizeRefs(rawConsultation?.evidence_refs,[...fallbacks.timing,...fallbacks.rebuild,...fallbacks.repeat_risks],valid,3)},
     why_reconnect: { ...source.why_reconnect, evidence_refs: normalizeRefs(source?.why_reconnect?.evidence_refs, fallbacks.why_reconnect, valid) },
     initiative: { ...source.initiative, evidence_refs: normalizeRefs(source?.initiative?.evidence_refs, fallbacks.initiative, valid) },
     timing: {
@@ -334,18 +364,26 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
       interpretation: `${preserved ? `${preserved} ` : ''}누가 먼저냐보다 연락이 생긴 뒤 대화가 이어지는지, 실제 만남을 잡는지, 예전 문제를 피하지 않는지를 보는 편이 더 중요하다.`.trim(),
       evidence_refs: normalizeRefs(v2?.initiative?.evidence_refs, fallbacks.initiative, valid),
     }
+    v2.consultation_answer = {...v2.consultation_answer,initiative:'누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다. 실제 접촉이 생기면 질문과 답이 이어지는지, 구체적 만남을 제안하는지부터 확인해야 한다.'}
   }
 
   if (text(v2.summary).length < 180) v2.summary = composeSummary(v2)
   v2 = polishV2(v2, provisional)
 
   const allRefs = uniq([
+    ...arr(v2?.consultation_answer?.evidence_refs),
     ...arr(v2?.why_reconnect?.evidence_refs),
     ...arr(v2?.initiative?.evidence_refs),
     ...arr(v2?.timing?.evidence_refs),
     ...arr(v2?.rebuild?.evidence_refs),
     ...arr(v2?.repeat_risks?.evidence_refs),
   ].map(text).filter(x => valid.has(x)))
+
+  const consultation=v2?.consultation_answer??{}
+  const requiredConsultation=["current_stage","contact_type_if_any","initiative","continuity","meeting_gate","rebuild_gate","behavior_change_evidence"]
+  if(requiredConsultation.some(key=>text(consultation?.[key]).length<12)||arr(consultation?.next_stage_up_conditions).length<1||arr(consultation?.down_conditions).length<1||arr(consultation?.repeat_risks).length<1){
+    return {ok:false,repaired:false,data,reason:'incomplete_direct_consultation'}
+  }
 
   if (text(v2.summary).length < 120 || allRefs.length < 3) {
     return { ok: false, repaired: false, data, reason: 'insufficient_grounded_content' }

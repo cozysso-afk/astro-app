@@ -292,6 +292,13 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
   const next = nextActionReading(contact.band, stages)
   const guides = conditionalGuides(contact.band, stages)
   const events = timeline(hierarchyData)
+  const consultation = reunionV2?.consultation_answer
+  const answerText = readerSentences(consultation?.current_stage, 3) || answer.text
+  const contactText = readerSentences(`${consultation?.contact_type_if_any ?? ''} ${consultation?.continuity ?? ''}`, 3) || contact.text
+  const initiativeText = readerSentences(consultation?.initiative, 2) || initiative.text
+  const behaviorText = readerSentences(consultation?.behavior_change_evidence, 3) || change.text
+  const nextUp = (consultation?.next_stage_up_conditions ?? []).map(item=>readerSentences(item,1)).filter(Boolean).slice(0,3)
+  const down = (consultation?.down_conditions ?? []).map(item=>readerSentences(item,1)).filter(Boolean).slice(0,3)
 
   const rawWhy = reunionV2?.why_reconnect ? `${reunionV2.why_reconnect.conclusion} ${reunionV2.why_reconnect.interpretation}` : ''
   const why = readerSentences(rawWhy, 2) || (stages.has('emotional_reactivation') ? '예전 대화나 감정이 다시 떠오르기 쉬운 배경은 있어. 다만 생각이 나는 것과 실제 연락·만남은 별도 단계로 봐.' : '')
@@ -304,7 +311,7 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
     <header className="reunion-result-meta" data-reading-export-tone="date"><small>기준일</small><strong>{hierarchyData.as_of_date}</strong></header>
     {!valid ? <p role="alert">계산 검증을 통과하지 못해서 현재·미래 해설을 보류했어.</p> : <>
       <section className="reunion-v3-hero reunion-v4-answer" data-reading-export-tone="love">
-        <span>이번 조회의 답</span><h3>{answer.title}</h3><p>{answer.text}</p>
+        <span>이번 조회의 답</span><h3>{answer.title}</h3><p>{answerText}</p>
       </section>
 
       <section className="reunion-v4-stage-board">
@@ -320,19 +327,21 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
 
       <div className="reunion-v3-grid">
         <section className="reunion-v3-card" data-reading-export-tone={contact.band === '낮음' ? 'caution' : 'love'}>
-          <small>CONTACT</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.band}</b><p>{contact.text}</p>{contact.first && <time>먼저 볼 시기 · {contact.first}</time>}
+          <small>CONTACT</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.band}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 시기 · {contact.first}</time>}
         </section>
         <section className="reunion-v3-card" data-reading-export-tone="love">
-          <small>DIRECTION</small><h4>굳이 비교하면 누가 먼저인가</h4><b>{initiative.label}</b><p>{initiative.text}</p>
+          <small>DIRECTION</small><h4>굳이 비교하면 누가 먼저인가</h4><b>{initiative.label}</b><p>{initiativeText}</p>
         </section>
       </div>
 
       <section className="reunion-v3-card reunion-v3-change" data-reading-export-tone="favorable">
-        <small>BEHAVIOR CHANGE</small><h4>상대가 예전과 다르게 움직일 여지가 있나</h4><b>{change.label}</b><p>{change.text}</p>
+        <small>BEHAVIOR CHANGE</small><h4>상대가 예전과 다르게 움직일 여지가 있나</h4><b>{change.label}</b><p>{behaviorText}</p>
       </section>
 
       <section className="reunion-v3-card reunion-v3-next" data-reading-export-tone="system">
-        <small>NEXT CHECK</small><h4>그래서 지금 무엇을 보면 되나</h4><b>{next.label}</b><p>{next.text}</p>
+        <small>NEXT CHECK</small><h4>그래서 지금 무엇을 보면 되나</h4><b>{next.label}</b><p>{readerSentences(consultation?.meeting_gate,2) || next.text}</p>
+        {!!nextUp.length && <><strong>판단을 올릴 조건</strong><ul>{nextUp.map((item,index)=><li key={`up:${index}`}>{item}</li>)}</ul></>}
+        {!!down.length && <><strong>다시 낮춰 볼 조건</strong><ul>{down.map((item,index)=><li key={`down:${index}`}>{item}</li>)}</ul></>}
       </section>
 
       {!!events.length && <section className="reunion-v3-timing" data-reading-export-tone="date"><div className="period-ai-section-title"><span>기억할 시기</span><strong>같은 단계 날짜는 반복하지 않아</strong></div><ReadingTimeline events={events}/></section>}
@@ -347,7 +356,11 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
 
       <section className="reunion-v3-situations">
         <div className="period-ai-section-title"><span>내 현재 상황에 맞춰 읽기</span><strong>연락 상태가 다르면 같은 결과도 의미가 달라</strong></div>
-        {guides.map(item => <article className="reunion-v3-situation" key={item.title}><strong>{item.title}</strong><p>{item.text}</p></article>)}
+        {guides.map((item,index) => {
+          const keys=['complete_cutoff','occasional_contact','meeting_again'] as const
+          const contextual=consultation?.contextual_application?.[keys[index]]
+          return <article className="reunion-v3-situation" key={item.title}><strong>{item.title}</strong><p>{readerSentences(contextual,3) || item.text}</p></article>
+        })}
       </section>
 
       <p className="reading-safety-note reunion-single-disclaimer">이 결과는 연락·만남·관계 재구축 단계를 서로 분리해서 보는 상대적 신호야. 실제 행동이나 상대의 속마음을 확정하지 않아.</p>

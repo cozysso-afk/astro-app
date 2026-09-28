@@ -53,6 +53,15 @@ function calculation(){
   };
 }
 function repeat(text,count=5){return Array.from({length:count},()=>text).join(" ");}
+const editorialScenes={
+  friends:"친구가 먼저 약속 날짜를 확정하고 취소 뒤 대안을 제시하는지 봐.",coworkers:"동료가 업무 범위와 마감 책임을 문서로 확인하는지 봐.",family:"가족이 반복된 생활 갈등 뒤 역할 분담을 실제로 지키는지 봐.",new_people:"새 인연이 첫 호감 뒤 두 번째 만남을 구체적으로 잡는지 봐.",boundaries:"거절 의사를 전했을 때 상대가 압박을 멈추고 선을 존중하는지 봐.",
+  love_single:"솔로 상태에서는 소개 제안을 받을지와 만남 기준을 먼저 정해.",love_crush:"짝사랑 상대가 예의 있는 반응을 넘어 먼저 대화를 확장하는지 봐.",love_flirting:"썸 단계에서는 연락 빈도보다 만남 제안과 일정 확정이 이어지는지 봐.",love_ambiguous:"애매한 관계에서는 관계 정의 질문에 상대가 회피 없이 답하는지 봐.",love_couple:"연인 사이에서는 갈등 뒤 합의한 행동을 다음 상황에도 반복하는지 봐.",love_reunion_interest:"재회 관심은 추억 언급이 아니라 과거 문제를 고칠 계획을 제안하는지 봐.",
+};
+function editorialSection(label,refs=[]){const scene=editorialScenes[label]??`${label}에서 약속·일정·후속 행동이 말과 일치하는지 봐.`;return {conclusion:`${label}은 지금 가능성을 확정하기보다 고유한 현실 신호를 조건부로 읽어.`,real_scene:scene,action:`${label}의 다음 단계에 필요한 질문이나 행동을 한 가지 정해.`,change_condition:`${label}에서 현실 신호가 두 번 이상 이어지면 판단을 올리고 반대 행동이 반복되면 낮춰.`,evidence_refs:refs,applicability:"conditional"};}
+function editorialClusters(){
+  const group=(keys)=>Object.fromEntries(keys.map(key=>[key,editorialSection(key)]));
+  return {relationship:group(["summary","friends","coworkers","family","new_people","boundaries","love_general","love_single","love_crush","love_flirting","love_ambiguous","love_couple","love_reunion_interest","contact_activation","contact_continuity"]),work_study:group(["work","career_change","exam","study"]),money_news:group(["money","news"]),investment:group(["psychology","realization","entry"]),condition:group(["condition"])};
+}
 function output(packet){
   const ids=packet.evidence_ledger.map(x=>x.id);
   const ref=(prefix)=>ids.find(x=>x.startsWith(prefix)) ?? ids[0];
@@ -118,7 +127,7 @@ function output(packet){
       {action:"5월 점검창에는 관계 결론보다 메시지와 사실관계를 다시 확인해.",timing:"2026-05-14~2026-05-15",reason:"연애와 발신 관련 하위 날짜가 연속으로 잡혀 있어.",watch:"상대가 실제로 한 말과 행동, 일정 변경 같은 확인 가능한 사실을 감정 해석과 분리해 봐.",avoid:"답장 속도나 한 번의 반응만으로 관계 전체를 확정하거나 연속 메시지를 보내지 마.",evidence_refs:[mayLove,mayOutgoing]},
       {action:"10월 재접점 신호는 실제 상대 행동이 있을 때만 해석 범위를 넓혀.",timing:"2026-10-21",reason:"과거인연접점의 상위 날짜와 월간 근거가 함께 있어.",watch:"실제 연락·만남 제안·우연한 재접촉처럼 관찰 가능한 사건이 생기는지 먼저 확인해.",avoid:"접점 지수만 보고 상대 속마음이나 재회 의사를 미리 확정하지 마.",evidence_refs:[octReconnect,octMonth]},
     ],
-    clusters:{relationship:repeat("대인관계·연애·연락·재접점을 하나로 뭉개지 말고 각각의 월별 변화와 날짜 피크를 따로 읽어야 해.",2),work_study:repeat("일과 학업은 월별 강약이 다르므로 중요한 일정 배치를 같은 기준으로 처리하지 않는 게 좋아.",2),money_news:repeat("금전과 소식은 서로 다른 계산축이라 한쪽의 피크가 다른 쪽의 결과를 보장하지 않아.",2),investment:repeat("투자심리·수익실현·신규진입·투자주의는 서로 다른 지수고 특히 투자주의는 높을수록 경계가 커져.",2),condition:repeat("컨디션은 일정 강도와 휴식 배치를 조절하는 참고 흐름으로만 읽어.",2)},
+    clusters:editorialClusters(),
     relationship_reading:{context:"연락과 재회 축은 관계 자체를 확정하는 값이 아니라 수신·발신·과거인연 재접점이 언제 따로 또는 함께 활성화되는지를 보는 구조야.",flow:"7월에는 발신 쪽 실행성이 먼저 살아나고 10월에는 과거인연 재접점이 따로 강해져서, 먼저 내가 움직이기 좋은 흐름과 이후 과거 관계 이슈가 다시 떠오르는 흐름을 구분해서 봐야 해.",focus_timing:"2026-07-24의 발신 적합과 2026-10-21의 과거인연 재접점 구간을 서로 다른 의미로 주목해.",watch:"실제 메시지 수신 여부, 상대의 지속적인 행동, 만남 제안처럼 현실에서 확인되는 반응이 이어지는지 확인해.",avoid:"상대 활성도나 재접점 지수를 상대 속마음, 연락 확정, 재회 확률로 바꾸지 마.",evidence_refs:[ref("W:overall:수신신호"),julyOutgoing,octReconnect]},
     contact_flow:{incoming:"수신신호는 실제 연락의 보장이 아니라 상대→나 방향의 상대 활성도를 보여주는 참고축이야.",outgoing:"발신적합은 내가 행동할 때의 상대적 적합 흐름이지 상대 반응을 확정하는 값이 아니야.",reconnection:"과거인연접점은 과거 관계가 다시 활성화되는 맥락을 뜻할 뿐 실제 재회를 보장하지 않아."},
     investment_reading:{psychology:"투자심리는 심리적 판단 환경을 보는 지수고 가격 방향을 예측하지 않아.",realization:"수익실현은 이미 형성된 흐름을 정리하기 좋은 상대적 조건이지 실제 수익을 보장하지 않아.",entry:"신규진입은 진입 판단 환경을 보는 지수이지 매수 성공률을 뜻하지 않아.",risk:"투자주의는 높을수록 경계가 커지는 위험 지수라 다른 투자지수와 방향을 뒤집어 읽으면 안 돼."},
@@ -153,7 +162,7 @@ test("full-daily packet preserves market nulls and promotes actual daily evidenc
   assert.ok(packet.evidence_ledger.some(x=>x.id.startsWith("W:daily:2026-02-14:")));
 });
 
-test("five stages accept a deep evidence-backed annual interpretation",()=>{
+test("six stages accept a deep evidence-backed annual interpretation",()=>{
   const packet=compactCalculation(calculation());
   const data=validateOutput(output(packet));
   const report=inspectInterpretationQuality(data,packet);

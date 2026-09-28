@@ -15,6 +15,7 @@ import { FortuneFlowCards } from './FortuneFlowCards'
 import type { ReactNode } from 'react'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
 import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
+import { editorialGroupCopy } from './lib/fortuneEditorialV3'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -166,7 +167,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
 
         {!!decisions.length && <div className="period-ai-section"><strong>행동 판단 원문</strong><div className="period-ai-actions">{decisions.map((item,index)=><article key={`technical-decision-${index}-${item.action}`}><span className="period-ai-action-index">{index+1}</span><div><strong>{visibleAiText(item.action)}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.watch&&<p className="period-ai-condition"><b>판단</b><span>{visibleAiText(item.watch)}</span></p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>주의</b><span>{visibleAiText(item.avoid)}</span></p>}</div></article>)}</div></div>}
 
-        <div className="period-ai-section"><strong>분야별 종합 원문</strong><p>{[data.clusters.relationship&&`관계 · ${data.clusters.relationship}`,data.clusters.work_study&&`일·학업 · ${data.clusters.work_study}`,data.clusters.money_news&&`돈·소식 · ${data.clusters.money_news}`,data.clusters.investment&&`투자 · ${data.clusters.investment}`,data.clusters.condition&&`컨디션 · ${data.clusters.condition}`].filter(Boolean).join('\n\n')}</p></div>
+        <div className="period-ai-section"><strong>분야별 종합 원문</strong><p>{[`관계 · ${editorialGroupCopy(data.clusters.relationship)}`,`일·학업 · ${editorialGroupCopy(data.clusters.work_study)}`,`돈·소식 · ${editorialGroupCopy(data.clusters.money_news)}`,`투자 · ${editorialGroupCopy(data.clusters.investment)}`,`컨디션 · ${editorialGroupCopy(data.clusters.condition)}`].join('\n\n')}</p></div>
         {!!data.priorities?.length && <div className="period-ai-section"><strong>우선순위 원문</strong><p>{data.priorities.map((item,index)=>`${index+1}. ${item}`).join('\n')}</p></div>}
 
         {data.relationship_reading ? <div className="period-ai-section"><strong>관계 해설 원문</strong><p>{[data.relationship_reading.context,data.relationship_reading.flow,data.relationship_reading.focus_timing,data.relationship_reading.watch,data.relationship_reading.avoid,data.contact_flow?.incoming,data.contact_flow?.outgoing,data.contact_flow?.reconnection].filter(Boolean).map((item)=>visibleAiText(String(item))).join('\n\n')}</p></div> : null}

@@ -27,21 +27,21 @@ export type FortuneEditorialV3 = {
   topicEditorial: Record<string, string>
 }
 
-const LOVE_CONTEXTS: Array<{ key: LoveContextKey; label: string; tag: string }> = [
-  { key: 'single', label: '솔로 · 새 인연', tag: '애정·솔로' },
-  { key: 'crush', label: '짝사랑 · 마음 가는 사람', tag: '애정·짝사랑' },
-  { key: 'flirting', label: '썸 · 알아가는 중', tag: '애정·썸' },
-  { key: 'ambiguous', label: '관계가 애매한 사이', tag: '애정·관계 미정' },
-  { key: 'couple', label: '연애 중', tag: '애정·연애 중' },
-  { key: 'reunion_interest', label: '재회를 생각하는 경우', tag: '애정·재회 관심' },
+const LOVE_CONTEXTS: Array<{ key: LoveContextKey; label: string; field: string }> = [
+  { key: 'single', label: '솔로 · 새 인연', field: 'love_single' },
+  { key: 'crush', label: '짝사랑 · 마음 가는 사람', field: 'love_crush' },
+  { key: 'flirting', label: '썸 · 알아가는 중', field: 'love_flirting' },
+  { key: 'ambiguous', label: '관계가 애매한 사이', field: 'love_ambiguous' },
+  { key: 'couple', label: '연애 중', field: 'love_couple' },
+  { key: 'reunion_interest', label: '재회를 생각하는 경우', field: 'love_reunion_interest' },
 ]
 
-const INTERPERSONAL_CONTEXTS: Array<{ key: InterpersonalContextKey; label: string; tag: string }> = [
-  { key: 'friends', label: '친구 · 지인', tag: '대인·친구지인' },
-  { key: 'coworkers', label: '직장동료 · 협업 상대', tag: '대인·직장동료' },
-  { key: 'family', label: '가족 · 가까운 사람', tag: '대인·가족가까운사람' },
-  { key: 'new_people', label: '새 인맥 · 모임', tag: '대인·새인맥' },
-  { key: 'boundaries', label: '갈등 · 경계', tag: '대인·갈등경계' },
+const INTERPERSONAL_CONTEXTS: Array<{ key: InterpersonalContextKey; label: string; field: string }> = [
+  { key: 'friends', label: '친구 · 지인', field: 'friends' },
+  { key: 'coworkers', label: '직장동료 · 협업 상대', field: 'coworkers' },
+  { key: 'family', label: '가족 · 가까운 사람', field: 'family' },
+  { key: 'new_people', label: '새 인맥 · 모임', field: 'new_people' },
+  { key: 'boundaries', label: '갈등 · 경계', field: 'boundaries' },
 ]
 
 const TECHNICAL_RE = /(?:태양|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|노드|하우스|트랜짓|프로그레스|컴포지트|시너스트리|삼분|사분|육합|육파|오브|\d+도각|사주\s*(?:일지|월지|시주)|[甲乙丙丁戊己庚辛壬癸寅卯辰巳午未申酉戌亥子丑])/i
@@ -76,21 +76,14 @@ function firstSentence(value: string) {
   return clean(match?.[1] ?? text)
 }
 
-export function parseEditorialSections(value: string | undefined) {
-  const raw = String(value ?? '').trim()
-  const out = new Map<string, string>()
-  if (!raw) return out
-  const re = /\[([^\]]+)\]/g
-  const hits = [...raw.matchAll(re)]
-  if (!hits.length) return out
-  for (let i = 0; i < hits.length; i++) {
-    const key = clean(hits[i][1])
-    const start = (hits[i].index ?? 0) + hits[i][0].length
-    const end = i + 1 < hits.length ? (hits[i + 1].index ?? raw.length) : raw.length
-    const text = clean(raw.slice(start, end))
-    if (key && text) out.set(key, text)
-  }
-  return out
+export function sectionCopy(value: any) {
+  if (!value || typeof value !== 'object') return ''
+  return [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean).filter(Boolean).join(' ')
+}
+
+export function editorialGroupCopy(value:any) {
+  if (!value || typeof value !== 'object') return ''
+  return Object.values(value).map(sectionCopy).filter(Boolean).join('\n\n')
 }
 
 function topic(data: InterpretationData, name: string) {
@@ -106,31 +99,20 @@ function bandLabel(calculation: IntegratedApiResponse, name: string) {
   return clean(calculation.western.overall?.[name]?.band) || '정보 부족'
 }
 
-function relationshipSections(data: InterpretationData) {
-  return parseEditorialSections(data.clusters?.relationship)
-}
-
 function topicEditorial(data: InterpretationData) {
-  const relationship = relationshipSections(data)
-  const workStudy = parseEditorialSections(data.clusters?.work_study)
-  const moneyNews = parseEditorialSections(data.clusters?.money_news)
-  const investment = parseEditorialSections(data.clusters?.investment)
-  const condition = parseEditorialSections(data.clusters?.condition)
+  const relationship = data.clusters?.relationship
+  const workStudy = data.clusters?.work_study
+  const moneyNews = data.clusters?.money_news
+  const investment = data.clusters?.investment
+  const condition = data.clusters?.condition
   const candidates: Record<string, string | undefined> = {
-    '대인관계': relationship.get('대인관계'),
-    '연애': relationship.get('애정 공통'),
-    '연락': relationship.get('연락 전체'),
-    '재회': relationship.get('애정·재회 관심'),
-    '직장': workStudy.get('직장'),
-    '이직': workStudy.get('이직'),
-    '시험': workStudy.get('시험'),
-    '학업': workStudy.get('학업'),
-    '컨디션': condition.get('컨디션'),
-    '금전': moneyNews.get('금전'),
-    '소식': moneyNews.get('소식'),
-    '투자심리': investment.get('투자심리'),
-    '수익실현': investment.get('수익실현'),
-    '신규진입': investment.get('신규진입'),
+    '대인관계': sectionCopy(relationship?.summary), '연애': sectionCopy(relationship?.love_general),
+    '연락': sectionCopy(relationship?.contact_activation), '재회': sectionCopy(relationship?.love_reunion_interest),
+    '직장': sectionCopy(workStudy?.work), '이직': sectionCopy(workStudy?.career_change),
+    '시험': sectionCopy(workStudy?.exam), '학업': sectionCopy(workStudy?.study),
+    '컨디션': sectionCopy(condition?.condition), '금전': sectionCopy(moneyNews?.money),
+    '소식': sectionCopy(moneyNews?.news), '투자심리': sectionCopy(investment?.psychology),
+    '수익실현': sectionCopy(investment?.realization), '신규진입': sectionCopy(investment?.entry),
   }
   return Object.fromEntries(Object.entries(candidates)
     .map(([key, value]) => [key, clean(value)])
@@ -138,7 +120,7 @@ function topicEditorial(data: InterpretationData) {
 }
 
 function fallbackLoveText(key: LoveContextKey, data: InterpretationData) {
-  const love = clean(topic(data, '연애')?.verdict) || clean(data.clusters?.relationship)
+  const love = clean(topic(data, '연애')?.verdict) || sectionCopy(data.clusters?.relationship?.love_general)
   const contact = clean(topic(data, '연락')?.verdict)
   switch (key) {
     case 'single': return `${love} 특정 상대가 없다면 새 사람을 만날 접점과 실제 만남을 받아들일 여유를 중심으로 읽어.`
@@ -151,19 +133,19 @@ function fallbackLoveText(key: LoveContextKey, data: InterpretationData) {
 }
 
 function loveContexts(data: InterpretationData) {
-  const sections = relationshipSections(data)
+  const sections:any = data.clusters?.relationship ?? {}
   return LOVE_CONTEXTS.map(item => ({
     key: item.key,
     label: item.label,
-    text: sections.get(item.tag) || fallbackLoveText(item.key, data),
+    text: sectionCopy(sections[item.field]) || fallbackLoveText(item.key, data),
   }))
 }
 
 function interpersonalContexts(data: InterpretationData) {
-  const sections = relationshipSections(data)
-  const general = clean(sections.get('대인관계'))
+  const sections:any = data.clusters?.relationship ?? {}
+  const general = sectionCopy(sections.summary)
   return INTERPERSONAL_CONTEXTS.map(item => {
-    const specific = clean(sections.get(item.tag))
+    const specific = sectionCopy(sections[item.field])
     return {
       key: item.key,
       label: item.label,
@@ -192,12 +174,12 @@ function directionSummary(calculation: IntegratedApiResponse) {
     : `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 이번 범위에서는 나 → 상대 방향이 더 두드러져.`
 }
 
-function contactEditorial(data: InterpretationData, calculation: IntegratedApiResponse, sections: Map<string,string>): EditorialContact {
+function contactEditorial(data: InterpretationData, calculation: IntegratedApiResponse, sections:any): EditorialContact {
   const contactScore = score(calculation, '연락')
-  const activation = sections.get('연락 전체')
+  const activation = sectionCopy(sections?.contact_activation)
     || clean(topic(data, '연락')?.verdict)
     || (contactScore == null ? '연락 전체 활성도를 판단할 정보가 부족해.' : `직접 연락·대화의 전체 활성도는 ${bandLabel(calculation, '연락')} 쪽이야.`)
-  const continuity = sections.get('연락 지속')
+  const continuity = sectionCopy(sections?.contact_continuity)
     || clean(topic(data, '연락')?.action)
     || '연락이 생기면 한 번의 답장보다 질문과 답이 이어지고 실제 약속이 구체화되는지를 봐.'
   return {
@@ -210,10 +192,10 @@ function contactEditorial(data: InterpretationData, calculation: IntegratedApiRe
   }
 }
 
-function interpersonalEditorial(data: InterpretationData, sections: Map<string,string>) {
+function interpersonalEditorial(data: InterpretationData, sections:any) {
   const base = topic(data, '대인관계')
   return {
-    summary: sections.get('대인관계') || clean(base?.verdict) || '친구·지인, 직장동료, 가족·가까운 사람처럼 관계 종류별로 나눠 읽어.',
+    summary: sectionCopy(sections?.summary) || clean(base?.verdict) || '친구·지인, 직장동료, 가족·가까운 사람처럼 관계 종류별로 나눠 읽어.',
     action: clean(base?.action) || '누구와 무엇을 조율해야 하는지 관계별 실제 장면을 먼저 봐.',
     watch: clean(base?.avoid) || '한 관계에서 생긴 일을 모든 인간관계의 결론으로 확대하지 마.',
   }
@@ -264,7 +246,7 @@ function integratedFallback(base: FortuneUserSummary, calculation: IntegratedApi
   return { headline, summary }
 }
 
-function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse, base: FortuneUserSummary, field: FortuneField | undefined, sections: Map<string,string>, editorialTopics: Record<string,string>) {
+function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse, base: FortuneUserSummary, field: FortuneField | undefined, sections:any, editorialTopics: Record<string,string>) {
   if (!field) {
     const copies = singleSectorCopies(data, base)
     const aiHeadline = clean(data.headline)
@@ -277,15 +259,15 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
   }
   if (field.id === 'love') return {
     headline: `${base.when} 애정운은 관계 상태별로 나눠 읽어.`,
-    summary: sections.get('애정 공통') || clean(topic(data, '연애')?.reason) || '솔로, 짝사랑, 썸, 애매한 관계, 연애 중, 재회 관심은 같은 계산을 서로 다른 현실 질문으로 읽어야 해.',
+    summary: sectionCopy(sections?.love_general) || clean(topic(data, '연애')?.reason) || '솔로, 짝사랑, 썸, 애매한 관계, 연애 중, 재회 관심은 같은 계산을 서로 다른 현실 질문으로 읽어야 해.',
   }
   if (field.id === 'social') return {
     headline: `${base.when} 대인관계는 관계 종류별로 나눠 봐야 해.`,
-    summary: sections.get('대인관계') || clean(topic(data, '대인관계')?.reason) || base.summary,
+    summary: sectionCopy(sections?.summary) || clean(topic(data, '대인관계')?.reason) || base.summary,
   }
   if (field.id === 'contact') return {
     headline: `${base.when} 연락은 전체 활성도와 선연락 방향을 따로 봐.`,
-    summary: sections.get('연락 전체') || clean(topic(data, '연락')?.reason) || base.summary,
+    summary: sectionCopy(sections?.contact_activation) || clean(topic(data, '연락')?.reason) || base.summary,
   }
   const firstTopic = field.topics[0]
   const row = topic(data, firstTopic)
@@ -297,7 +279,7 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
 }
 
 export function buildFortuneEditorialV3(data: InterpretationData, calculation: IntegratedApiResponse, base: FortuneUserSummary, field?: FortuneField): FortuneEditorialV3 {
-  const sections = relationshipSections(data)
+  const sections = data.clusters?.relationship ?? {}
   const editorialTopics = topicEditorial(data)
   const hero = fieldHero(data, calculation, base, field, sections, editorialTopics)
   return {
@@ -307,7 +289,7 @@ export function buildFortuneEditorialV3(data: InterpretationData, calculation: I
     interpersonalContexts: field?.id === 'social' ? interpersonalContexts(data) : undefined,
     contact: field?.id === 'contact' ? contactEditorial(data, calculation, sections) : undefined,
     loveContexts: field?.id === 'love' ? loveContexts(data) : undefined,
-    loveGeneral: field?.id === 'love' ? (sections.get('애정 공통') || clean(data.clusters?.relationship)) : undefined,
+    loveGeneral: field?.id === 'love' ? sectionCopy(sections?.love_general) : undefined,
     topicEditorial: editorialTopics,
   }
 }
