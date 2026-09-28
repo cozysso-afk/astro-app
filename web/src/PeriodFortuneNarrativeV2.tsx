@@ -19,6 +19,22 @@ function periodLabel(start: string, end: string) {
   return `${start} → ${end}`
 }
 
+function proseFingerprint(value: string) {
+  return String(value ?? '').replace(/[\s.,!?·~→:;()\[\]-]+/g, '').trim()
+}
+
+export function dedupeHeroSubtitle(summary: string, headline: string) {
+  const text = String(summary ?? '').trim()
+  const title = String(headline ?? '').trim()
+  if (!text || !title) return text
+  if (proseFingerprint(text) === proseFingerprint(title)) return ''
+  const first = text.match(/^(.+?[.!?])(?:\s|$)/)?.[1]?.trim()
+  if (first && proseFingerprint(first) === proseFingerprint(title)) {
+    return text.slice(first.length).trim()
+  }
+  return text
+}
+
 export function PeriodFortuneNarrativeV2({
   loveStatus: _loveStatus,
   systemOverview,
@@ -70,6 +86,7 @@ export function PeriodFortuneNarrativeV2({
   })
   const summary = polishFortuneSummary(base)
   const editorial = buildFortuneEditorialV3(data, calculation, summary, field)
+  const heroSubtitle = dedupeHeroSubtitle(editorial.heroSummary, editorial.heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
     ? 'caution'
@@ -86,7 +103,7 @@ export function PeriodFortuneNarrativeV2({
         <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {summary.when} 핵심</span>
         <span className="reading-period-date" data-reading-export-tone="date">{periodLabel(calculation.period.start, calculation.period.end)}</span>
         <h3>{editorial.heroHeadline}</h3>
-        {editorial.heroSummary && <p className="reading-hero-subtitle">{editorial.heroSummary}</p>}
+        {heroSubtitle && <p className="reading-hero-subtitle">{heroSubtitle}</p>}
       </div>
     </div>
 
