@@ -32,6 +32,8 @@ const LOVE_CONTEXTS: Array<{ key: LoveContextKey; label: string; tag: string }> 
   { key: 'reunion_interest', label: '재회를 생각하는 경우', tag: '애정·재회 관심' },
 ]
 
+const TECHNICAL_RE = /(?:태양|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|노드|하우스|트랜짓|프로그레스|컴포지트|시너스트리|삼분|사분|육합|육파|오브|\d+도각|사주\s*(?:일지|월지|시주)|[甲乙丙丁戊己庚辛壬癸寅卯辰巳午未申酉戌亥子丑])/i
+
 function clean(value: unknown) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
@@ -46,6 +48,14 @@ function overlapRatio(a: string, b: string) {
   if (!left.size || !right.size) return 0
   const overlap = [...left].filter(token => right.has(token)).length
   return overlap / Math.min(left.size, right.size)
+}
+
+function readerFacing(value: string) {
+  const text = clean(value)
+  if (!text || text.length < 10) return false
+  if (TECHNICAL_RE.test(text)) return false
+  if (/계산\s*(?:엔진|로직|threshold|오브)|(?:상대|절대)\s*확률/i.test(text)) return false
+  return true
 }
 
 export function parseEditorialSections(value: string | undefined) {
@@ -105,11 +115,19 @@ function directionSummary(calculation: IntegratedApiResponse) {
   const incoming = rel['수신신호']?.average
   const outgoing = rel['발신적합']?.average
   if (!Number.isFinite(incoming) || !Number.isFinite(outgoing)) return '선연락 방향은 비교할 계산 정보가 충분하지 않아.'
-  const diff = Number(incoming) - Number(outgoing)
-  if (Math.abs(diff) < 5) return '선연락 방향은 두 쪽이 비슷해서 뚜렷한 우세가 없어.'
+  const a = Number(incoming)
+  const b = Number(outgoing)
+  const diff = a - b
+  const roundedA = Math.round(a)
+  const roundedB = Math.round(b)
+  if (diff === 0) return `선연락 방향은 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 같아. 뚜렷한 우세는 없어.`
+  if (Math.abs(diff) < 5) {
+    const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
+    return `뚜렷한 우세는 없어. 참고로 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 ${micro} 쪽이 아주 조금 높지만 의미 있는 차이로 밀어 읽진 않아.`
+  }
   return diff > 0
-    ? '선연락 방향은 상대 → 나 쪽이 상대적으로 더 두드러져.'
-    : '선연락 방향은 나 → 상대 쪽이 상대적으로 더 두드러져.'
+    ? `선연락 방향은 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 상대 → 나 쪽이 상대적으로 더 두드러져.`
+    : `선연락 방향은 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 나 → 상대 쪽이 상대적으로 더 두드러져.`
 }
 
 function contactEditorial(data: InterpretationData, calculation: IntegratedApiResponse, sections: Map<string,string>): EditorialContact {
@@ -172,15 +190,15 @@ function integratedFallback(base: FortuneUserSummary, calculation: IntegratedApi
   const good = listTopics(positive)
   const watch = listTopics(caution.filter(name => !positive.includes(name)))
   const headline = good && watch
-    ? `${base.when}은 ${good} 쪽은 비교적 받쳐주고, ${watch} 쪽은 한 번 더 확인하면서 움직이는 날이야.`
+    ? `${base.when}은 ${good} 쪽은 비교적 받쳐주고, ${watch} 쪽은 한 번 더 확인하면서 움직이는 흐름이야.`
     : good ? `${base.when}은 ${good} 쪽이 상대적으로 받쳐줘. 다른 분야까지 무리하게 확대하지 말고 이 강점을 필요한 곳에 써.`
       : watch ? `${base.when}은 ${watch} 쪽에서 서두르지 않는 게 중요해. 나머지는 평소 계획을 유지해.`
         : `${base.when}은 한 분야가 압도하기보다 전반적인 균형이 중요해. 실제 일정과 반응에 맞춰 우선순위를 조정해.`
   const summary = good && watch
-    ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 두는 편이 안전해. 하루 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 않는 게 핵심이야.`
-    : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 전체 일정에서는 우선순위를 좁혀 실제로 끝낼 일을 만드는 쪽에 무게를 둬.`
-      : watch ? `${watch}의 부담을 줄이는 게 전체 운영의 핵심이야. 중요한 결정은 확인 단계를 하나 더 두고, 나머지 분야는 평소 리듬을 유지해.`
-        : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 하루를 정의하기 어렵다. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
+    ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 두는 편이 안전해. 기간 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 않는 게 핵심이야.`
+    : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 기간 전체에서는 우선순위를 좁혀 실제로 끝낼 일을 만드는 쪽에 무게를 둬.`
+      : watch ? `${watch}의 부담을 줄이는 게 기간 전체 운영의 핵심이야. 중요한 결정은 확인 단계를 하나 더 두고, 나머지 분야는 평소 리듬을 유지해.`
+        : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 기간 전체를 정의하기 어렵다. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
   return { headline, summary }
 }
 
@@ -191,8 +209,8 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
     const aiSummary = clean(data.overall?.summary)
     const fallback = integratedFallback(base, calculation)
     return {
-      headline: aiHeadline && !isSingleSectorCopy(aiHeadline, copies) ? aiHeadline : fallback.headline,
-      summary: aiSummary && !isSingleSectorCopy(aiSummary, copies) ? aiSummary : fallback.summary,
+      headline: readerFacing(aiHeadline) && !isSingleSectorCopy(aiHeadline, copies) ? aiHeadline : fallback.headline,
+      summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) ? aiSummary : fallback.summary,
     }
   }
   if (field.id === 'love') return {
