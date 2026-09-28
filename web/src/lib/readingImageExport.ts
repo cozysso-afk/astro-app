@@ -318,10 +318,10 @@ function cardMetrics(card: ExportCard) {
     smallSize: compact ? 24 : SMALL_SIZE,
     smallLine: compact ? 32 : SMALL_LINE,
     maxBodyLines: compact ? 3 : card.emphasis ? 5 : 6,
-    top: compact ? 22 : 28,
-    bottom: compact ? 20 : 24,
-    eyebrowHeight: card.eyebrow ? (compact ? 29 : 33) : 0,
-    xPad: compact ? 28 : 31,
+    top: compact ? 28 : 34,
+    bottom: compact ? 26 : 32,
+    eyebrowHeight: card.eyebrow ? (compact ? 34 : 39) : 0,
+    xPad: compact ? 34 : 38,
   }
 }
 
@@ -348,6 +348,12 @@ function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: numbe
   const x = PAGE_PADDING
   const width = CONTENT_WIDTH
   const radius = metrics.compact ? 28 : 32
+
+  // Canvas defaults to an alphabetic baseline. Using the card padding value as
+  // a baseline made Korean labels/titles visually stick to the top border and
+  // collapse into each other. Draw card copy from its top edge instead.
+  ctx.save()
+  ctx.textBaseline = 'top'
 
   ctx.save()
   ctx.shadowColor = 'rgba(67,83,119,.09)'
@@ -408,6 +414,7 @@ function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: numbe
     metaLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.smallLine))
   }
 
+  ctx.restore()
   return y + height
 }
 
