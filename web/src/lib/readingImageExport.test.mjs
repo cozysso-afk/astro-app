@@ -18,10 +18,10 @@ test('fortune export uses an iPhone-readable 3:4 aurora glass renderer instead o
   assert.match(exporter,/drawGlassCard/)
   assert.match(exporter,/toneGradient/)
   assert.match(exporter,/layoutCards/)
-  assert.match(exporter,/heights\[p\]-HEADER_HEIGHT<690/)
+  assert.match(exporter,/pageVisualSpacing/)
   assert.match(exporter,/내 상황에 맞춰 읽기/)
   assert.match(exporter,/연락 전체/)
-  assert.match(exporter,/선연락 방향 ·/)
+  assert.match(exporter,/선연락 방향/)
   assert.doesNotMatch(exporter,/contactCards\.push\(\{eyebrow:textOf\(row/)
   assert.match(exporter,/핵심 판단/)
   assert.match(exporter,/기억할 시기/)
@@ -32,13 +32,19 @@ test('fortune export uses an iPhone-readable 3:4 aurora glass renderer instead o
   assert.match(exporter,/anchor\.download=file\.name/)
 })
 
-test('export keeps section title with its first card, redistributes sparse tail pages, and avoids disclaimer-only pages',()=>{
+test('export keeps section title with its first card, redistributes sparse tail space, and avoids disclaimer-only pages',()=>{
   assert.match(exporter,/function itemHeight/)
   assert.match(exporter,/item\.section\?60:0/)
   assert.match(exporter,/if\(heights\[p\]\+h>pageCapacity\(\)&&pages\[p\]\.length\)/)
-  assert.match(exporter,/pages\[p\]\.unshift\(candidate\)/)
+  assert.match(exporter,/topOffset=spare>180/)
+  assert.match(exporter,/extraGap=.*spare>220/)
+  assert.match(exporter,/CARD_GAP\+spacing\.extraGap/)
   assert.match(exporter,/drawFooter/)
   assert.doesNotMatch(exporter,/sections\.push\(\{title:'면책|title:'주의사항'/)
+})
+
+test('canvas wrapping never leaves common closing punctuation orphaned at a new line',()=>{
+  assert.match(exporter,/\^\[,\.;:\!?%\)\\\]}/)
 })
 
 test('relationship result still exposes image save and excludes its toolbar from exported content',()=>{
