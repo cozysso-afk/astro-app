@@ -1,32 +1,33 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
-type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean }
+type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
 type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[] }
 type LayoutItem = { section?: string; card: ExportCard }
 
 const PAGE_WIDTH = 1206
-const PAGE_HEIGHT = 1608
-const PAGE_PADDING = 72
-const HEADER_HEIGHT = 178
-const FOOTER_HEIGHT = 70
+const PAGE_HEIGHT = 1508
+const PAGE_PADDING = 64
+const HEADER_HEIGHT = 148
+const FOOTER_HEIGHT = 58
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2
-const BODY_SIZE = 40
-const BODY_LINE = 55
-const SMALL_SIZE = 28
-const SMALL_LINE = 39
-const CARD_GAP = 28
+const BODY_SIZE = 38
+const BODY_LINE = 50
+const SMALL_SIZE = 26
+const SMALL_LINE = 35
+const CARD_GAP = 22
+const SECTION_HEIGHT = 42
 
 const COLORS = {
   ink: '#34405d',
   inkSoft: '#52617a',
   muted: '#7b879c',
-  favorable: ['rgba(220,250,239,.72)', 'rgba(244,255,251,.52)'],
-  caution: ['rgba(255,230,239,.70)', 'rgba(255,247,232,.50)'],
-  love: ['rgba(238,228,255,.72)', 'rgba(255,238,247,.50)'],
-  date: ['rgba(221,240,255,.74)', 'rgba(241,249,255,.50)'],
-  system: ['rgba(255,247,216,.60)', 'rgba(235,248,255,.50)'],
-  plain: ['rgba(255,255,255,.72)', 'rgba(245,249,255,.50)'],
+  favorable: ['rgba(219,250,239,.76)', 'rgba(246,255,252,.58)'],
+  caution: ['rgba(255,229,239,.74)', 'rgba(255,247,232,.56)'],
+  love: ['rgba(237,226,255,.76)', 'rgba(255,239,248,.56)'],
+  date: ['rgba(220,239,255,.78)', 'rgba(243,250,255,.58)'],
+  system: ['rgba(255,247,214,.64)', 'rgba(236,249,255,.56)'],
+  plain: ['rgba(255,255,255,.78)', 'rgba(247,249,255,.58)'],
 } as const
 
 function normalizeText(value: unknown) {
@@ -111,6 +112,7 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
       body: firstSentences(textOf(tile, 'p'), 1),
       meta: textOf(tile, '.flow-score') ? `상대지수 ${textOf(tile, '.flow-score')}` : '',
       tone: toneOf(tile),
+      compact: true,
     } satisfies ExportCard)))
     if (cards.length) sections.push({ title: textOf(section, ':scope > h4') || '한눈에 보는 흐름', cards })
   }
@@ -150,7 +152,7 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
     for (const event of Array.from(group.querySelectorAll<HTMLElement>('.reading-event')).slice(0, 2)) {
       const body = firstSentences(textOf(event, ':scope > p'), 1)
       if (!body) continue
-      dates.push({ eyebrow: textOf(event, '.reading-state') || textOf(event, '.reading-badge') || '주목', title: dateLabel, body, tone: toneOf(event) })
+      dates.push({ eyebrow: textOf(event, '.reading-state') || textOf(event, '.reading-badge') || '주목', title: dateLabel, body, tone: toneOf(event), compact: true })
     }
   }
   const cleanDates = dedupeCards(dates)
@@ -181,7 +183,7 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     for (const event of Array.from(group.querySelectorAll<HTMLElement>('.reading-event'))) {
       const body = firstSentences(textOf(event, ':scope > p'), 1)
       if (!body) continue
-      dates.push({ eyebrow: textOf(event, '.reading-state') || '주목', title: dateLabel, body, tone: 'date' })
+      dates.push({ eyebrow: textOf(event, '.reading-state') || '주목', title: dateLabel, body, tone: 'date', compact: true })
     }
   }
   const cleanDates = dedupeCards(dates).slice(0, 4)
@@ -217,7 +219,8 @@ function genericModel(root: HTMLElement, label: string): ExportModel {
     const body = firstSentences(directParagraphs(section).join(' '), 2)
     if (title && body) cards.push({ title, body, tone: toneOf(section) })
   }
-  return { title: label, date, hero, sections: dedupeCards(cards).length ? [{ cards: dedupeCards(cards).slice(0, 16) }] : [] }
+  const clean = dedupeCards(cards)
+  return { title: label, date, hero, sections: clean.length ? [{ cards: clean.slice(0, 16) }] : [] }
 }
 
 export function buildReadingExportModel(root: HTMLElement, label: string): ExportModel {
@@ -238,7 +241,7 @@ function createCanvas() {
 function drawAuroraBackground(ctx: CanvasRenderingContext2D) {
   const base = ctx.createLinearGradient(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
   base.addColorStop(0, '#f8fcff')
-  base.addColorStop(.46, '#fbf9ff')
+  base.addColorStop(.44, '#fbf9ff')
   base.addColorStop(1, '#f7fffb')
   ctx.fillStyle = base
   ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
@@ -249,11 +252,11 @@ function drawAuroraBackground(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = gradient
     ctx.fillRect(x - r, y - r, r * 2, r * 2)
   }
-  glow(145, 125, 340, 'rgba(187,235,255,.34)')
-  glow(1040, 185, 390, 'rgba(225,204,255,.32)')
-  glow(860, 1320, 440, 'rgba(198,247,229,.28)')
-  glow(130, 1220, 350, 'rgba(255,218,235,.24)')
-  glow(620, 780, 360, 'rgba(255,244,197,.10)')
+  glow(145, 120, 330, 'rgba(183,232,255,.36)')
+  glow(1030, 170, 370, 'rgba(225,203,255,.34)')
+  glow(860, 1220, 400, 'rgba(198,247,229,.30)')
+  glow(125, 1120, 330, 'rgba(255,216,235,.26)')
+  glow(620, 720, 330, 'rgba(255,244,197,.12)')
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -299,143 +302,177 @@ function toneGradient(ctx: CanvasRenderingContext2D, tone: ExportTone, x: number
   const colors = COLORS[tone] ?? COLORS.plain
   const gradient = ctx.createLinearGradient(x, y, x + width, y + height)
   gradient.addColorStop(0, colors[0])
-  gradient.addColorStop(.55, 'rgba(255,255,255,.52)')
+  gradient.addColorStop(.56, 'rgba(255,255,255,.56)')
   gradient.addColorStop(1, colors[1])
   return gradient
 }
 
+function cardMetrics(card: ExportCard) {
+  const compact = Boolean(card.compact)
+  return {
+    compact,
+    titleSize: compact ? 31 : 34,
+    titleLine: compact ? 40 : 45,
+    bodySize: compact ? 34 : BODY_SIZE,
+    bodyLine: compact ? 44 : BODY_LINE,
+    smallSize: compact ? 24 : SMALL_SIZE,
+    smallLine: compact ? 32 : SMALL_LINE,
+    maxBodyLines: compact ? 3 : card.emphasis ? 5 : 6,
+    top: compact ? 22 : 28,
+    bottom: compact ? 20 : 24,
+    eyebrowHeight: card.eyebrow ? (compact ? 29 : 33) : 0,
+    xPad: compact ? 28 : 31,
+  }
+}
+
 function measureCard(ctx: CanvasRenderingContext2D, card: ExportCard) {
-  font(ctx, 35, 760)
-  const titleLines = wrap(ctx, card.title, CONTENT_WIDTH - 62).slice(0, 2)
-  font(ctx, BODY_SIZE, 480)
-  const bodyLines = card.body ? wrap(ctx, card.body, CONTENT_WIDTH - 62).slice(0, card.emphasis ? 5 : 6) : []
-  font(ctx, SMALL_SIZE, 650)
-  const metaLines = card.meta ? wrap(ctx, card.meta, CONTENT_WIDTH - 62).slice(0, 2) : []
-  const eyebrow = card.eyebrow ? 35 : 0
-  return 32 + eyebrow + linesHeight(titleLines.length, 47) + (bodyLines.length ? 15 + linesHeight(bodyLines.length, BODY_LINE) : 0) + (metaLines.length ? 13 + linesHeight(metaLines.length, SMALL_LINE) : 0) + 28
+  const metrics = cardMetrics(card)
+  const textWidth = CONTENT_WIDTH - metrics.xPad * 2
+  font(ctx, metrics.titleSize, 760)
+  const titleLines = wrap(ctx, card.title, textWidth).slice(0, 2)
+  font(ctx, metrics.bodySize, 480)
+  const bodyLines = card.body ? wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines) : []
+  font(ctx, metrics.smallSize, 650)
+  const metaLines = card.meta ? wrap(ctx, card.meta, textWidth).slice(0, 2) : []
+  return metrics.top
+    + metrics.eyebrowHeight
+    + linesHeight(titleLines.length, metrics.titleLine)
+    + (bodyLines.length ? (metrics.compact ? 10 : 13) + linesHeight(bodyLines.length, metrics.bodyLine) : 0)
+    + (metaLines.length ? (metrics.compact ? 8 : 11) + linesHeight(metaLines.length, metrics.smallLine) : 0)
+    + metrics.bottom
 }
 
 function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: number) {
   const height = measureCard(ctx, card)
+  const metrics = cardMetrics(card)
   const x = PAGE_PADDING
   const width = CONTENT_WIDTH
+  const radius = metrics.compact ? 28 : 32
 
   ctx.save()
-  ctx.shadowColor = 'rgba(67,83,119,.10)'
-  ctx.shadowBlur = 26
-  ctx.shadowOffsetY = 11
-  roundRect(ctx, x, y, width, height, 34)
+  ctx.shadowColor = 'rgba(67,83,119,.09)'
+  ctx.shadowBlur = metrics.compact ? 20 : 24
+  ctx.shadowOffsetY = metrics.compact ? 7 : 9
+  roundRect(ctx, x, y, width, height, radius)
   ctx.fillStyle = toneGradient(ctx, card.tone, x, y, width, height)
   ctx.fill()
   ctx.restore()
 
-  roundRect(ctx, x, y, width, height, 34)
-  ctx.strokeStyle = 'rgba(118,137,180,.20)'
+  roundRect(ctx, x, y, width, height, radius)
+  ctx.strokeStyle = 'rgba(118,137,180,.18)'
   ctx.lineWidth = 2
   ctx.stroke()
 
-  roundRect(ctx, x + 3, y + 3, width - 6, height - 6, 31)
-  ctx.strokeStyle = 'rgba(255,255,255,.52)'
+  roundRect(ctx, x + 3, y + 3, width - 6, height - 6, radius - 3)
+  ctx.strokeStyle = 'rgba(255,255,255,.54)'
   ctx.lineWidth = 2
   ctx.stroke()
 
-  const shine = ctx.createLinearGradient(0, y, 0, y + Math.max(72, height * .42))
-  shine.addColorStop(0, 'rgba(255,255,255,.70)')
+  const shineHeight = Math.max(metrics.compact ? 58 : 68, height * .38)
+  const shine = ctx.createLinearGradient(0, y, 0, y + shineHeight)
+  shine.addColorStop(0, 'rgba(255,255,255,.72)')
   shine.addColorStop(1, 'rgba(255,255,255,0)')
-  roundRect(ctx, x + 5, y + 5, width - 10, Math.max(72, height * .42), 29)
+  roundRect(ctx, x + 5, y + 5, width - 10, shineHeight, radius - 5)
   ctx.fillStyle = shine
   ctx.fill()
 
-  let cy = y + 33
+  const textWidth = width - metrics.xPad * 2
+  let cy = y + metrics.top
   if (card.eyebrow) {
-    font(ctx, 26, 780)
+    font(ctx, metrics.compact ? 23 : 25, 780)
     ctx.fillStyle = card.tone === 'caution' ? '#aa6878' : card.tone === 'favorable' ? '#458675' : card.tone === 'love' ? '#7965a6' : card.tone === 'date' ? '#557ca8' : '#6f7d96'
-    ctx.fillText(card.eyebrow, x + 31, cy)
-    cy += 35
+    ctx.fillText(card.eyebrow, x + metrics.xPad, cy)
+    cy += metrics.eyebrowHeight
   }
 
-  font(ctx, 35, 760)
+  font(ctx, metrics.titleSize, 760)
   ctx.fillStyle = COLORS.ink
-  const titleLines = wrap(ctx, card.title, width - 62).slice(0, 2)
-  titleLines.forEach((line, index) => ctx.fillText(line, x + 31, cy + index * 47))
-  cy += linesHeight(titleLines.length, 47)
+  const titleLines = wrap(ctx, card.title, textWidth).slice(0, 2)
+  titleLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.titleLine))
+  cy += linesHeight(titleLines.length, metrics.titleLine)
 
   if (card.body) {
-    cy += 15
-    font(ctx, BODY_SIZE, 480)
+    cy += metrics.compact ? 10 : 13
+    font(ctx, metrics.bodySize, 480)
     ctx.fillStyle = COLORS.inkSoft
-    const bodyLines = wrap(ctx, card.body, width - 62).slice(0, card.emphasis ? 5 : 6)
-    bodyLines.forEach((line, index) => ctx.fillText(line, x + 31, cy + index * BODY_LINE))
-    cy += linesHeight(bodyLines.length, BODY_LINE)
+    const bodyLines = wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines)
+    bodyLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.bodyLine))
+    cy += linesHeight(bodyLines.length, metrics.bodyLine)
   }
 
   if (card.meta) {
-    cy += 13
-    font(ctx, SMALL_SIZE, 650)
+    cy += metrics.compact ? 8 : 11
+    font(ctx, metrics.smallSize, 650)
     ctx.fillStyle = COLORS.muted
-    const metaLines = wrap(ctx, card.meta, width - 62).slice(0, 2)
-    metaLines.forEach((line, index) => ctx.fillText(line, x + 31, cy + index * SMALL_LINE))
+    const metaLines = wrap(ctx, card.meta, textWidth).slice(0, 2)
+    metaLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.smallLine))
   }
 
   return y + height
 }
 
 function drawHeader(ctx: CanvasRenderingContext2D, model: ExportModel, page: number, total: number) {
-  font(ctx, 29, 720)
+  font(ctx, 27, 720)
   ctx.fillStyle = '#71809a'
-  ctx.fillText('별빛의 운명', PAGE_PADDING, 56)
+  ctx.fillText('별빛의 운명', PAGE_PADDING, 48)
 
-  font(ctx, 55, 800)
+  font(ctx, 52, 800)
   ctx.fillStyle = COLORS.ink
   const title = normalizeText(model.title.replace(/\s*·\s*\d{4}-\d{2}-\d{2}(?:~\d{4}-\d{2}-\d{2})?$/, ''))
-  wrap(ctx, title, CONTENT_WIDTH - 240).slice(0, 2).forEach((line, index) => ctx.fillText(line, PAGE_PADDING, 118 + index * 62))
+  wrap(ctx, title, CONTENT_WIDTH - 240).slice(0, 2).forEach((line, index) => ctx.fillText(line, PAGE_PADDING, 105 + index * 58))
 
   if (model.date) {
-    font(ctx, 28, 700)
-    const width = ctx.measureText(model.date).width + 38
-    roundRect(ctx, PAGE_WIDTH - PAGE_PADDING - width, 70, width, 52, 26)
-    ctx.fillStyle = 'rgba(255,255,255,.60)'
+    font(ctx, 26, 700)
+    const width = ctx.measureText(model.date).width + 36
+    roundRect(ctx, PAGE_WIDTH - PAGE_PADDING - width, 58, width, 48, 24)
+    ctx.fillStyle = 'rgba(255,255,255,.62)'
     ctx.fill()
-    ctx.strokeStyle = 'rgba(123,140,180,.15)'
+    ctx.strokeStyle = 'rgba(123,140,180,.14)'
     ctx.stroke()
     ctx.fillStyle = '#677895'
-    ctx.fillText(model.date, PAGE_WIDTH - PAGE_PADDING - width + 19, 105)
+    ctx.fillText(model.date, PAGE_WIDTH - PAGE_PADDING - width + 18, 91)
   }
 
-  font(ctx, 25, 650)
+  font(ctx, 23, 650)
   ctx.fillStyle = '#8a94a8'
-  ctx.fillText(`${page}/${total}`, PAGE_WIDTH - PAGE_PADDING - 54, 157)
+  const pageText = `${page}/${total}`
+  const pageWidth = ctx.measureText(pageText).width
+  ctx.fillText(pageText, PAGE_WIDTH - PAGE_PADDING - pageWidth, 132)
 }
 
 function drawFooter(ctx: CanvasRenderingContext2D) {
   const y = PAGE_HEIGHT - FOOTER_HEIGHT
-  ctx.strokeStyle = 'rgba(123,140,180,.12)'
+  ctx.strokeStyle = 'rgba(123,140,180,.11)'
   ctx.beginPath()
   ctx.moveTo(PAGE_PADDING, y)
   ctx.lineTo(PAGE_WIDTH - PAGE_PADDING, y)
   ctx.stroke()
-  font(ctx, 23, 550)
+  font(ctx, 21, 550)
   ctx.fillStyle = '#96a0b2'
-  ctx.fillText('점수는 사건 확률이 아니라 선택 기간 안의 상대적 활성도야.', PAGE_PADDING, y + 43)
+  ctx.fillText('점수는 사건 확률이 아니라 선택 기간 안의 상대적 활성도야.', PAGE_PADDING, y + 37)
 }
 
 function drawSectionTitle(ctx: CanvasRenderingContext2D, title: string, y: number) {
-  font(ctx, 30, 800)
+  font(ctx, 28, 800)
   ctx.fillStyle = '#64718b'
-  ctx.fillText(title, PAGE_PADDING, y + 29)
-  return y + 49
+  ctx.fillText(title, PAGE_PADDING, y + 27)
+  return y + SECTION_HEIGHT
 }
 
 function pageCapacity() {
-  return PAGE_HEIGHT - FOOTER_HEIGHT - 34
+  return PAGE_HEIGHT - FOOTER_HEIGHT - 24
 }
 
 function itemHeight(ctx: CanvasRenderingContext2D, item: LayoutItem) {
-  return (item.section ? 54 : 0) + measureCard(ctx, item.card) + CARD_GAP
+  return (item.section ? SECTION_HEIGHT : 0) + measureCard(ctx, item.card)
 }
 
 function pageUsedHeight(ctx: CanvasRenderingContext2D, page: LayoutItem[]) {
-  return page.reduce((sum, item) => sum + itemHeight(ctx, item), 0)
+  return page.reduce((sum, item, index) => sum + itemHeight(ctx, item) + (index < page.length - 1 ? CARD_GAP : 0), 0)
+}
+
+function pageFits(ctx: CanvasRenderingContext2D, items: LayoutItem[]) {
+  return HEADER_HEIGHT + pageUsedHeight(ctx, items) <= pageCapacity()
 }
 
 function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
@@ -447,32 +484,47 @@ function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
   }
 
   const pages: LayoutItem[][] = [[]]
-  const heights = [HEADER_HEIGHT]
   for (const item of groups) {
-    const height = itemHeight(ctx, item)
-    let pageIndex = pages.length - 1
-    if (heights[pageIndex] + height > pageCapacity() && pages[pageIndex].length) {
-      pages.push([])
-      heights.push(HEADER_HEIGHT)
-      pageIndex++
+    let current = pages[pages.length - 1]
+    if (current.length && !pageFits(ctx, [...current, item])) {
+      current = []
+      pages.push(current)
     }
-    pages[pageIndex].push(item)
-    heights[pageIndex] += height
+    current.push(item)
   }
 
-  for (let pass = 0; pass < 5; pass++) {
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = false
     for (let pageIndex = pages.length - 1; pageIndex > 0; pageIndex--) {
       const current = pages[pageIndex]
       const previous = pages[pageIndex - 1]
       if (!current.length || previous.length < 2) continue
-      const currentUsed = pageUsedHeight(ctx, current)
       const available = pageCapacity() - HEADER_HEIGHT
-      if (current.length >= 2 && currentUsed >= available * .50) continue
+      const currentFill = pageUsedHeight(ctx, current) / available
+      const previousFill = pageUsedHeight(ctx, previous) / available
+      if (currentFill >= .64) continue
       const candidate = previous[previous.length - 1]
-      const candidateHeight = itemHeight(ctx, candidate)
-      if (HEADER_HEIGHT + currentUsed + candidateHeight > pageCapacity()) continue
+      const nextCurrent = [candidate, ...current]
+      const nextPrevious = previous.slice(0, -1)
+      if (!pageFits(ctx, nextCurrent) || !nextPrevious.length) continue
+      const nextCurrentFill = pageUsedHeight(ctx, nextCurrent) / available
+      const nextPreviousFill = pageUsedHeight(ctx, nextPrevious) / available
+      const beforeGap = Math.abs(previousFill - currentFill)
+      const afterGap = Math.abs(nextPreviousFill - nextCurrentFill)
+      if (afterGap >= beforeGap && currentFill >= .48) continue
       previous.pop()
       current.unshift(candidate)
+      moved = true
+    }
+    if (!moved) break
+  }
+
+  for (let pageIndex = pages.length - 1; pageIndex > 0; pageIndex--) {
+    const previous = pages[pageIndex - 1]
+    const current = pages[pageIndex]
+    if (current.length && pageFits(ctx, [...previous, ...current])) {
+      previous.push(...current)
+      pages.splice(pageIndex, 1)
     }
   }
 
@@ -483,8 +535,8 @@ function pageVisualSpacing(ctx: CanvasRenderingContext2D, items: LayoutItem[]) {
   const available = pageCapacity() - HEADER_HEIGHT
   const used = pageUsedHeight(ctx, items)
   const spare = Math.max(0, available - used)
-  const topOffset = spare > 160 ? Math.min(62, Math.round(spare * .14)) : 0
-  const extraGap = items.length > 1 && spare > 190 ? Math.min(24, Math.round((spare - topOffset) / (items.length - 1) * .20)) : 0
+  const topOffset = spare > 250 ? 8 : 0
+  const extraGap = items.length > 1 && spare > 220 ? Math.min(8, Math.floor(spare / Math.max(4, items.length * 6))) : 0
   return { topOffset, extraGap }
 }
 

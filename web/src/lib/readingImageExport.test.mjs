@@ -7,9 +7,10 @@ const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import
 const css=readFileSync(new URL('../reading-image-export.css',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-v3.css',import.meta.url),'utf8')
 
-test('fortune export uses an iPhone-readable 3:4 aurora glass renderer instead of flat DOM pagination',()=>{
+test('fortune export uses an iPhone-readable 4:5 aurora glass renderer instead of flat DOM pagination',()=>{
   assert.match(exporter,/PAGE_WIDTH\s*=\s*1206/)
-  assert.match(exporter,/PAGE_HEIGHT\s*=\s*1608/)
+  assert.match(exporter,/PAGE_HEIGHT\s*=\s*1508/)
+  assert.match(exporter,/HEADER_HEIGHT\s*=\s*148/)
   assert.match(exporter,/BODY_SIZE\s*=\s*\d+/)
   assert.match(exporter,/BODY_LINE\s*=\s*\d+/)
   assert.match(exporter,/CARD_GAP\s*=\s*\d+/)
@@ -31,6 +32,15 @@ test('fortune export uses an iPhone-readable 3:4 aurora glass renderer instead o
   assert.match(exporter,/anchor\.download\s*=\s*file\.name/)
 })
 
+test('short flow and timing cards use compact geometry instead of wasting vertical space',()=>{
+  assert.match(exporter,/compact\?: boolean/)
+  assert.match(exporter,/compact:\s*true/)
+  assert.match(exporter,/function cardMetrics/)
+  assert.match(exporter,/titleSize:\s*compact\s*\?\s*31\s*:\s*34/)
+  assert.match(exporter,/bodySize:\s*compact\s*\?\s*34\s*:\s*BODY_SIZE/)
+  assert.match(exporter,/maxBodyLines:\s*compact\s*\?\s*3/)
+})
+
 test('export filters empty cards and includes both primary and reference period sectors',()=>{
   assert.match(exporter,/function meaningfulCard/)
   assert.match(exporter,/normalizeText\(card\.title\)/)
@@ -41,16 +51,16 @@ test('export filters empty cards and includes both primary and reference period 
   assert.match(exporter,/dedupeCards\(dates\)/)
 })
 
-test('export keeps section title with its first card and redistributes sparse tail space without disclaimer-only pages',()=>{
+test('export keeps a stable rhythm and actively rebalances sparse tail pages',()=>{
   assert.match(exporter,/function itemHeight/)
-  assert.match(exporter,/item\.section\s*\?\s*\d+\s*:\s*0/)
-  assert.match(exporter,/heights\[pageIndex\]\s*\+\s*height\s*>\s*pageCapacity\(\)/)
+  assert.match(exporter,/SECTION_HEIGHT/)
   assert.match(exporter,/function pageUsedHeight/)
-  assert.match(exporter,/current\.length\s*>=\s*2/)
+  assert.match(exporter,/function pageFits/)
+  assert.match(exporter,/currentFill\s*>=\s*\.64/)
   assert.match(exporter,/previous\.pop\(\)/)
   assert.match(exporter,/current\.unshift\(candidate\)/)
-  assert.match(exporter,/topOffset/)
-  assert.match(exporter,/extraGap/)
+  assert.match(exporter,/topOffset\s*=\s*spare\s*>\s*250\s*\?\s*8\s*:\s*0/)
+  assert.match(exporter,/Math\.min\(8,/)
   assert.match(exporter,/CARD_GAP\s*\+\s*spacing\.extraGap/)
   assert.match(exporter,/drawFooter/)
   assert.doesNotMatch(exporter,/sections\.push\(\{\s*title:\s*['"](?:면책|주의사항)/)
