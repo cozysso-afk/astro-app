@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { buildFortuneEditorialV3, parseEditorialSections } from './fortuneEditorialV3.ts'
 
 function stat(average,band='보통'){return {average,band,spread:0,best_days:[],caution_days:[]}}
@@ -38,4 +39,11 @@ test('contact overall activation is separate from incoming and outgoing directio
   assert.match(result.contact.directionSummary,/뚜렷한 우세가 없어/)
   assert.match(result.contact.incoming,/상대 → 나/)
   assert.match(result.contact.outgoing,/나 → 상대/)
+})
+
+test('contact UI collapses verbose direction rows when both direction scores are effectively tied',()=>{
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+  assert.match(panel,/showContactDirectionDetails/)
+  assert.match(panel,/뚜렷한 우세가 없어\|비교할 계산 정보가 충분하지 않아/)
+  assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
 })
