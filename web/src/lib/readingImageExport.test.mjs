@@ -56,9 +56,9 @@ test('export keeps section title with its first card and redistributes sparse ta
   assert.doesNotMatch(exporter,/sections\.push\(\{\s*title:\s*['"](?:면책|주의사항)/)
 })
 
-test('canvas wrapping never leaves common closing punctuation orphaned at a new line',()=>{
+test('canvas wrapping keeps common closing punctuation attached to the previous line',()=>{
   assert.match(exporter,/function wrap\(/)
-  assert.match(exporter,/^[\s\S]*\^\[,\.;:!?%\)\\\]}/m)
+  assert.match(exporter,/，。！？、/)
   assert.match(exporter,/line\s*\+=\s*ch/)
   assert.match(exporter,/out\.push\(line\.trimEnd\(\)\)/)
 })
