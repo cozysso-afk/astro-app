@@ -77,6 +77,8 @@ export function PeriodFortuneNarrativeV2({
       ? 'favorable'
       : ['연애','연락','재회'].includes(topic) ? 'love' : 'system'
   const dedicatedRelationshipField = field?.id === 'love' || field?.id === 'social' || field?.id === 'contact'
+  const showContactDirectionDetails = Boolean(editorial.contact)
+    && !/뚜렷한 우세가 없어|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
   return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
@@ -118,10 +120,10 @@ export function PeriodFortuneNarrativeV2({
         {editorial.contact.timing && <time>주목 시기 · {editorial.contact.timing}</time>}
       </article>
       <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>누가 먼저 움직이는 쪽이 더 두드러지나</strong><b>{editorial.contact.directionSummary}</b></article>
-      <ReadingDirections rows={[
+      {showContactDirectionDetails && <ReadingDirections rows={[
         { kind: 'incoming', label: '상대 → 나', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
         { kind: 'outgoing', label: '나 → 상대', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
-      ]}/>
+      ]}/>} 
     </section>}
 
     {!westernOnly && systemOverview}
