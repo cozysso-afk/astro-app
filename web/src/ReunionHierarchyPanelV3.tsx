@@ -7,6 +7,13 @@ type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>[
 type Strength = '낮음' | '보통' | '높음' | '정보 부족'
 type ScoredDirection = DirectionRow & { score?: number }
 
+type StageVerdict = {
+  key: string
+  label: string
+  status: string
+  text: string
+}
+
 const STAGE_LABEL: Record<string,string> = {
   emotional_reactivation: '서로를 다시 의식하는 배경',
   contact_recontact: '연락·대화 재개',
@@ -87,12 +94,13 @@ function initiativeReading(rows: DirectionRow[]) {
     const diff = a - b
     const roundedA = Math.round(a)
     const roundedB = Math.round(b)
-    if (diff === 0) return { label:'뚜렷한 우세 없음', text:`상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 같아. 어느 쪽이 먼저라고 밀어 읽지 않아.` }
+    if (diff === 0) return { label:'판정상 동률', text:`상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 계산값이 같아서 어느 쪽이 먼저라고 구분되지 않아.` }
     if (Math.abs(diff) < 5) {
       const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
+      const pointGap = Math.abs(roundedA - roundedB)
       return {
-        label:`뚜렷한 우세 없음 · ${micro} 미세우세`,
-        text:`상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}로 ${micro} 쪽이 아주 조금 높아. 다만 이 정도 차이는 선연락 주체를 확정할 수준은 아니야.`,
+        label:`판정상 동률권 · ${micro} +${pointGap}`,
+        text:`굳이 수치만 비교하면 ${micro}가 ${pointGap}점 높아. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}지만 이 차이는 실제 선연락 주체를 확정할 수준은 아니야.`,
       }
     }
     const side = diff > 0 ? '상대 → 나' : '나 → 상대'
@@ -122,6 +130,64 @@ function currentState(hierarchy: ReunionHierarchy) {
   if (all.has('contact_recontact')) return '현재 기준일에 열린 단계는 없지만 앞으로 연락·대화 재개를 살펴볼 구간은 잡혀 있어.'
   if (all.has('emotional_reactivation')) return '현재는 실제 접촉보다 과거 관계가 다시 떠오르는 배경 쪽이 먼저 보여.'
   return '현재 조회 범위에서는 연락·만남·관계 재구축 가운데 뚜렷하게 열린 단계가 없어.'
+}
+
+function stageVerdicts(hierarchy: ReunionHierarchy): StageVerdict[] {
+  const stages = stageSet(hierarchy)
+  const rows: Array<{ key:string; label:string }> = [
+    { key:'emotional_reactivation', label:'다시 의식하기' },
+    { key:'contact_recontact', label:'연락·대화' },
+    { key:'in_person_meeting', label:'실제 만남' },
+    { key:'relationship_rebuilding', label:'관계 재구축' },
+  ]
+  return rows.map(({key,label}) => {
+    const activation = hierarchy.stages?.[key]?.activation
+    const band = strengthFromActivation(activation)
+    const hasWindow = stages.has(key)
+    if (hasWindow) return {
+      key,
+      label,
+      status: band === '정보 부족' ? '시기 근거 있음' : `${band} · 시기 근거 있음`,
+      text: key === 'emotional_reactivation' ? '과거 관계를 다시 떠올리거나 서로를 의식하기 쉬운 배경이 잡혀 있어.'
+        : key === 'contact_recontact' ? '직접 연락이나 대화 재개를 따로 살펴볼 단계가 잡혀 있어.'
+        : key === 'in_person_meeting' ? '연락을 넘어 실제 약속·만남으로 이어지는 단계 근거가 잡혀 있어.'
+        : '다시 관계를 운영하기 위한 합의·지속 행동을 볼 단계 근거가 잡혀 있어.',
+    }
+    return {
+      key,
+      label,
+      status: band === '정보 부족' ? '근거 부족' : `${band} · 뚜렷한 시기 없음`,
+      text: key === 'emotional_reactivation' ? '이번 조회에서 다시 의식하는 배경을 따로 강조할 정도의 시기 근거는 약해.'
+        : key === 'contact_recontact' ? '연락이 실제로 생길 시기를 따로 강조할 정도의 근거는 약해.'
+        : key === 'in_person_meeting' ? '연락이 생기더라도 실제 만남까지 넘어간다고 읽을 근거는 아직 약해.'
+        : '만남이 생기더라도 안정적인 관계 재구축까지 넘어갔다고 읽을 근거는 아직 약해.',
+    }
+  })
+}
+
+function bottomLine(hierarchy: ReunionHierarchy, contact: ReturnType<typeof contactReading>, initiative: ReturnType<typeof initiativeReading>) {
+  const stages = stageSet(hierarchy)
+  const direction = initiative.label === '판정 보류' ? '선연락 주체는 판정 보류야.' : `선연락 비교는 ${initiative.label}이야.`
+  if (stages.has('relationship_rebuilding')) return {
+    title:'연락 여부보다 실제 관계 재구축 행동을 볼 단계',
+    text:`이번 조회에서는 관계 재구축 단계까지 근거가 이어져. ${direction} 이제 핵심은 누가 먼저 연락하느냐보다 이전 문제를 다르게 다루고 약속을 지속하는지가 실제로 보이는지야.`,
+  }
+  if (stages.has('in_person_meeting')) return {
+    title:'연락을 넘어 만남은 볼 수 있지만, 재구축은 별도 판단',
+    text:`실제 만남 단계까지는 근거가 이어져. ${direction} 다만 만났다는 사실만으로 재회가 성립했다고 보지 않고, 만남 뒤 관계 정의와 지속 행동이 붙는지를 따로 봐야 해.`,
+  }
+  if (stages.has('contact_recontact')) return {
+    title:'연락은 살펴볼 수 있지만, 아직 재회 단계는 아님',
+    text:`연락·대화 재개는 ${contact.band}이고${contact.first ? ` 먼저 볼 시기는 ${contact.first}야` : ' 특정 시기를 강하게 못 박을 정도는 아니야'}. ${direction} 현재 조회에서는 실제 만남과 관계 재구축까지 이어지는 근거가 약해서, 연락이 생기는지와 재회 여부를 같은 결론으로 묶으면 안 돼.`,
+  }
+  if (stages.has('emotional_reactivation')) return {
+    title:'생각날 배경은 있어도, 연락을 기다릴 근거는 약함',
+    text:`과거 관계를 다시 의식하는 단계는 보이지만 직접 연락·만남 단계는 잡히지 않았어. ${direction} 지금은 프로필 확인이나 추억 회상 같은 내면 반응보다 실제 접촉이 생기는지가 먼저야.`,
+  }
+  return {
+    title:'이번 조회에서는 재회 진행 단계를 뚜렷하게 잡기 어려움',
+    text:`연락·만남·관계 재구축으로 이어지는 단계 근거가 충분하지 않아. ${direction} 지금은 재회 결론을 만들기보다 현실에서 새 접촉이나 관계 변화가 생기는지를 먼저 봐야 해.`,
+  }
 }
 
 function behaviorChangeReading(hierarchy: ReunionHierarchy) {
@@ -221,6 +287,8 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
   const initiative = initiativeReading(directionRows)
   const change = behaviorChangeReading(hierarchyData)
   const stages = stageSet(hierarchyData)
+  const stageRows = stageVerdicts(hierarchyData)
+  const answer = bottomLine(hierarchyData, contact, initiative)
   const next = nextActionReading(contact.band, stages)
   const guides = conditionalGuides(contact.band, stages)
   const events = timeline(hierarchyData)
@@ -232,11 +300,22 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
   const rebuildConditions = (reunionV2?.rebuild?.conditions ?? []).map(item => readerSentences(item, 1)).filter(Boolean).slice(0, 3)
   const evidenceRows = [...evidence].filter(row => Number.isFinite(Number(row.orb))).sort((a,b) => Number(a.orb) - Number(b.orb)).slice(0, 6)
 
-  return <section className="reading-section reunion-hierarchy reunion-ui-v3">
+  return <section className="reading-section reunion-hierarchy reunion-ui-v3 reunion-ui-v4">
     <header className="reunion-result-meta" data-reading-export-tone="date"><small>기준일</small><strong>{hierarchyData.as_of_date}</strong></header>
     {!valid ? <p role="alert">계산 검증을 통과하지 못해서 현재·미래 해설을 보류했어.</p> : <>
-      <section className="reunion-v3-hero" data-reading-export-tone="love">
-        <span>REUNION SUMMARY</span><h3>지금 이 관계를 한 줄로 보면</h3><p>{currentState(hierarchyData)}</p>
+      <section className="reunion-v3-hero reunion-v4-answer" data-reading-export-tone="love">
+        <span>이번 조회의 답</span><h3>{answer.title}</h3><p>{answer.text}</p>
+      </section>
+
+      <section className="reunion-v4-stage-board">
+        <div className="period-ai-section-title"><span>재회 단계 한눈에</span><strong>생각 → 연락 → 만남 → 재구축을 섞지 않아</strong></div>
+        <div className="reunion-v4-stage-grid">{stageRows.map(row => <article className="reunion-v3-card reunion-v4-stage-card" key={row.key} data-reading-export-tone={row.key === 'relationship_rebuilding' ? 'favorable' : row.key === 'contact_recontact' ? 'love' : 'system'}>
+          <small>{row.label}</small><b>{row.status}</b><p>{row.text}</p>
+        </article>)}</div>
+      </section>
+
+      <section className="reunion-v3-hero reunion-v4-current" data-reading-export-tone="system">
+        <span>CURRENT STATE</span><h3>현재 위치</h3><p>{currentState(hierarchyData)}</p>
       </section>
 
       <div className="reunion-v3-grid">
