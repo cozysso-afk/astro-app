@@ -23,6 +23,35 @@ function proseFingerprint(value: string) {
   return String(value ?? '').replace(/[\s.,!?·~→:;()\[\]-]+/g, '').trim()
 }
 
+const META_EDITORIAL_RE = /계산\s*근거|기간 전체 운영|선택 기간(?:의)?|상대지수|판정은|같은 기간 안에서|별도 경계 신호|흐름을 계산|흐름을 .*확인하는/
+
+export function editorialCopyUsable(value: string) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  return text.length >= 12 && !META_EDITORIAL_RE.test(text)
+}
+
+export function compactEditorialCopy(value: string) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!editorialCopyUsable(text)) return ''
+  const sentences = (text.match(/[^.!?]+[.!?]?/g) ?? []).map(sentence => sentence.trim()).filter(Boolean)
+  if (sentences.length >= 3) return `${sentences[0]} ${sentences[2]}`.trim()
+  return sentences.slice(0, 2).join(' ').trim() || text
+}
+
+function overallFallback(summary: ReturnType<typeof polishFortuneSummary>) {
+  const favorable = summary.favorableCards.slice(0, 1)
+  const caution = summary.cautionCards.slice(0, 2)
+  if (!favorable.length && caution.length) {
+    const topics = caution.map(item => item.topic).join('·')
+    return {
+      headline: `${summary.when}은 ${topics}을 밀어붙이기보다 실수를 줄이는 쪽이 좋아.`,
+      summary: caution.map(item => item.meaning).join(' '),
+    }
+  }
+  const concrete = [...favorable, ...caution].map(item => item.meaning).filter(Boolean).join(' ')
+  return { headline: summary.headline, summary: concrete || summary.summary }
+}
+
 export function dedupeHeroSubtitle(summary: string, headline: string) {
   const text = String(summary ?? '').trim()
   const title = String(headline ?? '').trim()
@@ -86,8 +115,12 @@ export function PeriodFortuneNarrativeV2({
   })
   const summary = polishFortuneSummary(base)
   const editorial = buildFortuneEditorialV3(data, calculation, summary, field)
-  const heroSubtitle = dedupeHeroSubtitle(editorial.heroSummary, editorial.heroHeadline)
+  const fallbackHero = overallFallback(summary)
+  const heroHeadline = editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : fallbackHero.headline
+  const heroSummary = editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : fallbackHero.summary
+  const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
+  const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
   const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
     ? 'caution'
     : summary.bestFlow.includes(topic)
@@ -102,14 +135,14 @@ export function PeriodFortuneNarrativeV2({
       <div>
         <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {summary.when} 핵심</span>
         <span className="reading-period-date" data-reading-export-tone="date">{periodLabel(calculation.period.start, calculation.period.end)}</span>
-        <h3>{editorial.heroHeadline}</h3>
+        <h3><span className="period-ai-hero-title-v4" style={{fontFamily:"-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",fontWeight:800}}>{heroHeadline}</span></h3>
         {heroSubtitle && <p className="reading-hero-subtitle">{heroSubtitle}</p>}
       </div>
     </div>
 
     {!field && <div className="reading-flows">
       <h4 className="reading-section-heading">전 분야를 통틀어 보면</h4>
-      <FortuneFlowCards title={summary.doTitle} items={summary.favorableCards}/>
+      {!!summary.favorableCards.length && <FortuneFlowCards title={summary.doTitle} items={summary.favorableCards}/>} 
       {!!referenceFlowCards.length && <FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>} 
       <FortuneFlowCards title={summary.cautionTitle} items={summary.cautionCards} caution/>
     </div>}
@@ -157,7 +190,7 @@ export function PeriodFortuneNarrativeV2({
 
     {!dedicatedRelationshipField && summary.relationship && <section className="period-ai-window-section period-ai-relationship-section" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
-      <article className="period-ai-window period-ai-relationship-summary"><p>{editorial.topicEditorial['연락'] || summary.relationship.summary}</p>
+      <article className="period-ai-window period-ai-relationship-summary"><p>{compactEditorialCopy(editorial.topicEditorial['연락']) || summary.relationship.summary}</p>
         <ReadingDirections rows={[
           { kind: 'incoming', label: '상대가 먼저 오는 흐름', band: summary.relationship.incomingBand, text: summary.relationship.incoming, timing: summary.relationship.incomingTiming },
           { kind: 'outgoing', label: '내가 먼저 연락하기', band: summary.relationship.outgoingBand, text: summary.relationship.outgoing, timing: summary.relationship.outgoingTiming },
@@ -167,9 +200,9 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {!dedicatedRelationshipField && !!summary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
-      <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>Gemini 편집 원고 우선</strong></div>
+      <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>결론 · 지금 할 일</strong></div>
       <div className="period-ai-topic-list">{summary.focusTopics.map(item => {
-        const aiEditorial = editorial.topicEditorial[item.topic]
+        const aiEditorial = compactEditorialCopy(editorial.topicEditorial[item.topic])
         return <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
           <strong>{item.topic}</strong>
           {aiEditorial ? <p className="period-ai-topic-editorial-v4">{aiEditorial}</p> : <>
@@ -187,10 +220,10 @@ export function PeriodFortuneNarrativeV2({
       })}</div>
     </section>}
 
-    {!dedicatedRelationshipField && !!summary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
+    {!dedicatedRelationshipField && !!visibleReferenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
       <summary>다른 분야 보기</summary>
-      <div className="period-ai-topic-list">{summary.referenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v4-ref-${item.topic}`}>
-        <strong>{item.topic} · {item.band}</strong><p>{editorial.topicEditorial[item.topic] || item.detail?.conclusion || item.summary}</p>
+      <div className="period-ai-topic-list">{visibleReferenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v4-ref-${item.topic}`}>
+        <strong>{item.topic} · {item.band}</strong><p>{compactEditorialCopy(editorial.topicEditorial[item.topic]) || item.detail?.conclusion || item.summary}</p>
       </article>)}</div>
     </details>}
 
