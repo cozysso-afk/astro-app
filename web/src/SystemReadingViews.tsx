@@ -24,10 +24,10 @@ const TOPICS: LifeTopic[] = ['전체','애정','대인','학업','직업','금�
 const WESTERN: Record<LifeTopic,string[]> = {전체:[],애정:['연애','연락','재회'],대인:['대인관계','소식'],학업:['학업','시험'],직업:['직장','이직'],금전:['금전','투자심리','수익실현','신규진입','투자주의'],컨디션:['컨디션']}
 const WESTERN_FLOW_COPY: Record<string,[string,string]> = {
   금전:['수입·지출 계획을 정리하고 예산 안에서 움직여.','예상 밖 지출에 여유를 두고 꼭 필요한 돈부터 챙겨.'],
-  학업:['공부할 순서를 정해 차근차근 따라가면 무난해.','새 진도보다 복습부터 잡고 목표를 작게 나눠.'],
+  학업:['공부할 분량을 정하고, 끝낸 뒤 틀린 부분을 바로 표시해.','새 진도보다 복습부터 잡고 목표를 작게 나눠.'],
   시험:['배운 내용을 꺼내 쓰는 연습과 실수 점검을 같이 해.','새 내용을 늘리기보다 자주 틀리는 부분부터 확인해.'],
   직장:['업무 요청과 협의는 일정과 책임 범위를 분명히 해.','일정과 책임 범위가 모호하면 바로 확정하지 말고 다시 맞춰.'],
-  이직:['조건을 비교하고 필요한 대화를 이어가기 괜찮아.','조건이 불분명하면 결정을 서두르지 말고 확인부터 해.'],
+  이직:['직무·보상·시작 일정처럼 비교할 조건을 적고, 확인되지 않은 항목부터 물어봐.','조건이 불분명하면 결정을 서두르지 말고 확인부터 해.'],
   대인관계:['대화와 조율은 상대의 반응을 보면서 이어가.','의견 차이를 급히 결론 내지 말고 사실관계부터 맞춰.'],
   연애:['호감과 만남은 상대의 실제 반응을 보면서 이어가.','관계 진전을 서두르기보다 서로 원하는 속도를 확인해.'],
   연락:['안부·질문·약속처럼 목적이 분명한 연락이 나아.','먼저 연락한다면 짧고 구체적으로 하고 답을 재촉하지 마.'],
@@ -76,7 +76,7 @@ function westernCaution(name:string, stat:FortuneStat) {
   return stat.average < 40 || /약|낮/.test(String(stat.band ?? ''))
 }
 function westernGuidance(name:string, stat:FortuneStat) {
-  const pair = WESTERN_FLOW_COPY[name] ?? ['조건을 확인하면서 움직여.','무리해서 밀어붙이지 말고 조건부터 확인해.']
+  const pair = WESTERN_FLOW_COPY[name] ?? ['결정 전에 확인할 조건을 적고, 비어 있는 항목부터 채워.','확인되지 않은 조건이 있으면 결정을 미루고 사실부터 확인해.']
   return pair[westernCaution(name,stat) ? 1 : 0]
 }
 function westernWhen(dayCount:number) {
@@ -112,17 +112,19 @@ function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
   const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]] ?? strongest[0]
   const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]] ?? weakest[0]
   if (weakest[0]!==strongest[0] && strongest[1].average-weakest[1].average>=8) {
-    return `${koreanParticle(when,'은는')} ${strongLabel} 쪽이 상대적으로 더 살아 있어. 반대로 ${koreanParticle(weakLabel,'은는')} 힘이 덜 실리니, ${westernGuidance(weakest[0],weakest[1])}`
+    return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높아. ${westernGuidance(strongest[0],strongest[1])} ${koreanParticle(weakLabel,'은는')} 점수가 가장 낮으니 ${westernGuidance(weakest[0],weakest[1])}`
   }
-  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 가장 눈에 띄지만 분야 간 차이가 크진 않아. ${westernGuidance(strongest[0],strongest[1])}`
+  return `${koreanParticle(when,'은는')} 분야별 점수 차이가 크지 않아. ${strongLabel}에서는 ${westernGuidance(strongest[0],strongest[1])}`
 }
 function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string) {
   const readable = rows.filter(([name])=>name!=='투자주의')
   if (!readable.length) return '이 분야의 서양점성술 계산값이 충분하지 않아.'
   const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
   const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
-  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]} 흐름을 중심으로 보면 돼.`
-  return `${koreanParticle(when,'은는')} ${koreanParticle(WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0],'이가')} 상대적으로 강하고, ${koreanParticle(WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0],'은는')} 약한 편이야.`
+  const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]
+  const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]
+  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${strongLabel}을 중심으로 봐. ${westernGuidance(strongest[0],strongest[1])}`
+  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높고, ${koreanParticle(weakLabel,'은는')} 가장 낮아. ${westernGuidance(weakest[0],weakest[1])}`
 }
 function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
   const picked:Array<[string,FortuneStat]> = []
