@@ -159,12 +159,12 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {field?.id === 'contact' && editorial.contact && <section className="contact-reading-v3" data-reading-export-tone="date">
-      <div className="period-ai-section-title"><span>연락·소식</span><strong>전체 연락 활성도와 선연락 방향을 분리해서 봐</strong></div>
+      <div className="period-ai-section-title"><span>연락·소식</span><strong>대화가 이어지는지와 누가 먼저 움직이는지를 따로 봐</strong></div>
       <article className="editorial-focus-card-v3 contact-activation-v3">
-        <strong>연락 전체</strong><b>{editorial.contact.activation}</b><p>{editorial.contact.continuity}</p>
+        <strong>연락이 오가는 흐름</strong><b>{editorial.contact.activation}</b><p>{editorial.contact.continuity}</p>
         {editorial.contact.timing && <time>주목 시기 · {editorial.contact.timing}</time>}
       </article>
-      <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>누가 먼저 움직이는 쪽이 더 두드러지나</strong><b>{editorial.contact.directionSummary}</b></article>
+      <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>먼저 움직이는 쪽</strong><b>{editorial.contact.directionSummary}</b></article>
       {showContactDirectionDetails && <ReadingDirections rows={[
         { kind: 'incoming', label: '상대 → 나', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
         { kind: 'outgoing', label: '나 → 상대', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
