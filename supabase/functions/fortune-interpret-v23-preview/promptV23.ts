@@ -5,14 +5,20 @@ export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.4-editorial-usability-g
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
+function bandRole(row:any) {
+  const band=String(row?.band??'').trim()
+  if (/약|낮/.test(band)) return 'caution' as const
+  if (/강|높/.test(band)) return 'support' as const
+  return 'neutral' as const
+}
 
 export function buildNarrativePlan(packet:any) {
   const strongest = Array.isArray(packet?.ranking?.strongest) ? packet.ranking.strongest : []
   const weakest = Array.isArray(packet?.ranking?.weakest) ? packet.ranking.weakest : []
-  const supporting_topics = unique(strongest.filter((row:any)=>Number(row?.average)>=55 && row?.topic!=="투자주의").map((row:any)=>row?.topic)).slice(0,4)
+  const supporting_topics = unique(strongest.filter((row:any)=>bandRole(row)==='support' && row?.topic!=="투자주의").map((row:any)=>row?.topic)).slice(0,4)
   const caution_topics = unique([
-    ...weakest.filter((row:any)=>Number(row?.average)<45).map((row:any)=>row?.topic),
-    ...strongest.filter((row:any)=>row?.topic==="투자주의"&&Number(row?.average)>=55).map((row:any)=>row?.topic),
+    ...weakest.filter((row:any)=>bandRole(row)==='caution').map((row:any)=>row?.topic),
+    ...strongest.filter((row:any)=>row?.topic==="투자주의"&&bandRole(row)==='support').map((row:any)=>row?.topic),
   ]).filter(topic=>!supporting_topics.includes(topic)).slice(0,4)
   const phenomena = Array.isArray(packet?.period_narrative?.phenomena) ? packet.period_narrative.phenomena : []
   const evidence_refs = unique(phenomena.filter((row:any)=>{
