@@ -1,7 +1,7 @@
 import type { FortuneFlowCard, FortuneUserSummary, FortuneUserTopic } from './fortuneUserSummary'
 
 const ABSTRACT_WORDS = ['흐름','신호','구조','자극','배경','접점','활성도','맥락']
-const VAGUE_DECISION_RE = /(?:무난(?:한|하게|해|하지만)|평소 계획|전반적인 균형|한 분야가 압도|특정 분야 하나|속도를 조절|한 번 더 확인하면서|지켜보는 흐름)/
+const VAGUE_DECISION_RE = /(?:무난(?:한|하게|해|하지만)|평소 계획|이미 정한 일정과 기준|전반적인 균형|한 분야가 압도|특정 분야 하나|속도를 조절|한 번 더 확인하면서|지켜보는 흐름)/
 
 function collapseSpaces(value: string) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -182,13 +182,14 @@ export function polishFortuneSummary(summary: FortuneUserSummary): FortuneUserSu
   const rawSummary = summary.periodKind === 'day' ? '' : firstSentences(polishKoreanSentence(summary.summary), 2)
   const directSupport = summary.periodKind === 'day' ? '' : directTopicSupport(summary)
   const summaryText = rawSummary && !VAGUE_DECISION_RE.test(rawSummary) ? rawSummary : directSupport || rawSummary
+  const directSupportUsed = Boolean(directSupport && summaryText === directSupport)
   const headlineFamily = narrativeClaimFamily(headline)
   const summaryFamily = narrativeClaimFamily(summaryText)
   const summaryDuplicate = Boolean(
     summaryText && (
       summaryText === headline ||
       narrativeSimilarity(headline, summaryText) >= 0.68 ||
-      (headlineFamily && headlineFamily === summaryFamily)
+      (!directSupportUsed && headlineFamily && headlineFamily === summaryFamily)
     )
   )
 
