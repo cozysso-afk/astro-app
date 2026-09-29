@@ -16,6 +16,14 @@ test('western independent view starts with an actual period takeaway', () => {
   assert.doesNotMatch(view, /<span>서양점성술 · \{period\}<\/span>/)
 })
 
+test('western reader copy names the score difference and gives a concrete next action', () => {
+  assert.doesNotMatch(view, /상대적으로 더 살아 있어|힘이 덜 실리|무난해|이어가기 괜찮아|상대적으로 강하고|약한 편이야/)
+  assert.match(view, /분야별 점수 차이가 크지 않아/)
+  assert.match(view, /점수가 가장 높고/)
+  assert.match(view, /공부할 분량을 정하고/)
+  assert.match(view, /직무·보상·시작 일정/)
+})
+
 test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /className="system-score-grid western-score-grid"/)
   assert.match(view, /className="western-score-guidance">\{westernGuidance\(name,s\)\}/)
