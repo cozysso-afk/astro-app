@@ -5,6 +5,7 @@ import test from 'node:test'
 const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../system-reading-ux-v40.css', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
+const finalFont = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 
 test('western independent view starts with an actual period takeaway', () => {
@@ -28,10 +29,10 @@ test('western independent view never shows the integrated period panel again', (
   assert.match(polish, /system-reading\.system-western > \.period-deep-reading\s*\{[\s\S]*?display:\s*none\s*!important/)
 })
 
-test('mobile integrated reading uses bold Noto Serif headline and sans supporting copy', () => {
-  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-family:\s*'Noto Serif KR'/)
-  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-weight:\s*700\s*!important/)
-  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*-apple-system/)
+test('mobile integrated reading uses a strong 800 sans headline and lighter supporting copy', () => {
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-family:\s*-apple-system/)
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-weight:\s*800\s*!important/)
+  assert.match(finalFont, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-weight:\s*400\s*!important/)
 })
 
 test('top-level life topics use a fixed two-row mobile grid instead of horizontal clipping', () => {
