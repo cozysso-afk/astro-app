@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
+const periodPanel = readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx', import.meta.url), 'utf8')
+const signals = readFileSync(new URL('../ReadingSignals.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../system-reading-ux-v40.css', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
 const finalFont = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
@@ -37,6 +39,20 @@ test('western date detail uses relative score labels and tells users how to act'
   assert.match(view, /점수가 낮은 날:/)
   assert.match(view, /실제 일정·조건을 함께 확인해/)
   assert.match(view, /피해야 할 날로 단정하지 말고/)
+})
+
+test('important windows use action checks instead of fortune-style verdict labels', () => {
+  assert.match(periodPanel, /<span>기억할 시기<\/span><strong>날짜별 행동·확인 기준<\/strong>/)
+  assert.match(periodPanel, /return '진행 후보'/)
+  assert.match(periodPanel, /return '확인 필요'/)
+  assert.match(periodPanel, /return '변동 확인'/)
+  assert.match(periodPanel, /실제 일정·약속·조건이 구체화되는지 확인해/)
+  assert.match(periodPanel, /일정·문서·상대 행동처럼 확인 가능한 조건을 다시 봐/)
+  assert.match(periodPanel, /다음 행동이 이어지는지 확인해/)
+  assert.doesNotMatch(periodPanel, /활용·주의 구간/)
+  assert.doesNotMatch(periodPanel, /status: window\.kind === 'caution' \? '주의'/)
+  assert.match(signals, /TIMELINE_SIGNAL_LABELS/)
+  assert.match(signals, /favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인'/)
 })
 
 test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
