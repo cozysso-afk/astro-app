@@ -41,12 +41,13 @@ export function buildProviderCoreSchema(fullSchema:any){
   if(!section?.properties)throw new Error("editorial section schema missing");
   core.properties.clusters={
     type:"ARRAY",
-    minItems:EDITORIAL_SECTION_KEYS.length,
-    maxItems:EDITORIAL_SECTION_KEYS.length,
     items:{
       type:"OBJECT",
       properties:{
-        key:{type:"STRING",enum:[...EDITORIAL_SECTION_KEYS]},
+        // Gemini rejects the otherwise-valid 25-value enum/fixed-length combination
+        // as INVALID_ARGUMENT. The prompt names every key and the normalizer below
+        // remains the strict source of truth for exact count, membership and uniqueness.
+        key:{type:"STRING"},
         conclusion:structuredClone(section.properties.conclusion),
         real_scene:structuredClone(section.properties.real_scene),
         action:structuredClone(section.properties.action),

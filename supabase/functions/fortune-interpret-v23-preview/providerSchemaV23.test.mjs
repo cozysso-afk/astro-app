@@ -18,9 +18,9 @@ test('provider schema flattens repeated editorial object branches into one compa
   const clusters=provider.properties.clusters
   const original=SCHEMA.properties.clusters
   assert.equal(clusters.type,'ARRAY')
-  assert.equal(clusters.minItems,EDITORIAL_SECTION_KEYS.length)
-  assert.equal(clusters.maxItems,EDITORIAL_SECTION_KEYS.length)
-  assert.deepEqual(clusters.items.properties.key.enum,[...EDITORIAL_SECTION_KEYS])
+  assert.equal(clusters.minItems,undefined)
+  assert.equal(clusters.maxItems,undefined)
+  assert.deepEqual(clusters.items.properties.key,{type:'STRING'})
   assert.equal(new Set(EDITORIAL_SECTION_KEYS).size,EDITORIAL_SECTION_KEYS.length)
   assert.equal(provider.properties.topic_analysis,undefined)
   assert.ok(!provider.required.includes('topic_analysis'))
