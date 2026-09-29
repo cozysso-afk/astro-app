@@ -31,6 +31,14 @@ test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니/)
 })
 
+test('western date detail uses relative score labels and tells users how to act', () => {
+  assert.doesNotMatch(view, /좋은 날:|주의할 날:/)
+  assert.match(view, /점수가 높은 날:/)
+  assert.match(view, /점수가 낮은 날:/)
+  assert.match(view, /실제 일정·조건을 함께 확인해/)
+  assert.match(view, /피해야 할 날로 단정하지 말고/)
+})
+
 test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
   assert.match(view, /오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고/)
   assert.match(view, /수면·회복 시간을 일정에 먼저 넣어/)
