@@ -31,6 +31,16 @@ test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니/)
 })
 
+test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
+  assert.match(view, /오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고/)
+  assert.match(view, /수면·회복 시간을 일정에 먼저 넣어/)
+  assert.match(view, /부탁과 책임이 한쪽에 몰리는지/)
+  assert.match(view, /쉬는 시간·내가 결정할 범위·돈과 시간을 장기 계획으로 나눠 관리해/)
+  assert.match(view, /thaiLifeSummary\(w\.wheel\.map\(r=>r\.bhumi_key\)\)/)
+  assert.match(view, /부탁·휴식·결정 범위·돈과 시간처럼 지금 손댈 수 있는 부분부터 확인해/)
+  assert.doesNotMatch(view, /부탁·책임의 패턴|생활 영역을 읽는 기준표|좋고 나쁨을 한 줄로 단정하기보다/)
+})
+
 test('western independent view never shows the integrated period panel again', () => {
   assert.match(polish, /system-reading\.system-western > \.period-ai-card,/)
   assert.match(polish, /system-reading\.system-western > \.fortune-experience,/)
