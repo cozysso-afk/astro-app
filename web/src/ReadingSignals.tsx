@@ -6,6 +6,9 @@ const SIGNALS = {
   reconnection: [RotateCcw, '재접점'], rebuilding: [Link2, '유지력'],
   mixed: [Layers3, '혼합'], caution: [ShieldAlert, '주의'], favorable: [Sparkles, '활용'],
 } as const
+const TIMELINE_SIGNAL_LABELS: Partial<Record<ReadingSignal, string>> = {
+  favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인',
+}
 
 export function ReadingBadge({ kind, label }: { kind: ReadingSignal; label?: string }) {
   const [Icon, title] = SIGNALS[kind]
@@ -29,9 +32,12 @@ export type ReadingEvent = { date: string; kind: ReadingSignal; label: string; s
 export function ReadingTimeline({ events }: { events: ReadingEvent[] }) {
   const distinct=[...new Map(events.map(e=>[`${e.date}:${e.kind}:${e.label}:${e.status}`,e])).values()]
   const dates=[...new Set(distinct.map(e=>e.date))].sort()
-  const group=(date:string)=><li key={date}><time>{date}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=><div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
-    <div className="reading-event-heading"><ReadingBadge kind={e.kind}/>{e.status && e.status!==SIGNALS[e.kind][1]&&<span className={`reading-state ${e.status==='주의'?'is-caution':''}`}>{e.status}</span>}</div>
-    <p>{e.label}</p>{e.detail&&<details><summary>이 시기를 읽는 이유</summary><p>{e.detail}</p></details>}
-  </div>)}</div></li>
+  const group=(date:string)=><li key={date}><time>{date}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=>{
+    const badgeLabel=TIMELINE_SIGNAL_LABELS[e.kind]
+    return <div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
+      <div className="reading-event-heading"><ReadingBadge kind={e.kind} label={badgeLabel}/>{e.status && e.status!==badgeLabel&&<span className={`reading-state ${/확인 필요|주의/.test(e.status)?'is-caution':''}`}>{e.status}</span>}</div>
+      <p>{e.label}</p>{e.detail&&<details><summary>이 시기를 읽는 이유</summary><p>{e.detail}</p></details>}
+    </div>
+  })}</div></li>
   return <div className="reading-event-list"><ol>{dates.slice(0,2).map(group)}</ol>{dates.length>2&&<details className="reading-more"><summary>시기 {dates.length-2}개 더 보기</summary><ol>{dates.slice(2).map(group)}</ol></details>}</div>
 }
