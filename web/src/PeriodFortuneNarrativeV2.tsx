@@ -23,7 +23,7 @@ function proseFingerprint(value: string) {
   return String(value ?? '').replace(/[\s.,!?·~→:;()\[\]-]+/g, '').trim()
 }
 
-const META_EDITORIAL_RE = /계산\s*근거|기간 전체 운영|선택 기간(?:의)?|상대지수|판정은|같은 기간 안에서|별도 경계 신호|흐름을 계산|흐름을 .*확인하는/
+const META_EDITORIAL_RE = /계산\s*근거|기간 전체 운영|선택 기간(?:의)?|상대지수|판정은|같은 기간 안에서|별도 경계 신호|흐름을 계산|흐름을 .*확인하는|확인 단계|평소 리듬|두드러지게 밀어줄 분야|특정 분야 하나로|전 섹터/
 
 export function editorialCopyUsable(value: string) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -39,17 +39,12 @@ export function compactEditorialCopy(value: string) {
 }
 
 function overallFallback(summary: ReturnType<typeof polishFortuneSummary>) {
-  const favorable = summary.favorableCards.slice(0, 1)
-  const caution = summary.cautionCards.slice(0, 2)
-  if (!favorable.length && caution.length) {
-    const topics = caution.map(item => item.topic).join('·')
-    return {
-      headline: `${summary.when}은 ${topics}을 밀어붙이기보다 실수를 줄이는 쪽이 좋아.`,
-      summary: caution.map(item => item.meaning).join(' '),
-    }
-  }
-  const concrete = [...favorable, ...caution].map(item => item.meaning).filter(Boolean).join(' ')
-  return { headline: summary.headline, summary: concrete || summary.summary }
+  const concrete = [...summary.favorableCards.slice(0, 1), ...summary.cautionCards.slice(0, 2)]
+    .map(item => item.meaning)
+    .filter(Boolean)
+  const headline = summary.headline || concrete[0] || `${summary.when}은 중요한 한 가지부터 정리해.`
+  const supporting = summary.summary || concrete.join(' ')
+  return { headline, summary: supporting }
 }
 
 export function dedupeHeroSubtitle(summary: string, headline: string) {
@@ -116,8 +111,8 @@ export function PeriodFortuneNarrativeV2({
   const summary = polishFortuneSummary(base)
   const editorial = buildFortuneEditorialV3(data, calculation, summary, field)
   const fallbackHero = overallFallback(summary)
-  const heroHeadline = editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : fallbackHero.headline
-  const heroSummary = editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : fallbackHero.summary
+  const heroHeadline = fallbackHero.headline
+  const heroSummary = fallbackHero.summary
   const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
@@ -135,7 +130,7 @@ export function PeriodFortuneNarrativeV2({
       <div>
         <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {summary.when} 핵심</span>
         <span className="reading-period-date" data-reading-export-tone="date">{periodLabel(calculation.period.start, calculation.period.end)}</span>
-        <h3><span className="period-ai-hero-title-v4" style={{fontFamily:"-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",fontWeight:800}}>{heroHeadline}</span></h3>
+        <h3 className="period-ai-hero-title-v4">{heroHeadline}</h3>
         {heroSubtitle && <p className="reading-hero-subtitle">{heroSubtitle}</p>}
       </div>
     </div>
@@ -190,7 +185,7 @@ export function PeriodFortuneNarrativeV2({
 
     {!dedicatedRelationshipField && summary.relationship && <section className="period-ai-window-section period-ai-relationship-section" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
-      <article className="period-ai-window period-ai-relationship-summary"><p>{compactEditorialCopy(editorial.topicEditorial['연락']) || summary.relationship.summary}</p>
+      <article className="period-ai-window period-ai-relationship-summary"><p>{summary.relationship.summary}</p>
         <ReadingDirections rows={[
           { kind: 'incoming', label: '상대가 먼저 오는 흐름', band: summary.relationship.incomingBand, text: summary.relationship.incoming, timing: summary.relationship.incomingTiming },
           { kind: 'outgoing', label: '내가 먼저 연락하기', band: summary.relationship.outgoingBand, text: summary.relationship.outgoing, timing: summary.relationship.outgoingTiming },
@@ -201,29 +196,24 @@ export function PeriodFortuneNarrativeV2({
 
     {!dedicatedRelationshipField && !!summary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>결론 · 지금 할 일</strong></div>
-      <div className="period-ai-topic-list">{summary.focusTopics.map(item => {
-        const aiEditorial = compactEditorialCopy(editorial.topicEditorial[item.topic])
-        return <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
-          <strong>{item.topic}</strong>
-          {aiEditorial ? <p className="period-ai-topic-editorial-v4">{aiEditorial}</p> : <>
-            <b>{item.conclusion}</b>
-            {item.action && <p><em>실제로는</em> {item.action}</p>}
-            {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
-          </>}
-          <details className="reading-topic-depth">
-            <summary>왜 이렇게 보나</summary>
-            <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
-            {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
-            {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
-          </details>
-        </article>
-      })}</div>
+      <div className="period-ai-topic-list">{summary.focusTopics.map(item => <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
+        <strong>{item.topic}</strong>
+        <b>{item.conclusion}</b>
+        {item.action && <p><em>실제로는</em> {item.action}</p>}
+        {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
+        <details className="reading-topic-depth">
+          <summary>왜 이렇게 보나</summary>
+          <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
+          {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
+          {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
+        </details>
+      </article>)}</div>
     </section>}
 
     {!dedicatedRelationshipField && !!visibleReferenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
       <summary>다른 분야 보기</summary>
       <div className="period-ai-topic-list">{visibleReferenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v4-ref-${item.topic}`}>
-        <strong>{item.topic} · {item.band}</strong><p>{compactEditorialCopy(editorial.topicEditorial[item.topic]) || item.detail?.conclusion || item.summary}</p>
+        <strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion || item.summary}</p>
       </article>)}</div>
     </details>}
 
