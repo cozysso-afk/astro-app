@@ -1,16 +1,16 @@
-/* V58 · integrated-only typography owner
- * The old generic h3 selector fought with several global heading owners.
- * Scope the override to the integrated system surface only.
- * Independent Western/Saju/Thai typography must remain untouched.
+/* V63 · integrated-only typography owner
+ * The result headline must stay visually stronger than the supporting copy on iOS.
+ * Use the system sans face at a real 800 weight instead of a thin-looking serif face.
+ * Independent Western/Saju/Thai typography remains untouched.
  */
 @media (max-width: 600px) {
   html body #root .app-shell .fortune-experience .system-reading.system-integrated
-  .period-ai-card.period-ai-v18 .period-ai-head h3 {
-    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
-    font-synthesis: none !important;
-    font-weight: 700 !important;
-    line-height: 1.62 !important;
-    letter-spacing: -.025em !important;
+  .period-ai-card.period-ai-v18 .period-ai-head h3.period-ai-hero-title-v4 {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+    font-synthesis: weight !important;
+    font-weight: 800 !important;
+    line-height: 1.48 !important;
+    letter-spacing: -.028em !important;
     word-break: keep-all !important;
   }
 
