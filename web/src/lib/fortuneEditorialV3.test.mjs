@@ -62,25 +62,32 @@ test('contact UI collapses verbose direction rows when direction scores are effe
   assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
 })
 
-test('topic cards gate vague Gemini prose and keep a deterministic fallback',()=>{
+test('main fortune topic cards keep deterministic conclusion and action primary',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/export function editorialCopyUsable/)
-  assert.match(panel,/export function compactEditorialCopy/)
-  assert.match(panel,/const aiEditorial = compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\)/)
-  assert.match(panel,/period-ai-topic-editorial-v4/)
-  assert.match(panel,/결론 · 지금 할 일/)
-  assert.match(panel,/item\.conclusion/)
-  assert.match(panel,/item\.action/)
+  assert.doesNotMatch(panel,/const aiEditorial = compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\)/)
+  assert.doesNotMatch(panel,/period-ai-topic-editorial-v4/)
+  assert.match(panel,/<b>\{item\.conclusion\}<\/b>/)
+  assert.match(panel,/<em>실제로는<\/em> \{item\.action\}/)
+  assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
 })
 
-test('overall hero rejects meta copy, removes empty favorable filler, and restores strong mobile hierarchy',()=>{
+test('overall hero cannot be overwritten by Gemini meta copy',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/META_EDITORIAL_RE/)
-  assert.match(panel,/overallFallback/)
+  assert.match(panel,/const fallbackHero = overallFallback\(summary\)/)
+  assert.match(panel,/const heroHeadline = fallbackHero\.headline/)
+  assert.match(panel,/const heroSummary = fallbackHero\.summary/)
+  assert.doesNotMatch(panel,/editorialCopyUsable\(editorial\.heroHeadline\)/)
   assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
-  assert.match(panel,/period-ai-hero-title-v4/)
-  assert.match(panel,/fontWeight:800/)
-  assert.match(panel,/Apple SD Gothic Neo/)
+  assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroHeadline\}<\/h3>/)
+})
+
+test('main relationship and reference summaries cannot be overwritten by generic Gemini prose',()=>{
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+  assert.match(panel,/<p>\{summary\.relationship\.summary\}<\/p>/)
+  assert.doesNotMatch(panel,/compactEditorialCopy\(editorial\.topicEditorial\['연락'\]\) \|\| summary\.relationship\.summary/)
+  assert.match(panel,/<p>\{item\.detail\?\.conclusion \|\| item\.summary\}<\/p>/)
+  assert.doesNotMatch(panel,/compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\) \|\| item\.detail/)
 })
 
 test('weak investment caution boilerplate is hidden from the reference list',()=>{
