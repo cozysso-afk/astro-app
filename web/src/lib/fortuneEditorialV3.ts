@@ -82,6 +82,7 @@ export function sectionCopy(value: any) {
 }
 
 export function editorialGroupCopy(value:any) {
+  if (typeof value === 'string') return clean(value)
   if (!value || typeof value !== 'object') return ''
   return Object.values(value).map(sectionCopy).filter(Boolean).join('\n\n')
 }
