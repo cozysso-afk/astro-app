@@ -35,7 +35,7 @@ test('interpersonal reading exposes friend coworker family new-network and bound
   assert.doesNotMatch(result.interpersonal.summary,/메시지 활성도/)
 })
 
-test('Gemini structured cluster prose overrides deterministic user-facing topic copy',()=>{
+test('Gemini structured cluster prose remains available for user-facing topic copy',()=>{
   const clusters=emptyClusters();Object.assign(clusters.relationship,{summary:section('사람마다 역할을 나눠 읽어.'),love_general:section('관계의 속도를 보자.'),contact_activation:section('직접 대화가 시작되는지와 이어지는지를 나눠 봐.')});Object.assign(clusters.work_study,{work:section('진행 중인 업무를 먼저 닫고 새 일을 벌이지 마. 마감 기준을 먼저 맞추면 협업 마찰을 줄일 수 있어.'),career_change:section('제안의 빠진 조건을 비교해.'),exam:section('아는 문제의 실수를 줄여.'),study:section('복습 범위를 좁혀.')});Object.assign(clusters.money_news,{money:section('이미 정한 지출부터 처리하고 충동 결제는 미뤄.'),news:section('중간 전달보다 공식 안내를 기다려.')});Object.assign(clusters.investment,{psychology:section('불안과 실제 보유 조건을 분리해.'),realization:section('현금 필요와 계획 기준을 먼저 봐.'),entry:section('진입 조건이 충족됐는지부터 확인해.')});clusters.condition.condition=section('집중과 휴식을 번갈아 배치해. 오후 피로가 오기 전에 쉴 시간을 먼저 잡아.')
   const result=buildFortuneEditorialV3(data({clusters}),calc(),base())
   assert.match(result.topicEditorial['직장'],/진행 중인 업무/)
@@ -62,17 +62,39 @@ test('contact UI collapses verbose direction rows when direction scores are effe
   assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
 })
 
-test('overall topic cards prefer Gemini editorial prose over deterministic topic_analysis copy',()=>{
+test('topic cards gate vague Gemini prose and keep a deterministic fallback',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/const aiEditorial = editorial\.topicEditorial\[item\.topic\]/)
+  assert.match(panel,/export function editorialCopyUsable/)
+  assert.match(panel,/export function compactEditorialCopy/)
+  assert.match(panel,/const aiEditorial = compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\)/)
   assert.match(panel,/period-ai-topic-editorial-v4/)
-  assert.match(panel,/Gemini 편집 원고 우선/)
+  assert.match(panel,/결론 · 지금 할 일/)
+  assert.match(panel,/item\.conclusion/)
+  assert.match(panel,/item\.action/)
+})
+
+test('overall hero rejects meta copy, removes empty favorable filler, and restores strong mobile hierarchy',()=>{
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+  assert.match(panel,/META_EDITORIAL_RE/)
+  assert.match(panel,/overallFallback/)
+  assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
+  assert.match(panel,/period-ai-hero-title-v4/)
+  assert.match(panel,/fontWeight:800/)
+  assert.match(panel,/Apple SD Gothic Neo/)
+})
+
+test('weak investment caution boilerplate is hidden from the reference list',()=>{
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+  assert.match(panel,/visibleReferenceTopics/)
+  assert.match(panel,/item\.topic === '투자주의'/)
+  assert.match(panel,/\/약\/\.test\(item\.band\)/)
+  assert.match(panel,/visibleReferenceTopics\.map/)
 })
 
 test('hero subtitle removes the sentence already promoted into the headline',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/export function dedupeHeroSubtitle/)
-  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(editorial\.heroSummary, editorial\.heroHeadline\)/)
+  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(heroSummary, heroHeadline\)/)
   assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
   assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
 })
