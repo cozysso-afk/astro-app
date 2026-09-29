@@ -41,6 +41,15 @@ test('thai overview leads with concrete actions and keeps placement jargon secon
   assert.doesNotMatch(view, /부탁·책임의 패턴|생활 영역을 읽는 기준표|좋고 나쁨을 한 줄로 단정하기보다/)
 })
 
+test('integrated synthesis shows each system takeaway instead of methodology prose', () => {
+  assert.match(view, /className="system-synthesis"><summary>세 체계에서 지금 확인할 것<\/summary>/)
+  assert.match(view, /<b>서양점성술<\/b> · \{westernOverviewSummary\}/)
+  assert.match(view, /<b>사주<\/b> · \{sajuOverviewSummary\}/)
+  assert.match(view, /<b>태국점성술<\/b> · \{thaiReaderSummary\}/)
+  assert.match(view, /세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해/)
+  assert.doesNotMatch(view, /서양점성술의 분야 강약과 사주의 운 구간|선택한 분야에서 실제로 겹치는 맥락이 있는지 비교해/)
+})
+
 test('western independent view never shows the integrated period panel again', () => {
   assert.match(polish, /system-reading\.system-western > \.period-ai-card,/)
   assert.match(polish, /system-reading\.system-western > \.fortune-experience,/)
