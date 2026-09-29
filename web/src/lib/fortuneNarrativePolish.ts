@@ -1,6 +1,7 @@
 import type { FortuneFlowCard, FortuneUserSummary, FortuneUserTopic } from './fortuneUserSummary'
 
 const ABSTRACT_WORDS = ['흐름','신호','구조','자극','배경','접점','활성도','맥락']
+const VAGUE_DECISION_RE = /(?:무난(?:한|하게|해|하지만)|평소 계획|전반적인 균형|한 분야가 압도|특정 분야 하나|속도를 조절|한 번 더 확인하면서|지켜보는 흐름)/
 
 function collapseSpaces(value: string) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -28,6 +29,13 @@ export function polishKoreanSentence(value: string) {
     .replace(/말로만 오가던 요청을 담당자·마감·완료 기준까지 구체화하기 좋은 날이야\.?/g, '말로만 오가던 요청은 담당자를 정하고, 마감일과 완료 기준까지 분명하게 정리하는 게 좋아.')
     .replace(/변화 욕구를 직무·보상·일정 비교로 바꾸는 것/g, '이직을 생각한다면 직무·보상·시작 일정을 실제 조건으로 비교하는 것')
     .replace(/전해 들은 말보다 확정된 답과 다음 절차를 확인하는 것/g, '전해 들은 말보다 확정된 답과 다음 절차를 직접 확인하는 것')
+    .replace(/금전 흐름은 무난한 편이니 계획한 범위 안에서 움직여\.?/g, '금전은 새 지출을 늘리기보다 정한 예산 안에서 처리해.')
+    .replace(/공부할 순서를 정해 차근차근 따라가면 무난해\.?/g, '공부할 분량을 먼저 정하고 한 번에 하나씩 끝내.')
+    .replace(/업무는 맡은 일의 순서를 분명히 하면 무난하게 풀 수 있어\.?/g, '업무는 요청받은 일과 마감 순서를 먼저 정리해.')
+    .replace(/사람 관계는 무리하게 맞추기보다 적당한 거리를 지키면 무난해\.?/g, '사람 관계는 필요한 말만 분명히 하고, 상대 반응은 이후 행동으로 판단해.')
+    .replace(/소식은 서두르지 말고 정해진 연락 순서를 기다려\.?/g, '소식은 기한 전이면 기다리고, 기한이 지났다면 한 번만 짧게 확인해.')
+    .replace(/컨디션은 무난하지만 쉬는 시간을 빼놓진 마\.?/g, '컨디션은 중요한 일 사이에 쉬는 시간을 먼저 잡아.')
+    .replace(/평소 계획을 유지해\.?/g, '이미 정한 일정과 기준을 그대로 지켜.')
     .replace(/이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐\.?/g, '')
     .replace(/오늘은 이 흐름의 영향이 이어지는 구간이야\.?/g, '')
     .replace(/오늘은 이 주제가 가장 또렷하게 드러나는 구간이야\.?/g, '')
@@ -116,7 +124,25 @@ function concreteCardText(card: FortuneFlowCard | undefined) {
   return card ? firstSentences(polishKoreanSentence(card.meaning), 1) : ''
 }
 
+function directTopicHeadline(summary: FortuneUserSummary, limit = 2) {
+  const rows = summary.focusTopics
+    .slice(0, limit)
+    .map(topic => firstSentences(polishKoreanSentence(topic.conclusion), 1))
+    .filter(Boolean)
+  return distinctNarrativeParts(rows, limit).join(' ')
+}
+
+function directTopicSupport(summary: FortuneUserSummary) {
+  const rows = summary.focusTopics.slice(0, 2).flatMap(topic => [
+    firstSentences(polishKoreanSentence(topic.action), 1),
+    firstSentences(polishKoreanSentence(topic.observe ?? ''), 1),
+  ]).filter(Boolean)
+  return distinctNarrativeParts(rows, 2).join(' ')
+}
+
 function dailyHero(summary: FortuneUserSummary) {
+  const direct = directTopicHeadline(summary, 2)
+  if (direct) return direct
   const best = concreteCardText(summary.favorableCards[0])
   const caution = concreteCardText(summary.cautionCards[0])
   const parts = distinctNarrativeParts([best, caution], 2)
@@ -146,8 +172,16 @@ function dedupeTopicDetails(topics: FortuneUserTopic[]): FortuneUserTopic[] {
 }
 
 export function polishFortuneSummary(summary: FortuneUserSummary): FortuneUserSummary {
-  const headline = summary.periodKind === 'day' ? dailyHero(summary) : firstSentences(polishKoreanSentence(summary.headline), 2)
-  const summaryText = summary.periodKind === 'day' ? '' : firstSentences(polishKoreanSentence(summary.summary), 2)
+  const rawHeadline = firstSentences(polishKoreanSentence(summary.headline), 2)
+  const directHeadline = directTopicHeadline(summary, 2)
+  const headline = summary.periodKind === 'day'
+    ? dailyHero(summary)
+    : (!rawHeadline || VAGUE_DECISION_RE.test(rawHeadline)) && directHeadline
+      ? directHeadline
+      : rawHeadline
+  const rawSummary = summary.periodKind === 'day' ? '' : firstSentences(polishKoreanSentence(summary.summary), 2)
+  const directSupport = summary.periodKind === 'day' ? '' : directTopicSupport(summary)
+  const summaryText = rawSummary && !VAGUE_DECISION_RE.test(rawSummary) ? rawSummary : directSupport || rawSummary
   const headlineFamily = narrativeClaimFamily(headline)
   const summaryFamily = narrativeClaimFamily(summaryText)
   const summaryDuplicate = Boolean(
