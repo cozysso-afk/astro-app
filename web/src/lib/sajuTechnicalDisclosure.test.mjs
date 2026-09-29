@@ -6,6 +6,17 @@ const source = readFileSync(fileURLToPath(new URL('../SystemReadingViews.tsx', i
 const css = readFileSync(fileURLToPath(new URL('../system-reading-ux-v40.css', import.meta.url)), 'utf8')
 
 assert.match(source, /function sajuHeadline\(/, 'Saju should build a reader-facing takeaway from validated life lenses')
+assert.match(source, /function sajuOverviewText\(/, 'integrated overview should translate Saju lenses into reader-facing prose')
+assert.match(source, /const sajuOverviewSummary = topic==='전체'/, 'integrated Saju overview should use the reader-facing summary helper')
+assert.match(source, /<p>\{sajuOverviewSummary\}<\/p><small>간지·십성은 사주 탭의 계산 근거에서 따로 확인할 수 있어\.<\/small>/, 'Saju overview should lead with plain-language advice and keep technical labels secondary')
+assert.doesNotMatch(source, /selectedLenses\.map\(l=>l\.title\)\.join\(', '\)/, 'integrated Saju overview must not expose bare internal lens-title lists')
+for (const internalCopy of [
+  '현재 사주 계산 계약에는 이 분야를 직접 읽을 안전한 근거가 없어',
+  '탭을 막지는 않고, 직접 근거가 적다는 상태로 보여줘',
+  '생활 언어로 연결할 수 있는 사주 주제가 충분하지 않아',
+  '세 체계를 같이 보면 · {view.state}',
+]) assert.ok(!source.includes(internalCopy), `reader-facing Saju copy must not expose internal wording: ${internalCopy}`)
+assert.match(source, /이번 기간에는 \{topic\}을 바로 설명할 사주 근거가 많지 않아\./, 'empty Saju topic state should explain missing evidence in user language')
 assert.match(source, /className="system-hero saju-reader-hero"/, 'Saju independent view should have a reader-first hero')
 assert.match(source, /<span>사주 · \{sajuPeriod\}<\/span><h3>\{sajuReaderHeadline\}<\/h3>/, 'Saju hero should show the period label and plain-language takeaway before technical data')
 assert.doesNotMatch(source, /<header className="system-hero"><span>사주 · \{period\}<\/span><h3>\{view\.sajuSummary\}<\/h3>/, 'raw period and legacy technical summary must not lead the Saju view')
@@ -24,4 +35,4 @@ assert.doesNotMatch(source, /<small>\{r\.segment_start\}\s*→\s*\{r\.segment_en
 assert.match(css, /system-saju \.saju-reader-hero > h3[\s\S]*font-size:\s*clamp\(19px, 5vw, 23px\)/, 'Saju takeaway should have a clear headline hierarchy')
 assert.match(css, /system-saju \.system-lens-evidence[\s\S]*font-size:\s*11px/, 'technical evidence should be visually secondary')
 
-console.log('Saju disclosure contract: plain-language takeaway and action first; Ganzhi, ten-god and exact boundaries stay secondary.')
+console.log('Saju disclosure contract: overview and hero use plain-language takeaways; Ganzhi, ten-god and exact boundaries stay secondary.')
