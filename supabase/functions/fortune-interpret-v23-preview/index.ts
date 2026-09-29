@@ -66,7 +66,7 @@ function coreInstruction(){return `
 type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;error?:string};
 type Budget={used:number;deadline:number;calls:CallTrace[]};
 function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadline;}
-function outputLimit(kind:string,compact:boolean){if(kind==="annual")return compact?6200:7200;if(kind==="month")return compact?4800:5600;if(kind==="week")return compact?4000:4700;return compact?3400:4000;}
+function outputLimit(kind:string,compact:boolean){if(kind==="annual")return compact?6200:8192;if(kind==="month")return compact?4800:5600;if(kind==="week")return compact?4000:4700;return compact?3400:4000;}
 
 async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"fallback",compact=false,qualityRetry=""){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
