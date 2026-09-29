@@ -65,6 +65,24 @@ test('thai overview leads with concrete actions and keeps placement jargon secon
   assert.doesNotMatch(view, /부탁·책임의 패턴|생활 영역을 읽는 기준표|좋고 나쁨을 한 줄로 단정하기보다/)
 })
 
+test('calculation details translate engine contracts into reader-facing Korean', () => {
+  assert.match(view, /현재 입력된 출생시간 정보로는/)
+  assert.doesNotMatch(view, /출생시간 검증 정책|탭 전환으로 정밀도 제한/)
+  assert.match(view, /연간 계산 순환이 중앙 단계에 도달해, 이 전통 방식에서 정한 목성 기준을 사용해/)
+  assert.doesNotMatch(view, /엔진의 목성 대체 규칙/)
+  assert.match(view, /전통 천문 위치 자료 · 상승점 참고/)
+  assert.match(view, /상승점 위치 · \{view\.suriyayat\.lagna\.display\}/)
+  assert.match(view, /생활 영역 연결 참고/)
+  assert.doesNotMatch(view, /Suriyayat · 위치와 검증된 라그나|숫자 Lagna|검증된 비예측형 하우스 연결/)
+  assert.match(view, /<b>사용하는 계산<\/b>/)
+  assert.match(view, /<b>해석 범위<\/b>/)
+  assert.match(view, /<b>다른 체계와의 관계<\/b>/)
+  assert.match(view, /이번 해설에서 다루지 않는 계산/)
+  assert.doesNotMatch(view, /<p>\{view\.thai\?\.predictive_status\}<\/p>|<p>\{view\.thai\?\.consensus_policy\}<\/p>/)
+  assert.doesNotMatch(view, /<pre>\{JSON\.stringify\(view\.suriyayat\.ai_safe_descriptive_packet/)
+  assert.match(view, /이번 해설에서 다루지 않는 항목 · \{view\.saju\?\.not_calculated\?\.join/)
+})
+
 test('integrated synthesis shows each system takeaway instead of methodology prose', () => {
   assert.match(view, /className="system-synthesis"><summary>세 체계에서 지금 확인할 것<\/summary>/)
   assert.match(view, /<b>서양점성술<\/b> · \{westernOverviewSummary\}/)
