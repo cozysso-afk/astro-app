@@ -28,7 +28,7 @@ assert.ok(readerTopics >= 0 && calculationDetail > readerTopics, 'plain-language
 assert.match(source, /className="system-lens-evidence"><b>근거<\/b><span>\{evidence \|\|/, 'compact evidence should remain visible without becoming the headline')
 assert.match(source, /ganzhiWithReading\(r\.ganzhi\)/, 'Ganzhi evidence should include Korean readings')
 assert.match(source, /<summary>사주 계산 근거 자세히 보기<\/summary>/, 'technical Saju data should live behind one clear disclosure')
-assert.match(source, /정확 구간 · \{r\.segment_start\} → \{r\.segment_end_exclusive\} 미만/, 'exact solar-term boundaries must remain available inside calculation detail')
+assert.match(source, /적용 기간 · \{r\.segment_start\}부터 \{r\.segment_end_exclusive\} 직전까지/, 'exact solar-term boundaries must remain available inside calculation detail in reader-facing wording')
 assert.doesNotMatch(source, /open=\{i<2\}/, 'technical Saju segments must not open by default')
 assert.doesNotMatch(source, /<small>\{r\.segment_start\}\s*→\s*\{r\.segment_end_exclusive\}\s*미만<\/small>/, 'raw ISO boundaries must not appear in the default summary')
 
