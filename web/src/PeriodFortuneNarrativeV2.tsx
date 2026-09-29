@@ -59,6 +59,18 @@ export function dedupeHeroSubtitle(summary: string, headline: string) {
   return text
 }
 
+function importantWindowStatus(kind?: 'favorable' | 'caution' | 'mixed') {
+  if (kind === 'favorable') return '진행 후보'
+  if (kind === 'caution') return '확인 필요'
+  return '변동 확인'
+}
+
+function importantWindowCheck(kind?: 'favorable' | 'caution' | 'mixed') {
+  if (kind === 'favorable') return '해볼 일을 하나 정하고 실제 일정·약속·조건이 구체화되는지 확인해.'
+  if (kind === 'caution') return '결론부터 내리지 말고 일정·문서·상대 행동처럼 확인 가능한 조건을 다시 봐.'
+  return '한 번의 반응보다 다음 행동이 이어지는지 확인해.'
+}
+
 export function PeriodFortuneNarrativeV2({
   loveStatus: _loveStatus,
   systemOverview,
@@ -174,12 +186,12 @@ export function PeriodFortuneNarrativeV2({
     {!westernOnly && systemOverview}
 
     {!!summary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows" data-reading-export-tone="date">
-      <div className="period-ai-section-title"><span>기억할 시기</span><strong>활용·주의 구간</strong></div>
+      <div className="period-ai-section-title"><span>기억할 시기</span><strong>날짜별 행동·확인 기준</strong></div>
       <ReadingTimeline events={summary.importantWindows.map(window => ({
         date: window.date,
         kind: window.semantic ?? window.kind ?? 'mixed',
-        label: window.guidance,
-        status: window.kind === 'caution' ? '주의' : window.kind === 'favorable' ? '활용' : '혼합',
+        label: `${window.guidance} ${importantWindowCheck(window.kind)}`.trim(),
+        status: importantWindowStatus(window.kind),
       }))}/>
     </section>}
 
