@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFortuneEditorialV3 } from './fortuneEditorialV3.ts'
+import { buildFortuneEditorialV3, editorialGroupCopy } from './fortuneEditorialV3.ts'
 
 function stat(average,band='보통'){return {average,band,spread:0,best_days:[],caution_days:[]}}
 function base(){return {periodKind:'day',when:'오늘',headline:'컨디션 복붙',summary:'컨디션 복붙',doTitle:'좋은 흐름',cautionTitle:'주의',focusTitle:'중요',doItems:[],cautionItems:[],bestFlow:['컨디션','직장'],cautionFlow:['금전','소식'],favorableCards:[{topic:'컨디션',score:56,band:'다소 강함',meaning:'집중할 일정과 쉴 시간을 나눠'}],cautionCards:[{topic:'금전',score:35,band:'약함',meaning:'충동 결제를 주의'}],focusTopics:[{topic:'컨디션',conclusion:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',action:'쉬어',observe:'피로'}],referenceTopics:[],importantWindows:[]}}
@@ -75,4 +75,9 @@ test('hero subtitle removes the sentence already promoted into the headline',()=
   assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(editorial\.heroSummary, editorial\.heroHeadline\)/)
   assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
   assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
+})
+
+test('legacy saved string clusters remain visible in editorial group copy',()=>{
+  assert.equal(editorialGroupCopy('과거 저장 결과의 분야별 종합 문구야.'),'과거 저장 결과의 분야별 종합 문구야.')
+  assert.equal(editorialGroupCopy('  과거   저장   결과  '),'과거 저장 결과')
 })
