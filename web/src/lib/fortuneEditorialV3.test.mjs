@@ -7,6 +7,7 @@ function stat(average,band='보통'){return {average,band,spread:0,best_days:[],
 function base(){return {periodKind:'day',when:'오늘',headline:'컨디션 복붙',summary:'컨디션 복붙',doTitle:'좋은 흐름',cautionTitle:'주의',focusTitle:'중요',doItems:[],cautionItems:[],bestFlow:['컨디션','직장'],cautionFlow:['금전','소식'],favorableCards:[{topic:'컨디션',score:56,band:'다소 강함',meaning:'집중할 일정과 쉴 시간을 나눠'}],cautionCards:[{topic:'금전',score:35,band:'약함',meaning:'충동 결제를 주의'}],focusTopics:[{topic:'컨디션',conclusion:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',action:'쉬어',observe:'피로'}],referenceTopics:[],importantWindows:[]}}
 function calc(){return {period:{start:'2026-09-28',end:'2026-09-28',day_count:1,month_segments:1},western:{overall:{컨디션:stat(56,'다소 강함'),직장:stat(53,'다소 강함'),금전:stat(35,'약함'),소식:stat(36,'약함')},relationship_signals:{수신신호:stat(43,'보통'),발신적합:stat(45,'보통')}}}}
 function section(text=''){return {conclusion:text,real_scene:'현실 장면을 구분해.',action:'지금 할 일을 정해.',change_condition:'구체적 행동이 생기면 판단을 바꿔.',evidence_refs:[],applicability:'conditional'}}
+function blankSection(){return {conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'}}
 function emptyClusters(){return {relationship:Object.fromEntries(['summary','friends','coworkers','family','new_people','boundaries','love_general','love_single','love_crush','love_flirting','love_ambiguous','love_couple','love_reunion_interest','contact_activation','contact_continuity'].map(key=>[key,section()])),work_study:Object.fromEntries(['work','career_change','exam','study'].map(key=>[key,section()])),money_news:{money:section(),news:section()},investment:{psychology:section(),realization:section(),entry:section()},condition:{condition:section()}}}
 function data(overrides={}){return {headline:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',overall:{summary:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',dominant_pattern:'',best_phase:'',caution_phase:'',evidence_refs:[]},clusters:emptyClusters(),contact_flow:{incoming:'상대 → 나 방향은 보통이야.',outgoing:'나 → 상대 방향은 보통이야.',reconnection:''},topic_analysis:{컨디션:{verdict:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',timing:'',action:'쉬어',avoid:'',importance:'핵심',confidence:'보통',confidence_reason:'',evidence_refs:[]},연락:{verdict:'연락 보통',reason:'',timing:'',action:'대화 지속',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]},대인관계:{verdict:'대인 기본',reason:'',timing:'',action:'역할 합의',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]}},...overrides}}
 
@@ -18,21 +19,47 @@ test('integrated hero rejects strongest-sector copy and synthesizes supportive p
 })
 
 test('structured relationship schema exposes six love contexts at once',()=>{
-  const clusters=emptyClusters();Object.assign(clusters.relationship,{summary:section('협업과 경계를 정리해.'),love_general:section('관계 상태마다 질문이 달라.'),love_single:section('새 만남의 여유를 봐.'),love_crush:section('상호 반응을 봐.'),love_flirting:section('다음 약속을 봐.'),love_ambiguous:section('기대치를 맞춰.'),love_couple:section('갈등 뒤 회복을 봐.'),love_reunion_interest:section('재접점과 회복을 구분해.'),contact_activation:section('직접 대화 활성도는 중간이야.'),contact_continuity:section('질문과 답이 이어지는지 봐.')})
+  const clusters=emptyClusters();Object.assign(clusters.relationship,{summary:section('협업과 경계를 정리해.'),love_general:section('관계 상태마다 질문이 달라.'),love_single:section('새 만남의 여유를 봐.'),love_crush:section('상호 반응을 봐.'),love_flirting:section('다음 약속을 봐.'),love_ambiguous:section('기대치를 맞춰.'),love_couple:section('갈등 뒤 회복을 봐.'),love_reunion_interest:section('재접점과 회복을 구분해.'),contact_activation:section('직접 대화 흐름을 확인해.'),contact_continuity:section('질문과 답이 이어지는지 봐.')})
   const result=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'love',label:'애정',topics:['연애','연락','재회']})
   assert.deepEqual(result.loveContexts.map(row=>row.label),['솔로 · 새 인연','짝사랑 · 마음 가는 사람','썸 · 알아가는 중','관계가 애매한 사이','연애 중','재회를 생각하는 경우'])
   assert.match(result.loveContexts[1].text,/상호 반응/)
   assert.match(result.loveContexts[4].text,/갈등 뒤 회복/)
 })
 
+test('relationship dedicated copy drops internal meta but keeps real scene and action',()=>{
+  const clusters=emptyClusters()
+  clusters.relationship.love_crush={conclusion:'계산 근거상 상대지수는 보통이야.',real_scene:'상대가 먼저 질문하고 시간을 내는지 봐.',action:'한 번의 명확한 제안 뒤 반응을 확인해.',change_condition:'구체적 답과 대안 일정이 오면 판단을 올려.',evidence_refs:[],applicability:'conditional'}
+  const result=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'love',label:'애정',topics:['연애','연락','재회']})
+  const crush=result.loveContexts.find(row=>row.key==='crush').text
+  assert.doesNotMatch(crush,/계산 근거|상대지수/)
+  assert.match(crush,/상대가 먼저 질문하고 시간을 내는지/)
+  assert.match(crush,/명확한 제안 뒤 반응/)
+  assert.match(crush,/대안 일정/)
+})
+
 test('interpersonal reading exposes friend coworker family new-network and boundary contexts',()=>{
-  const clusters=emptyClusters();Object.assign(clusters.relationship,{summary:section('관계 종류마다 다르게 봐야 해.'),friends:section('친구와 약속을 다시 맞추는 장면이 중요해.'),coworkers:section('협업 역할을 문장으로 분명히 해.'),family:section('가까운 사람의 기대를 다 받아주지 마.'),new_people:section('새 모임은 넓게보다 한두 사람과 대화를 이어가.'),boundaries:section('부탁을 거절해야 할 때 이유를 길게 변명하지 마.'),contact_activation:section('메시지 활성도는 중간이야.')})
+  const clusters=emptyClusters();Object.assign(clusters.relationship,{summary:section('관계 종류마다 다르게 봐야 해.'),friends:section('친구와 약속을 다시 맞추는 장면이 중요해.'),coworkers:section('협업 역할을 문장으로 분명히 해.'),family:section('가까운 사람의 기대를 다 받아주지 마.'),new_people:section('새 모임은 넓게보다 한두 사람과 대화를 이어가.'),boundaries:section('부탁을 거절해야 할 때 이유를 길게 변명하지 마.'),contact_activation:section('메시지가 이어지는지 봐.')})
   const result=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'social',label:'대인관계',topics:['대인관계']})
   assert.match(result.interpersonal.summary,/관계 종류/)
   assert.deepEqual(result.interpersonalContexts.map(row=>row.label),['친구 · 지인','직장동료 · 협업 상대','가족 · 가까운 사람','새 인맥 · 모임','갈등 · 경계'])
   assert.match(result.interpersonalContexts[0].text,/친구와 약속/)
   assert.match(result.interpersonalContexts[1].text,/협업 역할/)
-  assert.doesNotMatch(result.interpersonal.summary,/메시지 활성도/)
+  assert.doesNotMatch(result.interpersonal.summary,/메시지/)
+})
+
+test('missing relationship editorial falls back to concrete user actions instead of AI status',()=>{
+  const clusters=emptyClusters()
+  for(const key of ['summary','friends','coworkers','family','new_people','boundaries','contact_activation','contact_continuity']) clusters.relationship[key]=blankSection()
+  const source=data()
+  const topicAnalysis={...source.topic_analysis,연락:{...source.topic_analysis.연락,verdict:'',timing:'',action:''},대인관계:{...source.topic_analysis.대인관계,verdict:'',action:'',avoid:''}}
+  const payload=data({clusters,contact_flow:{incoming:'',outgoing:'',reconnection:''},topic_analysis:topicAnalysis})
+  const social=buildFortuneEditorialV3(payload,calc(),base(),{id:'social',label:'대인관계',topics:['대인관계']})
+  const contact=buildFortuneEditorialV3(payload,calc(),base(),{id:'contact',label:'연락·소식',topics:['연락','소식']})
+  assert.match(social.interpersonalContexts.find(row=>row.key==='coworkers').text,/담당자·마감·완료 기준/)
+  assert.doesNotMatch(JSON.stringify(social.interpersonalContexts),/AI 원고|원고가 아직|별도 계산값/)
+  assert.match(contact.contact.incoming,/안부·질문·약속 제안/)
+  assert.match(contact.contact.outgoing,/짧고 구체적으로/)
+  assert.doesNotMatch(JSON.stringify(contact.contact),/AI 원고|별도 계산값|전체 활성도/)
 })
 
 test('Gemini structured cluster prose remains available for user-facing topic copy',()=>{
@@ -44,10 +71,12 @@ test('Gemini structured cluster prose remains available for user-facing topic co
   assert.match(result.topicEditorial['투자심리'],/보유 조건/)
 })
 
-test('contact overall activation is separate from incoming and outgoing direction',()=>{
-  const clusters=emptyClusters();clusters.relationship.contact_activation=section('직접 연락과 대화의 전체 활성도는 보통이야.');clusters.relationship.contact_continuity=section('대화가 이어지는지가 핵심이야.')
+test('contact overall reading keeps useful scene and action separate from direction',()=>{
+  const clusters=emptyClusters();clusters.relationship.contact_activation={conclusion:'계산 근거상 연락 활성도는 보통이야.',real_scene:'안부 뒤 질문이 이어지는지 봐.',action:'답장을 재촉하지 말고 다음 질문이 있는지 확인해.',change_condition:'구체적인 약속이 잡히면 판단을 올려.',evidence_refs:[],applicability:'conditional'};clusters.relationship.contact_continuity=section('대화가 이어지는지가 핵심이야.')
   const result=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'contact',label:'연락·소식',topics:['연락','소식']})
-  assert.match(result.contact.activation,/전체 활성도/)
+  assert.doesNotMatch(result.contact.activation,/계산 근거|활성도/)
+  assert.match(result.contact.activation,/안부 뒤 질문/)
+  assert.match(result.contact.activation,/답장을 재촉하지 말고/)
   assert.match(result.contact.directionSummary,/판정상 동률권/)
   assert.match(result.contact.directionSummary,/상대 → 나 43/)
   assert.match(result.contact.directionSummary,/나 → 상대 45/)
@@ -60,6 +89,10 @@ test('contact UI collapses verbose direction rows when direction scores are effe
   assert.match(panel,/showContactDirectionDetails/)
   assert.match(panel,/동률권\|같은 값\|비교할 계산 정보가 충분하지 않아/)
   assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
+  assert.match(panel,/대화가 이어지는지와 누가 먼저 움직이는지를 따로 봐/)
+  assert.match(panel,/<strong>연락이 오가는 흐름<\/strong>/)
+  assert.match(panel,/<strong>먼저 움직이는 쪽<\/strong>/)
+  assert.doesNotMatch(panel,/전체 연락 활성도/)
 })
 
 test('main fortune topic cards keep deterministic conclusion and action primary',()=>{
