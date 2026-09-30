@@ -55,11 +55,11 @@ test('important windows use action checks instead of fortune-style verdict label
   assert.match(signals, /favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인'/)
 })
 
-test('month and year restore decisions limits and annual phase changes in the natural reading', () => {
-  assert.match(periodPanel, /const showLongPeriodNarrative = verifiedNarrative && \(period === 'month' \|\| period === 'year'\)/)
+test('month and year restore period-level decisions limits and annual phase changes only in integrated view', () => {
+  assert.match(periodPanel, /const showLongPeriodNarrative = verifiedNarrative && !field && \(period === 'month' \|\| period === 'year'\)/)
   assert.match(periodPanel, /const longPeriodDecisions = showLongPeriodNarrative/)
   assert.match(periodPanel, /\(data\.decisions \?\? \[\]\)\.map/)
-  assert.match(periodPanel, /const yearPhaseRows = verifiedNarrative && period === 'year'/)
+  assert.match(periodPanel, /const yearPhaseRows = verifiedNarrative && !field && period === 'year'/)
   assert.match(periodPanel, /\(data\.year_phases \?\? \[\]\)\.map/)
   assert.match(periodPanel, /const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable\(data\.limits\)/)
   assert.match(periodPanel, /<span>연간 흐름 지도<\/span><strong>한 해 안에서 분위기가 바뀌는 구간<\/strong>/)
@@ -68,6 +68,25 @@ test('month and year restore decisions limits and annual phase changes in the na
   assert.match(periodPanel, /<span>해석 한계<\/span><strong>여기까지는 단정하지 않아<\/strong>/)
   assert.match(periodPanel, /periodGuidanceText/)
   assert.match(periodPanel, /RAW_PERIOD_GUIDANCE_RE/)
+})
+
+test('period priorities and cross checks are consumed without leaking whole-period prose into topic tabs', () => {
+  assert.match(periodPanel, /const priorityRows = verifiedNarrative && !field/)
+  assert.match(periodPanel, /\(data\.priorities \?\? \[\]\)/)
+  assert.match(periodPanel, /const showPriorityRows = priorityRows\.length > 0 && \(!showLongPeriodNarrative \|\| longPeriodDecisions\.length === 0\)/)
+  assert.match(periodPanel, /<span>이번 기간 우선순위<\/span><strong>먼저 챙길 것<\/strong>/)
+  assert.match(periodPanel, /const crossCheckRows = verifiedNarrative && !field/)
+  assert.match(periodPanel, /\(data\.cross_checks \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /crossCheckModeLabel\(item\.mode\)/)
+  assert.match(periodPanel, /<span>세 체계 교차해설<\/span><strong>같은 시기를 서로 다른 계산 체계로 확인<\/strong>/)
+  assert.match(periodPanel, /세 체계의 점수나 기준을 합산하거나 다수결하지 않고/)
+  assert.match(periodPanel, /<b>서양점성술<\/b><span>\{item\.western\}<\/span>/)
+  assert.match(periodPanel, /<b>사주<\/b><span>\{item\.saju\}<\/span>/)
+  assert.match(periodPanel, /<b>태국점성술<\/b><span>\{item\.thai\}<\/span>/)
+  assert.match(periodPanel, /<strong>같이 보면<\/strong><p>\{item\.synthesis\}<\/p>/)
+  assert.match(periodPanel, /여러 체계에서 함께 확인/)
+  assert.match(periodPanel, /체계별 해석이 다름/)
+  assert.match(periodPanel, /서양점성술 단독 근거/)
 })
 
 test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
