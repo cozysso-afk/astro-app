@@ -3,6 +3,7 @@ import type { FortuneField } from './fortuneFields'
 import type { FortuneUserSummary } from './fortuneUserSummary'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
+type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
 
 export type LoveContextKey = 'single' | 'crush' | 'flirting' | 'ambiguous' | 'couple' | 'reunion_interest'
 export type LoveContextReading = { key: LoveContextKey; label: string; text: string }
@@ -59,6 +60,18 @@ function clean(value: unknown) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+function sectionApplicability(value: any): EditorialApplicability {
+  const applicability = clean(value?.applicability)
+  if (applicability === 'direct' || applicability === 'conditional' || applicability === 'insufficient') return applicability
+  // Older cached structured objects may not carry this field. Keep them visible,
+  // but treat them as conditional rather than silently upgrading them to direct.
+  return 'conditional'
+}
+
+function editorialSectionUsable(value: any) {
+  return Boolean(value) && typeof value === 'object' && sectionApplicability(value) !== 'insufficient'
+}
+
 function fingerprint(value: unknown) {
   return clean(value).replace(/[\s.,!?·~→:;()\[\]-]+/g, '').replace(/(?:오늘|이번주|이번달|올해)/g, '')
 }
@@ -91,12 +104,12 @@ function firstSentence(value: string) {
 }
 
 export function sectionCopy(value: any) {
-  if (!value || typeof value !== 'object') return ''
+  if (!editorialSectionUsable(value)) return ''
   return [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean).filter(Boolean).join(' ')
 }
 
 export function relationshipSectionCopy(value: any) {
-  if (!value || typeof value !== 'object') return ''
+  if (!editorialSectionUsable(value)) return ''
   return [value.conclusion, value.real_scene, value.action, value.change_condition]
     .map(clean)
     .filter(part => relationshipPartUsable(part))
@@ -128,18 +141,21 @@ function topicEditorial(data: InterpretationData) {
   const moneyNews = data.clusters?.money_news
   const investment = data.clusters?.investment
   const condition = data.clusters?.condition
-  const candidates: Record<string, string | undefined> = {
-    '대인관계': sectionCopy(relationship?.summary), '연애': sectionCopy(relationship?.love_general),
-    '연락': sectionCopy(relationship?.contact_activation), '재회': sectionCopy(relationship?.love_reunion_interest),
-    '직장': sectionCopy(workStudy?.work), '이직': sectionCopy(workStudy?.career_change),
-    '시험': sectionCopy(workStudy?.exam), '학업': sectionCopy(workStudy?.study),
-    '컨디션': sectionCopy(condition?.condition), '금전': sectionCopy(moneyNews?.money),
-    '소식': sectionCopy(moneyNews?.news), '투자심리': sectionCopy(investment?.psychology),
-    '수익실현': sectionCopy(investment?.realization), '신규진입': sectionCopy(investment?.entry),
+  const candidates: Record<string, any> = {
+    '대인관계': relationship?.summary, '연애': relationship?.love_general,
+    '연락': relationship?.contact_activation, '재회': relationship?.love_reunion_interest,
+    '직장': workStudy?.work, '이직': workStudy?.career_change,
+    '시험': workStudy?.exam, '학업': workStudy?.study,
+    '컨디션': condition?.condition, '금전': moneyNews?.money,
+    '소식': moneyNews?.news, '투자심리': investment?.psychology,
+    '수익실현': investment?.realization, '신규진입': investment?.entry,
   }
-  return Object.fromEntries(Object.entries(candidates)
-    .map(([key, value]) => [key, clean(value)])
-    .filter(([, value]) => readerFacing(value))) as Record<string, string>
+  return Object.fromEntries(Object.entries(candidates).flatMap(([key, section]) => {
+    const value = clean(sectionCopy(section))
+    if (!readerFacing(value)) return []
+    const readerCopy = sectionApplicability(section) === 'conditional' ? `조건부로 보면, ${value}` : value
+    return [[key, readerCopy]]
+  })) as Record<string, string>
 }
 
 function fallbackLoveText(key: LoveContextKey, data: InterpretationData) {
