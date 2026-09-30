@@ -264,9 +264,10 @@ function contactEditorial(data: InterpretationData, calculation: IntegratedApiRe
     || (contactScore == null
       ? '연락 흐름을 한 문장으로 정리할 정보가 충분하지 않아. 실제 연락이 생기면 질문과 답이 이어지고 약속이 구체화되는지 확인해.'
       : `연락 관련 점수는 ${bandLabel(calculation, '연락')}이야. 한 번의 답장보다 질문과 답이 이어지고 약속이 구체화되는지 확인해.`)
-  const continuity = relationshipSectionCopy(sections?.contact_continuity)
+  const contactContinuity = relationshipSectionCopy(sections?.contact_continuity)
     || (relationshipPartUsable(topicAction) ? topicAction : '')
     || '연락이 생기면 한 번의 답장보다 질문과 답이 이어지고 실제 약속이 구체화되는지를 봐.'
+  const continuity = `${contactContinuity} 소식은 전해 들은 말보다 공식 안내·날짜·다음 단계가 구체적으로 오는지를 기준으로 봐.`
   return {
     activation,
     continuity,
