@@ -149,8 +149,10 @@ export function PeriodFortuneNarrativeV2({
   const summary = polishFortuneSummary(base)
   const editorial = buildFortuneEditorialV3(data, calculation, summary, field)
   const fallbackHero = overallFallback(summary)
-  const heroHeadline = fallbackHero.headline
-  const heroSummary = fallbackHero.summary
+  const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : ''
+  const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
+  const heroHeadline = integratedHeroHeadline || fallbackHero.headline
+  const heroSummary = integratedHeroSummary || fallbackHero.summary
   const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
@@ -225,7 +227,7 @@ export function PeriodFortuneNarrativeV2({
     </div>
 
     {!field && <div className="reading-flows">
-      <h4 className="reading-section-heading">전 분야를 통틀어 보면</h4>
+      <h4 className="reading-section-heading">분야별 흐름</h4>
       {!!summary.favorableCards.length && <FortuneFlowCards title={summary.doTitle} items={summary.favorableCards}/>} 
       {!!referenceFlowCards.length && <FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>} 
       <FortuneFlowCards title={summary.cautionTitle} items={summary.cautionCards} caution/>
