@@ -85,6 +85,18 @@ function periodGuidanceUsable(value: unknown) {
   return Boolean(text) && !RAW_PERIOD_GUIDANCE_RE.test(text)
 }
 
+function crossCheckModeLabel(value: string) {
+  if (value === '복수체계') return '여러 체계에서 함께 확인'
+  if (value === '상반맥락') return '체계별 해석이 다름'
+  return '서양점성술 단독 근거'
+}
+
+function crossCheckModeClass(value: string) {
+  if (value === '복수체계') return 'is-multi'
+  if (value === '상반맥락') return 'is-tension'
+  return 'is-western-only'
+}
+
 export function PeriodFortuneNarrativeV2({
   loveStatus: _loveStatus,
   systemOverview,
@@ -147,7 +159,7 @@ export function PeriodFortuneNarrativeV2({
       .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
       .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
     : []
-  const showLongPeriodNarrative = verifiedNarrative && (period === 'month' || period === 'year')
+  const showLongPeriodNarrative = verifiedNarrative && !field && (period === 'month' || period === 'year')
   const longPeriodDecisions = showLongPeriodNarrative
     ? (data.decisions ?? []).map((item, index) => ({
         key: `${index}-${periodGuidanceText(item.action)}`,
@@ -158,7 +170,7 @@ export function PeriodFortuneNarrativeV2({
         avoid: periodGuidanceUsable(item.avoid) ? periodGuidanceText(item.avoid) : '',
       })).filter(item => Boolean(item.action))
     : []
-  const yearPhaseRows = verifiedNarrative && period === 'year'
+  const yearPhaseRows = verifiedNarrative && !field && period === 'year'
     ? (data.year_phases ?? []).map((phase, index) => ({
         key: `${index}-${phase.start}-${phase.end}`,
         label: periodGuidanceText(phase.label),
@@ -171,6 +183,28 @@ export function PeriodFortuneNarrativeV2({
   const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable(data.limits)
     ? periodGuidanceText(data.limits)
     : ''
+  const priorityRows = verifiedNarrative && !field
+    ? [...new Set((data.priorities ?? [])
+        .filter(periodGuidanceUsable)
+        .map(periodGuidanceText))]
+      .filter(text => !longPeriodDecisions.some(item => proseFingerprint(item.action) === proseFingerprint(text)))
+      .slice(0, 3)
+    : []
+  const showPriorityRows = priorityRows.length > 0 && (!showLongPeriodNarrative || longPeriodDecisions.length === 0)
+  const crossCheckRows = verifiedNarrative && !field
+    ? (data.cross_checks ?? []).map((item, index) => ({
+        key: `${index}-${item.start}-${item.end}-${item.label}`,
+        label: periodGuidanceUsable(item.label) ? periodGuidanceText(item.label) : '같은 시기 교차 확인',
+        start: item.start,
+        end: item.end,
+        modeLabel: crossCheckModeLabel(item.mode),
+        modeClass: crossCheckModeClass(item.mode),
+        western: periodGuidanceUsable(item.western) ? periodGuidanceText(item.western) : '',
+        saju: periodGuidanceUsable(item.saju) ? periodGuidanceText(item.saju) : '',
+        thai: periodGuidanceUsable(item.thai) ? periodGuidanceText(item.thai) : '',
+        synthesis: periodGuidanceUsable(item.synthesis) ? periodGuidanceText(item.synthesis) : '',
+      })).filter(item => Boolean(item.western || item.saju || item.thai || item.synthesis))
+    : []
   const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
     ? 'caution'
     : summary.bestFlow.includes(topic)
@@ -234,6 +268,25 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {!westernOnly && systemOverview}
+
+    {showPriorityRows && <section className="ai-priorities period-ai-priorities-v4">
+      <div className="period-ai-section-title"><span>이번 기간 우선순위</span><strong>먼저 챙길 것</strong></div>
+      {priorityRows.map((item, index) => <p key={`priority-v4-${index}-${item}`}><b>{index + 1}</b> {item}</p>)}
+    </section>}
+
+    {!!crossCheckRows.length && <section className="ai-cross-check-section period-ai-cross-check-v4">
+      <div className="period-ai-section-title"><span>세 체계 교차해설</span><strong>같은 시기를 서로 다른 계산 체계로 확인</strong></div>
+      <p className="ai-cross-check-note">세 체계의 점수나 기준을 합산하거나 다수결하지 않고, 각 체계가 같은 시기를 어떻게 설명하는지 나란히 봐.</p>
+      <div className="ai-cross-check-list">{crossCheckRows.map(item => <article className={`ai-cross-check ${item.modeClass}`} key={item.key}>
+        <div className="ai-cross-check-head"><div><span>{periodLabel(item.start, item.end)}</span><strong>{item.label}</strong></div><b>{item.modeLabel}</b></div>
+        <div className="ai-cross-system-lines">
+          {item.western && <p><b>서양점성술</b><span>{item.western}</span></p>}
+          {item.saju && <p><b>사주</b><span>{item.saju}</span></p>}
+          {item.thai && <p><b>태국점성술</b><span>{item.thai}</span></p>}
+        </div>
+        {item.synthesis && <div className="ai-cross-synthesis"><strong>같이 보면</strong><p>{item.synthesis}</p></div>}
+      </article>)}</div>
+    </section>}
 
     {!!yearPhaseRows.length && <section className="ai-year-phase-section period-ai-year-phase-v4" data-reading-export-tone="date">
       <div className="period-ai-section-title"><span>연간 흐름 지도</span><strong>한 해 안에서 분위기가 바뀌는 구간</strong></div>
