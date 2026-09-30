@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v5-adaptive-length";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v6-semantic-usefulness";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -59,7 +59,8 @@ function claimStrings(data:any){
   for(const p of data?.year_phases??[]){add(p?.theme);add(p?.change);}
   for(const x of data?.cross_checks??[]){add(x?.label);add(x?.western);add(x?.saju);add(x?.thai);add(x?.synthesis);}
   for(const d of data?.decisions??[]){add(d?.action);add(d?.timing);add(d?.reason);add(d?.watch);add(d?.avoid);}
-  for(const v of Object.values(data?.clusters??{}))add(v);
+  const walkEditorial=(v:any)=>{if(!v||typeof v!=="object")return;for(const section of Object.values(v) as any[])for(const key of ["conclusion","real_scene","action","change_condition"])add(section?.[key]);};
+  for(const v of Object.values(data?.clusters??{}))walkEditorial(v);
   for(const v of Object.values(data?.relationship_reading??{}))add(v);
   for(const v of Object.values(data?.contact_flow??{}))add(v);
   for(const v of Object.values(data?.investment_reading??{}))add(v);
@@ -69,6 +70,13 @@ function claimStrings(data:any){
   add(data?.limits);
   return out;
 }
+const EDITORIAL_CLUSTER_KEYS:Record<string,string[]>={
+  relationship:["summary","friends","coworkers","family","new_people","boundaries","love_general","love_single","love_crush","love_flirting","love_ambiguous","love_couple","love_reunion_interest","contact_activation","contact_continuity"],
+  work_study:["work","career_change","exam","study"],money_news:["money","news"],investment:["psychology","realization","entry"],condition:["condition"],
+};
+function words(value:unknown){return new Set(String(value??"").toLowerCase().replace(/[^0-9a-z가-힣]+/gi," ").split(/\s+/).map(x=>x.replace(/(?:은|는|이|가|을|를|에서|으로|에게|하고|하면|해야|이다|야|해)$/,"")) .filter(x=>x.length>=2&&!new Set(["이번","현재","실제","흐름","분야","기간","확인","판단"]).has(x)));}
+function semanticSimilarity(a:unknown,b:unknown){const left=words(a),right=words(b);if(!left.size||!right.size)return 0;const overlap=[...left].filter(x=>right.has(x)).length;return overlap/Math.min(left.size,right.size);}
+function sectionText(section:any){return [section?.conclusion,section?.real_scene,section?.action,section?.change_condition].map(String).join(" ");}
 function hasUnnegatedProbabilityClaim(prose:string){
   const re=/(?:사건|연락|재회|합격|성공|수익)\s*확률/g;
   for(const match of prose.matchAll(re)){
@@ -95,6 +103,11 @@ export function inspectInterpretationQuality(data:any,payload:any){
   for(const k of TOPICS){
     if(!data?.topic_analysis?.[k])s1.push(`topic_analysis.${k} 누락`);
     else if(!["핵심","주목","참고"].includes(String(data.topic_analysis[k]?.importance??"")))s1.push(`topic_analysis.${k}.importance 오류`);
+  }
+  if(payload?.__v23_evidence_timing_repair===true)for(const [group,keys] of Object.entries(EDITORIAL_CLUSTER_KEYS)){
+    const value=data?.clusters?.[group];
+    if(!value||typeof value!=="object"||Array.isArray(value)){s1.push(`clusters.${group} structured schema 누락`);continue;}
+    for(const key of keys){const section=value?.[key];if(!section||typeof section!=="object")s1.push(`clusters.${group}.${key} 누락`);else if(!["direct","conditional","insufficient"].includes(String(section?.applicability??"")))s1.push(`clusters.${group}.${key}.applicability 오류`);}
   }
   stages.push(qualityStage(1,"구조 완전성",s1));
 
@@ -264,8 +277,8 @@ export function inspectInterpretationQuality(data:any,payload:any){
       if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&String(ir?.[field]??"").length<20)s5.push(`${topic} 중요 분야인데 투자 상세 설명 부족`);
     }
   }
-  const clusterMax=kind==="annual"?650:kind==="month"?500:420;
-  for(const [name,value] of Object.entries(data?.clusters??{}))if(String(value??"").length>clusterMax)s5.push(`분야별 종합 ${name}이 지나치게 김(${String(value??"").length}/${clusterMax})`);
+  const sectionMax=kind==="annual"?1500:kind==="month"?1200:950;
+  for(const [name,value] of Object.entries(data?.clusters??{}))for(const [key,section] of Object.entries(value??{}) as any[]){const length=sectionText(section).length;if(length>sectionMax)s5.push(`분야별 원고 ${name}.${key}가 지나치게 김(${length}/${sectionMax})`);}
   const dominantMax=kind==="annual"?900:650;
   if(String(data?.overall?.dominant_pattern??"").length>dominantMax)s5.push(`핵심 패턴이 지나치게 김(${String(data?.overall?.dominant_pattern??"").length}/${dominantMax})`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
@@ -293,19 +306,53 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if((prose.match(generic)??[]).length>=3)s5.push("일반론 조언 반복이 많음");
   stages.push(qualityStage(5,"깊이·실용성",uniq(s5).slice(0,45)));
 
+  const s6:string[]=[];
+  const summary=String(data?.overall?.summary??"");
+  for(const [topic,row] of Object.entries(data?.topic_analysis??{}) as any[]){
+    const candidate=[row?.verdict,row?.reason,row?.action].join(" ");
+    if(candidate.length>=45&&semanticSimilarity(summary,candidate)>=.78){s6.push(`overall이 단일 분야 ${topic}의 재진술에 가까움`);break;}
+  }
+  const allSections:Array<{id:string;section:any}>=[];
+  for(const [group,keys] of Object.entries(EDITORIAL_CLUSTER_KEYS))for(const key of keys){const section=data?.clusters?.[group]?.[key];if(section)allSections.push({id:`${group}.${key}`,section});}
+  for(const {id,section} of allSections){
+    const mode=String(section?.applicability??"");
+    if(String(section?.conclusion??"").length<10)s6.push(`${id} 현재 결론 누락`);
+    if(mode!=="insufficient"&&String(section?.real_scene??"").length<12)s6.push(`${id} 현실 장면/판단기준 누락`);
+    if(String(section?.action??"").length<8)s6.push(`${id} 사용자 행동 누락`);
+    if(String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
+    if(mode==="direct"&&!(section?.evidence_refs?.length))s6.push(`${id} direct인데 근거 ID 없음`);
+    const combined=sectionText(section);
+    if(/^(?:확인해|지켜봐|신중해|서두르지 마|천천히 봐)[.!\s]*$/.test(combined))s6.push(`${id} 안전하지만 무용한 원고`);
+  }
+  const genericStem=/(?:확인해|지켜봐|신중해|서두르지 마|천천히 봐)/g;
+  const genericSections=allSections.filter(({section})=>(sectionText(section).match(genericStem)??[]).length>=2);
+  if(genericSections.length>=3)s6.push(`여러 분야에서 확인·신중·관찰 조언 반복(${genericSections.length})`);
+  const interchangeable=(ids:string[],label:string)=>{
+    for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+      const a=data?.clusters?.relationship?.[ids[i]],b=data?.clusters?.relationship?.[ids[j]];
+      if(a&&b&&semanticSimilarity(sectionText(a),sectionText(b))>=.82){s6.push(`${label} 원고가 서로 바꿔 붙일 수 있음: ${ids[i]}/${ids[j]}`);return;}
+    }
+  };
+  interchangeable(["friends","coworkers","family","new_people","boundaries"],"대인 5상황");
+  interchangeable(["love_single","love_crush","love_flirting","love_ambiguous","love_couple","love_reunion_interest"],"애정 6상태");
+  stages.push(qualityStage(6,"상담 유용성·의미 비중복",uniq(s6).slice(0,45)));
+
   const passed=stages.filter(s=>s.passed).length;
-  return {version:QUALITY_VERSION,ok:passed===5,score:passed*20,stages,refs_used:refsUsed.length,ledger_size:map.size,local_timing_repair:localTimingRepair};
+  return {version:QUALITY_VERSION,ok:passed===6,score:Math.round(passed/6*100),stages,refs_used:refsUsed.length,ledger_size:map.size,local_timing_repair:localTimingRepair};
 }
 
 export function strictQualityRetryInstruction(report:any){
   const failed=(report?.stages??[]).filter((s:any)=>!s?.passed).map((s:any)=>`[${s.stage}단계 ${s.name}] ${(s.issues??[]).slice(0,10).join(" / ")}`).join("\n");
-  return `\n\nQUALITY_RETRY: 이전 응답이 5단계 품질검증을 통과하지 못했다. 아래 실패만 정확히 고치고 이미 통과한 근거/방향은 망가뜨리지 마라.
+  return `\n\nSEMANTIC_REWRITE: 이전 응답이 Quality V6 품질검증을 통과하지 못했다. API 오류 재시도가 아니라 안전하지만 무용한 원고를 사용자 질문에 답하도록 다시 쓰는 semantic rewrite다. 아래 실패만 정확히 고치고 이미 통과한 근거/방향은 망가뜨리지 마라.
 - 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고 날짜를 새로 만들지 마라. key_window의 start/end는 연결한 근거가 그 날짜를 직접 포함하거나 덮어야 한다. 한 날짜 근거로 임의 범위를 만들지 마라.
 - supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.
 - 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.
 - '핵심 근거 설명이 얕음'이면 해당 topic reason에 구체 추세/평균과 실제 시기·근거를 연결해 충분히 늘려라. '주목 근거 설명이 얕음'도 변화 방향과 시기 근거를 최소 두 문장 수준으로 보강해라. 참고 분야를 대신 장문화하지 마라.
 - 관계·재회 주목 시기 설명 부족이면 focus_timing을 최소 35자 정도로 실제 관계 evidence_refs가 직접 지지하는 날짜/구간 + 흐름 + 현실 확인 방식까지 포함해 보강해라.
 - 교차검증 종합이 너무 짧으면 해당 synthesis를 최소 60자 정도로 Western과 다른 체계의 공통점/차이를 구체적으로 풀어라.
-- 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
-- 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
+  - 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
+  - structured editorial section마다 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 모두 채워라. 결론→현실 장면→지금 할 일→판단이 달라질 조건이 한 번에 읽혀야 한다.
+  - overall은 narrative_plan의 supporting_topics와 caution_topics를 실제로 연결하고 단일 topic 문장을 재작성하지 마라.
+  - 대인 5상황과 애정 6상태는 서로 바꿔 붙일 수 없는 고유한 현실 질문과 판단 기준을 가져야 한다.
+  - 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
 }

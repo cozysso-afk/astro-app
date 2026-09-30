@@ -8,6 +8,7 @@ import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFa
 import { buildV23CorePrompt, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
+import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 
 const VERSION="supabase-ai-v23.0-phenomenon-first";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -25,12 +26,11 @@ const enc=new TextEncoder();
 function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status,headers:CORS});}
 function usage(raw:any){const u=raw?.usageMetadata??{};return {prompt_tokens:Number(u.promptTokenCount??0),candidate_tokens:Number(u.candidatesTokenCount??0),thought_tokens:Number(u.thoughtsTokenCount??0),total_tokens:Number(u.totalTokenCount??0)};}
 function qualitySummary(quality:any){return quality?{version:quality.version,score:quality.score,stages:(quality.stages??[]).map((s:any)=>({stage:s.stage,name:s.name,passed:s.passed}))}:null;}
-function qualityFailure(result:any,quality:any){const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");return {...result,ok:false,error:`5단계 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};}
+function qualityFailure(result:any,quality:any){const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");return {...result,ok:false,error:`Quality V6 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};}
 function criticalQualityPassed(quality:any){const stages=Array.isArray(quality?.stages)?quality.stages:[];return [1,2,3,4].every(stage=>stages.some((row:any)=>Number(row?.stage)===stage&&row?.passed===true));}
+function semanticQualityPassed(quality:any){return (quality?.stages??[]).some((row:any)=>Number(row?.stage)===6&&row?.passed===true);}
 
-const CORE_SCHEMA:any=structuredClone(SCHEMA);
-delete CORE_SCHEMA.properties.topic_analysis;
-CORE_SCHEMA.required=(CORE_SCHEMA.required??[]).filter((key:string)=>key!=="topic_analysis");
+const CORE_SCHEMA:any=buildProviderCoreSchema(SCHEMA);
 
 const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
 절대규칙:
@@ -54,6 +54,8 @@ const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이
 function coreInstruction(){return `
 [OUTPUT]
 - topic_analysis는 출력하지 마. 서버가 계산근거와 함께 별도로 붙인다.
+- clusters는 중첩 객체가 아니라 정확히 ${EDITORIAL_SECTION_KEYS.length}개의 배열 항목으로 출력해. 각 항목은 key/conclusion/real_scene/action/change_condition/evidence_refs/applicability를 모두 포함하고 key는 한 번씩만 써.
+- clusters key 목록=${EDITORIAL_SECTION_KEYS.join(", ")}.
 - 전체 결론, key_windows, annual이면 year_phases 4개, cross_checks, decisions, 관계가 중요할 경우 relationship_reading/contact_flow, 투자 중요 시 investment_reading, systems, priorities, limits를 작성해.
 - 같은 날짜·점수·근거를 여러 섹션에서 반복 설명하지 마. 한 번 설명한 세부 근거는 다른 섹션에서는 결론만 참조해.
 - 정확한 날짜 범위는 연결한 evidence_refs가 실제로 그 범위를 덮을 때만 사용해. 한 날짜 근거를 임의 범위로 늘리지 마.
@@ -61,12 +63,12 @@ function coreInstruction(){return `
 - day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
 - annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.`;}
 
-type CallTrace={call:number;model:string;kind:"initial"|"repair"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;error?:string};
+type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;error?:string};
 type Budget={used:number;deadline:number;calls:CallTrace[]};
 function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadline;}
-function outputLimit(kind:string,compact:boolean){if(kind==="annual")return compact?6200:7200;if(kind==="month")return compact?4800:5600;if(kind==="week")return compact?4000:4700;return compact?3400:4000;}
+function outputLimit(kind:string,compact:boolean){if(kind==="annual")return compact?6200:10000;if(kind==="month")return compact?4800:5600;if(kind==="week")return compact?4000:4700;return compact?3400:4000;}
 
-async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"repair"|"fallback",compact=false,qualityRetry=""){
+async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"fallback",compact=false,qualityRetry=""){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
   const periodNarrative=buildPeriodNarrativeInstruction(promptPayload);
   const prompt=`분석기간=${promptPayload?.period?.start??""}~${promptPayload?.period?.end??""}.\n${periodNarrative}\n${coreInstruction()}${qualityRetry}\nPROMPT_DATA=${JSON.stringify(promptPayload)}`;
@@ -139,12 +141,13 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:Boolean(meta?.local_quality_fallback),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
 }
 
-async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"|"repair"="initial",compact=false,qualityRetry=""){
+async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"|"semantic_rewrite"="initial",compact=false,qualityRetry=""){
   const pb=buildV23PromptBudget(payload);
   if(!pb.ok)return {ok:false,error:`V23 AI 해설 예상 최대 비용이 약 ${Math.round(pb.estimated_max_job_krw)}원으로 작업 상한 ${pb.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,model,cost_guard_blocked:true,prompt_budget:pb};
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
-  return {...finalizeCandidate(core.partial,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  const normalizedCore=normalizeProviderCore(core.partial);
+  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
 }
 
 async function calculate(payload:any,preferred:string,key:string,shouldContinue:()=>Promise<boolean>){
@@ -155,13 +158,13 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   if(!(await shouldContinue()))return {ok:false,error:"AI 해설 생성이 취소됐어.",model:preferred,canceled:true,usage:first.usage,attempt_count:budget.used,call_trace:budget.calls};
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
   let second:any;
-  if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"repair",true,strictQualityRetryInstruction(first.quality_report));
+  if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report));
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답"))second=await generate(payload,secondModel,key,budget,"fallback",true,"");
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
   if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
-  const degraded=second?.candidate_data&&criticalQualityPassed(second?.quality_report)?second:first;
-  if(degraded?.candidate_data&&criticalQualityPassed(degraded?.quality_report))return {ok:true,data:degraded.candidate_data,model:degraded?.model??secondModel,interpreter_version:VERSION,validation:degraded.quality_report,degraded_quality:true,local_quality_fallback:false,quality_warning:"구조·근거·의미 방향·일관성은 통과했고 깊이·실용성 일부 항목만 미통과라 결과를 숨기지 않고 표시해.",usage:{...combined,quality_validation:qualitySummary(degraded.quality_report)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  const degraded=second?.candidate_data&&criticalQualityPassed(second?.quality_report)&&semanticQualityPassed(second?.quality_report)?second:first;
+  if(degraded?.candidate_data&&criticalQualityPassed(degraded?.quality_report)&&semanticQualityPassed(degraded?.quality_report))return {ok:true,data:degraded.candidate_data,model:degraded?.model??secondModel,interpreter_version:VERSION,validation:degraded.quality_report,degraded_quality:true,local_quality_fallback:false,quality_warning:"구조·근거·의미 방향·일관성·상담 유용성은 통과했고 깊이 일부 항목만 미통과라 결과를 숨기지 않고 표시해.",usage:{...combined,quality_validation:qualitySummary(degraded.quality_report)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,...(preferred===secondModel?{}:{fallback_from:preferred})};
   const local=finalizeCandidate(buildLocalQualityFallbackCore(payload),payload,secondModel,{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0},{allow_degraded_quality:true,local_quality_fallback:true,quality_warning:"V23 Gemini 호출 뒤 검증 미통과 부분은 계산근거만으로 안전 보정했어. 추가 Gemini 호출은 0회야."});
   if(local?.ok)return {...local,usage:{...combined,quality_validation:qualitySummary(local.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,...(preferred===secondModel?{}:{fallback_from:preferred})};
   return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했고 안전 보정본도 만들지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}; 로컬=${local?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report};
@@ -199,7 +202,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res(publicFortuneError("METHOD_NOT_ALLOWED"),405);
   let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,five_stage_validation:true,single_core_generation:true,deterministic_topic_analysis:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
   const u=await user(req);if(!u)return res(publicFortuneError("AUTH_REQUIRED"),401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();
@@ -214,7 +217,7 @@ Deno.serve(async(req)=>{
   }
   if(!b?.calculation)return res(publicFortuneError("CALCULATION_REQUIRED"),400);
   const preferred=MODELS[b.model]?b.model:DEFAULT_MODEL;const payload=compactCalculation(b.calculation);const pb=buildV23PromptBudget(payload);
-  if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0,narrative_phenomena:pb.packet?.period_narrative?.phenomena?.length??0,narrative_kind:pb.packet?.period_narrative?.kind??null});
+  if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0,narrative_phenomena:pb.packet?.period_narrative?.phenomena?.length??0,narrative_kind:pb.packet?.period_narrative?.kind??null,provider_schema_bytes:enc.encode(JSON.stringify(CORE_SCHEMA)).byteLength,provider_editorial_sections:EDITORIAL_SECTION_KEYS.length});
   if(b?.action==="prompt"){const p=buildV23CorePrompt(payload);return res({ok:true,interpreter_version:VERSION,prompt:p.text,prompt_bytes:enc.encode(p.text).byteLength,estimated_input_tokens:Math.ceil(enc.encode(p.text).byteLength/2.6),prompt_budget_bytes:pb.max_bytes,narrative_version:p.narrative_version});}
   if(b?.action!=="start")return res(publicFortuneError("UNSUPPORTED_ACTION"),400);
   if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);

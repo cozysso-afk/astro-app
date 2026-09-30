@@ -378,7 +378,14 @@ function sanitizeInvestmentGuidance(data:any,map:Map<string,any>){
   };
   if(Array.isArray(data?.key_windows))data.key_windows=data.key_windows.map(sanitizeNode);
   if(Array.isArray(data?.decisions))data.decisions=data.decisions.map(sanitizeNode);
-  if(data?.clusters&&typeof data.clusters==="object")data.clusters.investment="투자 관련 점수는 심리·행동의 상대활성도 참고값이야. 가격방향·수익률·매매시점을 뜻하지 않으므로 실제 시장 데이터와 손익·리스크 기준을 우선해.";
+  if(data?.clusters?.investment&&typeof data.clusters.investment==="object"){
+    for(const section of Object.values(data.clusters.investment) as any[]){
+      if(!section||typeof section!=="object")continue;
+      section.conclusion=addNoTradeTiming(section.conclusion);
+      section.action=safeAction;
+      section.change_condition="실제 시장 데이터와 사전에 정한 손익·리스크 조건이 모두 충족될 때만 판단을 갱신해.";
+    }
+  }else if(data?.clusters&&typeof data.clusters==="object")data.clusters.investment="투자 관련 점수는 심리·행동의 상대활성도 참고값이야. 가격방향·수익률·매매시점을 뜻하지 않으므로 실제 시장 데이터와 손익·리스크 기준을 우선해.";
   if(Array.isArray(data?.priorities))data.priorities=uniq(data.priorities.map((value:any)=>{
     const text=String(value??"").trim();
     return tradingPattern.test(text)?"투자·금전: 실제 시장 데이터·현금흐름·손익 기준·리스크 한도 점검":text;
@@ -543,6 +550,11 @@ export function buildLocalQualityFallbackCore(payload:any){
     ? `Thai는 ${String(payload.thai.thai_day)} 출생요일과 실제 계산된 Mahathaksa·Taksajorn·Suriyayat 범위만 독립 맥락으로 참고해.`
     : "Thai는 실제 계산된 범위만 독립 맥락으로 참고해.";
   const topicMap=Object.fromEntries(topics.map(({topic,...row}:any)=>[topic,row]));
+  const editorial=(topic:string,scene:string,action:string,change:string,applicability:"direct"|"conditional"|"insufficient"="conditional")=>({
+    conclusion:String(topicMap?.[topic]?.verdict??`${topic}은 직접 근거가 충분하지 않아 결론을 넓히지 않아.`),
+    real_scene:scene,action,change_condition:change,evidence_refs:Array.isArray(topicMap?.[topic]?.evidence_refs)?topicMap[topic].evidence_refs.slice(0,4):[],applicability,
+  });
+  const relationshipBase=editorial("대인관계","사람마다 약속과 역할 이행이 달라지는지를 구분해서 봐.","중요한 부탁과 거절 기준을 짧게 말해.","약속 이행과 역할 존중이 반복되면 관계 판단을 올리고, 침범과 회피가 반복되면 낮춰.");
   return {
     headline:singleDay?`${periodLabel} ${focus} 흐름을 계산근거 중심으로 확인하는 날이야.`:`${periodLabel}은 ${focus} 흐름을 계산근거 중심으로 확인하는 기간이야.`,
     overall:{
@@ -557,11 +569,32 @@ export function buildLocalQualityFallbackCore(payload:any){
     cross_checks:[],
     decisions:[],
     clusters:{
-      relationship:topicLine(["대인관계","연애","연락","재회"]),
-      work_study:topicLine(["학업","시험","직장","이직"]),
-      money_news:topicLine(["금전","소식"]),
-      investment:"투자 관련 상대지수는 심리·행동의 참고값이야. 가격방향·수익률·매수·매도 시점을 뜻하지 않으며 실제 시장 데이터와 손익·리스크 기준을 우선해.",
-      condition:topicLine(["컨디션"]),
+      relationship:{
+        summary:relationshipBase,
+        friends:{...relationshipBase,real_scene:"친구·지인과는 약속 변경, 도움의 균형, 말의 온도가 실제 기준이야.",action:"모임이나 약속의 우선순위를 먼저 정해.",change_condition:"먼저 일정과 도움을 구체화하면 긍정적으로, 반복 취소와 일방적 부탁이면 보수적으로 읽어.",applicability:"conditional"},
+        coworkers:{...relationshipBase,real_scene:"직장동료·협업 상대와는 담당자, 마감일, 완료 기준이 분명한지가 핵심이야.",action:"역할과 책임 범위를 문장으로 남겨.",change_condition:"합의한 역할을 지키면 판단을 올리고, 책임 전가가 반복되면 낮춰.",applicability:"conditional"},
+        family:{...relationshipBase,real_scene:"가족·가까운 사람과는 돌봄과 간섭, 생활 리듬의 경계가 실제 장면이야.",action:"가능한 도움과 어려운 요구를 나눠 말해.",change_condition:"경계를 존중하면 관계 여유가 늘고, 죄책감 압박이 반복되면 거리를 조정해.",applicability:"conditional"},
+        new_people:{...relationshipBase,real_scene:"새 인맥은 소개 자체보다 두 번째 대화와 후속 약속이 생기는지가 기준이야.",action:"관심 가는 한두 사람에게만 후속 대화를 이어가.",change_condition:"상호 질문과 다음 약속이 생기면 넓혀 읽고, 일회성 인사로 끝나면 사건화하지 마.",applicability:"conditional"},
+        boundaries:{...relationshipBase,real_scene:"갈등·경계는 부탁 거절, 역할 침범, 반복되는 오해에서 확인해.",action:"불편한 요청에는 가능한 범위와 불가능한 범위를 분리해 답해.",change_condition:"거절 뒤 조정이 되면 안정적으로, 압박과 침범이 계속되면 주의 판단을 올려.",applicability:"conditional"},
+        love_general:editorial("연애","호감 표현과 실제 만남, 관계 속도가 같은 방향으로 가는지 봐.","관계 상태에 맞는 한 가지 질문을 먼저 확인해.","상호 행동이 이어지면 판단을 올리고 말뿐이면 낮춰."),
+        love_single:editorial("연애","솔로라면 소개·모임 뒤 두 번째 접점이 생기는지가 기준이야.","새 사람을 넓게 만나기보다 대화가 이어지는 접점에 시간을 써.","상호 질문과 재약속이 생기면 새 만남 판단을 올려."),
+        love_crush:editorial("연애","짝사랑이라면 호감 표현 하나보다 상대가 질문하고 시간을 내는지가 상호성 기준이야.","추측 대신 한 번의 명확한 제안 뒤 반응을 봐.","구체적 답과 대안 일정이 오면 올리고, 회피가 반복되면 낮춰."),
+        love_flirting:editorial("연애","썸이라면 대화량보다 다음 약속과 실제 만남 뒤 태도의 일관성이 중요해.","관계 속도와 기대를 한 번은 말로 맞춰.","만남과 후속 행동이 이어지면 올리고, 연락만 길어지면 보류해."),
+        love_ambiguous:editorial("연애","관계 미정이라면 친밀감과 합의된 관계를 같은 것으로 보지 마.","서로 원하는 관계와 만남 빈도를 직접 확인해.","말과 행동이 일치하면 올리고, 정의를 피한 채 친밀감만 요구하면 낮춰."),
+        love_couple:editorial("연애","연애 중이라면 표현 횟수보다 함께 보내는 시간과 갈등 뒤 회복 행동을 봐.","일정과 생활 리듬에서 반복되는 마찰 하나를 합의해.","합의가 지켜지면 올리고 같은 갈등을 회피하면 낮춰."),
+        love_reunion_interest:editorial("재회","재회 관심은 생각남, 연락, 만남, 관계 재구축을 다른 단계로 봐.","연락이 와도 질문 지속·구체적 만남·이전 문제 대화를 순서대로 확인해.","다음 단계 행동이 생기면 올리고 안부와 추억만 반복되면 다시 낮춰."),
+        contact_activation:editorial("연락","연락 전체는 메시지가 실제로 시작되고 답이 오가는지를 보는 축이야.","필요한 연락은 질문 하나와 기한을 분명히 보내.","답변이 구체화되면 올리고 읽음·단답만 반복되면 낮춰."),
+        contact_continuity:editorial("연락","연락 지속은 질문과 답, 후속 약속이 끊기지 않는지가 기준이야.","대화가 시작되면 다음 행동을 하나만 구체화해.","후속 질문이나 약속이 생기면 지속 판단을 올려."),
+      },
+      work_study:{
+        work:editorial("직장","업무에서는 담당자·마감일·완료 기준이 실제 진척 판단이야.","가장 중요한 작업의 완료 기준부터 합의해.","승인과 산출물이 확인되면 진척 판단을 올려."),
+        career_change:editorial("이직","이직은 관심 표현이 아니라 직무·보상·입사일이 적힌 제안이 기준이야.","현 직장 조건과 제안 조건을 항목별로 비교해.","서면 조건이 구체화되면 올리고 구두 관심만 있으면 보류해."),
+        exam:editorial("시험","시험은 익숙함보다 제한 시간 안의 정답률과 조건 누락이 기준이야.","시간을 재고 한 세트를 풀어 오류 원인을 나눠.","정답률과 시간 안정이 함께 오르면 준비 판단을 올려."),
+        study:editorial("학업","학업은 진도량보다 다음날 다시 설명할 수 있는지가 이해 기준이야.","새 진도 뒤 바로 인출 복습을 넣어.","빈 종이 재현과 오답 감소가 보이면 학습 판단을 올려."),
+      },
+      money_news:{money:editorial("금전","금전은 예정 결제와 가용 현금, 큰 구매 뒤 잔액을 함께 봐.","먼저 납부할 돈을 분리하고 선택 지출을 뒤로 미뤄.","필수 지출 뒤 안전 잔액이 남으면 판단을 올려."),news:editorial("소식","소식은 중간 전달보다 발신 주체가 분명한 공식 안내가 기준이야.","기다리는 답의 담당자와 회신 기한을 확인해.","공식 문서나 확정 일정이 오면 판단을 올려.")},
+      investment:{psychology:editorial("투자심리","불안·과열 감정과 실제 보유 조건을 분리해서 봐.","매수·보유 이유와 손실 한도를 다시 적어.","시장 데이터가 기존 가정을 확인하면 유지하고 훼손하면 낮춰."),realization:editorial("수익실현","수익실현은 욕구보다 현금 필요와 사전 기준 충족 여부가 핵심이야.","필요 현금과 목표 비중을 먼저 계산해.","사전 기준이 충족되면 실행 검토하고 기대감만 커지면 보류해."),entry:editorial("신규진입","신규진입은 충동보다 가격·거래량·집중도·손실 한도 조건을 봐.","진입 조건과 무효화 기준을 주문 전에 적어.","조건이 모두 맞으면 검토하고 하나라도 빠지면 기다려.")},
+      condition:{condition:editorial("컨디션","컨디션은 집중 지속 시간과 피로 뒤 회복 속도로 확인해.","집중 블록 뒤 짧은 휴식을 미리 배치해.","휴식 뒤 집중이 돌아오면 강도를 유지하고 회복되지 않으면 낮춰.")},
     },
     relationship_reading:{
       context:"관계가 중요 분야일 때 상대 → 나, 나 → 상대, 과거 인연 재접점을 서로 다른 축으로 분리해 확인해.",

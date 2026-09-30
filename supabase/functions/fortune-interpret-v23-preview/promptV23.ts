@@ -1,8 +1,42 @@
 import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.3-korean-editorial-contract'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.4-editorial-usability-gate'
 const enc = new TextEncoder()
+
+function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
+function bandRole(row:any) {
+  const band=String(row?.band??'').trim()
+  if (/약|낮/.test(band)) return 'caution' as const
+  if (/강|높/.test(band)) return 'support' as const
+  return 'neutral' as const
+}
+
+export function buildNarrativePlan(packet:any) {
+  const strongest = Array.isArray(packet?.ranking?.strongest) ? packet.ranking.strongest : []
+  const weakest = Array.isArray(packet?.ranking?.weakest) ? packet.ranking.weakest : []
+  const supporting_topics = unique(strongest.filter((row:any)=>bandRole(row)==='support' && row?.topic!=="투자주의").map((row:any)=>row?.topic)).slice(0,4)
+  const caution_topics = unique([
+    ...weakest.filter((row:any)=>bandRole(row)==='caution').map((row:any)=>row?.topic),
+    ...strongest.filter((row:any)=>row?.topic==="투자주의"&&bandRole(row)==='support').map((row:any)=>row?.topic),
+  ]).filter(topic=>!supporting_topics.includes(topic)).slice(0,4)
+  const phenomena = Array.isArray(packet?.period_narrative?.phenomena) ? packet.period_narrative.phenomena : []
+  const evidence_refs = unique(phenomena.filter((row:any)=>{
+    const topics=Array.isArray(row?.topics)?row.topics:[]
+    return topics.some((topic:string)=>supporting_topics.includes(topic)||caution_topics.includes(topic))
+  }).flatMap((row:any)=>row?.evidence_refs??[])).slice(0,12)
+  const kind=String(packet?.period_kind??packet?.period_narrative?.kind??"annual")
+  const period_operation=kind==="day"
+    ? "오늘 직접 확인되는 장면을 먼저 처리하고, 약한 분야는 결론을 미룬다."
+    : kind==="week"
+      ? "주간 전환을 따라 받쳐주는 분야에 먼저 시간을 쓰고, 경계 분야는 확인조건이 생기기 전 확대하지 않는다."
+      : kind==="month"
+        ? "월간 반복이 확인되는 분야를 우선하고, 단일 피크는 전체 방향으로 확대하지 않는다."
+        : "연중 누적되는 분야를 우선하고, 짧은 피크와 구조적 경계를 분리해 운영한다."
+  const support=supporting_topics.join("·")||"뚜렷한 지원 분야 없음"
+  const caution=caution_topics.join("·")||"뚜렷한 경계 분야 없음"
+  return {supporting_topics,caution_topics,core_tension:`받쳐주는 ${support}와 경계할 ${caution}을 동시에 운영해야 한다.`,period_operation,evidence_refs}
+}
 
 const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 해설의 첫 문장과 headline은 점수·등급·추상적인 운세평이 아니라, 이 기간에 실제 생활에서 체감할 수 있는 구체적인 장면이나 변화로 시작해.
@@ -18,7 +52,13 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 점수는 확률이 아니다. 숫자가 결론의 주어가 되지 않게 하고, 이미 말한 해석의 강약을 보조하는 경우에만 사용해.
 - 같은 뜻의 조언을 동의어로 바꿔 반복하지 마. "서두르지 마/신중해/천천히 봐"는 같은 의미로 취급해 한 번만 써.
 - headline·overall·topic verdict·action은 각자 다른 역할을 맡아. headline에서 말한 결론을 topic에서 다시 풀어 쓰지 말고, topic은 그 분야에서 새로 확인할 장면이나 행동을 추가해.
+- overall.summary는 최소 두 개의 서로 다른 생활 분야를 실제로 연결해 총평을 만들어. 한 분야의 verdict/reason을 길게 바꿔 쓴 것이 전체 총평의 대부분이면 실패야.
+- 사용자에게 직접 보이는 각 분야 원고는 단순 결론으로 끝내지 마. 가능하면 2~3문장 안에서 ① 결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건 중 최소 세 요소를 담아.
+- "확인해", "지켜봐", "신중해"라고만 끝내지 말고 무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지를 구체적으로 써. 사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패야.
+- 서로 다른 분야 원고에서 topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마. 특히 직장·학업·대인·애정·연락·금전은 서로 다른 생활 장면과 판단 기준을 가져야 해.
+- 대인관계 세부항목은 친구·지인, 직장동료, 가족·가까운 사람, 새 인맥, 갈등·경계를 서로 다른 독립 계산 결과처럼 꾸미지 마. 공통 대인관계 근거를 각 현실 상황에 어떻게 적용해 읽는지 조건부로 번역하고, 특정 하위관계 근거가 없으면 "이 상황이라면"처럼 한계를 드러내.
 - 연애와 연락은 같은 분야가 아니야. 연애는 만남·호감·관계의 속도·현재 관계의 교류를 다루고, 연락은 메시지·질문·답변·약속을 주고받는 커뮤니케이션을 다뤄. 연애 해설을 답장과 연락 여부만으로 채우지 마.
+- 재회 관심 해설은 생각남→연락→실제 만남→관계 재구축을 서로 다른 단계로 유지해. 현재 단계만 말하고 끝내지 말고, 다음 단계로 판단을 올릴 현실 행동과 다시 낮춰 읽을 현실 조건을 함께 줘.
 - 실제 근거가 없는 사건, 상대의 속마음, 연락 주체, 결과 확정, 금전 수익, 건강 진단은 만들지 마.
 - day면 headline은 오늘만의 촉발·시간대·현실 장면 중 하나를 반드시 포함해. "오늘은 ○○에 힘을 쓰기 좋은 편" 같은 분야 점수 요약만 쓰지 마.
 - week면 headline은 7일의 이동이나 전환을 말해. 하루짜리 문장을 기간만 "이번 주"로 바꿔 재사용하지 마. 가능하면 초반→중반→후반 중 실제 근거가 있는 두 구간 이상의 차이를 연결해.
@@ -28,11 +68,13 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 export function buildV23PromptPacket(payload:any) {
   const base = buildPromptPacket(payload)
   const narrative = buildPeriodNarrativeContext(base)
-  return {
+  const packet:any = {
     ...base,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
   }
+  packet.narrative_plan=buildNarrativePlan(packet)
+  return packet
 }
 
 export function buildV23PromptBudget(payload:any) {
@@ -61,7 +103,7 @@ export function buildV23PromptBudget(payload:any) {
 export function buildV23CorePrompt(payload:any) {
   const packet = buildV23PromptPacket(payload)
   const narrativeInstruction = buildPeriodNarrativeInstruction(packet)
-  const text = `${narrativeInstruction}\n\n${HUMAN_LANGUAGE_CONTRACT}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(packet)}`
+  const text = `${narrativeInstruction}\n\n${HUMAN_LANGUAGE_CONTRACT}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 Gemini 호출 전에 서버가 확정한 전체 총평 설계다. supporting_topics와 caution_topics를 함께 연결하고 core_tension과 period_operation에 직접 답해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(packet)}`
   return {
     version: V23_PROMPT_VERSION,
     narrative_version: PERIOD_NARRATIVE_VERSION,

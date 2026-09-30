@@ -88,7 +88,7 @@ test('crosswalk accepts exact engine names only and never creates missing meanin
 test('provisional system views exclude all disallowed source data',()=>{
  const f=fixture('week',true),v=systems.buildSystemReading(f.calculation)
  assert.equal(v.saju,undefined);assert.equal(v.thai,undefined)
- for(const system of ['saju','thai']){const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:system}));assert.match(html,/제외/);assert.doesNotMatch(html,/甲子|乙未|Boriwan|금성/)}
+ for(const system of ['saju','thai']){const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:system}));assert.match(html,/신뢰도 있게 계산할 수 없어/);assert.doesNotMatch(html,/甲子|乙未|Boriwan|금성/)}
 })
 test('Thai birthday segments remain separate; Saju solar-term segments are not calendar-merged',()=>{
  const f=fixture('year'),v=systems.buildSystemReading(f.calculation)

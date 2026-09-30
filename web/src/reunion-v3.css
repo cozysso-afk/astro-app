@@ -57,10 +57,26 @@
 .reunion-ui-v3 .reading-event-list{position:relative;gap:12px}
 .reunion-ui-v3 .reading-event{background:rgba(255,255,255,.58)!important;border-color:rgba(132,148,184,.14)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important}
 .reunion-ui-v3 .reunion-single-disclaimer{margin-top:22px!important;padding-top:14px;border-top:1px solid rgba(132,148,184,.12);color:#8993a5;font-size:.78rem;line-height:1.58}
+
+.reunion-ui-v4 .reunion-v4-answer{margin-bottom:16px;padding:22px 21px;background:radial-gradient(circle at 88% 8%,rgba(255,255,255,.92),transparent 32%),linear-gradient(135deg,rgba(229,244,255,.72),rgba(239,226,255,.70) 48%,rgba(221,250,239,.70))!important}
+.reunion-ui-v4 .reunion-v4-answer>span{color:#695a94}
+.reunion-ui-v4 .reunion-v4-answer h3{font-size:1.13rem;line-height:1.48}
+.reunion-v4-stage-board{margin:18px 0 22px}
+.reunion-v4-stage-board .period-ai-section-title{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+.reunion-v4-stage-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.reunion-ui-v4 .reunion-v4-stage-card{min-height:150px;padding:16px 17px;background:linear-gradient(145deg,rgba(255,255,255,.70),rgba(234,243,255,.56))!important}
+.reunion-ui-v4 .reunion-v4-stage-card small{margin-bottom:5px;color:#75859f;letter-spacing:0;font-size:.76rem}
+.reunion-ui-v4 .reunion-v4-stage-card>b{margin-bottom:7px;color:#4d5d78;font-size:.94rem}
+.reunion-ui-v4 .reunion-v4-stage-card p{font-size:.9rem;line-height:1.63}
+.reunion-ui-v4 .reunion-v4-current{margin:18px 0;background:linear-gradient(145deg,rgba(255,255,255,.62),rgba(232,245,255,.52))!important}
+
 @media(max-width:640px){
   .reunion-v3-grid{grid-template-columns:1fr;gap:12px}
   .reunion-ui-v3 .reunion-v3-hero{padding:18px;border-radius:23px}
   .reunion-ui-v3 .reunion-v3-card{padding:16px 17px;border-radius:20px}
   .reunion-ui-v3 .reunion-v3-timing,.reunion-ui-v3 .reunion-v3-situations{padding:16px;border-radius:22px;margin:18px 0}
   .reunion-v3-meaning{gap:12px;margin:18px 0}
+  .reunion-v4-stage-grid{grid-template-columns:1fr;gap:10px}
+  .reunion-ui-v4 .reunion-v4-answer{padding:19px 18px}
+  .reunion-ui-v4 .reunion-v4-stage-card{min-height:auto;padding:15px 16px}
 }

@@ -3,6 +3,7 @@ import type { AiInterpretationResponse } from './appTypes'
 import { ANNUAL_SCORE_FOCUS_EVENT } from './AnnualDailyScoresPanel'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { buildInterpretationBrief } from './lib/interpretationSummary'
+import { editorialGroupCopy } from './lib/fortuneEditorialV3'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -95,11 +96,11 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
     {!hasKeyWindows && (data.overall.best_phase || data.overall.caution_phase) ? <div className="ai-phase-fallback"><article><strong>활용 구간</strong><p>{data.overall.best_phase}</p></article><article><strong>주의 구간</strong><p>{data.overall.caution_phase}</p></article></div> : null}
 
     <div className="ai-cluster-grid">
-      {!showRelationshipFocus && data.clusters.relationship && <div><strong>관계</strong><p>{data.clusters.relationship}</p></div>}
-      {data.clusters.work_study && <div><strong>일 · 학업</strong><p>{data.clusters.work_study}</p></div>}
-      {data.clusters.money_news && <div><strong>금전 · 소식</strong><p>{data.clusters.money_news}</p></div>}
-      {data.clusters.investment && <div><strong>주식 · 투자</strong><p>{data.clusters.investment}</p></div>}
-      {data.clusters.condition && <div><strong>컨디션</strong><p>{data.clusters.condition}</p></div>}
+      {!showRelationshipFocus && <div><strong>관계</strong><p>{editorialGroupCopy(data.clusters.relationship)}</p></div>}
+      <div><strong>일 · 학업</strong><p>{editorialGroupCopy(data.clusters.work_study)}</p></div>
+      <div><strong>금전 · 소식</strong><p>{editorialGroupCopy(data.clusters.money_news)}</p></div>
+      <div><strong>주식 · 투자</strong><p>{editorialGroupCopy(data.clusters.investment)}</p></div>
+      <div><strong>컨디션</strong><p>{editorialGroupCopy(data.clusters.condition)}</p></div>
     </div>
 
     {showInvestmentFocus && data.investment_reading && (data.investment_reading.psychology || data.investment_reading.realization || data.investment_reading.entry || data.investment_reading.risk) && <div className="ai-investment-grid"><article><strong>투자심리</strong><p>{data.investment_reading.psychology}</p></article><article><strong>수익실현</strong><p>{data.investment_reading.realization}</p></article><article><strong>신규진입</strong><p>{data.investment_reading.entry}</p></article><article className="is-risk"><strong>투자주의 · 높을수록 경계</strong><p>{data.investment_reading.risk}</p></article></div>}

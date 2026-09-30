@@ -22,22 +22,24 @@ test('reunion calculation and AI grounding contracts remain intact',()=>{
   assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1-consultation-depth-v3/)
 })
 
-test('relationship result routes reunion to the v3 hierarchy product while retaining AI synthesis input',()=>{
+test('relationship result routes reunion to the hierarchy product while retaining AI synthesis input',()=>{
   assert.match(panel,/const reunionV2/)
   assert.match(panel,/<ReunionHierarchyPanel/)
   assert.match(wrapper,/ReunionHierarchyPanelV3/)
   assert.match(wrapper,/reunion-v3\.css/)
 })
 
-test('reunion v3 starts with user questions instead of technical stage prose',()=>{
-  const headings=['지금 이 관계를 한 줄로 보면','연락 자체는 얼마나 열려 있나','굳이 비교하면 누가 먼저인가','상대가 예전과 다르게 움직일 여지가 있나','기억할 시기','재회를 판단할 현실 기준','다시 만나면 반복될 수 있는 문제','내 현재 상황에 맞춰 읽기']
-  for(const heading of headings) assert.match(hierarchy,new RegExp(heading))
+test('reunion v4 starts with an answer and explicit stage ladder before supporting detail',()=>{
+  for(const heading of ['이번 조회의 답','재회 단계 한눈에','현재 위치','연락 자체는 얼마나 열려 있나','굳이 비교하면 누가 먼저인가','상대가 예전과 다르게 움직일 여지가 있나','그래서 지금 무엇을 보면 되나','기억할 시기','재회를 판단할 현실 기준','내 현재 상황에 맞춰 읽기']) assert.match(hierarchy,new RegExp(heading))
+  assert.match(hierarchy,/생각 → 연락 → 만남 → 재구축을 섞지 않아/)
+  assert.match(hierarchy,/연락은 살펴볼 수 있지만, 아직 재회 단계는 아님/)
+  assert.match(hierarchy,/생각날 배경은 있어도, 연락을 기다릴 근거는 약함/)
+  assert.match(hierarchy,/이번 조회에서는 재회 진행 단계를 뚜렷하게 잡기 어려움/)
   assert.doesNotMatch(hierarchy,/현재 계산은 연락 단계까지야/)
   assert.doesNotMatch(hierarchy,/왜 아직 서로를 신경 쓰기 쉬운가/)
-  assert.doesNotMatch(hierarchy,/보조지표 활성도/)
 })
 
-test('contact parent strength is independent from sender direction',()=>{
+test('contact parent strength is independent from sender direction and tied direction still reports the tiny numeric edge',()=>{
   assert.match(hierarchy,/function contactReading\(hierarchy: ReunionHierarchy\)/)
   assert.match(hierarchy,/hierarchy\.stages\?\.contact_recontact\?\.activation/)
   const contactBody=hierarchy.slice(hierarchy.indexOf('function contactReading'),hierarchy.indexOf('function directionRow'))
@@ -45,12 +47,22 @@ test('contact parent strength is independent from sender direction',()=>{
   assert.doesNotMatch(contactBody,/incomingBand|outgoingBand/)
   assert.match(hierarchy,/function initiativeReading\(rows: DirectionRow\[\]\)/)
   assert.match(hierarchy,/Math\.abs\(diff\) < 5/)
-  assert.match(hierarchy,/뚜렷한 우세 없음/)
+  assert.match(hierarchy,/판정상 동률권/)
+  assert.match(hierarchy,/\+\$\{pointGap\}/)
+  assert.match(hierarchy,/굳이 수치만 비교하면/)
+})
+
+test('stage board separates emotional reactivation contact meeting and rebuilding',()=>{
+  assert.match(hierarchy,/function stageVerdicts\(hierarchy: ReunionHierarchy\)/)
+  for(const stage of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding']) assert.match(hierarchy,new RegExp(stage))
+  assert.match(hierarchy,/실제 만남까지 넘어간다고 읽을 근거는 아직 약해/)
+  assert.match(hierarchy,/안정적인 관계 재구축까지 넘어갔다고 읽을 근거는 아직 약해/)
+  assert.match(hierarchy,/reunion-v4-stage-grid/)
 })
 
 test('behavior-change question uses meeting and rebuilding evidence, not contact as the answer',()=>{
   const start=hierarchy.indexOf('function behaviorChangeReading')
-  const end=hierarchy.indexOf('function conditionalGuides')
+  const end=hierarchy.indexOf('function nextActionReading')
   const body=hierarchy.slice(start,end)
   assert.match(body,/relationship_rebuilding/)
   assert.match(body,/in_person_meeting/)
@@ -74,12 +86,14 @@ test('reunion keeps one concise disclaimer and puts calculation detail behind di
   assert.match(hierarchy,/reunion-stage-activation-list/)
 })
 
-test('reunion v3 uses translucent aurora jelly cards with mobile spacing',()=>{
+test('reunion v4 keeps translucent aurora jelly cards and a mobile stage layout',()=>{
   assert.match(css,/--rv3-lilac/)
   assert.match(css,/--rv3-mint/)
   assert.match(css,/--rv3-sky/)
   assert.match(css,/--rv3-blush/)
   assert.match(css,/backdrop-filter:blur\(22px\)/)
+  assert.match(css,/\.reunion-v4-stage-grid/)
+  assert.match(css,/\.reunion-v4-answer/)
   assert.match(css,/@media\(max-width:640px\)/)
-  assert.match(css,/grid-template-columns:1fr/)
+  assert.match(css,/\.reunion-v4-stage-grid\{grid-template-columns:1fr/)
 })

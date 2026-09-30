@@ -1,4 +1,4 @@
-export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.3-editorial-depth'
+export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.5-structured-editorial-v6'
 
 export type PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
@@ -236,30 +236,34 @@ export function buildPeriodNarrativeContext(payload: any) {
   }
 }
 
-function editorialV3Instruction(kind: PeriodKind) {
+function editorialV4Instruction(kind: PeriodKind) {
   const periodWord = kind === 'day' ? '오늘' : kind === 'week' ? '이번 주' : kind === 'month' ? '이번 달' : '올해'
-  return `[EDITORIAL_V3 · 사용자에게 실제로 보이는 해설 계약]
+  return `[EDITORIAL_V4 · 최종 사용자에게 보이는 원고]
+- 이것은 계산 메모가 아니라 사용자가 실제로 읽는 최종 해설 원고다. 추상적인 운세평을 길게 늘이지 말고 "그래서 내 생활에서 무슨 장면이 생기고, 나는 무엇을 보면 되는가"에 답해라.
 - overall.summary는 ${periodWord} 전 섹터를 통틀어 읽은 총평이다. 가장 강한 한 섹터의 verdict를 복사하거나 조금 바꿔 쓰면 실패다.
 - overall.summary에는 근거가 있는 한 최소 두 개 이상의 서로 다른 생활 분야를 연결해라. 받쳐주는 분야와 조심할 분야가 함께 있으면 둘의 대비와 ${periodWord} 전체 운영 원칙을 한 문단으로 종합해라.
-- headline 역시 한 섹터의 verdict 복사본이 아니라 전 기간의 핵심 대비나 공통 테마를 새 문장으로 만들어라.
-- clusters.relationship은 아래 태그를 정확히 이 순서로 포함한 사용자용 편집 원고다. 대인관계는 2~3문장, 애정 공통은 1~2문장, 애정 상태별 여섯 항목은 각각 정확히 2문장, 연락 전체는 2문장, 연락 지속은 1~2문장으로 쓴다. 같은 조언을 문장만 바꿔 반복하지 마.
-[대인관계] 친구·동료·가족·협업·부탁과 거절·경계·갈등·약속·사회적 피로·새 인맥 중 실제 근거에 맞는 장면을 고른다. 첫 문장은 그날/기간의 관계 장면을 해석하고, 다음 문장에는 역할·거리·협력·거절·약속 중 근거에 맞는 현실적 판단 기준을 준다. 연락/답장 이야기를 기본값으로 삼지 마.
-[애정 공통] 애정 전반에서 공통으로 볼 핵심만 쓴다. 연애를 연락운으로 축약하지 마.
-[애정·솔로] 특정 상대가 없다고 가정하고 새 만남·소개·모임·호감 형성·관계를 받아들일 여유를 읽는다. 1문장은 현재 분위기, 1문장은 실제로 활용하거나 거를 접점을 쓴다.
-[애정·짝사랑] 마음 가는 사람이 있는 경우로만 읽되 상대의 속마음은 만들지 않는다. 1문장은 접근 속도·상호성의 해석, 1문장은 과해석을 피하면서 볼 구체적 반응이나 행동을 쓴다.
-[애정·썸] 알아가는 중인 경우로 읽는다. 1문장은 대화·상호 질문·관계 속도, 1문장은 다음 약속·실제 만남·관계 기대가 맞는지에 대한 현실 기준을 쓴다.
-[애정·관계 미정] 친밀하거나 애매하지만 합의된 관계가 아닌 경우로 읽는다. 1문장은 친밀감과 관계 합의를 분리하고, 1문장은 기대치·경계·만남 전후의 일관성·관계 정의 중 실제로 볼 것을 쓴다.
-[애정·연애 중] 현재 연인이 있는 경우로 읽는다. 1문장은 애정 표현·정서 온도, 1문장은 함께 보내는 시간·갈등 회복·일정·생활 리듬 중 현실적으로 조율할 것을 쓴다.
-[애정·재회 관심] 과거 인연을 다시 생각하는 경우로 읽는다. 1문장은 떠올림·재접점·연락의 단계를 구분하고, 1문장은 실제 만남·관계 회복으로 넘어갔다고 볼 수 있는 현실 행동을 쓴다.
-- 여섯 애정 항목은 서로 바꿔 붙여도 통하는 범용 문장을 금지한다. 각 상태의 고유 질문이 드러나야 하며, 두 문장 중 적어도 한 문장은 다른 상태에서는 그대로 쓸 수 없는 내용이어야 한다.
-[연락 전체] 연락 지수의 부모 의미다. 첫 문장은 직접 연락·메시지·대화가 얼마나 활성화되는지를, 두 번째 문장은 대화가 시작됐을 때 이어질 여지나 끊기는 양상을 설명한다. 누가 먼저 보내는지로 이 문단을 대신하지 마.
-[연락 지속] 질문·답변·약속·후속 대화 중 근거에 맞는 하나를 사용해, 연락이 생겼을 때 무엇을 보면 지속 여부를 구분할 수 있는지 쓴다.
-- contact_flow.incoming은 오직 상대→나 방향, contact_flow.outgoing은 오직 나→상대 방향을 설명한다. 둘은 [연락 전체]의 하위 방향축이며 전체 연락 활성도를 대신하지 않는다.
-- incoming/outgoing 차이가 작으면 억지로 승자를 만들지 말고 두 방향 본문도 과장하지 마. 방향 요약은 '뚜렷한 우세 없음'으로 끝내고, 어느 쪽이 실제로 먼저 행동할 것처럼 꾸민 문장을 만들지 마.
-- 사용자가 솔로/짝사랑/썸/연애 중이라고 실제 입력했다고 가정하지 마. 위 애정 태그들은 각 상황에 해당하는 사람이 골라 읽는 조건부 해설이다.
-- 대인관계, 애정, 연락은 서로 다른 분야다. 같은 '답장·반응·다음 행동을 봐' 문장을 세 분야에 반복하면 실패다.
-- '좋다/나쁘다'만 말하고 끝내지 마. 사용자에게 무슨 장면인지, 무엇이 그 판단을 바꾸는지까지 설명한다.
-- '~하는 편이 좋아', '흐름', '신호', '확인해'를 문단마다 반복하지 말고 자연스러운 생활 한국어로 문형을 바꿔라.`
+- headline도 한 섹터의 verdict 복사본이 아니라 전 기간의 핵심 대비나 공통 테마를 새 문장으로 만든다.
+- 각 분야 원고는 가능하면 2~3문장으로 쓴다. 1문장째는 결론, 2문장째는 실제 생활 장면이나 판단 기준, 3문장째는 사용자가 취할 행동 또는 확인할 변화를 쓴다. 근거가 약하면 사건을 만들지 말고 무엇까지 말할 수 없는지 분명히 한다.
+- "좋다/나쁘다/무난하다/신중해라/흐름을 봐/확인해"만으로 문단을 끝내면 실패다. 다른 날짜·다른 사람에게 그대로 붙일 수 있는 범용 조언도 실패다.
+
+  [clusters structured editorial schema · 문자열 태그 금지]
+  - clusters의 각 user-facing section은 문자열이 아니라 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 가진 객체다.
+  - applicability는 direct | conditional | insufficient 중 하나다. 직접 근거가 그 상황을 가리킬 때만 direct, 공통 근거의 조건부 현실 번역이면 conditional, 말할 근거가 부족하면 insufficient를 쓴다.
+  - relationship은 summary, friends, coworkers, family, new_people, boundaries, love_general, love_single, love_crush, love_flirting, love_ambiguous, love_couple, love_reunion_interest, contact_activation, contact_continuity를 모두 출력한다.
+  - friends/coworkers/family/new_people/boundaries는 별도 예측값이 아니다. 공통 대인 근거를 각 상황에 적용한 조건부 번역이며, 상황 고유 직접 근거가 없으면 conditional 또는 insufficient여야 한다.
+  - love_single은 새 만남·소개·호감 형성, love_crush는 상호성, love_flirting은 다음 약속·실제 만남, love_ambiguous는 관계 합의·일관성, love_couple은 함께 보내는 시간·갈등 회복, love_reunion_interest는 생각→연락→만남→재구축의 다음 단계와 상승/하락 조건을 각각 다룬다.
+  - contact_activation은 전체 연락·대화 활성도, contact_continuity는 질문·답변·약속·후속 대화가 이어지는지를 다룬다. 선연락 방향축으로 대체하지 않는다.
+  - work_study는 work, career_change, exam, study를 모두 출력한다. money_news는 money, news를 모두 출력한다. investment는 psychology, realization, entry를 모두 출력한다. condition은 condition을 출력한다.
+  - 각 section의 conclusion은 현재 결론, real_scene은 실제 생활 장면/판단 기준, action은 지금 할 일, change_condition은 무엇이 생기면 판단을 올리거나 낮출지를 쓴다.
+  - 근거가 약하면 사건을 만들지 말고 applicability=insufficient와 함께 부족한 정보 및 다음 확인 기준을 쓴다.
+
+- 위 structured 원고는 deterministic topic 문장의 재진술이 아니다. 동일 의미를 말만 바꿔 반복하지 말고, evidence가 허용하는 범위 안에서 장면·판단 기준·행동을 추가한다.
+- 대인관계, 애정, 연락, 소식은 서로 다른 분야다. 같은 '답장·반응·다음 행동을 봐' 문장을 반복하면 실패다.
+- 여섯 애정 항목은 서로 바꿔 붙여도 통하는 범용 문장을 금지한다. 각 상태의 고유 질문이 드러나야 한다.
+- contact_flow.incoming은 오직 상대→나 방향, contact_flow.outgoing은 오직 나→상대 방향이다. 둘은 [연락 전체]의 하위 방향축이며 전체 연락 활성도를 대신하지 않는다.
+- incoming/outgoing 차이가 작으면 억지로 승자를 만들지 않는다. 수치 차이가 작다는 사실과 '판정상 동률권'을 함께 말할 수는 있다.
+- 사용자가 솔로/짝사랑/썸/연애 중이라고 실제 입력했다고 가정하지 않는다. 상태별 애정 문단은 사용자가 자기 상황에 맞춰 골라 읽는 조건부 해설이다.
+- 기술용어는 세부 근거에서만 사용하고 사용자 원고에는 사람·일·돈·약속·대화·만남 같은 생활 언어를 우선한다.`
 }
 
 export function buildPeriodNarrativeInstruction(payload: any): string {
@@ -291,7 +295,7 @@ ${phenomena}
 [해석 원칙]
 ${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}
 
-${editorialV3Instruction(ctx.kind)}
+${editorialV4Instruction(ctx.kind)}
 
 중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
 }

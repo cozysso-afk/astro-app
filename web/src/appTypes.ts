@@ -190,6 +190,12 @@ export type RelationshipAiResponse = {
     }
     reunion_synthesis_v2?: {
       summary: string
+      consultation_answer: {
+        current_stage:string; contact_type_if_any:string; initiative:string; continuity:string; meeting_gate:string; rebuild_gate:string; behavior_change_evidence:string
+        next_stage_up_conditions:string[]; down_conditions:string[]; repeat_risks:string[]
+        contextual_application:{complete_cutoff:string; no_contact:string; occasional_contact:string; meeting_again:string; ambiguous_relationship:string}
+        evidence_refs:string[]
+      }
       why_reconnect: { conclusion:string; interpretation:string; evidence_refs:string[] }
       initiative: { conclusion:string; interpretation:string; evidence_refs:string[] }
       timing: { conclusion:string; windows:Array<{period:string; meaning:string; evidence_refs:string[]}>; evidence_refs:string[] }
@@ -401,6 +407,16 @@ export type AiQualityValidation = {
   stages?: Array<{ stage:number; name:string; passed:boolean }>
 }
 
+export type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
+export type AiEditorialSection = { conclusion:string; real_scene:string; action:string; change_condition:string; evidence_refs:string[]; applicability:EditorialApplicability }
+export type AiEditorialClusters = {
+  relationship: Record<'summary'|'friends'|'coworkers'|'family'|'new_people'|'boundaries'|'love_general'|'love_single'|'love_crush'|'love_flirting'|'love_ambiguous'|'love_couple'|'love_reunion_interest'|'contact_activation'|'contact_continuity',AiEditorialSection>
+  work_study: Record<'work'|'career_change'|'exam'|'study',AiEditorialSection>
+  money_news: Record<'money'|'news',AiEditorialSection>
+  investment: Record<'psychology'|'realization'|'entry',AiEditorialSection>
+  condition: Record<'condition',AiEditorialSection>
+}
+
 export type AiInterpretationResponse = {
   ok: boolean
   missing_key?: boolean
@@ -436,7 +452,7 @@ export type AiInterpretationResponse = {
     year_phases?: AiYearPhase[]
     cross_checks?: AiCrossCheck[]
     decisions?: AiDecision[]
-    clusters: { relationship: string; work_study: string; money_news: string; investment?: string; condition: string }
+    clusters: AiEditorialClusters
     relationship_reading?: { context: string; flow: string; focus_timing: string; watch: string; avoid: string; evidence_refs?: string[] }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
     investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }

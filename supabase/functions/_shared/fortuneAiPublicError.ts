@@ -104,13 +104,13 @@ export function publicCallTrace(value: unknown) {
 }
 
 // Fixed labels are produced by qualitySummary; never echo historical diagnostic names.
-const QUALITY_STAGE_NAMES = ['구조 완전성','근거 추적성','의미 방향 검증','내부 일관성','깊이·실용성'] as const
+const QUALITY_STAGE_NAMES = ['구조 완전성','근거 추적성','의미 방향 검증','내부 일관성','깊이·실용성','상담 유용성·의미 비중복'] as const
 
 export function publicQualityValidation(value: unknown) {
   if (!isRecord(value) || typeof value.version !== 'string'
     || value.version.length > 80 || !/^fortune-interpretation-quality-v[0-9]+(?:-[a-z]+)*$/.test(value.version)
     || !Number.isFinite(value.score) || Number(value.score) < 0 || Number(value.score) > 100
-    || !Array.isArray(value.stages) || value.stages.length !== 5) return undefined
+    || !Array.isArray(value.stages) || value.stages.length !== QUALITY_STAGE_NAMES.length) return undefined
   const stages = []
   for (let i = 0; i < value.stages.length; i += 1) {
     const row = value.stages[i]

@@ -25,7 +25,7 @@ function packet(kind='week') {
 }
 
 function periodOnly(instruction) {
-  return instruction.replace(/\[EDITORIAL_V3 · 사용자에게 실제로 보이는 해설 계약\][\s\S]*?(?=\n중요: day\/week\/month\/annual)/, '')
+  return instruction.replace(/\[EDITORIAL_V4 · 최종 사용자에게 보이는 원고\][\s\S]*?(?=\n중요: day\/week\/month\/annual)/, '')
 }
 
 test('normalizes year to annual without changing the public four-mode model', () => {
@@ -57,15 +57,25 @@ test('period instructions remain distinct after excluding the intentionally shar
   assert.equal(auditPeriodDistinctness(instructions,0.78).ok,true)
 })
 
-test('shared editorial contract makes Gemini write a real cross-sector summary and separates relationship domains', () => {
+test('editorial v4 makes Gemini write cross-sector summary and real relationship contexts', () => {
   const text=buildPeriodNarrativeInstruction(packet('day'))
   assert.match(text,/전 섹터를 통틀어 읽은 총평/)
   assert.match(text,/가장 강한 한 섹터의 verdict를 복사/)
-  assert.match(text,/\[애정·짝사랑\]/)
-  assert.match(text,/\[애정·연애 중\]/)
-  assert.match(text,/\[대인관계\]/)
-  assert.match(text,/\[연락 전체\]/)
+  assert.match(text,/friends, coworkers, family, new_people, boundaries/)
+  assert.match(text,/love_single, love_crush, love_flirting, love_ambiguous, love_couple, love_reunion_interest/)
+  assert.match(text,/contact_activation, contact_continuity/)
+  assert.match(text,/conclusion, real_scene, action, change_condition, evidence_refs, applicability/)
   assert.match(text,/전체 연락 활성도를 대신하지 않는다/)
+})
+
+test('editorial v4 supplies structured user prose sections for non-relationship sectors', () => {
+  const text=buildPeriodNarrativeInstruction(packet('day'))
+  assert.match(text,/work_study는 work, career_change, exam, study/)
+  assert.match(text,/money_news는 money, news/)
+  assert.match(text,/investment는 psychology, realization, entry/)
+  assert.match(text,/condition은 condition/)
+  assert.match(text,/structured 원고는 deterministic topic 문장의 재진술이 아니다/)
+  assert.match(text,/장면·판단 기준·행동을 추가/)
 })
 
 test('day favors triggers while annual favors recurring background patterns', () => {

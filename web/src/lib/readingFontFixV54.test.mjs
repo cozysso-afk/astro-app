@@ -5,11 +5,11 @@ import test from 'node:test'
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
 
-test('live mobile reading headline uses an unmistakable Nanum Myeongjo face', () => {
-  assert.match(css, /html body \.fortune-experience \.period-ai-head h3/)
-  assert.doesNotMatch(css, /\.app-shell \.fortune-experience \.period-ai-head h3/)
-  assert.match(css, /font-family:\s*'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
-  assert.match(css, /font-weight:\s*700\s*!important/)
+test('live mobile integrated headline uses the final strong sans owner', () => {
+  assert.match(css, /\.system-reading\.system-integrated[\s\S]*?h3\.period-ai-hero-title-v4/)
+  assert.match(css, /font-family:\s*-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif\s*!important/)
+  assert.match(css, /font-weight:\s*800\s*!important/)
+  assert.match(css, /font-synthesis:\s*weight\s*!important/)
   assert.match(css, /\.period-ai-head \.reading-hero-subtitle[\s\S]*font-weight:\s*400\s*!important/)
 })
 
@@ -28,10 +28,8 @@ test('reunion mode row cannot wobble horizontally and relationship loader does n
   assert.match(css, /\.relationship-main-mode-row\s*~\s*\.primary-button \.spin\s*\{[\s\S]*?transform:\s*none\s*!important/)
 })
 
-test('font fix loads immediately before the shared reading owner while shared owner stays last', () => {
+test('font fix is the final stylesheet owner so older reading CSS cannot override it', () => {
   const imports = [...main.matchAll(/import ['"]\.\/([^'"]+\.css)['"]/g)].map(match => match[1])
-  const fix = imports.indexOf('reading-font-fix-v54.css')
-  const owner = imports.indexOf('reading-experience.css')
-  assert.ok(fix >= 0 && owner === fix + 1)
-  assert.equal(imports.at(-1), 'reading-experience.css')
+  assert.equal(imports.at(-1), 'reading-font-fix-v54.css')
+  assert.ok(imports.indexOf('reading-experience.css') < imports.indexOf('reading-font-fix-v54.css'))
 })

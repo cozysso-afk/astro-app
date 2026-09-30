@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.3-korean-editorial-contract')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.4-editorial-usability-gate')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -76,6 +76,23 @@ test('human-language contract requires concrete scenes and semantic non-repetiti
   assert.match(day, /분야 점수 요약만 쓰지 마/)
   assert.match(week, /7일의 이동이나 전환/)
   assert.match(week, /초반→중반→후반/)
+})
+
+test('editorial usability gate requires an actionable reading instead of safe generic prose', () => {
+  const text = buildV23CorePrompt(payload('day')).text
+  assert.match(text, /최소 두 개의 서로 다른 생활 분야를 실제로 연결/)
+  assert.match(text, /결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건/)
+  assert.match(text, /무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지/)
+  assert.match(text, /사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패/)
+  assert.match(text, /topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마/)
+})
+
+test('interpersonal and reunion editorial contracts preserve domain-specific limits', () => {
+  const text = buildV23CorePrompt(payload('day')).text
+  assert.match(text, /대인관계 세부항목은 친구·지인, 직장동료, 가족·가까운 사람, 새 인맥, 갈등·경계를 서로 다른 독립 계산 결과처럼 꾸미지 마/)
+  assert.match(text, /공통 대인관계 근거를 각 현실 상황에 어떻게 적용해 읽는지 조건부로 번역/)
+  assert.match(text, /재회 관심 해설은 생각남→연락→실제 만남→관계 재구축을 서로 다른 단계로 유지/)
+  assert.match(text, /다시 낮춰 읽을 현실 조건/)
 })
 
 test('Korean editorial contract enforces grammar and separates love from contact', () => {

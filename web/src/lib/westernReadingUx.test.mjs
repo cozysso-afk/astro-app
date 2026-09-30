@@ -3,8 +3,11 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
+const periodPanel = readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx', import.meta.url), 'utf8')
+const signals = readFileSync(new URL('../ReadingSignals.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../system-reading-ux-v40.css', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
+const finalFont = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 
 test('western independent view starts with an actual period takeaway', () => {
@@ -15,11 +18,112 @@ test('western independent view starts with an actual period takeaway', () => {
   assert.doesNotMatch(view, /<span>서양점성술 · \{period\}<\/span>/)
 })
 
+test('western reader copy names the score difference and gives a concrete next action', () => {
+  assert.doesNotMatch(view, /상대적으로 더 살아 있어|힘이 덜 실리|무난해|이어가기 괜찮아|상대적으로 강하고|약한 편이야/)
+  assert.match(view, /분야별 점수 차이가 크지 않아/)
+  assert.match(view, /점수가 가장 높고/)
+  assert.match(view, /공부할 분량을 정하고/)
+  assert.match(view, /직무·보상·시작 일정/)
+})
+
 test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /className="system-score-grid western-score-grid"/)
   assert.match(view, /className="western-score-guidance">\{westernGuidance\(name,s\)\}/)
   assert.match(view, /className="western-score-more">날짜 보기<\/span><\/summary>/)
   assert.match(view, /연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니/)
+})
+
+test('western date detail uses relative score labels and tells users how to act', () => {
+  assert.doesNotMatch(view, /좋은 날:|주의할 날:/)
+  assert.match(view, /점수가 높은 날:/)
+  assert.match(view, /점수가 낮은 날:/)
+  assert.match(view, /실제 일정·조건을 함께 확인해/)
+  assert.match(view, /피해야 할 날로 단정하지 말고/)
+})
+
+test('important windows use action checks instead of fortune-style verdict labels', () => {
+  assert.match(periodPanel, /<span>기억할 시기<\/span><strong>날짜별 행동·확인 기준<\/strong>/)
+  assert.match(periodPanel, /return '진행 후보'/)
+  assert.match(periodPanel, /return '확인 필요'/)
+  assert.match(periodPanel, /return '변동 확인'/)
+  assert.match(periodPanel, /실제 일정·약속·조건이 구체화되는지 확인해/)
+  assert.match(periodPanel, /일정·문서·상대 행동처럼 확인 가능한 조건을 다시 봐/)
+  assert.match(periodPanel, /다음 행동이 이어지는지 확인해/)
+  assert.doesNotMatch(periodPanel, /활용·주의 구간/)
+  assert.doesNotMatch(periodPanel, /status: window\.kind === 'caution' \? '주의'/)
+  assert.match(signals, /TIMELINE_SIGNAL_LABELS/)
+  assert.match(signals, /favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인'/)
+})
+
+test('month and year restore period-level decisions limits and annual phase changes only in integrated view', () => {
+  assert.match(periodPanel, /const showLongPeriodNarrative = verifiedNarrative && !field && \(period === 'month' \|\| period === 'year'\)/)
+  assert.match(periodPanel, /const longPeriodDecisions = showLongPeriodNarrative/)
+  assert.match(periodPanel, /\(data\.decisions \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /const yearPhaseRows = verifiedNarrative && !field && period === 'year'/)
+  assert.match(periodPanel, /\(data\.year_phases \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable\(data\.limits\)/)
+  assert.match(periodPanel, /<span>연간 흐름 지도<\/span><strong>한 해 안에서 분위기가 바뀌는 구간<\/strong>/)
+  assert.match(periodPanel, /<span>판단 기준<\/span><strong>이 기간에 실제로 결정할 일<\/strong>/)
+  assert.match(periodPanel, /<b>다시 볼 조건<\/b>/)
+  assert.match(periodPanel, /<span>해석 한계<\/span><strong>여기까지는 단정하지 않아<\/strong>/)
+  assert.match(periodPanel, /periodGuidanceText/)
+  assert.match(periodPanel, /RAW_PERIOD_GUIDANCE_RE/)
+})
+
+test('period priorities and cross checks are consumed without leaking whole-period prose into topic tabs', () => {
+  assert.match(periodPanel, /const priorityRows = verifiedNarrative && !field/)
+  assert.match(periodPanel, /\(data\.priorities \?\? \[\]\)/)
+  assert.match(periodPanel, /const showPriorityRows = priorityRows\.length > 0 && \(!showLongPeriodNarrative \|\| longPeriodDecisions\.length === 0\)/)
+  assert.match(periodPanel, /<span>이번 기간 우선순위<\/span><strong>먼저 챙길 것<\/strong>/)
+  assert.match(periodPanel, /const crossCheckRows = verifiedNarrative && !field/)
+  assert.match(periodPanel, /\(data\.cross_checks \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /crossCheckModeLabel\(item\.mode\)/)
+  assert.match(periodPanel, /<span>세 체계 교차해설<\/span><strong>같은 시기를 서로 다른 계산 체계로 확인<\/strong>/)
+  assert.match(periodPanel, /세 체계의 점수나 기준을 합산하거나 다수결하지 않고/)
+  assert.match(periodPanel, /<b>서양점성술<\/b><span>\{item\.western\}<\/span>/)
+  assert.match(periodPanel, /<b>사주<\/b><span>\{item\.saju\}<\/span>/)
+  assert.match(periodPanel, /<b>태국점성술<\/b><span>\{item\.thai\}<\/span>/)
+  assert.match(periodPanel, /<strong>같이 보면<\/strong><p>\{item\.synthesis\}<\/p>/)
+  assert.match(periodPanel, /여러 체계에서 함께 확인/)
+  assert.match(periodPanel, /체계별 해석이 다름/)
+  assert.match(periodPanel, /서양점성술 단독 근거/)
+})
+
+test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
+  assert.match(view, /오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고/)
+  assert.match(view, /수면·회복 시간을 일정에 먼저 넣어/)
+  assert.match(view, /부탁과 책임이 한쪽에 몰리는지/)
+  assert.match(view, /쉬는 시간·내가 결정할 범위·돈과 시간을 장기 계획으로 나눠 관리해/)
+  assert.match(view, /thaiLifeSummary\(w\.wheel\.map\(r=>r\.bhumi_key\)\)/)
+  assert.match(view, /부탁·휴식·결정 범위·돈과 시간처럼 지금 손댈 수 있는 부분부터 확인해/)
+  assert.doesNotMatch(view, /부탁·책임의 패턴|생활 영역을 읽는 기준표|좋고 나쁨을 한 줄로 단정하기보다/)
+})
+
+test('calculation details translate engine contracts into reader-facing Korean', () => {
+  assert.match(view, /현재 입력된 출생시간 정보로는/)
+  assert.doesNotMatch(view, /출생시간 검증 정책|탭 전환으로 정밀도 제한/)
+  assert.match(view, /연간 계산 순환이 중앙 단계에 도달해, 이 전통 방식에서 정한 목성 기준을 사용해/)
+  assert.doesNotMatch(view, /엔진의 목성 대체 규칙/)
+  assert.match(view, /전통 천문 위치 자료 · 상승점 참고/)
+  assert.match(view, /상승점 위치 · \{view\.suriyayat\.lagna\.display\}/)
+  assert.match(view, /생활 영역 연결 참고/)
+  assert.doesNotMatch(view, /Suriyayat · 위치와 검증된 라그나|숫자 Lagna|검증된 비예측형 하우스 연결/)
+  assert.match(view, /<b>사용하는 계산<\/b>/)
+  assert.match(view, /<b>해석 범위<\/b>/)
+  assert.match(view, /<b>다른 체계와의 관계<\/b>/)
+  assert.match(view, /이번 해설에서 다루지 않는 계산/)
+  assert.doesNotMatch(view, /<p>\{view\.thai\?\.predictive_status\}<\/p>|<p>\{view\.thai\?\.consensus_policy\}<\/p>/)
+  assert.doesNotMatch(view, /<pre>\{JSON\.stringify\(view\.suriyayat\.ai_safe_descriptive_packet/)
+  assert.match(view, /이번 해설에서 다루지 않는 항목 · \{view\.saju\?\.not_calculated\?\.join/)
+})
+
+test('integrated synthesis shows each system takeaway instead of methodology prose', () => {
+  assert.match(view, /className="system-synthesis"><summary>세 체계에서 지금 확인할 것<\/summary>/)
+  assert.match(view, /<b>서양점성술<\/b> · \{westernOverviewSummary\}/)
+  assert.match(view, /<b>사주<\/b> · \{sajuOverviewSummary\}/)
+  assert.match(view, /<b>태국점성술<\/b> · \{thaiReaderSummary\}/)
+  assert.match(view, /세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해/)
+  assert.doesNotMatch(view, /서양점성술의 분야 강약과 사주의 운 구간|선택한 분야에서 실제로 겹치는 맥락이 있는지 비교해/)
 })
 
 test('western independent view never shows the integrated period panel again', () => {
@@ -28,10 +132,10 @@ test('western independent view never shows the integrated period panel again', (
   assert.match(polish, /system-reading\.system-western > \.period-deep-reading\s*\{[\s\S]*?display:\s*none\s*!important/)
 })
 
-test('mobile integrated reading uses bold Noto Serif headline and sans supporting copy', () => {
-  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-family:\s*'Noto Serif KR'/)
-  assert.match(polish, /period-ai-head h3\s*\{[\s\S]*?font-weight:\s*700\s*!important/)
-  assert.match(polish, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*-apple-system/)
+test('mobile integrated reading uses a strong 800 sans headline and lighter supporting copy', () => {
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-family:\s*-apple-system/)
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-weight:\s*800\s*!important/)
+  assert.match(finalFont, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-weight:\s*400\s*!important/)
 })
 
 test('top-level life topics use a fixed two-row mobile grid instead of horizontal clipping', () => {
