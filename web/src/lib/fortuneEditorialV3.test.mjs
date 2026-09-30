@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFortuneEditorialV3, editorialGroupCopy, editorialSectionComplete, sectionCopy } from './fortuneEditorialV3.ts'
+import { buildFortuneEditorialV3, editorialGroupCopy, editorialSectionComplete, editorialSectionReady, sectionCopy } from './fortuneEditorialV3.ts'
 import { FORTUNE_FIELDS } from './fortuneFields.ts'
 
 function stat(average,band='보통'){return {average,band,spread:0,best_days:[],caution_days:[]}}
@@ -103,6 +103,27 @@ test('structured depth requires conclusion scene action and change condition tog
     assert.equal(sectionCopy(partial),'',key)
   }
   assert.equal(editorialSectionComplete({...complete,applicability:'insufficient'}),false)
+})
+
+test('structured depth rejects repeated roles and vague change conditions',()=>{
+  const repeated={...deepSection('중복'),conclusion:'예산 범위를 먼저 정하고 지출을 줄이는 게 핵심이야.',action:'예산 범위를 먼저 정하고 지출을 줄이는 행동이 핵심이야.'}
+  assert.equal(editorialSectionComplete(repeated),true)
+  assert.equal(editorialSectionReady(repeated),false)
+  assert.equal(sectionCopy(repeated),'')
+
+  const vague={...deepSection('모호'),change_condition:'상황을 보면서 판단해.'}
+  assert.equal(editorialSectionComplete(vague),true)
+  assert.equal(editorialSectionReady(vague),false)
+  assert.equal(sectionCopy(vague),'')
+
+  const observable={...deepSection('관찰'),change_condition:'실제 약속 날짜가 확정되면 판단을 다시 해.'}
+  assert.equal(editorialSectionReady(observable),true)
+  assert.match(sectionCopy(observable),/실제 약속 날짜가 확정되면/)
+
+  const clusters=emptyClusters()
+  clusters.money_news.money=repeated
+  const result=buildFortuneEditorialV3(data({clusters}),calc(),base())
+  assert.equal(result.topicEditorial['금전'],undefined)
 })
 
 test('all ten fortune fields have a complete interpretation path',()=>{
