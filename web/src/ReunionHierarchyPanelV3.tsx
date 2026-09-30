@@ -315,31 +315,31 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
       </section>
 
       <section className="reunion-v4-stage-board">
-        <div className="period-ai-section-title"><span>재회 단계 한눈에</span><strong>생각 → 연락 → 만남 → 재구축을 섞지 않아</strong></div>
+        <div className="period-ai-section-title"><span>재회 단계 한눈에</span><strong>생각·연락·만남·재구축은 단계별로 따로 봐</strong></div>
         <div className="reunion-v4-stage-grid">{stageRows.map(row => <article className="reunion-v3-card reunion-v4-stage-card" key={row.key} data-reading-export-tone={row.key === 'relationship_rebuilding' ? 'favorable' : row.key === 'contact_recontact' ? 'love' : 'system'}>
           <small>{row.label}</small><b>{row.status}</b><p>{row.text}</p>
         </article>)}</div>
       </section>
 
       <section className="reunion-v3-hero reunion-v4-current" data-reading-export-tone="system">
-        <span>CURRENT STATE</span><h3>현재 위치</h3><p>{currentState(hierarchyData)}</p>
+        <span>현재 단계</span><h3>현재 위치</h3><p>{currentState(hierarchyData)}</p>
       </section>
 
       <div className="reunion-v3-grid">
         <section className="reunion-v3-card" data-reading-export-tone={contact.band === '낮음' ? 'caution' : 'love'}>
-          <small>CONTACT</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.band}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 시기 · {contact.first}</time>}
+          <small>연락 흐름</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.band}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 시기 · {contact.first}</time>}
         </section>
         <section className="reunion-v3-card" data-reading-export-tone="love">
-          <small>DIRECTION</small><h4>굳이 비교하면 누가 먼저인가</h4><b>{initiative.label}</b><p>{initiativeText}</p>
+          <small>먼저 움직이는 쪽</small><h4>굳이 비교하면 누가 먼저인가</h4><b>{initiative.label}</b><p>{initiativeText}</p>
         </section>
       </div>
 
       <section className="reunion-v3-card reunion-v3-change" data-reading-export-tone="favorable">
-        <small>BEHAVIOR CHANGE</small><h4>상대가 예전과 다르게 움직일 여지가 있나</h4><b>{change.label}</b><p>{behaviorText}</p>
+        <small>행동 변화</small><h4>상대가 예전과 다르게 움직일 여지가 있나</h4><b>{change.label}</b><p>{behaviorText}</p>
       </section>
 
       <section className="reunion-v3-card reunion-v3-next" data-reading-export-tone="system">
-        <small>NEXT CHECK</small><h4>그래서 지금 무엇을 보면 되나</h4><b>{next.label}</b><p>{readerSentences(consultation?.meeting_gate,2) || next.text}</p>
+        <small>다음 확인</small><h4>그래서 지금 무엇을 보면 되나</h4><b>{next.label}</b><p>{readerSentences(consultation?.meeting_gate,2) || next.text}</p>
         {!!nextUp.length && <><strong>판단을 올릴 조건</strong><ul>{nextUp.map((item,index)=><li key={`up:${index}`}>{item}</li>)}</ul></>}
         {!!down.length && <><strong>다시 낮춰 볼 조건</strong><ul>{down.map((item,index)=><li key={`down:${index}`}>{item}</li>)}</ul></>}
       </section>
