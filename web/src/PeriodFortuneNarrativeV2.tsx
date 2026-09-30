@@ -24,6 +24,7 @@ function proseFingerprint(value: string) {
 }
 
 const META_EDITORIAL_RE = /계산\s*근거|기간 전체 운영|선택 기간(?:의)?|상대지수|판정은|같은 기간 안에서|별도 경계 신호|흐름을 계산|흐름을 .*확인하는|확인 단계|평소 리듬|두드러지게 밀어줄 분야|특정 분야 하나로|전 섹터/
+const RAW_PERIOD_GUIDANCE_RE = /(?:evidence_refs|applicability|threshold|스키마|클러스터|출력\s*형식)/i
 
 export function editorialCopyUsable(value: string) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -69,6 +70,19 @@ function importantWindowCheck(kind?: 'favorable' | 'caution' | 'mixed') {
   if (kind === 'favorable') return '해볼 일을 하나 정하고 실제 일정·약속·조건이 구체화되는지 확인해.'
   if (kind === 'caution') return '결론부터 내리지 말고 일정·문서·상대 행동처럼 확인 가능한 조건을 다시 봐.'
   return '한 번의 반응보다 다음 행동이 이어지는지 확인해.'
+}
+
+export function periodGuidanceText(value: unknown) {
+  return String(value ?? '')
+    .replace(/\b(?:W|S|T):[^\s),]+/g, '')
+    .replace(/\(\s*계산 근거\s*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function periodGuidanceUsable(value: unknown) {
+  const text = periodGuidanceText(value)
+  return Boolean(text) && !RAW_PERIOD_GUIDANCE_RE.test(text)
 }
 
 export function PeriodFortuneNarrativeV2({
@@ -133,6 +147,30 @@ export function PeriodFortuneNarrativeV2({
       .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
       .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
     : []
+  const showLongPeriodNarrative = verifiedNarrative && (period === 'month' || period === 'year')
+  const longPeriodDecisions = showLongPeriodNarrative
+    ? (data.decisions ?? []).map((item, index) => ({
+        key: `${index}-${periodGuidanceText(item.action)}`,
+        action: periodGuidanceUsable(item.action) ? periodGuidanceText(item.action) : '',
+        timing: periodGuidanceUsable(item.timing) ? periodGuidanceText(item.timing) : '',
+        reason: periodGuidanceUsable(item.reason) ? periodGuidanceText(item.reason) : '',
+        watch: periodGuidanceUsable(item.watch) ? periodGuidanceText(item.watch) : '',
+        avoid: periodGuidanceUsable(item.avoid) ? periodGuidanceText(item.avoid) : '',
+      })).filter(item => Boolean(item.action))
+    : []
+  const yearPhaseRows = verifiedNarrative && period === 'year'
+    ? (data.year_phases ?? []).map((phase, index) => ({
+        key: `${index}-${phase.start}-${phase.end}`,
+        label: periodGuidanceText(phase.label),
+        start: phase.start,
+        end: phase.end,
+        theme: periodGuidanceUsable(phase.theme) ? periodGuidanceText(phase.theme) : '',
+        change: periodGuidanceUsable(phase.change) ? periodGuidanceText(phase.change) : '',
+      })).filter(phase => Boolean(phase.label) && Boolean(phase.theme || phase.change))
+    : []
+  const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable(data.limits)
+    ? periodGuidanceText(data.limits)
+    : ''
   const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
     ? 'caution'
     : summary.bestFlow.includes(topic)
@@ -196,6 +234,35 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {!westernOnly && systemOverview}
+
+    {!!yearPhaseRows.length && <section className="ai-year-phase-section period-ai-year-phase-v4" data-reading-export-tone="date">
+      <div className="period-ai-section-title"><span>연간 흐름 지도</span><strong>한 해 안에서 분위기가 바뀌는 구간</strong></div>
+      <div className="ai-year-phase-list">{yearPhaseRows.map(phase => <article key={phase.key}>
+        <div><b>{phase.label}</b><span>{periodLabel(phase.start, phase.end)}</span></div>
+        {phase.theme && <strong>{phase.theme}</strong>}
+        {phase.change && <p>{phase.change}</p>}
+      </article>)}</div>
+    </section>}
+
+    {!!longPeriodDecisions.length && <section className="ai-decision-section period-ai-decision-v4">
+      <div className="period-ai-section-title"><span>판단 기준</span><strong>이 기간에 실제로 결정할 일</strong></div>
+      <div className="ai-decision-list">{longPeriodDecisions.map((item, index) => <article key={item.key}>
+        <span className="ai-decision-index">{index + 1}</span><div>
+          <strong>{item.action}</strong>
+          {item.timing && <b>{item.timing}</b>}
+          {item.watch && <div className="ai-decision-condition"><b>다시 볼 조건</b><span>{item.watch}</span></div>}
+          {(item.reason || item.avoid) && <details className="ai-decision-more"><summary>이유 · 피할 것</summary>
+            {item.reason && <p>{item.reason}</p>}
+            {item.avoid && <div className="ai-decision-condition is-avoid"><b>피할 것</b><span>{item.avoid}</span></div>}
+          </details>}
+        </div>
+      </article>)}</div>
+    </section>}
+
+    {longPeriodLimit && <section className="period-ai-window-section period-ai-limit-v4">
+      <div className="period-ai-section-title"><span>해석 한계</span><strong>여기까지는 단정하지 않아</strong></div>
+      <article className="period-ai-window"><p>{longPeriodLimit}</p></article>
+    </section>}
 
     {!!summary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows" data-reading-export-tone="date">
       <div className="period-ai-section-title"><span>기억할 시기</span><strong>날짜별 행동·확인 기준</strong></div>
