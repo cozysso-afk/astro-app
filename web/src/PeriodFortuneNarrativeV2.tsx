@@ -128,6 +128,11 @@ export function PeriodFortuneNarrativeV2({
   const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
+  const structuredFieldTopics = verifiedNarrative && field
+    ? field.topics
+      .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
+      .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
+    : []
   const topicTone = (topic: string) => summary.cautionFlow.includes(topic)
     ? 'caution'
     : summary.bestFlow.includes(topic)
@@ -181,6 +186,13 @@ export function PeriodFortuneNarrativeV2({
         { kind: 'incoming', label: '상대 → 나', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
         { kind: 'outgoing', label: '나 → 상대', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
       ]}/>} 
+    </section>}
+
+    {!!structuredFieldTopics.length && <section className="period-ai-window-section period-ai-structured-field-v4">
+      <div className="period-ai-section-title"><span>{field?.id === 'contact' ? '소식 해설' : '현실에서 더 깊게 보면'}</span><strong>현실 장면 · 행동 · 판단 변경조건</strong></div>
+      <div className="period-ai-topic-list">{structuredFieldTopics.map(item => <article className="period-ai-topic period-ai-topic-editorial-v4" data-reading-export-tone={topicTone(item.topic)} key={`editorial-v4-${item.topic}`}>
+        <strong>{item.topic}</strong><p>{item.text}</p>
+      </article>)}</div>
     </section>}
 
     {!westernOnly && systemOverview}
