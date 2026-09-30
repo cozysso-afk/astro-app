@@ -51,25 +51,28 @@ const WESTERN_OVERVIEW_GROUPS = [
   ['컨디션'],
 ]
 const SAJU_LEAD_COPY: Record<string,string> = {
-  관성:'맡은 역할과 책임을 정리하는 데 먼저 무게를 둬. 새 일을 크게 벌이기보다 이미 맡은 일을 정확히 끝내고, 평가받는 부분을 점검하는 편이 좋아.',
-  인성:'새 자료를 많이 늘리기보다 이미 배운 내용을 정리하고 이해가 빈 곳을 메우는 데 집중해.',
-  재성:'돈과 시간을 어디에 쓸지 우선순위를 먼저 정해. 기대보다 지금 확실한 예산과 의무를 기준으로 움직이는 편이 좋아.',
-  식상:'생각을 말이나 결과물로 구체화하는 데 무게가 실려. 길게 설명하기보다 상대가 이해할 수 있는 형태로 보여주는 편이 좋아.',
-  비겁:'내 기준과 역할 분담을 분명히 하는 게 중요해. 혼자 밀어붙이거나 무조건 맞추기보다 조율할 부분을 나눠봐.',
+  관성:'먼저 맡은 일의 완료 기준과 기한을 적어. 책임 범위가 모호한 요청은 조건부터 맞춰.',
+  인성:'새 자료를 늘리기보다 이미 배운 내용을 한 번 설명해봐. 막히는 부분만 다시 확인해.',
+  재성:'예상 수입보다 지금 확실한 예산·고정지출·쓸 수 있는 시간을 먼저 적어. 남는 범위 안에서 우선순위를 정해.',
+  식상:'전하려는 내용을 짧은 제안이나 작은 결과물로 보여줘. 상대가 어떻게 이해했는지 실제 반응을 확인해.',
+  비겁:'함께 하는 일은 내 몫과 상대 몫을 나눠 적어. 양보할 부분과 지킬 기준을 먼저 정해.',
 }
 const SAJU_SECONDARY_COPY: Record<string,string> = {
-  관성:'맡은 일의 완료 기준과 책임 범위',
-  인성:'배운 내용과 문서 정리',
-  재성:'돈·시간의 우선순위',
-  식상:'말과 결과물로 표현하는 방식',
-  비겁:'내 기준과 역할 분담',
+  관성:'마감일과 책임 범위',
+  인성:'이해가 막히는 부분',
+  재성:'예산과 고정 의무',
+  식상:'표현 뒤 실제 반응',
+  비겁:'역할 분담과 경계',
+}
+function sajuLeadSentence(lens:Lens) {
+  const lead = SAJU_LEAD_COPY[lens.key] ?? lens.action
+  return lead.match(/^[^.!?]+[.!?]?/)?.[0]?.trim() || lead
 }
 function sajuOverviewText(lenses:Lens[], fallback:string) {
   if (!lenses.length) return fallback
-  const lead = SAJU_LEAD_COPY[lenses[0].key] ?? lenses[0].action
-  const concise = lead.match(/^[^.!?]+[.!?]?/)?.[0]?.trim() || lead
+  const concise = sajuLeadSentence(lenses[0])
   const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
-  return `${concise}${secondary ? ` 같이 확인할 건 ${secondary}야.` : ''}`
+  return `${concise}${secondary ? ` 이어서 ${secondary}도 확인해.` : ''}`
 }
 function westernCaution(name:string, stat:FortuneStat) {
   if (name === '투자주의') return stat.average >= 60 || /강|높/.test(String(stat.band ?? ''))
@@ -86,10 +89,7 @@ function westernWhen(dayCount:number) {
   return '올해'
 }
 function periodReadingFrame(when:string) {
-  if (when==='오늘') return '오늘 바로 처리할 선택과 반응을 기준으로 보면'
-  if (when==='이번 주') return '이번 주는 하루 한 번의 사건보다 며칠 동안 반복되는 역할과 반응을 기준으로 보면'
-  if (when==='이번 달') return '이번 달은 월초·중순·말까지 이어지는 책임과 생활 패턴을 기준으로 보면'
-  return '올해는 단기 사건보다 오래 이어지는 역할·책임과 생활 기반의 재배치를 기준으로 보면'
+  return koreanParticle(when,'은는')
 }
 function thaiPeriodOverview(when:string) {
   if (when==='오늘') return '오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고, 일정 사이에 쉴 시간을 먼저 확보해. 돈·시간을 쓰는 일은 남은 여유를 확인한 뒤 결정해.'
@@ -138,9 +138,9 @@ function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
 }
 function sajuHeadline(lenses:Lens[], when:string) {
   if (!lenses.length) return `${koreanParticle(when,'은는')} 바로 생활 조언으로 연결할 만큼 뚜렷한 사주 주제가 적어. 아래 계산 근거에서 적용 구간만 확인해줘.`
-  const lead = SAJU_LEAD_COPY[lenses[0].key] ?? lenses[0].action
+  const lead = sajuLeadSentence(lenses[0])
   const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
-  return `${periodReadingFrame(when)}, ${lead}${secondary ? ` 여기에 ${secondary}도 같이 확인해.` : ''}`
+  return `${periodReadingFrame(when)} ${lead}${secondary ? ` 이어서 ${secondary}도 확인해.` : ''}`
 }
 function LensCard({lens,evidence}:{lens:Lens;evidence:string}) { return <article className="system-lens saju-lens-card"><h4>{lens.title}</h4><p className="system-lens-meaning">{lens.meaning}</p><ReadingExplanation kind="practice">{lens.action}</ReadingExplanation><p className="system-lens-evidence"><b>근거</b><span>{evidence || '연결된 운 구간 근거가 없어.'}</span></p><details className="system-lens-limit"><summary>해석 범위</summary><p>{lens.limit}</p></details></article> }
 function shortKoreanDate(value?: string) {
