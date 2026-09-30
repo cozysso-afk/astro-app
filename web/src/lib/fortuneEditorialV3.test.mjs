@@ -72,6 +72,24 @@ test('Gemini structured cluster prose remains available for user-facing topic co
   assert.match(result.topicEditorial['소식'],/공식 안내/)
 })
 
+test('applicability blocks insufficient copy and marks conditional depth without downgrading direct copy',()=>{
+  const clusters=emptyClusters()
+  clusters.work_study.work={...section('근거가 부족한데도 직장 결론을 단정해.'),applicability:'insufficient'}
+  clusters.work_study.study={...section('공부할 범위를 좁히고 막힌 부분부터 다시 풀어.'),applicability:'direct'}
+  clusters.money_news.money={...section('예산과 고정지출을 먼저 확인하고 남는 범위에서 결정해.'),applicability:'conditional'}
+  clusters.relationship.love_crush={...section('근거가 부족한데도 상대 마음을 단정해.'),applicability:'insufficient'}
+  const result=buildFortuneEditorialV3(data({clusters}),calc(),base())
+  assert.equal(result.topicEditorial['직장'],undefined)
+  assert.match(result.topicEditorial['학업'],/^공부할 범위를 좁히고/)
+  assert.doesNotMatch(result.topicEditorial['학업'],/^조건부로 보면,/)
+  assert.match(result.topicEditorial['금전'],/^조건부로 보면,/)
+  const love=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'love',label:'애정',topics:['연애','연락','재회']})
+  const crush=love.loveContexts.find(row=>row.key==='crush').text
+  assert.doesNotMatch(crush,/근거가 부족한데도 상대 마음/)
+  assert.match(crush,/마음 가는 사람이 있다면/)
+  assert.equal(editorialGroupCopy({hidden:{...section('이 문장도 숨겨야 해.'),applicability:'insufficient'}}),'')
+})
+
 test('contact overall reading keeps useful scene and action separate from direction',()=>{
   const clusters=emptyClusters();clusters.relationship.contact_activation={conclusion:'계산 근거상 연락 활성도는 보통이야.',real_scene:'안부 뒤 질문이 이어지는지 봐.',action:'답장을 재촉하지 말고 다음 질문이 있는지 확인해.',change_condition:'구체적인 약속이 잡히면 판단을 올려.',evidence_refs:[],applicability:'conditional'};clusters.relationship.contact_continuity=section('대화가 이어지는지가 핵심이야.')
   const result=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'contact',label:'연락·소식',topics:['연락','소식']})
