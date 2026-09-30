@@ -125,11 +125,14 @@ test('love UI exposes six conditional contexts at once instead of requiring a pr
   assert.match(narrativeV2, /내 상황에 맞춰 읽기/)
 })
 
-test('completed period results route through editorial v3 and remain exportable', () => {
+test('completed period results consume the verified integrated hero and remain exportable', () => {
   assert.match(periodResults, /PeriodFortuneNarrativeV2/)
   assert.match(periodResults, /data-reading-export-root="period-fortune"/)
   assert.match(periodResults, /결과 이미지 저장/)
   assert.match(narrativeV2, /buildFortuneEditorialV3/)
-  assert.match(narrativeV2, /전 분야를 통틀어 보면/)
+  assert.match(narrativeV2, /integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
+  assert.match(narrativeV2, /integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
+  assert.match(narrativeV2, /분야별 흐름/)
+  assert.doesNotMatch(narrativeV2, /전 분야를 통틀어 보면/)
   assert.match(narrativeV2, /기억할 시기/)
 })
