@@ -1,15 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFortuneEditorialV3, editorialGroupCopy } from './fortuneEditorialV3.ts'
+import { buildFortuneEditorialV3, editorialGroupCopy, editorialSectionComplete, sectionCopy } from './fortuneEditorialV3.ts'
+import { FORTUNE_FIELDS } from './fortuneFields.ts'
 
 function stat(average,band='보통'){return {average,band,spread:0,best_days:[],caution_days:[]}}
 function base(){return {periodKind:'day',when:'오늘',headline:'컨디션 복붙',summary:'컨디션 복붙',doTitle:'좋은 흐름',cautionTitle:'주의',focusTitle:'중요',doItems:[],cautionItems:[],bestFlow:['컨디션','직장'],cautionFlow:['금전','소식'],favorableCards:[{topic:'컨디션',score:56,band:'다소 강함',meaning:'집중할 일정과 쉴 시간을 나눠'}],cautionCards:[{topic:'금전',score:35,band:'약함',meaning:'충동 결제를 주의'}],focusTopics:[{topic:'컨디션',conclusion:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',action:'쉬어',observe:'피로'}],referenceTopics:[],importantWindows:[]}}
 function calc(){return {period:{start:'2026-09-28',end:'2026-09-28',day_count:1,month_segments:1},western:{overall:{컨디션:stat(56,'다소 강함'),직장:stat(53,'다소 강함'),금전:stat(35,'약함'),소식:stat(36,'약함')},relationship_signals:{수신신호:stat(43,'보통'),발신적합:stat(45,'보통')}}}}
 function section(text=''){return {conclusion:text,real_scene:'현실 장면을 구분해.',action:'지금 할 일을 정해.',change_condition:'구체적 행동이 생기면 판단을 바꿔.',evidence_refs:[],applicability:'conditional'}}
+function deepSection(name){return {conclusion:`${name} 결론을 분명히 정리해.`,real_scene:`${name}에서 실제 장면을 구체적으로 확인해.`,action:`${name}에서 지금 할 행동을 하나 정해.`,change_condition:`${name}의 확인 조건이 바뀌면 판단을 다시 해.`,evidence_refs:[],applicability:'direct'}}
 function blankSection(){return {conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'}}
 function emptyClusters(){return {relationship:Object.fromEntries(['summary','friends','coworkers','family','new_people','boundaries','love_general','love_single','love_crush','love_flirting','love_ambiguous','love_couple','love_reunion_interest','contact_activation','contact_continuity'].map(key=>[key,section()])),work_study:Object.fromEntries(['work','career_change','exam','study'].map(key=>[key,section()])),money_news:{money:section(),news:section()},investment:{psychology:section(),realization:section(),entry:section()},condition:{condition:section()}}}
 function data(overrides={}){return {headline:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',overall:{summary:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',dominant_pattern:'',best_phase:'',caution_phase:'',evidence_refs:[]},clusters:emptyClusters(),contact_flow:{incoming:'상대 → 나 방향은 보통이야.',outgoing:'나 → 상대 방향은 보통이야.',reconnection:''},topic_analysis:{컨디션:{verdict:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',timing:'',action:'쉬어',avoid:'',importance:'핵심',confidence:'보통',confidence_reason:'',evidence_refs:[]},연락:{verdict:'연락 보통',reason:'',timing:'',action:'대화 지속',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]},대인관계:{verdict:'대인 기본',reason:'',timing:'',action:'역할 합의',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]}},...overrides}}
+function assertFourParts(text,name){for(const marker of [`${name} 결론을 분명히 정리해.`,`${name}에서 실제 장면을 구체적으로 확인해.`,`${name}에서 지금 할 행동을 하나 정해.`,`${name}의 확인 조건이 바뀌면 판단을 다시 해.`]) assert.ok(String(text??'').includes(marker),`${name}: missing ${marker}`)}
 
 test('integrated hero rejects strongest-sector copy and synthesizes supportive plus caution sectors',()=>{
   const result=buildFortuneEditorialV3(data(),calc(),base())
@@ -88,6 +91,55 @@ test('applicability blocks insufficient copy and marks conditional depth without
   assert.doesNotMatch(crush,/근거가 부족한데도 상대 마음/)
   assert.match(crush,/마음 가는 사람이 있다면/)
   assert.equal(editorialGroupCopy({hidden:{...section('이 문장도 숨겨야 해.'),applicability:'insufficient'}}),'')
+})
+
+test('structured depth requires conclusion scene action and change condition together',()=>{
+  const complete=deepSection('완결성')
+  assert.equal(editorialSectionComplete(complete),true)
+  assertFourParts(sectionCopy(complete),'완결성')
+  for(const key of ['conclusion','real_scene','action','change_condition']){
+    const partial={...complete,[key]:''}
+    assert.equal(editorialSectionComplete(partial),false,key)
+    assert.equal(sectionCopy(partial),'',key)
+  }
+  assert.equal(editorialSectionComplete({...complete,applicability:'insufficient'}),false)
+})
+
+test('all ten fortune fields have a complete interpretation path',()=>{
+  assert.deepEqual(FORTUNE_FIELDS.map(field=>field.id),['love','money','investment','study','exam','work','job-change','social','contact','condition'])
+  const clusters=emptyClusters()
+  Object.assign(clusters.work_study,{work:deepSection('직장'),career_change:deepSection('이직'),exam:deepSection('시험'),study:deepSection('학업')})
+  Object.assign(clusters.money_news,{money:deepSection('금전'),news:deepSection('소식')})
+  Object.assign(clusters.investment,{psychology:deepSection('투자심리'),realization:deepSection('수익실현'),entry:deepSection('신규진입')})
+  clusters.condition.condition=deepSection('컨디션')
+  Object.assign(clusters.relationship,{
+    summary:deepSection('대인관계'),friends:deepSection('친구'),coworkers:deepSection('직장동료'),family:deepSection('가족'),new_people:deepSection('새인맥'),boundaries:deepSection('갈등경계'),
+    love_general:deepSection('연애공통'),love_single:deepSection('솔로'),love_crush:deepSection('짝사랑'),love_flirting:deepSection('썸'),love_ambiguous:deepSection('관계미정'),love_couple:deepSection('연애중'),love_reunion_interest:deepSection('재회관심'),
+    contact_activation:deepSection('연락'),contact_continuity:deepSection('연락지속'),
+  })
+  const payload=data({clusters})
+  const byId=Object.fromEntries(FORTUNE_FIELDS.map(field=>[field.id,field]))
+
+  for(const [fieldId,topic] of [['money','금전'],['study','학업'],['exam','시험'],['work','직장'],['job-change','이직'],['condition','컨디션']]){
+    const result=buildFortuneEditorialV3(payload,calc(),base(),byId[fieldId])
+    assertFourParts(result.topicEditorial[topic],topic)
+  }
+
+  const investment=buildFortuneEditorialV3(payload,calc(),base(),byId.investment)
+  for(const topic of ['투자심리','신규진입','수익실현']) assertFourParts(investment.topicEditorial[topic],topic)
+  assert.equal(investment.topicEditorial['투자주의'],undefined,'투자주의는 deterministic safety path가 담당')
+
+  const contact=buildFortuneEditorialV3(payload,calc(),base(),byId.contact)
+  assertFourParts(contact.contact.activation,'연락')
+  assertFourParts(contact.topicEditorial['소식'],'소식')
+
+  const love=buildFortuneEditorialV3(payload,calc(),base(),byId.love)
+  const loveMarkers={single:'솔로',crush:'짝사랑',flirting:'썸',ambiguous:'관계미정',couple:'연애중',reunion_interest:'재회관심'}
+  for(const row of love.loveContexts) assertFourParts(row.text,loveMarkers[row.key])
+
+  const social=buildFortuneEditorialV3(payload,calc(),base(),byId.social)
+  const socialMarkers={friends:'친구',coworkers:'직장동료',family:'가족',new_people:'새인맥',boundaries:'갈등경계'}
+  for(const row of social.interpersonalContexts) assertFourParts(row.text,socialMarkers[row.key])
 })
 
 test('contact overall reading keeps useful scene and action separate from direction',()=>{
