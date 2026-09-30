@@ -79,8 +79,9 @@ jobs:
           <!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>QA</title></head><body><div id="root"></div><script type="module" src="/src/qa-browser-entry.tsx"></script></body></html>
           HTML
           cat > src/qa-browser-entry.tsx <<'TSX'
-          import React, { useState } from 'react'
+          import React from 'react'
           import ReactDOM from 'react-dom/client'
+          import { flushSync } from 'react-dom'
           import { PeriodFortuneResults } from './PeriodFortuneResults'
           import { ReunionHierarchyPanel } from './ReunionHierarchyPanelV3'
           // @ts-ignore fixture module is JavaScript by design
@@ -156,107 +157,62 @@ jobs:
           }
 
           const hierarchy:any={
-            validation:{status:'PASS'},
-            as_of_date:'2026-09-30',
-            score_meaning:'단계별 상대 활성도 참고값이며 사건 확률이 아니야.',
+            validation:{status:'PASS'},as_of_date:'2026-09-30',score_meaning:'단계별 상대 활성도 참고값이며 사건 확률이 아니야.',
             stages:{
-              emotional_reactivation:{label:'감정 재활성화',activation:68},
-              contact_recontact:{label:'연락·재접촉',activation:57},
-              in_person_meeting:{label:'실제 만남',activation:34},
-              relationship_rebuilding:{label:'관계 재구축',activation:29},
+              emotional_reactivation:{label:'감정 재활성화',activation:68},contact_recontact:{label:'연락·재접촉',activation:57},
+              in_person_meeting:{label:'실제 만남',activation:34},relationship_rebuilding:{label:'관계 재구축',activation:29},
             },
             current_windows:[{stage:'emotional_reactivation',start:'2026-09-28',end:'2026-10-02',label:'현재 감정 재활성화'}],
-            top_periods:[
-              {stage:'contact_recontact',start:'2026-10-21',end:'2026-10-24',label:'연락·대화 재개'},
-              {stage:'emotional_reactivation',start:'2027-01-20',end:'2027-01-23',label:'다시 의식하기'},
-            ],
+            top_periods:[{stage:'contact_recontact',start:'2026-10-21',end:'2026-10-24',label:'연락·대화 재개'},{stage:'emotional_reactivation',start:'2027-01-20',end:'2027-01-23',label:'다시 의식하기'}],
             limitations:['실제 행동과 상대의 속마음은 확정하지 않아.'],
           }
           const directions:any[]=[
             {kind:'incoming',label:'상대 → 나',score:52,band:'보통',text:'상대가 먼저 오는 흐름은 보통이야.',timing:'2026-10-21 전후'},
             {kind:'outgoing',label:'나 → 상대',score:49,band:'보통',text:'내가 먼저 움직이는 흐름도 보통이야.',timing:'2026-10-21 전후'},
           ]
+          function Reunion(){return <div className="relationship-experience" data-mode="reunion"><ReunionHierarchyPanel hierarchyData={hierarchy} evidence={[]} reunionV2={null} directionRows={directions as any} sustainabilityText="연락보다 만남과 지속 행동을 따로 확인해."/></div>}
+          function App({mode}:{mode:Mode}){return <div className="app-shell"><main style={{maxWidth:900,margin:'0 auto',padding:'24px 16px 80px'}}>{mode==='reunion'?<Reunion/>:<Fortune period={mode}/>}</main></div>}
 
-          function Reunion(){
-            return <div className="relationship-experience" data-mode="reunion"><ReunionHierarchyPanel hierarchyData={hierarchy} evidence={[]} reunionV2={null} directionRows={directions as any} sustainabilityText="연락보다 만남과 지속 행동을 따로 확인해."/></div>
-          }
-
-          function App(){
-            const [mode,setMode]=useState<Mode>('today')
-            return <div className="app-shell"><div id="qa-controls" style={{display:'none'}}>
-              {(['today','week','month','year','reunion'] as Mode[]).map(m=><button key={m} data-qa-mode={m} onClick={()=>setMode(m)}>{m}</button>)}
-            </div><main style={{maxWidth:900,margin:'0 auto',padding:'24px 16px 80px'}}>
-              {mode==='reunion'?<Reunion/>:<Fortune period={mode}/>} 
-            </main></div>
-          }
-
-          ReactDOM.createRoot(document.getElementById('root')!).render(<App/>)
+          const mode=((new URLSearchParams(location.search).get('mode')||'today') as Mode)
+          const root=ReactDOM.createRoot(document.getElementById('root')!)
+          flushSync(()=>root.render(<App mode={mode}/>))
 
           const fp=(value:string)=>String(value??'').replace(/[\s.,!?·~→:;()[\]\-]+/g,'')
           const visible=(el:Element)=>{const r=(el as HTMLElement).getBoundingClientRect();const s=getComputedStyle(el);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'}
           const rectInfo=(el:Element)=>{const r=(el as HTMLElement).getBoundingClientRect();return {tag:el.tagName.toLowerCase(),cls:String((el as HTMLElement).className||'').slice(0,120),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1)}}
           const lines=(el:Element|null)=>{if(!el)return null;const r=(el as HTMLElement).getBoundingClientRect();const lh=parseFloat(getComputedStyle(el).lineHeight);return Number.isFinite(lh)&&lh>0?+(r.height/lh).toFixed(2):null}
-
-          async function settle(){await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await new Promise(r=>setTimeout(r,80))}
-          async function select(mode:Mode){(document.querySelector(`[data-qa-mode="${mode}"]`) as HTMLButtonElement)?.click();await settle()}
-
-          function collect(mode:Mode){
-            const root=document.querySelector(mode==='reunion'?'.relationship-experience':'.fortune-experience') as HTMLElement|null
-            const targetSelectors=[
-              '.period-ai-v18','.period-ai-head','.reading-flows','.flow-grid','.flow-tile','.period-ai-topic',
-              '.reading-timeline','.integrated-topic-grid','.system-reading','.relationship-experience','.reunion-ui-v3',
-              '.reunion-v3-card','.reunion-v4-stage-grid','.reunion-v3-situations','.reunion-v3-timing'
-            ]
-            const candidates=[...document.querySelectorAll(targetSelectors.join(','))].filter(visible)
-            const overflow=candidates.filter(el=>(el as HTMLElement).scrollWidth>(el as HTMLElement).clientWidth+2).map(el=>({...rectInfo(el),scrollWidth:(el as HTMLElement).scrollWidth,clientWidth:(el as HTMLElement).clientWidth}))
-            const outside=candidates.filter(el=>{const r=(el as HTMLElement).getBoundingClientRect();return r.left < -2 || r.right > innerWidth+2}).map(rectInfo)
-            const text=[...document.querySelectorAll('.period-ai-v18 h3,.period-ai-v18 h4,.period-ai-v18 p,.period-ai-v18 li,.reunion-ui-v3 h3,.reunion-ui-v3 h4,.reunion-ui-v3 p,.reunion-ui-v3 li')].filter(visible)
-            const clipped=text.filter(el=>{const h=el as HTMLElement,cs=getComputedStyle(el);const ox=['hidden','clip'].includes(cs.overflowX),oy=['hidden','clip'].includes(cs.overflowY);return (ox&&h.scrollWidth>h.clientWidth+2)||(oy&&h.scrollHeight>h.clientHeight+2)}).map(rectInfo)
-            const hero=root?.querySelector('.period-ai-head h3,.reunion-v4-answer h3') as HTMLElement|null
-            const subtitle=root?.querySelector('.reading-hero-subtitle,.reunion-v4-answer p') as HTMLElement|null
-            const duplicate=Boolean(hero&&subtitle&&fp(hero.textContent||'')&&fp(hero.textContent||'')===fp(subtitle.textContent||''))
-            const head=root?.querySelector('.period-ai-head,.reunion-v4-answer') as HTMLElement|null
-            const next=root?.querySelector('.reading-flows,.reunion-v4-stage-board') as HTMLElement|null
-            const orderOk=!head||!next||head.getBoundingClientRect().top<=next.getBoundingClientRect().top
-            const titleStyle=hero?getComputedStyle(hero):null
-            const stageGrid=document.querySelector('.reunion-v4-stage-grid')
-            const stageCols=stageGrid?getComputedStyle(stageGrid).gridTemplateColumns.split(' ').filter(Boolean).length:null
-            const monthYearBody=(mode==='month'||mode==='year')?document.querySelector('.period-ai-user-focus .period-ai-topic p'):null
-            const report={
-              mode,
-              viewport:{width:innerWidth,height:innerHeight},
-              documentOverflow:document.documentElement.scrollWidth>innerWidth+2,
-              overflow,outside,clipped,duplicate,orderOk,
-              hero:{lines:lines(hero),fontWeight:titleStyle?.fontWeight??null,fontFamily:titleStyle?.fontFamily??null,fontSize:titleStyle?.fontSize??null},
-              subtitle:{lines:lines(subtitle)},
-              stageCols,
-              monthYearBodyFont:monthYearBody?getComputedStyle(monthYearBody).fontSize:null,
-            }
-            return report
-          }
-
-          ;(async()=>{
-            await settle()
-            const reports:any[]=[]
-            for(const mode of ['today','week','month','year','reunion'] as Mode[]){await select(mode);reports.push(collect(mode))}
-            const mobile=innerWidth<=600
-            const failures:string[]=[]
-            for(const r of reports){
-              if(r.documentOverflow)failures.push(`${r.mode}:document-overflow`)
-              if(r.overflow.length)failures.push(`${r.mode}:element-overflow:${r.overflow.length}`)
-              if(r.outside.length)failures.push(`${r.mode}:outside-viewport:${r.outside.length}`)
-              if(r.clipped.length)failures.push(`${r.mode}:clipped-text:${r.clipped.length}`)
-              if(r.duplicate)failures.push(`${r.mode}:hero-subtitle-duplicate`)
-              if(!r.orderOk)failures.push(`${r.mode}:hero-order`)
-              if(mobile && r.mode!=='reunion' && r.hero.fontWeight!=='800')failures.push(`${r.mode}:mobile-hero-weight-${r.hero.fontWeight}`)
-              if(mobile && (r.mode==='month'||r.mode==='year') && r.monthYearBodyFont && parseFloat(r.monthYearBodyFont)<15.5)failures.push(`${r.mode}:longform-font-${r.monthYearBodyFont}`)
-              if(r.mode==='reunion' && mobile && r.stageCols!==1)failures.push(`reunion:mobile-stage-columns-${r.stageCols}`)
-              if(r.mode==='reunion' && !mobile && r.stageCols!==2)failures.push(`reunion:desktop-stage-columns-${r.stageCols}`)
-            }
-            const payload={status:failures.length?'FAIL':'PASS',failures,reports}
-            const pre=document.createElement('pre');pre.id='qa-report';pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(payload)
-            document.body.appendChild(pre);document.documentElement.dataset.qaStatus=payload.status.toLowerCase()
-          })()
+          const appRoot=document.querySelector(mode==='reunion'?'.relationship-experience':'.fortune-experience') as HTMLElement|null
+          const targetSelectors=['.period-ai-v18','.period-ai-head','.reading-flows','.flow-grid','.flow-tile','.period-ai-topic','.reading-timeline','.integrated-topic-grid','.system-reading','.relationship-experience','.reunion-ui-v3','.reunion-v3-card','.reunion-v4-stage-grid','.reunion-v3-situations','.reunion-v3-timing']
+          const candidates=[...document.querySelectorAll(targetSelectors.join(','))].filter(visible)
+          const overflow=candidates.filter(el=>(el as HTMLElement).scrollWidth>(el as HTMLElement).clientWidth+2).map(el=>({...rectInfo(el),scrollWidth:(el as HTMLElement).scrollWidth,clientWidth:(el as HTMLElement).clientWidth}))
+          const outside=candidates.filter(el=>{const r=(el as HTMLElement).getBoundingClientRect();return r.left < -2 || r.right > innerWidth+2}).map(rectInfo)
+          const text=[...document.querySelectorAll('.period-ai-v18 h3,.period-ai-v18 h4,.period-ai-v18 p,.period-ai-v18 li,.reunion-ui-v3 h3,.reunion-ui-v3 h4,.reunion-ui-v3 p,.reunion-ui-v3 li')].filter(visible)
+          const clipped=text.filter(el=>{const h=el as HTMLElement,cs=getComputedStyle(el);const ox=['hidden','clip'].includes(cs.overflowX),oy=['hidden','clip'].includes(cs.overflowY);return (ox&&h.scrollWidth>h.clientWidth+2)||(oy&&h.scrollHeight>h.clientHeight+2)}).map(rectInfo)
+          const hero=appRoot?.querySelector('.period-ai-head h3,.reunion-v4-answer h3') as HTMLElement|null
+          const subtitle=appRoot?.querySelector('.reading-hero-subtitle,.reunion-v4-answer p') as HTMLElement|null
+          const duplicate=Boolean(hero&&subtitle&&fp(hero.textContent||'')&&fp(hero.textContent||'')===fp(subtitle.textContent||''))
+          const head=appRoot?.querySelector('.period-ai-head,.reunion-v4-answer') as HTMLElement|null
+          const next=appRoot?.querySelector('.reading-flows,.reunion-v4-stage-board') as HTMLElement|null
+          const orderOk=!head||!next||head.getBoundingClientRect().top<=next.getBoundingClientRect().top
+          const titleStyle=hero?getComputedStyle(hero):null
+          const stageGrid=document.querySelector('.reunion-v4-stage-grid')
+          const stageCols=stageGrid?getComputedStyle(stageGrid).gridTemplateColumns.split(' ').filter(Boolean).length:null
+          const monthYearBody=(mode==='month'||mode==='year')?document.querySelector('.period-ai-user-focus .period-ai-topic p'):null
+          const report={mode,viewport:{width:innerWidth,height:innerHeight},documentOverflow:document.documentElement.scrollWidth>innerWidth+2,overflow,outside,clipped,duplicate,orderOk,hero:{lines:lines(hero),fontWeight:titleStyle?.fontWeight??null,fontFamily:titleStyle?.fontFamily??null,fontSize:titleStyle?.fontSize??null},subtitle:{lines:lines(subtitle)},stageCols,monthYearBodyFont:monthYearBody?getComputedStyle(monthYearBody).fontSize:null}
+          const mobile=innerWidth<=600
+          const failures:string[]=[]
+          if(report.documentOverflow)failures.push(`${mode}:document-overflow`)
+          if(overflow.length)failures.push(`${mode}:element-overflow:${overflow.length}`)
+          if(outside.length)failures.push(`${mode}:outside-viewport:${outside.length}`)
+          if(clipped.length)failures.push(`${mode}:clipped-text:${clipped.length}`)
+          if(duplicate)failures.push(`${mode}:hero-subtitle-duplicate`)
+          if(!orderOk)failures.push(`${mode}:hero-order`)
+          if(mobile && mode!=='reunion' && report.hero.fontWeight!=='800')failures.push(`${mode}:mobile-hero-weight-${report.hero.fontWeight}`)
+          if(mobile && (mode==='month'||mode==='year') && report.monthYearBodyFont && parseFloat(report.monthYearBodyFont)<15.5)failures.push(`${mode}:longform-font-${report.monthYearBodyFont}`)
+          if(mode==='reunion' && mobile && stageCols!==1)failures.push(`reunion:mobile-stage-columns-${stageCols}`)
+          if(mode==='reunion' && !mobile && stageCols!==2)failures.push(`reunion:desktop-stage-columns-${stageCols}`)
+          const payload={status:failures.length?'FAIL':'PASS',failures,report}
+          const pre=document.createElement('pre');pre.id='qa-report';pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(payload);document.body.appendChild(pre)
           TSX
 
           npm exec vite -- --host 127.0.0.1 --port 4173 > /tmp/qa-vite.log 2>&1 &
@@ -268,31 +224,25 @@ jobs:
             sleep 1
           done
           if [ "$ready" != 1 ]; then cat /tmp/qa-vite.log; exit 1; fi
-
           chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$chrome" ]; then
-            echo "No Chromium/Chrome binary on runner" >&2
-            exit 1
-          fi
+          if [ -z "$chrome" ]; then echo "No Chromium/Chrome binary on runner" >&2; exit 1; fi
           "$chrome" --version
 
           for spec in mobile:390,844 desktop:1440,1000; do
-            label="${spec%%:*}"
-            size="${spec#*:}"
-            out="/tmp/qa-${label}.html"
-            "$chrome" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size="$size" --virtual-time-budget=9000 --dump-dom "http://127.0.0.1:4173/qa-browser.html" > "$out"
-            python - "$out" "$label" <<'PY'
+            label="${spec%%:*}"; size="${spec#*:}"
+            for mode in today week month year reunion; do
+              out="/tmp/qa-${label}-${mode}.html"
+              "$chrome" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size="$size" --dump-dom "http://127.0.0.1:4173/qa-browser.html?mode=${mode}" > "$out"
+              python - "$out" "$label" "$mode" <<'PY'
           import html,json,re,sys
-          path,label=sys.argv[1:3]
+          path,label,mode=sys.argv[1:4]
           text=open(path,encoding='utf-8').read()
           match=re.search(r'<pre id="qa-report"[^>]*>(.*?)</pre>',text,re.S)
-          if not match:
-              print(text[-5000:])
-              raise SystemExit(f'{label}: qa-report missing')
+          if not match: raise SystemExit(f'{label}/{mode}: qa-report missing')
           raw=html.unescape(re.sub(r'<[^>]+>','',match.group(1)))
           data=json.loads(raw)
-          print(f'BROWSER_QA_{label.upper()}='+json.dumps(data,ensure_ascii=False,separators=(',',':')))
-          if data.get('status')!='PASS':
-              raise SystemExit(f'{label}: browser QA failed: {data.get("failures")}')
+          print(f'BROWSER_QA_{label.upper()}_{mode.upper()}='+json.dumps(data,ensure_ascii=False,separators=(',',':')))
+          if data.get('status')!='PASS': raise SystemExit(f'{label}/{mode}: browser QA failed: {data.get("failures")}')
           PY
+            done
           done
