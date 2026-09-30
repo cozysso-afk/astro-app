@@ -55,6 +55,8 @@ const INTERPERSONAL_FALLBACK_COPY: Record<InterpersonalContextKey, string> = {
 
 const TECHNICAL_RE = /(?:태양|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|노드|하우스|트랜짓|프로그레스|컴포지트|시너스트리|삼분|사분|육합|육파|오브|\d+도각|사주\s*(?:일지|월지|시주)|[甲乙丙丁戊己庚辛壬癸寅卯辰巳午未申酉戌亥子丑])/i
 const RELATIONSHIP_META_RE = /(?:AI\s*원고|원고가 아직|별도\s*계산값|계산\s*(?:값|정보|근거|엔진|로직)|계산상|상대지수|활성도|판정상|threshold|스키마|클러스터|evidence_refs|applicability|출력\s*형식)/i
+const CHANGE_TRIGGER_RE = /(?:면|다면|때|경우|순간|뒤|후|전|확인되|생기|발생하|나오|오면|되면|잡히|이어지|끊기|바뀌|달라지|변하|정해지|확정되|줄어|늘어|없어지|나타나|도착하|제안하|응답하|반응하)/i
+const VAGUE_CHANGE_RE = /^(?:상황|흐름|분위기)(?:이|가|을|를)?\s*(?:바뀌|달라지|변하|보|살피)/i
 
 function clean(value: unknown) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -91,6 +93,35 @@ function overlapRatio(a: string, b: string) {
   return overlap / Math.min(left.size, right.size)
 }
 
+function nearDuplicate(a: string, b: string) {
+  const left = fingerprint(a)
+  const right = fingerprint(b)
+  if (!left || !right) return false
+  if (left === right) return true
+  if (Math.min(left.length, right.length) >= 16 && (left.includes(right) || right.includes(left))) return true
+  const leftTokens = new Set(clean(a).replace(/[^0-9a-z가-힣]+/gi, ' ').split(' ').filter(token => token.length >= 2))
+  const rightTokens = new Set(clean(b).replace(/[^0-9a-z가-힣]+/gi, ' ').split(' ').filter(token => token.length >= 2))
+  if (Math.min(leftTokens.size, rightTokens.size) < 4) return false
+  return overlapRatio(a, b) >= 0.82
+}
+
+function observableChangeCondition(value: unknown) {
+  const text = clean(value)
+  if (text.length < 10 || VAGUE_CHANGE_RE.test(text)) return false
+  return CHANGE_TRIGGER_RE.test(text)
+}
+
+export function editorialSectionReady(value: any) {
+  if (!editorialSectionComplete(value)) return false
+  const parts = [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean)
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      if (nearDuplicate(parts[i], parts[j])) return false
+    }
+  }
+  return observableChangeCondition(value.change_condition)
+}
+
 function readerFacing(value: string) {
   const text = clean(value)
   if (!text || text.length < 10) return false
@@ -111,7 +142,7 @@ function firstSentence(value: string) {
 }
 
 export function sectionCopy(value: any) {
-  if (!editorialSectionComplete(value)) return ''
+  if (!editorialSectionReady(value)) return ''
   return [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean).join(' ')
 }
 
