@@ -72,6 +72,13 @@ function editorialSectionUsable(value: any) {
   return Boolean(value) && typeof value === 'object' && sectionApplicability(value) !== 'insufficient'
 }
 
+export function editorialSectionComplete(value: any) {
+  if (!editorialSectionUsable(value)) return false
+  return [value.conclusion, value.real_scene, value.action, value.change_condition]
+    .map(clean)
+    .every(Boolean)
+}
+
 function fingerprint(value: unknown) {
   return clean(value).replace(/[\s.,!?·~→:;()\[\]-]+/g, '').replace(/(?:오늘|이번주|이번달|올해)/g, '')
 }
@@ -104,8 +111,8 @@ function firstSentence(value: string) {
 }
 
 export function sectionCopy(value: any) {
-  if (!editorialSectionUsable(value)) return ''
-  return [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean).filter(Boolean).join(' ')
+  if (!editorialSectionComplete(value)) return ''
+  return [value.conclusion, value.real_scene, value.action, value.change_condition].map(clean).join(' ')
 }
 
 export function relationshipSectionCopy(value: any) {
