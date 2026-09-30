@@ -69,6 +69,7 @@ test('Gemini structured cluster prose remains available for user-facing topic co
   assert.match(result.topicEditorial['금전'],/정한 지출/)
   assert.match(result.topicEditorial['컨디션'],/집중과 휴식/)
   assert.match(result.topicEditorial['투자심리'],/보유 조건/)
+  assert.match(result.topicEditorial['소식'],/공식 안내/)
 })
 
 test('contact overall reading keeps useful scene and action separate from direction',()=>{
@@ -95,10 +96,16 @@ test('contact UI collapses verbose direction rows when direction scores are effe
   assert.doesNotMatch(panel,/전체 연락 활성도/)
 })
 
-test('main fortune topic cards keep deterministic conclusion and action primary',()=>{
+test('verified non-relationship fields surface structured editorial without replacing deterministic cards',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.doesNotMatch(panel,/const aiEditorial = compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\)/)
-  assert.doesNotMatch(panel,/period-ai-topic-editorial-v4/)
+  assert.match(panel,/const structuredFieldTopics = verifiedNarrative && field/)
+  assert.match(panel,/editorial\.topicEditorial\[topic\] \?\? ''/)
+  assert.match(panel,/연애','대인관계','연락','재회','투자주의/)
+  assert.match(panel,/editorialCopyUsable\(item\.text\)/)
+  assert.match(panel,/period-ai-topic-editorial-v4/)
+  assert.match(panel,/현실 장면 · 행동 · 판단 변경조건/)
+  assert.match(panel,/field\?\.id === 'contact' \? '소식 해설'/)
+  assert.match(panel,/<p>\{item\.text\}<\/p>/)
   assert.match(panel,/<b>\{item\.conclusion\}<\/b>/)
   assert.match(panel,/<em>실제로는<\/em> \{item\.action\}/)
   assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
