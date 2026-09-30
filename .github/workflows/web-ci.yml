@@ -70,3 +70,229 @@ jobs:
 
       - name: Type-check and build
         run: npm run build
+
+      - name: Final verified Chromium layout QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > qa-browser.html <<'HTML'
+          <!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>QA</title></head><body><div id="root"></div><script type="module" src="/src/qa-browser-entry.tsx"></script></body></html>
+          HTML
+          cat > src/qa-browser-entry.tsx <<'TSX'
+          import React from 'react'
+          import ReactDOM from 'react-dom/client'
+          import { flushSync } from 'react-dom'
+          import { PeriodFortuneResults } from './PeriodFortuneResults'
+          import { ReunionHierarchyPanel } from './ReunionHierarchyPanelV3'
+          // @ts-ignore fixture module is JavaScript by design
+          import { fortuneFixture } from './lib/readingExperience.fixtures.mjs'
+          import './styles.css'
+          import './relationship.css'
+          import './birthplace.css'
+          import './integrated.css'
+          import './archive.css'
+          import './precision.css'
+          import './celestial-theme.css'
+          import './celestial-pastel.css'
+          import './settings.css'
+          import './ai-interpret.css'
+          import './annual-daily-scores.css'
+          import './ai-interpret-v2.css'
+          import './relationship-analysis.css'
+          import './visual-overhaul-v5.css'
+          import './visual-overhaul-v6.css'
+          import './mobile-spacing-v11.css'
+          import './fortune-ux-v14.css'
+          import './period-ai-v18.css'
+          import './ux-readability-v22.css'
+          import './mobile-design-v27.css'
+          import './background-stability-v1.css'
+          import './mobile-type-v28.css'
+          import './mobile-density-v29.css'
+          import './auth.css'
+          import './home-moonlit.css'
+          import './ios-viewport-stability.css'
+          import './mobile-viewport-v31.css'
+          import './vertical-density-v32.css'
+          import './reading-type-hierarchy-v33.css'
+          import './home-information-architecture-v35.css'
+          import './system-reading-ux-v40.css'
+          import './reunion-location-mobile-v42.css'
+          import './basic-fortune-v43.css'
+          import './ai-cost-preview-v47.css'
+          import './reading-legibility-v49.css'
+          import './reading-polish-v50.css'
+          import './reading-experience.css'
+          import './reunion-reading-product-v13.css'
+          import './redline-layout-v55.css'
+          import './archive-mobile-polish-v57.css'
+          import './archive-mobile-polish-v59.css'
+          import './profile-form-aurora-v71.css'
+          import './viewport-background-v60.css'
+          import './reading-font-fix-v54.css'
+          import './reunion-v3.css'
+
+          type Mode = 'today'|'week'|'month'|'year'|'money'|'investment'|'contact'|'reunion'
+          const noop=()=>{}
+          const outcome={date:'2026-09-21',event:'',past_connection:false,event_time_bucket:'',channel:'',note:'',saved_at:'',scores:{}} as any
+          const calibration={n:0,contactN:0,noneN:0,incomingContact:null,incomingNone:null,reconnectionContact:null,reconnectionNone:null}
+          const section=(conclusion:string,real_scene:string,action:string,change_condition:string,applicability='direct')=>({conclusion,real_scene,action,change_condition,evidence_refs:[],applicability})
+          function Fortune({mode}:{mode:Exclude<Mode,'reunion'>}) {
+            const period = mode==='money'||mode==='investment' ? 'month' : mode==='contact' ? 'week' : mode
+            const fieldId = mode==='money' ? 'money' : mode==='investment' ? 'investment' : mode==='contact' ? 'contact' : undefined
+            const f=fortuneFixture(period)
+            const richData:any={...f.data,
+              priorities:['가장 중요한 약속과 마감을 먼저 확정하고 나머지 일정은 그 뒤에 배치해.','돈과 시간을 쓰는 일은 남은 여유를 확인한 뒤 결정해.','관계에서는 한 번의 반응보다 다음 행동과 약속이 이어지는지 확인해.'],
+              limits:'이 해설은 실제 사건의 발생이나 상대의 행동, 투자 수익을 확정하지 않아. 실제 일정과 확인된 조건을 함께 봐.',
+              decisions:(period==='month'||period==='year')?[
+                {action:'이번 기간에 가장 중요한 한 가지 결정을 먼저 정하고, 실행 조건을 문장으로 적어.',timing:'첫째 주에 조건을 정리하고 중간 점검일에 다시 확인해.',reason:'여러 선택을 동시에 확정하면 우선순위가 흐려질 수 있어.',watch:'담당자·일정·예산처럼 확인되지 않았던 조건이 실제로 확정되는지 봐.',avoid:'불안이나 기대만으로 기존 계획을 갑자기 뒤집지 마.',evidence_refs:[]},
+                {action:'사람과 관련된 결정은 말보다 다음 약속과 역할 분담이 실제로 이어지는지 본 뒤 확정해.',timing:'중순 이후 후속 행동이 확인될 때 다시 판단해.',reason:'초기 반응 하나만으로 관계 전체를 읽지 않기 위해서야.',watch:'질문과 답이 이어지고 구체적인 일정이 잡히는지 확인해.',avoid:'답장 속도 하나로 관계를 단정하지 마.',evidence_refs:[]}
+              ]:[],
+              year_phases:period==='year'?[
+                {label:'1구간',start:'2026-01-01',end:'2026-03-31',theme:'기존 계획과 책임을 정리하고 올해 우선순위를 좁히는 구간이야.',change:'새 일을 늘리기보다 완료 기준을 분명히 하는 쪽으로 무게가 이동해.',evidence_refs:[]},
+                {label:'2구간',start:'2026-04-01',end:'2026-06-30',theme:'사람과 일정의 조율이 늘어나 실제 약속과 역할 분담을 확인할 일이 많아져.',change:'혼자 정하던 방식에서 상대와 조건을 맞추는 방식으로 바뀌어.',evidence_refs:[]},
+                {label:'3구간',start:'2026-07-01',end:'2026-09-30',theme:'돈과 시간의 배분을 다시 조정하고 이미 시작한 일의 성과를 점검하는 구간이야.',change:'확장보다 선택과 집중, 비용 대비 결과 확인이 중요해져.',evidence_refs:[]},
+                {label:'4구간',start:'2026-10-01',end:'2026-12-31',theme:'남은 과제를 정리하고 다음 해로 넘길 것과 올해 끝낼 것을 나누는 구간이야.',change:'새 선택보다 마무리와 장기 계획의 현실성을 확인하는 쪽으로 이동해.',evidence_refs:[]}
+              ]:[],
+              cross_checks:[{label:'중요한 선택을 실제 조건과 함께 확인할 시기',start:f.calculation.period.start,end:f.calculation.period.end,mode:'복수체계',western:'일정과 선택지의 상대적 강약을 비교해 우선순위를 좁혀.',saju:'맡은 역할과 돈·시간의 배분이 실제 생활에서 어떻게 정리되는지 확인해.',thai:'부탁과 책임이 한쪽에 몰리지 않도록 쉬는 시간과 결정 범위를 먼저 확보해.',synthesis:'세 체계가 같은 결론을 강요하는 것이 아니라, 실제 일정·책임·자원 조건을 확인한 뒤 결정하라는 공통점을 참고해.',evidence_refs:[]}],
+              contact_flow:{incoming:'상대가 먼저 움직이는지는 안부와 질문, 약속 제안이 실제로 오는지 확인해.',outgoing:'내가 먼저 연락한다면 짧고 구체적으로 보내고 후속 대화가 이어지는지 봐.',reconnection:'과거 인연은 추억보다 실제 재접촉과 만남이 이어지는지 따로 확인해.'},
+              clusters:{
+                relationship:{
+                  summary:section('사람 관계는 역할과 약속이 실제 행동으로 이어지는지 보는 게 중요해.','대화 후 담당자나 다음 일정이 구체적으로 정해지는 장면을 봐.','중요한 말은 짧고 분명하게 전달해.','약속이 반복해서 지켜지면 판단을 한 단계 올려도 돼.'),
+                  contact_activation:section('연락 흐름은 한 번의 답장보다 대화가 이어지는지가 중요해.','질문과 답이 오가고 다음 약속이 잡히는지를 봐.','연락한다면 목적을 한 문장으로 분명히 해.','후속 질문이나 약속 제안이 실제로 생기면 판단을 바꿔.'),
+                  contact_continuity:section('연락이 이어지는지는 다음 행동으로 확인해.','답장 뒤에 다시 질문하거나 만남을 잡는 흐름이 있는지 봐.','한 번의 반응보다 두 번째 행동을 확인해.','대화가 끊기지 않고 구체화되면 연속성을 높게 봐.'),
+                  love_general:section('관계는 호감 표현보다 실제 만남과 약속의 지속성을 봐.','말과 실제 행동의 간격이 줄어드는지를 확인해.','상대 반응을 재촉하지 말고 다음 행동을 봐.','반복 행동이 확인되면 관계 판단을 조정해.')
+                },
+                work_study:{
+                  work:section('업무는 완료 기준과 담당자를 먼저 정리해.','회의 뒤 누가 언제까지 무엇을 끝낼지가 적히는 장면을 봐.','마감과 책임 범위를 문장으로 확인해.','담당자와 일정이 확정되면 실행 속도를 높여.'),
+                  career_change:section('이직은 기대보다 직무·보상·시작 일정의 확인이 먼저야.','제안이 구체적인 조건표와 일정으로 바뀌는지를 봐.','확인되지 않은 조건부터 질문해.','핵심 조건이 문서로 확정되면 판단을 다시 해.'),
+                  study:section('학업은 새 자료를 늘리기보다 이미 배운 내용을 꺼내 쓰는 데 집중해.','설명하거나 문제를 풀 때 막히는 부분이 드러나는 장면을 봐.','틀린 부분을 바로 표시하고 다시 확인해.','같은 실수가 줄어들면 다음 범위로 넘어가.'),
+                  exam:section('시험 준비는 아는 문제의 실수를 줄이는 게 우선이야.','시간 안에 풀었는데 반복해서 틀리는 유형을 확인해.','오답 유형을 짧게 분류해.','반복 실수가 줄어들면 새 범위를 추가해.')
+                },
+                money_news:{
+                  money:section('금전은 남은 예산과 고정지출을 먼저 확인해.','결제 전에 이번 달 남은 금액과 예정 지출을 같이 보는 장면이 필요해.','우선순위를 정한 뒤 결제해.','예정 지출을 반영해도 여유가 남으면 선택 범위를 넓혀.'),
+                  news:section('소식은 전달된 말보다 원문과 실제 일정 확인이 먼저야.','공지·메시지·메일의 원문에서 날짜와 조건을 확인해.','전해 들은 내용은 원문을 다시 봐.','공식 일정과 조건이 확인되면 그때 계획에 반영해.')
+                },
+                investment:{
+                  psychology:section('투자심리는 기대와 불안이 판단 기준을 바꾸는지 먼저 봐.','가격 움직임을 본 직후 원래 세운 기준을 바꾸고 싶은 충동이 생기는지를 확인해.','매수·매도 근거를 가격과 분리해서 적어.','새 정보가 기존 근거를 실제로 바꿀 때만 판단을 수정해.'),
+                  entry:section('신규진입은 가격보다 진입 조건과 손실 한도를 먼저 확인해.','주문 전에 진입 이유와 무효화 조건을 적는 장면이 필요해.','조건이 충족되지 않으면 기다려.','확인한 정보가 진입 조건을 충족할 때만 다시 검토해.'),
+                  realization:section('수익실현은 목표와 청산 조건을 먼저 확인해.','수익률 숫자보다 처음 정한 매도 조건과 현재 근거가 같은지를 봐.','부분·전체 청산 기준을 미리 적어.','기존 근거가 약해지거나 목표 조건이 충족되면 실행 판단을 다시 해.')
+                },
+                condition:{condition:section('컨디션은 일정 사이의 회복 시간을 먼저 확보해.','집중 시간이 길어진 뒤 회복 없이 다음 일정을 붙이는 장면을 피해야 해.','쉬는 시간을 일정에 먼저 넣어.','회복 후 집중력이 유지되면 활동량을 조정해.')}
+              }
+            }
+            const rows=Object.entries(f.calculation.western.overall).filter(([,stat]:any)=>Number.isFinite(Number(stat?.average))) as any[]
+            const top=rows.slice().sort((a,b)=>Number(b[1].average)-Number(a[1].average)).slice(0,3).map(([topic,stat])=>({topic,stat}))
+            const caution=rows.slice().sort((a,b)=>Number(a[1].average)-Number(b[1].average)).slice(0,2).map(([topic,stat])=>({topic,stat}))
+            const ai:any={ok:true,model:'gemini-3.7-flash',data:richData,usage:{quality_validation:{score:100,stages:[]},local_quality_fallback:false,degraded_quality:false}}
+            return <PeriodFortuneResults fieldId={fieldId} period={period as any} periodLabel={period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'} result={f.calculation}
+              aiInterpretation={ai} aiLoading={false} aiError="" aiCacheSource="fresh"
+              topTopics={top} cautionTopics={caution} bestDays={[]} cautionDays={[]} activeDayun={null} outcomeDraft={outcome} outcomeSaved={false} outcomeCalibration={calibration}
+              topicDisplay={(x)=>x} humanizeEvidence={(x)=>x} onRetryAi={noop} onCopyAiPrompt={noop} onCancelAi={noop} aiCanCancel={false} onOutcomeChange={noop as any} onSaveOutcome={noop}/>
+          }
+          const hierarchy:any={validation:{status:'PASS'},as_of_date:'2026-09-30',score_meaning:'단계별 상대 활성도 참고값이며 사건 확률이 아니야.',stages:{emotional_reactivation:{label:'감정 재활성화',activation:68},contact_recontact:{label:'연락·재접촉',activation:57},in_person_meeting:{label:'실제 만남',activation:34},relationship_rebuilding:{label:'관계 재구축',activation:29}},current_windows:[{stage:'emotional_reactivation',start:'2026-09-28',end:'2026-10-02',label:'현재 감정 재활성화'}],top_periods:[{stage:'contact_recontact',start:'2026-10-21',end:'2026-10-24',label:'연락·대화 재개'},{stage:'emotional_reactivation',start:'2027-01-20',end:'2027-01-23',label:'다시 의식하기'}],limitations:['실제 행동과 상대의 속마음은 확정하지 않아.']}
+          const directions:any[]=[{kind:'incoming',label:'상대 → 나',score:52,band:'보통',text:'상대가 먼저 오는 흐름은 보통이야.',timing:'2026-10-21 전후'},{kind:'outgoing',label:'나 → 상대',score:49,band:'보통',text:'내가 먼저 움직이는 흐름도 보통이야.',timing:'2026-10-21 전후'}]
+          function Reunion(){return <div className="relationship-experience" data-mode="reunion"><ReunionHierarchyPanel hierarchyData={hierarchy} evidence={[]} reunionV2={null} directionRows={directions as any} sustainabilityText="연락보다 만남과 지속 행동을 따로 확인해."/></div>}
+          function App({mode}:{mode:Mode}){return <div className="app-shell"><main style={{maxWidth:900,margin:'0 auto',padding:'24px 16px 80px'}}>{mode==='reunion'?<Reunion/>:<Fortune mode={mode}/>}</main></div>}
+
+          const mode=((new URLSearchParams(location.search).get('mode')||'today') as Mode)
+          const root=ReactDOM.createRoot(document.getElementById('root')!)
+          flushSync(()=>root.render(<App mode={mode}/>))
+          const fp=(value:string)=>String(value??'').replace(/[\s.,!?·~→:;()[\]\-]+/g,'')
+          const visible=(el:Element)=>{const r=(el as HTMLElement).getBoundingClientRect();const s=getComputedStyle(el);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'}
+          const rectInfo=(el:Element)=>{const r=(el as HTMLElement).getBoundingClientRect();return {tag:el.tagName.toLowerCase(),cls:String((el as HTMLElement).className||'').slice(0,120),top:+r.top.toFixed(1),bottom:+r.bottom.toFixed(1),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1),height:+r.height.toFixed(1)}}
+          const lines=(el:Element|null)=>{if(!el)return null;const r=(el as HTMLElement).getBoundingClientRect();const lh=parseFloat(getComputedStyle(el).lineHeight);return Number.isFinite(lh)&&lh>0?+(r.height/lh).toFixed(2):null}
+          ;(window as any).__qaCollect=()=>{
+            const appRoot=document.querySelector(mode==='reunion'?'.relationship-experience':'.fortune-experience') as HTMLElement|null
+            const targetSelectors=['.period-ai-v18','.period-ai-head','.reading-flows','.flow-grid','.flow-tile','.period-ai-topic','.reading-timeline','.integrated-topic-grid','.system-reading','.period-ai-priorities-v4','.period-ai-cross-check-v4','.ai-cross-check','.period-ai-year-phase-v4','.ai-year-phase-list>article','.period-ai-decision-v4','.ai-decision-list>article','.period-ai-limit-v4','.period-ai-structured-field-v4','.contact-reading-v3','.relationship-experience','.reunion-ui-v3','.reunion-v3-card','.reunion-v4-stage-grid','.reunion-v3-situations','.reunion-v3-timing']
+            const candidates=[...document.querySelectorAll(targetSelectors.join(','))].filter(visible)
+            const overflow=candidates.filter(el=>{const h=el as HTMLElement,cs=getComputedStyle(el);return !['hidden','clip'].includes(cs.overflowX)&&h.scrollWidth>h.clientWidth+2}).map(el=>({...rectInfo(el),scrollWidth:(el as HTMLElement).scrollWidth,clientWidth:(el as HTMLElement).clientWidth}))
+            const childEscape=candidates.flatMap(parent=>{const pr=(parent as HTMLElement).getBoundingClientRect();return [...parent.children].filter(visible).filter(child=>{const cs=getComputedStyle(child);if(['absolute','fixed'].includes(cs.position))return false;const r=(child as HTMLElement).getBoundingClientRect();return r.left<pr.left-2||r.right>pr.right+2}).map(child=>({parent:String((parent as HTMLElement).className||'').slice(0,80),child:rectInfo(child)}))})
+            const outside=candidates.filter(el=>{const r=(el as HTMLElement).getBoundingClientRect();return r.left < -2 || r.right > innerWidth+2}).map(rectInfo)
+            const text=[...document.querySelectorAll('.period-ai-v18 h3,.period-ai-v18 h4,.period-ai-v18 p,.period-ai-v18 li,.period-ai-v18 strong,.period-ai-v18 span,.reunion-ui-v3 h3,.reunion-ui-v3 h4,.reunion-ui-v3 p,.reunion-ui-v3 li')].filter(visible)
+            const clipped=text.filter(el=>{const h=el as HTMLElement,cs=getComputedStyle(el);const ox=['hidden','clip'].includes(cs.overflowX),oy=['hidden','clip'].includes(cs.overflowY);return (ox&&h.scrollWidth>h.clientWidth+2)||(oy&&h.scrollHeight>h.clientHeight+2)}).map(rectInfo)
+            const narrative=document.querySelector('.period-ai-v18') as HTMLElement|null
+            const direct=narrative?[...narrative.children].filter(visible):[]
+            const verticalOverlap=direct.slice(1).flatMap((el,index)=>{const prev=(direct[index] as HTMLElement).getBoundingClientRect(),cur=(el as HTMLElement).getBoundingClientRect();return cur.top<prev.bottom-1?[{previous:rectInfo(direct[index]),current:rectInfo(el)}]:[]})
+            const hero=appRoot?.querySelector('.period-ai-head h3,.reunion-v4-answer h3') as HTMLElement|null
+            const subtitle=appRoot?.querySelector('.reading-hero-subtitle,.reunion-v4-answer p') as HTMLElement|null
+            const duplicate=Boolean(hero&&subtitle&&fp(hero.textContent||'')&&fp(hero.textContent||'')===fp(subtitle.textContent||''))
+            const titleStyle=hero?getComputedStyle(hero):null
+            const stageGrid=document.querySelector('.reunion-v4-stage-grid')
+            const stageCols=stageGrid?getComputedStyle(stageGrid).gridTemplateColumns.split(' ').filter(Boolean).length:null
+            const monthYearBody=(mode==='month'||mode==='year')?document.querySelector('.period-ai-user-focus .period-ai-topic p'):null
+            const counts={priorities:document.querySelectorAll('.period-ai-priorities-v4').length,crossChecks:document.querySelectorAll('.period-ai-cross-check-v4').length,yearPhases:document.querySelectorAll('.period-ai-year-phase-v4').length,decisions:document.querySelectorAll('.period-ai-decision-v4').length,limits:document.querySelectorAll('.period-ai-limit-v4').length,structured:document.querySelectorAll('.period-ai-structured-field-v4').length,contact:document.querySelectorAll('.contact-reading-v3').length}
+            const order=direct.map(el=>String((el as HTMLElement).className||el.tagName).slice(0,100))
+            const report={mode,viewport:{width:innerWidth,height:innerHeight},documentHeight:document.documentElement.scrollHeight,documentOverflow:document.documentElement.scrollWidth>innerWidth+2,overflow,childEscape,outside,clipped,verticalOverlap,duplicate,hero:{lines:lines(hero),fontWeight:titleStyle?.fontWeight??null,fontFamily:titleStyle?.fontFamily??null,fontSize:titleStyle?.fontSize??null},subtitle:{lines:lines(subtitle)},stageCols,monthYearBodyFont:monthYearBody?getComputedStyle(monthYearBody).fontSize:null,counts,order}
+            const mobile=innerWidth<=600,failures:string[]=[]
+            if(report.documentOverflow)failures.push(`${mode}:document-overflow`)
+            if(overflow.length)failures.push(`${mode}:element-overflow:${overflow.length}`)
+            if(childEscape.length)failures.push(`${mode}:child-escape:${childEscape.length}`)
+            if(outside.length)failures.push(`${mode}:outside-viewport:${outside.length}`)
+            if(clipped.length)failures.push(`${mode}:clipped-text:${clipped.length}`)
+            if(verticalOverlap.length)failures.push(`${mode}:vertical-overlap:${verticalOverlap.length}`)
+            if(duplicate)failures.push(`${mode}:hero-subtitle-duplicate`)
+            if(mobile && mode!=='reunion' && report.hero.fontWeight!=='800')failures.push(`${mode}:mobile-hero-weight-${report.hero.fontWeight}`)
+            if(mobile && (mode==='month'||mode==='year') && !report.monthYearBodyFont)failures.push(`${mode}:longform-body-probe-missing`)
+            if(mobile && (mode==='month'||mode==='year') && report.monthYearBodyFont && parseFloat(report.monthYearBodyFont)<15.5)failures.push(`${mode}:longform-font-${report.monthYearBodyFont}`)
+            if(mode==='reunion' && mobile && stageCols!==1)failures.push(`reunion:mobile-stage-columns-${stageCols}`)
+            if(mode==='reunion' && !mobile && stageCols!==2)failures.push(`reunion:desktop-stage-columns-${stageCols}`)
+            if((mode==='today'||mode==='week') && (counts.priorities!==1||counts.crossChecks!==1))failures.push(`${mode}:missing-priority-or-crosscheck`)
+            if(mode==='month' && (counts.priorities!==0||counts.crossChecks!==1||counts.decisions!==1||counts.limits!==1||counts.yearPhases!==0))failures.push('month:long-period-block-contract')
+            if(mode==='year' && (counts.priorities!==0||counts.crossChecks!==1||counts.decisions!==1||counts.limits!==1||counts.yearPhases!==1))failures.push('year:long-period-block-contract')
+            if((mode==='money'||mode==='investment'||mode==='contact') && (counts.priorities||counts.crossChecks||counts.decisions||counts.limits||counts.yearPhases))failures.push(`${mode}:whole-period-data-leaked-into-field`)
+            if((mode==='money'||mode==='investment') && counts.structured!==1)failures.push(`${mode}:structured-field-missing`)
+            if(mode==='contact' && (counts.contact!==1||counts.structured!==1))failures.push('contact:dedicated-or-news-structured-missing')
+            return {status:failures.length?'FAIL':'PASS',failures,report}
+          }
+          TSX
+
+          cat > /tmp/cdp-qa.mjs <<'JS'
+          const [baseUrl,widthRaw,heightRaw,label,mode]=process.argv.slice(2)
+          const width=Number(widthRaw),height=Number(heightRaw)
+          const target=await fetch('http://127.0.0.1:9222/json/new?about:blank',{method:'PUT'}).then(r=>r.json())
+          const ws=new WebSocket(target.webSocketDebuggerUrl)
+          await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})})
+          let nextId=1
+          const pending=new Map(),eventWaiters=new Map()
+          ws.addEventListener('message',event=>{
+            const msg=JSON.parse(String(event.data))
+            if(msg.id&&pending.has(msg.id)){const {resolve,reject}=pending.get(msg.id);pending.delete(msg.id);msg.error?reject(new Error(JSON.stringify(msg.error))):resolve(msg.result);return}
+            const waiters=eventWaiters.get(msg.method);if(waiters?.length){const fn=waiters.shift();fn(msg.params);if(!waiters.length)eventWaiters.delete(msg.method)}
+          })
+          const send=(method,params={})=>new Promise((resolve,reject)=>{const id=nextId++;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}))})
+          const once=method=>new Promise(resolve=>{const list=eventWaiters.get(method)||[];list.push(resolve);eventWaiters.set(method,list)})
+          await send('Page.enable');await send('Runtime.enable')
+          await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=600,screenWidth:width,screenHeight:height})
+          const loaded=once('Page.loadEventFired')
+          await send('Page.navigate',{url:`${baseUrl}?mode=${mode}`});await loaded
+          const evaluated=await send('Runtime.evaluate',{expression:`(async()=>{await document.fonts.ready;await new Promise(r=>setTimeout(r,160));return window.__qaCollect?window.__qaCollect():{status:'FAIL',failures:['collector-missing']}})()`,awaitPromise:true,returnByValue:true})
+          const data=evaluated?.result?.value
+          console.log(`BROWSER_QA_${label.toUpperCase()}_${mode.toUpperCase()}=${JSON.stringify(data)}`)
+          try{await send('Page.close')}catch{}
+          ws.close()
+          if(!data||data.status!=='PASS')process.exitCode=1
+          JS
+
+          npm exec vite -- --host 127.0.0.1 --port 4173 > /tmp/qa-vite.log 2>&1 &
+          vite_pid=$!
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$chrome" ]; then echo "No Chromium/Chrome binary on runner" >&2; exit 1; fi
+          "$chrome" --headless=new --no-sandbox --disable-gpu --remote-debugging-port=9222 --user-data-dir=/tmp/qa-chrome about:blank >/tmp/qa-chrome.log 2>&1 &
+          chrome_pid=$!
+          trap 'kill "$vite_pid" "$chrome_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/qa-browser.html >/dev/null && curl -fsS http://127.0.0.1:9222/json/version >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then cat /tmp/qa-vite.log; cat /tmp/qa-chrome.log; exit 1; fi
+          "$chrome" --version
+          failed=0
+          for spec in mobile:390:844 desktop:1440:1000; do
+            IFS=: read -r label width height <<< "$spec"
+            for mode in today week month year money investment contact reunion; do
+              if ! node /tmp/cdp-qa.mjs 'http://127.0.0.1:4173/qa-browser.html' "$width" "$height" "$label" "$mode"; then failed=1; fi
+            done
+          done
+          exit "$failed"
