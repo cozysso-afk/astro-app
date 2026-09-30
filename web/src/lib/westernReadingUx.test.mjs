@@ -55,6 +55,21 @@ test('important windows use action checks instead of fortune-style verdict label
   assert.match(signals, /favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인'/)
 })
 
+test('month and year restore decisions limits and annual phase changes in the natural reading', () => {
+  assert.match(periodPanel, /const showLongPeriodNarrative = verifiedNarrative && \(period === 'month' \|\| period === 'year'\)/)
+  assert.match(periodPanel, /const longPeriodDecisions = showLongPeriodNarrative/)
+  assert.match(periodPanel, /\(data\.decisions \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /const yearPhaseRows = verifiedNarrative && period === 'year'/)
+  assert.match(periodPanel, /\(data\.year_phases \?\? \[\]\)\.map/)
+  assert.match(periodPanel, /const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable\(data\.limits\)/)
+  assert.match(periodPanel, /<span>연간 흐름 지도<\/span><strong>한 해 안에서 분위기가 바뀌는 구간<\/strong>/)
+  assert.match(periodPanel, /<span>판단 기준<\/span><strong>이 기간에 실제로 결정할 일<\/strong>/)
+  assert.match(periodPanel, /<b>다시 볼 조건<\/b>/)
+  assert.match(periodPanel, /<span>해석 한계<\/span><strong>여기까지는 단정하지 않아<\/strong>/)
+  assert.match(periodPanel, /periodGuidanceText/)
+  assert.match(periodPanel, /RAW_PERIOD_GUIDANCE_RE/)
+})
+
 test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
   assert.match(view, /오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고/)
   assert.match(view, /수면·회복 시간을 일정에 먼저 넣어/)
