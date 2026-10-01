@@ -132,9 +132,11 @@ test('western independent view never shows the integrated period panel again', (
   assert.match(polish, /system-reading\.system-western > \.period-deep-reading\s*\{[\s\S]*?display:\s*none\s*!important/)
 })
 
-test('mobile integrated reading uses a strong 800 sans headline and lighter supporting copy', () => {
-  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-family:\s*-apple-system/)
-  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-weight:\s*800\s*!important/)
+test('mobile integrated reading uses a strong Myeongjo headline and lighter supporting copy', () => {
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-weight:\s*700\s*!important/)
+  assert.match(finalFont, /period-ai-head h3\.period-ai-hero-title-v4\s*\{[\s\S]*?font-synthesis:\s*none\s*!important/)
+  assert.match(finalFont, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-family:\s*-apple-system/)
   assert.match(finalFont, /period-ai-head \.reading-hero-subtitle\s*\{[\s\S]*?font-weight:\s*400\s*!important/)
 })
 

@@ -1,6 +1,6 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
-type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean }
+type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
 type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[] }
 type LayoutItem = { section?: string; card: ExportCard }
@@ -94,7 +94,7 @@ function periodTopicCards(root: HTMLElement) {
     const detail = textOf(article, ':scope > b')
     const paragraphs = directParagraphs(article)
     const body = [detail, ...paragraphs].filter(Boolean).join(' ')
-    return { title, body: firstSentences(body, 3), tone: toneOf(article) } satisfies ExportCard
+    return { title, body: firstSentences(body, 3), tone: toneOf(article), editorial: true } satisfies ExportCard
   })
   return dedupeCards(cards)
 }
@@ -121,13 +121,14 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
     title: textOf(card, ':scope > strong'),
     body: firstSentences(textOf(card, ':scope > p'), 2),
     tone: 'love' as const,
+    editorial: true,
   })))
   if (loveCards.length) sections.push({ title: '내 상황에 맞춰 읽기', cards: loveCards })
 
   const interpersonal = root.querySelector<HTMLElement>('.interpersonal-reading-v3 .editorial-focus-card-v3')
   if (interpersonal) {
     const body = [textOf(interpersonal, ':scope > b'), ...directParagraphs(interpersonal)].filter(Boolean).join(' ')
-    if (body) sections.push({ title: '대인관계', cards: [{ title: '사람 사이의 역할·거리·협력', body, tone: 'system' }] })
+    if (body) sections.push({ title: '대인관계', cards: [{ title: '사람 사이의 역할·거리·협력', body, tone: 'system', editorial: true }] })
   }
 
   const contactCards: ExportCard[] = []
@@ -135,7 +136,7 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
   const direction = root.querySelector<HTMLElement>('.contact-direction-summary-v3')
   if (activation) {
     const body = [textOf(activation, ':scope > b'), ...directParagraphs(activation)].filter(Boolean).join(' ')
-    contactCards.push({ eyebrow: '연락 전체', title: textOf(activation, ':scope > strong') || '연락 전체 활성도', body, meta: textOf(activation, ':scope > time'), tone: 'date' })
+    contactCards.push({ eyebrow: '연락 전체', title: textOf(activation, ':scope > strong') || '연락 전체 활성도', body, meta: textOf(activation, ':scope > time'), tone: 'date', editorial: true })
   }
   if (direction) contactCards.push({ eyebrow: '선연락 방향', title: textOf(direction, ':scope > strong') || '누가 먼저 움직이는가', body: textOf(direction, ':scope > b'), tone: 'love' })
   const cleanContactCards = dedupeCards(contactCards)
@@ -173,6 +174,7 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     meta: textOf(card, ':scope > time'),
     tone: toneOf(card),
     emphasis: true,
+    editorial: true,
   })))
   if (lead.length) sections.push({ title: '핵심 판단', cards: lead })
 
@@ -196,6 +198,7 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
       ...Array.from(card.querySelectorAll<HTMLElement>('li')).map(li => normalizeText(li.innerText)),
     ].filter(Boolean).join(' '), 4),
     tone: toneOf(card),
+    editorial: true,
   })))
   if (meaning.length) sections.push({ title: '관계를 판단할 기준', cards: meaning })
 
@@ -203,6 +206,7 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     title: textOf(card, ':scope > strong'),
     body: firstSentences(textOf(card, ':scope > p'), 2),
     tone: 'love' as const,
+    editorial: true,
   })))
   if (situations.length) sections.push({ title: '내 현재 상황에 맞춰 읽기', cards: situations })
 
@@ -294,6 +298,24 @@ function font(ctx: CanvasRenderingContext2D, size: number, weight = 500) {
   ctx.font = `${weight} ${size}px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", sans-serif`
 }
 
+function readingFont(ctx: CanvasRenderingContext2D, size: number, weight = 500) {
+  ctx.font = `${weight} ${size}px "Nanum Myeongjo", "Noto Serif KR", AppleMyungjo, Batang, serif`
+}
+
+async function ensureExportFonts() {
+  if (typeof document === 'undefined' || !document.fonts) return
+  try {
+    await Promise.all([
+      document.fonts.load('500 38px "Nanum Myeongjo"'),
+      document.fonts.load('700 38px "Nanum Myeongjo"'),
+      document.fonts.load('500 38px "Noto Serif KR"'),
+      document.fonts.load('700 38px "Noto Serif KR"'),
+    ])
+  } catch {
+    // AppleMyungjo/Batang remain deterministic local serif fallbacks on supported clients.
+  }
+}
+
 function linesHeight(lines: number, lineHeight: number) {
   return Math.max(1, lines) * lineHeight
 }
@@ -330,7 +352,8 @@ function measureCard(ctx: CanvasRenderingContext2D, card: ExportCard) {
   const textWidth = CONTENT_WIDTH - metrics.xPad * 2
   font(ctx, metrics.titleSize, 760)
   const titleLines = wrap(ctx, card.title, textWidth).slice(0, 2)
-  font(ctx, metrics.bodySize, 480)
+  if (card.editorial) readingFont(ctx, metrics.bodySize, 500)
+  else font(ctx, metrics.bodySize, 480)
   const bodyLines = card.body ? wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines) : []
   font(ctx, metrics.smallSize, 650)
   const metaLines = card.meta ? wrap(ctx, card.meta, textWidth).slice(0, 2) : []
@@ -399,7 +422,8 @@ function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: numbe
 
   if (card.body) {
     cy += metrics.compact ? 10 : 13
-    font(ctx, metrics.bodySize, 480)
+    if (card.editorial) readingFont(ctx, metrics.bodySize, 500)
+    else font(ctx, metrics.bodySize, 480)
     ctx.fillStyle = COLORS.inkSoft
     const bodyLines = wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines)
     bodyLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.bodyLine))
@@ -484,7 +508,7 @@ function pageFits(ctx: CanvasRenderingContext2D, items: LayoutItem[]) {
 
 function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
   const groups: LayoutItem[] = []
-  if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true } })
+  if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true } })
   for (const section of model.sections) {
     const clean = dedupeCards(section.cards)
     clean.forEach((card, index) => groups.push({ section: index === 0 ? section.title : undefined, card }))
@@ -584,6 +608,7 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 export async function exportReadingImages(root: HTMLElement, label: string): Promise<ExportResult> {
   const model = buildReadingExportModel(root, label)
   if (!model.hero && !model.sections.some(section => section.cards.length)) throw new Error('저장할 결과 내용을 찾지 못했어.')
+  await ensureExportFonts()
   const canvases = renderPages(model)
   const blobs = await Promise.all(canvases.map(canvasToBlob))
   const base = safeFileName(label)
