@@ -32,6 +32,19 @@ test('fortune export uses an iPhone-readable 4:5 aurora glass renderer instead o
   assert.match(exporter,/anchor\.download\s*=\s*file\.name/)
 })
 
+test('export keeps UI labels sans but renders editorial reading prose in Myeongjo after fonts load',()=>{
+  assert.match(exporter,/editorial\?: boolean/)
+  assert.match(exporter,/function readingFont/)
+  assert.match(exporter,/"Nanum Myeongjo", "Noto Serif KR", AppleMyungjo, Batang, serif/)
+  assert.match(exporter,/async function ensureExportFonts/)
+  assert.match(exporter,/document\.fonts\.load\('500 38px "Nanum Myeongjo"'\)/)
+  assert.match(exporter,/document\.fonts\.load\('700 38px "Nanum Myeongjo"'\)/)
+  assert.match(exporter,/periodTopicCards[\s\S]*editorial:\s*true/)
+  assert.match(exporter,/전체를 통틀어 보면[\s\S]*editorial:\s*true/)
+  assert.match(exporter,/if \(card\.editorial\) readingFont\(ctx, metrics\.bodySize, 500\)/)
+  assert.match(exporter,/await ensureExportFonts\(\)[\s\S]*const canvases = renderPages\(model\)/)
+})
+
 test('short flow and timing cards use compact geometry instead of wasting vertical space',()=>{
   assert.match(exporter,/compact\?: boolean/)
   assert.match(exporter,/compact:\s*true/)
