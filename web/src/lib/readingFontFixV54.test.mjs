@@ -5,11 +5,12 @@ import test from 'node:test'
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
 
-test('live mobile integrated headline uses the final strong sans owner', () => {
+test('live mobile integrated headline uses the final Myeongjo owner', () => {
   assert.match(css, /\.system-reading\.system-integrated[\s\S]*?h3\.period-ai-hero-title-v4/)
-  assert.match(css, /font-family:\s*-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif\s*!important/)
-  assert.match(css, /font-weight:\s*800\s*!important/)
-  assert.match(css, /font-synthesis:\s*weight\s*!important/)
+  assert.match(css, /font-family:\s*'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif\s*!important/)
+  assert.match(css, /font-weight:\s*700\s*!important/)
+  assert.match(css, /font-synthesis:\s*none\s*!important/)
+  assert.match(css, /\.period-ai-head \.reading-hero-subtitle[\s\S]*font-family:\s*-apple-system/)
   assert.match(css, /\.period-ai-head \.reading-hero-subtitle[\s\S]*font-weight:\s*400\s*!important/)
 })
 
