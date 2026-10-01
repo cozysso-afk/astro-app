@@ -343,7 +343,7 @@ function integratedFallback(base: FortuneUserSummary, calculation: IntegratedApi
         : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 기간 전체를 정의하기 어려워. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
   return {
     headline: clean(base.headline) || generatedHeadline,
-    summary: clean(base.summary) || generatedSummary,
+    summary: generatedSummary,
   }
 }
 
