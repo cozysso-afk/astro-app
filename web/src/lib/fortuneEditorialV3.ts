@@ -293,7 +293,10 @@ function singleSectorCopies(data: InterpretationData, base: FortuneUserSummary) 
   const topicCopies = Object.values(data.topic_analysis ?? {}).flatMap(row => [row?.verdict, row?.reason, row?.action].map(clean).filter(Boolean))
   const viewCopies = base.focusTopics.flatMap(row => [row.conclusion, row.action, row.observe].map(clean).filter(Boolean))
   const cardCopies = [...base.favorableCards, ...base.cautionCards].map(row => clean(row.meaning)).filter(Boolean)
-  return [...topicCopies, ...viewCopies, ...cardCopies]
+  const relationshipCopies = base.relationship
+    ? [base.relationship.incoming, base.relationship.outgoing, base.relationship.reconnection].map(clean).filter(Boolean)
+    : []
+  return [...topicCopies, ...viewCopies, ...cardCopies, ...relationshipCopies]
 }
 
 function isSingleSectorCopy(value: string, copies: string[]) {
@@ -304,6 +307,13 @@ function isSingleSectorCopy(value: string, copies: string[]) {
     if (!other) return false
     return key === other || (Math.min(key.length, other.length) >= 18 && (key.includes(other) || other.includes(key))) || overlapRatio(value, copy) >= 0.82
   })
+}
+
+function isSectorStitch(value: string, copies: string[]) {
+  const sentences = clean(value).match(/[^.!?]+[.!?]?/g)?.map(clean).filter(sentence => sentence.length >= 10) ?? []
+  if (sentences.length < 2) return false
+  const matched = sentences.filter(sentence => isSingleSectorCopy(sentence, copies))
+  return matched.length >= 2
 }
 
 function listTopics(values: string[]) {
@@ -321,17 +331,20 @@ function integratedFallback(base: FortuneUserSummary, calculation: IntegratedApi
     .sort((a,b) => Number(a[1]?.average) - Number(b[1]?.average)).map(([name]) => name).slice(0,2)
   const good = listTopics(positive)
   const watch = listTopics(caution.filter(name => !positive.includes(name)))
-  const headline = good && watch
+  const generatedHeadline = good && watch
     ? `${base.when}은 ${good} 쪽은 비교적 받쳐주고, ${watch} 쪽은 한 번 더 확인하면서 움직이는 흐름이야.`
     : good ? `${base.when}은 ${good} 쪽이 상대적으로 받쳐줘. 다른 분야까지 무리하게 확대하지 말고 이 강점을 필요한 곳에 써.`
       : watch ? `${base.when}은 ${watch} 쪽에서 서두르지 않는 게 중요해. 나머지는 평소 계획을 유지해.`
         : `${base.when}은 한 분야가 압도하기보다 전반적인 균형이 중요해. 실제 일정과 반응에 맞춰 우선순위를 조정해.`
-  const summary = good && watch
-    ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 두는 편이 안전해. 기간 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 않는 게 핵심이야.`
-    : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 기간 전체에서는 우선순위를 좁혀 실제로 끝낼 일을 만드는 쪽에 무게를 둬.`
+  const generatedSummary = good && watch
+    ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 둬. 기간 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 마.`
+    : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 기간 전체에서는 우선순위를 좁혀 실제로 끝낼 일을 만들어.`
       : watch ? `${watch}의 부담을 줄이는 게 기간 전체 운영의 핵심이야. 중요한 결정은 확인 단계를 하나 더 두고, 나머지 분야는 평소 리듬을 유지해.`
-        : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 기간 전체를 정의하기 어렵다. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
-  return { headline, summary }
+        : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 기간 전체를 정의하기 어려워. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
+  return {
+    headline: clean(base.headline) || generatedHeadline,
+    summary: clean(base.summary) || generatedSummary,
+  }
 }
 
 function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse, base: FortuneUserSummary, field: FortuneField | undefined, sections:any, editorialTopics: Record<string,string>) {
@@ -341,8 +354,8 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
     const aiSummary = clean(data.overall?.summary)
     const fallback = integratedFallback(base, calculation)
     return {
-      headline: readerFacing(aiHeadline) && !isSingleSectorCopy(aiHeadline, copies) ? aiHeadline : fallback.headline,
-      summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) ? aiSummary : fallback.summary,
+      headline: readerFacing(aiHeadline) && !isSingleSectorCopy(aiHeadline, copies) && !isSectorStitch(aiHeadline, copies) ? aiHeadline : fallback.headline,
+      summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) && !isSectorStitch(aiSummary, copies) ? aiSummary : fallback.summary,
     }
   }
   if (field.id === 'love') return {
