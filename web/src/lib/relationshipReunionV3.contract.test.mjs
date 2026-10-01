@@ -31,12 +31,17 @@ test('relationship result routes reunion to the hierarchy product while retainin
 
 test('reunion v4 starts with an answer and explicit stage ladder before supporting detail',()=>{
   for(const heading of ['이번 조회의 답','재회 단계 한눈에','현재 위치','연락 자체는 얼마나 열려 있나','굳이 비교하면 누가 먼저인가','상대가 예전과 다르게 움직일 여지가 있나','그래서 지금 무엇을 보면 되나','기억할 시기','재회를 판단할 현실 기준','내 현재 상황에 맞춰 읽기']) assert.match(hierarchy,new RegExp(heading))
-  assert.match(hierarchy,/생각 → 연락 → 만남 → 재구축을 섞지 않아/)
+  assert.match(hierarchy,/생각·연락·만남·재구축은 단계별로 따로 봐/)
   assert.match(hierarchy,/연락은 살펴볼 수 있지만, 아직 재회 단계는 아님/)
   assert.match(hierarchy,/생각날 배경은 있어도, 연락을 기다릴 근거는 약함/)
   assert.match(hierarchy,/이번 조회에서는 재회 진행 단계를 뚜렷하게 잡기 어려움/)
   assert.doesNotMatch(hierarchy,/현재 계산은 연락 단계까지야/)
   assert.doesNotMatch(hierarchy,/왜 아직 서로를 신경 쓰기 쉬운가/)
+})
+
+test('reunion reader-facing section labels stay Korean instead of internal English markers',()=>{
+  for(const label of ['현재 단계','연락 흐름','먼저 움직이는 쪽','행동 변화','다음 확인']) assert.match(hierarchy,new RegExp(label))
+  for(const marker of ['CURRENT STATE','CONTACT','DIRECTION','BEHAVIOR CHANGE','NEXT CHECK']) assert.doesNotMatch(hierarchy,new RegExp(marker))
 })
 
 test('contact parent strength is independent from sender direction and tied direction still reports the tiny numeric edge',()=>{

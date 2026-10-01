@@ -157,7 +157,6 @@ test('all ten fortune fields have a complete interpretation path',()=>{
   const love=buildFortuneEditorialV3(payload,calc(),base(),byId.love)
   const loveMarkers={single:'솔로',crush:'짝사랑',flirting:'썸',ambiguous:'관계미정',couple:'연애중',reunion_interest:'재회관심'}
   for(const row of love.loveContexts) assertFourParts(row.text,loveMarkers[row.key])
-
   const social=buildFortuneEditorialV3(payload,calc(),base(),byId.social)
   const socialMarkers={friends:'친구',coworkers:'직장동료',family:'가족',new_people:'새인맥',boundaries:'갈등경계'}
   for(const row of social.interpersonalContexts) assertFourParts(row.text,socialMarkers[row.key])
@@ -202,13 +201,14 @@ test('verified non-relationship fields surface structured editorial without repl
   assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
 })
 
-test('overall hero cannot be overwritten by Gemini meta copy',()=>{
+test('overall hero accepts only verified reader-facing integrated editorial and keeps deterministic fallback',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/META_EDITORIAL_RE/)
   assert.match(panel,/const fallbackHero = overallFallback\(summary\)/)
-  assert.match(panel,/const heroHeadline = fallbackHero\.headline/)
-  assert.match(panel,/const heroSummary = fallbackHero\.summary/)
-  assert.doesNotMatch(panel,/editorialCopyUsable\(editorial\.heroHeadline\)/)
+  assert.match(panel,/const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
+  assert.match(panel,/const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
+  assert.match(panel,/const heroHeadline = integratedHeroHeadline \|\| fallbackHero\.headline/)
+  assert.match(panel,/const heroSummary = integratedHeroSummary \|\| fallbackHero\.summary/)
   assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
   assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroHeadline\}<\/h3>/)
 })
