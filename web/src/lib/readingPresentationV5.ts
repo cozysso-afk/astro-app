@@ -1,5 +1,5 @@
 const ROOT_SELECTOR = '.period-ai-v4'
-const TOPIC_SELECTOR = '.period-ai-user-focus .period-ai-topic'
+const TOPIC_SELECTOR = '.period-ai-user-focus .period-ai-topic:not(.reading-export-checks-v7)'
 
 function normalizedClause(value: unknown) {
   return String(value ?? '')
@@ -16,6 +16,8 @@ function naturalClause(value: unknown) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^\s*(?:근거|시기|주의)\s*[·:]\s*/i, '')
+    .replace(/^실제로는\s*/, '')
+    .replace(/^확인할 것\s*/, '')
     .replace(/움직임가\b/g, '움직임이')
     .replace(/\s*·\s*/g, ' ')
     .replace(/\s+([,.!?])/g, '$1')
@@ -109,6 +111,36 @@ function ensureExportDepth(topic: HTMLElement) {
   topic.dataset.exportDepthV5Initialized = 'true'
 }
 
+function cautionSentence(topic: HTMLElement) {
+  const title = naturalClause(topic.querySelector<HTMLElement>(':scope > strong')?.textContent ?? '')
+  const caution = naturalClause(topic.querySelector<HTMLElement>('.reading-topic-depth .reading-explanation.is-caution > p')?.textContent ?? '')
+  if (!title || !caution) return ''
+  return asSentence(`${title}에서는 ${caution}`)
+}
+
+function ensureExportChecks(reading: HTMLElement, topics: HTMLElement[]) {
+  if (reading.dataset.exportChecksV7Initialized || topics.length < 2) return
+  const list = reading.querySelector<HTMLElement>('.period-ai-user-focus .period-ai-topic-list')
+  if (!list) return
+  const body = topics.slice(0, 2).map(cautionSentence).filter(Boolean).join(' ')
+  if (!body) {
+    reading.dataset.exportChecksV7Initialized = 'true'
+    return
+  }
+  const article = document.createElement('article')
+  article.className = 'period-ai-topic reading-export-checks-v7'
+  article.setAttribute('data-reading-export-tone', 'system')
+  article.setAttribute('aria-hidden', 'true')
+  const title = document.createElement('strong')
+  title.textContent = '현실에서 확인할 것'
+  const detail = document.createElement('b')
+  detail.textContent = body
+  article.append(title, detail)
+  applyExportOnlyStyle(article)
+  list.appendChild(article)
+  reading.dataset.exportChecksV7Initialized = 'true'
+}
+
 function exposePrimaryTopicDepth(root: ParentNode) {
   for (const reading of Array.from(root.querySelectorAll<HTMLElement>(ROOT_SELECTOR))) {
     ensureExportHeroCompact(reading)
@@ -121,6 +153,7 @@ function exposePrimaryTopicDepth(root: ParentNode) {
       }
       if (index < 3) ensureExportDepth(topic)
     })
+    ensureExportChecks(reading, topics)
   }
 }
 
