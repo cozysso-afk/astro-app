@@ -63,18 +63,32 @@ panel_path.write_text(panel)
 
 test_path = Path('web/src/lib/fortuneEditorialV3.test.mjs')
 test = test_path.read_text()
-test_anchor = """test('verified non-relationship fields surface structured editorial without replacing deterministic cards',()=>{
+test_start_marker = "test('verified non-relationship fields surface structured editorial without replacing deterministic cards',()=>{"
+test_end_marker = "\n})\n\ntest('overall hero accepts only verified reader-facing integrated editorial and keeps deterministic fallback'"
+test_start = test.find(test_start_marker)
+if test_start < 0:
+    raise SystemExit('editorial test start marker not found')
+test_end = test.find(test_end_marker, test_start)
+if test_end < 0:
+    raise SystemExit('editorial test end marker not found')
+new_test = """test('verified non-relationship fields surface structured editorial in main focus cards with deterministic fallback',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-"""
-test_replacement = test_anchor + """  assert.match(panel,/export function focusEditorialParts/)
+  assert.match(panel,/const structuredFieldTopics = verifiedNarrative && field/)
+  assert.match(panel,/editorial\\.topicEditorial\\[topic\\] \\?\\? ''/)
+  assert.match(panel,/연애','대인관계','연락','재회','투자주의/)
+  assert.match(panel,/editorialCopyUsable\\(item\\.text\\)/)
+  assert.match(panel,/export function focusEditorialParts/)
   assert.match(panel,/verifiedNarrative && !field \\? focusEditorialParts\\(editorial\\.topicEditorial\\[item\\.topic\\]/)
   assert.match(panel,/deepEditorial\\?\\.conclusion \\|\\| item\\.conclusion/)
   assert.match(panel,/period-ai-topic-editorial-v4/)
+  assert.match(panel,/deepEditorial\\.sceneAction/)
   assert.match(panel,/판단 바뀌는 조건/)
+  assert.match(panel,/deepEditorial\\.change/)
+  assert.match(panel,/<em>실제로는<\\/em> \\{item\\.action\\}/)
+  assert.match(panel,/<em>확인할 것<\\/em> \\{item\\.observe\\}/)
+})
 """
-if test_anchor not in test:
-    raise SystemExit('editorial test anchor not found')
-test = test.replace(test_anchor, test_replacement, 1)
+test = test[:test_start] + new_test + test[test_end + len('\n})\n'):]
 test_path.write_text(test)
 
 Path('.github/workflows/editorial-depth-v9-patch.yml').unlink(missing_ok=True)
