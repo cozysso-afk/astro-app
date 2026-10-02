@@ -122,6 +122,29 @@ export function editorialSectionReady(value: any) {
   return observableChangeCondition(value.change_condition)
 }
 
+
+export function editorialTopicCoreReady(value: any) {
+  if (!editorialSectionUsable(value)) return false
+  const parts = [value.conclusion, value.real_scene, value.action].map(clean)
+  if (!parts.every(Boolean)) return false
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      if (nearDuplicate(parts[i], parts[j])) return false
+    }
+  }
+  return true
+}
+
+export function topicSectionCopy(value: any) {
+  if (!editorialTopicCoreReady(value)) return ''
+  const parts = [value.conclusion, value.real_scene, value.action].map(clean)
+  const change = clean(value.change_condition)
+  if (change && observableChangeCondition(change) && parts.every(part => !nearDuplicate(part, change))) {
+    parts.push(change)
+  }
+  return parts.join(' ')
+}
+
 function readerFacing(value: string) {
   const text = clean(value)
   if (!text || text.length < 10) return false
@@ -189,7 +212,7 @@ function topicEditorial(data: InterpretationData) {
     '수익실현': investment?.realization, '신규진입': investment?.entry,
   }
   return Object.fromEntries(Object.entries(candidates).flatMap(([key, section]) => {
-    const value = clean(sectionCopy(section))
+    const value = clean(topicSectionCopy(section))
     if (!readerFacing(value)) return []
     const readerCopy = sectionApplicability(section) === 'conditional' ? `조건부로 보면, ${value}` : value
     return [[key, readerCopy]]
