@@ -15,7 +15,11 @@ export function FortuneFlowCards({ title, items, caution = false }: { title: str
     </article>
   }
   if (!items.length) return <p className="flow-empty"><Check size={15} aria-hidden="true"/>{caution ? '특별히 두드러진 주의 분야는 없어.' : '뚜렷하게 밀어줄 분야는 없어. 평소 계획을 이어가.'}</p>
-  return <section className={`flow-section ${caution ? 'is-caution' : reference ? 'is-reference-flow' : 'is-favorable'}`} aria-label={title}>
+  return <section
+    className={`flow-summary-section-v5 ${caution ? 'is-caution' : reference ? 'is-reference-flow' : 'is-favorable'}`}
+    aria-label={title}
+    data-reading-export-ignore="true"
+  >
     <h4>{title}</h4><div className="flow-grid">{items.slice(0, 2).map(card)}</div>
     {items.length > 2 && <details className="flow-more"><summary>더 보기 · {items.length - 2}개 분야</summary><div className="flow-grid">{items.slice(2).map(card)}</div></details>}
   </section>
