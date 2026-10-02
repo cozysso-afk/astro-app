@@ -8,6 +8,7 @@ const css = readFileSync(new URL('../reading-compact-v5.css', import.meta.url), 
 const captureCss = readFileSync(new URL('../reading-capture-polish-v6.css', import.meta.url), 'utf8')
 const runtime = readFileSync(new URL('./readingPresentationV5.ts', import.meta.url), 'utf8')
 const exporter = readFileSync(new URL('./readingImageExport.ts', import.meta.url), 'utf8')
+const visualQa = readFileSync(new URL('../VisualQaPreview.tsx', import.meta.url), 'utf8')
 
 test('top flow cards are a compact screen index and no longer duplicate saved-image cards', () => {
   assert.match(flow, /flow-summary-section-v5/)
@@ -46,12 +47,13 @@ test('saved hero keeps the headline but drops repeated subtitle copy so evidence
   assert.match(runtime, /ensureExportHeroCompact\(reading\)/)
 })
 
-test('saved image adds one hidden reality-check card from omitted cautions without extending phone scroll', () => {
-  assert.match(runtime, /reading-export-checks-v7/)
-  assert.match(runtime, /현실에서 확인할 것/)
-  assert.match(runtime, /topics\.slice\(0, 2\)\.map\(cautionSentence\)/)
+test('saved image adds one hidden three-system synthesis card without extending phone scroll', () => {
+  assert.match(runtime, /reading-export-system-v7/)
+  assert.match(runtime, /세 체계 한눈에/)
+  assert.match(runtime, /system-overview-grid > article/)
+  assert.match(runtime, /ensureExportSystemSummary\(reading\)/)
   assert.match(runtime, /applyExportOnlyStyle\(article\)/)
-  assert.match(runtime, /ensureExportChecks\(reading, topics\)/)
+  assert.match(visualQa, /qa-export-system-source/)
 })
 
 test('mobile vertical density keeps only suitable secondary cards in horizontal lanes', () => {

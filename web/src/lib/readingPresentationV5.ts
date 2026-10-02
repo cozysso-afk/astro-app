@@ -1,5 +1,5 @@
 const ROOT_SELECTOR = '.period-ai-v4'
-const TOPIC_SELECTOR = '.period-ai-user-focus .period-ai-topic:not(.reading-export-checks-v7)'
+const TOPIC_SELECTOR = '.period-ai-user-focus .period-ai-topic:not(.reading-export-system-v7)'
 
 function normalizedClause(value: unknown) {
   return String(value ?? '')
@@ -56,11 +56,10 @@ function explanationText(topic: HTMLElement) {
 
 function applyExportOnlyStyle(element: HTMLElement) {
   element.style.position = 'absolute'
-  element.style.width = '1px'
-  element.style.height = '1px'
-  element.style.overflow = 'hidden'
-  element.style.clipPath = 'inset(50%)'
-  element.style.whiteSpace = 'nowrap'
+  element.style.left = '-10000px'
+  element.style.top = '0'
+  element.style.width = '640px'
+  element.style.height = 'auto'
   element.style.opacity = '0'
   element.style.pointerEvents = 'none'
 }
@@ -68,10 +67,7 @@ function applyExportOnlyStyle(element: HTMLElement) {
 function ensureExportHeroCompact(reading: HTMLElement) {
   if (reading.dataset.exportHeroV7Initialized) return
   const visibleSubtitle = reading.querySelector<HTMLElement>('.period-ai-head .reading-hero-subtitle:not(.reading-export-subtitle-v7)')
-  if (!visibleSubtitle?.parentElement) {
-    reading.dataset.exportHeroV7Initialized = 'true'
-    return
-  }
+  if (!visibleSubtitle?.parentElement) return
   const bridge = document.createElement('p')
   bridge.className = 'reading-hero-subtitle reading-export-subtitle-v7'
   bridge.setAttribute('aria-hidden', 'true')
@@ -111,34 +107,35 @@ function ensureExportDepth(topic: HTMLElement) {
   topic.dataset.exportDepthV5Initialized = 'true'
 }
 
-function cautionSentence(topic: HTMLElement) {
-  const title = naturalClause(topic.querySelector<HTMLElement>(':scope > strong')?.textContent ?? '')
-  const caution = naturalClause(topic.querySelector<HTMLElement>('.reading-topic-depth .reading-explanation.is-caution > p')?.textContent ?? '')
-  if (!title || !caution) return ''
-  return asSentence(`${title}에서는 ${caution}`)
+function systemSummarySentence(article: HTMLElement) {
+  const label = naturalClause(article.querySelector<HTMLElement>(':scope > strong')?.textContent ?? '')
+  const copy = firstSentence(article.querySelector<HTMLElement>(':scope > p')?.textContent ?? '')
+  if (!label || !copy) return ''
+  return `${label}: ${copy}`
 }
 
-function ensureExportChecks(reading: HTMLElement, topics: HTMLElement[]) {
-  if (reading.dataset.exportChecksV7Initialized || topics.length < 2) return
+function ensureExportSystemSummary(reading: HTMLElement) {
+  if (reading.dataset.exportSystemV7Initialized) return
   const list = reading.querySelector<HTMLElement>('.period-ai-user-focus .period-ai-topic-list')
   if (!list) return
-  const body = topics.slice(0, 2).map(cautionSentence).filter(Boolean).join(' ')
-  if (!body) {
-    reading.dataset.exportChecksV7Initialized = 'true'
-    return
-  }
+  const body = Array.from(reading.querySelectorAll<HTMLElement>('.system-overview-grid > article'))
+    .slice(0, 3)
+    .map(systemSummarySentence)
+    .filter(Boolean)
+    .join(' ')
+  if (!body) return
   const article = document.createElement('article')
-  article.className = 'period-ai-topic reading-export-checks-v7'
+  article.className = 'period-ai-topic reading-export-system-v7'
   article.setAttribute('data-reading-export-tone', 'system')
   article.setAttribute('aria-hidden', 'true')
   const title = document.createElement('strong')
-  title.textContent = '현실에서 확인할 것'
+  title.textContent = '세 체계 한눈에'
   const detail = document.createElement('b')
   detail.textContent = body
   article.append(title, detail)
   applyExportOnlyStyle(article)
   list.appendChild(article)
-  reading.dataset.exportChecksV7Initialized = 'true'
+  reading.dataset.exportSystemV7Initialized = 'true'
 }
 
 function exposePrimaryTopicDepth(root: ParentNode) {
@@ -153,7 +150,7 @@ function exposePrimaryTopicDepth(root: ParentNode) {
       }
       if (index < 3) ensureExportDepth(topic)
     })
-    ensureExportChecks(reading, topics)
+    ensureExportSystemSummary(reading)
   }
 }
 

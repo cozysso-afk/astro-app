@@ -46,18 +46,19 @@ try {
       }
     })
 
-    const systemGrid = document.querySelector('.system-overview-grid')
+    const systemGrid = document.querySelector('[data-qa-block="systems"] .system-overview-grid')
     const reunionMeaning = document.querySelector('.reunion-v3-meaning')
     const situations = document.querySelector('.reunion-v3-situations')
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       systemDisplay: systemGrid ? getComputedStyle(systemGrid).display : 'missing',
       systemAlignItems: systemGrid ? getComputedStyle(systemGrid).alignItems : 'missing',
-      systemCards: slackFor('.system-overview-grid > article'),
+      systemCards: slackFor('[data-qa-block="systems"] .system-overview-grid > article'),
       reunionDisplay: reunionMeaning ? getComputedStyle(reunionMeaning).display : 'missing',
       reunionAlignItems: reunionMeaning ? getComputedStyle(reunionMeaning).alignItems : 'missing',
       reunionCards: slackFor('.reunion-v3-meaning > .reunion-v3-card'),
       situationsDisplay: situations ? getComputedStyle(situations).display : 'missing',
+      exportSystemCards: document.querySelectorAll('[data-qa-block="export-source"] .reading-export-system-v7').length,
     }
   })
 
@@ -73,6 +74,7 @@ try {
   assert(Math.max(...diagnostics.systemCards.map(card => Math.abs(card.slack))) < 32, `system card has excessive empty tail: ${JSON.stringify(diagnostics.systemCards)}`)
   assert(Math.max(...diagnostics.reunionCards.map(card => Math.abs(card.slack))) < 32, `reunion card has excessive empty tail: ${JSON.stringify(diagnostics.reunionCards)}`)
   assert(diagnostics.situationsDisplay === 'grid', `reunion situations must stay vertical on mobile, got ${diagnostics.situationsDisplay}`)
+  assert(diagnostics.exportSystemCards === 1, `saved system synthesis bridge missing: ${diagnostics.exportSystemCards}`)
 
   await page.screenshot({ path: path.join(outDir, 'mobile-full.png'), fullPage: true })
   await page.locator('[data-qa-block="systems"]').screenshot({ path: path.join(outDir, 'systems-mobile.png') })
@@ -87,7 +89,7 @@ try {
   const state = (await page.locator('[data-qa-export-status]').textContent()) || ''
   assert(!state.startsWith('error:'), `saved-image QA failed: ${state}`)
   const expectedPages = Number(state.split(':')[1])
-  assert(Number.isFinite(expectedPages) && expectedPages >= 1 && expectedPages <= 3, `unexpected saved-image page count: ${state}`)
+  assert(expectedPages === 2, `visual fixture must stay at 2 saved pages, got ${state}`)
 
   const deadline = Date.now() + 8_000
   while (downloadCount < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
