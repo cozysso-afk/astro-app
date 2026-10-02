@@ -63,6 +63,22 @@ function applyExportOnlyStyle(element: HTMLElement) {
   element.style.pointerEvents = 'none'
 }
 
+function ensureExportHeroCompact(reading: HTMLElement) {
+  if (reading.dataset.exportHeroV7Initialized) return
+  const visibleSubtitle = reading.querySelector<HTMLElement>('.period-ai-head .reading-hero-subtitle:not(.reading-export-subtitle-v7)')
+  if (!visibleSubtitle?.parentElement) {
+    reading.dataset.exportHeroV7Initialized = 'true'
+    return
+  }
+  const bridge = document.createElement('p')
+  bridge.className = 'reading-hero-subtitle reading-export-subtitle-v7'
+  bridge.setAttribute('aria-hidden', 'true')
+  bridge.textContent = ''
+  applyExportOnlyStyle(bridge)
+  visibleSubtitle.parentElement.insertBefore(bridge, visibleSubtitle)
+  reading.dataset.exportHeroV7Initialized = 'true'
+}
+
 function ensureExportConclusion(topic: HTMLElement) {
   if (topic.dataset.exportConclusionV7Initialized) return
   const visibleConclusion = Array.from(topic.children)
@@ -95,6 +111,7 @@ function ensureExportDepth(topic: HTMLElement) {
 
 function exposePrimaryTopicDepth(root: ParentNode) {
   for (const reading of Array.from(root.querySelectorAll<HTMLElement>(ROOT_SELECTOR))) {
+    ensureExportHeroCompact(reading)
     const topics = Array.from(reading.querySelectorAll<HTMLElement>(TOPIC_SELECTOR))
     topics.forEach((topic, index) => {
       const details = topic.querySelector<HTMLDetailsElement>('details.reading-topic-depth')
