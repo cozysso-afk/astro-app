@@ -89,6 +89,11 @@ export function VisualQaPreview() {
     <section ref={node => { exportRoot.current = node }} data-reading-export-root="period-fortune" className="fortune-experience period-ai-v4" data-qa-block="export-source">
       <span className="reading-period-date">2026-10-02</span>
       <div className="period-ai-head"><div><span className="period-ai-kicker">맞춤 운세 해설 · 오늘 핵심</span><h3>오늘 이직 문제는 가능성을 열어 두고 현실 조건부터 비교해. 오늘은 집중이 쉽게 흐어질 수 있어.</h3><p className="reading-hero-subtitle">막연한 이동 욕구보다 직무·보상·일정 같은 실제 조건을 비교하기 좋은 날이야. 집중이 흐어지면 여러 과제를 벌이기보다 하나를 끝내는 쪽이 나아.</p></div></div>
+      <div className="system-overview-grid qa-export-system-source" aria-hidden="true" style={{position:'absolute',left:-10000,top:0,width:640,opacity:0,pointerEvents:'none'}}>
+        <article><strong>서양점성술</strong><p>이직 조건은 열어 두되 실제 직무·보상·일정을 먼저 비교해.</p></article>
+        <article><strong>사주</strong><p>완료 기준과 기한을 먼저 잡고 넓히기보다 하나를 끝내는 쪽에 무게가 실려.</p></article>
+        <article><strong>태국점성술</strong><p>일정과 회복 여유를 먼저 확인하고 무리하게 범위를 넓히지 않는 편이 좋아.</p></article>
+      </div>
       <section className="period-ai-user-focus">
         <div className="period-ai-topic-list">
           <TopicCard title="학업" summary="오늘은 집중이 쉽게 흐어질 수 있어. 목표를 넓히기보다 끝낼 단위를 하나로 좁혀." action="실제로는 공부할 분량을 작게 나눠 한 번에 하나씩 처리해." reason="시작 자체보다 집중을 오래 유지하는 쪽에서 마찰이 생기기 쉬워." technical="달과 화성이 긴장을 만들고 수성의 흐름이 분산되는 배치가 겹쳐, 같은 시간 안에서도 이해가 이어지는 단원과 반복해서 막히는 단원이 갈릴 수 있어." timing="오전 후반부터 오후에는 새 범위를 넓히기보다 복습과 오답 정리가 더 안정적이야." caution="막히는 단원이 생겼다고 공부 전체가 안 되는 날로 확대해석하지 마." />
