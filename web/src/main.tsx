@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './AppNext'
 import { AuthGate } from './AuthGate'
 import { EditorialQaPreview } from './EditorialQaPreview'
+import { VisualQaPreview } from './VisualQaPreview'
 import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
 import { installReadingPresentationV5 } from './lib/readingPresentationV5'
 import './styles.css'
@@ -52,18 +53,25 @@ import './reading-capture-polish-v6.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
 
-const qaHost = typeof window !== 'undefined'
-  && window.location.hostname.endsWith('.vercel.app')
-  && window.location.hostname.includes('git-fix-reunion-hierarchy-v2')
-const qaPreview = qaHost && new URLSearchParams(window.location.search).get('qa') === 'editorial'
+const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+const host = typeof window !== 'undefined' ? window.location.hostname : ''
+const localQaHost = host === '127.0.0.1' || host === 'localhost'
+const editorialQaHost = host.endsWith('.vercel.app') && host.includes('git-fix-reunion-hierarchy-v2')
+const qaMode = params?.get('qa') ?? ''
+const editorialQaPreview = editorialQaHost && qaMode === 'editorial'
+const visualQaPreview = localQaHost && qaMode === 'visual'
 
-if (!qaPreview) {
+if (!editorialQaPreview && !visualQaPreview) {
   installIntegratedPrecisionFetch()
   installReadingPresentationV5()
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {qaPreview ? <EditorialQaPreview/> : <AuthGate><App /></AuthGate>}
+    {visualQaPreview
+      ? <VisualQaPreview/>
+      : editorialQaPreview
+        ? <EditorialQaPreview/>
+        : <AuthGate><App /></AuthGate>}
   </React.StrictMode>,
 )
