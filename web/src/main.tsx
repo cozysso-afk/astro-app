@@ -4,6 +4,7 @@ import App from './AppNext'
 import { AuthGate } from './AuthGate'
 import { EditorialQaPreview } from './EditorialQaPreview'
 import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
+import { installReadingPresentationV5 } from './lib/readingPresentationV5'
 import './styles.css'
 import './relationship.css'
 import './birthplace.css'
@@ -46,6 +47,7 @@ import './redline-layout-v55.css'
 import './archive-mobile-polish-v57.css'
 import './archive-mobile-polish-v59.css'
 import './profile-form-aurora-v71.css'
+import './reading-compact-v5.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
 
@@ -54,7 +56,10 @@ const qaHost = typeof window !== 'undefined'
   && window.location.hostname.includes('git-fix-reunion-hierarchy-v2')
 const qaPreview = qaHost && new URLSearchParams(window.location.search).get('qa') === 'editorial'
 
-if (!qaPreview) installIntegratedPrecisionFetch()
+if (!qaPreview) {
+  installIntegratedPrecisionFetch()
+  installReadingPresentationV5()
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -1,0 +1,259 @@
+/* V5 reading presentation: remove repeated overview copy from the vertical stack,
+   keep the deep explanation on the important cards, and use horizontal lanes for
+   secondary summaries. Calculation and interpretation values are untouched. */
+
+.reading-flows {
+  gap: 10px !important;
+}
+
+.flow-summary-section-v5 {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.flow-summary-section-v5 > h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: .025em;
+  color: #536b62;
+  font-weight: 760;
+}
+
+.flow-summary-section-v5.is-caution > h4 { color: #8d5960; }
+.flow-summary-section-v5.is-reference-flow { display: none; }
+
+.flow-summary-section-v5 .flow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flow-summary-section-v5 .flow-tile {
+  min-height: 0 !important;
+  padding: 10px 11px !important;
+  border-radius: 17px !important;
+}
+
+.flow-summary-section-v5 .flow-tile-heading {
+  gap: 5px !important;
+}
+
+.flow-summary-section-v5 .flow-tile-heading strong {
+  font-size: .95rem !important;
+}
+
+.flow-summary-section-v5 .flow-score {
+  font-size: 1.05rem !important;
+}
+
+.flow-summary-section-v5 .flow-band {
+  margin-top: 4px !important;
+  font-size: .73rem !important;
+}
+
+/* The overview is an index. The same interpretation is explained in depth below. */
+.flow-summary-section-v5 .flow-tile > p {
+  display: none !important;
+}
+
+.flow-summary-section-v5 .flow-more {
+  margin-top: 0 !important;
+}
+
+.flow-summary-section-v5 .flow-more > summary {
+  padding: 4px 1px !important;
+  font-size: .8rem !important;
+}
+
+.period-ai-v4 .period-ai-head {
+  margin-bottom: 14px !important;
+}
+
+.period-ai-v4 .reading-flows {
+  margin-bottom: 14px !important;
+}
+
+.period-ai-v4 .period-ai-user-focus {
+  margin-top: 18px !important;
+}
+
+.period-ai-v4 .period-ai-user-focus .period-ai-topic-list {
+  gap: 11px !important;
+}
+
+.period-ai-v4 .period-ai-user-focus .period-ai-topic {
+  padding: 16px 17px !important;
+  border-radius: 21px !important;
+}
+
+.period-ai-v4 .period-ai-user-focus .period-ai-topic > strong {
+  margin-bottom: 8px !important;
+}
+
+.period-ai-v4 .period-ai-user-focus .period-ai-topic > b {
+  display: block;
+  line-height: 1.58 !important;
+}
+
+.period-ai-v4 .period-ai-user-focus .period-ai-topic > p {
+  margin: 8px 0 0 !important;
+  font-size: .92rem !important;
+  line-height: 1.56 !important;
+}
+
+/* Export bridge: preserve the already-generated deep reason/timing/caution in the
+   canvas model without adding another visible paragraph to the phone screen. */
+.period-ai-v4 .period-ai-user-focus .period-ai-topic > .reading-export-depth-v5 {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
+.period-ai-v4 .reading-topic-depth {
+  margin-top: 10px !important;
+  padding-top: 9px !important;
+  border-top: 1px solid rgba(116,128,164,.12);
+}
+
+.period-ai-v4 .reading-topic-depth > summary {
+  font-size: .83rem !important;
+  font-weight: 760 !important;
+}
+
+.period-ai-v4 .reading-topic-depth[open] > summary {
+  margin-bottom: 8px !important;
+}
+
+.period-ai-v4 .reading-topic-depth .reading-explanation {
+  margin-top: 7px !important;
+  padding: 9px 10px !important;
+  border-radius: 14px !important;
+}
+
+.period-ai-v4 .reading-topic-depth .reading-explanation-label {
+  margin-bottom: 3px !important;
+  font-size: .76rem !important;
+}
+
+.period-ai-v4 .reading-topic-depth .reading-explanation p {
+  margin: 0 !important;
+  font-size: .86rem !important;
+  line-height: 1.54 !important;
+}
+
+/* Three-system overview remains available, but no longer consumes three full mobile rows. */
+@media (max-width: 700px) {
+  .system-overview {
+    margin-top: 16px !important;
+  }
+
+  .system-overview-grid {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-inline: contain;
+    padding: 2px 2px 8px !important;
+    scrollbar-width: none;
+  }
+
+  .system-overview-grid::-webkit-scrollbar { display: none; }
+
+  .system-overview-grid > article {
+    flex: 0 0 min(82vw, 350px) !important;
+    scroll-snap-align: start;
+    padding: 15px 16px !important;
+    min-height: 0 !important;
+  }
+
+  .system-overview-grid > article p {
+    margin-top: 7px !important;
+    line-height: 1.52 !important;
+  }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction-panel {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x proximity;
+    padding-bottom: 7px !important;
+    scrollbar-width: none;
+  }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction-panel::-webkit-scrollbar { display: none; }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction {
+    flex: 0 0 min(84vw, 350px) !important;
+    scroll-snap-align: start;
+    min-height: 0 !important;
+  }
+}
+
+/* Reunion: keep every stage, but move secondary cards into swipeable lanes instead
+   of forcing them all into the vertical reading path. */
+@media (max-width: 640px) {
+  .reunion-ui-v3 .reunion-v3-grid {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x proximity;
+    padding: 1px 1px 8px !important;
+    scrollbar-width: none;
+  }
+
+  .reunion-ui-v3 .reunion-v3-grid::-webkit-scrollbar { display: none; }
+
+  .reunion-ui-v3 .reunion-v3-grid > .reunion-v3-card {
+    flex: 0 0 86% !important;
+    scroll-snap-align: start;
+    padding: 16px 17px !important;
+  }
+
+  .reunion-ui-v3 .reunion-v3-meaning {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x proximity;
+    padding-bottom: 8px !important;
+    scrollbar-width: none;
+  }
+
+  .reunion-ui-v3 .reunion-v3-meaning::-webkit-scrollbar { display: none; }
+
+  .reunion-ui-v3 .reunion-v3-meaning > .reunion-v3-card {
+    flex: 0 0 86% !important;
+    scroll-snap-align: start;
+  }
+
+  .reunion-ui-v3 .reunion-v3-situations {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x proximity;
+    padding-bottom: 8px !important;
+    scrollbar-width: none;
+  }
+
+  .reunion-ui-v3 .reunion-v3-situations::-webkit-scrollbar { display: none; }
+
+  .reunion-ui-v3 .reunion-v3-situations > .period-ai-section-title {
+    flex: 0 0 100%;
+  }
+
+  .reunion-ui-v3 .reunion-v3-situation {
+    flex: 0 0 86% !important;
+    scroll-snap-align: start;
+    padding: 14px 15px !important;
+  }
+}
