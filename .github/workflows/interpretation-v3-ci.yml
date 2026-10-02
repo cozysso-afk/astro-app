@@ -81,6 +81,7 @@ jobs:
           node --experimental-strip-types --test web/src/lib/readingReasonLayers.test.mjs
           node --experimental-strip-types --test web/src/lib/basicFortuneReading.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneNarrativePolish.test.mjs
+          node --experimental-strip-types --test web/src/lib/timelineTime.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneEditorialV3.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneEditorialSemanticCorpus.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneFallbackFloor.test.mjs
