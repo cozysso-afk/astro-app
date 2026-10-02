@@ -39,6 +39,19 @@ export function compactEditorialCopy(value: string) {
   return sentences.slice(0, 2).join(' ').trim() || text
 }
 
+
+export function focusEditorialParts(value: string) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!editorialCopyUsable(text)) return null
+  const sentences = (text.match(/[^.!?]+[.!?]?/g) ?? []).map(sentence => sentence.trim()).filter(Boolean)
+  if (sentences.length < 4) return null
+  return {
+    conclusion: sentences[0],
+    sceneAction: `${sentences[1]} ${sentences[2]}`.trim(),
+    change: sentences.slice(3).join(' ').trim(),
+  }
+}
+
 function overallFallback(summary: ReturnType<typeof polishFortuneSummary>) {
   const concrete = [...summary.favorableCards.slice(0, 1), ...summary.cautionCards.slice(0, 2)]
     .map(item => item.meaning)
@@ -342,18 +355,26 @@ export function PeriodFortuneNarrativeV2({
 
     {!dedicatedRelationshipField && !!summary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>결론 · 지금 할 일</strong></div>
-      <div className="period-ai-topic-list">{summary.focusTopics.map(item => <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
-        <strong>{item.topic}</strong>
-        <b>{item.conclusion}</b>
-        {item.action && <p><em>실제로는</em> {item.action}</p>}
-        {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
-        <details className="reading-topic-depth">
-          <summary>왜 이렇게 보나</summary>
-          <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
-          {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
-          {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
-        </details>
-      </article>)}</div>
+      <div className="period-ai-topic-list">{summary.focusTopics.map(item => {
+        const deepEditorial = verifiedNarrative && !field ? focusEditorialParts(editorial.topicEditorial[item.topic] ?? '') : null
+        return <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
+          <strong>{item.topic}</strong>
+          <b>{deepEditorial?.conclusion || item.conclusion}</b>
+          {deepEditorial ? <>
+            <p className="period-ai-topic-editorial-v4">{deepEditorial.sceneAction}</p>
+            <p className="period-ai-topic-change-v9"><em>판단 바뀌는 조건</em> {deepEditorial.change}</p>
+          </> : <>
+            {item.action && <p><em>실제로는</em> {item.action}</p>}
+            {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
+          </>}
+          <details className="reading-topic-depth">
+            <summary>왜 이렇게 보나</summary>
+            <ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>
+            {item.timing && <ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}
+            {item.caution && <ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}
+          </details>
+        </article>
+      })}</div>
     </section>}
 
     {!dedicatedRelationshipField && !!visibleReferenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">

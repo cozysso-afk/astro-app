@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFortuneEditorialV3, editorialGroupCopy, editorialSectionComplete, editorialSectionReady, sectionCopy } from './fortuneEditorialV3.ts'
+import { buildFortuneEditorialV3, editorialGroupCopy, editorialSectionComplete, editorialSectionReady, sectionCopy, topicSectionCopy } from './fortuneEditorialV3.ts'
 import { FORTUNE_FIELDS } from './fortuneFields.ts'
 
 function stat(average,band='보통'){return {average,band,spread:0,best_days:[],caution_days:[]}}
@@ -73,6 +73,25 @@ test('Gemini structured cluster prose remains available for user-facing topic co
   assert.match(result.topicEditorial['컨디션'],/집중과 휴식/)
   assert.match(result.topicEditorial['투자심리'],/보유 조건/)
   assert.match(result.topicEditorial['소식'],/공식 안내/)
+})
+
+test('topic editorial preserves strong core prose when only change condition is weak',()=>{
+  const clusters=emptyClusters()
+  clusters.work_study.work={
+    conclusion:'업무 우선순위를 한 번에 하나로 줄이는 편이 낫다.',
+    real_scene:'요청이 겹치면 먼저 마감과 담당자를 다시 정하는 장면이 생기기 쉽다.',
+    action:'새 일을 받기 전에 기존 작업의 완료 기준부터 합의해.',
+    change_condition:'상황이 바뀌면 다시 봐.',
+    evidence_refs:[],
+    applicability:'direct',
+  }
+  assert.equal(sectionCopy(clusters.work_study.work),'')
+  assert.match(topicSectionCopy(clusters.work_study.work),/업무 우선순위/)
+  const result=buildFortuneEditorialV3(data({clusters}),calc(),base())
+  assert.match(result.topicEditorial['직장'],/업무 우선순위/)
+  assert.match(result.topicEditorial['직장'],/마감과 담당자/)
+  assert.match(result.topicEditorial['직장'],/완료 기준/)
+  assert.doesNotMatch(result.topicEditorial['직장'],/상황이 바뀌면/)
 })
 
 test('applicability blocks insufficient copy and marks conditional depth without downgrading direct copy',()=>{
@@ -186,17 +205,19 @@ test('contact UI collapses verbose direction rows when direction scores are effe
   assert.doesNotMatch(panel,/전체 연락 활성도/)
 })
 
-test('verified non-relationship fields surface structured editorial without replacing deterministic cards',()=>{
+test('verified non-relationship fields surface structured editorial in main focus cards with deterministic fallback',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/const structuredFieldTopics = verifiedNarrative && field/)
   assert.match(panel,/editorial\.topicEditorial\[topic\] \?\? ''/)
   assert.match(panel,/연애','대인관계','연락','재회','투자주의/)
   assert.match(panel,/editorialCopyUsable\(item\.text\)/)
+  assert.match(panel,/export function focusEditorialParts/)
+  assert.match(panel,/verifiedNarrative && !field \? focusEditorialParts\(editorial\.topicEditorial\[item\.topic\]/)
+  assert.match(panel,/deepEditorial\?\.conclusion \|\| item\.conclusion/)
   assert.match(panel,/period-ai-topic-editorial-v4/)
-  assert.match(panel,/현실 장면 · 행동 · 판단 변경조건/)
-  assert.match(panel,/field\?\.id === 'contact' \? '소식 해설'/)
-  assert.match(panel,/<p>\{item\.text\}<\/p>/)
-  assert.match(panel,/<b>\{item\.conclusion\}<\/b>/)
+  assert.match(panel,/deepEditorial\.sceneAction/)
+  assert.match(panel,/판단 바뀌는 조건/)
+  assert.match(panel,/deepEditorial\.change/)
   assert.match(panel,/<em>실제로는<\/em> \{item\.action\}/)
   assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
 })
