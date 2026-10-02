@@ -46,6 +46,14 @@ test('saved hero keeps the headline but drops repeated subtitle copy so evidence
   assert.match(runtime, /ensureExportHeroCompact\(reading\)/)
 })
 
+test('saved image adds one hidden reality-check card from omitted cautions without extending phone scroll', () => {
+  assert.match(runtime, /reading-export-checks-v7/)
+  assert.match(runtime, /현실에서 확인할 것/)
+  assert.match(runtime, /topics\.slice\(0, 2\)\.map\(cautionSentence\)/)
+  assert.match(runtime, /applyExportOnlyStyle\(article\)/)
+  assert.match(runtime, /ensureExportChecks\(reading, topics\)/)
+})
+
 test('mobile vertical density keeps only suitable secondary cards in horizontal lanes', () => {
   assert.match(css, /\.system-overview-grid[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /period-ai-relationship-section \.reading-direction-panel[\s\S]*overflow-x:\s*auto/)
