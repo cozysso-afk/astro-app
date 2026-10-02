@@ -18,24 +18,40 @@
 
 @media (max-width: 640px) {
   html body .app-shell .reunion-ui-v3 .reunion-v3-grid,
-  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning,
-  html body .app-shell .reunion-ui-v3 .reunion-v3-situations {
+  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning {
     align-items: flex-start !important;
   }
 
   html body .app-shell .reunion-ui-v3 .reunion-v3-grid > .reunion-v3-card,
-  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning > .reunion-v3-card,
-  html body .app-shell .reunion-ui-v3 .reunion-v3-situations > .reunion-v3-situation {
+  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning > .reunion-v3-card {
     align-self: flex-start !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
   }
 
-  /* Keep the situations heading in the vertical reading flow instead of making
-     it consume a full horizontal slide before the actual situation cards. */
+  /* The section heading is a direct child, so turning the whole situations
+     section into a horizontal flex lane made the heading itself the first empty
+     slide. Keep this short three-card section vertical instead. */
+  html body .app-shell .reunion-ui-v3 .reunion-v3-situations {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+  }
+
   html body .app-shell .reunion-ui-v3 .reunion-v3-situations > .period-ai-section-title {
-    flex: 0 0 auto !important;
-    width: 100% !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  html body .app-shell .reunion-ui-v3 .reunion-v3-situations > .reunion-v3-situation {
+    flex: none !important;
+    width: auto !important;
+    align-self: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
   }
 }
