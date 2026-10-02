@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'chore: apply fortune editorial depth patch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,8 +110,7 @@ jobs:
           test = test.replace(test_anchor, test_replacement, 1)
           test_path.write_text(test)
 
-          workflow = Path('.github/workflows/editorial-depth-v9-patch.yml')
-          workflow.unlink()
+          Path('.github/workflows/editorial-depth-v9-patch.yml').unlink()
           PY
       - name: Install dependencies
         working-directory: web
