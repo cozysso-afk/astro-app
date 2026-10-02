@@ -102,6 +102,21 @@
   line-height: 1.56 !important;
 }
 
+/* Export bridge: preserve the already-generated deep reason/timing/caution in the
+   canvas model without adding another visible paragraph to the phone screen. */
+.period-ai-v4 .period-ai-user-focus .period-ai-topic > .reading-export-depth-v5 {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
 .period-ai-v4 .reading-topic-depth {
   margin-top: 10px !important;
   padding-top: 9px !important;
@@ -163,6 +178,24 @@
   .system-overview-grid > article p {
     margin-top: 7px !important;
     line-height: 1.52 !important;
+  }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction-panel {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x proximity;
+    padding-bottom: 7px !important;
+    scrollbar-width: none;
+  }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction-panel::-webkit-scrollbar { display: none; }
+
+  .period-ai-v4 .period-ai-relationship-section .reading-direction {
+    flex: 0 0 min(84vw, 350px) !important;
+    scroll-snap-align: start;
+    min-height: 0 !important;
   }
 }
 
