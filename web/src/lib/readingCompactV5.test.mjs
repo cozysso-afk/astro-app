@@ -15,15 +15,24 @@ test('top flow cards are a compact screen index and no longer duplicate saved-im
   assert.match(exporter, /querySelectorAll<HTMLElement>\('\.flow-section'\)/)
 })
 
-test('primary topic cards expose deeper why/timing/caution layers without opening every topic', () => {
+test('primary topic cards expose deeper why timing and caution layers without opening every topic', () => {
   assert.match(runtime, /topics\.slice\(0, 2\)/)
   assert.match(runtime, /details\.open = true/)
   assert.match(runtime, /reading-topic-depth/)
   assert.match(main, /installReadingPresentationV5\(\)/)
 })
 
-test('mobile vertical density moves secondary system and reunion cards into horizontal lanes', () => {
+test('saved image receives the already-generated deep topic explanation before direct action copy', () => {
+  assert.match(runtime, /reading-topic-depth \.reading-explanation > p/)
+  assert.match(runtime, /reading-export-depth-v5/)
+  assert.match(runtime, /insertBefore\(paragraph, firstDirectParagraph/)
+  assert.match(css, /reading-export-depth-v5[\s\S]*position:\s*absolute/)
+  assert.match(exporter, /const body = \[detail, \.\.\.paragraphs\]/)
+})
+
+test('mobile vertical density moves secondary system relationship and reunion cards into horizontal lanes', () => {
   assert.match(css, /\.system-overview-grid[\s\S]*overflow-x:\s*auto/)
+  assert.match(css, /period-ai-relationship-section \.reading-direction-panel[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /\.reunion-ui-v3 \.reunion-v3-grid[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /\.reunion-ui-v3 \.reunion-v3-situations[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /\.flow-summary-section-v5 \.flow-tile > p[\s\S]*display:\s*none/)
