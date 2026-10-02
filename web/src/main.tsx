@@ -47,9 +47,9 @@ import './redline-layout-v55.css'
 import './archive-mobile-polish-v57.css'
 import './archive-mobile-polish-v59.css'
 import './profile-form-aurora-v71.css'
+import './reading-compact-v5.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
-import './reading-compact-v5.css'
 
 const qaHost = typeof window !== 'undefined'
   && window.location.hostname.endsWith('.vercel.app')
