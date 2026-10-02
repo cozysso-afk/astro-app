@@ -1,4 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, RotateCcw, Link2, Layers3, ShieldAlert, Sparkles } from 'lucide-react'
+import { orderTimelineDates, timelineDisplayDate } from './lib/timelineTime'
 
 export type ReadingSignal = 'incoming' | 'outgoing' | 'reconnection' | 'rebuilding' | 'mixed' | 'caution' | 'favorable'
 const SIGNALS = {
@@ -31,8 +32,9 @@ export function ReadingDirections({ rows }: { rows: DirectionRow[] }) {
 export type ReadingEvent = { date: string; kind: ReadingSignal; label: string; status?: string; detail?: string }
 export function ReadingTimeline({ events }: { events: ReadingEvent[] }) {
   const distinct=[...new Map(events.map(e=>[`${e.date}:${e.kind}:${e.label}:${e.status}`,e])).values()]
-  const dates=[...new Set(distinct.map(e=>e.date))].sort()
-  const group=(date:string)=><li key={date}><time>{date}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=>{
+  const now=new Date()
+  const dates=orderTimelineDates([...new Set(distinct.map(e=>e.date))],now)
+  const group=(date:string)=><li key={date}><time>{timelineDisplayDate(date,now)}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=>{
     const badgeLabel=TIMELINE_SIGNAL_LABELS[e.kind]
     return <div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
       <div className="reading-event-heading"><ReadingBadge kind={e.kind} label={badgeLabel}/>{e.status && e.status!==badgeLabel&&<span className={`reading-state ${/확인 필요|주의/.test(e.status)?'is-caution':''}`}>{e.status}</span>}</div>
