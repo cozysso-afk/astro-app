@@ -1,0 +1,41 @@
+/* V6 capture feedback polish.
+   Horizontal reading lanes must size each card to its own content instead of
+   stretching short cards to the tallest sibling. Calculation output is untouched. */
+
+@media (max-width: 700px) {
+  html body .app-shell .system-overview-grid {
+    align-items: flex-start !important;
+  }
+
+  html body .app-shell .system-overview-grid > article,
+  html body .app-shell .system-overview-grid > .system-unavailable {
+    align-self: flex-start !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  html body .app-shell .reunion-ui-v3 .reunion-v3-grid,
+  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning,
+  html body .app-shell .reunion-ui-v3 .reunion-v3-situations {
+    align-items: flex-start !important;
+  }
+
+  html body .app-shell .reunion-ui-v3 .reunion-v3-grid > .reunion-v3-card,
+  html body .app-shell .reunion-ui-v3 .reunion-v3-meaning > .reunion-v3-card,
+  html body .app-shell .reunion-ui-v3 .reunion-v3-situations > .reunion-v3-situation {
+    align-self: flex-start !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  /* Keep the situations heading in the vertical reading flow instead of making
+     it consume a full horizontal slide before the actual situation cards. */
+  html body .app-shell .reunion-ui-v3 .reunion-v3-situations > .period-ai-section-title {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+  }
+}
