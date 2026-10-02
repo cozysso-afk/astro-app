@@ -39,6 +39,13 @@ test('saved image spends its three-sentence budget on conclusion plus real evide
   assert.match(exporter, /const body = \[detail, \.\.\.paragraphs\]/)
 })
 
+test('saved hero keeps the headline but drops repeated subtitle copy so evidence cards can pack evenly', () => {
+  assert.match(runtime, /ensureExportHeroCompact/)
+  assert.match(runtime, /reading-export-subtitle-v7/)
+  assert.match(runtime, /bridge\.textContent = ''/)
+  assert.match(runtime, /ensureExportHeroCompact\(reading\)/)
+})
+
 test('mobile vertical density keeps only suitable secondary cards in horizontal lanes', () => {
   assert.match(css, /\.system-overview-grid[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /period-ai-relationship-section \.reading-direction-panel[\s\S]*overflow-x:\s*auto/)
