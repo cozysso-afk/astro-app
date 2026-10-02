@@ -16,22 +16,26 @@ test('top flow cards are a compact screen index and no longer duplicate saved-im
   assert.match(exporter, /querySelectorAll<HTMLElement>\('\.flow-section'\)/)
 })
 
-test('primary topic cards expose deeper why timing and caution layers without opening every topic', () => {
-  assert.match(runtime, /topics\.slice\(0, 2\)/)
+test('primary topic cards expose deeper layers on screen while three key export cards keep evidence', () => {
+  assert.match(runtime, /topics\.forEach\(\(topic, index\)/)
+  assert.match(runtime, /index < 2 && details/)
+  assert.match(runtime, /index < 3\) ensureExportDepth/)
   assert.match(runtime, /details\.open = true/)
   assert.match(runtime, /reading-topic-depth/)
   assert.match(main, /installReadingPresentationV5\(\)/)
 })
 
-test('saved image receives one dense evidence sentence before direct action copy', () => {
+test('saved image spends its three-sentence budget on conclusion plus real evidence instead of labels', () => {
   assert.match(runtime, /reading-reason-more > p/)
   assert.match(runtime, /reading-explanation\.is-reason > p/)
   assert.match(runtime, /reading-explanation\.is-timing > p/)
   assert.match(runtime, /reading-explanation\.is-caution > p/)
   assert.match(runtime, /primaryReason = technical \|\| reason/)
   assert.match(runtime, /reading-export-depth-v5/)
-  assert.match(runtime, /insertBefore\(paragraph, firstDirectParagraph/)
-  assert.match(css, /reading-export-depth-v5[\s\S]*position:\s*absolute/)
+  assert.match(runtime, /reading-export-conclusion-v7/)
+  assert.match(runtime, /firstSentence\(visibleConclusion/)
+  assert.match(runtime, /\.replace\(\/움직임가\\b\/g, '움직임이'\)/)
+  assert.doesNotMatch(runtime, /`근거 · \$\{primaryReason\}`/)
   assert.match(exporter, /const body = \[detail, \.\.\.paragraphs\]/)
 })
 
