@@ -1,11 +1,32 @@
 const ROOT_SELECTOR = '.period-ai-v4'
 const TOPIC_SELECTOR = '.period-ai-user-focus .period-ai-topic'
 
+function normalizedClause(value: unknown) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.!?]+(?=\s|$)/g, ' ·')
+    .replace(/(?:\s*·\s*)+/g, ' · ')
+    .replace(/\s*·\s*$/, '')
+    .trim()
+}
+
+function nodeText(topic: HTMLElement, selector: string) {
+  return normalizedClause(topic.querySelector<HTMLElement>(selector)?.textContent ?? '')
+}
+
 function explanationText(topic: HTMLElement) {
-  return Array.from(topic.querySelectorAll<HTMLElement>('.reading-topic-depth .reading-explanation > p'))
-    .map(node => node.innerText.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .join(' ')
+  const technical = nodeText(topic, '.reading-topic-depth .reading-reason-more > p')
+  const reason = nodeText(topic, '.reading-topic-depth .reading-explanation.is-reason > p')
+  const timing = nodeText(topic, '.reading-topic-depth .reading-explanation.is-timing > p')
+  const caution = nodeText(topic, '.reading-topic-depth .reading-explanation.is-caution > p')
+  const primaryReason = technical || reason
+  const parts = [
+    primaryReason ? `근거 · ${primaryReason}` : '',
+    timing ? `시기 · ${timing}` : '',
+    caution ? `주의 · ${caution}` : '',
+  ].filter(Boolean)
+  return parts.length ? `${parts.join(' · ')}.` : ''
 }
 
 function ensureExportDepth(topic: HTMLElement) {
