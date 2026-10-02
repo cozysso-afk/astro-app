@@ -35,12 +35,13 @@ test('saved image receives one dense evidence sentence before direct action copy
   assert.match(exporter, /const body = \[detail, \.\.\.paragraphs\]/)
 })
 
-test('mobile vertical density moves secondary system relationship and reunion cards into horizontal lanes', () => {
+test('mobile vertical density keeps only suitable secondary cards in horizontal lanes', () => {
   assert.match(css, /\.system-overview-grid[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /period-ai-relationship-section \.reading-direction-panel[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /\.reunion-ui-v3 \.reunion-v3-grid[\s\S]*overflow-x:\s*auto/)
-  assert.match(css, /\.reunion-ui-v3 \.reunion-v3-situations[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /\.flow-summary-section-v5 \.flow-tile > p[\s\S]*display:\s*none/)
+  assert.match(captureCss, /reunion-v3-situations[\s\S]*display:\s*grid/)
+  assert.match(captureCss, /reunion-v3-situations[\s\S]*overflow:\s*visible/)
 })
 
 test('horizontal system and reunion cards keep their intrinsic mobile height', () => {
