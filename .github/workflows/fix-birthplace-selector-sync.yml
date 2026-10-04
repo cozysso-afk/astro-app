@@ -1,0 +1,40 @@
+name: Birthplace Selector Sync Patch
+
+on:
+  push:
+    branches:
+      - fix/compatibility-birthplace-selector-sync
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/compatibility-birthplace-selector-sync
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply birthplace selector sync fix
+        run: python3 scripts/fix_birthplace_selector_sync.py
+      - name: Run targeted regression
+        run: |
+          node --test web/src/lib/reunionV31Regression.test.mjs
+          cd web && npm ci && npm run build
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/koreaBirthplaces.tsx web/src/lib/reunionV31Regression.test.mjs
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: keep birthplace region selection staged"
+          git push origin HEAD:fix/compatibility-birthplace-selector-sync
