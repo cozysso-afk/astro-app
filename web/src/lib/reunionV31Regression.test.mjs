@@ -16,7 +16,8 @@ test('birthplace chooser avoids native select and preserves rendered relationshi
   assert.match(birthplace, /stagedValueRef/)
   assert.match(birthplace, /sourceValueRef/)
   assert.match(birthplace, /sameBirthplaceValue/)
-  assert.match(birthplace, /if \(!stagedValueRef\.current \|\| !sameBirthplaceValue\(value, stagedValueRef\.current\)\)/)
+  assert.match(birthplace, /stagedValueRef\.current && sameBirthplaceValue\(value, stagedValueRef\.current\)/)
+  assert.match(birthplace, /stagedSelectionRef\.current\?\.district/)
   assert.match(birthplace, /if \(stagedSelectionRef\.current\) return/)
   assert.match(birthplace, /selection: \{ region: string; district: string \}/)
   assert.match(birthplace, /\{ region: nextRegion, district: '' \}/)
@@ -39,4 +40,9 @@ test('main reunion reader never exposes internal stage identifiers', () => {
   assert.match(panel, /const summary = phaseVerdict\(hierarchyData\)/)
   assert.match(panel, /function dedupeTimingWindows/)
   assert.match(panel, /같은 종류의 신호라 날짜마다 서로 다른 사건을 뜻하는 것은 아니야/)
+})
+
+test('birthplace region step stays staged while placeKey is empty', () => {
+  assert.match(birthplace, /stagedSelectionRef\.current = selection[\s\S]*stagedValueRef\.current = next[\s\S]*onChange\(next\)/)
+  assert.match(birthplace, /A region-only selection has an empty placeKey/)
 })

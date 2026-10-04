@@ -297,7 +297,14 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
   useEffect(() => {
     if (sourceValueRef.current !== value) {
       sourceValueRef.current = value
-      if (!stagedValueRef.current || !sameBirthplaceValue(value, stagedValueRef.current)) {
+      if (stagedValueRef.current && sameBirthplaceValue(value, stagedValueRef.current)) {
+        // A region-only selection has an empty placeKey until the district is chosen.
+        // Keep that partial UI selection staged when the parent acknowledges the cleared coordinates.
+        if (stagedSelectionRef.current?.district) {
+          stagedValueRef.current = null
+          stagedSelectionRef.current = null
+        }
+      } else {
         stagedValueRef.current = null
         stagedSelectionRef.current = null
       }
@@ -320,8 +327,11 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
       Object.assign(value, next)
       return
     }
-    stagedSelectionRef.current = null
-    stagedValueRef.current = null
+    // Stage the selection before notifying the parent. For the first (region) step,
+    // placeKey is intentionally empty, so deriving local UI state from placeKey on the
+    // next render would otherwise snap the selector back to the placeholder.
+    stagedSelectionRef.current = selection
+    stagedValueRef.current = next
     onChange(next)
   }
 
