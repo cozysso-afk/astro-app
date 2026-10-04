@@ -70,7 +70,7 @@ test('shallow cross-system synthesis becomes role-based and practical without vo
 
 test('certainty polish softens event-like overstatement while leaving calculation values untouched',()=>{
   const {payload,data}=fixture()
-  data.clusters.work_study.study.conclusion='이 선택은 비효율적이야.'
+  data.clusters.work_study.study.conclusion='지금 조건에서 이 선택을 밀어붙이는 건 비효율적이야.'
   const out=polishV23EditorialDepth(data,payload)
   assert.equal(out.score_marker,33)
   assert.doesNotMatch(out.overall.summary,/가능성이 높아/)
