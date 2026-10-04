@@ -33,6 +33,7 @@ function softenCertainty(value:string){
     .replace(/가능성이 높다/g,'그런 장면이 나타날 수 있어')
     .replace(/필수적인 날이야/g,'중요도가 커지는 날이야')
     .replace(/필수적이야/g,'중요해')
+    .replace(/비효율적이야/g,'효율이 낮을 수 있어')
     .replace(/무조건/g,'조건을 확인하지 않은 채')
     .replace(/반드시/g,'우선')
     .replace(/오늘 바로 정중히 거절해/g,'오늘은 정중히 거절하는 쪽이 안전해')
@@ -52,6 +53,30 @@ function polishProseFields(data:any){
   if(Array.isArray(data?.priorities))data.priorities=data.priorities.map((value:any)=>softenCertainty(String(value)))
 }
 
+function stripGenericReasonTail(value:string){
+  const normalized=text(value)
+  if(!normalized)return ''
+  const sentences=normalized.match(/[^.!?]+[.!?]?/g)?.map(part=>text(part)).filter(Boolean)??[normalized]
+  if(sentences.length<2)return normalized
+  const last=sentences.at(-1)??''
+  const genericLead=/^(이날은|오늘은|이번 기간(?:에는|은)?|이 구간은)/
+  const genericClose=/(확인해|점검해|살펴봐|지켜봐|기준으로 봐|대조해)\.?$/
+  if(genericLead.test(last)&&genericClose.test(last))sentences.pop()
+  return text(sentences.join(' '))
+}
+
+function compactKey(value:string){
+  return text(value).replace(/[\s.,·;:!?~'"“”‘’()\[\]{}\-]/g,'')
+}
+
+function appendChangeNaturally(avoidValue:string,changeValue:string){
+  const avoid=text(avoidValue),change=text(changeValue)
+  if(!change)return avoid
+  const avoidKey=compactKey(avoid),changeKey=compactKey(change)
+  if(changeKey.length>=12&&avoidKey.includes(changeKey.slice(0,Math.min(changeKey.length,28))))return avoid
+  return clip([avoid,`다만 ${change}`].filter(Boolean).join(' '),360)
+}
+
 function enrichTopicAnalysis(data:any,map:Map<string,any>){
   if(!data?.topic_analysis||typeof data.topic_analysis!=='object')return
   for(const [topic,item] of Object.entries(data.topic_analysis) as any[]){
@@ -64,14 +89,12 @@ function enrichTopicAnalysis(data:any,map:Map<string,any>){
     if(conclusion.length>=18)item.verdict=clip(conclusion,240)
     const existingReason=text(item?.reason)
     if(scene.length>=18){
+      const reasonBase=action.length>=10?stripGenericReasonTail(existingReason):existingReason
       const sceneSentence=`현실에서는 ${scene}`
-      item.reason=clip([existingReason,sceneSentence].filter(Boolean).join(' '),680)
+      item.reason=clip([reasonBase,sceneSentence].filter(Boolean).join(' '),680)
     }
     if(action.length>=10)item.action=clip(action,260)
-    if(change.length>=12){
-      const existingAvoid=text(item?.avoid)
-      item.avoid=clip([existingAvoid,`판단을 바꿀 조건은 ${change}`].filter(Boolean).join(' '),360)
-    }
+    if(change.length>=12)item.avoid=appendChangeNaturally(item?.avoid,change)
     item.evidence_refs=uniq([...refs(item?.evidence_refs).filter(ref=>map.has(ref)),...linked]).slice(0,8)
   }
 }

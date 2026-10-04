@@ -16,7 +16,7 @@ function fixture(){
     topic_analysis:{
       학업:{
         importance:'핵심',verdict:'학업은 이날 활성도가 33점으로 주의야.',
-        reason:'수성-토성 마찰이 직접 연결돼 있어.',timing:'2026-10-05',
+        reason:'수성-토성 마찰이 직접 연결돼 있어. 이날은 집중 지속 시간과 과제 진척을 확인해.',timing:'2026-10-05',
         action:'집중력을 확인해.',avoid:'낮은 점수만 보고 단정하지 마.',confidence:'보통',confidence_reason:'근거가 연결돼 있어.',
         evidence_refs:['W:detail:2026-10-05:학업:1'],
       },
@@ -48,8 +48,10 @@ test('important topic analysis reuses grounded deep cluster prose instead of gen
   assert.match(out.topic_analysis.학업.verdict,/학습 진도가 더디고/)
   assert.match(out.topic_analysis.학업.reason,/수성-토성/)
   assert.match(out.topic_analysis.학업.reason,/책상 앞에 오래 있어도/)
+  assert.doesNotMatch(out.topic_analysis.학업.reason,/집중 지속 시간과 과제 진척을 확인해/)
   assert.match(out.topic_analysis.학업.action,/목표 분량을 절반으로 줄이고/)
-  assert.match(out.topic_analysis.학업.avoid,/판단을 바꿀 조건은/)
+  assert.match(out.topic_analysis.학업.avoid,/다만 이해가 안 되는 부분은/)
+  assert.doesNotMatch(out.topic_analysis.학업.avoid,/판단을 바꿀 조건은/)
   assert.deepEqual(out.topic_analysis.학업.evidence_refs,['W:detail:2026-10-05:학업:1'])
 })
 
@@ -68,10 +70,13 @@ test('shallow cross-system synthesis becomes role-based and practical without vo
 
 test('certainty polish softens event-like overstatement while leaving calculation values untouched',()=>{
   const {payload,data}=fixture()
+  data.clusters.work_study.study.conclusion='지금 조건에서 이 선택을 밀어붙이는 건 비효율적이야.'
   const out=polishV23EditorialDepth(data,payload)
   assert.equal(out.score_marker,33)
   assert.doesNotMatch(out.overall.summary,/가능성이 높아/)
   assert.match(out.overall.summary,/나타날 수 있어/)
+  assert.doesNotMatch(out.topic_analysis.학업.verdict,/비효율적이야/)
+  assert.match(out.topic_analysis.학업.verdict,/효율이 낮을 수 있어/)
   assert.equal(data.overall.summary,'오늘 결과가 나쁠 가능성이 높아.')
 })
 
@@ -81,4 +86,13 @@ test('ungrounded cluster copy is not promoted into topic analysis',()=>{
   const out=polishV23EditorialDepth(data,payload)
   assert.equal(out.topic_analysis.학업.verdict,'학업은 이날 활성도가 33점으로 주의야.')
   assert.equal(out.topic_analysis.학업.action,'집중력을 확인해.')
+})
+
+test('change condition is not duplicated when avoid already contains the same grounded instruction',()=>{
+  const {payload,data}=fixture()
+  data.topic_analysis.학업.avoid='이해가 안 되는 부분은 표시해 두고 다음 학습 구간으로 넘겨.'
+  const out=polishV23EditorialDepth(data,payload)
+  const avoid=out.topic_analysis.학업.avoid
+  assert.equal((avoid.match(/다음 학습 구간으로 넘겨/g)??[]).length,1)
+  assert.doesNotMatch(avoid,/다만 이해가 안 되는 부분은/)
 })
