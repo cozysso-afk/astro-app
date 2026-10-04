@@ -9,8 +9,9 @@ import { buildV23CorePrompt, buildV23PromptBudget, V23_PROMPT_VERSION } from "./
 import { buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
+import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
 
-const VERSION="supabase-ai-v23.0-phenomenon-first";
+const VERSION="supabase-ai-v23.1-structured-output-headroom";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -63,11 +64,9 @@ function coreInstruction(){return `
 - day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
 - annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.`;}
 
-type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;error?:string};
+type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;max_output_tokens:number;finish_reason?:string;error?:string};
 type Budget={used:number;deadline:number;calls:CallTrace[]};
 function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadline;}
-function outputLimit(kind:string,compact:boolean){if(kind==="annual")return compact?6200:10000;if(kind==="month")return compact?4800:5600;if(kind==="week")return compact?4000:4700;return compact?3400:4000;}
-
 async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"fallback",compact=false,qualityRetry=""){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
   const periodNarrative=buildPeriodNarrativeInstruction(promptPayload);
@@ -77,19 +76,22 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
   const timeout=Math.min(compact?46000:54000,remain);
+  const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
   try{
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:CORE_SCHEMA,maxOutputTokens:outputLimit(String(fullPayload?.period_kind??"annual"),compact),temperature:.28,thinkingConfig:{thinkingLevel:compact?"low":"medium"}}}),
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:CORE_SCHEMA,maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:compact?"low":"medium"}}}),
     });
     const rawText=await r.text();
     let raw:any=null;try{raw=JSON.parse(rawText);}catch{}
     const u=usage(raw);
-    const trace:CallTrace={call:callNo,model,kind,prompt_bytes:promptBytes,elapsed_ms:Date.now()-started,http_status:r.status,usage:u};
+    const finishReason=v23FinishReason(raw);
+    const trace:CallTrace={call:callNo,model,kind,prompt_bytes:promptBytes,elapsed_ms:Date.now()-started,http_status:r.status,usage:u,max_output_tokens:maxOutputTokens,...(finishReason?{finish_reason:finishReason}:{})};
     if(!r.ok){trace.error=`Gemini HTTP ${r.status}`;budget.calls.push(trace);return {ok:false,error:`Gemini HTTP ${r.status}`,model,http_status:r.status,usage:u};}
     budget.calls.push(trace);
+    if(finishReason==="MAX_TOKENS")return {ok:false,error:`core 구조화 응답이 maxOutputTokens=${maxOutputTokens}에서 잘렸어`,model,usage:u,finish_reason:finishReason,max_output_tokens:maxOutputTokens};
     const parts=raw?.candidates?.[0]?.content?.parts??[];
     let out=parts.filter((p:any)=>!p?.thought).map((p:any)=>p?.text??"").join("").trim();
     if(!out)out=parts.map((p:any)=>p?.text??"").join("").trim();
@@ -98,7 +100,7 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
     catch{return {ok:false,error:"core 구조화 응답이 완전하지 않았어",model,usage:u};}
   }catch(e){
     const msg=e instanceof DOMException&&e.name==="AbortError"?"AI 해설 시간이 초과됐어.":`AI 해설 호출 실패: ${e instanceof Error?e.message:String(e)}`;
-    budget.calls.push({call:callNo,model,kind,prompt_bytes:promptBytes,elapsed_ms:Date.now()-started,http_status:0,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0},error:msg});
+    budget.calls.push({call:callNo,model,kind,prompt_bytes:promptBytes,elapsed_ms:Date.now()-started,http_status:0,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0},max_output_tokens:maxOutputTokens,error:msg});
     return {ok:false,error:msg,model,timeout:e instanceof DOMException&&e.name==="AbortError"};
   }finally{clearTimeout(timer);}
 }

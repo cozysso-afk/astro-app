@@ -91,10 +91,10 @@ export function publicCallTrace(value: unknown) {
   return value.slice(0, 2).map((entry) => {
     if (!isRecord(entry)) return {}
     const out: Record<string, unknown> = {}
-    for (const key of ['call','prompt_bytes','elapsed_ms','http_status'] as const) {
+    for (const key of ['call','prompt_bytes','elapsed_ms','http_status','max_output_tokens'] as const) {
       if (Number.isFinite(entry[key])) out[key] = Math.max(0, Number(entry[key]))
     }
-    for (const key of ['model','kind'] as const) {
+    for (const key of ['model','kind','finish_reason'] as const) {
       if (typeof entry[key] === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(entry[key] as string)) out[key] = entry[key]
     }
     const usage = publicFailedUsage(entry.usage)
