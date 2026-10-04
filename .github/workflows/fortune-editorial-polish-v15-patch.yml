@@ -1,0 +1,42 @@
+name: Fortune Editorial Polish V15 Patch
+
+on:
+  push:
+    branches:
+      - fix/fortune-v23-editorial-polish-v15
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fortune-v23-editorial-polish-v15
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply targeted V23 editorial flow patch
+        run: python3 scripts/apply-fortune-editorial-polish-v15.py
+      - name: Run targeted editorial tests
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/editorialPolishV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/dayDepthRepairV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/runtimeBudgetV23.test.mjs
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v23-preview/index.ts
+      - name: Commit patch when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/fortune-interpret-v23-preview/index.ts
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump V23 editorial flow cache identity"
+          git push origin HEAD:fix/fortune-v23-editorial-polish-v15
