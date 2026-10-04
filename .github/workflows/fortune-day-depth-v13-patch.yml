@@ -1,0 +1,42 @@
+name: Fortune Day Depth V13 Patch
+
+on:
+  push:
+    branches:
+      - fix/fortune-v23-day-depth-v13
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fortune-v23-day-depth-v13
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply targeted V23 daily depth patch
+        run: python3 scripts/apply-fortune-day-depth-v13.py
+      - name: Run targeted V23 depth tests
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/dayDepthRepairV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/cacheIdentityV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/runtimeBudgetV23.test.mjs
+          node --experimental-strip-types --check supabase/functions/fortune-interpret-v23-preview/index.ts
+      - name: Commit patch when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: preserve daily intraday depth guides"
+          git push origin HEAD:fix/fortune-v23-day-depth-v13
