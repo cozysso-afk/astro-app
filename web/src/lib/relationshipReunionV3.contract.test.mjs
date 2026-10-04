@@ -44,7 +44,7 @@ test('reunion reader-facing section labels stay Korean instead of internal Engli
   for(const marker of ['CURRENT STATE','CONTACT','DIRECTION','BEHAVIOR CHANGE','NEXT CHECK']) assert.doesNotMatch(hierarchy,new RegExp(marker))
 })
 
-test('contact parent strength is independent from sender direction and tied direction still reports the tiny numeric edge',()=>{
+test('contact strength stays separate from relative initiative and even a small edge is shown',()=>{
   assert.match(hierarchy,/function contactReading\(hierarchy: ReunionHierarchy\)/)
   assert.match(hierarchy,/hierarchy\.stages\?\.contact_recontact\?\.activation/)
   const contactBody=hierarchy.slice(hierarchy.indexOf('function contactReading'),hierarchy.indexOf('function directionRow'))
@@ -52,9 +52,11 @@ test('contact parent strength is independent from sender direction and tied dire
   assert.doesNotMatch(contactBody,/incomingBand|outgoingBand/)
   assert.match(hierarchy,/function initiativeReading\(rows: DirectionRow\[\]\)/)
   assert.match(hierarchy,/Math\.abs\(diff\) < 5/)
-  assert.match(hierarchy,/판정상 동률권/)
-  assert.match(hierarchy,/\+\$\{pointGap\}/)
-  assert.match(hierarchy,/굳이 수치만 비교하면/)
+  assert.match(hierarchy,/근소 우세/)
+  assert.match(hierarchy,/연락 자체 강도와 별개로 상대 비교에서는/)
+  assert.doesNotMatch(hierarchy,/판정상 동률권/)
+  assert.match(hierarchy,/const initiativeText = initiative\.text/)
+  assert.doesNotMatch(hierarchy,/readerSentences\(consultation\?\.initiative/)
 })
 
 test('stage board separates emotional reactivation contact meeting and rebuilding',()=>{

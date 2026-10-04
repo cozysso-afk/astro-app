@@ -99,17 +99,18 @@ function initiativeReading(rows: DirectionRow[]) {
       const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
       const pointGap = Math.abs(roundedA - roundedB)
       return {
-        label:`판정상 동률권 · ${micro} +${pointGap}`,
-        text:`굳이 수치만 비교하면 ${micro}가 ${pointGap}점 높아. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}지만 이 차이는 실제 선연락 주체를 확정할 수준은 아니야.`,
+        label:`${micro} 근소 우세`,
+        text:`연락 자체 강도와 별개로 상대 비교에서는 ${micro}가 ${pointGap}점 앞서. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 다만 차이가 근소해서 실제 선연락 주체를 확정한다는 뜻은 아니야.`,
       }
     }
     const side = diff > 0 ? '상대 → 나' : '나 → 상대'
+    const pointGap = Math.abs(roundedA - roundedB)
     const weak = a < 40 && b < 40
     return {
-      label: weak ? `${side} 약우세` : `${side} 우세`,
+      label:`${side} 우세`,
       text: weak
-        ? `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 두 방향 모두 강하지 않지만 상대 비교에서는 ${side} 쪽이 조금 앞서.`
-        : `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. ${side} 쪽이 반대 방향보다 상대적으로 더 두드러져.`,
+        ? `두 방향 모두 연락 자체 강도는 낮지만 상대 비교에서는 ${side}가 ${pointGap}점 앞서. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}.`
+        : `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 상대 비교에서는 ${side}가 ${pointGap}점 앞서.`,
     }
   }
   const ar = bandRank(incoming?.band)
@@ -295,7 +296,7 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
   const consultation = reunionV2?.consultation_answer
   const answerText = readerSentences(consultation?.current_stage, 3) || answer.text
   const contactText = readerSentences(`${consultation?.contact_type_if_any ?? ''} ${consultation?.continuity ?? ''}`, 3) || contact.text
-  const initiativeText = readerSentences(consultation?.initiative, 2) || initiative.text
+  const initiativeText = initiative.text
   const behaviorText = readerSentences(consultation?.behavior_change_evidence, 3) || change.text
   const nextUp = (consultation?.next_stage_up_conditions ?? []).map(item=>readerSentences(item,1)).filter(Boolean).slice(0,3)
   const down = (consultation?.down_conditions ?? []).map(item=>readerSentences(item,1)).filter(Boolean).slice(0,3)
