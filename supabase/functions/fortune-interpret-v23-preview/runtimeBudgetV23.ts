@@ -1,11 +1,12 @@
 export type V23PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
 const LIMITS: Record<V23PeriodKind, { full: number; compact: number }> = {
-  // Production telemetry on 2026-10-01/02 hit the old 4,000-token day ceiling:
-  // visible candidate 3,466~3,515 + thinking 470~519 ~= 3,985 tokens.
-  // The structured 31-section result is ~20k JSON chars, so keep a small completion margin
-  // without expanding the annual ceiling.
-  day: { full: 6200, compact: 5600 },
+  // Production telemetry on 2026-10-04 still exhausted the first headroom bump:
+  // full: candidate 5,383 + thinking 802 = 6,185 at a 6,200 ceiling.
+  // compact fallback: candidate 5,585 at a 5,600 ceiling.
+  // Earlier 7,200 daily canary telemetry also finished by MAX_TOKENS, so give day
+  // only the next small safety step while leaving week/month/annual unchanged.
+  day: { full: 8200, compact: 7000 },
   week: { full: 7000, compact: 6200 },
   month: { full: 8000, compact: 7000 },
   annual: { full: 10000, compact: 8200 },
