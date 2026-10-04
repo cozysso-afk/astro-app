@@ -1,0 +1,40 @@
+name: Reunion Relative Initiative Patch
+
+on:
+  push:
+    branches:
+      - fix/reunion-relative-initiative
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reunion-relative-initiative
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Apply initiative interpretation fix
+        run: python3 scripts/patch_reunion_relative_initiative.py
+      - name: Run targeted regression
+        run: |
+          node --test web/src/lib/relationshipReunionV3.contract.test.mjs
+          cd web && npm ci && npm run build
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/ReunionHierarchyPanelV3.tsx web/src/lib/relationshipReunionV3.contract.test.mjs
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: keep relative reunion initiative visible"
+          git push origin HEAD:fix/reunion-relative-initiative
