@@ -1,13 +1,13 @@
 export type V23PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
 const LIMITS: Record<V23PeriodKind, { full: number; compact: number }> = {
-  // Production telemetry on 2026-10-04 still exhausted the first headroom bump:
-  // full: candidate 5,383 + thinking 802 = 6,185 at a 6,200 ceiling.
-  // compact fallback: candidate 5,585 at a 5,600 ceiling.
-  // Earlier 7,200 daily canary telemetry also finished by MAX_TOKENS, so give day
-  // only the next small safety step while leaving week/month/annual unchanged.
+  // Production telemetry on 2026-10-04 showed both day and week structured output
+  // finishing at their token ceilings. Keep changes period-scoped and leave month/annual
+  // unchanged until production telemetry proves they also need more room.
   day: { full: 8200, compact: 7000 },
-  week: { full: 7000, compact: 6200 },
+  // Weekly production: full candidate 6,379 + thinking 606 = 6,985 at 7,000;
+  // compact candidate 6,185 at 6,200. Give only the next safe completion margin.
+  week: { full: 9000, compact: 8000 },
   month: { full: 8000, compact: 7000 },
   annual: { full: 10000, compact: 8200 },
 }
