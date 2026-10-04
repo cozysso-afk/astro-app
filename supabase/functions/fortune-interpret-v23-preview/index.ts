@@ -13,7 +13,7 @@ import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
 import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
 import { polishV23EditorialDepth } from "./editorialPolishV23.ts";
 
-const VERSION="supabase-ai-v23.2-editorial-polish";
+const VERSION="supabase-ai-v23.3-editorial-flow";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
