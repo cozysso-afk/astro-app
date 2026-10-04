@@ -10,6 +10,7 @@ import { buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from "./per
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
+import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
 
 const VERSION="supabase-ai-v23.1-structured-output-headroom";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -115,7 +116,7 @@ function normalizeDirectionalWindows(data:any,payload:any){
 }
 
 function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
-  const merged=stabilizeCoreForQuality({...core,topic_analysis:buildDeterministicTopicAnalysis(payload)},payload);
+  const merged=ensureDayDepthGuides(stabilizeCoreForQuality({...core,topic_analysis:buildDeterministicTopicAnalysis(payload)},payload),payload);
   let validated=validateOutput(merged);
   if(!validated)return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,...meta};
   let data=normalizeDirectionalWindows(validated,payload);
