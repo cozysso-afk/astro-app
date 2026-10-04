@@ -2,7 +2,6 @@ from pathlib import Path
 
 INDEX = Path('supabase/functions/fortune-interpret-v23-preview/index.ts')
 SHARED = Path('supabase/functions/_shared/fortuneAiPublicError.ts')
-CI = Path('.github/workflows/interpretation-v3-ci.yml')
 RUNTIME = Path('supabase/functions/fortune-interpret-v23-preview/runtimeBudgetV23.ts')
 TEST = Path('supabase/functions/fortune-interpret-v23-preview/runtimeBudgetV23.test.mjs')
 
@@ -79,13 +78,4 @@ RUNTIME.write_text('''export type V23PeriodKind = 'day' | 'week' | 'month' | 'an
 
 TEST.write_text('''import assert from 'node:assert/strict'\nimport test from 'node:test'\n\nimport { publicCallTrace } from '../_shared/fortuneAiPublicError.ts'\nimport { v23FinishReason, v23OutputTokenLimit } from './runtimeBudgetV23.ts'\n\ntest('V23 structured output has completion headroom for every period', () => {\n  assert.equal(v23OutputTokenLimit('day', false), 6200)\n  assert.equal(v23OutputTokenLimit('day', true), 5600)\n  assert.equal(v23OutputTokenLimit('week', false), 7000)\n  assert.equal(v23OutputTokenLimit('week', true), 6200)\n  assert.equal(v23OutputTokenLimit('month', false), 8000)\n  assert.equal(v23OutputTokenLimit('month', true), 7000)\n  assert.equal(v23OutputTokenLimit('annual', false), 10000)\n  assert.equal(v23OutputTokenLimit('annual', true), 8200)\n  assert.equal(v23OutputTokenLimit('today', false), 6200)\n})\n\ntest('MAX_TOKENS is observable in the persisted safe call trace', () => {\n  assert.equal(v23FinishReason({ candidates: [{ finishReason: 'MAX_TOKENS' }] }), 'MAX_TOKENS')\n  assert.equal(v23FinishReason({ candidates: [{ finishReason: 'not safe text' }] }), '')\n  const trace = publicCallTrace([{\n    call: 1, model: 'gemini-3.7-flash', kind: 'initial', prompt_bytes: 66000, elapsed_ms: 18000,\n    http_status: 200, max_output_tokens: 6200, finish_reason: 'MAX_TOKENS',\n    usage: { prompt_tokens: 27000, candidate_tokens: 3500, thought_tokens: 500, total_tokens: 31000 },\n  }])\n  assert.equal(trace[0].max_output_tokens, 6200)\n  assert.equal(trace[0].finish_reason, 'MAX_TOKENS')\n})\n''')
 
-ci = CI.read_text()
-anchor = '          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/routingV23.test.mjs\n'
-addition = anchor + '          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/runtimeBudgetV23.test.mjs\n'
-if anchor not in ci:
-    raise SystemExit('CI test anchor missing')
-ci = ci.replace(anchor, addition, 1)
-CI.write_text(ci)
-
-Path('.github/workflows/fortune-output-headroom-v10-patch.yml').unlink(missing_ok=True)
 Path('scripts/apply-fortune-output-headroom-v10.py').unlink(missing_ok=True)
