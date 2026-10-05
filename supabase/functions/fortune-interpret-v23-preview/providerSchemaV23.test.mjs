@@ -39,9 +39,40 @@ test('provider editorial array normalizes back to the existing grouped API shape
   assert.deepEqual(Object.keys(normalized.clusters.relationship).sort(),EDITORIAL_SECTION_KEYS.filter(key=>key.startsWith('relationship.')).map(key=>key.split('.')[1]).sort())
 })
 
-test('provider normalization rejects missing or duplicate editorial keys instead of silently inventing sections',()=>{
+test('provider normalization isolates a missing key without discarding valid authored sections',()=>{
   const rows=EDITORIAL_SECTION_KEYS.map(section)
-  assert.equal(normalizeProviderCore({clusters:rows.slice(1)}).clusters,null)
-  const duplicate=[...rows.slice(0,-1),section(EDITORIAL_SECTION_KEYS[0],99)]
-  assert.equal(normalizeProviderCore({clusters:duplicate}).clusters,null)
+  const normalized=normalizeProviderCore({clusters:rows.slice(1)})
+  assert.notEqual(normalized.clusters,null)
+  assert.equal(normalized.clusters.relationship.summary.applicability,'insufficient')
+  assert.deepEqual(normalized.clusters.relationship.summary.evidence_refs,[])
+  assert.equal(normalized.clusters.relationship.friends.conclusion,'결론 1')
+  assert.equal(normalized.clusters.condition.condition.conclusion,'결론 24')
+})
+
+test('provider normalization isolates only a duplicated key and preserves the other unique rows',()=>{
+  const rows=EDITORIAL_SECTION_KEYS.map(section)
+  const duplicate=[...rows,section(EDITORIAL_SECTION_KEYS[0],99)]
+  const normalized=normalizeProviderCore({clusters:duplicate})
+  assert.equal(normalized.clusters.relationship.summary.applicability,'insufficient')
+  assert.equal(normalized.clusters.relationship.friends.conclusion,'결론 1')
+  assert.equal(normalized.clusters.work_study.work.conclusion,'결론 15')
+  assert.equal(normalized.clusters.condition.condition.conclusion,'결론 24')
+})
+
+test('provider normalization ignores unknown rows and isolates malformed known rows field by field',()=>{
+  const rows=EDITORIAL_SECTION_KEYS.map(section)
+  rows[20]={...rows[20],applicability:'broken'}
+  rows.push(section('unknown.extra',99))
+  const normalized=normalizeProviderCore({clusters:rows})
+  assert.equal(normalized.clusters.money_news.news.applicability,'insufficient')
+  assert.equal(normalized.clusters.money_news.money.conclusion,'결론 19')
+  assert.equal(normalized.clusters.investment.psychology.conclusion,'결론 21')
+})
+
+test('provider normalization turns a missing cluster array into isolated insufficient sections rather than nulling the core',()=>{
+  const normalized=normalizeProviderCore({headline:'테스트'})
+  assert.equal(normalized.headline,'테스트')
+  assert.equal(normalized.clusters.relationship.summary.applicability,'insufficient')
+  assert.equal(normalized.clusters.condition.condition.applicability,'insufficient')
+  assert.equal(Object.keys(normalized.clusters.relationship).length,15)
 })

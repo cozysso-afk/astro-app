@@ -28,9 +28,24 @@ export const EDITORIAL_SECTION_KEYS = [
 
 const KEY_SET = new Set<string>(EDITORIAL_SECTION_KEYS);
 const EDITORIAL_FIELDS = ["conclusion","real_scene","action","change_condition","evidence_refs","applicability"] as const;
+const APPLICABILITY = new Set(["direct","conditional","insufficient"]);
 
-function invalidProviderClusters(core:any){
-  return {...core,clusters:null};
+function insufficientProviderSection(){
+  return {
+    conclusion:"이 항목은 이번 응답에서 직접 해설 근거가 충분하지 않아.",
+    real_scene:"",
+    action:"확인 가능한 사실과 다른 정상 해설 항목을 우선해.",
+    change_condition:"직접 근거가 보강되면 이 항목의 판단을 다시 갱신해.",
+    evidence_refs:[],
+    applicability:"insufficient",
+  };
+}
+
+function validProviderSection(row:any){
+  if(!row||typeof row!=="object"||Array.isArray(row))return false;
+  if(!["conclusion","real_scene","action","change_condition"].every(field=>typeof row?.[field]==="string"))return false;
+  if(!Array.isArray(row?.evidence_refs))return false;
+  return APPLICABILITY.has(String(row?.applicability??""));
 }
 
 export function buildProviderCoreSchema(fullSchema:any){
@@ -45,8 +60,9 @@ export function buildProviderCoreSchema(fullSchema:any){
       type:"OBJECT",
       properties:{
         // Gemini rejects the otherwise-valid 25-value enum/fixed-length combination
-        // as INVALID_ARGUMENT. The prompt names every key and the normalizer below
-        // remains the strict source of truth for exact count, membership and uniqueness.
+        // as INVALID_ARGUMENT. The prompt names every key; normalization below keeps
+        // valid rows and isolates a malformed/missing/duplicate key instead of
+        // discarding every authored section.
         key:{type:"STRING"},
         conclusion:structuredClone(section.properties.conclusion),
         real_scene:structuredClone(section.properties.real_scene),
@@ -62,19 +78,37 @@ export function buildProviderCoreSchema(fullSchema:any){
 }
 
 export function normalizeProviderCore(core:any){
-  if(!core||typeof core!=="object"||Array.isArray(core)||!Array.isArray(core.clusters))return core;
-  if(core.clusters.length!==EDITORIAL_SECTION_KEYS.length)return invalidProviderClusters(core);
+  if(!core||typeof core!=="object"||Array.isArray(core))return core;
+  const rows=Array.isArray(core.clusters)?core.clusters:[];
   const groups:any={relationship:{},work_study:{},money_news:{},investment:{},condition:{}};
   const seen=new Set<string>();
-  for(const row of core.clusters){
+  const invalid=new Set<string>();
+
+  for(const row of rows){
     const key=String(row?.key??"");
-    if(!KEY_SET.has(key)||seen.has(key))return invalidProviderClusters(core);
+    if(!KEY_SET.has(key))continue;
+    if(seen.has(key)){
+      invalid.add(key);
+      continue;
+    }
     seen.add(key);
+    if(!validProviderSection(row)){
+      invalid.add(key);
+      continue;
+    }
     const dot=key.indexOf(".");
     const group=key.slice(0,dot),section=key.slice(dot+1);
-    if(!groups[group]||!section)return invalidProviderClusters(core);
+    if(!groups[group]||!section){
+      invalid.add(key);
+      continue;
+    }
     groups[group][section]=Object.fromEntries(EDITORIAL_FIELDS.map(field=>[field,row?.[field]]));
   }
-  if(seen.size!==EDITORIAL_SECTION_KEYS.length)return invalidProviderClusters(core);
+
+  for(const key of EDITORIAL_SECTION_KEYS){
+    const dot=key.indexOf(".");
+    const group=key.slice(0,dot),section=key.slice(dot+1);
+    if(!seen.has(key)||invalid.has(key))groups[group][section]=insufficientProviderSection();
+  }
   return {...core,clusters:groups};
 }
