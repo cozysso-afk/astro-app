@@ -1,0 +1,36 @@
+name: Prose ownership follow-up patch
+
+on:
+  push:
+    branches: [refactor/fortune-prose-ownership]
+    paths:
+      - 'scripts/patch_prose_ownership_fix_once.py'
+      - '.github/workflows/prose-ownership-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/patch_prose_ownership_fix_once.py
+      - run: |
+          git diff --check
+          node --test supabase/functions/fortune-interpret-v23-preview/proseOwnershipV23.contract.test.mjs
+      - run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts \
+                  supabase/functions/fortune-interpret-v23-preview/proseOwnershipV23.contract.test.mjs
+          git commit -m 'fix: preserve authored relationship timing copy'
+          git push origin HEAD:refactor/fortune-prose-ownership
