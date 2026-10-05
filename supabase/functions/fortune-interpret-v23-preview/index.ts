@@ -11,10 +11,10 @@ import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
 import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
-import { polishV23EditorialDepth } from "./editorialPolishV23.ts";
+import { mergeAuthoredTopicAnalysis, polishV23EditorialDepth } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 
-const VERSION="supabase-ai-v23.4-editorial-trace-v1";
+const VERSION="supabase-ai-v23.5-prose-ownership-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -121,7 +121,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   const {editorial_trace_seed:traceSeed=[],editorial_trace_origin:traceOrigin,...resultMeta}=meta??{};
   const traceStages=Array.isArray(traceSeed)?[...traceSeed]:[];
   if(!traceStages.length)traceStages.push(captureEditorialStage("finalize_input",core));
-  const withTopics={...core,topic_analysis:buildDeterministicTopicAnalysis(payload)};
+  const withTopics={...core,topic_analysis:mergeAuthoredTopicAnalysis(core,buildDeterministicTopicAnalysis(payload),payload)};
   traceStages.push(captureEditorialStage("post_topic_injection",withTopics));
   const stabilized=stabilizeCoreForQuality(withTopics,payload);
   traceStages.push(captureEditorialStage("post_stabilizer",stabilized));

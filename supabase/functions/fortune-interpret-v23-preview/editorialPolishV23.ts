@@ -77,6 +77,30 @@ function appendChangeNaturally(avoidValue:string,changeValue:string){
   return clip([avoid,`다만 ${change}`].filter(Boolean).join(' '),360)
 }
 
+export function mergeAuthoredTopicAnalysis(data:any,deterministic:any,payload:any){
+  const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]
+  const map=new Map<string,any>(rows.map((row:any)=>[String(row?.id??''),row]))
+  const source=Array.isArray(deterministic)?deterministic:Object.entries(deterministic??{}).map(([topic,row]:any)=>({topic,...row}))
+  return Object.fromEntries(source.map((item:any)=>{
+    const topic=text(item?.topic)
+    const base={...item}
+    delete base.topic
+    const section=sectionFor(data,topic)
+    if(!section||!['direct','conditional'].includes(String(section?.applicability??'')))return [topic,base]
+    const linked=refs(section?.evidence_refs).filter(ref=>map.has(ref))
+    if(!linked.length)return [topic,base]
+    const conclusion=text(section?.conclusion),scene=text(section?.real_scene),action=text(section?.action),change=text(section?.change_condition)
+    return [topic,{
+      ...base,
+      ...(conclusion.length>=12?{verdict:clip(conclusion,240)}:{}),
+      ...(scene.length>=12?{reason:clip(scene,680)}:{}),
+      ...(action.length>=10?{action:clip(action,260)}:{}),
+      ...(change.length>=10?{avoid:clip(change,320)}:{}),
+      evidence_refs:uniq([...refs(base?.evidence_refs).filter(ref=>map.has(ref)),...linked]).slice(0,8),
+    }]
+  }))
+}
+
 function enrichTopicAnalysis(data:any,map:Map<string,any>){
   if(!data?.topic_analysis||typeof data.topic_analysis!=='object')return
   for(const [topic,item] of Object.entries(data.topic_analysis) as any[]){
@@ -89,9 +113,12 @@ function enrichTopicAnalysis(data:any,map:Map<string,any>){
     if(conclusion.length>=18)item.verdict=clip(conclusion,240)
     const existingReason=text(item?.reason)
     if(scene.length>=18){
-      const reasonBase=action.length>=10?stripGenericReasonTail(existingReason):existingReason
-      const sceneSentence=`현실에서는 ${scene}`
-      item.reason=clip([reasonBase,sceneSentence].filter(Boolean).join(' '),680)
+      const existingKey=compactKey(existingReason),sceneKey=compactKey(scene)
+      if(!sceneKey||!existingKey.includes(sceneKey.slice(0,Math.min(sceneKey.length,40)))){
+        const reasonBase=action.length>=10?stripGenericReasonTail(existingReason):existingReason
+        const sceneSentence=`현실에서는 ${scene}`
+        item.reason=clip([reasonBase,sceneSentence].filter(Boolean).join(' '),680)
+      }
     }
     if(action.length>=10)item.action=clip(action,260)
     if(change.length>=12)item.avoid=appendChangeNaturally(item?.avoid,change)

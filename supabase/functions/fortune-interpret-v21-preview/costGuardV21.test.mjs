@@ -254,16 +254,16 @@ test('V21.2 local stabilizer softens overclaim and investment prediction languag
   assert.match(fixed.investment_reading.entry,/매수 신호가 아니며/);
 });
 
-test('V21 local stabilizer repairs evidence links and minimum prose without Gemini',()=>{
+test('V21 local stabilizer repairs evidence links without padding authored prose',()=>{
   const p=packet();
   const core={headline:'테스트',overall:{summary:'짧은 총평',dominant_pattern:'패턴',best_phase:'활용',caution_phase:'주의',evidence_refs:['W:overall:직장']},key_windows:[{label:'직장 날짜',start:'2027-04-11',end:'2027-04-11',signal:'활용',topics:['직장'],summary:'짧음',action:'확인',avoid:'주의',evidence_refs:['W:date:2027-04-11:직장:best']}],year_phases:[],cross_checks:[{label:'교차',start:'2027-04-11',end:'2027-04-11',mode:'복수체계',western:'짧음',saju:'',thai:'',synthesis:'짧음',evidence_refs:['W:date:2027-04-11:직장:best']}],decisions:[{action:'직장 확인',timing:'2027-04-11',reason:'짧음',watch:'짧음',avoid:'짧음',evidence_refs:['W:overall:직장']}],clusters:{relationship:'',work_study:'',money_news:'',investment:'',condition:''},relationship_reading:{context:'',flow:'',focus_timing:'',watch:'',avoid:'',evidence_refs:[]},contact_flow:{incoming:'',outgoing:'',reconnection:''},investment_reading:{psychology:'',realization:'',entry:'',risk:''},systems:{western:'w',saju:'s',thai:'t'},priorities:[],limits:'점수는 확률이 아니다'};
   const fixed=stabilizeCoreForQuality(core,p);
-  assert.ok(fixed.overall.summary.length>=240);
+  assert.equal(fixed.overall.summary,'짧은 총평');
   assert.ok(fixed.overall.evidence_refs.length>=3);
   assert.ok(fixed.key_windows[0].evidence_refs.some(ref=>ref.startsWith('W:daily:2027-04-11:직장')));
-  assert.ok(fixed.key_windows[0].summary.length>=45);
+  assert.equal(fixed.key_windows[0].summary,'짧음');
   assert.ok(fixed.decisions[0].evidence_refs.some(ref=>fixed.key_windows[0].evidence_refs.includes(ref)));
-  assert.ok(fixed.decisions[0].watch.length>=14);
+  assert.equal(fixed.decisions[0].watch,'짧음');
   assert.ok(fixed.cross_checks[0].evidence_refs.includes('S:annual:1:2027-01-01'));
   assert.ok(fixed.cross_checks[0].evidence_refs.includes('T:taksajorn:1:2027-01-01'));
   assert.ok(fixed.cross_checks[0].synthesis.length>=45);
