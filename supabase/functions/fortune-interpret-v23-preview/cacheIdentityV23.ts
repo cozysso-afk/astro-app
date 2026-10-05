@@ -2,7 +2,7 @@ import { V23_PROMPT_VERSION } from './promptV23.ts'
 import { PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
 export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
-export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-depth-guides-v3'
+export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-authored-prose-v4'
 export const WEEKLY_OUTPUT_CACHE_VERSION = 'weekly-output-headroom-v2'
 // Cache identity follows the actual prompt + narrative contracts so an editorial
 // release cannot silently reuse an older completed Gemini result.

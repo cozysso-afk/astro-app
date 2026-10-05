@@ -104,8 +104,8 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   ).slice(0, 16)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
   const verifiedHero = verifiedNarrative && !field && !westernOnly
-  // Today/week hero copy is owned by the semantic view model so saved legacy AI prose cannot overwrite the current scene/arc.
-  const semanticHero = !westernOnly && (period === 'today' || period === 'week')
+  // Short-period semantic copy remains the fallback only when no verified model hero is available.
+  const semanticHero = !westernOnly && (period === 'today' || period === 'week') && !verifiedHero
   const heroHeadline = semanticHero
     ? userSummary.headline
     : verifiedHero ? visibleAiText(data.headline) || userSummary.headline : userSummary.headline

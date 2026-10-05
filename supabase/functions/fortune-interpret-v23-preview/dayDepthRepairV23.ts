@@ -37,6 +37,77 @@ function signalOf(row: any) {
   return '혼합'
 }
 
+function windowTopics(item: any) {
+  return Array.isArray(item?.topics) ? item.topics.map(text).filter(Boolean) : []
+}
+
+function windowProse(item: any) {
+  return [item?.label,item?.summary,item?.action,item?.avoid].map(text).filter(Boolean).join(' ')
+}
+
+function rowScore(item: any, row: any) {
+  const id = text(row?.id)
+  const refs = Array.isArray(item?.evidence_refs) ? item.evidence_refs.map(text) : []
+  const topic = text(row?.topic)
+  const topics = windowTopics(item)
+  const prose = windowProse(item)
+  let score = 0
+  if (id && refs.includes(id)) score += 12
+  if (topic && topics.includes(topic)) score += 7
+  if (topic && prose.includes(topic)) score += 3
+  if (text(item?.signal) && text(item?.signal) === signalOf(row)) score += 3
+  const proseClock = clockWindow(prose)
+  const rowClock = clockWindow(row?.window ?? row?.text)
+  if (proseClock && rowClock && proseClock === rowClock) score += 4
+  return score
+}
+
+function matchingWindow(item: any, windows: any[]) {
+  const ranked = windows
+    .map(row => ({ row, score: rowScore(item, row) }))
+    .filter(entry => entry.score > 0)
+    .sort((a,b) => b.score - a.score)
+  return ranked[0]?.row ?? null
+}
+
+function compatibleDetails(ledger: any[], date: string, row: any) {
+  const topic = text(row?.topic)
+  const direction = text(row?.direction)
+  return ledger
+    .filter((item: any) => String(item?.id ?? '').startsWith(`W:detail:${date}:${topic}:`) && iso(item?.date) === date)
+    .filter((item: any) => !direction || !text(item?.direction) || text(item?.direction) === direction)
+    .map((item: any) => text(item?.id))
+    .filter(Boolean)
+    .slice(0, 2)
+}
+
+function groundWindow(item: any, row: any, ledger: any[], date: string) {
+  if (!row) return item
+  const windowRef = text(row?.id)
+  if (!windowRef) return item
+  const current = Array.isArray(item?.evidence_refs) ? item.evidence_refs.map(text).filter(Boolean) : []
+  return {
+    ...item,
+    evidence_refs: uniq([...current, windowRef, ...compatibleDetails(ledger, date, row)]),
+  }
+}
+
+function linkedLedgerWindow(item: any, byId: Map<string, any>) {
+  const refs = Array.isArray(item?.evidence_refs) ? item.evidence_refs.map(text) : []
+  return refs.map(ref => byId.get(ref)).find((row: any) => String(row?.id ?? '').startsWith('W:window:')) ?? null
+}
+
+function decisionTarget(decision: any, groundedWindows: any[], byId: Map<string, any>) {
+  const timing = clockWindow(decision?.timing)
+  if (timing) {
+    const exact = groundedWindows.find(item => clockWindow(linkedLedgerWindow(item, byId)?.window ?? linkedLedgerWindow(item, byId)?.text) === timing)
+    if (exact) return exact
+  }
+  const prose = [decision?.action,decision?.reason,decision?.watch,decision?.avoid].map(text).filter(Boolean).join(' ')
+  const topical = groundedWindows.find(item => windowTopics(item).some(topic => prose.includes(topic)))
+  return topical ?? groundedWindows[0] ?? null
+}
+
 export function ensureDayDepthGuides(core: any, payload: any) {
   if (periodKind(payload) !== 'day' || !core || typeof core !== 'object') return core
   const date = iso(payload?.period?.start)
@@ -56,11 +127,7 @@ export function ensureDayDepthGuides(core: any, payload: any) {
   const windowRef = text(preferred?.id)
   const topic = text(preferred?.topic) || '핵심 흐름'
   const timing = clockWindow(preferred?.window ?? preferred?.text)
-  const detailRefs = ledger
-    .filter((row: any) => String(row?.id ?? '').startsWith(`W:detail:${date}:${topic}:`) && iso(row?.date) === date)
-    .map((row: any) => text(row?.id))
-    .filter(Boolean)
-    .slice(0, 2)
+  const detailRefs = compatibleDetails(ledger, date, preferred)
   const evidenceRefs = uniq([windowRef, ...detailRefs].filter(Boolean))
   if (!windowRef || !timing || !detailRefs.length) return core
 
@@ -73,8 +140,12 @@ export function ensureDayDepthGuides(core: any, payload: any) {
   const summary = [text(preferred?.text), scene].filter(Boolean).join(' ')
 
   const existingWindows = Array.isArray(core?.key_windows) ? core.key_windows : []
-  const hasLinkedWindow = existingWindows.some((item: any) => (item?.evidence_refs ?? []).map(String).includes(windowRef))
-  if (!hasLinkedWindow) {
+  const groundedWindows = existingWindows.map((item: any) => groundWindow(item, matchingWindow(item, windows), ledger, date))
+  const byId = new Map(ledger.map((row: any) => [text(row?.id), row]))
+  const authoredGrounded = groundedWindows.filter((item: any) => linkedLedgerWindow(item, byId))
+  if (authoredGrounded.length) {
+    core.key_windows = groundedWindows
+  } else {
     core.key_windows = [{
       label: `${date} ${topic} ${signalOf(preferred)} 시간대`,
       start: date,
@@ -88,10 +159,17 @@ export function ensureDayDepthGuides(core: any, payload: any) {
     }, ...existingWindows]
   }
 
+  const usableWindows = (Array.isArray(core?.key_windows) ? core.key_windows : []).filter((item: any) => linkedLedgerWindow(item, byId))
   const decisions = Array.isArray(core?.decisions) ? core.decisions : []
-  const hasTimedDecision = decisions.some((item: any) => clockWindow(item?.timing) === timing
-    && (item?.evidence_refs ?? []).map(String).includes(windowRef))
-  if (!hasTimedDecision) {
+  if (decisions.length && usableWindows.length) {
+    core.decisions = decisions.map((item: any) => {
+      const target = decisionTarget(item, usableWindows, byId)
+      if (!target) return item
+      const targetRefs = Array.isArray(target?.evidence_refs) ? target.evidence_refs.map(text).filter(Boolean) : []
+      const current = Array.isArray(item?.evidence_refs) ? item.evidence_refs.map(text).filter(Boolean) : []
+      return { ...item, evidence_refs: uniq([...current, ...targetRefs]) }
+    })
+  } else if (!decisions.length) {
     core.decisions = [{
       action,
       timing: `${date} ${timing}`,
@@ -99,7 +177,7 @@ export function ensureDayDepthGuides(core: any, payload: any) {
       watch,
       avoid,
       evidence_refs: evidenceRefs,
-    }, ...decisions]
+    }]
   }
   return core
 }
