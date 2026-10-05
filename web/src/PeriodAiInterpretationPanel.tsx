@@ -104,11 +104,16 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   ).slice(0, 16)
   const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
   const verifiedHero = verifiedNarrative && !field && !westernOnly
-  // Verified model prose owns the hero; deterministic semantic copy remains the fallback for provisional or failed validation.
-  const heroHeadline = verifiedHero ? visibleAiText(data.headline) || userSummary.headline : userSummary.headline
-  const heroSummary = verifiedHero
-    ? visibleAiText(data.overall.summary) || userSummary.summary
-    : field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary
+  // Short-period semantic copy remains the fallback only when no verified model hero is available.
+  const semanticHero = !westernOnly && (period === 'today' || period === 'week') && !verifiedHero
+  const heroHeadline = semanticHero
+    ? userSummary.headline
+    : verifiedHero ? visibleAiText(data.headline) || userSummary.headline : userSummary.headline
+  const heroSummary = semanticHero
+    ? userSummary.summary
+    : verifiedHero
+      ? visibleAiText(data.overall.summary) || userSummary.summary
+      : field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary
 
   return <section className="period-ai-card period-ai-v18">
     <div className="reading-copy-access"><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
