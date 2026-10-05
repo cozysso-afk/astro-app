@@ -148,7 +148,8 @@ export function topicSectionCopy(value: any) {
 function readerFacing(value: string) {
   const text = clean(value)
   if (!text || text.length < 10) return false
-  if (TECHNICAL_RE.test(text)) return false
+  // Technical evidence belongs in the explanation layer, but its presence must not
+  // discard the entire authored conclusion/scene/action block. Meta/system copy is still rejected.
   if (/계산\s*(?:엔진|로직|threshold|오브)|(?:상대|절대)\s*확률/i.test(text)) return false
   return true
 }

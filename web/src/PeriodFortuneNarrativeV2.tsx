@@ -44,11 +44,11 @@ export function focusEditorialParts(value: string) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
   if (!editorialCopyUsable(text)) return null
   const sentences = (text.match(/[^.!?]+[.!?]?/g) ?? []).map(sentence => sentence.trim()).filter(Boolean)
-  if (sentences.length < 4) return null
+  if (sentences.length < 2) return null
   return {
     conclusion: sentences[0],
-    sceneAction: `${sentences[1]} ${sentences[2]}`.trim(),
-    change: sentences.slice(3).join(' ').trim(),
+    sceneAction: sentences.length >= 3 ? `${sentences[1]} ${sentences[2]}`.trim() : sentences[1],
+    change: sentences.length >= 4 ? sentences.slice(3).join(' ').trim() : '',
   }
 }
 
@@ -362,7 +362,7 @@ export function PeriodFortuneNarrativeV2({
           <b>{deepEditorial?.conclusion || item.conclusion}</b>
           {deepEditorial ? <>
             <p className="period-ai-topic-editorial-v4">{deepEditorial.sceneAction}</p>
-            <p className="period-ai-topic-change-v9"><em>판단 바뀌는 조건</em> {deepEditorial.change}</p>
+            {deepEditorial.change && <p className="period-ai-topic-change-v9"><em>판단 바뀌는 조건</em> {deepEditorial.change}</p>}
           </> : <>
             {item.action && <p><em>실제로는</em> {item.action}</p>}
             {item.observe && <p><em>확인할 것</em> {item.observe}</p>}
