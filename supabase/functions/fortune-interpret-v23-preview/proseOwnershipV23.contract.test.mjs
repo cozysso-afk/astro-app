@@ -20,6 +20,7 @@ test('stabilizer uses deterministic prose only as a missing-field fallback',()=>
   assert.match(stabilizer,/out\.summary=String\(out\?\.summary/)
   assert.match(stabilizer,/data\.overall\.summary=String\(data\.overall\.summary/)
   assert.match(stabilizer,/rr\.context=String\(rr\?\.context/)
+  assert.match(stabilizer,/rr\.focus_timing=String\(rr\?\.focus_timing.*\|\|\(timingParts\.length/)
   assert.match(stabilizer,/authoredContact/)
   assert.match(stabilizer,/ir\.psychology=String\(ir\?\.psychology/)
 })

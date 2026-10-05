@@ -493,7 +493,7 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     rr.context=String(rr?.context??"").trim()||`관계 계산은 상대 → 나 ${scoreText(axes[0].avg)}점, 나 → 상대 ${scoreText(axes[1].avg)}점, 과거 인연 재접점 ${scoreText(axes[2].avg)}점을 서로 다른 축으로 분리해 읽어.`;
     rr.flow=String(rr?.flow??"").trim()||`${compare} 상대 → 나, 나 → 상대, 재접점은 의미가 서로 다르므로 한 축의 상승을 다른 축의 결과로 옮겨 읽지 마.`;
     const timingParts=axes.filter((a:any)=>a.best).map((a:any)=>`${a.label} ${a.best}`);
-    rr.focus_timing=String(rr?.focus_timing??"").trim()||timingParts.length?(singleDay?"선택한 날에 세 방향의 직접 계산근거가 연결돼 있어. 실제 답변·약속·만남 제안이 뒤따르는지 확인해.":`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`):`${singleDay?"이날":"직접 관계 날짜 근거가 있는 구간에서"} 실제 답변·약속·만남 제안이 뒤따르는지 확인해.`;
+    rr.focus_timing=String(rr?.focus_timing??"").trim()||(timingParts.length?(singleDay?"선택한 날에 세 방향의 직접 계산근거가 연결돼 있어. 실제 답변·약속·만남 제안이 뒤따르는지 확인해.":`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`):`${singleDay?"이날":"직접 관계 날짜 근거가 있는 구간에서"} 실제 답변·약속·만남 제안이 뒤따르는지 확인해.`);
     const timingDirectRefs=axes.flatMap((axis:any)=>[axis.best,axis.caution].filter(Boolean).flatMap((date:string)=>relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))));
     linked=uniq([...timingDirectRefs,...linked]);
     rr.evidence_refs=linked.slice(0,10);
