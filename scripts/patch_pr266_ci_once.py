@@ -68,3 +68,5 @@ new = '''  assert.equal(fixed.overall.summary,'짧은 총평');
 assert old in t, 'stabilizer test anchor not found'
 t = t.replace(old, new, 1)
 test.write_text(t, encoding='utf-8')
+
+# trigger
