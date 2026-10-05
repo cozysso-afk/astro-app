@@ -71,6 +71,7 @@ jobs:
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/cacheIdentityV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/dayDepthRepairV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/editorialPolishV23.test.mjs
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/editorialTraceV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/promptV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/provisionalV23.test.mjs
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/routingV23.test.mjs
@@ -87,6 +88,7 @@ jobs:
           node --experimental-strip-types --test web/src/lib/timelineTime.test.mjs
           node --test web/src/lib/readingCompactV5.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneEditorialV3.test.mjs
+          node --test web/src/lib/fortuneEditorialOwnershipAudit.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneEditorialSemanticCorpus.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneFallbackFloor.test.mjs
           node --test web/src/lib/sajuTechnicalDisclosure.test.mjs
