@@ -23,6 +23,7 @@ test('frontend ownership audit documents why stored prose alone cannot prove rea
   assert.match(editorial, /function readerFacing\(/)
   assert.match(editorial, /function topicEditorial\(/)
   assert.match(narrative, /export function focusEditorialParts\(/)
+  assert.match(narrative, /buildFortuneEditorialV3/)
   assert.match(panel, /buildFortuneUserSummary/)
-  assert.match(panel, /buildFortuneEditorialV3/)
+  assert.match(panel, /editorialGroupCopy/)
 })
