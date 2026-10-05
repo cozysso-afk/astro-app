@@ -50,6 +50,12 @@ function repairUnsupportedV23Timing(data:any,payload:any,map:Map<string,any>){
   }
   return changed;
 }
+
+export function repairInterpretationQuality(data:any,payload:any){
+  const map=ledgerMap(payload);
+  const timingRepair=repairUnsupportedV23Timing(data,payload,map as Map<string,any>);
+  return {changed:timingRepair,timing_repair:timingRepair};
+}
 function claimStrings(data:any){
   const out:string[]=[];
   const add=(v:any)=>{if(typeof v==="string"&&v)out.push(v);};
@@ -93,7 +99,6 @@ function hasDeterministicClaim(prose:string){
 
 export function inspectInterpretationQuality(data:any,payload:any){
   const map=ledgerMap(payload),kind=String(payload?.period_kind??"day"),stages:any[]=[];
-  const localTimingRepair=repairUnsupportedV23Timing(data,payload,map as Map<string,any>);
 
   const s1:string[]=[];
   if(!data?.headline||!data?.overall?.summary)s1.push("headline/overall 누락");
@@ -338,7 +343,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
   stages.push(qualityStage(6,"상담 유용성·의미 비중복",uniq(s6).slice(0,45)));
 
   const passed=stages.filter(s=>s.passed).length;
-  return {version:QUALITY_VERSION,ok:passed===6,score:Math.round(passed/6*100),stages,refs_used:refsUsed.length,ledger_size:map.size,local_timing_repair:localTimingRepair};
+  return {version:QUALITY_VERSION,ok:passed===6,score:Math.round(passed/6*100),stages,refs_used:refsUsed.length,ledger_size:map.size};
 }
 
 export function strictQualityRetryInstruction(report:any){

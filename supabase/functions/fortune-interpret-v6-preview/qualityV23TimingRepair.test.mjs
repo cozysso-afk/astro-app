@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { inspectInterpretationQuality } from './qualityV2.ts'
+import { inspectInterpretationQuality, repairInterpretationQuality } from './qualityV2.ts'
 
 function payload(v23=true) {
   return {
@@ -38,24 +38,39 @@ function candidate() {
   }
 }
 
-test('V23 locally removes unsupported timing claims before traceability scoring', () => {
+test('quality inspection is pure and targeted V23 timing repair is explicit', () => {
   const data=candidate()
-  const report=inspectInterpretationQuality(data,payload(true))
-  assert.equal(report.local_timing_repair,true)
+  const before=structuredClone(data)
+  const beforeReport=inspectInterpretationQuality(data,payload(true))
+  assert.deepEqual(data,before,'inspection must not mutate candidate data')
+  const beforeStage2=beforeReport.stages.find(stage=>stage.stage===2)
+  assert.ok(beforeStage2)
+  assert.match(beforeStage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
+
+  const repair=repairInterpretationQuality(data,payload(true))
+  assert.equal(repair.changed,true)
+  assert.equal(repair.timing_repair,true)
   assert.equal(data.key_windows.length,1)
   assert.equal(data.key_windows[0].start,'2026-09-16')
   assert.equal(data.decisions.length,1)
   assert.doesNotMatch(data.relationship_reading.focus_timing,/2026-09-18/)
-  const stage2=report.stages.find(stage=>stage.stage===2)
-  assert.ok(stage2)
-  assert.doesNotMatch(stage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
+
+  const afterRepair=structuredClone(data)
+  const afterReport=inspectInterpretationQuality(data,payload(true))
+  assert.deepEqual(data,afterRepair,'inspection after repair must still be pure')
+  const afterStage2=afterReport.stages.find(stage=>stage.stage===2)
+  assert.ok(afterStage2)
+  assert.doesNotMatch(afterStage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
 })
 
-test('legacy quality validation keeps unsupported timing visible for retry', () => {
+test('legacy path keeps unsupported timing visible because targeted repair is disabled', () => {
   const data=candidate()
-  const report=inspectInterpretationQuality(data,payload(false))
-  assert.equal(report.local_timing_repair,false)
+  const repair=repairInterpretationQuality(data,payload(false))
+  assert.equal(repair.changed,false)
   assert.equal(data.key_windows.length,2)
+  const before=structuredClone(data)
+  const report=inspectInterpretationQuality(data,payload(false))
+  assert.deepEqual(data,before)
   const stage2=report.stages.find(stage=>stage.stage===2)
   assert.match(stage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
 })

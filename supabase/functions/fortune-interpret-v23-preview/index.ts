@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
-import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
+import { QUALITY_VERSION, inspectInterpretationQuality, repairInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, buildThaiOutputFallback, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { buildDeterministicTopicAnalysis, buildLocalQualityFallbackCore, stabilizeCoreForQuality } from "../fortune-interpret-v21-preview/costGuardV21.ts";
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
@@ -14,7 +14,7 @@ import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
 import { mergeAuthoredTopicAnalysis, polishV23EditorialDepth } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 
-const VERSION="supabase-ai-v23.5-prose-ownership-v1";
+const VERSION="supabase-ai-v23.6-quality-repair-split-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -148,12 +148,14 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   traceStages.push(captureEditorialStage("post_thai_guard",data));
   data=polishV23EditorialDepth(data,payload);
   traceStages.push(captureEditorialStage("post_editorial_polish",data));
-  const quality=inspectInterpretationQuality(data,payload);
+  const qualityRepair=repairInterpretationQuality(data,payload);
   traceStages.push(captureEditorialStage("post_quality_repair",data));
+  const quality=inspectInterpretationQuality(data,payload);
+  traceStages.push(captureEditorialStage("post_quality_validation",data));
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini"),quality_ok:Boolean(quality?.ok)});
   if(!quality.ok){
     const criticalPassed=criticalQualityPassed(quality);
-    const locallyRepairedTiming=quality?.local_timing_repair===true&&criticalPassed;
+    const locallyRepairedTiming=qualityRepair?.timing_repair===true&&criticalPassed;
     if((resultMeta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming){
       const warning=locallyRepairedTiming
         ? "직접 근거가 없는 날짜·구간만 로컬에서 제거했고 구조·근거·의미 방향·일관성은 통과했어. 같은 결과를 고치려고 Gemini를 한 번 더 호출하지 않아."
