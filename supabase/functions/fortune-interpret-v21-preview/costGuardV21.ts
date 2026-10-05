@@ -386,6 +386,12 @@ function sanitizeInvestmentGuidance(data:any,map:Map<string,any>){
       section.change_condition="실제 시장 데이터와 사전에 정한 손익·리스크 조건이 모두 충족될 때만 판단을 갱신해.";
     }
   }else if(data?.clusters&&typeof data.clusters==="object")data.clusters.investment="투자 관련 점수는 심리·행동의 상대활성도 참고값이야. 가격방향·수익률·매매시점을 뜻하지 않으므로 실제 시장 데이터와 손익·리스크 기준을 우선해.";
+  if(data?.investment_reading&&typeof data.investment_reading==="object"){
+    const ir=data.investment_reading;
+    const unsafeMarketClaim=/(?:수익에?\s*(?:유리|좋|높|가능)|수익\s*(?:가능|확정|보장)|매수|매도|현금화|보유\s*유지|매매\s*(?:신호|적기|시점)|진입\s*(?:적기|시기)|가격\s*(?:상승|하락)|오를|내릴)/;
+    if(unsafeMarketClaim.test(String(ir?.realization??"")))ir.realization="수익실현 상대활성도는 심리·행동 참고값이야. 실제 수익 가능성이나 매도 적기를 뜻하지 않으므로 보유 종목의 시장 데이터와 손익 기준을 우선해.";
+    if(unsafeMarketClaim.test(String(ir?.entry??"")))ir.entry="신규진입 상대활성도는 심리·행동 참고값이야. 매수 신호가 아니며 실제 밸류에이션·가격·거래량과 본인 위험 한도를 먼저 확인해.";
+  }
   if(Array.isArray(data?.priorities))data.priorities=uniq(data.priorities.map((value:any)=>{
     const text=String(value??"").trim();
     return tradingPattern.test(text)?"투자·금전: 실제 시장 데이터·현금흐름·손익 기준·리스크 한도 점검":text;
@@ -490,10 +496,16 @@ export function stabilizeCoreForQuality(core:any,payload:any){
     const compare=gap<4
       ? `세 방향의 ${singleDay?"점수":"평균"} 차이가 ${scoreText(gap)}점으로 크지 않아 한 방향만 앞세우기보다 실제 반응을 함께 확인하는 편이 좋아.`
       : `${ranked[0]?.label??"관계"} 축이 ${ranked[ranked.length-1]?.label??"다른 관계"} 축보다 ${scoreText(gap)}점 높아, ${singleDay?"이날은":"이번 기간에는"} 세 방향의 활성도가 같은 강도로 움직이지 않아.`;
-    rr.context=String(rr?.context??"").trim()||`관계 계산은 상대 → 나 ${scoreText(axes[0].avg)}점, 나 → 상대 ${scoreText(axes[1].avg)}점, 과거 인연 재접점 ${scoreText(axes[2].avg)}점을 서로 다른 축으로 분리해 읽어.`;
-    rr.flow=String(rr?.flow??"").trim()||`${compare} 상대 → 나, 나 → 상대, 재접점은 의미가 서로 다르므로 한 축의 상승을 다른 축의 결과로 옮겨 읽지 마.`;
+    const hasRelationshipAxes=(value:any)=>{const text=String(value??"").trim();return ["상대 → 나","나 → 상대","과거 인연 재접점"].every(label=>text.includes(label));};
+    const authoredContext=String(rr?.context??"").trim(),authoredFlow=String(rr?.flow??"").trim();
+    rr.context=hasRelationshipAxes(authoredContext)?authoredContext:`관계 계산은 상대 → 나 ${scoreText(axes[0].avg)}점, 나 → 상대 ${scoreText(axes[1].avg)}점, 과거 인연 재접점 ${scoreText(axes[2].avg)}점을 서로 다른 축으로 분리해 읽어.`;
+    rr.flow=hasRelationshipAxes(authoredFlow)?authoredFlow:`${compare} 상대 → 나, 나 → 상대, 과거 인연 재접점은 의미가 서로 다르므로 한 축의 상승을 다른 축의 결과로 옮겨 읽지 마.`;
     const timingParts=axes.filter((a:any)=>a.best).map((a:any)=>`${a.label} ${a.best}`);
-    rr.focus_timing=String(rr?.focus_timing??"").trim()||(timingParts.length?(singleDay?"선택한 날에 세 방향의 직접 계산근거가 연결돼 있어. 실제 답변·약속·만남 제안이 뒤따르는지 확인해.":`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`):`${singleDay?"이날":"직접 관계 날짜 근거가 있는 구간에서"} 실제 답변·약속·만남 제안이 뒤따르는지 확인해.`);
+    const groundedTimingDates=new Set(axes.flatMap((axis:any)=>[axis.best,axis.caution]).filter(Boolean));
+    const authoredTiming=String(rr?.focus_timing??"").trim();
+    const authoredDates=[...authoredTiming.matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].map(match=>match[0]);
+    const authoredTimingGrounded=authoredTiming.length>=12&&authoredDates.length>0&&authoredDates.every(date=>groundedTimingDates.has(date));
+    rr.focus_timing=authoredTimingGrounded?authoredTiming:(timingParts.length?(singleDay?"선택한 날에 세 방향의 직접 계산근거가 연결돼 있어. 실제 답변·약속·만남 제안이 뒤따르는지 확인해.":`${timingParts.join(" · ")}. 각 날짜는 해당 방향의 직접 계산상 두드러지는 시기이며 관계 결과 자체를 뜻하지 않아.`):`${singleDay?"이날":"직접 관계 날짜 근거가 있는 구간에서"} 실제 답변·약속·만남 제안이 뒤따르는지 확인해.`);
     const timingDirectRefs=axes.flatMap((axis:any)=>[axis.best,axis.caution].filter(Boolean).flatMap((date:string)=>relRows.filter((row:any)=>iso(row?.date)===date).map((row:any)=>String(row.id))));
     linked=uniq([...timingDirectRefs,...linked]);
     rr.evidence_refs=linked.slice(0,10);
@@ -507,10 +519,11 @@ export function stabilizeCoreForQuality(core:any,payload:any){
       return `${axis.label} 축은 기간 평균 ${scoreText(axis.avg)}점(${tone(axis.avg)})이야. ${peak}${low} ${meaning}`;
     };
     const authoredContact=data?.contact_flow&&typeof data.contact_flow==="object"?data.contact_flow:{};
+    const axisCopy=(value:any,pattern:RegExp,fallback:string)=>{const text=String(value??"").trim();return text.length>=16&&pattern.test(text)?text:fallback;};
     data.contact_flow={
-      incoming:String(authoredContact?.incoming??"").trim()||axisText(axes[0],"이 축은 상대가 실제로 보이는 반응을 확인하는 용도라서 답변·먼저 온 연락·구체적 만남 제안과 함께 봐."),
-      outgoing:String(authoredContact?.outgoing??"").trim()||axisText(axes[1],"이 축은 내가 먼저 연락하거나 제안할 때의 상대적 적합도를 보는 값이지, 상대가 받아준다는 뜻은 아니야."),
-      reconnection:String(authoredContact?.reconnection??"").trim()||axisText(axes[2],"이 축은 과거 인연의 재접점 활성도를 보는 값이지, 재회나 관계 재성립을 확정하지 않아."),
+      incoming:axisCopy(authoredContact?.incoming,/(?:상대|수신|답변|먼저 온 연락|반응)/,axisText(axes[0],"이 축은 상대가 실제로 보이는 반응을 확인하는 용도라서 답변·먼저 온 연락·구체적 만남 제안과 함께 봐.")),
+      outgoing:axisCopy(authoredContact?.outgoing,/(?:내가|발신|먼저 연락|보낸|제안)/,axisText(axes[1],"이 축은 내가 먼저 연락하거나 제안할 때의 상대적 적합도를 보는 값이지, 상대가 받아준다는 뜻은 아니야.")),
+      reconnection:axisCopy(authoredContact?.reconnection,/(?:과거|재접점|재회|다시 이어)/,axisText(axes[2],"이 축은 과거 인연의 재접점 활성도를 보는 값이지, 재회나 관계 재성립을 확정하지 않아.")),
     };
   }
   const investmentSalient=important.some((x:any)=>INVESTMENT_TOPICS.has(String(x.topic)));
