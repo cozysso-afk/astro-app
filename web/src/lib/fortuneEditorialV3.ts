@@ -268,7 +268,8 @@ function directionSummary(calculation: IntegratedApiResponse) {
   if (diff === 0) return `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 계산상 같은 값이라 선연락 주체는 구분되지 않아.`
   if (Math.abs(diff) < 5) {
     const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
-    return `${micro}가 ${Math.abs(roundedA - roundedB)}점 높지만 판정상 동률권이야. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}라 어느 쪽이 실제로 먼저 연락한다고 밀어 읽을 정도는 아니야.`
+    const pointGap = Math.round(Math.abs(diff) * 10) / 10
+    return `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 연락 자체의 강도와 별개로 상대 비교에서는 ${micro}가 ${pointGap}점 앞서 근소 우세야. 차이가 작아 실제 선연락 주체를 확정하는 뜻은 아니야.`
   }
   return diff > 0
     ? `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 이번 범위에서는 상대 → 나 방향이 더 두드러져.`
