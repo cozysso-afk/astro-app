@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v6-semantic-usefulness";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v7-no-padding-gates";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -240,46 +240,45 @@ export function inspectInterpretationQuality(data:any,payload:any){
       }
     }
   }
-  const minSummary=kind==="annual"?240:kind==="month"?170:110;
   const maxSummary=kind==="annual"?1100:kind==="month"?800:650;
-  const summaryLength=String(data?.overall?.summary??"").length;
-  if(summaryLength<minSummary)s5.push(`총평 깊이 부족(${summaryLength}/${minSummary})`);
+  const summaryLength=String(data?.overall?.summary??"").trim().length;
+  if(!summaryLength)s5.push("총평 누락");
   if(summaryLength>maxSummary)s5.push(`총평이 핵심보다 지나치게 김(${summaryLength}/${maxSummary})`);
   for(const x of data?.cross_checks??[]){
-    if(String(x?.synthesis??"").length<45)s5.push(`교차검증 종합이 너무 짧음: ${x?.label}`);
-    if(String(x?.western??"").length<25)s5.push(`교차검증 Western 설명이 너무 짧음: ${x?.label}`);
+    if(!String(x?.synthesis??"").trim())s5.push(`교차검증 종합 누락: ${x?.label}`);
+    if(!String(x?.western??"").trim())s5.push(`교차검증 Western 설명 누락: ${x?.label}`);
   }
   for(const d of data?.decisions??[]){
-    if(String(d?.watch??"").length<14)s5.push(`결정 가이드 확인조건이 너무 짧음: ${txt(d?.action,45)}`);
-    if(String(d?.avoid??"").length<14)s5.push(`결정 가이드 회피조건이 너무 짧음: ${txt(d?.action,45)}`);
+    if(!String(d?.watch??"").trim())s5.push(`결정 가이드 확인조건 누락: ${txt(d?.action,45)}`);
+    if(!String(d?.avoid??"").trim())s5.push(`결정 가이드 회피조건 누락: ${txt(d?.action,45)}`);
     if(String(d?.reason??"").length>700)s5.push(`결정 가이드 근거가 지나치게 김: ${txt(d?.action,45)}`);
     if(String(d?.watch??"").length>400)s5.push(`결정 가이드 확인조건이 지나치게 김: ${txt(d?.action,45)}`);
     if(String(d?.avoid??"").length>400)s5.push(`결정 가이드 회피조건이 지나치게 김: ${txt(d?.action,45)}`);
   }
   for(const w of data?.key_windows??[]){
-    if(String(w?.summary??"").length<45)s5.push(`핵심 시기 설명이 너무 짧음: ${w?.label}`);
+    if(!String(w?.summary??"").trim())s5.push(`핵심 시기 설명 누락: ${w?.label}`);
     if(String(w?.summary??"").length>750)s5.push(`핵심 시기 설명이 지나치게 김: ${w?.label}`);
-    if(String(w?.action??"").length<18)s5.push(`핵심 시기 행동이 너무 짧음: ${w?.label}`);
+    if(!String(w?.action??"").trim())s5.push(`핵심 시기 행동 누락: ${w?.label}`);
     if((w?.evidence_refs?.length??0)<(kind==="annual"?2:1))s5.push(`핵심 시기 근거 수 부족: ${w?.label}`);
   }
   if(kind==="annual")for(const p of data?.year_phases??[])if(!(p?.evidence_refs?.length))s5.push(`연간 phase 근거 없음: ${p?.label}`);
   if(relationshipSalient){
     const rr=data?.relationship_reading??{},cf=data?.contact_flow??{};
-    if(String(rr?.context??"").length<35)s5.push("관계·재회 관계 맥락 설명 부족");
-    if(String(rr?.flow??"").length<55)s5.push("관계·재회 이어지는 흐름 설명 부족");
-    if(String(rr?.focus_timing??"").length<20)s5.push("관계·재회 주목 시기 설명 부족");
-    if(String(rr?.watch??"").length<20)s5.push("관계·재회 현실 확인 신호 부족");
-    if(String(rr?.avoid??"").length<20)s5.push("관계·재회 과대해석 방지 설명 부족");
+    if(!String(rr?.context??"").trim())s5.push("관계·재회 관계 맥락 누락");
+    if(!String(rr?.flow??"").trim())s5.push("관계·재회 이어지는 흐름 누락");
+    if(!String(rr?.focus_timing??"").trim())s5.push("관계·재회 주목 시기 누락");
+    if(!String(rr?.watch??"").trim())s5.push("관계·재회 현실 확인 신호 누락");
+    if(!String(rr?.avoid??"").trim())s5.push("관계·재회 과대해석 방지 설명 누락");
     if(String(rr?.context??"").length>600||String(rr?.flow??"").length>850||String(rr?.focus_timing??"").length>550||String(rr?.watch??"").length>550||String(rr?.avoid??"").length>500)s5.push("관계·재회 핵심 흐름이 지나치게 장황함");
-    if(String(cf?.incoming??"").length<15)s5.push("관계·재회 상대→나 방향 설명 부족");
-    if(String(cf?.outgoing??"").length<15)s5.push("관계·재회 나→상대 방향 설명 부족");
-    if(String(cf?.reconnection??"").length<15)s5.push("관계·재회 과거인연 방향 설명 부족");
+    if(!String(cf?.incoming??"").trim())s5.push("관계·재회 상대→나 방향 설명 누락");
+    if(!String(cf?.outgoing??"").trim())s5.push("관계·재회 나→상대 방향 설명 누락");
+    if(!String(cf?.reconnection??"").trim())s5.push("관계·재회 과거인연 방향 설명 누락");
   }
   if(investmentSalient){
     const ir=data?.investment_reading??{};
     const investmentFields:Record<string,string>={"투자심리":"psychology","수익실현":"realization","신규진입":"entry","투자주의":"risk"};
     for(const [topic,field] of Object.entries(investmentFields)){
-      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&String(ir?.[field]??"").length<20)s5.push(`${topic} 중요 분야인데 투자 상세 설명 부족`);
+      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&!String(ir?.[field]??"").trim())s5.push(`${topic} 중요 분야인데 투자 상세 설명 누락`);
     }
   }
   const sectionMax=kind==="annual"?1500:kind==="month"?1200:950;
@@ -288,10 +287,9 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if(String(data?.overall?.dominant_pattern??"").length>dominantMax)s5.push(`핵심 패턴이 지나치게 김(${String(data?.overall?.dominant_pattern??"").length}/${dominantMax})`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
     const importance=["핵심","주목","참고"].includes(String(x?.importance??""))?String(x.importance):"참고";
-    const minReason=importance==="핵심"?(kind==="annual"?85:60):importance==="주목"?(kind==="annual"?55:40):(kind==="annual"?25:18);
     const maxReason=importance==="핵심"?1200:importance==="주목"?700:320;
-    const reasonLength=String(x?.reason??"").length;
-    if(reasonLength<minReason)s5.push(`${topic} ${importance} 근거 설명이 얕음`);
+    const reasonLength=String(x?.reason??"").trim().length;
+    if(importance!=="참고"&&!reasonLength)s5.push(`${topic} ${importance} 근거 설명 누락`);
     if(reasonLength>maxReason)s5.push(`${topic} ${importance} 분야 과설명(${reasonLength}/${maxReason})`);
     const minRefs=importance==="핵심"?2:1;
     if((x?.evidence_refs?.length??0)<minRefs)s5.push(`${topic} ${importance} 근거 ID 부족`);
@@ -352,9 +350,9 @@ export function strictQualityRetryInstruction(report:any){
 - 근거 ID는 evidence_ledger에 실제 존재하는 값만 쓰고 날짜를 새로 만들지 마라. key_window의 start/end는 연결한 근거가 그 날짜를 직접 포함하거나 덮어야 한다. 한 날짜 근거로 임의 범위를 만들지 마라.
 - supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.
 - 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.
-- '핵심 근거 설명이 얕음'이면 해당 topic reason에 구체 추세/평균과 실제 시기·근거를 연결해 충분히 늘려라. '주목 근거 설명이 얕음'도 변화 방향과 시기 근거를 최소 두 문장 수준으로 보강해라. 참고 분야를 대신 장문화하지 마라.
-- 관계·재회 주목 시기 설명 부족이면 focus_timing을 최소 35자 정도로 실제 관계 evidence_refs가 직접 지지하는 날짜/구간 + 흐름 + 현실 확인 방식까지 포함해 보강해라.
-- 교차검증 종합이 너무 짧으면 해당 synthesis를 최소 60자 정도로 Western과 다른 체계의 공통점/차이를 구체적으로 풀어라.
+- topic reason에 직접 연결된 추세·시기·근거가 빠졌을 때만 보완해라. 이미 구체적인 문장을 길이만 맞추려고 늘리지 마라.
+- 관계·재회 focus_timing은 실제 relationship evidence_refs가 직접 지지하는 날짜/구간만 유지하고 필요한 현실 확인 방식만 보완해라. 길이만 늘리지 마라.
+- 교차검증 synthesis가 비어 있거나 의미가 빠졌을 때만 Western과 다른 체계의 공통점/차이를 보완해라. 길이만 늘리지 마라.
   - 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
   - structured editorial section마다 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 모두 채워라. 결론→현실 장면→지금 할 일→판단이 달라질 조건이 한 번에 읽혀야 한다.
   - overall은 narrative_plan의 supporting_topics와 caution_topics를 실제로 연결하고 단일 topic 문장을 재작성하지 마라.

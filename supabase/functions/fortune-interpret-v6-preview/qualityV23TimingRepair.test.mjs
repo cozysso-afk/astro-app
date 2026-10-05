@@ -74,3 +74,17 @@ test('legacy path keeps unsupported timing visible because targeted repair is di
   const stage2=report.stages.find(stage=>stage.stage===2)
   assert.match(stage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
 })
+
+
+test('Quality Stage 5 does not reject concise non-empty prose only for character count', () => {
+  const data=candidate()
+  data.overall.summary='짧지만 분명한 총평'
+  data.key_windows[0].summary='직접 근거 있음'
+  data.key_windows[0].action='확인'
+  data.decisions[0].watch='관찰'
+  data.decisions[0].avoid='단정 금지'
+  const report=inspectInterpretationQuality(data,payload(false))
+  const stage5=report.stages.find(stage=>stage.stage===5)
+  const issues=stage5?.issues.join(' ') ?? ''
+  assert.doesNotMatch(issues,/총평 깊이 부족|핵심 시기 설명이 너무 짧음|핵심 시기 행동이 너무 짧음|결정 가이드 확인조건이 너무 짧음|결정 가이드 회피조건이 너무 짧음/)
+})

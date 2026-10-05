@@ -15,8 +15,9 @@ test("fallback core has enough structured-output headroom",()=>{
   assert.match(source,/part==="core"\?\(compactMode\?10000:12000\)/);
 });
 
-test("core and retry prompts require relationship and cross-check depth",()=>{
+test("core prompt keeps depth while Quality retry avoids padding-only rewrites",()=>{
   assert.match(source,/focus_timing은 최소 35자/);
   assert.match(source,/synthesis는 최소 60자/);
-  assert.match(quality,/교차검증 종합이 너무 짧으면 해당 synthesis를 최소 60자/);
+  assert.match(quality,/교차검증 synthesis가 비어 있거나 의미가 빠졌을 때만/);
+  assert.match(quality,/길이만 늘리지 마라/);
 });
