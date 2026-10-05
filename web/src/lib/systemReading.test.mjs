@@ -153,7 +153,7 @@ for(const period of ['today','week','month','year'])test(`${period}: single/coup
  assert.ok(contact)
  assert.match(contact.conclusion,/수신 활성도/)
  assert.match(contact.conclusion,/실제 연락이 오거나 안 온다고 판단하지 않아/)
- assert.match(contact.conclusion,/먼저 말을 꺼내/)
+ assert.match(contact.conclusion,/먼저 말을 꺼낼/)
  assert.match(contact.conclusion,/수신 의향은 아니야/)
  assert.doesNotMatch(JSON.stringify([...v.favorableCards,...v.cautionCards]),/답장을 재촉/)
  const {applyLoveContext,lovePromptContext}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
