@@ -12,8 +12,9 @@ import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore 
 import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
 import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
 import { polishV23EditorialDepth } from "./editorialPolishV23.ts";
+import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 
-const VERSION="supabase-ai-v23.3-editorial-flow";
+const VERSION="supabase-ai-v23.4-editorial-trace-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -117,9 +118,20 @@ function normalizeDirectionalWindows(data:any,payload:any){
 }
 
 function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
-  const merged=ensureDayDepthGuides(stabilizeCoreForQuality({...core,topic_analysis:buildDeterministicTopicAnalysis(payload)},payload),payload);
+  const {editorial_trace_seed:traceSeed=[],editorial_trace_origin:traceOrigin,...resultMeta}=meta??{};
+  const traceStages=Array.isArray(traceSeed)?[...traceSeed]:[];
+  if(!traceStages.length)traceStages.push(captureEditorialStage("finalize_input",core));
+  const withTopics={...core,topic_analysis:buildDeterministicTopicAnalysis(payload)};
+  traceStages.push(captureEditorialStage("post_topic_injection",withTopics));
+  const stabilized=stabilizeCoreForQuality(withTopics,payload);
+  traceStages.push(captureEditorialStage("post_stabilizer",stabilized));
+  const merged=ensureDayDepthGuides(stabilized,payload);
+  traceStages.push(captureEditorialStage("post_day_depth",merged));
   let validated=validateOutput(merged);
-  if(!validated)return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,...meta};
+  if(!validated){
+    const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
+    return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,editorial_trace,...resultMeta};
+  }
   let data=normalizeDirectionalWindows(validated,payload);
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
   let localThaiScrub=false;
@@ -127,23 +139,30 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
     const scrubbed=buildThaiOutputFallback(data);
     validated=scrubbed?validateOutput(scrubbed):null;
     const secondGuard=validated?inspectThaiOutputSafety(validated,thaiOutputGuardRequired(payload)):{safe:false};
-    if(!validated||!secondGuard.safe)return {ok:false,error:"Thai 출력 안전검증 실패",model,usage:u,guard_violations:guard.violations,...meta};
+    if(!validated||!secondGuard.safe){
+      const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
+      return {ok:false,error:"Thai 출력 안전검증 실패",model,usage:u,guard_violations:guard.violations,editorial_trace,...resultMeta};
+    }
     data=normalizeDirectionalWindows(validated,payload);localThaiScrub=true;
   }
+  traceStages.push(captureEditorialStage("post_thai_guard",data));
   data=polishV23EditorialDepth(data,payload);
+  traceStages.push(captureEditorialStage("post_editorial_polish",data));
   const quality=inspectInterpretationQuality(data,payload);
+  traceStages.push(captureEditorialStage("post_quality_repair",data));
+  const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini"),quality_ok:Boolean(quality?.ok)});
   if(!quality.ok){
     const criticalPassed=criticalQualityPassed(quality);
     const locallyRepairedTiming=quality?.local_timing_repair===true&&criticalPassed;
-    if((meta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming){
+    if((resultMeta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming){
       const warning=locallyRepairedTiming
         ? "직접 근거가 없는 날짜·구간만 로컬에서 제거했고 구조·근거·의미 방향·일관성은 통과했어. 같은 결과를 고치려고 Gemini를 한 번 더 호출하지 않아."
-        : String(meta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해.");
-      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(meta?.local_quality_fallback),quality_warning:warning,local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+        : String(resultMeta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해.");
+      return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(resultMeta?.local_quality_fallback),quality_warning:warning,local_thai_scrub:localThaiScrub,editorial_trace,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...resultMeta};
     }
-    return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,...meta},quality);
+    return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,editorial_trace,...resultMeta},quality);
   }
-  return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:Boolean(meta?.local_quality_fallback),local_thai_scrub:localThaiScrub,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...meta};
+  return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:Boolean(resultMeta?.local_quality_fallback),local_thai_scrub:localThaiScrub,editorial_trace,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...resultMeta};
 }
 
 async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"|"semantic_rewrite"="initial",compact=false,qualityRetry=""){
@@ -151,8 +170,10 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   if(!pb.ok)return {ok:false,error:`V23 AI 해설 예상 최대 비용이 약 ${Math.round(pb.estimated_max_job_krw)}원으로 작업 상한 ${pb.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,model,cost_guard_blocked:true,prompt_budget:pb};
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  const rawTrace=captureEditorialStage("provider_raw",core.partial);
   const normalizedCore=normalizeProviderCore(core.partial);
-  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  const normalizedTrace=captureEditorialStage("provider_normalized",normalizedCore);
+  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
 }
 
 async function calculate(payload:any,preferred:string,key:string,shouldContinue:()=>Promise<boolean>){
@@ -194,7 +215,7 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:publicCallTrace(r.call_trace),prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),degraded_quality:Boolean(r.degraded_quality),local_quality_fallback:Boolean(r.local_quality_fallback),quality_warning:r.quality_warning??null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:publicCallTrace(r.call_trace),prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,local_thai_scrub:Boolean(r.local_thai_scrub),degraded_quality:Boolean(r.degraded_quality),local_quality_fallback:Boolean(r.local_quality_fallback),quality_warning:r.quality_warning??null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,editorial_trace:r.editorial_trace??null};
     if(!(await jobActive(id))){await a.from("ai_interpret_jobs").update({usage_json:usageJson,updated_at:new Date().toISOString()}).eq("id",id);return;}
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
