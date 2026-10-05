@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { inspectInterpretationQuality } from './qualityV2.ts'
+import { inspectInterpretationQuality, repairUnsupportedV23Timing } from './qualityV2.ts'
 
 function payload(v23=true) {
   return {
@@ -38,23 +38,29 @@ function candidate() {
   }
 }
 
-test('V23 locally removes unsupported timing claims before traceability scoring', () => {
+test('Quality validator is pure and targeted timing repair is explicit', () => {
   const data=candidate()
-  const report=inspectInterpretationQuality(data,payload(true))
-  assert.equal(report.local_timing_repair,true)
-  assert.equal(data.key_windows.length,1)
-  assert.equal(data.key_windows[0].start,'2026-09-16')
-  assert.equal(data.decisions.length,1)
-  assert.doesNotMatch(data.relationship_reading.focus_timing,/2026-09-18/)
+  const before=structuredClone(data)
+  const rawReport=inspectInterpretationQuality(data,payload(true))
+  assert.deepEqual(data,before)
+  const rawStage2=rawReport.stages.find(stage=>stage.stage===2)
+  assert.match(rawStage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
+
+  const repaired=repairUnsupportedV23Timing(data,payload(true))
+  assert.equal(repaired.changed,true)
+  assert.deepEqual(data,before)
+  assert.equal(repaired.data.key_windows.length,1)
+  assert.equal(repaired.data.key_windows[0].start,'2026-09-16')
+  assert.equal(repaired.data.decisions.length,1)
+  assert.doesNotMatch(repaired.data.relationship_reading.focus_timing,/2026-09-18/)
+  const report=inspectInterpretationQuality(repaired.data,payload(true))
   const stage2=report.stages.find(stage=>stage.stage===2)
-  assert.ok(stage2)
   assert.doesNotMatch(stage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
 })
 
 test('legacy quality validation keeps unsupported timing visible for retry', () => {
   const data=candidate()
   const report=inspectInterpretationQuality(data,payload(false))
-  assert.equal(report.local_timing_repair,false)
   assert.equal(data.key_windows.length,2)
   const stage2=report.stages.find(stage=>stage.stage===2)
   assert.match(stage2.issues.join(' '),/key_window 날짜를 뒷받침하지 않는 근거|관계·재회 주목 날짜에 직접 날짜 근거 미연결/)
