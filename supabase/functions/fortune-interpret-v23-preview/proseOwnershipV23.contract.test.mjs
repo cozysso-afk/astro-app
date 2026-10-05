@@ -16,18 +16,22 @@ test('normal V23 path gives authored clusters prose ownership',()=>{
   assert.doesNotMatch(index,/topic_analysis:buildDeterministicTopicAnalysis\(payload\)}/)
 })
 
-test('stabilizer uses deterministic prose only as a missing-field fallback',()=>{
+test('stabilizer preserves grounded authored prose and falls back only when needed',()=>{
   assert.match(stabilizer,/out\.summary=String\(out\?\.summary/)
   assert.match(stabilizer,/data\.overall\.summary=String\(data\.overall\.summary/)
-  assert.match(stabilizer,/rr\.context=String\(rr\?\.context/)
-  assert.match(stabilizer,/rr\.focus_timing=String\(rr\?\.focus_timing.*\|\|\(timingParts\.length/)
+  assert.match(stabilizer,/rr\.context=hasRelationshipAxes\(authoredContext\)\?authoredContext:/)
+  assert.match(stabilizer,/rr\.flow=hasRelationshipAxes\(authoredFlow\)\?authoredFlow:/)
+  assert.match(stabilizer,/rr\.focus_timing=authoredTimingGrounded\?authoredTiming:/)
+  assert.match(stabilizer,/const axisCopy=/)
   assert.match(stabilizer,/authoredContact/)
   assert.match(stabilizer,/ir\.psychology=String\(ir\?\.psychology/)
+  assert.match(stabilizer,/unsafeMarketClaim/)
 })
 
 test('frontend preserves concise authored blocks instead of discarding them wholesale',()=>{
   const readerFacing=frontend.slice(frontend.indexOf('function readerFacing'),frontend.indexOf('function relationshipPartUsable'))
   assert.doesNotMatch(readerFacing,/TECHNICAL_RE\.test/)
+  assert.match(readerFacing,/계산\\s\*/)
   assert.match(narrative,/if \(sentences\.length < 2\) return null/)
   assert.doesNotMatch(narrative,/if \(sentences\.length < 4\) return null/)
 })
