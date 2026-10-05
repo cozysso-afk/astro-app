@@ -156,15 +156,11 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini"),quality_ok:Boolean(quality?.ok)});
   if(!quality.ok){
     const criticalPassed=criticalQualityPassed(quality);
-    const semanticPassed=semanticQualityPassed(quality);
     const locallyRepairedTiming=quality?.local_timing_repair===true&&criticalPassed;
-    const stage5OnlyGap=criticalPassed&&semanticPassed&&(quality?.stages??[]).some((row:any)=>Number(row?.stage)===5&&row?.passed===false);
-    if((resultMeta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming||stage5OnlyGap){
+    if((resultMeta?.allow_degraded_quality===true&&criticalPassed)||locallyRepairedTiming){
       const warning=locallyRepairedTiming
         ? "직접 근거가 없는 날짜·구간만 targeted repair로 제거했고 validator는 원고를 다시 쓰지 않았어."
-        : stage5OnlyGap
-          ? "구조·근거·의미 방향·일관성·상담 유용성은 통과했고 길이·구성 보조 기준만 남아 원고를 재작성하지 않았어."
-          : String(resultMeta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해.");
+        : String(resultMeta?.quality_warning??"5단계 깊이·실용성 일부 항목은 보정본으로 표시해.");
       return {ok:true,data,model,interpreter_version:VERSION,validation:quality,degraded_quality:true,local_quality_fallback:Boolean(resultMeta?.local_quality_fallback),quality_warning:warning,local_thai_scrub:localThaiScrub,editorial_trace,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...resultMeta};
     }
     return qualityFailure({model,usage:u,data,local_thai_scrub:localThaiScrub,editorial_trace,...resultMeta},quality);
