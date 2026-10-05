@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "scripts/patch_quality_pure_validator_once.py"
+      - ".github/workflows/quality-pure-validator-patch.yml"
 
 permissions:
   contents: write
