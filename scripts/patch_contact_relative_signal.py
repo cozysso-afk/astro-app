@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Temporary branch-only helper. Removed before merge.
 
 def replace_once(path: str, old: str, new: str) -> None:
     p = Path(path)
