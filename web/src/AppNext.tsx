@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 31763)
-Total output lines: 1884
-
 import { lovePromptContext, type LoveStatus } from './lib/loveReadingContext'
 import { SystemReadingViews } from './SystemReadingViews'
 import { fortuneField } from './lib/fortuneFields'
@@ -1118,7 +1115,107 @@ export default function AppNext() {
     } catch (error) {
       if (revision === relationshipRevisionRef.current) setRelationshipError(error instanceof Error ? error.message : '관계 계산 중 오류가 발생했어.')
     } finally {
-      if (revision === relationshipRevisio…1763 tokens truncated…압축 프롬프트 복사에 실패했어.')
+      if (revision === relationshipRevisionRef.current) setRelationshipLoading(false)
+    }
+  }
+
+
+  const runRelationshipAi = async () => {
+    if (!relationshipResult) return
+    const revision = relationshipRevisionRef.current
+    const currentMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
+    const snapshotMode = String(relationshipRequestSnapshot?.analysis_mode ?? '')
+    const analysisMode = (snapshotMode || currentMode) as RelationshipAnalysisMode
+    if (analysisMode === 'reunion' && relationshipResult.result.reunion_evidence_contract?.version !== REQUIRED_REUNION_EVIDENCE_CONTRACT) {
+      setRelationshipAiError('이 계산본은 현재 재회 해설 계약보다 오래된 결과야. 유료 AI 해설을 새로 호출하지 않아. 최신 재회 계산을 먼저 실행해줘.')
+      return
+    }
+    if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
+    const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, reunionTiming)
+    setRelationshipAiLoading(true); setRelationshipAiError('')
+    try {
+      const cached = relationshipAiSuccess(await readReadingCache<RelationshipAiResponse>(relationshipCacheId))
+      if (cached?.ok && cached.data) {
+        if (revision !== relationshipRevisionRef.current) return
+        setRelationshipAi(annotatePayload(cached))
+        setRelationshipAiCacheSource('local')
+        return
+      }
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
+      if (error) throw new RelationshipAiPublicError({error:await relationshipAiInvokeErrorMessage(error)})
+      const payload = relationshipAiSuccess(data)
+      if (!payload) throw new RelationshipAiPublicError(data)
+      if (revision !== relationshipRevisionRef.current) return
+      const annotated = annotatePayload(payload)
+      await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
+      setRelationshipAi(annotated)
+      setRelationshipAiCacheSource('fresh')
+      if (relationshipRequestSnapshot) {
+        const autoKind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
+        const autoIsReunion = selectedTool === 'compatibility' && analysisMode === 'reunion'
+        const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }
+        const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
+        const autoLabel = autoKind === 'marriage' ? '결혼운' : autoIsReunion ? '재회운' : '궁합운'
+        void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)
+      }
+    } catch (error) {
+      if (revision === relationshipRevisionRef.current) setRelationshipAiError(relationshipAiCatchMessage(error))
+    } finally {
+      if (revision === relationshipRevisionRef.current) setRelationshipAiLoading(false)
+    }
+  }
+
+
+  async function runLocationFit() {
+    if (!birthProfile.birthDate || !birthProfile.birthTime) { setLocationError('먼저 내정보에서 생년월일과 출생시간을 저장해줘.'); return }
+    if (parseOptionalNumber(birthProfile.latitude) === null || parseOptionalNumber(birthProfile.longitude) === null) { setLocationError('내정보에서 출생지역을 먼저 선택해줘.'); return }
+    setLocationLoading(true); setLocationError(''); setLocationResult(null)
+    try {
+      const response = await fetch(`${API_BASE}/v1/location/fit`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({profile:{name:birthProfile.name||null,birth_date:birthProfile.birthDate,birth_time:birthProfile.birthTime,latitude:Number(birthProfile.latitude||0),longitude:Number(birthProfile.longitude||0),utc_offset_hours:Number(birthProfile.utcOffset||9),gender:birthProfile.gender}}),
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload?.ok) throw new Error(payload?.detail || payload?.error || '지역·국가운 계산에 실패했어.')
+      setLocationResult(payload as LocationFitResponse)
+    } catch (error) { setLocationError(error instanceof Error ? error.message : '지역·국가운 계산 중 오류가 발생했어.') }
+    finally { setLocationLoading(false) }
+  }
+
+  async function handleCopy(label: string, text: string) {
+    const ok = await copyToClipboard(text)
+    setActionNotice(ok ? `${label} 완료` : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
+    window.setTimeout(() => setActionNotice(''), 2200)
+  }
+
+
+  async function copyExternalPrompt(build: string | (() => string), mode: ExternalCopyMode) {
+    try {
+      const text = sanitizeExternalFortuneText(typeof build === 'function' ? build() : build)
+      const ok = await copyToClipboard(text)
+      setActionNotice(ok ? promptCopyNotice(text,mode) : '복사 권한을 사용할 수 없어. 브라우저에서 다시 시도해줘.')
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : '프롬프트를 만들지 못했어. 다시 시도해줘.')
+    }
+    window.setTimeout(()=>setActionNotice(''),4200)
+  }
+
+
+  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult, mode: ExternalCopyMode = 'compact') {
+    if (!calculation) return
+    try {
+      if (mode === 'compact') {
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics, fortuneFieldId==='love'?lovePromptContext(loveStatus):''), mode)
+        return
+      }
+      await ensureSupabaseSession()
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
+      if (error) throw error
+      if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
+      await copyExternalPrompt((fortuneFieldId==='love'?lovePromptContext(loveStatus):'') + THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
+    } catch (error) {
+      setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
     }
   }
