@@ -35,14 +35,14 @@ test('AI prompt copy is visually secondary to the reading result', () => {
   assert.match(css, /period-ai-v18 > \.period-ai-details[\s\S]*order:\s*91\s*!important/)
 })
 
-test('compatibility marriage and location are peers in relationship and life', () => {
+test('compatibility marriage location and Horary are peers in relationship and life', () => {
   const life = home.indexOf('home-life-section')
   const systems = home.indexOf('home-system-section')
   const advanced = home.indexOf('home-specialist-tools')
   assert.ok(life >= 0 && systems > life && advanced > systems)
-  assert.match(home, /\['compatibility','marriage','location'\]/)
+  assert.match(home, /\['compatibility','marriage','location','horary'\]/)
   assert.match(home, /key==='location'\?'is-wide'/)
-  for (const label of ['궁합운','결혼운','지역·국가운']) assert.ok(home.includes(label))
+  for (const label of ['궁합운','결혼운','지역·국가운','호라리 · 프라슈나']) assert.ok(home.includes(label))
   assert.doesNotMatch(home, /home-compatibility-cta/)
 })
 

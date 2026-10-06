@@ -50,6 +50,7 @@ import './archive-mobile-polish-v59.css'
 import './profile-form-aurora-v71.css'
 import './reading-compact-v5.css'
 import './reading-capture-polish-v6.css'
+import './horary-prashna.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
 

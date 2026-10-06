@@ -57,6 +57,7 @@ import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
 import { LocationResults } from './LocationResults'
+import { HoraryPrashnaPanel } from './HoraryPrashnaPanel'
 import { ArchiveView } from './ArchiveView'
 import { ProfileView } from './ProfileView'
 import { BirthTimeReliabilityFields } from './BirthTimeReliabilityFields'
@@ -1765,6 +1766,8 @@ export default function AppNext() {
                 </>}/>
             </div>}
           </section>}
+
+          {selectedTool === 'horary' && <HoraryPrashnaPanel apiBase={API_BASE} gender={birthProfile.gender}/>}
 
           {selectedTool === 'location' && <section className="tool-panel location-panel">
             <div className="tool-panel-heading"><span className="tool-icon tone-sage"><MapPin size={22}/></span><div><span className="eyebrow">지역 활성도 계산</span><h2>지역·국가운</h2><p>출생 순간의 행성이 각 도시의 ASC(상승점)·DSC(하강점)·MC(중천점)·IC(천저점)에 얼마나 가까이 놓이는지 계산해서 장기거주·연애·커리어·공부·휴식 목적별로 비교해.</p></div></div>

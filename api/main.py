@@ -27,6 +27,7 @@ from personal_marriage_v1 import ENGINE_VERSION as PERSONAL_MARRIAGE_ENGINE_VERS
 from personal_love_forecast_v1 import ENGINE_VERSION as PERSONAL_LOVE_ENGINE_VERSION, build_personal_love_forecast
 from birth_time_reliability_v1 import resolve_birth_time_reliability
 from timezone_provenance_v1 import resolve_local_datetime
+from api.horary_prashna_v1 import router as horary_prashna_router
 
 APP_VERSION = "api-fortune-v6.0-reunion-hierarchy"
 
@@ -53,6 +54,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+app.include_router(horary_prashna_router)
 
 
 RelationshipStatus = Literal[
