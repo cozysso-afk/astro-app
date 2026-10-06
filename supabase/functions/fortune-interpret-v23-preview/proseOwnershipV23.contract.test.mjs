@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
+import './proseGoldenRegressionV1.test.mjs'
 
 const index=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8')
 const polish=fs.readFileSync(new URL('./editorialPolishV23.ts',import.meta.url),'utf8')
