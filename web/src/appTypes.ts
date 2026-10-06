@@ -3,7 +3,7 @@
 export type PeriodKey = 'today' | 'week' | 'month' | 'year'
 export type ApiStatus = 'warming' | 'online' | 'offline'
 export type MainView = 'home' | 'profile' | 'history' | 'settings'
-export type ToolKey = 'integrated' | 'compatibility' | 'marriage' | 'location' | 'precision'
+export type ToolKey = 'integrated' | 'compatibility' | 'marriage' | 'location' | 'horary' | 'precision'
 export type RelationshipStatus = 'single' | 'dating' | 'long_term' | 'cohabiting' | 'engaged' | 'married'
 export type RelationshipPurpose = 'compatibility' | 'reunion'
 export type MarriageMode = 'unmarried' | 'married'

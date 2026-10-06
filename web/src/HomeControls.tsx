@@ -15,6 +15,7 @@ export const analysisTools = [
   { key: 'compatibility' as const, label: '궁합운', desc: '두 사람의 궁합·재회·관계 흐름', icon: Heart, tone: 'rose' },
   { key: 'marriage' as const, label: '결혼운', desc: '개인 결혼운부터 현재 부부 관계까지', icon: Gem, tone: 'champagne' },
   { key: 'location' as const, label: '지역·국가운', desc: '나와 잘 맞는 국가·도시를 목적별로 비교', icon: MapPin, tone: 'sage' },
+  { key: 'horary' as const, label: '호라리 · 프라슈나', desc: '질문 시각과 위치로 자유질문 유형을 분류', icon: Moon, tone: 'sage' },
   { key: 'precision' as const, label: '정밀분석', desc: '세부 계산과 고급 점성 레이어', icon: Search, tone: 'sage' },
 ]
 
@@ -66,7 +67,7 @@ function displayRange(value: string, period: PeriodKey) {
 
 export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthProfile, hasProfile, queryDate, period, selectedTool, apiStatus, apiLabel, onOpenProfile, onQueryDateChange, onPeriodSelect, onToolSelect }: HomeControlsProps) {
   const periodDriven = selectedTool === null || selectedTool === 'precision'
-  const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location'
+  const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location' && selectedTool !== 'horary'
   const effectivePeriod: PeriodKey = periodDriven ? period : 'today'
   const now = toDateValue(new Date())
   const resetLabel = effectivePeriod === 'today' ? '오늘' : effectivePeriod === 'week' ? '이번 주' : effectivePeriod === 'month' ? '이번 달' : '올해'
@@ -74,7 +75,7 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
   const yearOptions = Array.from({length:16},(_,i)=>year-5+i)
   const pickerLabel = periodDriven ? (effectivePeriod === 'today' ? '운세 날짜' : effectivePeriod === 'week' ? '주간 선택 · 월요일~일요일' : effectivePeriod === 'month' ? '월간 선택 · 달력 월' : '연간 선택 · 달력 연도') : '관계 분석 기준 날짜'
   const resetDate = effectivePeriod === 'month' ? `${now.slice(0,7)}-01` : effectivePeriod === 'year' ? `${now.slice(0,4)}-01-01` : now
-  const lifeTools = analysisTools.filter((tool)=>['compatibility','marriage','location'].includes(tool.key))
+  const lifeTools = analysisTools.filter((tool)=>['compatibility','marriage','location','horary'].includes(tool.key))
   const advancedTools = analysisTools.filter((tool)=>['integrated','precision'].includes(tool.key))
   return <div className="moonlit-home-controls">
     {workspace!=='period'&&<button type="button" className="workspace-back" onClick={()=>onWorkspace?.('period')}>← 전체 기간운세로 돌아가기</button>}
@@ -105,7 +106,7 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
     {selectedTool === 'precision' && <section className="section-block precision-period-range"><div className="section-label">정밀분석 기간 선택</div><div className="period-grid" role="tablist" aria-label="정밀분석 기간">{fortunePeriods.map(({key,label,icon:Icon})=><button aria-selected={period===key} className={`period-button ${period===key?'is-active':''}`} key={key} role="tab" type="button" onClick={()=>onPeriodSelect(key,false)}><Icon size={17}/><span>{label}</span></button>)}</div></section>}
 
     {workspace==='period'&&<section className="section-block home-life-section" aria-label="관계와 인생">
-      <div className="home-section-heading"><div className="section-label">관계와 인생</div><p>궁합·결혼·지역 분석을 목적별로 따로 봐.</p></div>
+      <div className="home-section-heading"><div className="section-label">관계와 인생</div><p>궁합·결혼·지역·자유질문을 목적별로 따로 봐.</p></div>
       <div className="home-life-grid">{lifeTools.map(({key,label,desc,icon:Icon,tone})=><button aria-pressed={selectedTool===key} className={`home-tool-card home-life-card ${key==='location'?'is-wide':''} ${selectedTool===key?'is-selected':''}`} key={key} type="button" onClick={()=>onToolSelect(key)}><span className={`home-tool-symbol tone-${tone}`}><Icon size={22} strokeWidth={1.7} aria-hidden="true"/></span><span className="home-tool-copy"><strong>{label}</strong><small>{desc}</small></span><ChevronRight size={16} aria-hidden="true"/></button>)}</div>
     </section>}
 

@@ -2,6 +2,7 @@ from horary_prashna_router_v1 import (
     ROUTER_VERSION,
     build_classifier_system_prompt,
     classifier_contract,
+    classify_question,
     get_policy,
     load_router_spec,
     seed_examples,
@@ -72,3 +73,48 @@ def test_domain_filtered_prompt_only_uses_requested_domain_examples():
     prompt = build_classifier_system_prompt(["LOST_ITEM"])
     assert "잃어버린 지갑" in prompt
     assert "이번 시험에 합격" not in prompt
+
+
+def test_deterministic_classifier_routes_normal_question():
+    result = classify_question("  다음   국가시험에서 합격할 수 있을까?  ")
+    assert result["normalized_question"] == "다음 국가시험에서 합격할 수 있을까?"
+    assert result["primary_type"] == "EXAM_EDUCATION"
+    assert result["policy_id"] == "H_EXAM"
+    assert "PASS_FAIL" in result["intents"]
+    assert result["needs_clarification"] is False
+
+
+def test_deterministic_classifier_preserves_multi_option_order():
+    result = classify_question(
+        "현재 쿨픽스가 집 안에 있다면, 내 침실 수납 / 내 방 베란다 / 오래된 전자기기·서류·잡동사니 수납 중 어느 범주가 가장 강한가?"
+    )
+    assert result["primary_type"] == "LOST_ITEM"
+    assert "OPTION_RANKING" in result["intents"]
+    assert result["options"] == [
+        "내 침실 수납",
+        "내 방 베란다",
+        "오래된 전자기기·서류·잡동사니 수납",
+    ]
+
+
+def test_deterministic_classifier_handles_fuzzy_question_by_clarifying():
+    result = classify_question("이거 잘 될까?")
+    assert result["primary_type"] == "GENERAL_EVENT"
+    assert result["confidence"] < 0.55
+    assert result["needs_clarification"] is True
+    assert result["clarification_question"]
+
+
+def test_deterministic_classifier_keeps_sensitive_policy_classification():
+    health = classify_question("요즘 피로가 회복되는 시기는 언제일까?")
+    legal = classify_question("진행 중인 소송이 합의로 끝날 가능성이 있을까?")
+    assert health["risk_profile"] == "medical_non_diagnostic"
+    assert legal["risk_profile"] == "legal_decision_support_only"
+
+
+def test_deterministic_classifier_never_returns_chart_judgement():
+    result = classify_question("헤어진 사람이 올해 안에 다시 연락한다면 언제쯤일까?")
+    assert result["primary_type"] == "RELATIONSHIP"
+    assert {"CONTACT", "RECONCILIATION", "TIMING"}.issubset(result["intents"])
+    assert "prediction" not in result
+    assert "chart" not in result
