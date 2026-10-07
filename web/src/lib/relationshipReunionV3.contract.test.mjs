@@ -62,8 +62,8 @@ test('contact strength stays separate from relative initiative and even a small 
 test('stage board separates emotional reactivation contact meeting and rebuilding',()=>{
   assert.match(hierarchy,/function stageVerdicts\(hierarchy: ReunionHierarchy\)/)
   for(const stage of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding']) assert.match(hierarchy,new RegExp(stage))
-  assert.match(hierarchy,/실제 만남까지 넘어간다고 읽을 근거는 아직 약해/)
-  assert.match(hierarchy,/안정적인 관계 재구축까지 넘어갔다고 읽을 근거는 아직 약해/)
+  assert.match(hierarchy,/계산됨 · 미래 후보 없음/)
+  assert.match(hierarchy,/미래 후보 \$\{candidateCount\}개 · 핵심 TOP 미포함/)
   assert.match(hierarchy,/reunion-v4-stage-grid/)
 })
 
