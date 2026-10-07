@@ -67,7 +67,7 @@ test('A7 baseline D: provider editorial sections share one six-field shape', () 
   }
 })
 
-test('A10 preserved: period narrative already differentiates day, week, month and annual objectives', () => {
+test('A8 preserved: period narrative already differentiates day, week, month and annual objectives', () => {
   for (const key of ["day:", "week:", "month:", "annual:"]) assert.ok(periodNarrative.includes(key), `missing period contract ${key}`)
   assert.match(periodNarrative, /hours-and-one-day/)
   assert.match(periodNarrative, /early-mid-late-week/)
@@ -75,7 +75,7 @@ test('A10 preserved: period narrative already differentiates day, week, month an
   assert.match(periodNarrative, /quarters-and-months/)
 })
 
-test('A8 preserved: relationship direction values exist but side activation alone cannot decide initiative', () => {
+test('A9 preserved: relationship direction values exist but side activation alone cannot decide initiative', () => {
   assert.match(relationshipWestern, /incoming/)
   assert.match(relationshipWestern, /outgoing/)
   assert.match(relationshipWestern, /initiative_gate/)
@@ -83,7 +83,7 @@ test('A8 preserved: relationship direction values exist but side activation alon
   assert.match(relationshipWestern, /side activation alone is not an action-direction indicator/)
 })
 
-test('A9 preserved: fortune presentation has an explicit incoming/outgoing comparison path', () => {
+test('A10 preserved: fortune presentation has an explicit incoming/outgoing comparison path', () => {
   assert.match(fortuneEditorial, /function directionSummary/)
   assert.match(fortuneEditorial, /['"]수신신호['"]/)
   assert.match(fortuneEditorial, /['"]발신적합['"]/)
