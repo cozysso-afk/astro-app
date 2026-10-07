@@ -46,7 +46,8 @@ test('reunion reader-facing section labels stay Korean instead of internal Engli
 
 test('contact strength stays separate from relative initiative and even a small edge is shown',()=>{
   assert.match(hierarchy,/function contactReading\(hierarchy: ReunionHierarchy\)/)
-  assert.match(hierarchy,/hierarchy\.stages\?\.contact_recontact\?\.activation/)
+  assert.match(hierarchy,/const stage = hierarchy\.stages\?\.contact_recontact/)
+  assert.match(hierarchy,/stage\?\.activation/)
   const contactBody=hierarchy.slice(hierarchy.indexOf('function contactReading'),hierarchy.indexOf('function directionRow'))
   assert.doesNotMatch(contactBody,/directionRows/)
   assert.doesNotMatch(contactBody,/incomingBand|outgoingBand/)
