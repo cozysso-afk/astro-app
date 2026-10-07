@@ -7,6 +7,7 @@ const read = (url) => readFileSync(new URL(url, import.meta.url), 'utf8')
 const hierarchyEngine = read('../../../reunion_hierarchy_v2.py')
 const hierarchyView = read('./reunionHierarchy.ts')
 const compactPrompt = read('./compactDeepPrompt.ts')
+const reunionCompact = read('./reunionCompactEvidence.ts')
 const resultFormatters = read('./resultFormatters.ts')
 const reunionPanel = read('../ReunionHierarchyPanelV3.tsx')
 const providerSchema = read('../../../supabase/functions/fortune-interpret-v23-preview/providerSchemaV23.ts')
@@ -31,11 +32,11 @@ test('A2 baseline: web hierarchy view preserves past and current windows', () =>
 })
 
 test('A3 preserved: relationship compact prompt keeps structured past/current/future hierarchy', () => {
-  assert.match(compactPrompt, /hierarchyForExternal/)
-  assert.match(compactPrompt, /top_periods:list\(h\.top_periods\)/)
-  assert.match(compactPrompt, /past_windows:list\(h\.past_windows\)/)
-  assert.match(compactPrompt, /current_windows:list\(h\.current_windows\)/)
-  assert.match(compactPrompt, /nearest_window:hierarchyWindow/)
+  assert.match(compactPrompt, /compactReunionHierarchyForExternal/)
+  assert.match(reunionCompact, /top_periods:list\(h\.top_periods\)/)
+  assert.match(reunionCompact, /past_windows:list\(h\.past_windows\)/)
+  assert.match(reunionCompact, /current_windows:list\(h\.current_windows\)/)
+  assert.match(reunionCompact, /nearest_window:hierarchyWindow/)
 })
 
 test('A4 preserved: production relationship Edge hierarchy packet keeps bounded past/current windows', () => {
