@@ -100,12 +100,11 @@ export function buildProviderCoreSchema(fullSchema:any){
       properties:{
         topic:{type:"STRING"},
         question_key:{type:"STRING"},
-        label:{type:"STRING"},
         answer:{type:"STRING"},
-        status:{type:"STRING",enum:["direct","partial","not_calculated"]},
+        status:{type:"STRING",enum:["direct","partial"]},
         evidence_refs:{type:"ARRAY",items:{type:"STRING"}},
       },
-      required:["topic","question_key","label","answer","status","evidence_refs"],
+      required:["topic","question_key","answer","status","evidence_refs"],
     },
   };
   if(!core.required.includes("domain_answers"))core.required.push("domain_answers");
