@@ -93,7 +93,7 @@ export const DOMAIN_ANSWER_CONTRACTS: DomainAnswerContract[] = [
       {key:'timing',label:'시기',scope:'컨디션 변화가 상대적으로 두드러지는 구간만 말한다.'},
     ],
   },
-] as const
+]
 
 export const DOMAIN_ANSWER_KEYS = DOMAIN_ANSWER_CONTRACTS.flatMap(contract =>
   contract.questions.map(question => ({
