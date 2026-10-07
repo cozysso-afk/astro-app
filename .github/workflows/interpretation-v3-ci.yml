@@ -89,6 +89,7 @@ jobs:
           node --experimental-strip-types --test web/src/lib/fortuneNarrativePolish.test.mjs
           node --experimental-strip-types --test web/src/lib/toneCalibrationV1.test.mjs
           node --test web/src/lib/interpretationAnswerabilityBaselineV1.test.mjs
+          node --experimental-strip-types --test web/src/lib/interpretationEvidencePreservationV1.test.mjs
           node --experimental-strip-types --test web/src/lib/timelineTime.test.mjs
           node --test web/src/lib/readingCompactV5.test.mjs
           node --experimental-strip-types --test web/src/lib/fortuneEditorialV3.test.mjs

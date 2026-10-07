@@ -28,8 +28,8 @@ test('hierarchy reunion shows a full human story before technical evidence',()=>
 })
 
 test('rich reunion prose has a new cache contract and explicit depth instruction',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
-  assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
+  assert.match(edge,/REUNION_VERSION="relationship-v13\.0-answerability-evidence"/)
+  assert.match(cache,/relationship-v13\.0-answerability-evidence-v1/)
   assert.match(edge,/summary는 5~7문장/)
   assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 6~9문장/)
   assert.match(edge,/오브와 전문용어 나열은 기술 근거로 밀어라/)
@@ -69,7 +69,7 @@ test('hierarchy numeric support uses stage-gated candidates rather than generic 
 })
 
 test('reunion prose contract is score-aware and validates every major human section',()=>{
-  assert.match(edge,/candidate_count가 0이거나 activation이 null/)
+  assert.match(edge,/candidate_count가 0이면 그 단계에는 공개할 미래 후보가 없다고 써라/)
   assert.match(edge,/generic incoming\/outgoing\/reconnection 점수로 hierarchy gate를 덮어쓰지 마라/)
   assert.match(edge,/why\.length<need\(420\)/)
   assert.match(edge,/timing\?\.conclusion.*need\(220\)/s)
