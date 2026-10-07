@@ -22,6 +22,33 @@ const stat = (s: Row | null | undefined, day = false): Row | null => s ? {
 } : null
 const evidence = (e: Row) => pick(e,['date','system','transit','target','a','b','aspect','tone','direction','contribution','polarity','label','text'])
 const directions = (r: Row | null | undefined) => ({ incoming:stat(r?.incoming ?? r?.수신신호), outgoing:stat(r?.outgoing ?? r?.발신적합), reconnection:stat(r?.reconnection ?? r?.과거인연접점 ?? r?.재접점) })
+const hierarchyWindow = (x: Row | null | undefined) => x ? ({
+  ...pick(x,['date','start','end','stage','label','final','temporal_status']),
+  components:pick(x.components,['long_term','mid_term','event_trigger','cross_system','convergence_bonus']),
+}) : null
+const hierarchyForExternal = (h: Row | null | undefined, level: number) => {
+  if(!h) return null
+  const limit=level===0?3:level===1?2:1
+  const stages=Object.fromEntries(Object.entries(h.stages ?? {}).map(([key,value])=>[key,pick(value as Row,['label','activation','candidate_count','gate_pass_count','hierarchy_pass_count'])]))
+  const coverage=Object.fromEntries(Object.entries(h.coverage ?? {}).filter(([,value])=>typeof value==='boolean'))
+  return {
+    ...pick(h,['version','as_of_date','score_meaning']),
+    validation:h.validation ? {status:h.validation.status,checks:list(h.validation.checks).slice(0,3).map(row=>pick(row,['name','status','detail']))} : undefined,
+    stages,
+    top_periods:list(h.top_periods).slice(0,limit).map(hierarchyWindow).filter(Boolean),
+    nearest_window:hierarchyWindow(h.nearest_window),
+    past_windows:list(h.past_windows).slice(0,limit).map(hierarchyWindow).filter(Boolean),
+    current_windows:list(h.current_windows).slice(0,limit).map(hierarchyWindow).filter(Boolean),
+    initiative:h.initiative ? pick(h.initiative,['available','verdict','reason']) : undefined,
+    coverage,
+    limitations:(h.limitations ?? []).filter((s:unknown)=>typeof s==='string'&&s.length<=240).slice(0,3),
+    temporal_policy:'past_windows=지난 활성 구간·사후 비교용, current_windows=현재 활성 구간, top_periods/nearest_window=미래 후보. 과거를 미래 후보로 승격하지 않는다.',
+  }
+}
+const reunionTimingForExternal = (x: Row | null | undefined, level: number) => x ? ({
+  windows:list(x.windows).slice(0,level>=2?1:3).map(row=>pick(row,['date','start','end','stage','label','score'])),
+  policy:typeof x.policy==='string' ? x.policy.slice(0,240) : undefined,
+}) : null
 
 function fit(instructions: string, build: (level: number) => Row) {
   for (let level = 0; level <= 3; level++) {
@@ -121,8 +148,8 @@ export function buildRelationshipCompactPrompt(instructions: string, kind: strin
     precision:{partner_time_exact:exact,policy:'생시 미검증 시 Moon·ASC/DSC·MC/IC·하우스·Davison·Marks·시간 민감 진행을 추정하거나 복원하지 않는다.'},
     patterns:aspects.slice(0,level>=1?8:10).map(a=>({role:aspectRole(a),...pick(a,['a','b','aspect','tone','orb'])})),
     reunion_directional_context:kind==='reunion'?directions(timing):undefined,
-    reunion_hierarchy:kind==='reunion'?pick(r.reunion_hierarchy,['version','as_of_date','validation','weights','thresholds','stages','top_periods','nearest_window','initiative','coverage','score_meaning']):undefined,
-    reunion_timing_windows:kind==='reunion'?pick(r.reunion_timing_windows,['windows','policy']):undefined,
+    reunion_hierarchy:kind==='reunion'?hierarchyForExternal(r.reunion_hierarchy,level):undefined,
+    reunion_timing_windows:kind==='reunion'?reunionTimingForExternal(r.reunion_timing_windows,level):undefined,
     reunion_dimensions:kind==='reunion'?Object.fromEntries(['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding'].map(k=>[k,axis(r.reunion_dimensions?.[k])])):undefined,
     timing:list(r.reunion_transits?.top_days).slice(0,level>=2?2:4).map(d=>({...pick(d,['date','score','user_score','counterpart_score']),hits:list(d.hits).slice(0,1).map(h=>pick(h,['person','transit','target','aspect','tone']))})),
     saju_relationship:r.saju_relationship?.available ? {day_master_relation:r.saju_relationship.day_master_relation,policy:r.saju_relationship.policy,limitations:r.saju_relationship.limitations} : undefined,
