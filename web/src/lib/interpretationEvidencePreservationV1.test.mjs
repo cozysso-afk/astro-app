@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildRelationshipCompactPrompt } from './compactDeepPrompt.ts'
+import { compactReunionHierarchyForExternal, compactReunionTimingForExternal } from './reunionCompactEvidence.ts'
 
 const edge = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
 const panel = readFileSync(new URL('../ReunionHierarchyPanelV3.tsx', import.meta.url), 'utf8')
@@ -16,46 +16,32 @@ function hierarchyWindow(date, stage, final, temporal_status) {
 }
 
 function compactPayload() {
-  const calculation = {
-    period:{start:'2026-10-01',end:'2027-03-31'},
-    relationship_status:'past_connection',
-    result:{
-      natal_synastry:{partner_time_exact:true,aspects:[]},
-      reunion_hierarchy:{
-        version:'reunion-hierarchy-v2-test',
-        as_of_date:'2026-10-07',
-        validation:{status:'PASS',checks:[]},
-        stages:{
-          emotional_reactivation:{label:'의식',activation:58,candidate_count:2,gate_pass_count:2,hierarchy_pass_count:2},
-          contact_recontact:{label:'연락',activation:null,candidate_count:0,gate_pass_count:0,hierarchy_pass_count:0},
-          in_person_meeting:{label:'만남',activation:61,candidate_count:1,gate_pass_count:1,hierarchy_pass_count:1},
-          relationship_rebuilding:{label:'재구축',activation:null,candidate_count:0,gate_pass_count:0,hierarchy_pass_count:0},
-        },
-        top_periods:[hierarchyWindow('2027-02-20','in_person_meeting',61,'future')],
-        nearest_window:hierarchyWindow('2027-02-20','in_person_meeting',61,'future'),
-        past_windows:[hierarchyWindow('2026-08-17','contact_recontact',55,'past')],
-        current_windows:[hierarchyWindow('2026-10-07','emotional_reactivation',48,'current')],
-        initiative:{available:false,verdict:'undetermined',reason:'independent action gate absent'},
-        coverage:{western:true,saju:false},
-        limitations:['test limitation'],
-        score_meaning:'relative activation, not event probability',
-      },
-      reunion_timing_windows:{
-        windows:[{date:'2027-02-20',start:'2027-02-19',end:'2027-02-20',stage:'in_person_meeting',label:'만남'}],
-        policy:'future gate only',
-      },
-      reunion_dimensions:{},
-      reunion_transits:{top_days:[]},
-      saju_relationship:{available:false},
+  const hierarchy={
+    version:'reunion-hierarchy-v2-test',
+    as_of_date:'2026-10-07',
+    validation:{status:'PASS',checks:[]},
+    stages:{
+      emotional_reactivation:{label:'의식',activation:58,candidate_count:2,gate_pass_count:2,hierarchy_pass_count:2},
+      contact_recontact:{label:'연락',activation:null,candidate_count:0,gate_pass_count:0,hierarchy_pass_count:0},
+      in_person_meeting:{label:'만남',activation:61,candidate_count:1,gate_pass_count:1,hierarchy_pass_count:1},
+      relationship_rebuilding:{label:'재구축',activation:null,candidate_count:0,gate_pass_count:0,hierarchy_pass_count:0},
     },
+    top_periods:[hierarchyWindow('2027-02-20','in_person_meeting',61,'future')],
+    nearest_window:hierarchyWindow('2027-02-20','in_person_meeting',61,'future'),
+    past_windows:[hierarchyWindow('2026-08-17','contact_recontact',55,'past')],
+    current_windows:[hierarchyWindow('2026-10-07','emotional_reactivation',48,'current')],
+    initiative:{available:false,verdict:'undetermined',reason:'independent action gate absent'},
+    coverage:{western:true,saju:false},
+    limitations:['test limitation'],
+    score_meaning:'relative activation, not event probability',
   }
-  const prompt = buildRelationshipCompactPrompt('TEST', 'reunion', {analysis_mode:'reunion'}, calculation, {
-    incoming:{average:20,band:'약함',spread:4},
-    outgoing:{average:23,band:'약함',spread:5},
-    reconnection:{average:31,band:'약함',spread:5},
-  })
-  const marker='CALCULATED_DATA='
-  return JSON.parse(prompt.slice(prompt.lastIndexOf(marker)+marker.length))
+  return {
+    reunion_hierarchy:compactReunionHierarchyForExternal(hierarchy,0),
+    reunion_timing_windows:compactReunionTimingForExternal({
+      windows:[{date:'2027-02-20',start:'2027-02-19',end:'2027-02-20',stage:'in_person_meeting',label:'만남'}],
+      policy:'future gate only',
+    },0),
+  }
 }
 
 test('external compact relationship packet preserves structured past/current/future chronology', () => {
