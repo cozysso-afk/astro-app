@@ -1,4 +1,4 @@
-import type { AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
+import type { AiDomainAnswer, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 import type { FortuneUserSummary } from './fortuneUserSummary'
 
@@ -17,6 +17,7 @@ export type EditorialContact = {
   directionSummary: string
   timing?: string
 }
+export type DomainAnswerReading = { topic:string; questionKey:string; label:string; answer:string; status:'direct'|'partial' }
 export type FortuneEditorialV3 = {
   heroHeadline: string
   heroSummary: string
@@ -26,6 +27,7 @@ export type FortuneEditorialV3 = {
   loveContexts?: LoveContextReading[]
   loveGeneral?: string
   topicEditorial: Record<string, string>
+  domainAnswers: Record<string, DomainAnswerReading[]>
 }
 
 const LOVE_CONTEXTS: Array<{ key: LoveContextKey; label: string; field: string }> = [
@@ -195,6 +197,21 @@ function score(calculation: IntegratedApiResponse, name: string) {
 
 function bandLabel(calculation: IntegratedApiResponse, name: string) {
   return clean(calculation.western.overall?.[name]?.band) || '정보 부족'
+}
+
+function domainAnswers(data: InterpretationData) {
+  const rows=(Array.isArray(data.domain_answers)?data.domain_answers:[]) as AiDomainAnswer[]
+  const grouped:Record<string,DomainAnswerReading[]>={}
+  for(const row of rows){
+    if(!row || (row.status!=='direct' && row.status!=='partial')) continue
+    const answer=clean(row.answer)
+    if(!answer || !readerFacing(answer)) continue
+    const item:DomainAnswerReading={topic:clean(row.topic),questionKey:clean(row.question_key),label:clean(row.label),answer,status:row.status}
+    if(!item.topic||!item.questionKey||!item.label) continue
+    grouped[item.topic] ??= []
+    if(!grouped[item.topic].some(existing=>existing.questionKey===item.questionKey)) grouped[item.topic].push(item)
+  }
+  return grouped
 }
 
 function topicEditorial(data: InterpretationData) {
@@ -415,5 +432,6 @@ export function buildFortuneEditorialV3(data: InterpretationData, calculation: I
     loveContexts: field?.id === 'love' ? loveContexts(data) : undefined,
     loveGeneral: field?.id === 'love' ? relationshipSectionCopy(sections?.love_general) : undefined,
     topicEditorial: editorialTopics,
+    domainAnswers: domainAnswers(data),
   }
 }
