@@ -67,6 +67,7 @@ function claimStrings(data:any){
   for(const d of data?.decisions??[]){add(d?.action);add(d?.timing);add(d?.reason);add(d?.watch);add(d?.avoid);}
   const walkEditorial=(v:any)=>{if(!v||typeof v!=="object")return;for(const section of Object.values(v) as any[])for(const key of ["conclusion","real_scene","action","change_condition"])add(section?.[key]);};
   for(const v of Object.values(data?.clusters??{}))walkEditorial(v);
+  for(const row of data?.domain_answers??[])add(row?.answer);
   for(const v of Object.values(data?.relationship_reading??{}))add(v);
   for(const v of Object.values(data?.contact_flow??{}))add(v);
   for(const v of Object.values(data?.investment_reading??{}))add(v);
@@ -108,6 +109,22 @@ export function inspectInterpretationQuality(data:any,payload:any){
   for(const k of TOPICS){
     if(!data?.topic_analysis?.[k])s1.push(`topic_analysis.${k} 누락`);
     else if(!["핵심","주목","참고"].includes(String(data.topic_analysis[k]?.importance??"")))s1.push(`topic_analysis.${k}.importance 오류`);
+  }
+  if(data?.domain_answers!==undefined){
+    if(!Array.isArray(data.domain_answers))s1.push("domain_answers 배열 아님");
+    else {
+      const seenDomain=new Set<string>();
+      for(const row of data.domain_answers){
+        const topic=String(row?.topic??""),question=String(row?.question_key??""),status=String(row?.status??""),answer=String(row?.answer??"").trim();
+        const key=`${topic}::${question}`;
+        if(!topic||!question)s1.push("domain_answers topic/question_key 누락");
+        else if(seenDomain.has(key))s1.push(`domain_answers 중복: ${key}`); else seenDomain.add(key);
+        if(!["direct","partial","not_calculated"].includes(status))s1.push(`domain_answers status 오류: ${key}`);
+        if(status==="not_calculated"&&answer)s1.push(`미계산 질문에 답변 생성: ${key}`);
+        if((status==="direct"||status==="partial")&&!answer)s1.push(`답변 상태인데 answer 누락: ${key}`);
+        if((status==="direct"||status==="partial")&&!(row?.evidence_refs??[]).length)s1.push(`답변 상태인데 evidence_refs 누락: ${key}`);
+      }
+    }
   }
   if(payload?.__v23_evidence_timing_repair===true)for(const [group,keys] of Object.entries(EDITORIAL_CLUSTER_KEYS)){
     const value=data?.clusters?.[group];
