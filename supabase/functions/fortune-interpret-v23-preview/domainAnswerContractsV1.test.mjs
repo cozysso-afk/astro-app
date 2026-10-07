@@ -37,6 +37,8 @@ test('C2 provider schema adds domain_answers without replacing the legacy editor
   assert.ok(schema.properties.domain_answers.items.required.includes('question_key'))
   assert.ok(schema.properties.domain_answers.items.required.includes('status'))
   assert.ok(schema.properties.domain_answers.items.required.includes('evidence_refs'))
+  assert.deepEqual(schema.properties.domain_answers.items.properties.status.enum,['direct','partial'])
+  assert.ok(!schema.properties.domain_answers.items.required.includes('label'))
 })
 
 test('C3 provider normalization preserves grounded answers and fills missing questions as not_calculated',()=>{
@@ -80,7 +82,9 @@ test('C5 V23 prompt contract forbids generic padding for unsupported subquestion
   assert.match(promptSource,/not_calculated/)
   assert.match(promptSource,/일반론으로 채우지 마/)
   assert.match(indexSource,/domain_answers는 PROMPT_DATA\.domain_answer_contracts/)
-  assert.match(indexSource,/금전 점수만 있는데 계약·회수 근거가 없으면 contract_recovery는 not_calculated/)
+  assert.match(indexSource,/근거가 없는 질문은 행 자체를 생략해/)
+  assert.match(indexSource,/서버가 누락 질문을 not_calculated로 채운다/)
+  assert.match(indexSource,/금전 점수만 있는데 계약·회수 근거가 없으면 contract_recovery 행을 출력하지 않는다/)
   assert.match(indexSource,/시험 점수만 있는데 실수 유형 근거가 없으면 performance_error/)
 })
 
