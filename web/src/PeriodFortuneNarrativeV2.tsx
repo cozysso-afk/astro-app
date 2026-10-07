@@ -284,7 +284,7 @@ export function PeriodFortuneNarrativeV2({
       <div className="period-ai-section-title"><span>질문별 해설</span><strong>계산된 질문만 답하고, 없는 세부값은 만들지 않아</strong></div>
       <div className="period-ai-topic-list">{domainAnswerRows.map(item => <article className="period-ai-topic period-ai-domain-answer-v5" data-reading-export-tone={topicTone(item.topic)} key={`domain-v5-${item.topic}-${item.questionKey}`}>
         <strong>{item.label}</strong>
-        {field.topics.length > 1 && <b>{item.topic}</b>}
+        {(field?.topics.length ?? 0) > 1 && <b>{item.topic}</b>}
         <p>{item.answer}</p>
         {item.status === 'partial' && <small>부분 근거 · 이 질문 전체를 확정하는 계산은 아님</small>}
       </article>)}</div>
