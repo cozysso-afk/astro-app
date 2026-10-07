@@ -169,12 +169,6 @@ export function PeriodFortuneNarrativeV2({
   const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
-  const structuredFieldTopics = verifiedNarrative && field
-    ? field.topics
-      .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
-      .filter(item => !domainAnsweredTopics.has(item.topic))
-      .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
-    : []
   const showLongPeriodNarrative = verifiedNarrative && !field && (period === 'month' || period === 'year')
   const longPeriodDecisions = showLongPeriodNarrative
     ? (data.decisions ?? []).map((item, index) => ({
@@ -231,6 +225,12 @@ export function PeriodFortuneNarrativeV2({
     ? field.topics.flatMap(topic => editorial.domainAnswers[topic] ?? [])
     : []
   const domainAnsweredTopics = new Set(domainAnswerRows.map(row => row.topic))
+  const structuredFieldTopics = verifiedNarrative && field
+    ? field.topics
+      .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
+      .filter(item => !domainAnsweredTopics.has(item.topic))
+      .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
+    : []
   const showContactDirectionDetails = Boolean(editorial.contact)
     && !/동률권|같은 값|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
