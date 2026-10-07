@@ -49,9 +49,9 @@ Primary ownership surfaces reviewed in V1:
 | R3 | Reunion future candidates | **P** | `top_periods` and `nearest_window` are explicitly transported and rendered. |
 | R4 | Contact direction comparison | **P/C** | incoming/outgoing scores are preserved and frontend can compare them; independent action-direction gate is intentionally unavailable, so “who contacts first” remains undetermined. Keep the safety distinction. |
 | R5 | Technical evidence in readable reunion prose | **P/partial** | `readerSentences` still prefers plain language, but if plain prose underfills the requested limit it now retains a technical causal sentence instead of deleting all remaining explanation. Full structured causal ownership remains a later architecture task. |
-| F1 | Fortune editorial structure | **D** | all 25 editorial sections use the same six fields: `conclusion/real_scene/action/change_condition/evidence_refs/applicability`. |
+| F1 | Fortune editorial structure | **P/extended** | the 25 legacy editorial sections keep the six-field compatibility base, while V23 now adds `domain_answers[]` with question-specific keys and `direct/partial/not_calculated` states. |
 | F2 | Contact-specific interpretation | **P** | the schema has distinct `contact_activation` and `contact_continuity` sections. |
-| F3 | Other domain-specific subquestions | **D/partial** | work, career change, exam, study, money, news, condition are represented mainly as one section each; the schema cannot separately express every domain question such as exam performance vs error risk or money inflow vs outflow without embedding them into generic prose. This is a schema limitation, not proof that the engine calculates those subquestions. |
+| F3 | Other domain-specific subquestions | **P/partial** | work, career change, study, exam, money, news, love, contact, reunion and condition now have explicit question contracts. Unsupported subquestions remain `not_calculated` instead of being padded with generic advice. This still does not claim the engine calculates every subquestion. |
 | F4 | Compact fortune evidence depth | **B/intentional compression** | `compactDeepPrompt.ts` limits selected topics, dates and evidence rows. This is not automatically a bug, but it is a verified information-loss boundary and must be measured before further compression. |
 | F5 | Period granularity | **P** | `periodNarrativeV23.ts` has distinct day/week/month/annual objectives and sequencing. Preserve this. |
 | F6 | Low activation vs negative direction | **P** | Tone Calibration V1 separates activation magnitude from evidence direction. Preserve this. |
@@ -66,13 +66,13 @@ This table describes the interpretation structure, not a claim that every reques
 | Contact | Partial | activation/direction/continuity exist, but “no timing candidate” can dominate the explanation and history is not consistently preserved into interpretation packets. |
 | Love | Partial | multiple relationship contexts exist, but they still resolve through the shared editorial field shape. |
 | Reunion | Improved partial | stage model plus past/current/future chronology are now transported; candidate absence, current activation and direction comparison are separated. Domain-level causal structure still needs the later answer-contract work. |
-| Work | Partial | topic evidence exists, but one generic work section must carry progress, negotiation, responsibility, evaluation and change. |
-| Career change | Partial | one section must carry exploration, proposal, interview/conditions and movement. Do not invent sub-calculations that do not exist. |
-| Study | Partial | one study section plus topic evidence; domain-specific answer slots are absent. |
-| Exam | Partial | one exam section plus topic evidence; execution/error/timing distinctions must only be added where calculation evidence supports them. |
-| Money | Partial | one money section plus topic evidence; inflow/outflow/contract/recovery must not be invented if not calculated. |
-| News | Partial | one news section; private contact and official result/notice need clearer answer semantics when evidence supports them. |
-| Condition | Partial | one condition section; health diagnosis remains forbidden. |
+| Work | Improved partial | explicit 업무 진행 / 협업·책임 / 변화·시기 questions exist; only grounded direct/partial answers render. |
+| Career change | Improved partial | 탐색·제안 / 조건·실제 이동 / 시기 questions are separated, while unsupported hiring outcomes remain uncalculated. |
+| Study | Improved partial | 집중·이해 / 복습·수행 / 시기 questions are separated; missing distinctions remain uncalculated. |
+| Exam | Improved partial | 준비 / 수행·실수 / 시기 questions are separated; 합격 여부 remains outside the contract. |
+| Money | Improved partial | 유입·유출 / 계약·회수 / 시기 questions exist; absent contract/recovery evidence stays `not_calculated`. |
+| News | Improved partial | 회신·공식 통보 / 지연 / 시기 questions are separated when evidence supports them. |
+| Condition | Improved partial | 회복·피로 / 지속력·일정 소화 / 시기 questions are separated while diagnosis remains forbidden. |
 | Investment | Partial but safety-sensitive | psychology/realization/entry are separated; real market data and risk limits remain authoritative. |
 
 ## P0 implementation targets
@@ -86,7 +86,7 @@ This table describes the interpretation structure, not a claim that every reques
    - initiative/action direction remains undetermined
 3. Never translate “no public candidate” into “no information” if other verified comparison data exists.
 4. Keep one readable causal/evidence sentence when technical prose is filtered; move raw technical detail behind disclosure instead of deleting all explanation.
-5. Add domain answer contracts as extensions over the shared base schema. Do not force fields for data the engine does not calculate.
+5. ✅ Add domain answer contracts as extensions over the shared base schema. Unsupported questions remain `not_calculated` and are not rendered as generic filler.
 6. Keep authored grounded prose ownership and current safety gates.
 
 ## Answerability Golden V1 target contracts
