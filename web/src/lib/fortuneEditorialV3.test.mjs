@@ -264,3 +264,15 @@ test('legacy saved string clusters remain visible in editorial group copy',()=>{
   assert.equal(editorialGroupCopy('과거 저장 결과의 분야별 종합 문구야.'),'과거 저장 결과의 분야별 종합 문구야.')
   assert.equal(editorialGroupCopy('  과거   저장   결과  '),'과거 저장 결과')
 })
+test('domain answers expose grounded question rows and hide not-calculated padding',()=>{
+  const domain_answers=[
+    {topic:'직장',question_key:'progress',label:'업무 진행',answer:'마감 전 처리 속도가 살아 있고 완료 기준을 먼저 맞추는 쪽이 유리해.',status:'direct',evidence_refs:['W:work']},
+    {topic:'직장',question_key:'coordination_responsibility',label:'협업 · 책임',answer:'협업은 담당자와 마감 기준을 다시 맞추는 정도까지는 읽을 수 있어.',status:'partial',evidence_refs:['W:work']},
+    {topic:'직장',question_key:'change_timing',label:'변화 · 시기',answer:'',status:'not_calculated',evidence_refs:[]},
+  ]
+  const result=buildFortuneEditorialV3(data({domain_answers}),calc(),base(),{id:'work',label:'직업운',topics:['직장']})
+  assert.deepEqual(result.domainAnswers.직장.map(row=>row.questionKey),['progress','coordination_responsibility'])
+  assert.equal(result.domainAnswers.직장[0].status,'direct')
+  assert.equal(result.domainAnswers.직장[1].status,'partial')
+  assert.ok(!result.domainAnswers.직장.some(row=>row.questionKey==='change_timing'))
+})
