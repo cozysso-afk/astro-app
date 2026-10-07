@@ -347,25 +347,23 @@ function listTopics(values: string[]) {
   return unique.length === 1 ? unique[0] : `${unique[0]}·${unique[1]}`
 }
 
-function integratedFallback(base: FortuneUserSummary, calculation: IntegratedApiResponse) {
-  const positive = base.bestFlow.length ? base.bestFlow : Object.entries(calculation.western.overall ?? {})
-    .filter(([,stat]) => Number.isFinite(stat?.average) && Number(stat?.average) >= 52)
-    .sort((a,b) => Number(b[1]?.average) - Number(a[1]?.average)).map(([name]) => name).slice(0,2)
-  const caution = base.cautionFlow.length ? base.cautionFlow : Object.entries(calculation.western.overall ?? {})
-    .filter(([name,stat]) => name !== '투자주의' && Number.isFinite(stat?.average) && Number(stat?.average) <= 40)
-    .sort((a,b) => Number(a[1]?.average) - Number(b[1]?.average)).map(([name]) => name).slice(0,2)
+function integratedFallback(base: FortuneUserSummary, _calculation: IntegratedApiResponse) {
+  // bestFlow/cautionFlow already separate activation magnitude from evidence direction.
+  // Re-ranking raw scores here would turn low activation back into a negative verdict.
+  const positive = base.bestFlow
+  const caution = base.cautionFlow
   const good = listTopics(positive)
   const watch = listTopics(caution.filter(name => !positive.includes(name)))
   const generatedHeadline = good && watch
     ? `${base.when}은 ${good} 쪽은 비교적 받쳐주고, ${watch} 쪽은 한 번 더 확인하면서 움직이는 흐름이야.`
     : good ? `${base.when}은 ${good} 쪽이 상대적으로 받쳐줘. 다른 분야까지 무리하게 확대하지 말고 이 강점을 필요한 곳에 써.`
-      : watch ? `${base.when}은 ${watch} 쪽에서 서두르지 않는 게 중요해. 나머지는 평소 계획을 유지해.`
-        : `${base.when}은 한 분야가 압도하기보다 전반적인 균형이 중요해. 실제 일정과 반응에 맞춰 우선순위를 조정해.`
+      : watch ? `${base.when}은 ${watch} 쪽에 실제 부담 근거가 있어 조건을 나눠 보는 흐름이야. 나머지는 평소 계획에 가까워.`
+        : `${base.when}은 특정 분야를 좋거나 나쁘다고 가를 근거가 두드러지지 않아. 평소 흐름을 유지하는 구간이야.`
   const generatedSummary = good && watch
     ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 둬. 기간 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 마.`
     : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 기간 전체에서는 우선순위를 좁혀 실제로 끝낼 일을 만들어.`
-      : watch ? `${watch}의 부담을 줄이는 게 기간 전체 운영의 핵심이야. 중요한 결정은 확인 단계를 하나 더 두고, 나머지 분야는 평소 리듬을 유지해.`
-        : `전 섹터가 크게 벌어지지 않아 특정 분야 하나로 기간 전체를 정의하기 어려워. 해야 할 일의 우선순위와 실제 체감 변화를 기준으로 속도를 조절해.`
+      : watch ? `${watch}에는 실제 주의 방향 근거가 연결돼 있어 부담 조건을 구분할 필요가 있어. 나머지 분야는 평소 리듬을 유지해.`
+        : `이번 기간에는 분야별 활성도 차이가 사건의 좋고 나쁨을 뜻하지 않아. 뚜렷한 촉발이 없는 분야는 기존 계획을 이어가면 충분해.`
   return {
     headline: clean(base.headline) || generatedHeadline,
     summary: generatedSummary,

@@ -76,6 +76,13 @@ function topicEvidence(payload:any, topic:string){
   return [...direct].sort((a,b)=>priority(a)-priority(b)).slice(0,8);
 }
 
+function topicEvidenceDirection(payload:any,topic:string){
+  const rows=topicEvidence(payload,topic);
+  const supportive=rows.some((row:any)=>row?.direction==="supportive");
+  const caution=rows.some((row:any)=>row?.direction==="caution"||row?.direction==="challenging");
+  return supportive&&caution?"mixed":supportive?"supportive":caution?"challenging":"neutral";
+}
+
 function relatedTopicsFromEvidence(row:any){
   const match=String(row?.text??"").match(/관련분야\s+(.+)$/);
   return match?match[1].split(/[,·/]/).map((value:string)=>value.trim()).filter(Boolean):[];
@@ -165,31 +172,32 @@ function bestTopicDate(payload:any,topic:string){
 }
 
 function topicVerb(topic:string){
-  if(topic==="이직")return {action:"제안이 있다면 직무·보상·입사일을 따로 확인하고 현재 조건과 비교해.",avoid:"관심 표현을 채용 확정으로 받아들이거나 답답함만으로 퇴사를 결정하지 마."};
-  if(topic==="직장")return {action:"조건·일정·문서를 실제 기준과 대조해 우선순위를 정리해.",avoid:"한 번의 고점이나 저점만 보고 커리어 결론을 즉시 확정하지 마."};
-  if(topic==="시험")return {action:"시간을 재고 문제를 푼 뒤 지식 부족, 조건 누락, 시간 부족을 구분해서 오답을 정리해.",avoid:"공부한 시간이나 익숙한 느낌을 실전 정답률과 같다고 보지 마."};
-  if(topic==="학업")return {action:"집중력이 상대적으로 나은 구간에 핵심 과제와 점검을 먼저 배치해.",avoid:"낮은 구간의 체감만으로 전체 학습 성과를 단정하지 마."};
-  if(topic==="대인관계")return {action:"상대별 실제 반응과 약속 이행 여부를 구분해 관계의 우선순위를 조절해.",avoid:"한 사람과의 긴장이나 호의를 전체 인간관계 흐름으로 확대하지 마."};
-  if(topic==="연애")return {action:"호감 표현·만남의 지속성·관계 정의처럼 실제로 확인되는 연애 행동을 기준으로 속도를 조절해.",avoid:"연애 상대활성도만 보고 상대의 감정이나 관계 성립을 미리 확정하지 마."};
-  if(topic==="연락")return {action:"상대가 먼저 보낸 연락과 내가 먼저 보내기 좋은 흐름을 구분하고, 답변의 구체성과 지속성을 확인해.",avoid:"발신 적합도가 높다는 이유로 상대의 수신 의향까지 높다고 해석하지 마."};
-  if(topic==="재회")return {action:"과거 인연의 실제 재접촉·대화 재개·만남 제안이 생기는지 확인한 뒤 관계 재정립 여부를 판단해.",avoid:"재접점 활성도를 재회 확정이나 상대의 복귀 의사로 바꾸어 읽지 마."};
-  if(["금전","소식"].includes(topic))return {action:"계약·입금·안내처럼 확인 가능한 정보부터 다시 점검해.",avoid:"확인되지 않은 기대만으로 지출이나 결정을 확대하지 마."};
-  if(INVESTMENT_TOPICS.has(topic))return {action:"실제 시장 데이터와 본인 리스크 한도를 함께 확인해 규모를 조절해.",avoid:"상대지수를 가격방향·수익률 예측으로 바꾸거나 레버리지를 확대하지 마."};
-  return {action:"체감보다 수면·일정·회복 같은 확인 가능한 상태를 기준으로 강도를 조절해.",avoid:"하루의 컨디션 변화를 장기 상태로 단정하지 마."};
+  if(topic==="이직")return {action:"제안이 있다면 직무·보상·입사일을 현재 조건과 나란히 비교할 수 있어.",avoid:"관심 표현을 채용 확정으로 받아들이거나 답답함만으로 퇴사를 결정하지 마."};
+  if(topic==="직장")return {action:"담당자·일정·결과물의 기준을 맞추는 일이 우선이야.",avoid:"한 번의 고점이나 저점만 보고 커리어 결론을 즉시 확정하지 마."};
+  if(topic==="시험")return {action:"제한 시간 풀이 뒤 지식 부족·조건 누락·시간 부족을 나누면 다음 복습 지점이 보여.",avoid:"공부한 시간이나 익숙한 느낌을 실전 정답률과 같다고 보지 마."};
+  if(topic==="학업")return {action:"집중이 이어지는 구간에는 핵심 과제와 인출 복습을 배치하기 좋아.",avoid:"낮은 활성도만으로 전체 학습 성과가 나쁘다고 보지 않아."};
+  if(topic==="대인관계")return {action:"상대별 반응과 약속 이행을 나눠 보면 관계의 우선순위가 선명해져.",avoid:"한 사람과의 긴장이나 호의를 전체 인간관계 흐름으로 확대하지 마."};
+  if(topic==="연애")return {action:"호감 표현보다 만남의 지속성과 관계 속도가 함께 이어지는지가 핵심이야.",avoid:"연애 상대활성도만 보고 상대의 감정이나 관계 성립을 미리 확정하지 마."};
+  if(topic==="연락")return {action:"질문에 대한 답과 대화 지속, 다음 약속이 연락 흐름을 구분하는 기준이야.",avoid:"발신 적합도가 높다는 이유로 상대의 수신 의향까지 높다고 해석하지 마."};
+  if(topic==="재회")return {action:"재접촉 뒤 대화 재개와 만남 제안이 이어질 때 관계 재정립을 따로 볼 수 있어.",avoid:"재접점 활성도를 재회 확정이나 상대의 복귀 의사로 바꾸어 읽지 마."};
+  if(topic==="금전")return {action:"예정 결제·가용 예산·현금 흐름을 나란히 보는 편이 맞아.",avoid:"확인되지 않은 기대만으로 지출을 확대하지 마."};
+  if(topic==="소식")return {action:"발신 주체가 분명한 안내와 확정 일정이 다음 판단의 기준이야.",avoid:"중간 전달만으로 결과를 확정하지 마."};
+  if(INVESTMENT_TOPICS.has(topic))return {action:"실제 시장 데이터와 본인 리스크 한도가 판단의 우선 기준이야.",avoid:"상대지수를 가격방향·수익률 예측으로 바꾸거나 레버리지를 확대하지 마."};
+  return {action:"수면·일정·회복 속도가 실제 강도를 정하는 기준이야.",avoid:"하루의 컨디션 변화를 장기 상태로 단정하지 마."};
 }
 
 function topicRealityCheck(topic:string){
-  if(topic==="연애")return "이날은 호감 표현, 만남의 지속성, 관계를 구체화하는 행동이 실제로 이어지는지 확인해.";
-  if(topic==="연락")return "이날은 연락 횟수보다 답변의 구체성, 대화의 지속, 다음 약속으로 이어지는지를 확인해.";
-  if(topic==="재회")return "이날은 과거 인연의 실제 재접촉이나 대화 재개가 있는지를 확인하되 재회 결과로 단정하지 마.";
-  if(topic==="대인관계")return "이날은 상대별 반응과 약속 이행처럼 관찰 가능한 관계 행동을 구분해서 확인해.";
-  if(topic==="직장")return "이날은 업무 요청, 협의, 일정 진행처럼 실제로 확인되는 직장 흐름을 기준으로 봐.";
-  if(topic==="이직")return "이날은 제안, 공고, 면담, 조건 확인처럼 구체적인 이직 움직임이 있는지를 확인해.";
-  if(topic==="학업")return "이날은 집중 지속 시간과 과제 진척처럼 확인 가능한 학업 반응을 기준으로 봐.";
-  if(topic==="시험")return "이날은 준비도와 실수 점검처럼 실제 시험 대응에 필요한 신호를 확인해.";
-  if(topic==="금전")return "이날은 입금, 지출, 계약처럼 확인 가능한 금전 변화를 먼저 점검해.";
-  if(topic==="소식")return "이날은 안내의 출처, 전달 내용, 후속 일정이 구체적인지를 확인해.";
-  if(topic==="컨디션")return "이날은 수면, 회복, 일정 소화처럼 확인 가능한 몸 상태를 기준으로 봐.";
+  if(topic==="연애")return "이날의 현실 단서는 호감 표현 뒤 만남과 상호 반응이 이어지는지에 있어.";
+  if(topic==="연락")return "연락 횟수보다 답변의 구체성, 대화 지속, 다음 약속이 핵심이야.";
+  if(topic==="재회")return "실제 재접촉과 대화 재개가 현실 단서이며, 그 자체가 재회 결과는 아니야.";
+  if(topic==="대인관계")return "상대별 반응과 약속 이행이 관계 흐름을 구분하는 현실 단서야.";
+  if(topic==="직장")return "업무 요청이 담당자·마감·결과물로 구체화되는지가 현실 기준이야.";
+  if(topic==="이직")return "공고·면담·직무·보상·입사일이 구체화되는지가 이직 움직임의 기준이야.";
+  if(topic==="학업")return "집중 지속 시간과 실제로 끝낸 진도가 학업 반응을 보여줘.";
+  if(topic==="시험")return "제한 시간 정답률과 반복 오답이 준비 상태를 구분해.";
+  if(topic==="금전")return "입금·지출·계약 뒤 남는 현금 흐름이 금전 변화의 현실 기준이야.";
+  if(topic==="소식")return "발신 주체와 후속 일정이 구체적인 안내가 실제 소식이야.";
+  if(topic==="컨디션")return "수면 뒤 회복과 일정 소화 정도가 실제 몸 상태의 기준이야.";
   if(INVESTMENT_TOPICS.has(topic))return "이날은 실제 가격·거래량·손익 기준을 우선하고, 이 상대지수를 매매 신호로 사용하지 마.";
   return "이날 실제로 확인되는 변화가 계산 흐름과 함께 나타나는지를 살펴봐.";
 }
@@ -209,10 +217,22 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const evidenceLimit=importance==="핵심"?5:importance==="주목"?3:2;
     const refs=traceRows.map((row:any)=>String(row.id)).slice(0,evidenceLimit);
     const risk=topic===INVESTMENT_RISK;
-    const direction=risk?(avg>=60?"경계 압력이 상대적으로 높은 편":avg<40?"경계 압력이 상대적으로 낮은 편":"경계 압력이 중간권"):(/약|낮/.test(String(stat?.band??""))?"상대적으로 약한 편":/강|높/.test(String(stat?.band??""))?"상대적으로 강한 편":avg>=60?"상대적으로 강한 편":avg<40?"상대적으로 약한 편":"중간권");
+    const evidenceDirection=topicEvidenceDirection(payload,topic);
+    const magnitude=/약|낮/.test(String(stat?.band??""))||avg<40?"활성도는 낮은 편":/강|높/.test(String(stat?.band??""))||avg>=60?"활성도는 높은 편":"활성도는 중간권";
+    const direction=risk
+      ? (avg>=60?"경계 압력이 상대적으로 높은 편":avg<40?"경계 압력이 상대적으로 낮은 편":"경계 압력이 중간권")
+      : evidenceDirection==="supportive"?`${magnitude}이고 도움 방향 근거가 연결돼 있어`
+        : evidenceDirection==="challenging"?`${magnitude}이고 주의 방향 근거가 연결돼 있어`
+          : evidenceDirection==="mixed"?`${magnitude}이며 도움과 주의 방향이 함께 있어`
+            : avg<40?"활성도는 낮고 이번 기간의 중심 주제로 두드러지지 않아"
+              : `${magnitude}이며 좋고 나쁨을 가를 방향 근거는 뚜렷하지 않아`;
     if(importance==="참고")return {
       topic,importance,
-      verdict:`${topicSubject(topic)} ${singleDay?"이날":"이번 기간"} 우선순위로 볼 직접 근거가 상대적으로 약해.`,
+      verdict:evidenceDirection==="challenging"
+        ? `${topicSubject(topic)} ${singleDay?"이날":"이번 기간"} 주의 방향 근거는 있지만 중심 주제로 두드러지지는 않아.`
+        : evidenceDirection==="supportive"
+          ? `${topicSubject(topic)} ${singleDay?"이날":"이번 기간"} 도움 방향 근거는 있지만 중심 주제로 두드러지지는 않아.`
+          : `${topicSubject(topic)} ${singleDay?"이날":"이번 기간"} 중심 주제로 볼 직접 근거가 두드러지지 않아.`,
       reason:readable.summaries.length?`참고 가능한 직접 근거: ${readable.summaries[0]}. 다른 분야보다 우선순위는 낮게 봐.`:"직접 연결된 세부 계산근거가 제한적이라 핵심 판단에는 사용하지 않아.",
       timing:"",action:"",avoid:"",confidence:"낮음",
       confidence_reason:"핵심 판단이 아닌 제한된 근거만 확인해 확신도를 낮게 두었어.",
@@ -254,7 +274,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const confidence=independent.size>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
     return {
       topic,importance,
-      verdict:singleDay?`${topicSubject(topic)} 이날 활성도가 ${pointScoreText(avg)}점으로 ${direction}이야.`:`${topicSubject(topic)} 이번 기간에서 ${direction}으로 읽혀.`,
+      verdict:singleDay?`${topicSubject(topic)} 이날 ${pointScoreText(avg)}점이며 ${direction}이야.`:`${topicSubject(topic)} 이번 기간에는 ${direction}.`,
       reason:reasonParts.join(" "),
       timing,
       action:va.action,
@@ -568,7 +588,7 @@ export function buildLocalQualityFallbackCore(payload:any){
     conclusion:String(topicMap?.[topic]?.verdict??`${topic}은 직접 근거가 충분하지 않아 결론을 넓히지 않아.`),
     real_scene:scene,action,change_condition:change,evidence_refs:Array.isArray(topicMap?.[topic]?.evidence_refs)?topicMap[topic].evidence_refs.slice(0,4):[],applicability,
   });
-  const relationshipBase=editorial("대인관계","사람마다 약속과 역할 이행이 달라지는지를 구분해서 봐.","중요한 부탁과 거절 기준을 짧게 말해.","약속 이행과 역할 존중이 반복되면 관계 판단을 올리고, 침범과 회피가 반복되면 낮춰.");
+  const relationshipBase=editorial("대인관계","사람마다 약속과 역할 이행이 달라지는지가 핵심이야.","중요한 부탁은 가능한 범위와 거절 기준을 함께 말할 수 있어.","약속 이행과 역할 존중이 반복되면 관계 여유가 커지고, 침범과 회피가 반복되면 거리 조정이 필요해.");
   return {
     headline:singleDay?`${periodLabel} ${focus} 흐름을 계산근거 중심으로 확인하는 날이야.`:`${periodLabel}은 ${focus} 흐름을 계산근거 중심으로 확인하는 기간이야.`,
     overall:{
@@ -586,29 +606,29 @@ export function buildLocalQualityFallbackCore(payload:any){
       relationship:{
         summary:relationshipBase,
         friends:{...relationshipBase,real_scene:"친구·지인과는 약속 변경, 도움의 균형, 말의 온도가 실제 기준이야.",action:"모임이나 약속의 우선순위를 먼저 정해.",change_condition:"먼저 일정과 도움을 구체화하면 긍정적으로, 반복 취소와 일방적 부탁이면 보수적으로 읽어.",applicability:"conditional"},
-        coworkers:{...relationshipBase,real_scene:"직장동료·협업 상대와는 담당자, 마감일, 완료 기준이 분명한지가 핵심이야.",action:"역할과 책임 범위를 문장으로 남겨.",change_condition:"합의한 역할을 지키면 판단을 올리고, 책임 전가가 반복되면 낮춰.",applicability:"conditional"},
+        coworkers:{...relationshipBase,real_scene:"직장동료·협업 상대와는 담당자, 마감일, 완료 기준이 분명한지가 핵심이야.",action:"역할과 책임 범위를 문장으로 남기는 편이 맞아.",change_condition:"합의한 역할이 지켜지면 협업 흐름이 안정되고, 책임 전가가 반복되면 범위를 다시 정해야 해.",applicability:"conditional"},
         family:{...relationshipBase,real_scene:"가족·가까운 사람과는 돌봄과 간섭, 생활 리듬의 경계가 실제 장면이야.",action:"가능한 도움과 어려운 요구를 나눠 말해.",change_condition:"경계를 존중하면 관계 여유가 늘고, 죄책감 압박이 반복되면 거리를 조정해.",applicability:"conditional"},
         new_people:{...relationshipBase,real_scene:"새 인맥은 소개 자체보다 두 번째 대화와 후속 약속이 생기는지가 기준이야.",action:"관심 가는 한두 사람에게만 후속 대화를 이어가.",change_condition:"상호 질문과 다음 약속이 생기면 넓혀 읽고, 일회성 인사로 끝나면 사건화하지 마.",applicability:"conditional"},
-        boundaries:{...relationshipBase,real_scene:"갈등·경계는 부탁 거절, 역할 침범, 반복되는 오해에서 확인해.",action:"불편한 요청에는 가능한 범위와 불가능한 범위를 분리해 답해.",change_condition:"거절 뒤 조정이 되면 안정적으로, 압박과 침범이 계속되면 주의 판단을 올려.",applicability:"conditional"},
-        love_general:editorial("연애","호감 표현과 실제 만남, 관계 속도가 같은 방향으로 가는지 봐.","관계 상태에 맞는 한 가지 질문을 먼저 확인해.","상호 행동이 이어지면 판단을 올리고 말뿐이면 낮춰."),
-        love_single:editorial("연애","솔로라면 소개·모임 뒤 두 번째 접점이 생기는지가 기준이야.","새 사람을 넓게 만나기보다 대화가 이어지는 접점에 시간을 써.","상호 질문과 재약속이 생기면 새 만남 판단을 올려."),
-        love_crush:editorial("연애","짝사랑이라면 호감 표현 하나보다 상대가 질문하고 시간을 내는지가 상호성 기준이야.","추측 대신 한 번의 명확한 제안 뒤 반응을 봐.","구체적 답과 대안 일정이 오면 올리고, 회피가 반복되면 낮춰."),
-        love_flirting:editorial("연애","썸이라면 대화량보다 다음 약속과 실제 만남 뒤 태도의 일관성이 중요해.","관계 속도와 기대를 한 번은 말로 맞춰.","만남과 후속 행동이 이어지면 올리고, 연락만 길어지면 보류해."),
-        love_ambiguous:editorial("연애","관계 미정이라면 친밀감과 합의된 관계를 같은 것으로 보지 마.","서로 원하는 관계와 만남 빈도를 직접 확인해.","말과 행동이 일치하면 올리고, 정의를 피한 채 친밀감만 요구하면 낮춰."),
-        love_couple:editorial("연애","연애 중이라면 표현 횟수보다 함께 보내는 시간과 갈등 뒤 회복 행동을 봐.","일정과 생활 리듬에서 반복되는 마찰 하나를 합의해.","합의가 지켜지면 올리고 같은 갈등을 회피하면 낮춰."),
-        love_reunion_interest:editorial("재회","재회 관심은 생각남, 연락, 만남, 관계 재구축을 다른 단계로 봐.","연락이 와도 질문 지속·구체적 만남·이전 문제 대화를 순서대로 확인해.","다음 단계 행동이 생기면 올리고 안부와 추억만 반복되면 다시 낮춰."),
-        contact_activation:editorial("연락","연락 전체는 메시지가 실제로 시작되고 답이 오가는지를 보는 축이야.","필요한 연락은 질문 하나와 기한을 분명히 보내.","답변이 구체화되면 올리고 읽음·단답만 반복되면 낮춰."),
-        contact_continuity:editorial("연락","연락 지속은 질문과 답, 후속 약속이 끊기지 않는지가 기준이야.","대화가 시작되면 다음 행동을 하나만 구체화해.","후속 질문이나 약속이 생기면 지속 판단을 올려."),
+        boundaries:{...relationshipBase,real_scene:"갈등·경계는 부탁 거절, 역할 침범, 반복되는 오해에서 드러나.",action:"불편한 요청에는 가능한 범위와 불가능한 범위를 나눠 답하는 편이 맞아.",change_condition:"거절 뒤 조정이 되면 안정 흐름이고, 압박과 침범이 계속되면 주의가 필요해.",applicability:"conditional"},
+        love_general:editorial("연애","호감 표현과 실제 만남, 관계 속도가 같은 방향으로 가는지가 핵심이야.","관계 상태에 맞는 한 가지 질문이면 충분해.","상호 행동이 이어지면 관계가 구체화되고, 말뿐이면 현재 속도를 유지하는 편이 맞아."),
+        love_single:editorial("연애","솔로라면 소개·모임 뒤 두 번째 접점이 생기는지가 기준이야.","대화가 이어지는 한두 접점에 시간을 쓰기 좋은 구간이야.","상호 질문과 재약속이 생기면 새 만남의 흐름이 구체화돼."),
+        love_crush:editorial("연애","짝사랑이라면 호감 표현 하나보다 상대가 질문하고 시간을 내는지가 상호성 기준이야.","한 번의 명확한 제안 뒤 구체적인 답을 보는 편이 맞아.","대안 일정이 오면 상호성이 확인되고, 회피가 반복되면 현재 거리로 읽어야 해."),
+        love_flirting:editorial("연애","썸이라면 대화량보다 다음 약속과 실제 만남 뒤 태도의 일관성이 중요해.","관계 속도와 기대를 말로 맞출 가치가 있어.","만남과 후속 행동이 이어지면 관계가 구체화되고, 연락만 길어지면 현재 단계가 유지돼."),
+        love_ambiguous:editorial("연애","관계 미정이라면 친밀감과 합의된 관계는 다른 단계야.","서로 원하는 관계와 만남 빈도를 말로 맞출 필요가 있어.","말과 행동이 일치하면 관계가 구체화되고, 정의 회피가 반복되면 애매한 상태가 이어져."),
+        love_couple:editorial("연애","연애 중이라면 표현 횟수보다 함께 보내는 시간과 갈등 뒤 회복 행동이 중요해.","일정과 생활 리듬에서 반복되는 마찰 하나를 합의할 가치가 있어.","합의가 지켜지면 안정감이 커지고, 같은 갈등을 회피하면 조정 과제가 남아."),
+        love_reunion_interest:editorial("재회","재회 관심은 생각남, 연락, 만남, 관계 재구축이 서로 다른 단계야.","연락이 와도 질문 지속·구체적 만남·이전 문제 대화를 순서대로 봐야 해.","다음 단계 행동이 생기면 재접촉이 구체화되고, 안부와 추억만 반복되면 그 단계에 머물러."),
+        contact_activation:editorial("연락","연락 전체는 메시지가 실제로 시작되고 답이 오가는지를 보는 축이야.","필요한 연락은 질문 하나와 기한이 분명할수록 답하기 쉬워.","답변이 구체화되면 대화가 이어지고, 읽음·단답만 반복되면 현재 흐름이 유지돼."),
+        contact_continuity:editorial("연락","연락 지속은 질문과 답, 후속 약속이 끊기지 않는지가 기준이야.","대화가 시작되면 다음 행동 하나가 구체적일수록 좋아.","후속 질문이나 약속이 생기면 지속 흐름이 확인돼."),
       },
       work_study:{
-        work:editorial("직장","업무에서는 담당자·마감일·완료 기준이 실제 진척 판단이야.","가장 중요한 작업의 완료 기준부터 합의해.","승인과 산출물이 확인되면 진척 판단을 올려."),
-        career_change:editorial("이직","이직은 관심 표현이 아니라 직무·보상·입사일이 적힌 제안이 기준이야.","현 직장 조건과 제안 조건을 항목별로 비교해.","서면 조건이 구체화되면 올리고 구두 관심만 있으면 보류해."),
-        exam:editorial("시험","시험은 익숙함보다 제한 시간 안의 정답률과 조건 누락이 기준이야.","시간을 재고 한 세트를 풀어 오류 원인을 나눠.","정답률과 시간 안정이 함께 오르면 준비 판단을 올려."),
-        study:editorial("학업","학업은 진도량보다 다음날 다시 설명할 수 있는지가 이해 기준이야.","새 진도 뒤 바로 인출 복습을 넣어.","빈 종이 재현과 오답 감소가 보이면 학습 판단을 올려."),
+        work:editorial("직장","업무에서는 담당자·마감일·완료 기준이 실제 진척 판단이야.","가장 중요한 작업의 완료 기준을 먼저 맞추는 편이 효율적이야.","승인과 산출물이 나오면 실제 진척으로 볼 수 있어."),
+        career_change:editorial("이직","이직은 관심 표현이 아니라 직무·보상·입사일이 적힌 제안이 기준이야.","현 직장과 제안 조건을 항목별로 비교할 가치가 있어.","서면 조건이 구체화되면 선택지가 되고, 구두 관심만 있으면 검토 단계에 머물러."),
+        exam:editorial("시험","시험은 익숙함보다 제한 시간 안의 정답률과 조건 누락이 기준이야.","한 세트를 시간 안에 푼 뒤 오류 원인을 나누면 준비 상태가 보여.","정답률과 시간 안정이 함께 오르면 준비가 실제로 진전된 거야."),
+        study:editorial("학업","학업은 진도량보다 다음날 다시 설명할 수 있는지가 이해 기준이야.","새 진도 뒤 인출 복습을 붙이면 이해 정도가 드러나.","빈 종이 재현과 오답 감소가 보이면 학습이 실제로 쌓이는 흐름이야."),
       },
-      money_news:{money:editorial("금전","금전은 예정 결제와 가용 현금, 큰 구매 뒤 잔액을 함께 봐.","먼저 납부할 돈을 분리하고 선택 지출을 뒤로 미뤄.","필수 지출 뒤 안전 잔액이 남으면 판단을 올려."),news:editorial("소식","소식은 중간 전달보다 발신 주체가 분명한 공식 안내가 기준이야.","기다리는 답의 담당자와 회신 기한을 확인해.","공식 문서나 확정 일정이 오면 판단을 올려.")},
-      investment:{psychology:editorial("투자심리","불안·과열 감정과 실제 보유 조건을 분리해서 봐.","매수·보유 이유와 손실 한도를 다시 적어.","시장 데이터가 기존 가정을 확인하면 유지하고 훼손하면 낮춰."),realization:editorial("수익실현","수익실현은 욕구보다 현금 필요와 사전 기준 충족 여부가 핵심이야.","필요 현금과 목표 비중을 먼저 계산해.","사전 기준이 충족되면 실행 검토하고 기대감만 커지면 보류해."),entry:editorial("신규진입","신규진입은 충동보다 가격·거래량·집중도·손실 한도 조건을 봐.","진입 조건과 무효화 기준을 주문 전에 적어.","조건이 모두 맞으면 검토하고 하나라도 빠지면 기다려.")},
-      condition:{condition:editorial("컨디션","컨디션은 집중 지속 시간과 피로 뒤 회복 속도로 확인해.","집중 블록 뒤 짧은 휴식을 미리 배치해.","휴식 뒤 집중이 돌아오면 강도를 유지하고 회복되지 않으면 낮춰.")},
+      money_news:{money:editorial("금전","금전은 예정 결제와 가용 현금, 큰 구매 뒤 잔액을 함께 봐.","먼저 납부할 돈과 선택 지출을 나누면 현금 흐름이 선명해져.","필수 지출 뒤 안전 잔액이 남으면 선택 여지가 커져."),news:editorial("소식","소식은 중간 전달보다 발신 주체가 분명한 공식 안내가 기준이야.","기다리는 답의 담당자와 회신 기한이 핵심이야.","공식 문서나 확정 일정이 오면 다음 단계가 구체화돼.")},
+      investment:{psychology:editorial("투자심리","불안·과열 감정과 실제 보유 조건을 분리해서 봐.","매수·보유 이유와 손실 한도가 판단의 기준이야.","시장 데이터가 기존 가정을 확인하면 유지 조건이고, 훼손하면 재검토 조건이야."),realization:editorial("수익실현","수익실현은 욕구보다 현금 필요와 사전 기준 충족 여부가 핵심이야.","필요 현금과 목표 비중을 먼저 계산할 가치가 있어.","사전 기준이 충족되면 실행 검토 구간이고, 기대감만 커지면 보류 조건이야."),entry:editorial("신규진입","신규진입은 충동보다 가격·거래량·집중도·손실 한도 조건을 봐.","진입 조건과 무효화 기준이 주문 전 판단의 핵심이야.","조건이 모두 맞아야 검토 구간이고, 하나라도 빠지면 아직 진입 조건이 아니야.")},
+      condition:{condition:editorial("컨디션","컨디션은 집중 지속 시간과 피로 뒤 회복 속도로 드러나.","집중 블록 뒤 짧은 휴식을 미리 배치하는 편이 자연스러워.","휴식 뒤 집중이 돌아오면 현재 강도가 맞고, 회복되지 않으면 일정 여유가 더 필요해.")},
     },
     relationship_reading:{
       context:"관계가 중요 분야일 때 상대 → 나, 나 → 상대, 과거 인연 재접점을 서로 다른 축으로 분리해 확인해.",

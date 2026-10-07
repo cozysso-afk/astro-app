@@ -87,6 +87,7 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} ca
   const f=fortuneFixture(period)
   f.calculation.western.overall.연락={...f.calculation.western.overall.연락,average:44}
   f.data.topic_analysis.연락.evidence_refs=['W:contact']
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:3,polarity:-0.7})
   const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
   assert.match(visible, /signal-incoming[\s\S]*?상대가 먼저 오는 흐름[\s\S]*?약함/)

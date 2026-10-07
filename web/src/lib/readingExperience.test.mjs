@@ -13,6 +13,7 @@ test('all 15 topics participate; extreme reference with evidence beats near-neut
   data.topic_analysis.학업.importance='핵심'
   data.topic_analysis.시험.evidence_refs=['W:exam']
   context.calculation.western.overall.시험=stat(91)
+  context.calculation.western.daily_scores[0].evidence.push({source_topics:['시험'],transit:'Mercury',target:'Jupiter',aspect:'trine',contribution:4,polarity:0.8})
   const view=buildFortuneUserSummary(data,context)
   assert.equal(view.bestFlow[0],'시험')
   assert.equal(view.focusTopics[0].topic,'시험')
@@ -227,6 +228,7 @@ for (const period of ['today','week','month','year']) test(`observed contact ref
   const f=fortuneFixture(period)
   f.calculation.western.overall.연락=stat(44)
   f.data.topic_analysis.연락.evidence_refs=['W:contact']
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:3,polarity:-0.7})
   // Stronger salience keeps contact out of the three detailed topics.
   f.calculation.western.overall.재회=stat(83)
   f.data.topic_analysis.재회.evidence_refs=['W:reconnection']
@@ -251,7 +253,8 @@ test('evidence depth names only linked symbols and explains meaning, not raw ide
   assert.match(topic.reason,/목성.*기대/)
   assert.doesNotMatch(topic.reason,/해왕성|orb|W:|S:|T:/)
   assert.ok(topic.conclusion.split('.').filter(Boolean).length>=2)
-  assert.ok(topic.action && topic.observe && topic.caution)
+  assert.ok(topic.action && topic.observe)
+  assert.equal(topic.caution,undefined)
   f.calculation.western.daily_scores=[]
   const missing=buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계')
   assert.match(missing.reason,/부족|적어|없어/)
@@ -272,8 +275,8 @@ test('actual week, month and year progressions differ and never fill missing dat
   }
   assert.equal(views.today,undefined)
   assert.match(views.week,/후반.*초반/)
-  assert.match(views.month,/이번 달.*구간.*주별/)
-  assert.match(views.year,/2026-10-01~2026-10-31.*2026-11-01~2026-11-30.*장기/)
+  assert.match(views.month,/이번 달.*구간.*중심에서 멀어져/)
+  assert.match(views.year,/2026-10-01~2026-10-31.*2026-11-01~2026-11-30.*중심에서 멀어져/)
   const f=fortuneFixture('month');f.calculation.western.daily_scores=[];f.calculation.western.overall.대인관계=stat(67)
   assert.equal(buildFortuneUserSummary(f.data,f.context).focusTopics.find(t=>t.topic==='대인관계').timing,undefined)
 })

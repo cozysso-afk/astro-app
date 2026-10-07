@@ -1,5 +1,6 @@
 import type { FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
+import { fortunePresentationTone } from './fortuneToneCalibration.ts'
 
 export type BasicFortuneTone = 'good' | 'steady' | 'caution'
 export type BasicFortuneRow = {
@@ -76,11 +77,8 @@ function statFor(calculation: IntegratedApiResponse, topic: string): FortuneStat
   return calculation.western.overall?.[topic] ?? calculation.western.relationship_signals?.[topic] ?? null
 }
 
-function toneFor(topic: string, score: number): BasicFortuneTone {
-  if (topic === '투자주의') return score >= 55 ? 'caution' : score < 40 ? 'good' : 'steady'
-  if (score >= 60) return 'good'
-  if (score < 40) return 'caution'
-  return 'steady'
+function toneFor(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat): BasicFortuneTone {
+  return fortunePresentationTone(calculation, topic, stat.average, String(stat.band ?? ''))
 }
 
 function meaningFor(topic: string, tone: BasicFortuneTone) {
@@ -120,7 +118,7 @@ function timingFor(calculation: IntegratedApiResponse, topic: string, stat: Fort
 function rowFor(calculation: IntegratedApiResponse, topic: string): BasicFortuneRow | null {
   const stat = statFor(calculation, topic)
   if (!stat || !Number.isFinite(stat.average)) return null
-  const tone = toneFor(topic, stat.average)
+  const tone = toneFor(calculation, topic, stat)
   const guide = TOPIC_GUIDE[topic] ?? { nuance:'이 분야는 점수 하나보다 실제 상황과 함께 읽어야 해.', practice:'지금 할 수 있는 행동을 하나 정해서 구체적으로 확인해.', caution:'한 번의 신호만으로 결과를 확정하지 마.' }
   return {
     topic,

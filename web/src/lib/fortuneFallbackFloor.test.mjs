@@ -82,7 +82,8 @@ test('all ten user fields keep a concrete deterministic floor when structured AI
       assert.ok(row.conclusion.length >= 20, `${field.id}/${row.topic}: conclusion too thin`)
       assert.ok(row.action.length >= 10, `${field.id}/${row.topic}: action missing`)
       assert.ok((row.observe ?? '').length >= 10, `${field.id}/${row.topic}: observable scene missing`)
-      assert.ok((row.caution ?? '').length >= 10, `${field.id}/${row.topic}: caution missing`)
+      if (row.caution) assert.ok(row.caution.length >= 10, `${field.id}/${row.topic}: caution too thin`)
+      else assert.doesNotMatch(row.conclusion, /나쁘|위험|조심|하지 마/, `${field.id}/${row.topic}: neutral fallback became negative`)
       assert.doesNotMatch(`${row.conclusion} ${row.action} ${row.observe} ${row.caution}`, GENERIC_ONLY_RE, `${field.id}/${row.topic}: generic-only fallback leaked`)
     }
   }
