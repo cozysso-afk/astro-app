@@ -9,7 +9,7 @@ const calculation = {
   western:{
     overall:{금전:stat(64,'좋음'),학업:stat(34,'약함'),직장:stat(52),컨디션:stat(38,'약함'),투자주의:stat(68,'높음')},
     relationship_signals:{연락:stat(58),재회:stat(42)},
-    daily_scores:[{date:'2026-09-18',evidence:[{source_topics:['금전'],contribution:4.2,transit:'Venus',target:'Moon',aspect:'trine'}]}],
+    daily_scores:[{date:'2026-09-18',evidence:[{source_topics:['금전'],contribution:4.2,polarity:1,transit:'Venus',target:'Moon',aspect:'trine'}]}],
   },
 }
 
@@ -17,7 +17,9 @@ test('basic reading is useful without any AI payload',()=>{
   const reading=buildBasicFortuneReading(calculation,'week')
   assert.match(reading.headline,/금전/)
   assert.ok(reading.favorable.some(row=>row.topic==='금전'))
-  assert.ok(reading.caution.some(row=>row.topic==='학업'||row.topic==='컨디션'))
+  const lowOnly=buildBasicFortuneReading(calculation,'week',{id:'study',label:'학업운',desc:'',topics:['학업','컨디션'],lens:'학업'})
+  assert.ok(lowOnly.steady.some(row=>row.topic==='학업'||row.topic==='컨디션'))
+  assert.ok(!lowOnly.caution.some(row=>row.topic==='학업'||row.topic==='컨디션'))
   assert.match(reading.summary,/이유.*활용법.*주의할 점.*시기/)
 })
 

@@ -11,7 +11,7 @@ const finalFont = readFileSync(new URL('../reading-font-fix-v54.css', import.met
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 
 test('western independent view starts with an actual period takeaway', () => {
-  assert.match(view, /const westernReaderHeadline = westernHeadline\(selectedWestern,westernPeriod\)/)
+  assert.match(view, /const westernReaderHeadline = westernHeadline\(selectedWestern,westernPeriod,c\)/)
   assert.match(view, /className="system-hero western-reader-hero"/)
   assert.match(view, /<span>서양점성술 · \{westernPeriod\}<\/span><h3>\{westernReaderHeadline\}<\/h3>/)
   assert.doesNotMatch(view, /분야의 강약과 날짜를 나눠 읽어봐/)
@@ -28,7 +28,7 @@ test('western reader copy names the score difference and gives a concrete next a
 
 test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /className="system-score-grid western-score-grid"/)
-  assert.match(view, /className="western-score-guidance">\{westernGuidance\(name,s\)\}/)
+  assert.match(view, /className="western-score-guidance">\{westernGuidance\(name,s,c\)\}/)
   assert.match(view, /className="western-score-more">날짜 보기<\/span><\/summary>/)
   assert.match(view, /연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니/)
 })
@@ -38,7 +38,7 @@ test('western date detail uses relative score labels and tells users how to act'
   assert.match(view, /점수가 높은 날:/)
   assert.match(view, /점수가 낮은 날:/)
   assert.match(view, /실제 일정·조건을 함께 확인해/)
-  assert.match(view, /피해야 할 날로 단정하지 말고/)
+  assert.match(view, /불리한 사건이나 피해야 할 날이라는 뜻은 아니야/)
 })
 
 test('important windows use action checks instead of fortune-style verdict labels', () => {

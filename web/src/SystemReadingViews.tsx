@@ -1,4 +1,5 @@
 import type { LoveStatus } from './lib/loveReadingContext'
+import { fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
 import type { FortuneField } from './lib/fortuneFields'
 import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
@@ -74,13 +75,18 @@ function sajuOverviewText(lenses:Lens[], fallback:string) {
   const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
   return `${concise}${secondary ? ` 이어서 ${secondary}도 확인해.` : ''}`
 }
-function westernCaution(name:string, stat:FortuneStat) {
-  if (name === '투자주의') return stat.average >= 60 || /강|높/.test(String(stat.band ?? ''))
-  return stat.average < 40 || /약|낮/.test(String(stat.band ?? ''))
+const WESTERN_NEUTRAL_COPY: Record<string,string> = {
+  금전:'예산과 현금 흐름은 평소 계획에 가까워.', 학업:'진도와 복습은 평소 리듬에 가까워.', 시험:'준비 흐름은 크게 흔들리지 않는 편이야.',
+  직장:'업무 범위와 마감은 기존 계획을 이어가기 충분해.', 이직:'이직을 크게 촉발하는 신호는 두드러지지 않아.', 대인관계:'관계 흐름은 평소 거리와 약속을 유지하는 쪽이 자연스러워.',
+  연애:'관계 속도를 크게 바꾸는 신호는 두드러지지 않아.', 연락:'연락을 크게 촉발하거나 막는 방향은 뚜렷하지 않아.', 재회:'재접촉을 강하게 뜻하는 방향은 뚜렷하지 않아.',
+  소식:'새 소식을 크게 앞당기거나 늦추는 방향은 뚜렷하지 않아.', 컨디션:'일정과 회복은 평소 리듬을 유지하는 흐름이야.',
+  투자심리:'투자 판단을 크게 흔드는 방향은 뚜렷하지 않아.', 수익실현:'청산 판단을 새로 바꿀 방향은 뚜렷하지 않아.', 신규진입:'신규 진입을 새로 촉발하는 방향은 뚜렷하지 않아.',
+  투자주의:'별도 경계 압력이 두드러지지 않지만 일반적인 시장 위험은 그대로야.',
 }
-function westernGuidance(name:string, stat:FortuneStat) {
+function westernGuidance(name:string, stat:FortuneStat, calculation:IntegratedApiResponse) {
   const pair = WESTERN_FLOW_COPY[name] ?? ['결정 전에 확인할 조건을 적고, 비어 있는 항목부터 채워.','확인되지 않은 조건이 있으면 결정을 미루고 사실부터 확인해.']
-  return pair[westernCaution(name,stat) ? 1 : 0]
+  const tone = fortunePresentationTone(calculation,name,stat.average,String(stat.band ?? ''))
+  return tone === 'good' ? pair[0] : tone === 'caution' ? pair[1] : WESTERN_NEUTRAL_COPY[name] ?? `${name}은 평소 흐름에 가까워.`
 }
 function westernWhen(dayCount:number) {
   if (dayCount <= 1) return '오늘'
@@ -104,7 +110,7 @@ function koreanParticle(text:string, pair:'은는'|'이가') {
   const hasFinal = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0
   return `${clean}${pair === '은는' ? (hasFinal ? '은' : '는') : (hasFinal ? '이' : '가')}`
 }
-function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
+function westernHeadline(rows:Array<[string,FortuneStat]>, when:string, calculation:IntegratedApiResponse) {
   const readable = rows.filter(([name])=>name!=='투자주의')
   if (!readable.length) return `${koreanParticle(when,'은는')} 비교할 수 있는 서양점성술 분야 점수가 없어.`
   const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
@@ -112,19 +118,19 @@ function westernHeadline(rows:Array<[string,FortuneStat]>, when:string) {
   const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]] ?? strongest[0]
   const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]] ?? weakest[0]
   if (weakest[0]!==strongest[0] && strongest[1].average-weakest[1].average>=8) {
-    return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높아. ${westernGuidance(strongest[0],strongest[1])} ${koreanParticle(weakLabel,'은는')} 점수가 가장 낮으니 ${westernGuidance(weakest[0],weakest[1])}`
+    return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높아. ${westernGuidance(strongest[0],strongest[1],calculation)} ${koreanParticle(weakLabel,'은는')} 점수가 가장 낮지만, ${westernGuidance(weakest[0],weakest[1],calculation)}`
   }
-  return `${koreanParticle(when,'은는')} 분야별 점수 차이가 크지 않아. ${strongLabel}에서는 ${westernGuidance(strongest[0],strongest[1])}`
+  return `${koreanParticle(when,'은는')} 분야별 점수 차이가 크지 않아. ${strongLabel}에서는 ${westernGuidance(strongest[0],strongest[1],calculation)}`
 }
-function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string) {
+function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string, calculation:IntegratedApiResponse) {
   const readable = rows.filter(([name])=>name!=='투자주의')
   if (!readable.length) return '이 분야의 서양점성술 계산값이 충분하지 않아.'
   const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
   const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
   const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]
   const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]
-  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${strongLabel}을 중심으로 봐. ${westernGuidance(strongest[0],strongest[1])}`
-  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높고, ${koreanParticle(weakLabel,'은는')} 가장 낮아. ${westernGuidance(weakest[0],weakest[1])}`
+  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${strongLabel}을 중심으로 봐. ${westernGuidance(strongest[0],strongest[1],calculation)}`
+  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높고, ${koreanParticle(weakLabel,'은는')} 가장 낮아. 낮은 값은 불리한 사건보다 활성도가 덜 두드러진다는 뜻이야. ${westernGuidance(weakest[0],weakest[1],calculation)}`
 }
 function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
   const picked:Array<[string,FortuneStat]> = []
@@ -176,8 +182,8 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     : selectedBhumi.length ? thaiLifeSummary(selectedBhumi.map(r=>r.bhumi_key)) : '이 분야와 연결된 생활 영역 자료가 없어.'
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
   const westernPeriod = westernWhen(c.period.day_count)
-  const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod)
-  const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod)
+  const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod,c)
+  const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod,c)
   const westernDisplayRows = field || topic!=='전체' ? selectedWestern : representativeWesternRows(selectedWestern)
   const sajuPeriod = westernWhen(c.period.day_count)
   const sajuReaderHeadline = sajuHeadline(selectedLenses,sajuPeriod)
@@ -200,7 +206,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>점수는 사건 확률이 아니야. 특히 연락·재회·투자 관련 값은 실제 행동이나 수익을 보장하지 않으니 조건과 위험을 같이 확인해.</p></header>
       {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}
-      <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 날짜별 점수 차이는 아래처럼 참고해.</p>}<p>점수가 높은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 계획한 일을 진행할 후보일로만 보고 실제 일정·조건을 함께 확인해.</p><p>점수가 낮은 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 피해야 할 날로 단정하지 말고 일정·문서·약속을 한 번 더 확인해.</p></details>)}</div>
+      <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s,c)}</small><span className="western-score-more">날짜 보기</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 날짜별 점수 차이는 아래처럼 참고해.</p>}<p>점수가 높은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 계획한 일을 진행할 후보일로만 보고 실제 일정·조건을 함께 확인해.</p><p>점수가 낮은 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 활성도가 덜 두드러지는 비교일이며, 불리한 사건이나 피해야 할 날이라는 뜻은 아니야.</p></details>)}</div>
       {injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}
     </> : !view.allowed ? <p className="system-unavailable">현재 입력된 출생시간 정보로는 {system==='saju'?'사주':'태국점성술'}를 신뢰도 있게 계산할 수 없어. 화면을 바꿔도 이 제한은 그대로야.</p> : system==='saju' ? <>
       <header className="system-hero saju-reader-hero"><span>사주 · {sajuPeriod}</span><h3>{sajuReaderHeadline}</h3><p>이 기간에 계산된 운 구간을 생활에서 확인할 문제로 풀어봤어. 특정 사건이 반드시 생긴다는 뜻은 아니고, 간지·십성·절기 경계는 아래 계산 근거에서 따로 확인할 수 있어.</p></header>

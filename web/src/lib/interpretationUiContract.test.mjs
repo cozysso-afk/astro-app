@@ -58,6 +58,7 @@ function fixture({
   scores = { 연애: 37, 연락: 37, 컨디션: 36 },
   relationshipScores = { 수신신호: 37, 발신적합: 37, 과거인연접점: 37 },
   keyWindows = [],
+  evidence = [],
 } = {}) {
   const topicAnalysis = Object.fromEntries(topicOrder.map((topic)=>[topic,topicRow(topic,focus[topic] ?? '참고')]))
   const data = {
@@ -93,7 +94,7 @@ function fixture({
     western: {
       overall,
       relationship_signals: Object.fromEntries(Object.entries(relationshipScores).map(([topic,score])=>[topic,stat(score)])),
-      daily_scores: [],
+      daily_scores: evidence.length ? [{ date:'2026-09-12', evidence }] : [],
     },
   }
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder)
@@ -218,9 +219,12 @@ test('period topic normalization supports legacy arrays without exposing numeric
 })
 
 test('daily QA fixture becomes concise natural Korean without default technical language', () => {
-  const { summary } = fixture()
+  const { summary } = fixture({ evidence:[
+    { source_topics:['연애'], transit:'Venus', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+    { source_topics:['컨디션'], transit:'Mars', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+  ] })
   const visible = defaultVisibleText(summary)
-  assert.match(summary.headline, /^오늘은/)
+  assert.match(summary.headline, /^오늘(?:은| 전체)/)
   assert.equal(summary.bestFlow.length, 0)
   assert.equal(summary.cautionItems.length, 2)
   assert.equal(summary.focusTopics.length, 3)
@@ -247,6 +251,11 @@ test('weekly QA fixture states a real priority and keeps meaningful dates natura
     dayCount: 7,
     focus: { 학업: '핵심', 연애: '주목', 연락: '주목' },
     scores: { 학업: 68, 연애: 37, 연락: 37 },
+    evidence: [
+      { source_topics:['학업'], transit:'Mercury', target:'Jupiter', aspect:'trine', contribution:3, polarity:0.7 },
+      { source_topics:['연애'], transit:'Venus', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+      { source_topics:['연락'], transit:'Mercury', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+    ],
     keyWindows: [{ label:'내부 계산 라벨', start:'2026-09-14', end:'2026-09-15', signal:'활용', topics:['학업'], summary:'원문', action:'원문', avoid:'', evidence_refs:['W:x'] }],
   })
   assert.match(summary.headline, /^이번 주는 공부/)
@@ -330,7 +339,12 @@ test('daily scene headline changes its language by domain even when the same pla
 })
 
 test('A/B: study leads favorable flow while relationship weakness stays in caution', () => {
-  const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 } })
+  const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 }, evidence:[
+    { source_topics:['학업'], transit:'Mercury', target:'Jupiter', aspect:'trine', contribution:3, polarity:0.7 },
+    { source_topics:['직장'], transit:'Sun', target:'Jupiter', aspect:'trine', contribution:3, polarity:0.7 },
+    { source_topics:['연애'], transit:'Venus', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+    { source_topics:['컨디션'], transit:'Mars', target:'Saturn', aspect:'square', contribution:3, polarity:-0.7 },
+  ] })
   assert.deepEqual(summary.bestFlow,['학업','직장'])
   assert.deepEqual(summary.cautionFlow,['연애','컨디션'])
   assert.match(summary.headline,/^오늘 전체 흐름에서 가장 먼저 볼 건 학업이야\./)
@@ -370,16 +384,16 @@ test('F: actual topic-linked planets and contribution are translated, unrelated 
   assert.equal(JSON.stringify({data,calculation}),input,'view model must not mutate payload or scores')
 })
 
-test('neutral ranking uses deviation then support then backend order, not array order', () => {
+test('neutral activation ranking never manufactures favorable direction', () => {
   const {data,calculation}=fixture({focus:{연애:'핵심',학업:'핵심',직장:'핵심'},scores:{연애:61,학업:80,직장:80}})
   data.topic_analysis.직장.evidence_refs.push('W:second')
   const entries=normalizeTopicEntries(data.topic_analysis,topicOrder)
   const view=(topicEntries)=>buildFortuneUserSummary(data,{period:'today',calculation,topicEntries})
-  assert.deepEqual(view(entries).bestFlow,['직장','학업'])
-  assert.deepEqual(view([...entries].reverse()).bestFlow,['직장','학업'])
+  assert.deepEqual(view(entries).bestFlow,[])
+  assert.deepEqual(view([...entries].reverse()).bestFlow,[])
   data.topic_analysis.직장.evidence_refs.pop()
   data.priorities=['학업 우선','직장 다음']
-  assert.deepEqual(view(entries).bestFlow,['학업','직장'])
+  assert.deepEqual(view(entries).bestFlow,[])
 })
 
 test('week/month/year timing uses actual distinct high/low dates and day never invents a trend', () => {
