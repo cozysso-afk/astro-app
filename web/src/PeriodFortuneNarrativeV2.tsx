@@ -172,6 +172,7 @@ export function PeriodFortuneNarrativeV2({
   const structuredFieldTopics = verifiedNarrative && field
     ? field.topics
       .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
+      .filter(item => !domainAnsweredTopics.has(item.topic))
       .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
     : []
   const showLongPeriodNarrative = verifiedNarrative && !field && (period === 'month' || period === 'year')
@@ -226,6 +227,10 @@ export function PeriodFortuneNarrativeV2({
       ? 'favorable'
       : ['연애','연락','재회'].includes(topic) ? 'love' : 'system'
   const dedicatedRelationshipField = field?.id === 'love' || field?.id === 'social' || field?.id === 'contact'
+  const domainAnswerRows = verifiedNarrative && field
+    ? field.topics.flatMap(topic => editorial.domainAnswers[topic] ?? [])
+    : []
+  const domainAnsweredTopics = new Set(domainAnswerRows.map(row => row.topic))
   const showContactDirectionDetails = Boolean(editorial.contact)
     && !/동률권|같은 값|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
@@ -273,6 +278,16 @@ export function PeriodFortuneNarrativeV2({
         { kind: 'incoming', label: '상대 → 나', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
         { kind: 'outgoing', label: '나 → 상대', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
       ]}/>} 
+    </section>}
+
+    {!!domainAnswerRows.length && <section className="period-ai-window-section period-ai-domain-answers-v5">
+      <div className="period-ai-section-title"><span>질문별 해설</span><strong>계산된 질문만 답하고, 없는 세부값은 만들지 않아</strong></div>
+      <div className="period-ai-topic-list">{domainAnswerRows.map(item => <article className="period-ai-topic period-ai-domain-answer-v5" data-reading-export-tone={topicTone(item.topic)} key={`domain-v5-${item.topic}-${item.questionKey}`}>
+        <strong>{item.label}</strong>
+        {field.topics.length > 1 && <b>{item.topic}</b>}
+        <p>{item.answer}</p>
+        {item.status === 'partial' && <small>부분 근거 · 이 질문 전체를 확정하는 계산은 아님</small>}
+      </article>)}</div>
     </section>}
 
     {!!structuredFieldTopics.length && <section className="period-ai-window-section period-ai-structured-field-v4">
