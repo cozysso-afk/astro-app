@@ -30,21 +30,22 @@ test('A2 baseline: web hierarchy view preserves past and current windows', () =>
   assert.match(hierarchyView, /value\.current_windows/)
 })
 
-test('A3 baseline gap B: relationship compact prompt carries future hierarchy but omits past/current windows', () => {
-  assert.match(compactPrompt, /reunion_hierarchy:kind==='reunion'\?pick\(r\.reunion_hierarchy/)
-  assert.match(compactPrompt, /['"]top_periods['"]/)
-  assert.match(compactPrompt, /['"]nearest_window['"]/)
-  assert.doesNotMatch(compactPrompt, /past_windows/)
-  assert.doesNotMatch(compactPrompt, /current_windows/)
+test('A3 preserved: relationship compact prompt keeps structured past/current/future hierarchy', () => {
+  assert.match(compactPrompt, /hierarchyForExternal/)
+  assert.match(compactPrompt, /top_periods:list\(h\.top_periods\)/)
+  assert.match(compactPrompt, /past_windows:list\(h\.past_windows\)/)
+  assert.match(compactPrompt, /current_windows:list\(h\.current_windows\)/)
+  assert.match(compactPrompt, /nearest_window:hierarchyWindow/)
 })
 
-test('A4 baseline gap B: production relationship Edge hierarchy packet also omits past/current windows', () => {
+test('A4 preserved: production relationship Edge hierarchy packet keeps bounded past/current windows', () => {
   assert.match(relationshipEdge, /function hierarchyPacket/)
-  assert.match(relationshipEdge, /top_periods/)
-  assert.match(relationshipEdge, /nearest_window/)
   const packet = relationshipEdge.slice(relationshipEdge.indexOf('function hierarchyPacket'), relationshipEdge.indexOf('function aspect'))
-  assert.doesNotMatch(packet, /past_windows/)
-  assert.doesNotMatch(packet, /current_windows/)
+  assert.match(packet, /past_windows:/)
+  assert.match(packet, /current_windows:/)
+  assert.match(packet, /contextLimit=level===0\?3:level===1\?2:1/)
+  assert.match(packet, /top_periods:/)
+  assert.match(packet, /nearest_window:/)
 })
 
 test('A5 baseline: result formatter preserves hierarchy fields except audit-heavy traces', () => {
@@ -54,10 +55,11 @@ test('A5 baseline: result formatter preserves hierarchy fields except audit-heav
   assert.match(resultFormatters, /saju_boundaries/)
 })
 
-test('A6 baseline gap E: readable reunion prose can filter technical causal sentences', () => {
+test('A6 partial fix: readable reunion prose keeps a technical sentence when plain prose underfills the limit', () => {
   assert.match(reunionPanel, /const TECHNICAL_RE/)
   assert.match(reunionPanel, /function readerSentences/)
-  assert.match(reunionPanel, /filter\(row\s*=>\s*!TECHNICAL_RE\.test\(row\)\)/)
+  assert.match(reunionPanel, /if \(plain\.length >= limit\)/)
+  assert.match(reunionPanel, /selected\.push\(row\)/)
 })
 
 test('A7 baseline D: provider editorial sections share one six-field shape', () => {
