@@ -44,8 +44,8 @@ Primary ownership surfaces reviewed in V1:
 
 | ID | Domain/question | Classification | Verified source -> loss/presentation point |
 | --- | --- | --- | --- |
-| R1 | Reunion historical windows | **B** | `reunion_hierarchy_v2.py` emits `past_windows`; `resultFormatters.ts` preserves hierarchy fields except audit-heavy arrays; `compactDeepPrompt.ts` relationship packet selects `top_periods/nearest_window` but omits `past_windows`. |
-| R2 | Reunion current windows | **B** | Engine emits `current_windows`; `web/src/lib/reunionHierarchy.ts` parses them; relationship compact prompt omits them. |
+| R1 | Reunion historical windows | **B** | `reunion_hierarchy_v2.py` emits `past_windows`; `resultFormatters.ts` preserves hierarchy fields except audit-heavy arrays; `compactDeepPrompt.ts` relationship packet selects `top_periods/nearest_window` but omits `past_windows`; production `relationship-interpret-v9-preview/index.ts::hierarchyPacket()` also omits it. |
+| R2 | Reunion current windows | **B** | Engine emits `current_windows`; `web/src/lib/reunionHierarchy.ts` parses them; both the web external compact packet and production relationship Edge `hierarchyPacket()` omit them. |
 | R3 | Reunion future candidates | **P** | `top_periods` and `nearest_window` are explicitly transported and rendered. |
 | R4 | Contact direction comparison | **P/C** | incoming/outgoing scores are preserved and frontend can compare them; independent action-direction gate is intentionally unavailable, so “who contacts first” remains undetermined. Keep the safety distinction. |
 | R5 | Technical evidence in readable reunion prose | **E** | `ReunionHierarchyPanelV3.tsx::readerSentences` filters sentences matching planet/aspect/orb/transit/progression/synastry terms before taking the first two sentences. Technical details may survive elsewhere, but this readable path can discard the only causal sentence. |
