@@ -89,7 +89,7 @@ test('reunion hierarchy puts concise consultation answers before technical engin
   assert.match(hierarchy,/slice\(0,3\)/)
   assert.match(hierarchy,/row\.date >= asOf/)
   assert.match(server,/날짜 문자열을 새로 만들거나/)
-  assert.match(server,/이미 지난 날짜를 미래 핵심 시기처럼/)
+  assert.match(server,/past_windows 날짜를 쓸 때는 반드시 과거\/지난 구간임을 분명히 하고 미래 후보로 승격하지 않는다/)
   assert.match(server,/카르마적 인연/)
   assert.match(server,/summary는 첫 2~3문장 안에서 현재 가장 가까운 단계/)
   assert.match(server,/repeat_risks는 현재 단계와 직접 연결되는 근거가 있는 문제만 최대 2개/)
