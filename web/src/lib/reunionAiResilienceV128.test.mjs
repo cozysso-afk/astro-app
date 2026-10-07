@@ -15,7 +15,8 @@ test('reunion Gemini packet has a tighter target and compact hierarchy windows',
   assert.match(server,/fast_evidence:compactList\(x\?\.fast_evidence,2\)/)
   assert.match(server,/period_support:compactList\(x\?\.period_support,2\)/)
   assert.doesNotMatch(server,/top_periods:h\.top_periods/)
-  assert.doesNotMatch(server,/past_windows:h\.past_windows/)
+  assert.match(server,/past_windows:\(Array\.isArray\(h\?\.past_windows\)/)
+  assert.match(server,/current_windows:\(Array\.isArray\(h\?\.current_windows\)/)
   assert.match(cache,/relationship-v13\.0-answerability-evidence-v1/)
 })
 
