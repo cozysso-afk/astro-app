@@ -297,6 +297,20 @@ const conditionClusterSchema={type:"OBJECT",properties:{condition:editorialSecti
 export const SCHEMA:any={type:"OBJECT",properties:{headline:S,overall:{type:"OBJECT",properties:{summary:S,dominant_pattern:S,best_phase:S,caution_phase:S,evidence_refs:refs},required:["summary","dominant_pattern","best_phase","caution_phase","evidence_refs"]},key_windows:{type:"ARRAY",items:windowSchema},year_phases:{type:"ARRAY",items:phaseSchema},cross_checks:{type:"ARRAY",items:crossCheckSchema},decisions:{type:"ARRAY",items:decisionSchema},clusters:{type:"OBJECT",properties:{relationship:relationshipClusterSchema,work_study:workStudyClusterSchema,money_news:moneyNewsClusterSchema,investment:investmentClusterSchema,condition:conditionClusterSchema},required:["relationship","work_study","money_news","investment","condition"]},relationship_reading:relationshipSchema,contact_flow:{type:"OBJECT",properties:{incoming:S,outgoing:S,reconnection:S},required:["incoming","outgoing","reconnection"]},investment_reading:{type:"OBJECT",properties:{psychology:S,realization:S,entry:S,risk:S},required:["psychology","realization","entry","risk"]},systems:{type:"OBJECT",properties:{western:S,saju:S,thai:S},required:["western","saju","thai"]},priorities:{type:"ARRAY",items:S},topic_analysis:{type:"ARRAY",items:topicSchema,minItems:TOPICS.length,maxItems:TOPICS.length},limits:S},required:["headline","overall","key_windows","year_phases","cross_checks","decisions","clusters","systems","priorities","topic_analysis","limits"]};
 
 function cleanRefs(v:any){return Array.isArray(v)?uniq(v.map((x:any)=>txt(x,180)).filter(Boolean)).slice(0,12):[];}
+function cleanDomainAnswers(v:any){
+  if(!Array.isArray(v))return [];
+  const seen=new Set<string>();
+  return v.slice(0,48).flatMap((x:any)=>{
+    if(!x||typeof x!=="object"||Array.isArray(x))return [];
+    const topic=txt(x?.topic,80),question_key=txt(x?.question_key,80),label=txt(x?.label,120),status=txt(x?.status,32);
+    const key=`${topic}::${question_key}`;
+    if(!topic||!question_key||!label||seen.has(key)||!["direct","partial","not_calculated"].includes(status))return [];
+    seen.add(key);
+    const answer=status==="not_calculated"?"":txt(x?.answer,1200);
+    if(status!=="not_calculated"&&!answer)return [];
+    return [{topic,question_key,label,answer,status,evidence_refs:cleanRefs(x?.evidence_refs)}];
+  });
+}
 function cleanEditorialSection(v:any){
   if(!v||typeof v!=="object"||Array.isArray(v))return null;
   const mode=txt(v?.applicability,24);
@@ -328,5 +342,5 @@ export function validateOutput(o:any){
     condition:cleanEditorialGroup(o?.clusters?.condition,["condition"]),
   };
   if(Object.values(clusters).some(value=>!value))return null;
-  return deep({headline:txt(o.headline,300),overall:{summary:txt(o?.overall?.summary,3600),dominant_pattern:txt(o?.overall?.dominant_pattern,2200),best_phase:txt(o?.overall?.best_phase,1500),caution_phase:txt(o?.overall?.caution_phase,1500),evidence_refs:cleanRefs(o?.overall?.evidence_refs)},key_windows:keyWindows,year_phases:yearPhases,cross_checks:crossChecks,decisions,clusters,relationship_reading:{context:txt(o?.relationship_reading?.context,1300),flow:txt(o?.relationship_reading?.flow,1700),focus_timing:txt(o?.relationship_reading?.focus_timing,1100),watch:txt(o?.relationship_reading?.watch,1000),avoid:txt(o?.relationship_reading?.avoid,900),evidence_refs:cleanRefs(o?.relationship_reading?.evidence_refs)},contact_flow:{incoming:txt(o?.contact_flow?.incoming,1700),outgoing:txt(o?.contact_flow?.outgoing,1700),reconnection:txt(o?.contact_flow?.reconnection,1700)},investment_reading:{psychology:txt(o?.investment_reading?.psychology,1300),realization:txt(o?.investment_reading?.realization,1300),entry:txt(o?.investment_reading?.entry,1300),risk:txt(o?.investment_reading?.risk,1300)},systems:{western:txt(o?.systems?.western,1700),saju:txt(o?.systems?.saju,1900),thai:txt(o?.systems?.thai,1700)},priorities:Array.isArray(o?.priorities)?o.priorities.slice(0,5).map((x:any)=>txt(x,650)).filter(Boolean):[],topic_analysis:analyses,limits:txt(o.limits,1700)});
+  return deep({headline:txt(o.headline,300),overall:{summary:txt(o?.overall?.summary,3600),dominant_pattern:txt(o?.overall?.dominant_pattern,2200),best_phase:txt(o?.overall?.best_phase,1500),caution_phase:txt(o?.overall?.caution_phase,1500),evidence_refs:cleanRefs(o?.overall?.evidence_refs)},key_windows:keyWindows,year_phases:yearPhases,cross_checks:crossChecks,decisions,clusters,domain_answers:cleanDomainAnswers(o?.domain_answers),relationship_reading:{context:txt(o?.relationship_reading?.context,1300),flow:txt(o?.relationship_reading?.flow,1700),focus_timing:txt(o?.relationship_reading?.focus_timing,1100),watch:txt(o?.relationship_reading?.watch,1000),avoid:txt(o?.relationship_reading?.avoid,900),evidence_refs:cleanRefs(o?.relationship_reading?.evidence_refs)},contact_flow:{incoming:txt(o?.contact_flow?.incoming,1700),outgoing:txt(o?.contact_flow?.outgoing,1700),reconnection:txt(o?.contact_flow?.reconnection,1700)},investment_reading:{psychology:txt(o?.investment_reading?.psychology,1300),realization:txt(o?.investment_reading?.realization,1300),entry:txt(o?.investment_reading?.entry,1300),risk:txt(o?.investment_reading?.risk,1300)},systems:{western:txt(o?.systems?.western,1700),saju:txt(o?.systems?.saju,1900),thai:txt(o?.systems?.thai,1700)},priorities:Array.isArray(o?.priorities)?o.priorities.slice(0,5).map((x:any)=>txt(x,650)).filter(Boolean):[],topic_analysis:analyses,limits:txt(o.limits,1700)});
 }

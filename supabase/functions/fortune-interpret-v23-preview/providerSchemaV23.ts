@@ -1,3 +1,5 @@
+import { DOMAIN_ANSWER_KEYS, DOMAIN_ANSWER_LOOKUP, domainAnswerContractKey } from "./domainAnswerContractsV1.ts";
+
 export const EDITORIAL_SECTION_KEYS = [
   "relationship.summary",
   "relationship.friends",
@@ -29,6 +31,7 @@ export const EDITORIAL_SECTION_KEYS = [
 const KEY_SET = new Set<string>(EDITORIAL_SECTION_KEYS);
 const EDITORIAL_FIELDS = ["conclusion","real_scene","action","change_condition","evidence_refs","applicability"] as const;
 const APPLICABILITY = new Set(["direct","conditional","insufficient"]);
+const DOMAIN_ANSWER_STATUS = new Set(["direct","partial","not_calculated"]);
 
 function insufficientProviderSection(){
   return {
@@ -39,6 +42,42 @@ function insufficientProviderSection(){
     evidence_refs:[],
     applicability:"insufficient",
   };
+}
+
+
+function normalizedDomainAnswers(value:any){
+  const rows=Array.isArray(value)?value:[];
+  const seen=new Set<string>();
+  const invalid=new Set<string>();
+  const found=new Map<string,any>();
+  for(const row of rows){
+    const topic=String(row?.topic??"").trim();
+    const questionKey=String(row?.question_key??"").trim();
+    const key=domainAnswerContractKey(topic,questionKey);
+    if(!DOMAIN_ANSWER_LOOKUP.has(key))continue;
+    if(seen.has(key)){invalid.add(key);continue;}
+    seen.add(key);
+    const status=String(row?.status??"").trim();
+    const answer=String(row?.answer??"").trim();
+    const refs=Array.isArray(row?.evidence_refs)?row.evidence_refs.map((x:any)=>String(x??"").trim()).filter(Boolean).slice(0,8):[];
+    if(!DOMAIN_ANSWER_STATUS.has(status) || (status!=="not_calculated"&&!answer)){
+      invalid.add(key);
+      continue;
+    }
+    found.set(key,{status,answer:status==="not_calculated"?"":answer,evidence_refs:refs});
+  }
+  return DOMAIN_ANSWER_KEYS.map(contract=>{
+    const key=domainAnswerContractKey(contract.topic,contract.question_key);
+    const row=!invalid.has(key)?found.get(key):null;
+    return {
+      topic:contract.topic,
+      question_key:contract.question_key,
+      label:contract.label,
+      answer:row?.answer??"",
+      status:row?.status??"not_calculated",
+      evidence_refs:row?.evidence_refs??[],
+    };
+  });
 }
 
 function validProviderSection(row:any){
@@ -54,6 +93,21 @@ export function buildProviderCoreSchema(fullSchema:any){
   core.required=(core.required??[]).filter((key:string)=>key!=="topic_analysis");
   const section=fullSchema?.properties?.clusters?.properties?.relationship?.properties?.summary;
   if(!section?.properties)throw new Error("editorial section schema missing");
+  core.properties.domain_answers={
+    type:"ARRAY",
+    items:{
+      type:"OBJECT",
+      properties:{
+        topic:{type:"STRING"},
+        question_key:{type:"STRING"},
+        answer:{type:"STRING"},
+        status:{type:"STRING",enum:["direct","partial"]},
+        evidence_refs:{type:"ARRAY",items:{type:"STRING"}},
+      },
+      required:["topic","question_key","answer","status","evidence_refs"],
+    },
+  };
+  if(!core.required.includes("domain_answers"))core.required.push("domain_answers");
   core.properties.clusters={
     type:"ARRAY",
     items:{
@@ -110,5 +164,5 @@ export function normalizeProviderCore(core:any){
     const group=key.slice(0,dot),section=key.slice(dot+1);
     if(!seen.has(key)||invalid.has(key))groups[group][section]=insufficientProviderSection();
   }
-  return {...core,clusters:groups};
+  return {...core,clusters:groups,domain_answers:normalizedDomainAnswers(core?.domain_answers)};
 }

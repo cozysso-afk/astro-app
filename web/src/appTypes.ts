@@ -409,6 +409,8 @@ export type AiQualityValidation = {
 
 export type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
 export type AiEditorialSection = { conclusion:string; real_scene:string; action:string; change_condition:string; evidence_refs:string[]; applicability:EditorialApplicability }
+export type AiDomainAnswerStatus = 'direct' | 'partial' | 'not_calculated'
+export type AiDomainAnswer = { topic:string; question_key:string; label:string; answer:string; status:AiDomainAnswerStatus; evidence_refs:string[] }
 export type AiEditorialClusters = {
   relationship: Record<'summary'|'friends'|'coworkers'|'family'|'new_people'|'boundaries'|'love_general'|'love_single'|'love_crush'|'love_flirting'|'love_ambiguous'|'love_couple'|'love_reunion_interest'|'contact_activation'|'contact_continuity',AiEditorialSection>
   work_study: Record<'work'|'career_change'|'exam'|'study',AiEditorialSection>
@@ -453,6 +455,7 @@ export type AiInterpretationResponse = {
     cross_checks?: AiCrossCheck[]
     decisions?: AiDecision[]
     clusters: AiEditorialClusters
+    domain_answers?: AiDomainAnswer[]
     relationship_reading?: { context: string; flow: string; focus_timing: string; watch: string; avoid: string; evidence_refs?: string[] }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
     investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }

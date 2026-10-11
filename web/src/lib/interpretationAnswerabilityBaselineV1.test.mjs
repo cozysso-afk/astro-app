@@ -11,6 +11,7 @@ const reunionCompact = read('./reunionCompactEvidence.ts')
 const resultFormatters = read('./resultFormatters.ts')
 const reunionPanel = read('../ReunionHierarchyPanelV3.tsx')
 const providerSchema = read('../../../supabase/functions/fortune-interpret-v23-preview/providerSchemaV23.ts')
+const domainContracts = read('../../../supabase/functions/fortune-interpret-v23-preview/domainAnswerContractsV1.ts')
 const periodNarrative = read('../../../supabase/functions/fortune-interpret-v23-preview/periodNarrativeV23.ts')
 const relationshipWestern = read('../../../relationship_western_v1.py')
 const relationshipEdge = read('../../../supabase/functions/relationship-interpret-v9-preview/index.ts')
@@ -63,10 +64,12 @@ test('A6 partial fix: readable reunion prose keeps a technical sentence when pla
   assert.match(reunionPanel, /selected\.push\(row\)/)
 })
 
-test('A7 baseline D: provider editorial sections share one six-field shape', () => {
+test('A7 improved: shared editorial base remains compatible while domain-specific answer extension exists', () => {
   assert.match(providerSchema, /EDITORIAL_FIELDS\s*=\s*\["conclusion","real_scene","action","change_condition","evidence_refs","applicability"\]/)
-  for (const key of ['relationship.contact_activation','relationship.contact_continuity','work_study.work','work_study.career_change','work_study.exam','work_study.study','money_news.money','money_news.news','condition.condition']) {
-    assert.ok(providerSchema.includes(`"${key}"`), `missing audited section ${key}`)
+  assert.match(providerSchema, /core\.properties\.domain_answers/)
+  assert.match(providerSchema, /"direct","partial","not_calculated"/)
+  for (const topic of ['직장','이직','학업','시험','금전','소식','연애','연락','재회','컨디션']) {
+    assert.ok(domainContracts.includes(`topic:'${topic}'`), `missing domain answer contract ${topic}`)
   }
 })
 

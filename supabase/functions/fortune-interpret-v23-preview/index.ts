@@ -14,7 +14,7 @@ import { ensureDayDepthGuides } from "./dayDepthRepairV23.ts";
 import { mergeAuthoredTopicAnalysis, polishV23EditorialDepth } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 
-const VERSION="supabase-ai-v23.7-quality-no-padding-v1";
+const VERSION="supabase-ai-v23.8-domain-answer-contracts-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -59,6 +59,8 @@ function coreInstruction(){return `
 [OUTPUT]
 - topic_analysis는 출력하지 마. 서버가 계산근거와 함께 별도로 붙인다.
 - clusters는 중첩 객체가 아니라 정확히 ${EDITORIAL_SECTION_KEYS.length}개의 배열 항목으로 출력해. 각 항목은 key/conclusion/real_scene/action/change_condition/evidence_refs/applicability를 모두 포함하고 key는 한 번씩만 써.
+- domain_answers는 PROMPT_DATA.domain_answer_contracts 중 실제 evidence_refs로 답할 수 있는 질문만 sparse하게 출력해. 각 행은 topic/question_key/answer/status/evidence_refs를 포함한다. status=direct는 해당 질문을 직접 뒷받침하는 근거가 있을 때, partial은 같은 분야 근거로 일부만 답할 수 있을 때만 쓴다. 근거가 없는 질문은 행 자체를 생략해. 서버가 누락 질문을 not_calculated로 채운다.
+- domain_answers에서 일반 상담문으로 빈칸을 메우지 마. 예: 금전 점수만 있는데 계약·회수 근거가 없으면 contract_recovery 행을 출력하지 않는다. 시험 점수만 있는데 실수 유형 근거가 없으면 performance_error를 합격/실패 예측으로 만들지 않는다.
 - clusters key 목록=${EDITORIAL_SECTION_KEYS.join(", ")}.
 - 전체 결론, key_windows, annual이면 year_phases 4개, cross_checks, decisions, 관계가 중요할 경우 relationship_reading/contact_flow, 투자 중요 시 investment_reading, systems, priorities, limits를 작성해.
 - 같은 날짜·점수·근거를 여러 섹션에서 반복 설명하지 마. 한 번 설명한 세부 근거는 다른 섹션에서는 결론만 참조해.

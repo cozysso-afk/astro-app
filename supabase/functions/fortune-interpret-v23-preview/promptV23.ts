@@ -1,7 +1,8 @@
 import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
+import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.4-editorial-usability-gate'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.5-domain-answer-contracts'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
@@ -56,6 +57,7 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 사용자에게 직접 보이는 각 분야 원고는 단순 결론으로 끝내지 마. 가능하면 2~3문장 안에서 ① 결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건 중 최소 세 요소를 담아.
 - "확인해", "지켜봐", "신중해"라고만 끝내지 말고 무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지를 구체적으로 써. 사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패야.
 - 서로 다른 분야 원고에서 topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마. 특히 직장·학업·대인·애정·연락·금전은 서로 다른 생활 장면과 판단 기준을 가져야 해.
+- domain_answer_contracts는 각 분야에서 사용자가 실제로 묻는 질문 목록이다. conclusion/action에 억지로 섞지 말고, evidence_refs로 직접 또는 부분 답변할 수 있는 질문만 domain_answers 행으로 출력해. 근거가 없는 질문은 생략하고 일반론으로 채우지 마. 서버가 생략된 질문을 not_calculated로 처리한다.
 - 대인관계 세부항목은 친구·지인, 직장동료, 가족·가까운 사람, 새 인맥, 갈등·경계를 서로 다른 독립 계산 결과처럼 꾸미지 마. 공통 대인관계 근거를 각 현실 상황에 어떻게 적용해 읽는지 조건부로 번역하고, 특정 하위관계 근거가 없으면 "이 상황이라면"처럼 한계를 드러내.
 - 연애와 연락은 같은 분야가 아니야. 연애는 만남·호감·관계의 속도·현재 관계의 교류를 다루고, 연락은 메시지·질문·답변·약속을 주고받는 커뮤니케이션을 다뤄. 연애 해설을 답장과 연락 여부만으로 채우지 마.
 - 재회 관심 해설은 생각남→연락→실제 만남→관계 재구축을 서로 다른 단계로 유지해. 현재 단계만 말하고 끝내지 말고, 다음 단계로 판단을 올릴 현실 행동과 다시 낮춰 읽을 현실 조건을 함께 줘.
@@ -72,6 +74,8 @@ export function buildV23PromptPacket(payload:any) {
     ...base,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
+    domain_answer_contract_version: DOMAIN_ANSWER_CONTRACT_VERSION,
+    domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
   packet.narrative_plan=buildNarrativePlan(packet)
   return packet

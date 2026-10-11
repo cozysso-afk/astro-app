@@ -39,11 +39,22 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.4-editorial-usability-gate')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.5-domain-answer-contracts')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
   assert.match(out.text, /Mercury trine Jupiter/)
+})
+
+test('V23 prompt carries domain-specific user questions without inventing missing sub-calculations', () => {
+  const out = buildV23CorePrompt(payload('week'))
+  assert.equal(out.packet.domain_answer_contract_version,'domain-answer-contracts-v1')
+  assert.ok(Array.isArray(out.packet.domain_answer_contracts))
+  assert.ok(out.packet.domain_answer_contracts.some(row=>row.topic==='시험'&&row.questions.some(q=>q.key==='performance_error')))
+  assert.ok(out.packet.domain_answer_contracts.some(row=>row.topic==='금전'&&row.questions.some(q=>q.key==='contract_recovery')))
+  assert.match(out.text,/domain_answer_contracts/)
+  assert.match(out.text,/not_calculated/)
+  assert.match(out.text,/일반론으로 채우지 마/)
 })
 
 test('same evidence receives different period narrative contracts', () => {
