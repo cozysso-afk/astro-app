@@ -12,14 +12,14 @@ const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
 
 test('reunion calculation and AI grounding contracts remain intact',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
+  assert.match(server,/REUNION_VERSION="relationship-v13\.0-answerability-evidence"/)
   assert.match(server,/buildReunionEvidenceV2/)
   assert.match(server,/repairReunionGroundingV2/)
   assert.match(server,/validEvidenceRefs/)
   assert.match(server,/reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(publicError,/publicReunionV2/)
   assert.match(types,/reunion_synthesis_v2\?:/)
-  assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1-consultation-depth-v3/)
+  assert.match(cache,/relationship-v13\.0-answerability-evidence-v1-consultation-depth-v3/)
 })
 
 test('relationship result routes reunion to the hierarchy product while retaining AI synthesis input',()=>{
@@ -46,7 +46,8 @@ test('reunion reader-facing section labels stay Korean instead of internal Engli
 
 test('contact strength stays separate from relative initiative and even a small edge is shown',()=>{
   assert.match(hierarchy,/function contactReading\(hierarchy: ReunionHierarchy\)/)
-  assert.match(hierarchy,/hierarchy\.stages\?\.contact_recontact\?\.activation/)
+  assert.match(hierarchy,/const stage = hierarchy\.stages\?\.contact_recontact/)
+  assert.match(hierarchy,/stage\?\.activation/)
   const contactBody=hierarchy.slice(hierarchy.indexOf('function contactReading'),hierarchy.indexOf('function directionRow'))
   assert.doesNotMatch(contactBody,/directionRows/)
   assert.doesNotMatch(contactBody,/incomingBand|outgoingBand/)
@@ -62,8 +63,8 @@ test('contact strength stays separate from relative initiative and even a small 
 test('stage board separates emotional reactivation contact meeting and rebuilding',()=>{
   assert.match(hierarchy,/function stageVerdicts\(hierarchy: ReunionHierarchy\)/)
   for(const stage of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding']) assert.match(hierarchy,new RegExp(stage))
-  assert.match(hierarchy,/실제 만남까지 넘어간다고 읽을 근거는 아직 약해/)
-  assert.match(hierarchy,/안정적인 관계 재구축까지 넘어갔다고 읽을 근거는 아직 약해/)
+  assert.match(hierarchy,/계산됨 · 미래 후보 없음/)
+  assert.match(hierarchy,/미래 후보 \$\{candidateCount\}개 · 핵심 TOP 미포함/)
   assert.match(hierarchy,/reunion-v4-stage-grid/)
 })
 

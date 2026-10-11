@@ -12,7 +12,7 @@ const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',impor
 const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v12\.9-grounding-false-negative"/)
+  assert.match(server,/REUNION_VERSION="relationship-v13\.0-answerability-evidence"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -64,7 +64,7 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
 test('reunion hierarchy puts concise consultation answers before technical engine state',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v12\.9-grounding-false-negative-v1/)
+  assert.match(cache,/relationship-v13\.0-answerability-evidence-v1/)
   const headingMarkup=['<h3>결론부터 보면</h3>','<h4>지금 두 사람의 흐름</h4>','<h4>연락 흐름</h4>','<h4>누가 먼저 움직일 가능성이 더 큰가</h4>','<h4>기억할 시기</h4>','<h4>과거 관계를 다시 떠올리기 쉬운 배경</h4>','<h4>연락 뒤 실제 변화가 있는지</h4>','<h4>연락 뒤 무엇을 확인할까</h4>','<h4>다시 만나면 조심할 반복 패턴</h4>','<summary>계산된 단계와 시기 자세히 보기</summary>','<summary>상대 → 나 / 나 → 상대 보조지표 보기</summary>','<summary>지난 시기 · 사후 확인용</summary>','<summary>계산 근거 보기</summary>']
   let cursor=-1
   for(const markup of headingMarkup){
@@ -89,7 +89,7 @@ test('reunion hierarchy puts concise consultation answers before technical engin
   assert.match(hierarchy,/slice\(0,3\)/)
   assert.match(hierarchy,/row\.date >= asOf/)
   assert.match(server,/날짜 문자열을 새로 만들거나/)
-  assert.match(server,/이미 지난 날짜를 미래 핵심 시기처럼/)
+  assert.match(server,/past_windows 날짜를 쓸 때는 반드시 과거\/지난 구간임을 분명히 하고 미래 후보로 승격하지 않는다/)
   assert.match(server,/카르마적 인연/)
   assert.match(server,/summary는 첫 2~3문장 안에서 현재 가장 가까운 단계/)
   assert.match(server,/repeat_risks는 현재 단계와 직접 연결되는 근거가 있는 문제만 최대 2개/)

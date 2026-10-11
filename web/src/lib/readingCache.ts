@@ -20,7 +20,7 @@ const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v3'
 const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v4-editorial-v3'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11.8-provisional-time-reference'
-const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v12.9-grounding-false-negative-v1-consultation-depth-v3'
+const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13.0-answerability-evidence-v1-consultation-depth-v3'
 
 function normalizedFortunePeriodKind(request: Record<string, unknown>, calculation: Record<string, unknown>, period: Record<string, unknown>): string {
   const raw = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()

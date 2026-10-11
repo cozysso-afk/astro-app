@@ -44,11 +44,11 @@ Primary ownership surfaces reviewed in V1:
 
 | ID | Domain/question | Classification | Verified source -> loss/presentation point |
 | --- | --- | --- | --- |
-| R1 | Reunion historical windows | **B** | `reunion_hierarchy_v2.py` emits `past_windows`; `resultFormatters.ts` preserves hierarchy fields except audit-heavy arrays; `compactDeepPrompt.ts` relationship packet selects `top_periods/nearest_window` but omits `past_windows`; production `relationship-interpret-v9-preview/index.ts::hierarchyPacket()` also omits it. |
-| R2 | Reunion current windows | **B** | Engine emits `current_windows`; `web/src/lib/reunionHierarchy.ts` parses them; both the web external compact packet and production relationship Edge `hierarchyPacket()` omit them. |
+| R1 | Reunion historical windows | **P** | `past_windows` now survives both the production relationship Edge packet and the external compact relationship packet. It is explicitly historical/retrospective context and cannot become a future timing window. |
+| R2 | Reunion current windows | **P** | `current_windows` now survives both interpretation transports and is labeled as current-state context, separate from future candidates. |
 | R3 | Reunion future candidates | **P** | `top_periods` and `nearest_window` are explicitly transported and rendered. |
 | R4 | Contact direction comparison | **P/C** | incoming/outgoing scores are preserved and frontend can compare them; independent action-direction gate is intentionally unavailable, so “who contacts first” remains undetermined. Keep the safety distinction. |
-| R5 | Technical evidence in readable reunion prose | **E** | `ReunionHierarchyPanelV3.tsx::readerSentences` filters sentences matching planet/aspect/orb/transit/progression/synastry terms before taking the first two sentences. Technical details may survive elsewhere, but this readable path can discard the only causal sentence. |
+| R5 | Technical evidence in readable reunion prose | **P/partial** | `readerSentences` still prefers plain language, but if plain prose underfills the requested limit it now retains a technical causal sentence instead of deleting all remaining explanation. Full structured causal ownership remains a later architecture task. |
 | F1 | Fortune editorial structure | **D** | all 25 editorial sections use the same six fields: `conclusion/real_scene/action/change_condition/evidence_refs/applicability`. |
 | F2 | Contact-specific interpretation | **P** | the schema has distinct `contact_activation` and `contact_continuity` sections. |
 | F3 | Other domain-specific subquestions | **D/partial** | work, career change, exam, study, money, news, condition are represented mainly as one section each; the schema cannot separately express every domain question such as exam performance vs error risk or money inflow vs outflow without embedding them into generic prose. This is a schema limitation, not proof that the engine calculates those subquestions. |
@@ -65,7 +65,7 @@ This table describes the interpretation structure, not a claim that every reques
 | --- | --- | --- |
 | Contact | Partial | activation/direction/continuity exist, but “no timing candidate” can dominate the explanation and history is not consistently preserved into interpretation packets. |
 | Love | Partial | multiple relationship contexts exist, but they still resolve through the shared editorial field shape. |
-| Reunion | Partial | stage model and future candidates are strong; past/current chronology is not consistently transported to authored interpretation; technical causal sentences can be filtered. |
+| Reunion | Improved partial | stage model plus past/current/future chronology are now transported; candidate absence, current activation and direction comparison are separated. Domain-level causal structure still needs the later answer-contract work. |
 | Work | Partial | topic evidence exists, but one generic work section must carry progress, negotiation, responsibility, evaluation and change. |
 | Career change | Partial | one section must carry exploration, proposal, interview/conditions and movement. Do not invent sub-calculations that do not exist. |
 | Study | Partial | one study section plus topic evidence; domain-specific answer slots are absent. |
@@ -77,8 +77,8 @@ This table describes the interpretation structure, not a claim that every reques
 
 ## P0 implementation targets
 
-1. Preserve already-calculated historical/current/future timing through interpretation transport when size budgets permit.
-2. Distinguish semantic states:
+1. ✅ Preserve already-calculated historical/current/future timing through interpretation transport with bounded compact windows.
+2. ✅ Distinguish semantic states:
    - not calculated
    - calculated but no candidate
    - candidate exists but weak

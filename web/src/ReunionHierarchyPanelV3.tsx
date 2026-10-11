@@ -5,6 +5,7 @@ import { polishKoreanSentence } from './lib/fortuneNarrativePolish'
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
 type Strength = '낮음' | '보통' | '높음' | '정보 부족'
+type ContactAvailabilityState = 'not_calculated' | 'calculated_no_candidate' | 'candidate_not_top' | 'current_active' | 'future_candidate'
 type ScoredDirection = DirectionRow & { score?: number }
 
 type StageVerdict = {
@@ -38,7 +39,16 @@ function sentences(value?: string | null, limit = 2) {
 }
 
 function readerSentences(value?: string | null, limit = 2) {
-  return sentenceList(value).filter(row => !TECHNICAL_RE.test(row)).slice(0, limit).join(' ')
+  const rows = sentenceList(value)
+  const plain = rows.filter(row => !TECHNICAL_RE.test(row))
+  if (plain.length >= limit) return plain.slice(0, limit).join(' ')
+  const selected = [...plain]
+  for (const row of rows) {
+    if (!TECHNICAL_RE.test(row) || selected.includes(row)) continue
+    selected.push(row)
+    if (selected.length >= limit) break
+  }
+  return selected.slice(0, limit).join(' ')
 }
 
 function stageSet(hierarchy: ReunionHierarchy) {
@@ -53,24 +63,59 @@ function strengthFromActivation(value: number | null | undefined): Strength {
 }
 
 function contactReading(hierarchy: ReunionHierarchy) {
-  const activation = hierarchy.stages?.contact_recontact?.activation
+  const stage = hierarchy.stages?.contact_recontact
+  const candidateCount = typeof stage?.candidate_count === 'number' && Number.isFinite(stage.candidate_count) ? stage.candidate_count : null
+  const currentWindows = hierarchy.current_windows.filter(row => row.stage === 'contact_recontact')
+  const futureWindows = hierarchy.top_periods.filter(row => row.stage === 'contact_recontact')
+  const contactWindows = [...currentWindows, ...futureWindows]
+  const windowActivation = contactWindows.map(row => row.final).filter(Number.isFinite).sort((a,b)=>b-a)[0]
+  const activation = typeof stage?.activation === 'number' && Number.isFinite(stage.activation) ? stage.activation : windowActivation
   const band = strengthFromActivation(activation)
-  const contactWindows = [...hierarchy.current_windows, ...hierarchy.top_periods].filter(row => row.stage === 'contact_recontact')
-  if (band === '정보 부족') return { band, text:'연락·대화 재개 자체의 강도를 판단할 계산 정보가 부족해.', first:'' }
-  if (!contactWindows.length) return {
+  const first = [...futureWindows].sort((a,b) => a.start.localeCompare(b.start))[0]
+  const firstText = first ? (first.start === first.end ? first.start : `${first.start}~${first.end}`) : ''
+
+  if (!stage || candidateCount === null) return {
+    state:'not_calculated' as ContactAvailabilityState,
     band,
-    text: band === '낮음'
-      ? '이번 조회 범위에서는 연락·대화 재개가 두드러지는 구간이 잡히지 않았어.'
-      : `연락 단계의 전체 활성도는 ${band}이지만, 특정 구간을 따로 강조할 만큼 시기 근거가 모이지 않았어.`,
+    status:'계산 정보 없음',
+    candidateCount,
+    text:'연락 단계의 후보 수와 활성도를 구분할 계산 정보가 없어. 미래 후보 없음으로 바꿔 말하지 않아.',
     first:'',
   }
-  const first = [...contactWindows].sort((a,b) => a.start.localeCompare(b.start))[0]
-  const text = band === '낮음'
-    ? '연락을 살펴볼 시기는 있지만 전체 연락 활성도 자체는 낮아. 시기가 있다는 이유만으로 연락을 기대하는 쪽으로 확대하지 않아.'
-    : band === '높음'
-      ? '연락·대화 재개 자체가 이번 조회 범위에서 비교적 두드러져. 연락이 생긴다면 한 번의 반응보다 대화가 이어지는지를 같이 봐.'
-      : '연락·대화 재개를 살펴볼 구간은 있어. 강한 확정 신호라기보다 실제 접촉이 생기는지 확인할 정도로 읽는 게 맞아.'
-  return { band, text, first:first.start === first.end ? first.start : `${first.start}~${first.end}` }
+  if (currentWindows.length) return {
+    state:'current_active' as ContactAvailabilityState,
+    band,
+    status:`현재 활성 · ${band === '정보 부족' ? '강도 미산출' : band}`,
+    candidateCount,
+    text:`현재 연락·대화 재개 단계에 걸린 구간이 있어. 기준일 이후 미래 후보는 ${candidateCount}개로 따로 계산돼 있으며, 현재 활성과 미래 후보를 같은 뜻으로 합치지 않아.`,
+    first:firstText,
+  }
+  if (futureWindows.length) return {
+    state:'future_candidate' as ContactAvailabilityState,
+    band,
+    status:`${band === '정보 부족' ? '강도 미산출' : band} · 미래 후보 ${candidateCount}개`,
+    candidateCount,
+    text: band === '낮음'
+      ? '미래 연락 후보는 잡혀 있지만 활성도는 낮아. 후보가 있다는 이유만으로 실제 연락을 기대하는 쪽으로 확대하지 않아.'
+      : '미래 연락·대화 재개 후보가 계산돼 있어. 실제 선연락 주체와 대화 지속성은 별도 근거로 나눠서 봐.',
+    first:firstText,
+  }
+  if (candidateCount === 0) return {
+    state:'calculated_no_candidate' as ContactAvailabilityState,
+    band,
+    status:'계산됨 · 미래 후보 없음',
+    candidateCount,
+    text:'연락 단계 계산은 완료됐지만 기준일 이후 공개할 미래 후보는 0개야. 계산 자체가 없다는 뜻은 아니며, 상대 → 나 / 나 → 상대 비교값과 지난 활성 구간은 별도로 읽어.',
+    first:'',
+  }
+  return {
+    state:'candidate_not_top' as ContactAvailabilityState,
+    band,
+    status:`미래 후보 ${candidateCount}개 · 핵심 TOP 미포함`,
+    candidateCount,
+    text:'연락 단계의 미래 후보는 계산됐지만 현재 공개된 핵심 TOP 시기에는 포함되지 않았어. 날짜를 새로 만들어 보충하지 않고 후보 존재와 핵심 시기 노출을 구분해.',
+    first:'',
+  }
 }
 
 function directionRow(rows: DirectionRow[], kind:'incoming'|'outgoing') {
@@ -134,38 +179,55 @@ function currentState(hierarchy: ReunionHierarchy) {
 }
 
 function stageVerdicts(hierarchy: ReunionHierarchy): StageVerdict[] {
-  const stages = stageSet(hierarchy)
+  const currentStages = new Set(hierarchy.current_windows.map(row => row.stage))
+  const futureStages = new Set(hierarchy.top_periods.map(row => row.stage))
   const rows: Array<{ key:string; label:string }> = [
     { key:'emotional_reactivation', label:'다시 의식하기' },
     { key:'contact_recontact', label:'연락·대화' },
     { key:'in_person_meeting', label:'실제 만남' },
     { key:'relationship_rebuilding', label:'관계 재구축' },
   ]
+  const presentText=(key:string)=>key === 'emotional_reactivation' ? '과거 관계를 다시 떠올리거나 서로를 의식하기 쉬운 배경이 잡혀 있어.'
+    : key === 'contact_recontact' ? '직접 연락이나 대화 재개를 따로 살펴볼 단계가 잡혀 있어.'
+    : key === 'in_person_meeting' ? '연락을 넘어 실제 약속·만남으로 이어지는 단계 근거가 잡혀 있어.'
+    : '다시 관계를 운영하기 위한 합의·지속 행동을 볼 단계 근거가 잡혀 있어.'
+  const absentText=(key:string)=>key === 'emotional_reactivation' ? '기준일 이후 다시 의식하는 배경의 공개 후보가 없어.'
+    : key === 'contact_recontact' ? '기준일 이후 공개할 연락·대화 재개 후보가 없어.'
+    : key === 'in_person_meeting' ? '기준일 이후 공개할 실제 만남 후보가 없어.'
+    : '기준일 이후 공개할 관계 재구축 후보가 없어.'
+
   return rows.map(({key,label}) => {
-    const activation = hierarchy.stages?.[key]?.activation
+    const stage = hierarchy.stages?.[key]
+    const activation = stage?.activation
     const band = strengthFromActivation(activation)
-    const hasWindow = stages.has(key)
-    if (hasWindow) return {
-      key,
-      label,
-      status: band === '정보 부족' ? '시기 근거 있음' : `${band} · 시기 근거 있음`,
-      text: key === 'emotional_reactivation' ? '과거 관계를 다시 떠올리거나 서로를 의식하기 쉬운 배경이 잡혀 있어.'
-        : key === 'contact_recontact' ? '직접 연락이나 대화 재개를 따로 살펴볼 단계가 잡혀 있어.'
-        : key === 'in_person_meeting' ? '연락을 넘어 실제 약속·만남으로 이어지는 단계 근거가 잡혀 있어.'
-        : '다시 관계를 운영하기 위한 합의·지속 행동을 볼 단계 근거가 잡혀 있어.',
+    const candidateCount = typeof stage?.candidate_count === 'number' && Number.isFinite(stage.candidate_count) ? stage.candidate_count : null
+    if (currentStages.has(key)) return {
+      key,label,
+      status:`현재 활성${band === '정보 부족' ? '' : ` · ${band}`}`,
+      text:presentText(key),
+    }
+    if (futureStages.has(key)) return {
+      key,label,
+      status:`${band === '정보 부족' ? '강도 미산출' : band} · 미래 핵심 시기 있음`,
+      text:presentText(key),
+    }
+    if (candidateCount != null && candidateCount > 0) return {
+      key,label,
+      status:`미래 후보 ${candidateCount}개 · 핵심 TOP 미포함`,
+      text:`${presentText(key)} 다만 현재 공개된 핵심 TOP 시기에는 들지 않아 날짜를 새로 만들어 강조하지 않아.`,
+    }
+    if (candidateCount === 0) return {
+      key,label,
+      status:'계산됨 · 미래 후보 없음',
+      text:absentText(key),
     }
     return {
-      key,
-      label,
-      status: band === '정보 부족' ? '근거 부족' : `${band} · 뚜렷한 시기 없음`,
-      text: key === 'emotional_reactivation' ? '이번 조회에서 다시 의식하는 배경을 따로 강조할 정도의 시기 근거는 약해.'
-        : key === 'contact_recontact' ? '연락이 실제로 생길 시기를 따로 강조할 정도의 근거는 약해.'
-        : key === 'in_person_meeting' ? '연락이 생기더라도 실제 만남까지 넘어간다고 읽을 근거는 아직 약해.'
-        : '만남이 생기더라도 안정적인 관계 재구축까지 넘어갔다고 읽을 근거는 아직 약해.',
+      key,label,
+      status:'계산 정보 없음',
+      text:'이 단계는 후보 수와 활성도를 구분할 계산 정보가 없어 결론을 만들지 않아.',
     }
   })
 }
-
 function bottomLine(hierarchy: ReunionHierarchy, contact: ReturnType<typeof contactReading>, initiative: ReturnType<typeof initiativeReading>) {
   const stages = stageSet(hierarchy)
   const direction = initiative.label === '판정 보류' ? '선연락 주체는 판정 보류야.' : `선연락 비교는 ${initiative.label}이야.`
@@ -268,6 +330,12 @@ function timeline(hierarchy: ReunionHierarchy) {
   return rows
 }
 
+function windowSummary(row: ReunionHierarchy['top_periods'][number]) {
+  const when = row.start === row.end ? row.start : `${row.start}~${row.end}`
+  const score = Number.isFinite(Number(row.final)) ? ` · 활성도 ${Math.round(row.final)}` : ''
+  return `${when} · ${STAGE_LABEL[row.stage] ?? row.label}${score}`
+}
+
 function evidenceLabel(row: Aspect) {
   const a = String(row.a ?? '')
   const b = String(row.b ?? '')
@@ -293,6 +361,8 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
   const next = nextActionReading(contact.band, stages)
   const guides = conditionalGuides(contact.band, stages)
   const events = timeline(hierarchyData)
+  const pastContext = hierarchyData.past_windows.slice(0,2)
+  const currentContext = hierarchyData.current_windows.slice(0,2)
   const consultation = reunionV2?.consultation_answer
   const answerText = readerSentences(consultation?.current_stage, 3) || answer.text
   const contactText = readerSentences(`${consultation?.contact_type_if_any ?? ''} ${consultation?.continuity ?? ''}`, 3) || contact.text
@@ -326,9 +396,17 @@ export function ReunionHierarchyPanel({ hierarchyData, evidence, reunionV2, dire
         <span>현재 단계</span><h3>현재 위치</h3><p>{currentState(hierarchyData)}</p>
       </section>
 
+      {(pastContext.length > 0 || currentContext.length > 0) && <section className="reunion-v3-temporal-context">
+        <div className="period-ai-section-title"><span>과거 · 현재 비교</span><strong>지난 구간은 사후 비교용이고 미래 예측으로 재사용하지 않아</strong></div>
+        <div className="reunion-v3-grid">
+          {!!pastContext.length && <article className="reunion-v3-card" data-reading-export-tone="date"><small>지난 활성 구간</small><h4>실제 기록과 대조할 사후 비교</h4><ul>{pastContext.map((row,index)=><li key={`past:${row.date}:${index}`}>{windowSummary(row)}</li>)}</ul></article>}
+          {!!currentContext.length && <article className="reunion-v3-card" data-reading-export-tone="system"><small>현재 활성 구간</small><h4>기준일에 실제로 걸려 있는 단계</h4><ul>{currentContext.map((row,index)=><li key={`current:${row.date}:${index}`}>{windowSummary(row)}</li>)}</ul></article>}
+        </div>
+      </section>}
+
       <div className="reunion-v3-grid">
         <section className="reunion-v3-card" data-reading-export-tone={contact.band === '낮음' ? 'caution' : 'love'}>
-          <small>연락 흐름</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.band}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 시기 · {contact.first}</time>}
+          <small>연락 흐름</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.status}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 미래 시기 · {contact.first}</time>}
         </section>
         <section className="reunion-v3-card" data-reading-export-tone="love">
           <small>먼저 움직이는 쪽</small><h4>굳이 비교하면 누가 먼저인가</h4><b>{initiative.label}</b><p>{initiativeText}</p>
