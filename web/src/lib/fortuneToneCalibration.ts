@@ -10,7 +10,7 @@ export type FortuneToneAssessment = {
 
 type CalculationSlice = Pick<IntegratedApiResponse, 'period' | 'western'>
 
-function evidenceDirection(row: FortuneDailyEvidence) {
+export function evidenceDirection(row: FortuneDailyEvidence) {
   if (row.direction === 'supportive') return 1
   if (row.direction === 'caution' || row.direction === 'challenging') return -1
   if (typeof row.polarity === 'number' && Number.isFinite(row.polarity)) return Math.sign(row.polarity)

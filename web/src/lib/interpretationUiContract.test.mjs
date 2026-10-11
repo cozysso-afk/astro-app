@@ -465,5 +465,6 @@ test('independent period copy uses Korean particle selection instead of hard-cod
   assert.match(systemViews, /function koreanParticle/)
   assert.doesNotMatch(systemViews, /`\$\{when\}은/)
   assert.match(systemViews, /koreanParticle\(when,'은는'\)/)
-  assert.match(systemViews, /koreanParticle\(strongLabel,'이가'\)/)
+  assert.match(systemViews, /westernRankCopy\(rows, when\)/)
+  assert.doesNotMatch(systemViews, /흐름이 점수가/)
 })

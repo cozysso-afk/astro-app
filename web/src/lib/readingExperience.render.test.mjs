@@ -105,7 +105,7 @@ test('same date groups utilization and caution without losing either meaning',()
   const f=fortuneFixture('week');f.data.key_windows=[{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용'},{start:'2026-09-14',end:'2026-09-14',topics:['컨디션'],signal:'주의'}]
   const html=renderToStaticMarkup(createElement(Fortune,{period:'week',calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
-  assert.equal((visible.match(/<time>2026-09-14<\/time>/g)||[]).length,1)
+  assert.equal((visible.match(/<time>(?:지난 · )?2026-09-14<\/time>/g)||[]).length,1)
   assert.match(visible,/reading-event signal-favorable/)
   assert.match(visible,/reading-event signal-caution/)
 })

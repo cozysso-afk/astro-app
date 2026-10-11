@@ -205,7 +205,7 @@ function domainAnswers(data: InterpretationData) {
   for(const row of rows){
     if(!row || (row.status!=='direct' && row.status!=='partial')) continue
     const answer=clean(row.answer)
-    if(!answer || !readerFacing(answer)) continue
+    if(!answer || !readerFacing(answer) || !row.evidence_refs?.some(ref => typeof ref === 'string' && ref.trim())) continue
     const item:DomainAnswerReading={topic:clean(row.topic),questionKey:clean(row.question_key),label:clean(row.label),answer,status:row.status}
     if(!item.topic||!item.questionKey||!item.label) continue
     grouped[item.topic] ??= []
