@@ -1,5 +1,5 @@
 import type { AiInterpretationResponse, AiTopicInterpretation, FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
-import { fortunePresentationTone, fortuneToneAssessment, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
+import { fortunePresentationTone, fortuneToneAssessment, evidenceDirection, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
 type FlowLevel = 'low' | 'steady' | 'high'
@@ -136,11 +136,11 @@ function topicStat(context: FortuneUserSummaryContext, topic: string) {
 }
 
 const LOW_ACTIVATION_CONCLUSION: Record<string,string> = {
-  금전:'수입·지출을 크게 흔드는 신호가 두드러지지 않아.', 학업:'진도와 이해를 크게 바꾸는 촉발이 두드러지지 않아.', 시험:'시험 준비를 크게 흔드는 신호가 두드러지지 않아.',
-  직장:'업무 환경을 크게 바꾸는 촉발이 두드러지지 않아.', 이직:'이직을 크게 촉발하는 신호가 두드러지지 않아.', 대인관계:'관계 구도를 크게 바꾸는 신호가 두드러지지 않아.',
-  연애:'관계 속도를 크게 바꾸는 촉발이 두드러지지 않아.', 연락:'연락을 크게 촉발하거나 막는 방향이 두드러지지 않아.', 재회:'재접촉을 크게 촉발하는 신호가 두드러지지 않아.',
+  금전:'수입·지출을 크게 흔드는 신호가 두드러지지 않아.', 학업:'진도와 이해를 크게 바꾸는 신호가 두드러지지 않아.', 시험:'시험 준비를 크게 흔드는 신호가 두드러지지 않아.',
+  직장:'업무 환경을 크게 바꾸는 신호가 두드러지지 않아.', 이직:'이직을 크게 촉발하는 신호가 두드러지지 않아.', 대인관계:'관계 구도를 크게 바꾸는 신호가 두드러지지 않아.',
+  연애:'호감이나 만남의 흐름을 크게 바꿀 신호는 두드러지지 않아.', 연락:'연락을 크게 촉발하거나 막는 방향이 두드러지지 않아.', 재회:'재접촉을 크게 촉발하는 신호가 두드러지지 않아.',
   소식:'새 안내나 결과 통보를 크게 촉발하는 신호가 두드러지지 않아.', 컨디션:'생활 리듬을 크게 흔드는 신호가 두드러지지 않아.',
-  투자심리:'투자 판단을 크게 흔드는 촉발이 두드러지지 않아.', 수익실현:'청산 판단을 새로 바꿀 신호가 두드러지지 않아.', 신규진입:'신규 진입을 새로 촉발하는 신호가 두드러지지 않아.',
+  투자심리:'투자 판단을 크게 흔드는 신호가 두드러지지 않아.', 수익실현:'청산 판단을 새로 바꿀 신호가 두드러지지 않아.', 신규진입:'신규 진입을 새로 촉발하는 신호가 두드러지지 않아.',
   투자주의:'별도 경계 압력이 두드러지지 않지만 일반적인 시장 위험은 그대로야.',
 }
 
@@ -159,11 +159,11 @@ function topicCopy(topic: string, level: FlowLevel, when: string, direction: For
     const directionNote = direction === 'supportive'
       ? '다만 연결된 도움 방향 근거는 있어 평소 흐름 안에서 수월한 부분을 살릴 수 있어.'
       : direction === 'mixed'
-        ? '도움과 부담 방향이 함께 있어 한쪽 결론으로 기울이지 않아.'
+        ? '도움을 주는 근거와 마찰을 나타내는 근거가 각각 있어. 아래에서 두 근거를 나눠 설명할게.'
         : '낮은 활성도는 불리한 사건보다 이번 기간의 중심 주제가 아니라는 뜻에 가까워.'
     return {
       ...base,
-      conclusion: `${when} ${topic}은 ${LOW_ACTIVATION_CONCLUSION[topic] ?? '뚜렷한 촉발이 적어 평소 흐름에 가까워.'} ${directionNote}`,
+      conclusion: `${when} ${topic}${particle(topic, '은', '는')} ${LOW_ACTIVATION_CONCLUSION[topic] ?? '뚜렷한 촉발이 적어 평소 흐름에 가까워.'} ${directionNote}`,
       practice: NEUTRAL_PRACTICE[topic] ?? `${topic}은 기존 계획을 이어가는 정도면 충분해.`,
       caution: '',
     }
@@ -429,8 +429,9 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     const source = aspect && names.length === 2 ? `${subject}${particle(subject, '이', '가')} ${aspect}` : `${subject}의 움직임`
     const value = evidence.contribution
     // contribution is unsigned activation; polarity alone carries direction.
-    const signed = typeof evidence.polarity === 'number' && Number.isFinite(evidence.polarity) ? Math.sign(evidence.polarity) : null
-    return { source, signed, date, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
+    const signed = evidenceDirection(evidence)
+    const detail = [evidence.whole_house ? `${evidence.whole_house}하우스` : '', evidence.sample_time].filter(Boolean).join(' · ')
+    return { source: `${source}${detail ? ` (${detail})` : ''}`, signed, date, strength: typeof value === 'number' && Number.isFinite(value) ? Math.abs(value) : 0 }
   }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.strength - a.strength)
   const meaning: Record<string, string> = { 학업: '새 내용을 이해하고 집중하는 데', 시험: '배운 것을 꺼내 쓰는 데', 직장: '업무를 협의하고 처리하는 데', 이직: '변화를 검토하고 조건을 조율하는 데', 대인관계: '서로 의견을 주고받는 데', 연애: '호감을 나누고 거리를 좁히는 데', 연락: '말을 꺼내고 대화를 이어가는 데', 재회: '끊겼던 대화의 접점을 찾는 데', 컨디션: '힘을 쓰고 회복하는 데', 금전: '돈의 흐름을 정리하는 데', 소식: '새 정보를 받아 판단하는 데' }
   const area = meaning[topic] ?? `${topic}을 판단하는 데`
@@ -439,9 +440,9 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     const sources = unique(signals.filter(s => s.signed === sign).map(s => s.source), 2)
     const dates = [...new Set(signals.filter(s => s.signed === sign).map(s => s.date))].sort()
     const dateNote = context.calculation.period.day_count > 1 ? `확인된 ${dates.length === 1 ? dates[0] : dates[0] + '·' + dates.at(-1)} 근거에서 ` : ''
-    const source = dateNote + (sources.length > 1 ? `${sources[0]}와 ${sources[1]}가 선택 기간에 관찰돼` : `${sources[0]} 때문에`)
-    readable.push(sign === 1 ? `${source} ${area} 힘이 실려.`
-      : sign === -1 ? `${source} ${area} 마찰이나 부담이 생기기 쉬워.`
+    const source = dateNote + sources.join(' / ') + '에서'
+    readable.push(sign === 1 ? `도움 근거: ${source} ${area} 힘이 실려.`
+      : sign === -1 ? `마찰 근거: ${source} ${area} 마찰이나 부담을 나타내는 신호가 보여.`
       : `${sources.join(', ')} 신호는 보이지만, 이 신호만으로 유리하거나 불리하다고 단정하기는 어려워.`)
   }
   // A shared reference is required: never attach a whole-period system statement to an unrelated topic.

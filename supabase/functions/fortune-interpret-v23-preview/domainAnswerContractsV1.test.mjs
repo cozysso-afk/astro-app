@@ -97,8 +97,10 @@ test('C6 quality gate rejects invented answers and requires grounding for direct
 test('C7 frontend gives domain answers priority over generic topic editorial for field pages',()=>{
   assert.match(editorialSource,/domainAnswers: domainAnswers\(data\)/)
   assert.match(editorialSource,/row\.status!=='direct' && row\.status!=='partial'/)
-  assert.match(narrativeSource,/const domainAnswerRows = verifiedNarrative && field/)
+  assert.match(narrativeSource,/const domainAnswerRows = verifiedNarrative/)
   assert.match(narrativeSource,/domainAnsweredTopics\.has\(item\.topic\)/)
+  assert.match(narrativeSource,/field\?\.topics \?\? summary\.focusTopics/)
+  assert.match(editorialSource,/row\.evidence_refs\?\.some/)
   assert.match(narrativeSource,/질문별 해설/)
   assert.match(narrativeSource,/없는 세부값은 만들지 않아/)
   assert.match(narrativeSource,/부분 근거 · 이 질문 전체를 확정하는 계산은 아님/)

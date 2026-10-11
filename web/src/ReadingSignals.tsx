@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, RotateCcw, Link2, Layers3, ShieldAlert, Sparkles } from 'lucide-react'
-import { orderTimelineDates, timelineDisplayDate } from './lib/timelineTime'
+import { orderTimelineDates, timelineWindowState, timelinePresentation, type TimelineContext } from './lib/timelineTime'
 
 export type ReadingSignal = 'incoming' | 'outgoing' | 'reconnection' | 'rebuilding' | 'mixed' | 'caution' | 'favorable'
 const SIGNALS = {
@@ -7,9 +7,7 @@ const SIGNALS = {
   reconnection: [RotateCcw, '재접점'], rebuilding: [Link2, '유지력'],
   mixed: [Layers3, '혼합'], caution: [ShieldAlert, '주의'], favorable: [Sparkles, '활용'],
 } as const
-const TIMELINE_SIGNAL_LABELS: Partial<Record<ReadingSignal, string>> = {
-  favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인',
-}
+
 
 export function ReadingBadge({ kind, label }: { kind: ReadingSignal; label?: string }) {
   const [Icon, title] = SIGNALS[kind]
@@ -30,15 +28,16 @@ export function ReadingDirections({ rows }: { rows: DirectionRow[] }) {
 }
 
 export type ReadingEvent = { date: string; kind: ReadingSignal; label: string; status?: string; detail?: string }
-export function ReadingTimeline({ events }: { events: ReadingEvent[] }) {
+export function ReadingTimeline({ events, context = {} }: { events: ReadingEvent[]; context?: TimelineContext }) {
   const distinct=[...new Map(events.map(e=>[`${e.date}:${e.kind}:${e.label}:${e.status}`,e])).values()]
-  const now=new Date()
+  const now=context.now ?? new Date()
   const dates=orderTimelineDates([...new Set(distinct.map(e=>e.date))],now)
-  const group=(date:string)=><li key={date}><time>{timelineDisplayDate(date,now)}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=>{
-    const badgeLabel=TIMELINE_SIGNAL_LABELS[e.kind]
+  const group=(date:string)=><li key={date}><time>{timelineWindowState(date,{...context,now}) === 'past' ? `지난 · ${date}` : date}</time><div className="reading-event-lines">{distinct.filter(e=>e.date===date).map((e,i)=>{
+    const temporal=timelinePresentation(e.date,e.kind,{...context,now})
+    const badgeLabel=temporal.label
     return <div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
-      <div className="reading-event-heading"><ReadingBadge kind={e.kind} label={badgeLabel}/>{e.status && e.status!==badgeLabel&&<span className={`reading-state ${/확인 필요|주의/.test(e.status)?'is-caution':''}`}>{e.status}</span>}</div>
-      <p>{e.label}</p>{e.detail&&<details><summary>이 시기를 읽는 이유</summary><p>{e.detail}</p></details>}
+      <div className="reading-event-heading"><ReadingBadge kind={e.kind} label={badgeLabel}/>{temporal.state !== 'past' && e.status && e.status!==badgeLabel&&<span className={`reading-state ${/확인 필요|주의/.test(e.status)?'is-caution':''}`}>{e.status}</span>}</div>
+      {temporal.state === 'past' ? <><p>이미 지난 구간이야. 당시 경험과 비교하는 정보로만 봐.</p><details><summary>{temporal.detailLabel}</summary><p>{e.label}</p>{e.detail && <p>{e.detail}</p>}</details></> : <><p>{e.label}</p>{e.detail&&<details><summary>{temporal.detailLabel}</summary><p>{e.detail}</p></details>}</>}
     </div>
   })}</div></li>
   return <div className="reading-event-list"><ol>{dates.slice(0,2).map(group)}</ol>{dates.length>2&&<details className="reading-more"><summary>시기 {dates.length-2}개 더 보기</summary><ol>{dates.slice(2).map(group)}</ol></details>}</div>

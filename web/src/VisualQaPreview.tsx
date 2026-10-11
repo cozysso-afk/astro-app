@@ -1,3 +1,5 @@
+import { ReadingTimeline } from './ReadingSignals'
+import { westernRankCopy } from './lib/westernRankCopy'
 import { useEffect, useRef, useState } from 'react'
 import { exportReadingImages } from './lib/readingImageExport'
 import { installReadingPresentationV5 } from './lib/readingPresentationV5'
@@ -70,6 +72,16 @@ export function VisualQaPreview() {
           <article className="system-thai"><strong>태국점성술</strong><p>수면·일정·회복 시간을 무리 없이 유지할 수 있는지 차례로 확인해봐.</p><small>행성 이름과 배치는 태국점성술 탭의 계산 상세에서 확인해.</small></article>
         </div>
       </section>
+    </section>
+
+    <section data-qa-block="interpretation-v2" style={{marginBottom:28}}>
+      <h3>해설 품질 회귀 검증</h3>
+      <p>{westernRankCopy([['연애',{average:25,band:'약함',spread:0,best_days:[],caution_days:[]}],['연락',{average:20,band:'약함',spread:0,best_days:[],caution_days:[]}],['재회',{average:30,band:'약함',spread:0,best_days:[],caution_days:[]}]],'오늘')}</p>
+      <ReadingTimeline context={{now:new Date('2026-10-11T14:08:00Z'),timeZone:'Asia/Seoul',referenceDate:'2026-10-11'}} events={[
+        {date:'15:30–17:00',kind:'favorable',label:'연락 · 당시 대화 활성 구간',status:'진행 후보'},
+        {date:'23:00–23:30',kind:'mixed',label:'연애 · 호감과 만남의 속도를 구분하는 구간'},
+        {date:'23:30–23:59',kind:'favorable',label:'재회 · 과거 인연의 재접촉 관련 구간'},
+      ]}/>
     </section>
 
     <section className="reunion-ui-v3" data-qa-block="reunion" style={{marginBottom:28}}>

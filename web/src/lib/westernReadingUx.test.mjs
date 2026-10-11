@@ -20,8 +20,8 @@ test('western independent view starts with an actual period takeaway', () => {
 
 test('western reader copy names the score difference and gives a concrete next action', () => {
   assert.doesNotMatch(view, /상대적으로 더 살아 있어|힘이 덜 실리|무난해|이어가기 괜찮아|상대적으로 강하고|약한 편이야/)
-  assert.match(view, /분야별 점수 차이가 크지 않아/)
-  assert.match(view, /점수가 가장 높고/)
+  assert.match(view, /westernRankCopy\(rows, when\)/)
+  assert.doesNotMatch(view, /점수가 가장 높고|흐름이 점수가/)
   assert.match(view, /공부할 분량을 정하고/)
   assert.match(view, /직무·보상·시작 일정/)
 })
@@ -46,13 +46,13 @@ test('important windows use action checks instead of fortune-style verdict label
   assert.match(periodPanel, /return '진행 후보'/)
   assert.match(periodPanel, /return '확인 필요'/)
   assert.match(periodPanel, /return '변동 확인'/)
-  assert.match(periodPanel, /실제 일정·약속·조건이 구체화되는지 확인해/)
-  assert.match(periodPanel, /일정·문서·상대 행동처럼 확인 가능한 조건을 다시 봐/)
-  assert.match(periodPanel, /다음 행동이 이어지는지 확인해/)
+  assert.doesNotMatch(periodPanel, /importantWindowCheck/)
+  assert.match(periodPanel, /label: window.guidance/)
+  assert.match(periodPanel, /referenceDate: calculation.period.start/)
   assert.doesNotMatch(periodPanel, /활용·주의 구간/)
   assert.doesNotMatch(periodPanel, /status: window\.kind === 'caution' \? '주의'/)
-  assert.match(signals, /TIMELINE_SIGNAL_LABELS/)
-  assert.match(signals, /favorable: '진행 후보', caution: '확인 필요', mixed: '변동 확인'/)
+  assert.match(signals, /timelinePresentation/)
+  assert.match(signals, /temporal.state === 'past'/)
 })
 
 test('month and year restore period-level decisions limits and annual phase changes only in integrated view', () => {

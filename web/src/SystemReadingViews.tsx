@@ -1,3 +1,4 @@
+import { westernRankCopy } from './lib/westernRankCopy'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
 import type { FortuneField } from './lib/fortuneFields'
@@ -110,27 +111,11 @@ function koreanParticle(text:string, pair:'은는'|'이가') {
   const hasFinal = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0
   return `${clean}${pair === '은는' ? (hasFinal ? '은' : '는') : (hasFinal ? '이' : '가')}`
 }
-function westernHeadline(rows:Array<[string,FortuneStat]>, when:string, calculation:IntegratedApiResponse) {
-  const readable = rows.filter(([name])=>name!=='투자주의')
-  if (!readable.length) return `${koreanParticle(when,'은는')} 비교할 수 있는 서양점성술 분야 점수가 없어.`
-  const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
-  const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
-  const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]] ?? strongest[0]
-  const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]] ?? weakest[0]
-  if (weakest[0]!==strongest[0] && strongest[1].average-weakest[1].average>=8) {
-    return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높아. ${westernGuidance(strongest[0],strongest[1],calculation)} ${koreanParticle(weakLabel,'은는')} 점수가 가장 낮지만, ${westernGuidance(weakest[0],weakest[1],calculation)}`
-  }
-  return `${koreanParticle(when,'은는')} 분야별 점수 차이가 크지 않아. ${strongLabel}에서는 ${westernGuidance(strongest[0],strongest[1],calculation)}`
+function westernHeadline(rows:Array<[string,FortuneStat]>, when:string, _calculation:IntegratedApiResponse) {
+  return westernRankCopy(rows, when)
 }
-function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string, calculation:IntegratedApiResponse) {
-  const readable = rows.filter(([name])=>name!=='투자주의')
-  if (!readable.length) return '이 분야의 서양점성술 계산값이 충분하지 않아.'
-  const strongest = readable.slice().sort((a,b)=>b[1].average-a[1].average)[0]
-  const weakest = readable.slice().sort((a,b)=>a[1].average-b[1].average)[0]
-  const strongLabel = WESTERN_HEADLINE_LABEL[strongest[0]]??strongest[0]
-  const weakLabel = WESTERN_HEADLINE_LABEL[weakest[0]]??weakest[0]
-  if (strongest[0]===weakest[0]) return `${koreanParticle(when,'은는')} ${strongLabel}을 중심으로 봐. ${westernGuidance(strongest[0],strongest[1],calculation)}`
-  return `${koreanParticle(when,'은는')} ${koreanParticle(strongLabel,'이가')} 점수가 가장 높고, ${koreanParticle(weakLabel,'은는')} 가장 낮아. 낮은 값은 불리한 사건보다 활성도가 덜 두드러진다는 뜻이야. ${westernGuidance(weakest[0],weakest[1],calculation)}`
+function westernOverviewText(rows:Array<[string,FortuneStat]>, when:string, _calculation:IntegratedApiResponse) {
+  return westernRankCopy(rows, when)
 }
 function representativeWesternRows(rows:Array<[string,FortuneStat]>) {
   const picked:Array<[string,FortuneStat]> = []

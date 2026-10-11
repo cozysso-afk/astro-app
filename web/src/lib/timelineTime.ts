@@ -57,3 +57,35 @@ export function orderTimelineDates(values: string[], now = new Date()) {
 export function timelineDisplayDate(value: string, now = new Date()) {
   return intradayWindowState(value, now) === 'past' ? `지난 · ${value}` : value
 }
+
+export type TimelineContext = { now?: Date; timeZone?: string; referenceDate?: string }
+
+// A clock-only window belongs to the calculation date, not every day it is opened.
+export function timelineWindowState(value: string, context: TimelineContext = {}): IntradayWindowState {
+  const now = context.now ?? new Date()
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: context.timeZone, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(now)
+  const part = (name: string) => parts.find(p => p.type === name)?.value ?? ''
+  const today = `${part('year')}-${part('month')}-${part('day')}`
+  const range = parseIntradayRange(value)
+  if (range) {
+    const date = context.referenceDate ?? today
+    const minute = Number(part('hour')) * 60 + Number(part('minute'))
+    const start = Date.parse(`${date}T00:00:00Z`) + range.start * 60000
+    const end = Date.parse(`${date}T00:00:00Z`) + (range.end + (range.end < range.start ? 1440 : 0)) * 60000
+    const current = Date.parse(`${today}T00:00:00Z`) + minute * 60000
+    return current < start ? 'upcoming' : current > end ? 'past' : 'current'
+  }
+  const dates = value.match(/\d{4}-\d{2}-\d{2}/g)
+  if (!dates?.length) return 'not-intraday'
+  return today < dates[0] ? 'upcoming' : today > dates[dates.length - 1] ? 'past' : 'current'
+}
+
+export function timelinePresentation(value: string, kind: string, context: TimelineContext = {}) {
+  const state = timelineWindowState(value, context)
+  return {
+    state,
+    label: state === 'past' ? '지난 구간 · 회고' : state === 'current' ? '진행 중' : state === 'upcoming' ? '예정 구간' : '시점 확인 필요',
+    detailLabel: state === 'past' ? '당시 계산 근거' : '이 시기를 읽는 이유',
+    signalLabel: kind === 'favorable' ? '도움 근거' : kind === 'caution' ? '주의 근거' : '혼합 근거',
+  }
+}
