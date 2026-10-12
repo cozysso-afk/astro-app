@@ -10,16 +10,17 @@ const wrapper=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.ur
 const css=readFileSync(new URL('../reunion-v3.css',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
+const observation=readFileSync(new URL('./reunionObservation.ts',import.meta.url),'utf8')
 
 test('reunion calculation and AI grounding contracts remain intact',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v13\.0-answerability-evidence"/)
+  assert.match(server,/REUNION_VERSION="relationship-v13\.1-observation-history"/)
   assert.match(server,/buildReunionEvidenceV2/)
   assert.match(server,/repairReunionGroundingV2/)
   assert.match(server,/validEvidenceRefs/)
   assert.match(server,/reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(publicError,/publicReunionV2/)
   assert.match(types,/reunion_synthesis_v2\?:/)
-  assert.match(cache,/relationship-v13\.0-answerability-evidence-v1-consultation-depth-v3/)
+  assert.match(cache,/relationship-v13\.1-observation-history-v1-consultation-depth-v3/)
 })
 
 test('relationship result routes reunion to the hierarchy product while retaining AI synthesis input',()=>{
@@ -30,7 +31,8 @@ test('relationship result routes reunion to the hierarchy product while retainin
 })
 
 test('reunion v4 starts with an answer and explicit stage ladder before supporting detail',()=>{
-  for(const heading of ['이번 조회의 답','재회 단계 한눈에','현재 위치','연락 자체는 얼마나 열려 있나','굳이 비교하면 누가 먼저인가','상대가 예전과 다르게 움직일 여지가 있나','그래서 지금 무엇을 보면 되나','기억할 시기','재회를 판단할 현실 기준','내 현재 상황에 맞춰 읽기']) assert.match(hierarchy,new RegExp(heading))
+  for(const heading of ['이번 조회의 답','재회 단계 한눈에','연락 자체는 얼마나 열려 있나','수신·발신 계산값 비교','선택한 과거 기간','상대가 예전과 다르게 움직일 여지가 있나','그래서 지금 무엇을 보면 되나','기억할 시기','재회를 판단할 현실 기준','내 현재 상황에 맞춰 읽기']) assert.match(hierarchy,new RegExp(heading))
+  assert.match(observation,/현재 관계 상태 미입력/)
   assert.match(hierarchy,/생각·연락·만남·재구축은 단계별로 따로 봐/)
   assert.match(hierarchy,/연락은 살펴볼 수 있지만, 아직 재회 단계는 아님/)
   assert.match(hierarchy,/생각날 배경은 있어도, 연락을 기다릴 근거는 약함/)
@@ -40,7 +42,7 @@ test('reunion v4 starts with an answer and explicit stage ladder before supporti
 })
 
 test('reunion reader-facing section labels stay Korean instead of internal English markers',()=>{
-  for(const label of ['현재 단계','연락 흐름','먼저 움직이는 쪽','행동 변화','다음 확인']) assert.match(hierarchy,new RegExp(label))
+  for(const label of ['현재 단계','연락 흐름','방향별 상대 활성도','행동 변화','다음 확인']) assert.match(hierarchy,new RegExp(label))
   for(const marker of ['CURRENT STATE','CONTACT','DIRECTION','BEHAVIOR CHANGE','NEXT CHECK']) assert.doesNotMatch(hierarchy,new RegExp(marker))
 })
 
@@ -79,11 +81,12 @@ test('behavior-change question uses meeting and rebuilding evidence, not contact
   assert.doesNotMatch(body,/수신신호|발신적합/)
 })
 
-test('reunion result branches for materially different real-world contact states',()=>{
-  for(const heading of ['현재 완전 단절·차단 상태라면','가끔 연락하거나 안부를 주고받는 중이라면','이미 다시 만나고 있거나 관계가 애매하다면']) assert.match(hierarchy,new RegExp(heading))
-  assert.match(hierarchy,/차단 해제·직접 접촉/)
-  assert.match(hierarchy,/안부만 반복되면 재회 단계로 올려 읽지 않아/)
-  assert.match(hierarchy,/관계 정의와 반복 문제/)
+test('reunion result applies only the selected observed state and advances to the next unanswered stage',()=>{
+  for(const marker of ['observationReading','contextualGuide']) assert.match(hierarchy,new RegExp(marker))
+  for(const marker of ['관측 사실 · 재접촉은 이미 발생','관측 사실 · 실제 만남 발생','관측 사실 · 친밀하지만 관계는 미정','관측 사실 · 관계 재정립 또는 재결합 합의']) assert.match(observation,new RegExp(marker))
+  assert.match(hierarchy,/선택한 한 상태만 적용하고 다른 가정을 함께 붙이지 않아/)
+  assert.doesNotMatch(hierarchy,/굳이 비교하면 누가 먼저인가/)
+  assert.match(hierarchy,/실제로 누가 먼저 연락할지를 예측하지 않아/)
 })
 
 test('reunion keeps one concise disclaimer and puts calculation detail behind disclosure',()=>{

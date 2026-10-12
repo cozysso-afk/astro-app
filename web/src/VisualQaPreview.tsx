@@ -86,15 +86,18 @@ export function VisualQaPreview() {
 
     <section className="reunion-ui-v3" data-qa-block="reunion" style={{marginBottom:28}}>
       <h3>재회 카드 높이 QA</h3>
+      <section className="reunion-v4-stage-grid">
+        <article className="reunion-v3-card reunion-v4-stage-card"><small>연락·대화 · 관측 완료</small><b>계산됨 · 미래 후보 없음</b><p>연락 발생 여부는 이미 확인된 현실 정보이고, 계산된 미래 후보가 없다는 결과와 서로 다른 뜻이야.</p></article>
+        <article className="reunion-v3-card reunion-v4-stage-card"><small>실제 만남 · 관측 완료</small><b>현재 활성 없음</b><p>실제 만남 기록을 계산이 부정하지 않아. 현재 활성과 과거 사건을 분리해.</p></article>
+      </section>
+      <section className="reunion-v3-history"><div className="period-ai-section-title"><span>선택한 과거 기간</span><strong>실제 기록과 계산 신호를 사후 대조</strong></div><div className="reunion-history-list"><article><time>2026-06-09 ~ 2026-06-11</time><b>연락·대화 재개</b><span>활성도 68 · 지난 구간</span></article></div></section>
       <section className="reunion-v3-meaning">
         <article className="reunion-v3-card"><h4>왜 다시 생각날 수 있나</h4><p>공유된 진행 차트의 조화각과 상호 정서적 접점이 다시금 서로를 의식하게 만드는 배경을 형성하고 있어.</p></article>
         <article className="reunion-v3-card"><h4>재회를 판단할 현실 기준</h4><p>연락이 닿더라도 실제 만남과 안정적 재결합으로 이어지기 위해서는 질문과 답이 이어지는지, 구체적인 약속을 잡는지, 예전 문제를 피하지 않고 다르게 다루는지가 함께 확인되어야 해.</p></article>
       </section>
       <section className="reunion-v3-situations">
-        <div className="period-ai-section-title"><span>내 현재 상황에 맞춰 읽기</span><strong>연락 상태가 다르면 같은 결과도 의미가 달라</strong></div>
-        <article className="reunion-v3-situation"><strong>현재 완전 단절·차단 상태라면</strong><p>연락 신호가 있어도 차단 상태 자체를 넘어서는 행동을 예측하지 않아.</p></article>
-        <article className="reunion-v3-situation"><strong>가끔 연락하거나 안부를 주고받는 중이라면</strong><p>연락 횟수보다 질문과 답이 이어지는지, 구체적인 약속을 잡는지, 예전 문제를 피하지 않는지를 구분해.</p></article>
-        <article className="reunion-v3-situation"><strong>이미 다시 만나고 있거나 관계가 애매하다면</strong><p>연락 지수보다 만남 뒤 관계 정의와 반복 문제를 다루는 행동이 있는지가 더 중요해.</p></article>
+        <div className="period-ai-section-title"><span>내 현재 상황에 맞춰 읽기</span><strong>선택한 한 상태만 적용하고 다른 가정을 함께 붙이지 않아</strong></div>
+        <article className="reunion-v3-situation"><strong>만남이 확인된 뒤 볼 것</strong><p>만남은 관측 사실이야. 다음 질문은 관계 정의와 지속 행동을 뒷받침하는 재구축 근거가 따로 있는지야.</p></article>
       </section>
     </section>
 

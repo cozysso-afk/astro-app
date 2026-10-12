@@ -48,6 +48,8 @@ import type {
   AiTopicInterpretation,
   AiInterpretationResponse
 } from './appTypes'
+import type { ReunionObservationContext, ReunionObservedInitiator, ReunionObservedState } from './appTypes'
+import { REUNION_STATE_OPTIONS } from './lib/reunionObservation'
 
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
@@ -399,6 +401,16 @@ export default function AppNext() {
   const [reunionTiming, setReunionTiming] = useState<ReunionTimingContext | null>(null)
   const [reunionTimingLoading, setReunionTimingLoading] = useState(false)
   const [reunionTimingError, setReunionTimingError] = useState('')
+  const [reunionObservedState, setReunionObservedState] = useState<ReunionObservedState>('')
+  const [reunionObservedInitiator, setReunionObservedInitiator] = useState<ReunionObservedInitiator>('')
+  const [reunionRecontactDate, setReunionRecontactDate] = useState('')
+  const [reunionMeetingDate, setReunionMeetingDate] = useState('')
+  const [reunionRebuildingDate, setReunionRebuildingDate] = useState('')
+  const [reunionHistoryStart, setReunionHistoryStart] = useState(()=>addDays(toDateInputValue(new Date()),-90))
+  const [reunionHistoryEnd, setReunionHistoryEnd] = useState(()=>addDays(toDateInputValue(new Date()),-1))
+  const [reunionHistoryResult, setReunionHistoryResult] = useState<RelationshipApiResponse | null>(null)
+  const [reunionHistoryLoading, setReunionHistoryLoading] = useState(false)
+  const [reunionHistoryError, setReunionHistoryError] = useState('')
   const [birthProfile, setBirthProfile] = useState<BirthProfile>(() => loadStoredProfile())
   const [profileSaved, setProfileSaved] = useState(false)
   const [counterpart, setCounterpart] = useState<CounterpartProfile>(emptyCounterpart)
@@ -497,6 +509,8 @@ export default function AppNext() {
     setRelationshipAiError('')
     setRelationshipError('')
     setReunionTiming(null)
+    setReunionHistoryResult(null)
+    setReunionHistoryError('')
     setReunionTimingError('')
     setRelationshipLoading(false)
     setRelationshipAiLoading(false)
@@ -586,6 +600,15 @@ export default function AppNext() {
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
   const relationshipDayCount = Math.round((new Date(`${relationshipEndDate}T12:00:00Z`).getTime()-new Date(`${relationshipStartDate}T12:00:00Z`).getTime())/86400000)+1
   const relationshipPeriodKey: PeriodKey = relationshipCalendarYear || clampedRelationshipDays >= 365 ? 'year' : clampedRelationshipDays >= 28 ? 'month' : 'week'
+  const reunionObservation = useMemo<ReunionObservationContext>(()=>({
+    state:reunionObservedState,
+    initiator:reunionObservedInitiator,
+    events:[
+      {kind:'recontact' as const,date:reunionRecontactDate},
+      {kind:'meeting' as const,date:reunionMeetingDate},
+      {kind:'rebuilding' as const,date:reunionRebuildingDate},
+    ].filter(row=>Boolean(row.date)),
+  }),[reunionObservedState,reunionObservedInitiator,reunionRecontactDate,reunionMeetingDate,reunionRebuildingDate])
   const isPersonalMarriage = selectedTool === 'marriage' && marriageMode === 'unmarried' && marriageScope === 'personal'
   const needsCounterpart = selectedTool === 'compatibility' || (selectedTool === 'marriage' && !isPersonalMarriage)
   const integratedMatchesSelection = Boolean(
@@ -1054,7 +1077,7 @@ export default function AppNext() {
   const runRelationship = async () => {
     const revision = relationshipRevisionRef.current + 1
     relationshipRevisionRef.current = revision
-    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError(''); setReunionTiming(null); setReunionTimingError('')
+    setRelationshipError(''); setRelationshipResult(null); setRelationshipRequestSnapshot(null); setRelationshipAi(null); setRelationshipAiError(''); setReunionTiming(null); setReunionTimingError(''); setReunionHistoryResult(null); setReunionHistoryError('')
     const reunionRequest = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
     if (reunionRequest && reunionContractStatus !== 'ready') {
       setRelationshipError(reunionContractStatus === 'stale' ? '재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 비용이 드는 AI 해설은 시작하지 않아. 잠시 후 다시 시도해줘.' : '재회 계산 서버 버전을 확인 중이야. 확인이 끝난 뒤 다시 시도해줘.')
@@ -1119,6 +1142,26 @@ export default function AppNext() {
     }
   }
 
+  const runReunionHistory = async () => {
+    setReunionHistoryError('')
+    const today = toDateInputValue(new Date())
+    if (!relationshipRequestSnapshot || !relationshipResult) { setReunionHistoryError('현재 재회운 계산을 먼저 완료해줘.'); return }
+    if (!reunionHistoryStart || !reunionHistoryEnd || reunionHistoryStart > reunionHistoryEnd) { setReunionHistoryError('과거 분석 시작일과 종료일을 올바르게 선택해줘.'); return }
+    if (reunionHistoryEnd >= today) { setReunionHistoryError('과거 분석 종료일은 사용자 현지 날짜 기준 오늘보다 이전이어야 해.'); return }
+    const days = Math.round((new Date(`${reunionHistoryEnd}T12:00:00`).getTime()-new Date(`${reunionHistoryStart}T12:00:00`).getTime())/86400000)+1
+    if (days < 1 || days > 365) { setReunionHistoryError('과거 분석 범위는 한 번에 1~365일로 선택해줘.'); return }
+    const body = {...relationshipRequestSnapshot,start_date:reunionHistoryStart,end_date:reunionHistoryEnd,as_of_date:today,analysis_mode:'reunion'}
+    setReunionHistoryLoading(true)
+    try {
+      const response = await fetchAuthorizedReunionRelationship({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      const payload = await response.json().catch(()=>({}))
+      if (!response.ok || !payload?.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : '과거 재회운 계산에 실패했어.')
+      setReunionHistoryResult(payload as RelationshipApiResponse)
+    } catch (error) {
+      setReunionHistoryError(error instanceof Error ? error.message : '과거 재회운 계산 중 오류가 발생했어.')
+    } finally { setReunionHistoryLoading(false) }
+  }
+
 
   const runRelationshipAi = async () => {
     if (!relationshipResult) return
@@ -1131,7 +1174,8 @@ export default function AppNext() {
       return
     }
     if (analysisMode === 'reunion' && !reunionTiming) { setRelationshipAiError('재회 시기 계산이 먼저 완료되어야 해.'); return }
-    const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, reunionTiming)
+    const aiContext = analysisMode === 'reunion' ? {timing:reunionTiming,observation:reunionObservation} : reunionTiming
+    const relationshipCacheId = relationshipAiCacheId(relationshipResult as unknown as Record<string,unknown>, analysisMode, aiModel, aiContext)
     setRelationshipAiLoading(true); setRelationshipAiError('')
     try {
       const cached = relationshipAiSuccess(await readReadingCache<RelationshipAiResponse>(relationshipCacheId))
@@ -1142,7 +1186,8 @@ export default function AppNext() {
         return
       }
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionTiming, purpose: analysisMode, model: aiModel } })
+      const reunionContextForAi = analysisMode === 'reunion' ? {...reunionTiming,reunion_observation:reunionObservation} : reunionTiming
+      const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionContextForAi, purpose: analysisMode, model: aiModel } })
       if (error) throw new RelationshipAiPublicError({error:await relationshipAiInvokeErrorMessage(error)})
       const payload = relationshipAiSuccess(data)
       if (!payload) throw new RelationshipAiPublicError(data)
@@ -1154,7 +1199,7 @@ export default function AppNext() {
       if (relationshipRequestSnapshot) {
         const autoKind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
         const autoIsReunion = selectedTool === 'compatibility' && analysisMode === 'reunion'
-        const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }
+        const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, reunion_observation:reunionObservation, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }
         const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
         const autoLabel = autoKind === 'marriage' ? '결혼운' : autoIsReunion ? '재회운' : '궁합운'
         void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)
@@ -1323,7 +1368,7 @@ export default function AppNext() {
     const kind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
     const isReunion = selectedTool === 'compatibility' && relationshipPurpose === 'reunion'
     const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
-    const archiveRequest = isReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming } : relationshipRequestSnapshot
+    const archiveRequest = isReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, reunion_observation:reunionObservation } : relationshipRequestSnapshot
     const archiveLabel = kind === 'marriage' ? '결혼운' : isReunion ? '재회운' : '궁합운'
     try {
     const saved = await saveArchive({
@@ -1430,6 +1475,13 @@ export default function AppNext() {
         setRelationshipPurpose('reunion')
         const archivedContext = request.reunion_context
         setReunionTiming(archivedContext && typeof archivedContext === 'object' ? archivedContext as ReunionTimingContext : null)
+        const archivedObservation = request.reunion_observation as Partial<ReunionObservationContext> | undefined
+        setReunionObservedState((archivedObservation?.state as ReunionObservedState) || '')
+        setReunionObservedInitiator((archivedObservation?.initiator as ReunionObservedInitiator) || '')
+        const archivedEvents = Array.isArray(archivedObservation?.events) ? archivedObservation.events : []
+        setReunionRecontactDate(archivedEvents.find(row=>row?.kind==='recontact')?.date ?? '')
+        setReunionMeetingDate(archivedEvents.find(row=>row?.kind==='meeting')?.date ?? '')
+        setReunionRebuildingDate(archivedEvents.find(row=>row?.kind==='rebuilding')?.date ?? '')
       } else {
         setRelationshipPurpose('compatibility')
         setReunionTiming(null)
@@ -1721,6 +1773,12 @@ export default function AppNext() {
             {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&reunionContractStatus!=='ready'&&<div className="status-banner error"><AlertTriangle size={16}/><span>{reunionContractStatus==='stale'?'재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 최신 서버 확인 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.':'재회 계산 서버 버전을 확인 중이야. 확인이 끝나기 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.'}</span></div>}
+            {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<section className="reunion-observation-form" aria-labelledby="reunion-observation-title">
+              <div><strong id="reunion-observation-title">현재 관계 상태 · 선택 입력</strong><span>관측 사실은 계산 점수·날짜·관문을 바꾸지 않고, 이미 확인된 단계를 반복하지 않게 해설 순서에만 반영해.</span></div>
+              <label className="field field-wide"><span>지금 확인된 상태</span><select value={reunionObservedState} onChange={e=>{setReunionObservedState(e.target.value as ReunionObservedState);setRelationshipAi(null);setRelationshipAiError('')}}>{REUNION_STATE_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}</select></label>
+              <label className="field field-wide"><span>실제 첫 재접촉 주체 · 선택</span><select value={reunionObservedInitiator} onChange={e=>{setReunionObservedInitiator(e.target.value as ReunionObservedInitiator);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="counterpart">상대가 먼저</option><option value="user">내가 먼저</option><option value="mutual">서로 비슷한 시점</option><option value="unknown">확인 어려움</option></select><small>이 기록은 계산된 상대 → 나 / 나 → 상대 활성도와 별도로 표시돼.</small></label>
+              <details><summary>실제 사건 날짜 기록 · 선택</summary><div className="reunion-observation-dates"><label><span>재접촉</span><input type="date" value={reunionRecontactDate} onChange={e=>{setReunionRecontactDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>실제 만남</span><input type="date" value={reunionMeetingDate} onChange={e=>{setReunionMeetingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>관계 합의</span><input type="date" value={reunionRebuildingDate} onChange={e=>{setReunionRebuildingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label></div></details>
+            </section>}
             {needsCounterpart&&<>
             <div className="subsection-title">상대 출생정보</div>
             <div className="field-grid">
@@ -1746,6 +1804,12 @@ export default function AppNext() {
 
             {!isPersonalMarriage&&relationshipResult && <div className="results-wrap">
               <div className="result-headline"><CheckCircle2 size={20}/><div><strong>실제 계산 완료</strong><span>{relationshipResult.period.start} ~ {relationshipResult.period.end} · {relationshipDayCount}일</span></div></div>
+              {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<section className="reunion-history-controls" aria-labelledby="reunion-history-title">
+                <div><strong id="reunion-history-title">과거 시기 독립 분석</strong><span>현재·미래 결과를 덮어쓰지 않고 같은 계산 엔진으로 선택 기간만 별도 계산해.</span></div>
+                <div className="reunion-history-range"><label><span>시작일</span><input type="date" value={reunionHistoryStart} max={addDays(toDateInputValue(new Date()),-1)} onChange={e=>{setReunionHistoryStart(e.target.value);setReunionHistoryResult(null)}}/></label><label><span>종료일</span><input type="date" value={reunionHistoryEnd} max={addDays(toDateInputValue(new Date()),-1)} onChange={e=>{setReunionHistoryEnd(e.target.value);setReunionHistoryResult(null)}}/></label></div>
+                <button type="button" onClick={runReunionHistory} disabled={reunionHistoryLoading}>{reunionHistoryLoading?<LoaderCircle className="spin" size={16}/>:<Search size={16}/>}<span>{reunionHistoryLoading?'과거 기간 계산 중…':'선택한 과거 기간 계산'}</span></button>
+                {reunionHistoryError&&<small role="alert">{reunionHistoryError}</small>}
+              </section>}
               <div className="result-actions">
                 <ExternalPromptCopy onCopy={mode=>{if(relationshipRequestSnapshot) void copyExternalPrompt(()=>relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose,relationshipRequestSnapshot,relationshipResult,reunionTiming,mode),mode)}}/>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming))}><Copy size={15}/><span>결과 전체복사</span></button>
@@ -1758,6 +1822,9 @@ export default function AppNext() {
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 returnSupport={relationshipResult.result.reunion_return_support ?? null}
                 hierarchy={relationshipResult.result.reunion_hierarchy ?? null}
+                historyHierarchy={reunionHistoryResult?.result.reunion_hierarchy ?? null}
+                historyCalculated={Boolean(reunionHistoryResult)}
+                observation={reunionObservation}
                 evidenceContract={relationshipResult.result.reunion_evidence_contract ?? null}
                 technicalDetails={<>
                   {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<ReunionTimingPanel context={reunionTiming} loading={reunionTimingLoading} error={reunionTimingError}/>}

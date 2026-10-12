@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v13.0-answerability-evidence";
+const REUNION_VERSION="relationship-v13.1-observation-history";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -125,11 +125,12 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
    reunion_timing_windows:purpose==="reunion"?r?.reunion_timing_windows??null:null,
    reunion_return_support:purpose==="reunion"?r?.reunion_return_support??null:null,
    transit_triggers:trans?{period:trans?.period,policy:trans?.policy,top_days:transitDays,top_months:transitMonths}:null,
+   reunion_observation:purpose==="reunion"&&ctx?.reunion_observation?{state:String(ctx.reunion_observation?.state??"").slice(0,40),initiator:String(ctx.reunion_observation?.initiator??"").slice(0,40),events:Array.isArray(ctx.reunion_observation?.events)?ctx.reunion_observation.events.slice(0,3).map((x:any)=>({kind:String(x?.kind??"").slice(0,30),date:String(x?.date??"").slice(0,10)})):[]}:null,
    limitations:Array.isArray(r?.limitations)?r.limitations.slice(0,8):[]
  });
  if(purpose==="reunion"){
    const reunion_evidence_v2=buildReunionEvidenceV2(base);
-   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_hierarchy:base.reunion_hierarchy,reunion_dimensions:base.reunion_dimensions,reunion_secondary_support:base.reunion_secondary_support,reunion_evidence_contract:base.reunion_evidence_contract,reunion_timing_windows:base.reunion_timing_windows,reunion_return_support:base.reunion_return_support,reunion_evidence_v2,limitations:base.limitations};
+   return {analysis_mode:base.analysis_mode,period:base.period,relationship_status:base.relationship_status,timing_contract:base.timing_contract,precision:base.precision,saju_relationship:base.saju_relationship,reunion_hierarchy:base.reunion_hierarchy,reunion_dimensions:base.reunion_dimensions,reunion_secondary_support:base.reunion_secondary_support,reunion_evidence_contract:base.reunion_evidence_contract,reunion_timing_windows:base.reunion_timing_windows,reunion_return_support:base.reunion_return_support,reunion_observation:base.reunion_observation,reunion_evidence_v2,limitations:base.limitations};
  }
  return base;
 }
@@ -150,6 +151,7 @@ const SYSTEM=`너는 '별빛의 운명'의 관계 전문 리더다. 사용자가
 - 레이어 우선순위는 Natal structure > Secondary Progression > 주요/중장기 Transit > 빠른 Daily Transit > Tertiary/Marks 보조층이다. 하위 보조층 하나만으로 상위 레이어 결론을 뒤집지 않는다.
 - sensitivity_scan은 진단용이며 exact 생시 확정이나 사건확률 계산에 사용하지 않는다.
 - 재회운에서는 CALCULATED_DATA.reunion_dimensions의 ① emotional_reactivation(감정 활성) ② contact_recontact(연락·재접촉) ③ in_person_meeting(실제 만남) ④ relationship_rebuilding(관계 재결합)을 절대 하나로 합치지 않는다. 감정 활성↑ ≠ 연락↑ ≠ 만남↑ ≠ 재결합↑이다. incoming/outgoing은 상대측/내측 차트 활성이지 선연락 주체가 아니다.
+- reunion_observation은 사용자가 입력한 현실의 관측 사실이며 점성 계산값이 아니다. 비어 있으면 현실 단계를 추정하지 않는다. 값이 있으면 이미 확인된 연락·만남을 부정하거나 다시 기다리라고 하지 말고, 아직 확인되지 않은 다음 단계의 계산 근거를 중심으로 설명한다. 관측 사실로 점수·날짜·관문을 수정하지 않는다. observation.initiator는 실제 기록이며 incoming/outgoing 상대 활성도와 일치한다고 가정하지 않는다.
 - reunion_secondary_support는 daily transit 점수와 합산하지 않는다. Secondary Progression(2차 진행)은 기간/배경 신호로만 읽고 정확한 날짜를 만들지 않는다. 특정 날짜는 CALCULATED_DATA.reunion_timing_windows에 존재하는 fast transit trigger 날짜만 제시한다. Marks/Tertiary 단독 신호로 관계 재결합 결론을 뒤집지 않는다.
 - 누가 먼저 움직이는지는 reunion_evidence_v2.initiative_gate가 available=true일 때만 방향을 말한다. false면 반드시 판정 불가로 쓰고, 상대측 활성만으로 상대가 먼저 연락한다고 단정하지 않는다.
 - Return(회귀)이 Daily Transit과 같은 현상을 재표현한 경우 독립 근거로 중복 가산하지 않는다.

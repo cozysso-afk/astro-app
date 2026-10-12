@@ -112,7 +112,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13\.0-answerability-evidence-v1-consultation-depth-v3'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13\.1-observation-history-v1-consultation-depth-v3'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -125,7 +125,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
   assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v13\.0-answerability-evidence/)
+  assert.match(relationshipFn, /relationship-v13\.1-observation-history/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

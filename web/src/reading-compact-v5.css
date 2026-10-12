@@ -199,61 +199,55 @@
   }
 }
 
-/* Reunion: keep every stage, but move secondary cards into swipeable lanes instead
-   of forcing them all into the vertical reading path. */
+/* Reunion: keep cards inside the iPhone portrait width; no hidden horizontal lane. */
 @media (max-width: 640px) {
   .reunion-ui-v3 .reunion-v3-grid {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: 10px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    scroll-snap-type: x proximity;
-    padding: 1px 1px 8px !important;
-    scrollbar-width: none;
+    overflow: visible !important;
+    padding: 0 !important;
   }
 
   .reunion-ui-v3 .reunion-v3-grid::-webkit-scrollbar { display: none; }
 
   .reunion-ui-v3 .reunion-v3-grid > .reunion-v3-card {
-    flex: 0 0 86% !important;
-    scroll-snap-align: start;
+    width: 100% !important;
+    min-width: 0 !important;
     padding: 16px 17px !important;
   }
 
   .reunion-ui-v3 .reunion-v3-meaning {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: 10px !important;
-    overflow-x: auto !important;
-    scroll-snap-type: x proximity;
-    padding-bottom: 8px !important;
-    scrollbar-width: none;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
   }
 
   .reunion-ui-v3 .reunion-v3-meaning::-webkit-scrollbar { display: none; }
 
   .reunion-ui-v3 .reunion-v3-meaning > .reunion-v3-card {
-    flex: 0 0 86% !important;
-    scroll-snap-align: start;
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
   .reunion-ui-v3 .reunion-v3-situations {
-    display: flex !important;
+    display: grid !important;
     gap: 10px !important;
-    overflow-x: auto !important;
-    scroll-snap-type: x proximity;
-    padding-bottom: 8px !important;
-    scrollbar-width: none;
+    overflow: visible !important;
+    padding-bottom: 16px !important;
   }
 
   .reunion-ui-v3 .reunion-v3-situations::-webkit-scrollbar { display: none; }
 
   .reunion-ui-v3 .reunion-v3-situations > .period-ai-section-title {
-    flex: 0 0 100%;
+    width: 100%;
   }
 
   .reunion-ui-v3 .reunion-v3-situation {
-    flex: 0 0 86% !important;
-    scroll-snap-align: start;
+    width: 100% !important;
+    min-width: 0 !important;
     padding: 14px 15px !important;
   }
 }
