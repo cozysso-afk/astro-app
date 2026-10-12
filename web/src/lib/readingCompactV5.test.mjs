@@ -56,10 +56,12 @@ test('saved image adds one hidden three-system synthesis card without extending 
   assert.match(visualQa, /qa-export-system-source/)
 })
 
-test('mobile vertical density keeps only suitable secondary cards in horizontal lanes', () => {
+test('mobile vertical density keeps general secondary cards horizontal but reunion cards fully visible', () => {
   assert.match(css, /\.system-overview-grid[\s\S]*overflow-x:\s*auto/)
   assert.match(css, /period-ai-relationship-section \.reading-direction-panel[\s\S]*overflow-x:\s*auto/)
-  assert.match(css, /\.reunion-ui-v3 \.reunion-v3-grid[\s\S]*overflow-x:\s*auto/)
+  assert.match(css, /\.reunion-ui-v3 \.reunion-v3-grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/)
+  assert.match(css, /\.reunion-ui-v3 \.reunion-v3-grid[\s\S]*overflow:\s*visible/)
+  assert.doesNotMatch(css, /\.reunion-ui-v3 \.reunion-v3-grid\s*\{[^}]*overflow-x:\s*auto/)
   assert.match(css, /\.flow-summary-section-v5 \.flow-tile > p[\s\S]*display:\s*none/)
   assert.match(captureCss, /reunion-v3-situations[\s\S]*display:\s*grid/)
   assert.match(captureCss, /reunion-v3-situations[\s\S]*overflow:\s*visible/)
