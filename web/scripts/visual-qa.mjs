@@ -58,6 +58,8 @@ try {
       reunionAlignItems: reunionMeaning ? getComputedStyle(reunionMeaning).alignItems : 'missing',
       reunionCards: slackFor('.reunion-v3-meaning > .reunion-v3-card'),
       situationsDisplay: situations ? getComputedStyle(situations).display : 'missing',
+      situationCount: document.querySelectorAll('.reunion-v3-situation').length,
+      reunionOverflow: document.querySelector('[data-qa-block="reunion"]') ? Math.ceil(document.querySelector('[data-qa-block="reunion"]').scrollWidth-document.querySelector('[data-qa-block="reunion"]').clientWidth) : 999,
       exportSystemCards: document.querySelectorAll('[data-qa-block="export-source"] .reading-export-system-v7').length,
     }
   })
@@ -70,10 +72,12 @@ try {
   assert(diagnostics.systemCards.length === 3, 'system overview fixture did not render 3 cards')
   assert(diagnostics.reunionCards.length === 2, 'reunion meaning fixture did not render 2 cards')
   assert(diagnostics.systemAlignItems === 'flex-start', `system cards are stretching: align-items=${diagnostics.systemAlignItems}`)
-  assert(diagnostics.reunionAlignItems === 'flex-start', `reunion cards are stretching: align-items=${diagnostics.reunionAlignItems}`)
+  assert(diagnostics.reunionDisplay === 'grid', `reunion meaning cards must stay vertical on mobile, got ${diagnostics.reunionDisplay}`)
   assert(Math.max(...diagnostics.systemCards.map(card => Math.abs(card.slack))) < 32, `system card has excessive empty tail: ${JSON.stringify(diagnostics.systemCards)}`)
   assert(Math.max(...diagnostics.reunionCards.map(card => Math.abs(card.slack))) < 32, `reunion card has excessive empty tail: ${JSON.stringify(diagnostics.reunionCards)}`)
   assert(diagnostics.situationsDisplay === 'grid', `reunion situations must stay vertical on mobile, got ${diagnostics.situationsDisplay}`)
+  assert(diagnostics.situationCount === 1, `only the selected observed state should render, got ${diagnostics.situationCount}`)
+  assert(diagnostics.reunionOverflow <= 1, `reunion cards overflow the iPhone viewport by ${diagnostics.reunionOverflow}px`)
   assert(diagnostics.exportSystemCards === 1, `saved system synthesis bridge missing: ${diagnostics.exportSystemCards}`)
 
   const quality = page.locator('[data-qa-block="interpretation-v2"]')

@@ -1,0 +1,23 @@
+{
+  "observation": {
+    "state": "intimate_undefined",
+    "initiator": "counterpart",
+    "events": [
+      {"kind": "recontact", "date": "2026-06-10"},
+      {"kind": "meeting", "date": "2026-06-21"}
+    ]
+  },
+  "history": {
+    "selection_policy": {"requested_range": {"start": "2026-06-01", "end": "2026-06-30"}},
+    "past_windows": [
+      {"stage": "contact_recontact", "start": "2026-06-09", "end": "2026-06-11", "date": "2026-06-10", "final": 68},
+      {"stage": "in_person_meeting", "start": "2026-06-15", "end": "2026-06-17", "date": "2026-06-16", "final": 57}
+    ]
+  },
+  "expected": {
+    "next_stage": "relationship_rebuilding",
+    "recontact": "match",
+    "meeting": "mismatch",
+    "actual_initiator_is_observation": true
+  }
+}

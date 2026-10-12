@@ -5,7 +5,7 @@ import { ReadingBadge, ReadingDirections, ReadingTimeline } from './ReadingSigna
 import { ReadingExplanation } from './ReadingExplanation'
 import { AlertTriangle, ImageDown, LoaderCircle, Orbit, Sparkles } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
-import type { Aspect, RelationshipAiResponse, RelationshipAnalysisMode, ReunionTimingContext } from './appTypes'
+import type { Aspect, RelationshipAiResponse, RelationshipAnalysisMode, ReunionObservationContext, ReunionTimingContext } from './appTypes'
 import { buildRelationshipUserSummary, type RelationshipPattern } from './lib/relationshipUserSummary'
 import { relationshipAiCostPreview } from './lib/aiCostPreview'
 import { firstSentences, relationshipGenerationCost, reunionSajuCopy } from './lib/reunionPresentation'
@@ -36,16 +36,20 @@ function ReadableCopy({ text, className = '' }: { text: string; className?: stri
   return <div className={`reunion-readable-copy ${className}`.trim()}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
-export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, evidenceContract, technicalDetails }: {
+export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerExact, angleTimeAvailable, ai, aiLoading, aiError, onAi, analysisMode, timeSensitivePoints, formatAspect, timing, returnSupport, hierarchy, historyHierarchy, historyCalculated=false, observation, evidenceContract, technicalDetails }: {
   sajuContext?: Record<string, unknown>;
   aspects: Aspect[]; partnerExact: boolean; angleTimeAvailable?: boolean; ai: RelationshipAiResponse | null; aiLoading: boolean; aiError: string;
   onAi: () => void; analysisMode: RelationshipAnalysisMode; timeSensitivePoints: ReadonlySet<string>; formatAspect: (aspect: Aspect) => string;
   hierarchy?: Record<string, unknown> | null;
+  historyHierarchy?: Record<string, unknown> | null;
+  historyCalculated?: boolean;
+  observation?: ReunionObservationContext;
   evidenceContract?: { version?: string; available?: boolean; evidence?: Aspect[] } | null;
   timing?: ReunionTimingContext | null; returnSupport?: Record<string, unknown> | null; technicalDetails?: ReactNode
 }) {
   const reunion = analysisMode === 'reunion'
   const hierarchyData = hierarchyView(hierarchy)
+  const historyHierarchyData = hierarchyView(historyHierarchy)
   const exportRef = useRef<HTMLElement | null>(null)
   const [imageExporting, setImageExporting] = useState(false)
   const [imageExportStatus, setImageExportStatus] = useState('')
@@ -218,6 +222,9 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
 
     {reunion && hierarchyData && <ReunionHierarchyPanel
     hierarchyData={hierarchyData}
+    historyHierarchyData={historyHierarchyData}
+    historyCalculated={historyCalculated}
+    observation={observation}
     evidence={evidenceContract?.evidence ?? []}
     reunionV2={reunionV2}
     directionRows={[

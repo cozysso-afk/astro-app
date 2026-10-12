@@ -8,6 +8,15 @@ export type RelationshipStatus = 'single' | 'dating' | 'long_term' | 'cohabiting
 export type RelationshipPurpose = 'compatibility' | 'reunion'
 export type MarriageMode = 'unmarried' | 'married'
 export type RelationshipAnalysisMode = RelationshipPurpose | 'marriage_unmarried' | 'marriage_married'
+export type ReunionObservedState = '' | 'disconnected' | 'recontacted' | 'messaging' | 'met' | 'intimate_undefined' | 'reunited'
+export type ReunionObservedEventKind = 'recontact' | 'meeting' | 'rebuilding'
+export type ReunionObservedInitiator = '' | 'counterpart' | 'user' | 'mutual' | 'unknown'
+export type ReunionObservedEvent = { kind: ReunionObservedEventKind; date: string }
+export type ReunionObservationContext = {
+  state: ReunionObservedState
+  initiator: ReunionObservedInitiator
+  events: ReunionObservedEvent[]
+}
 export type Gender = 'female' | 'male'
 export type TimeSource = 'official_record' | 'family_memory' | 'user_estimate' | 'arbitrary_input' | 'rectified' | 'unknown'
 export type TimeConfidence = 'exact' | 'high' | 'medium' | 'low' | 'unknown'
