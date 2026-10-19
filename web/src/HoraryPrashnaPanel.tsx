@@ -170,7 +170,12 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
         }),
       })
       const payload = await response.json().catch(() => ({}))
-      if (!response.ok || !payload?.ok) throw new Error(payload?.detail || payload?.error || '질문 분류에 실패했어.')
+      if (!response.ok || !payload?.ok) {
+        const message = response.status === 404 && payload?.detail === 'Not Found'
+          ? '호라리 기능이 서버에 아직 연결되지 않았어. 잠시 후 다시 시도해줘.'
+          : payload?.detail || payload?.error || '질문 분류에 실패했어.'
+        throw new Error(message)
+      }
       setResult(payload as HoraryClassifyResponse)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '질문 분류 중 오류가 발생했어.')
