@@ -4,7 +4,9 @@
 .horary-prashna-panel textarea::placeholder{color:#aa9b91;font-weight:550}
 .horary-prashna-panel textarea:focus-visible{outline:2px solid rgba(178,125,69,.45);outline-offset:2px}
 .horary-input-caption{display:flex;justify-content:space-between;gap:12px;margin:6px 2px 0;color:#9a887d;font-size:.62rem;line-height:1.4}
-.horary-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:9px}
+.horary-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:9px;width:100%;min-width:0;max-width:100%}
+.horary-time-row>.field{width:100%;min-width:0;max-width:100%;overflow:hidden}
+.horary-time-row input[type="datetime-local"]{display:block;width:100%!important;min-width:0!important;max-width:100%!important;inline-size:100%;min-inline-size:0;max-inline-size:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;overflow:hidden}
 .horary-secondary-button,.horary-location-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;border:1px solid rgba(95,66,47,.13);border-radius:13px;padding:0 13px;color:#715b4d;background:#fffdf9;font-size:.7rem;font-weight:850;cursor:pointer}
 .horary-secondary-button:disabled,.horary-location-button:disabled{opacity:.55;cursor:default}
 .horary-time-row>.horary-secondary-button{height:44px}
@@ -26,4 +28,4 @@
 .horary-route-systems span{color:#998478;font-size:.59rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
 .horary-route-systems strong{color:#554237;font-size:.68rem;line-height:1.4}
 .horary-routing-result>.horary-secondary-button{margin-top:10px}
-@media(max-width:480px){.horary-input-caption{display:grid;gap:2px}.horary-route-systems{grid-template-columns:1fr}.horary-time-row{grid-template-columns:1fr}.horary-time-row>.horary-secondary-button{height:40px}}
+@media(max-width:480px){.horary-input-caption{display:grid;gap:2px}.horary-route-systems{grid-template-columns:1fr}.horary-time-row{grid-template-columns:minmax(0,1fr)}.horary-time-row>.horary-secondary-button{width:100%;height:40px}}

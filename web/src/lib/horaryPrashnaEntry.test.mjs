@@ -4,6 +4,7 @@ import test from 'node:test'
 
 
 const panel = readFileSync(new URL('../HoraryPrashnaPanel.tsx', import.meta.url), 'utf8')
+const styles = readFileSync(new URL('../horary-prashna.css', import.meta.url), 'utf8')
 const home = readFileSync(new URL('../HomeControls.tsx', import.meta.url), 'utf8')
 const app = readFileSync(new URL('../AppNext.tsx', import.meta.url), 'utf8')
 
@@ -40,7 +41,18 @@ test('entry posts classification metadata and renders loading error clarificatio
   assert.match(panel, /timezone_id/)
   assert.match(panel, /질문 유형 확인 중/)
   assert.match(panel, /status-banner error/)
+  assert.match(panel, /response\.status === 404/)
+  assert.match(panel, /호라리 기능이 서버에 아직 연결되지 않았어/)
   assert.match(panel, /needs_clarification/)
+})
+
+
+test('datetime control stays inside the mobile panel on iOS', () => {
+  assert.match(styles, /\.horary-time-row\{[^}]*width:100%[^}]*min-width:0[^}]*max-width:100%/)
+  assert.match(styles, /\.horary-time-row>\.field\{[^}]*min-width:0[^}]*overflow:hidden/)
+  assert.match(styles, /input\[type="datetime-local"\]\{[^}]*min-inline-size:0[^}]*-webkit-appearance:none/)
+  assert.match(styles, /@media\(max-width:480px\)[^{]*\{[^}]*\.horary-input-caption/)
+  assert.match(styles, /\.horary-time-row\{grid-template-columns:minmax\(0,1fr\)\}/)
 })
 
 
