@@ -6,6 +6,9 @@ export type FortuneToneAssessment = {
   direction: FortuneEvidenceDirection
   hasSupportiveEvidence: boolean
   hasChallengingEvidence: boolean
+  supportiveWeight: number
+  challengingWeight: number
+  dominantDirection: 'supportive' | 'challenging' | 'balanced' | 'neutral'
 }
 
 type CalculationSlice = Pick<IntegratedApiResponse, 'period' | 'western'>
@@ -17,21 +20,53 @@ export function evidenceDirection(row: FortuneDailyEvidence) {
   return 0
 }
 
+/**
+ * Aggregate one physical transit/aspect once for a requested topic. The same
+ * slow aspect can be sampled every day, but those samples are not independent
+ * evidence. 'direction' in the raw ephemeris is motion (순행/역행), not valence;
+ * only polarity (or an explicit supportive/challenging label) sets the sign.
+ */
+export function fortuneEvidenceBalance(calculation: CalculationSlice, topic: string): FortuneToneAssessment {
+  const grouped = new Map<string, {support: number; challenge: number}>()
+  for (const day of calculation.western.daily_scores ?? []) {
+    if (day.date < calculation.period.start || day.date > calculation.period.end) continue
+    for (const row of day.evidence ?? []) {
+      if (!row.source_topics?.includes(topic)) continue
+      const sign = evidenceDirection(row)
+      if (!sign) continue
+      const amount = Math.abs(Number(row.contribution ?? 0))
+      if (!Number.isFinite(amount) || amount <= 0) continue
+      const polarity = Number(row.polarity)
+      const weight = amount * (Number.isFinite(polarity) ? Math.abs(polarity) : 1)
+      if (!weight) continue
+      const key = row.transit && row.target && row.aspect
+        ? [row.transit, row.target, row.aspect, row.whole_house ?? ''].join('|')
+        : [row.text ?? '', day.date].join('|')
+      const current = grouped.get(key) ?? {support: 0, challenge: 0}
+      if (sign > 0) current.support = Math.max(current.support, weight)
+      else current.challenge = Math.max(current.challenge, weight)
+      grouped.set(key, current)
+    }
+  }
+  const supportiveWeight = [...grouped.values()].reduce((sum, entry) => sum + entry.support, 0)
+  const challengingWeight = [...grouped.values()].reduce((sum, entry) => sum + entry.challenge, 0)
+  const hasSupportiveEvidence = supportiveWeight > 0
+  const hasChallengingEvidence = challengingWeight > 0
+  const direction: FortuneEvidenceDirection = hasSupportiveEvidence && hasChallengingEvidence
+    ? 'mixed' : hasSupportiveEvidence ? 'supportive' : hasChallengingEvidence ? 'challenging' : 'neutral'
+  // Require a meaningful proportional gap. A mixed configuration is NOT
+  // neutral merely because it contains both positive and negative evidence.
+  const total = supportiveWeight + challengingWeight
+  const tilt = total > 0 ? (supportiveWeight - challengingWeight) / total : 0
+  const dominantDirection = !total ? 'neutral'
+    : tilt >= 0.25 ? 'supportive'
+      : tilt <= -0.25 ? 'challenging'
+        : 'balanced'
+  return {direction, hasSupportiveEvidence, hasChallengingEvidence, supportiveWeight, challengingWeight, dominantDirection}
+}
+
 export function fortuneToneAssessment(calculation: CalculationSlice, topic: string): FortuneToneAssessment {
-  const rows = (calculation.western.daily_scores ?? [])
-    .filter(day => day.date >= calculation.period.start && day.date <= calculation.period.end)
-    .flatMap(day => day.evidence ?? [])
-    .filter(row => row.source_topics?.includes(topic))
-  const hasSupportiveEvidence = rows.some(row => evidenceDirection(row) > 0)
-  const hasChallengingEvidence = rows.some(row => evidenceDirection(row) < 0)
-  const direction = hasSupportiveEvidence && hasChallengingEvidence
-    ? 'mixed'
-    : hasSupportiveEvidence
-      ? 'supportive'
-      : hasChallengingEvidence
-        ? 'challenging'
-        : 'neutral'
-  return { direction, hasSupportiveEvidence, hasChallengingEvidence }
+  return fortuneEvidenceBalance(calculation, topic)
 }
 
 export function fortunePresentationTone(
@@ -41,9 +76,9 @@ export function fortunePresentationTone(
   band = '',
 ): 'good' | 'steady' | 'caution' {
   if (topic === '투자주의') return average >= 55 || /강|높/.test(band) ? 'caution' : 'steady'
-  const { direction } = fortuneToneAssessment(calculation, topic)
-  if (direction === 'supportive') return 'good'
-  if (direction === 'challenging') return 'caution'
+  const { direction, dominantDirection } = fortuneToneAssessment(calculation, topic)
+  if (direction === 'supportive' || (direction === 'mixed' && dominantDirection === 'supportive')) return 'good'
+  if (direction === 'challenging' || (direction === 'mixed' && dominantDirection === 'challenging')) return 'caution'
   return 'steady'
 }
 
