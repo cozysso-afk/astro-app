@@ -26,6 +26,64 @@ export function evidenceDirection(row: FortuneDailyEvidence) {
  * evidence. 'direction' in the raw ephemeris is motion (순행/역행), not valence;
  * only polarity (or an explicit supportive/challenging label) sets the sign.
  */
+
+const PLANET_LABEL: Record<string, string> = {
+  Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성',
+  Jupiter:'목성', Saturn:'토성', Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성',
+}
+const ASPECT_LABEL: Record<string, string> = {
+  trine:'삼분위', sextile:'육십분위', square:'사분위',
+  opposition:'충', conjunction:'합',
+}
+
+export type FortuneEvidenceSnapshot = {
+  support?: string
+  challenge?: string
+  neutral?: string
+  dominantDirection: FortuneToneAssessment['dominantDirection']
+}
+
+/** Reader-facing evidence with observed dates. Do not claim an actual event happened. */
+export function fortuneEvidenceSnapshot(calculation: CalculationSlice, topic: string): FortuneEvidenceSnapshot {
+  const leads: Array<{ sign: number; weight: number; date: string; row: FortuneDailyEvidence }> = []
+  const seen = new Map<string, number>()
+  for (const day of calculation.western.daily_scores ?? []) {
+    if (day.date < calculation.period.start || day.date > calculation.period.end) continue
+    for (const row of day.evidence ?? []) {
+      if (!row.source_topics?.includes(topic) || !row.transit || !row.target || !row.aspect) continue
+      const contribution = Number(row.contribution ?? 0)
+      if (!Number.isFinite(contribution) || contribution <= 0) continue
+      const pol = Number(row.polarity)
+      const weight = contribution * (Number.isFinite(pol) ? Math.abs(pol) : 1)
+      const sign = evidenceDirection(row)
+      const key = [row.transit, row.target, row.aspect, sign].join('|')
+      const existing = seen.get(key)
+      if (existing !== undefined && leads[existing].weight >= weight) continue
+      const record = { sign, weight, date: day.date, row }
+      if (existing === undefined) { seen.set(key, leads.length); leads.push(record) }
+      else leads[existing] = record
+    }
+  }
+  const display = (entry?: typeof leads[number]) => {
+    if (!entry) return undefined
+    const {row, date} = entry
+    const transit = PLANET_LABEL[row.transit ?? ''] ?? row.transit
+    const target = PLANET_LABEL[row.target ?? ''] ?? row.target
+    const aspect = ASPECT_LABEL[row.aspect ?? ''] ?? row.aspect
+    const phase = /Applying|적용/.test(row.motion ?? '') ? '접근 중'
+      : /Separating|분리/.test(row.motion ?? '') ? '분리 중' : ''
+    return [transit + '–출생 ' + target + ' ' + aspect, date, phase].filter(Boolean).join(' · ')
+  }
+  const ranked = leads.sort((a,b)=>b.weight-a.weight)
+  const balance = fortuneEvidenceBalance(calculation,topic)
+  return {
+    support: display(ranked.find(item => item.sign > 0)),
+    challenge: display(ranked.find(item => item.sign < 0)),
+    neutral: display(ranked.find(item => item.sign === 0)),
+    dominantDirection: balance.dominantDirection,
+  }
+}
+
 export function fortuneEvidenceBalance(calculation: CalculationSlice, topic: string): FortuneToneAssessment {
   const grouped = new Map<string, {support: number; challenge: number}>()
   for (const day of calculation.western.daily_scores ?? []) {
