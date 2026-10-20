@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { buildBasicFortuneReading } from './basicFortuneReading.ts'
 import { buildFortuneUserSummary } from './fortuneUserSummary.ts'
-import { fortunePresentationTone, fortuneToneAssessment, inspectFortuneToneRepetition } from './fortuneToneCalibration.ts'
+import { fortunePresentationTone, fortuneToneAssessment, fortuneEvidenceSnapshot, inspectFortuneToneRepetition } from './fortuneToneCalibration.ts'
 import { buildDeterministicTopicAnalysis } from '../../../supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts'
 
 const stat = (average, band = average < 40 ? '약함' : average >= 60 ? '강함' : '보통') => ({
@@ -136,4 +136,48 @@ test('tone 12: actual safety domains keep their guard', () => {
   assert.match(reading.caution[0]?.caution ?? '', /위험 관리|포지션/)
   const guard = readFileSync(new URL('../../../supabase/functions/fortune-interpret-v21-preview/costGuardV21.ts', import.meta.url), 'utf8')
   assert.match(guard, /가격방향·수익률 예측/)
+})
+
+test('tone 13: mixed polarities use weighted dominance, not unconditional steady', () => {
+  const calc = calculation({연애:stat(70)}, [
+    {source_topics:['연애'],contribution:4,polarity:0.8,transit:'Venus',target:'Sun',aspect:'trine',kind:'aspect',text:'금성 도움'},
+    {source_topics:['연애'],contribution:1,polarity:-0.6,transit:'Saturn',target:'Moon',aspect:'square',kind:'aspect',text:'토성 부담'},
+  ])
+  const assessed = fortuneToneAssessment(calc, '연애')
+  assert.equal(assessed.direction, 'mixed')
+  assert.equal(assessed.dominantDirection, 'supportive')
+  assert.equal(fortunePresentationTone(calc,'연애',70,'강함'),'good')
+  const snapshot=fortuneEvidenceSnapshot(calc,'연애')
+  assert.match(snapshot.support, /금성/)
+  assert.match(snapshot.challenge, /토성/)
+  assert.match(buildBasicFortuneReading(calc,'today').favorable[0]?.why ?? '', /금성/)
+  assert.match(buildBasicFortuneReading(calc,'today').favorable[0]?.why ?? '', /토성/)
+})
+
+test('tone 14: balanced mixed scores keep steady but retain both dated reasons', () => {
+  const calc=calculation({연애:stat(69)},[
+    {source_topics:['연애'],contribution:2,polarity:0.8,transit:'Venus',target:'Sun',aspect:'trine',kind:'aspect',text:'도움'},
+    {source_topics:['연애'],contribution:2,polarity:-0.8,transit:'Saturn',target:'Moon',aspect:'square',kind:'aspect',text:'부담'},
+  ])
+  assert.equal(fortuneToneAssessment(calc,'연애').dominantDirection,'balanced')
+  assert.equal(fortunePresentationTone(calc,'연애',69,'강함'),'steady')
+  const basic=buildBasicFortuneReading(calc,'today')
+  assert.match(basic.headline,/금성/)
+  assert.match(basic.headline,/토성/)
+})
+
+test('tone 15: repeated slow aspect does not multiply evidence weight by day count', () => {
+  const slow={source_topics:['연락'],contribution:4,polarity:0.7,transit:'Saturn',target:'Sun',aspect:'trine',kind:'aspect',direction:'역행',text:'same slow aspect'}
+  const calc=calculation({연락:stat(60)},[slow])
+  calc.period.end='2026-10-09'
+  calc.western.daily_scores=[
+    {date:'2026-10-07',evidence:[slow]},
+    {date:'2026-10-08',evidence:[slow]},
+    {date:'2026-10-09',evidence:[slow]},
+  ]
+  const assessed=fortuneToneAssessment(calc,'연락')
+  assert.equal(assessed.supportiveWeight, 2.8)
+  assert.equal(assessed.direction,'supportive')
+  const changed=calculation({연락:stat(60)},[{...slow,polarity:-0.7}])
+  assert.equal(fortuneToneAssessment(changed,'연락').direction,'challenging')
 })
