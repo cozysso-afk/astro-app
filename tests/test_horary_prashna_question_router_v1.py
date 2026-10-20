@@ -118,3 +118,14 @@ def test_deterministic_classifier_never_returns_chart_judgement():
     assert {"CONTACT", "RECONCILIATION", "TIMING"}.issubset(result["intents"])
     assert "prediction" not in result
     assert "chart" not in result
+
+
+def test_user_style_planned_meeting_routes_relationship_and_delay_without_clarification():
+    result = classify_question(
+        "오늘 예정되어있던 만남(약속)은 차질없이 성사되는가? 지연되는가? 무산되는가?"
+    )
+    assert result["primary_type"] == "RELATIONSHIP"
+    assert result["needs_clarification"] is False
+    assert "OUTCOME" in result["intents"]
+    assert "TIMING" in result["intents"]
+    assert "YES_NO" in result["intents"]
