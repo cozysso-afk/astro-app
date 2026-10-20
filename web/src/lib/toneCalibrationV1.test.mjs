@@ -181,3 +181,96 @@ test('tone 15: repeated slow aspect does not multiply evidence weight by day cou
   const changed=calculation({연락:stat(60)},[{...slow,polarity:-0.7}])
   assert.equal(fortuneToneAssessment(changed,'연락').direction,'challenging')
 })
+
+test('tone 16: separate Moon visits weeks apart remain distinct evidence episodes', () => {
+  const moon=(date,contribution)=>({date,evidence:[{
+    source_topics:['연애'],contribution,polarity:0.9,transit:'Moon',target:'Venus',
+    aspect:'trine',whole_house:5,kind:'aspect',text:'달 삼분위',
+  }]})
+  const calc=calculation({연애:stat(70)})
+  calc.period={start:'2026-10-03',end:'2026-10-30',day_count:28,month_segments:1}
+  calc.western.daily_scores=[moon('2026-10-03',2.2),moon('2026-10-04',2.1),
+    {date:'2026-10-17',evidence:[{source_topics:['연애'],contribution:2.2,polarity:-1,transit:'Saturn',target:'Sun',aspect:'square',kind:'aspect',text:'제동'}]},
+    moon('2026-10-30',1.4)]
+  const balance=fortuneToneAssessment(calc,'연애')
+  assert.ok(Math.abs(balance.supportiveWeight-(2.2+1.4)*0.9)<1e-9)
+  assert.equal(balance.dominantDirection,'supportive')
+  const snap=fortuneEvidenceSnapshot(calc,'연애')
+  assert.match(snap.support,/2026-10-03/)
+  assert.match(snap.support,/2026-10-30/)
+  assert.match(snap.support,/5하우스/)
+  assert.match(snap.challenge,/토성/)
+})
+
+test('tone 17: neutral conjunction is visible without being incorrectly favorable', () => {
+  const calc=calculation({연애:stat(80)},[
+    {source_topics:['연애'],contribution:6,polarity:0,transit:'Venus',target:'Venus',
+      aspect:'conjunction',kind:'aspect',text:'중립 합'},
+  ])
+  const assessment=fortuneToneAssessment(calc,'연애')
+  assert.equal(assessment.direction,'neutral')
+  assert.equal(assessment.dominantDirection,'neutral')
+  const evidence=fortuneEvidenceSnapshot(calc,'연애')
+  assert.match(evidence.neutral,/금성/)
+  assert.match(buildBasicFortuneReading(calc,'today').headline,/금성/)
+  assert.match(summary(['연애'],calc).headline,/금성/)
+})
+
+test('tone 18: daily hero carries actual date and transit in supportive cases', () => {
+  const make=(date,transit)=> {
+    const calc=calculation({연애:stat(70)})
+    calc.period={start:date,end:date,day_count:1,month_segments:1}
+    calc.western.daily_scores=[{date,evidence:[{source_topics:['연애'],
+      contribution:4,polarity:0.8,transit,target:'Sun',aspect:'trine',kind:'aspect',text:'도움'}]}]
+    return summary(['연애'],calc)
+  }
+  const a=make('2026-10-20','Venus')
+  const b=make('2026-10-21','Mercury')
+  assert.match(a.headline,/2026-10-20/)
+  assert.match(a.headline,/금성/)
+  assert.match(b.headline,/2026-10-21/)
+  assert.match(b.headline,/수성/)
+  assert.notEqual(a.headline,b.headline)
+  assert.notEqual(a.focusTopics[0].action,b.focusTopics[0].action)
+})
+
+test('tone 19: weekly hero includes aspect evidence even if phase-based arc returns early',()=>{
+  const calc=calculation({학업:stat(67)})
+  calc.period={start:'2026-10-20',end:'2026-10-26',day_count:7,month_segments:1}
+  calc.western.daily_scores=[
+    {date:'2026-10-20',evidence:[{source_topics:['학업'],contribution:5,polarity:0.8,transit:'Mercury',target:'Sun',aspect:'trine',kind:'aspect'}]},
+    {date:'2026-10-24',evidence:[{source_topics:['학업'],contribution:4,polarity:-0.3,transit:'Saturn',target:'Sun',aspect:'square',kind:'aspect'}]},
+  ]
+  const data=dataFor(['학업'])
+  const result=buildFortuneUserSummary(data,{verifiedNarrative:false,focusTopics:['학업'],period:'week',calculation:calc,topicEntries:Object.entries(data.topic_analysis),allowIntraday:false})
+  assert.match(result.headline,/수성/)
+  assert.match(result.headline,/2026-10-20/)
+  assert.match(result.headline,/토성/)
+})
+
+test('tone 20: supportive-dominant mixed readings retain caution text',()=>{
+  const calc=calculation({연애:stat(70)},[
+    {source_topics:['연애'],contribution:5,polarity:1,transit:'Venus',target:'Sun',aspect:'trine'},
+    {source_topics:['연애'],contribution:2,polarity:-1,transit:'Saturn',target:'Moon',aspect:'square'},
+  ])
+  const result=summary(['연애'],calc)
+  assert.ok(result.bestFlow.includes('연애'))
+  assert.match(result.focusTopics[0].caution ?? '', /토성/)
+  assert.match(result.focusTopics[0].action,/금성/)
+  assert.ok(result.cautionFlow.includes('연애'))
+})
+
+test('tone 21: weak contact activation never asserts that no contact occurred',()=>{
+  const calc=calculation({재회:stat(66),연락:stat(25)},[])
+  const result=summary(['재회','연락'],calc)
+  assert.doesNotMatch(result.focusTopics.find(row=>row.topic==='재회')?.caution ?? '',/연락이 없는데/)
+  assert.match(result.focusTopics.find(row=>row.topic==='재회')?.caution ?? '',/실제 연락/)
+})
+
+test('tone 22: counterpart observation is reset when identity changes but archive restore is preserved',()=>{
+  const app=readFileSync(new URL('../AppNext.tsx', import.meta.url),'utf8')
+  assert.match(app,/counterpartChanged/)
+  assert.match(app,/if \(restoringRelationshipRef\.current\)/)
+  assert.match(app,/setReunionObservedState\(''\)/)
+  assert.match(app,/setReunionMeetingDate\(''\)/)
+})
