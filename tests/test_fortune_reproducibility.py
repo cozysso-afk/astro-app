@@ -22,4 +22,10 @@ def test_identical_single_day_scores(exact):
     assert first["ok"] and second["ok"]
     assert first["western"]["overall"] == second["western"]["overall"]
     assert first["western"]["daily_scores"] == second["western"]["daily_scores"]
+    contrast = first["western"]["daily_scores"][0]["contrast"]
+    assert contrast["dominant_topics"]
+    assert isinstance(contrast["dominant_evidence"], list)
+    assert set(contrast) == {
+        "dominant_topics", "dominant_evidence", "previous_day_delta", "period_mean_delta"
+    }
     assert len(first["western"]["overall"]) >= 15

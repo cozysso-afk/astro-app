@@ -48,7 +48,7 @@ import type {
   AiTopicInterpretation,
   AiInterpretationResponse
 } from './appTypes'
-import type { ReunionObservationContext, ReunionObservedInitiator, ReunionObservedState } from './appTypes'
+import type { ReunionContactFrequency, ReunionContactStatus, ReunionMessageSide, ReunionObservationContext, ReunionObservedInitiator, ReunionObservedState } from './appTypes'
 import { REUNION_STATE_OPTIONS } from './lib/reunionObservation'
 
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
@@ -403,6 +403,12 @@ export default function AppNext() {
   const [reunionTimingError, setReunionTimingError] = useState('')
   const [reunionObservedState, setReunionObservedState] = useState<ReunionObservedState>('')
   const [reunionObservedInitiator, setReunionObservedInitiator] = useState<ReunionObservedInitiator>('')
+  const [reunionContactStartDate, setReunionContactStartDate] = useState('')
+  const [reunionContactEndDate, setReunionContactEndDate] = useState('')
+  const [reunionContactFrequency, setReunionContactFrequency] = useState<ReunionContactFrequency>('')
+  const [reunionContactStatus, setReunionContactStatus] = useState<ReunionContactStatus>('')
+  const [reunionLastMessageBy, setReunionLastMessageBy] = useState<ReunionMessageSide>('')
+  const [reunionPausedBy, setReunionPausedBy] = useState<ReunionMessageSide>('')
   const [reunionRecontactDate, setReunionRecontactDate] = useState('')
   const [reunionMeetingDate, setReunionMeetingDate] = useState('')
   const [reunionRebuildingDate, setReunionRebuildingDate] = useState('')
@@ -603,12 +609,18 @@ export default function AppNext() {
   const reunionObservation = useMemo<ReunionObservationContext>(()=>({
     state:reunionObservedState,
     initiator:reunionObservedInitiator,
+    contactStartDate:reunionContactStartDate,
+    contactEndDate:reunionContactEndDate,
+    contactFrequency:reunionContactFrequency,
+    contactStatus:reunionContactStatus,
+    lastMessageBy:reunionLastMessageBy,
+    pausedBy:reunionPausedBy,
     events:[
       {kind:'recontact' as const,date:reunionRecontactDate},
       {kind:'meeting' as const,date:reunionMeetingDate},
       {kind:'rebuilding' as const,date:reunionRebuildingDate},
     ].filter(row=>Boolean(row.date)),
-  }),[reunionObservedState,reunionObservedInitiator,reunionRecontactDate,reunionMeetingDate,reunionRebuildingDate])
+  }),[reunionObservedState,reunionObservedInitiator,reunionContactStartDate,reunionContactEndDate,reunionContactFrequency,reunionContactStatus,reunionLastMessageBy,reunionPausedBy,reunionRecontactDate,reunionMeetingDate,reunionRebuildingDate])
   const isPersonalMarriage = selectedTool === 'marriage' && marriageMode === 'unmarried' && marriageScope === 'personal'
   const needsCounterpart = selectedTool === 'compatibility' || (selectedTool === 'marriage' && !isPersonalMarriage)
   const integratedMatchesSelection = Boolean(
@@ -1478,6 +1490,12 @@ export default function AppNext() {
         const archivedObservation = request.reunion_observation as Partial<ReunionObservationContext> | undefined
         setReunionObservedState((archivedObservation?.state as ReunionObservedState) || '')
         setReunionObservedInitiator((archivedObservation?.initiator as ReunionObservedInitiator) || '')
+        setReunionContactStartDate(String(archivedObservation?.contactStartDate ?? ''))
+        setReunionContactEndDate(String(archivedObservation?.contactEndDate ?? ''))
+        setReunionContactFrequency((archivedObservation?.contactFrequency as ReunionContactFrequency) || '')
+        setReunionContactStatus((archivedObservation?.contactStatus as ReunionContactStatus) || '')
+        setReunionLastMessageBy((archivedObservation?.lastMessageBy as ReunionMessageSide) || '')
+        setReunionPausedBy((archivedObservation?.pausedBy as ReunionMessageSide) || '')
         const archivedEvents = Array.isArray(archivedObservation?.events) ? archivedObservation.events : []
         setReunionRecontactDate(archivedEvents.find(row=>row?.kind==='recontact')?.date ?? '')
         setReunionMeetingDate(archivedEvents.find(row=>row?.kind==='meeting')?.date ?? '')
@@ -1485,6 +1503,17 @@ export default function AppNext() {
       } else {
         setRelationshipPurpose('compatibility')
         setReunionTiming(null)
+        setReunionObservedState('')
+        setReunionObservedInitiator('')
+        setReunionContactStartDate('')
+        setReunionContactEndDate('')
+        setReunionContactFrequency('')
+        setReunionContactStatus('')
+        setReunionLastMessageBy('')
+        setReunionPausedBy('')
+        setReunionRecontactDate('')
+        setReunionMeetingDate('')
+        setReunionRebuildingDate('')
       }
       if (request.analysis_mode === 'marriage_married') setMarriageMode('married')
       else if (request.analysis_mode === 'marriage_unmarried') setMarriageMode('unmarried')
@@ -1777,6 +1806,14 @@ export default function AppNext() {
               <div><strong id="reunion-observation-title">현재 관계 상태 · 선택 입력</strong><span>관측 사실은 계산 점수·날짜·관문을 바꾸지 않고, 이미 확인된 단계를 반복하지 않게 해설 순서에만 반영해.</span></div>
               <label className="field field-wide"><span>지금 확인된 상태</span><select value={reunionObservedState} onChange={e=>{setReunionObservedState(e.target.value as ReunionObservedState);setRelationshipAi(null);setRelationshipAiError('')}}>{REUNION_STATE_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}</select></label>
               <label className="field field-wide"><span>실제 첫 재접촉 주체 · 선택</span><select value={reunionObservedInitiator} onChange={e=>{setReunionObservedInitiator(e.target.value as ReunionObservedInitiator);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="counterpart">상대가 먼저</option><option value="user">내가 먼저</option><option value="mutual">서로 비슷한 시점</option><option value="unknown">확인 어려움</option></select><small>이 기록은 계산된 상대 → 나 / 나 → 상대 활성도와 별도로 표시돼.</small></label>
+              <details><summary>연락 지속 기록 · 선택</summary><div className="reunion-observation-dates">
+                <label><span>연락 시작일</span><input type="date" value={reunionContactStartDate} onChange={e=>{setReunionContactStartDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label>
+                <label><span>마지막 연락일</span><input type="date" value={reunionContactEndDate} onChange={e=>{setReunionContactEndDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label>
+                <label><span>연락 빈도</span><select value={reunionContactFrequency} onChange={e=>{setReunionContactFrequency(e.target.value as ReunionContactFrequency);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="daily">매일</option><option value="frequent">자주</option><option value="occasional">간헐적</option><option value="single">한 차례</option></select></label>
+                <label><span>현재 연락 상태</span><select value={reunionContactStatus} onChange={e=>{setReunionContactStatus(e.target.value as ReunionContactStatus);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="ongoing">현재도 연락 중</option><option value="paused">현재 대화 중단</option><option value="ended">연락 종료</option></select></label>
+                <label><span>마지막 메시지</span><select value={reunionLastMessageBy} onChange={e=>{setReunionLastMessageBy(e.target.value as ReunionMessageSide);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="counterpart">상대가 보냄</option><option value="user">내가 보냄</option><option value="mutual">서로 비슷함</option><option value="unknown">확인 어려움</option></select></label>
+                <label><span>대화를 멈춘 쪽</span><select value={reunionPausedBy} onChange={e=>{setReunionPausedBy(e.target.value as ReunionMessageSide);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="counterpart">상대가 미응답</option><option value="user">내가 미응답</option><option value="mutual">서로 자연스럽게 멈춤</option><option value="unknown">확인 어려움</option></select></label>
+              </div></details>
               <details><summary>실제 사건 날짜 기록 · 선택</summary><div className="reunion-observation-dates"><label><span>재접촉</span><input type="date" value={reunionRecontactDate} onChange={e=>{setReunionRecontactDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>실제 만남</span><input type="date" value={reunionMeetingDate} onChange={e=>{setReunionMeetingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>관계 합의</span><input type="date" value={reunionRebuildingDate} onChange={e=>{setReunionRebuildingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label></div></details>
             </section>}
             {needsCounterpart&&<>

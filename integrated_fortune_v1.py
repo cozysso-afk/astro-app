@@ -1137,6 +1137,79 @@ def _period_stats(rows: list[dict], key: str):
     }
 
 
+def _daily_score_payload(rows: list[dict], score_keys: list[str]):
+    period_values = {
+        key: [float(row[key]) for row in rows if isinstance(row.get(key), (int, float))]
+        for key in score_keys
+    }
+    period_means = {
+        key: (sum(values) / len(values) if values else None)
+        for key, values in period_values.items()
+    }
+    result = []
+    previous_scores = None
+    for row in rows:
+        scores = {
+            key: (float(row[key]) if isinstance(row.get(key), (int, float)) else None)
+            for key in score_keys
+        }
+        dominant_topics = [
+            key for key, _ in sorted(
+                ((key, value) for key, value in scores.items() if value is not None),
+                key=lambda item: abs(float(item[1]) - 50.0),
+                reverse=True,
+            )[:4]
+        ]
+        evidence_rows = list(row.get("_evidence") or [])[:10]
+        dominant_evidence = []
+        for item in evidence_rows:
+            if not isinstance(item, dict):
+                continue
+            signature = {
+                "kind": item.get("kind"),
+                "transit": item.get("transit"),
+                "target": item.get("target"),
+                "aspect": item.get("aspect"),
+                "motion": item.get("motion"),
+                "source_topics": list(item.get("source_topics") or [])[:4],
+                "polarity": item.get("polarity"),
+                "contribution": item.get("contribution"),
+            }
+            if signature not in dominant_evidence:
+                dominant_evidence.append(signature)
+            if len(dominant_evidence) >= 3:
+                break
+        result.append({
+            "date": row["date"],
+            "label": row["label"],
+            "market_open": bool(row.get("market_open")),
+            "scores": scores,
+            "evidence": evidence_rows,
+            "contrast": {
+                "dominant_topics": dominant_topics,
+                "dominant_evidence": dominant_evidence,
+                "previous_day_delta": {
+                    key: (
+                        round(float(value) - float(previous_scores[key]), 1)
+                        if previous_scores and value is not None and previous_scores.get(key) is not None
+                        else None
+                    )
+                    for key, value in scores.items()
+                },
+                "period_mean_delta": {
+                    key: (
+                        round(float(value) - float(period_means[key]), 1)
+                        if len(rows) > 1 and value is not None and period_means.get(key) is not None
+                        else None
+                    )
+                    for key, value in scores.items()
+                },
+            },
+        })
+        previous_scores = scores
+    return result
+
+
 def _month_segments(start_date: date, end_date: date):
     cur = date(start_date.year, start_date.month, 1)
     out = []
@@ -1191,18 +1264,7 @@ def _western_payload(
         key: _period_stats(rows, key) for key in ["수신신호", "발신적합", "과거인연접점"]
     }
     daily_score_keys = TOPIC_ORDER + ["수신신호", "발신적합", "과거인연접점"]
-    daily_scores = []
-    for row in rows:
-        daily_scores.append({
-            "date": row["date"],
-            "label": row["label"],
-            "market_open": bool(row.get("market_open")),
-            "scores": {
-                key: (float(row[key]) if isinstance(row.get(key), (int, float)) else None)
-                for key in daily_score_keys
-            },
-            "evidence": list(row.get("_evidence") or [])[:10],
-        })
+    daily_scores = _daily_score_payload(rows, daily_score_keys)
     market_precision = _krx_calendar_precision(start_date, end_date)
     market_info = {
         "has_open_session": bool(market_rows),

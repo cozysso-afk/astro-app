@@ -20,12 +20,32 @@ test('all optional observed relationship states remain distinct and no-input doe
   assert.match(observationReading(fixture.observation).text,/관계 정의·다음 만남·지속 행동/)
 })
 
+test('contact history keeps a confirmed meeting and daily messages separate from the next forecast stage',()=>{
+  const observation={
+    state:'met',initiator:'counterpart',
+    contactStartDate:'2026-10-07',contactEndDate:'2026-10-17',contactFrequency:'daily',
+    contactStatus:'paused',lastMessageBy:'counterpart',pausedBy:'user',
+    events:[{kind:'meeting',date:'2026-10-07'}],
+  }
+  const reading=observationReading(observation)
+  assert.equal(reading.next,'relationship_rebuilding')
+  assert.match(reading.text,/2026-10-07부터 2026-10-17까지 매일 연락한 사실/)
+  assert.match(reading.text,/마지막 메시지는 상대가 보냈어/)
+  assert.match(reading.text,/내가 답하지 않은 뒤 멈췄어/)
+  assert.match(reading.text,/다음 질문은 연락·만남 발생 여부가 아니라/)
+})
+
 test('observed facts never enter the astrology calculation request and do enter interpretation context',()=>{
   const calculationBody=app.slice(app.indexOf('const body = {',app.indexOf('const runRelationship =')),app.indexOf('setRelationshipLoading',app.indexOf('const runRelationship =')))
   assert.doesNotMatch(calculationBody,/reunionObserved|reunion_observation/)
   assert.match(app,/reunionContextForAi/)
+  for(const field of ['contactStartDate','contactEndDate','contactFrequency','contactStatus','lastMessageBy','pausedBy']) {
+    assert.match(app,new RegExp(field))
+    assert.match(compact,new RegExp(field))
+  }
   assert.match(compact,/reunion_observation/)
   assert.match(compact,/관측 사실이며 점성 계산값이 아니다/)
+  assert.match(compact,/과거에 이미 확인된 연락·만남 사실을 부정하는 문장으로 쓰지 마/)
 })
 
 test('past analysis reuses the existing reunion endpoint as an independent bounded calculation',()=>{

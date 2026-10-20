@@ -338,6 +338,20 @@ test('daily scene headline changes its language by domain even when the same pla
   assert.match(joined,/연락.*안부·질문·일정|안부·질문·일정/)
 })
 
+test('same topic and score still name a different actual sky driver', () => {
+  const headlineFor = (transit,target,aspect) => {
+    const { data, calculation } = fixture({ focus:{학업:'핵심'}, scores:{학업:72} })
+    calculation.western.daily_scores=[{date:'2026-09-12',evidence:[{source_topics:['학업'],transit,target,aspect,contribution:4,polarity:.7,motion:'Applying'}]}]
+    return buildFortuneUserSummary(data,{period:'today',calculation,topicEntries:normalizeTopicEntries(data.topic_analysis,topicOrder)}).headline
+  }
+  const mercuryJupiter=headlineFor('Mercury','Jupiter','trine')
+  const venusSaturn=headlineFor('Venus','Saturn','square')
+  assert.notEqual(mercuryJupiter,venusSaturn)
+  assert.match(mercuryJupiter,/수성과 목성/)
+  assert.match(venusSaturn,/금성과 토성/)
+  assert.doesNotMatch(`${mercuryJupiter}\n${venusSaturn}`,/연결이이|연결은은|배치이|배치은/)
+})
+
 test('A/B: study leads favorable flow while relationship weakness stays in caution', () => {
   const { summary } = fixture({ focus: { 연애:'핵심', 학업:'핵심', 직장:'주목', 컨디션:'주목' }, scores:{ 학업:82, 직장:73, 연애:22, 컨디션:31 }, evidence:[
     { source_topics:['학업'], transit:'Mercury', target:'Jupiter', aspect:'trine', contribution:3, polarity:0.7 },

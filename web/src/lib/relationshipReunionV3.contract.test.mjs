@@ -13,14 +13,14 @@ const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
 const observation=readFileSync(new URL('./reunionObservation.ts',import.meta.url),'utf8')
 
 test('reunion calculation and AI grounding contracts remain intact',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v13\.1-observation-history"/)
+  assert.match(server,/REUNION_VERSION="relationship-v13\.2-contact-history"/)
   assert.match(server,/buildReunionEvidenceV2/)
   assert.match(server,/repairReunionGroundingV2/)
   assert.match(server,/validEvidenceRefs/)
   assert.match(server,/reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(publicError,/publicReunionV2/)
   assert.match(types,/reunion_synthesis_v2\?:/)
-  assert.match(cache,/relationship-v13\.1-observation-history-v1-consultation-depth-v3/)
+  assert.match(cache,/relationship-v13\.2-contact-history-v1-consultation-depth-v3/)
 })
 
 test('relationship result routes reunion to the hierarchy product while retaining AI synthesis input',()=>{

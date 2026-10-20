@@ -38,7 +38,7 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
 
 test('relationship interpretation cache versions track the provisional-time and current reunion narrative contracts', () => {
   assert.match(edge, /VERSION="relationship-v11\.8-provisional-time-reference"/)
-  assert.match(edge, /REUNION_VERSION="relationship-v13\.1-observation-history"/)
+  assert.match(edge, /REUNION_VERSION="relationship-v13\.2-contact-history"/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13\.1-observation-history-v1-consultation-depth-v3'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13\.2-contact-history-v1-consultation-depth-v3'/)
 })

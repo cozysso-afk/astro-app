@@ -41,6 +41,15 @@ export function nextUnconfirmedStage(state: ReunionObservedState): ReunionStage 
 
 export function observationReading(context: ReunionObservationContext) {
   const next = nextUnconfirmedStage(context.state)
+  const frequency = context.contactFrequency === 'daily' ? '매일' : context.contactFrequency === 'frequent' ? '자주' : context.contactFrequency === 'occasional' ? '간헐적으로' : context.contactFrequency === 'single' ? '한 차례' : ''
+  const dateRange = context.contactStartDate && context.contactEndDate
+    ? `${context.contactStartDate}부터 ${context.contactEndDate}까지`
+    : context.contactStartDate ? `${context.contactStartDate}부터` : context.contactEndDate ? `${context.contactEndDate}까지` : ''
+  const continuity = [dateRange, frequency, (dateRange || frequency) ? '연락한 사실이 확인됐어.' : ''].filter(Boolean).join(' ')
+  const lastSide = context.lastMessageBy === 'counterpart' ? '마지막 메시지는 상대가 보냈어.' : context.lastMessageBy === 'user' ? '마지막 메시지는 내가 보냈어.' : ''
+  const stopSide = context.pausedBy === 'counterpart' ? '현재 대화는 상대의 미응답 뒤 멈췄어.' : context.pausedBy === 'user' ? '현재 대화는 내가 답하지 않은 뒤 멈췄어.' : context.pausedBy === 'mutual' ? '현재 대화는 서로 자연스럽게 멈춘 것으로 기록됐어.' : ''
+  const status = context.contactStatus === 'ongoing' ? '현재도 연락 중이야.' : context.contactStatus === 'paused' ? '현재는 대화가 멈춘 상태야.' : context.contactStatus === 'ended' ? '현재 연락은 종료된 상태로 기록됐어.' : ''
+  const contactHistory = [continuity,lastSide,stopSide,status].filter(Boolean).join(' ')
   if (!context.state) return {
     title:'현재 관계 상태 미입력',
     text:'실제 연락·만남 여부를 입력하지 않았으므로 계산된 구간만 보여 주고 현실의 관계 단계를 추정하지 않아.',
@@ -53,27 +62,27 @@ export function observationReading(context: ReunionObservationContext) {
   }
   if (context.state === 'recontacted') return {
     title:'관측 사실 · 재접촉은 이미 발생',
-    text:'연락 발생 여부는 이미 확인됐으므로 “연락이 올지”를 중심 결론으로 반복하지 않아. 이제 대화가 이어지는지와 실제 만남 단계의 근거를 분리해 봐.',
+    text:`연락 발생 여부는 이미 확인됐으므로 “연락이 올지”를 중심 결론으로 반복하지 않아. ${contactHistory} 이제 대화가 다시 이어지는지와 실제 만남 단계의 근거를 분리해 봐.`.replace(/\s+/g,' ').trim(),
     next,
   }
   if (context.state === 'messaging') return {
     title:'관측 사실 · 현재 서로 연락 중',
-    text:'연락은 이미 진행 중이야. 계산값을 선연락 확률로 바꾸지 않고, 대화 지속과 실제 만남으로 이어지는 별도 근거를 우선해 봐.',
+    text:`연락은 이미 확인된 사실이야. ${contactHistory} 계산값을 과거 연락의 발생 확률로 바꾸지 않고, 앞으로의 대화 지속과 실제 만남으로 이어지는 별도 근거를 우선해 봐.`.replace(/\s+/g,' ').trim(),
     next,
   }
   if (context.state === 'met') return {
     title:'관측 사실 · 실제 만남 발생',
-    text:'만남이 있었다는 사실을 계산이 부정하지 않아. 다음 질문은 만남 발생 여부가 아니라 관계를 다시 정의하고 지속할 근거가 따로 있는지야.',
+    text:`만남이 있었다는 사실을 계산이 부정하지 않아. ${contactHistory} 다음 질문은 연락·만남 발생 여부가 아니라 대화 재개, 다음 만남, 관계를 다시 정의하고 지속할 근거가 따로 있는지야.`.replace(/\s+/g,' ').trim(),
     next,
   }
   if (context.state === 'intimate_undefined') return {
     title:'관측 사실 · 친밀하지만 관계는 미정',
-    text:'재접촉과 만남은 이미 확인된 단계야. 친밀감만으로 재결합을 확정하지 않고, 관계 정의·다음 만남·지속 행동을 뒷받침하는 재구축 근거를 봐.',
+    text:`재접촉과 만남은 이미 확인된 단계야. ${contactHistory} 친밀감만으로 재결합을 확정하지 않고, 관계 정의·다음 만남·지속 행동을 뒷받침하는 재구축 근거를 봐.`.replace(/\s+/g,' ').trim(),
     next,
   }
   return {
     title:'관측 사실 · 관계 재정립 또는 재결합 합의',
-    text:'관계 합의는 사용자가 확인한 사실이므로 계산 결과로 되돌려 부정하지 않아. 이후에는 관계를 유지하는 행동과 반복 문제를 다루는 구조를 참고해.',
+    text:`관계 합의는 사용자가 확인한 사실이므로 계산 결과로 되돌려 부정하지 않아. ${contactHistory} 이후에는 관계를 유지하는 행동과 반복 문제를 다루는 구조를 참고해.`.replace(/\s+/g,' ').trim(),
     next:null,
   }
 }

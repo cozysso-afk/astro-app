@@ -709,15 +709,21 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   const applying = /Applying|적용/i.test(motion)
   const exact = /Exact|정확/i.test(motion)
   const separating = /Separating|분리/i.test(motion)
+  const transit = planetName(lead.item.transit)
+  const target = planetName(lead.item.target)
+  const aspect = lead.item.aspect ? ASPECT_WORDING[lead.item.aspect] : undefined
+  const driver = transit && target
+    ? `${transit}${particle(transit, '과', '와')} ${target}${aspect ? `의 ${aspect}` : '의 연결'}`
+    : transit ? `${transit}의 움직임` : ''
   if (separating) {
     const followThrough = DAILY_FOLLOW_THROUGH[lead.topic] ?? '이미 시작된 일이 실제 행동으로 이어지는지 확인해.'
-    return `${lead.topic}에서 오늘 남아 있는 핵심은 ${focus}이야. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}`
+    return `${lead.topic}에서 오늘 남아 있는 핵심은 ${focus}이야. ${driver ? `${driver}${particle(driver, '은', '는')} ` : '이 흐름은 '}가장 강했던 구간을 지나고 있어. ${followThrough}`
   }
   const phase = applying
-    ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
+    ? `${driver ? `${driver}${particle(driver, '이', '가')} ` : '이 흐름은 '}아직 강해지는 중이야.`
     : exact
-      ? '오늘은 이 주제가 가장 또렷하게 드러나는 구간이야.'
-      : '오늘은 이 흐름의 영향이 이어지는 구간이야.'
+      ? `${driver ? `${driver}${particle(driver, '이', '가')} ` : '이 주제가 '}오늘 가장 또렷한 구간이야.`
+      : `${driver ? `${driver}의 영향이 ` : '이 흐름의 영향이 '}오늘 이어지고 있어.`
   if (!scopedTopics.size) {
     const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== lead.topic && DAILY_HEADLINE_SCENE[topic])
     const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''

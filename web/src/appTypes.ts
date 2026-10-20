@@ -12,10 +12,19 @@ export type ReunionObservedState = '' | 'disconnected' | 'recontacted' | 'messag
 export type ReunionObservedEventKind = 'recontact' | 'meeting' | 'rebuilding'
 export type ReunionObservedInitiator = '' | 'counterpart' | 'user' | 'mutual' | 'unknown'
 export type ReunionObservedEvent = { kind: ReunionObservedEventKind; date: string }
+export type ReunionContactFrequency = '' | 'daily' | 'frequent' | 'occasional' | 'single'
+export type ReunionContactStatus = '' | 'ongoing' | 'paused' | 'ended'
+export type ReunionMessageSide = '' | 'counterpart' | 'user' | 'mutual' | 'unknown'
 export type ReunionObservationContext = {
   state: ReunionObservedState
   initiator: ReunionObservedInitiator
   events: ReunionObservedEvent[]
+  contactStartDate?: string
+  contactEndDate?: string
+  contactFrequency?: ReunionContactFrequency
+  contactStatus?: ReunionContactStatus
+  lastMessageBy?: ReunionMessageSide
+  pausedBy?: ReunionMessageSide
 }
 export type Gender = 'female' | 'male'
 export type TimeSource = 'official_record' | 'family_memory' | 'user_estimate' | 'arbitrary_input' | 'rectified' | 'unknown'
@@ -286,6 +295,12 @@ export type FortuneDailyScore = {
   market_open: boolean
   scores: Record<string, number | null>
   evidence?: FortuneDailyEvidence[]
+  contrast?: {
+    dominant_topics?: string[]
+    dominant_evidence?: Array<Pick<FortuneDailyEvidence,'kind'|'transit'|'target'|'aspect'|'motion'|'source_topics'|'polarity'|'contribution'>>
+    previous_day_delta?: Record<string, number | null>
+    period_mean_delta?: Record<string, number | null>
+  }
 }
 
 export type IntegratedApiResponse = {
