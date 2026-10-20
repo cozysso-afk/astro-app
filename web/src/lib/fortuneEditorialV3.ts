@@ -1,6 +1,7 @@
 import type { AiDomainAnswer, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 import type { FortuneUserSummary } from './fortuneUserSummary'
+import { fortuneEvidenceSnapshot } from './fortuneToneCalibration.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
 type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
@@ -398,17 +399,25 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
       summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) && !isSectorStitch(aiSummary, copies) ? aiSummary : fallback.summary,
     }
   }
-  if (field.id === 'love') return {
-    headline: `${base.when} 애정운은 관계 상태별로 나눠 읽어.`,
-    summary: relationshipSectionCopy(sections?.love_general) || clean(topic(data, '연애')?.reason) || '솔로, 짝사랑, 썸, 애매한 관계, 연애 중, 재회 관심은 같은 계산을 서로 다른 현실 질문으로 읽어야 해.',
-  }
-  if (field.id === 'social') return {
-    headline: `${base.when} 대인관계는 관계 종류별로 나눠 봐야 해.`,
-    summary: relationshipSectionCopy(sections?.summary) || clean(topic(data, '대인관계')?.reason) || base.summary,
-  }
-  if (field.id === 'contact') return {
-    headline: `${base.when} 연락은 실제 대화가 이어지는지와 먼저 움직이는 쪽을 따로 봐.`,
-    summary: relationshipSectionCopy(sections?.contact_activation) || clean(topic(data, '연락')?.reason) || base.summary,
+  if (field.id === 'love' || field.id === 'social' || field.id === 'contact') {
+    const name = field.id === 'love' ? '연애' : field.id === 'social' ? '대인관계' : '연락'
+    const cluster = field.id === 'love' ? sections?.love_general
+      : field.id === 'social' ? sections?.summary : sections?.contact_activation
+    const clusterText = relationshipSectionCopy(cluster)
+    const authored = clean(topic(data, name)?.verdict)
+    const snapshot = fortuneEvidenceSnapshot(calculation, name)
+    const specific = [snapshot.support ? '도움: ' + snapshot.support : '',
+      snapshot.challenge ? '부담: ' + snapshot.challenge : ''].filter(Boolean).join(' / ')
+    const chosen = [firstSentence(clusterText), authored, base.focusTopics.find(row => row.topic === name)?.conclusion]
+      .find(part => readerFacing(clean(part)) && relationshipPartUsable(part)) ?? ''
+    const calculatedHeadline = specific ? base.when + ' ' + name + ' · ' + specific : base.headline
+    const relatedSummary = clean(topic(data, name)?.reason)
+    return {
+      headline: chosen || calculatedHeadline,
+      summary: clusterText || relatedSummary || (specific
+        ? name + '에 연결된 실제 계산 근거: ' + specific + '. 근거는 사건이 일어날 확률이나 상대의 의도를 뜻하지 않아.'
+        : base.focusTopics.find(row => row.topic === name)?.reason || base.summary),
+    }
   }
   const firstTopic = field.topics[0]
   const row = topic(data, firstTopic)
