@@ -7,9 +7,9 @@
 .horary-time-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:9px;width:100%;min-width:0;max-width:100%}
 .horary-date-time-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;min-width:0;max-width:100%}
 .horary-date-time-fields>.field{display:flex;flex-direction:column;gap:5px;min-width:0;max-width:100%;overflow:visible}
-.horary-date-time-fields input[type="date"],.horary-date-time-fields input[type="time"]{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;padding:11px 10px;min-height:48px;height:48px;font-size:16px;line-height:normal;-webkit-appearance:none;appearance:none;background-color:#fffdf9;border:1px solid rgba(105,80,60,.15);border-radius:13px;color:#43372e}
-.horary-date-time-fields input::-webkit-date-and-time-value{min-width:0;text-align:left;line-height:normal}
-.horary-date-time-fields input::-webkit-datetime-edit{min-width:0;padding:0}
+.horary-date-time-fields input[type="date"],.horary-date-time-fields input[type="time"]{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;padding:11px 10px;min-height:48px;height:48px;font-size:16px;line-height:normal;text-align:center;text-align-last:center;color-scheme:light;background-color:#fffdf9;border:1px solid rgba(105,80,60,.15);border-radius:13px;color:#43372e}
+.horary-date-time-fields input::-webkit-date-and-time-value{min-width:0;text-align:center;line-height:normal}
+.horary-date-time-fields input::-webkit-datetime-edit{min-width:0;padding:0;text-align:center}
 .horary-form-hint{font-size:.69rem;color:#918478;line-height:1.5;margin:4px 1px 12px}
 .horary-action-group{display:grid;gap:9px;margin-top:15px}
 .horary-action-secondary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
