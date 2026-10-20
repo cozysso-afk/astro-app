@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Copy, LocateFixed, LoaderCircle, MapPin, RotateCcw, Sparkles } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Copy, LocateFixed, LoaderCircle, MapPin, RotateCcw, Sparkles } from 'lucide-react'
 
 import type { Gender } from './appTypes'
 
@@ -287,8 +287,20 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
     <div className="subsection-title">질문 시각</div>
     <div className="horary-time-row">
       <div className="horary-date-time-fields">
-        <label className="field"><span>질문 날짜</span><input aria-label="질문 날짜" type="date" value={questionTime.slice(0,10)} onChange={(event) => setQuestionDate(event.target.value)}/></label>
-        <label className="field"><span>질문 시간 · 기기 현지</span><input aria-label="질문 시간" type="time" step={60} value={questionTime.slice(11,16)} onChange={(event) => setQuestionClock(event.target.value)}/></label>
+        <label className="field">
+          <span>질문 날짜</span>
+          <span className="horary-native-input">
+            <input aria-label="질문 날짜" type="date" value={questionTime.slice(0,10)} onChange={(event) => setQuestionDate(event.target.value)}/>
+            <CalendarDays aria-hidden="true" size={18}/>
+          </span>
+        </label>
+        <label className="field">
+          <span>질문 시간 · 기기 현지</span>
+          <span className="horary-native-input">
+            <input aria-label="질문 시간" type="time" step={60} value={questionTime.slice(11,16)} onChange={(event) => setQuestionClock(event.target.value)}/>
+            <Clock3 aria-hidden="true" size={18}/>
+          </span>
+        </label>
       </div>
       <button className="horary-secondary-button" type="button" onClick={resetQuestionTime}><Clock3 size={16}/><span>지금 시각</span></button>
     </div>
