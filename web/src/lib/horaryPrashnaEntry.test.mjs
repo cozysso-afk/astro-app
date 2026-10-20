@@ -35,29 +35,49 @@ test('permission failure keeps manual latitude and longitude fallback visible', 
 
 
 test('entry posts classification metadata and renders loading error clarification states', () => {
-  assert.match(panel, /\/v1\/horary-prashna\/classify/)
+  assert.match(panel, /\/v1\/horary-prashna\/\$\{mode\}/)
   assert.match(panel, /question_time_local/)
   assert.match(panel, /utc_offset_hours/)
   assert.match(panel, /timezone_id/)
-  assert.match(panel, /질문 유형 확인 중/)
+  assert.match(panel, /유형 확인 중/)
   assert.match(panel, /status-banner error/)
   assert.match(panel, /response\.status === 404/)
-  assert.match(panel, /호라리 기능이 서버에 아직 연결되지 않았어/)
+  assert.match(panel, /해설 계산 API가 아직 배포되지 않았어/)
   assert.match(panel, /needs_clarification/)
 })
 
 
-test('datetime control stays inside the mobile panel on iOS', () => {
-  assert.match(styles, /\.horary-time-row\{[^}]*width:100%[^}]*min-width:0[^}]*max-width:100%/)
-  assert.match(styles, /\.horary-time-row>\.field\{[^}]*min-width:0[^}]*overflow:hidden/)
-  assert.match(styles, /input\[type="datetime-local"\]\{[^}]*min-inline-size:0[^}]*-webkit-appearance:none/)
-  assert.match(styles, /@media\(max-width:480px\)[^{]*\{[^}]*\.horary-input-caption/)
-  assert.match(styles, /\.horary-time-row\{grid-template-columns:minmax\(0,1fr\)\}/)
+test('iPhone question date and time are separate sized controls', () => {
+  assert.match(panel, /type="date"/)
+  assert.match(panel, /type="time"/)
+  assert.doesNotMatch(panel, /type="datetime-local"/)
+  assert.match(styles, /\.horary-date-time-fields\{[^}]*min-width:0/)
+  assert.match(styles, /input\[type="date"\]/)
+  assert.match(styles, /input\[type="time"\]/)
+  assert.match(styles, /font-size:16px/)
+  assert.match(styles, /@media\(max-width:480px\)/)
+  assert.match(panel, /resetQuestionTime/)
 })
 
-
-test('entry renders routing only and never starts chart judgement', () => {
-  assert.match(panel, /차트 계산과 실제 판단을 아직 만들지 않기 때문에/)
-  assert.doesNotMatch(panel, /\/v1\/horary-prashna\/(?:chart|judge|predict)/)
-  assert.doesNotMatch(panel, /gemini/i)
+test('chart-backed analyze route and optional classification are kept distinct', () => {
+  assert.match(panel, /submitQuestion = async \(mode: 'analyze' \| 'classify'\)/)
+  assert.match(panel, /horary-prashna\/\$\{mode\}/)
+  assert.match(panel, /차트 계산 · 해설 보기/)
+  assert.match(panel, /질문 유형만 확인/)
+  assert.match(panel, /result\.analysis/)
+  assert.match(panel, /Western Horary · 실제 차트/)
+  assert.match(panel, /Prashna D1 · 독립 계산/)
+  assert.match(panel, /분류 신뢰도/)
+  assert.doesNotMatch(panel, /독립 규칙 적용 예정/)
 })
+
+test('question and calculation prompt are copyable without fabricating predictions', () => {
+  assert.match(panel, /navigator\.clipboard\?\.writeText/)
+  assert.match(panel, /document\.execCommand\('copy'\)/)
+  assert.match(panel, /프롬프트 복사/)
+  assert.match(panel, /chart\.western/)
+  assert.match(panel, /chart\.prashna/)
+  assert.match(panel, /근거 없이 예측을 만들어내지 마/)
+  assert.match(panel, /setResult\(null\)/)
+})
+
