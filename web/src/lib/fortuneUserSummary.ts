@@ -528,9 +528,9 @@ function relationshipConsistency(context: FortuneUserSummaryContext): Relationsh
     return {
       contactLevel, reconnectionLevel, incomingLevel, outgoingLevel, pastLevel, blockReconnectionAction,
       reconnectionMeaning: '관계 회복 여지는 있으나 실제 연락 흐름은 약함',
-      reconnectionConclusion: '재회 흐름은 보통 이상으로 잡혀 있지만 실제 연락 움직임은 약해. 대화 재개나 재접촉이 곧 생긴다고 읽기보다 현재 상황을 지켜보는 편이 좋아.',
-      reconnectionAction: '먼저 재회를 밀기보다 실제 연락이나 재접촉이 생기는지를 확인해.',
-      reconnectionCaution: '재회 점수가 연락의 약세를 덮어쓰지 않아. 연락이 없는데 대화 재개를 예상하지 마.',
+      reconnectionConclusion: '재회 흐름은 보통 이상이지만 계산된 연락 활성도는 약해. 실제 연락을 주고받았는지는 별도로 확인하고, 그 사실과 관계 회복 의향은 구분해서 봐.',
+      reconnectionAction: '이미 연락 중이라면 대화의 지속과 다음 만남을 보고, 연락 여부가 미확인이라면 재접촉 기록부터 확인해.',
+      reconnectionCaution: '재회 점수가 연락 신호의 약세를 덮어쓰지는 않아. 이 수치는 실제 연락의 유무를 판단하지 않으므로, 이미 확인된 연락 기록과 구분해서 읽어.',
     }
   }
 
@@ -678,11 +678,12 @@ function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string
   const scene = DAILY_HEADLINE_SCENE[focus]
   const direction = fortuneToneAssessment(context.calculation, focus).direction
   const snapshot = fortuneEvidenceSnapshot(context.calculation, focus)
+  if (direction === 'neutral' && snapshot.neutral) return `오늘 ${focus}${particle(focus,'은','는')} ${snapshot.neutral}의 중립적인 활성 근거가 있어. 좋거나 나쁜 사건을 확정할 신호는 아니야.`
   if (direction === 'mixed' && snapshot.support && snapshot.challenge) {
-    const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 쪽이 상대적으로 우세하지만'
-      : snapshot.dominantDirection === 'challenging' ? '부담 쪽이 상대적으로 우세하지만'
-        : '한쪽으로 확실히 기울지는 않아'
-    return `오늘 ${focus}은 ${snapshot.support}의 도움 신호와 ${snapshot.challenge}의 부담 신호가 함께 보여. ${emphasis}, 실제 결과를 확정하는 뜻은 아니야.`
+    const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 상대적으로 커.'
+      : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 상대적으로 커.'
+        : '한쪽이 뚜렷하게 우세하지 않아.'
+    return `오늘 ${focus}${particle(focus,'은','는')} 도움 근거(${snapshot.support})와 부담 근거(${snapshot.challenge})가 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.`
   }
   if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use} ${snapshot.support ? `주요 근거는 ${snapshot.support}야.` : ''}`
   if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution} ${snapshot.challenge ? `주요 근거는 ${snapshot.challenge}야.` : ''}`
@@ -856,6 +857,22 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
     : grounded || `${when}${particle(when, '은', '는')} 좋거나 조심할 분야가 뚜렷하게 갈리지 않아. 평소 계획을 유지하면서 변화를 지켜봐.`
 }
 
+function evidenceLedHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext): string {
+  const base = buildHeadline(when, bestFlow, cautionFlow, consistency, context)
+  const candidates = context.focusTopics?.length ? context.focusTopics : [...bestFlow, ...cautionFlow, ...Object.keys(context.calculation.western.overall ?? {})]
+  const topic = candidates.find(name => {
+    const snapshot=fortuneEvidenceSnapshot(context.calculation,name)
+    return snapshot.support || snapshot.challenge || snapshot.neutral
+  })
+  if (!topic) return base
+  const snapshot=fortuneEvidenceSnapshot(context.calculation,topic)
+  const refs = [snapshot.support ? '도움: '+snapshot.support : '',
+    snapshot.challenge ? '부담: '+snapshot.challenge : '',
+    snapshot.neutral && !snapshot.support && !snapshot.challenge ? '중립: '+snapshot.neutral : ''].filter(Boolean)
+  if (!refs.length || refs.every(text=>base.includes(text.split(': ').at(-1) ?? ''))) return base
+  return `${base} ${topic}의 핵심 근거는 ${refs.join(' / ')}. 계산 근거는 현실 사건의 확정이 아니야.`
+}
+
 export function buildFortuneUserSummary(data: InterpretationData, context: FortuneUserSummaryContext): FortuneUserSummary {
   const frame = frameFor(context.period, context.calculation.period.day_count)
   const importance = (value: AiTopicInterpretation['importance']) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
@@ -872,7 +889,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     const favorable = score === null ? null : topic === '투자주의' ? 100 - score : score
     const evidenceDirection = fortuneToneAssessment(context.calculation, topic).direction
     const tone = score === null ? 'steady' : fortunePresentationTone(context.calculation, topic, score, String(stat?.band ?? ''))
-    const direction: FortuneEvidenceDirection = tone === 'caution' ? 'challenging' : tone === 'good' ? 'supportive' : evidenceDirection
+    const direction: FortuneEvidenceDirection = topic === '투자주의' && tone === 'caution' ? 'challenging' : evidenceDirection
     return { topic, interpretation, score, favorable, level: flowLevel(stat), direction, tone, support: linkedEvidence(context, topic).length + (interpretation.evidence_refs?.length ?? 0), priority: position < 0 ? Infinity : position }
   })
   const rank = (mode: 'best' | 'caution' | 'salience') => (a: typeof normalized[number], b: typeof normalized[number]) => {
@@ -887,14 +904,14 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   const eligible = normalized.filter(row => importance(row.interpretation.importance) < 2 || row.support > 0)
   const consistency = relationshipConsistency(context)
   const bestCandidates = eligible.filter(row => row.tone === 'good' && row.topic !== '투자주의' && !(row.topic === '재회' && consistency.blockReconnectionAction)).sort(rank('best'))
-  const cautionCandidates = eligible.filter(row => row.tone === 'caution').sort(rank('caution'))
+  const cautionCandidates = eligible.filter(row => row.tone === 'caution' || (row.direction === 'mixed' && fortuneEvidenceSnapshot(context.calculation, row.topic).challenge)).sort(rank('caution'))
   const best = bestCandidates.slice(0, 2)
   const caution = cautionCandidates.slice(0, 2)
   const selected = context.focusTopics ? normalized.filter(r=>context.focusTopics!.includes(r.topic)).sort((a,b)=>context.focusTopics!.indexOf(a.topic)-context.focusTopics!.indexOf(b.topic)) : [...eligible].sort(rank('salience')).slice(0, 3)
   const bestFlow = best.map(row => row.topic)
   const cautionFlow = caution.map(row => row.topic)
   const when = frame.when
-  const headline = buildHeadline(when, bestFlow, cautionFlow, consistency, context)
+  const headline = evidenceLedHeadline(when, bestFlow, cautionFlow, consistency, context)
   const directions = relationshipSummary(context, new Set(normalized.map(row => row.topic)), frame.kind)
   const explainTopic = ({ topic, interpretation, level, score, direction }: typeof normalized[number]): FortuneUserTopic => {
     const copy = topicCopy(topic, level, when, direction)
@@ -912,11 +929,17 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
       : topic === '재회'
         ? consistency.reconnectionAction
         : clean(narrative?.action) ?? copy.practice
+    const snapshot = fortuneEvidenceSnapshot(context.calculation, topic)
     const cautionText = topic === '재회'
       ? consistency.reconnectionCaution
-      : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : undefined)
+      : snapshot.challenge
+        ? `${clean(narrative?.avoid) ?? copy.caution} 실제 부담 근거: ${snapshot.challenge}. 이것만으로 사건을 확정하지 마.`
+        : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : undefined)
+    const groundedAction = snapshot.support || snapshot.challenge || snapshot.neutral
+    const actionWithEvidence = groundedAction && !action.includes(groundedAction)
+      ? `${action} 참고할 계산 근거는 ${groundedAction}이야. 해당 시기 실제 행동과 반응을 따로 대조해.` : action
     return { topic, conclusion, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level, direction),
-      timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,
+      timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action: actionWithEvidence, observe: realLifeDepth(topic) || copy.observe,
       caution: cautionText }
   }
   const focusTopics = selected.map(explainTopic)

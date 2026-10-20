@@ -5,9 +5,10 @@ export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-sce
 export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-authored-prose-v4'
 export const WEEKLY_OUTPUT_CACHE_VERSION = 'weekly-output-headroom-v2'
 export const PROVIDER_NORMALIZATION_CACHE_VERSION = 'provider-partial-isolation-v1'
+export const FALLBACK_EDITORIAL_CACHE_VERSION = 'evidence-episode-action-v2'
 // Cache identity follows the actual prompt + narrative + normalization contracts so
 // an editorial release cannot silently reuse an older completed Gemini result.
-export const EDITORIAL_CACHE_VERSION = `editorial-runtime:${V23_PROMPT_VERSION}:${PERIOD_NARRATIVE_VERSION}:${PROVIDER_NORMALIZATION_CACHE_VERSION}`
+export const EDITORIAL_CACHE_VERSION = `editorial-runtime:${V23_PROMPT_VERSION}:${PERIOD_NARRATIVE_VERSION}:${PROVIDER_NORMALIZATION_CACHE_VERSION}:${FALLBACK_EDITORIAL_CACHE_VERSION}`
 
 function periodKind(source: any): string {
   const raw = String(source?.period_kind ?? source?.period?.kind ?? source?.kind ?? '').trim().toLowerCase()

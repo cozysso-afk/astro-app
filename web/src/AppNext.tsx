@@ -414,6 +414,7 @@ export default function AppNext() {
   const [birthProfile, setBirthProfile] = useState<BirthProfile>(() => loadStoredProfile())
   const [profileSaved, setProfileSaved] = useState(false)
   const [counterpart, setCounterpart] = useState<CounterpartProfile>(emptyCounterpart)
+  const previousCounterpartIdentityRef = useRef<string | null>(null)
   const [relationshipResult, setRelationshipResult] = useState<RelationshipApiResponse | null>(null)
   const [relationshipLoading, setRelationshipLoading] = useState(false)
   const [relationshipError, setRelationshipError] = useState('')
@@ -497,9 +498,24 @@ export default function AppNext() {
 
   useEffect(() => {
     relationshipRevisionRef.current += 1
+    // A factual observation belongs to one counterpart only. The archived
+    // restore path intentionally preserves the observation restored with it.
+    const identity = [counterpart.name.trim(), counterpart.birthDate, counterpart.birthTime,
+      counterpart.placeKey, counterpart.latitude, counterpart.longitude].join('|')
+    const counterpartChanged = previousCounterpartIdentityRef.current !== null && previousCounterpartIdentityRef.current !== identity
+    previousCounterpartIdentityRef.current = identity
     if (restoringRelationshipRef.current) {
       restoringRelationshipRef.current = false
       return
+    }
+    if (counterpartChanged) {
+      setReunionObservedState('')
+      setReunionObservedInitiator('')
+      setReunionRecontactDate('')
+      setReunionMeetingDate('')
+      setReunionRebuildingDate('')
+      setReunionHistoryResult(null)
+      setReunionHistoryError('')
     }
     if (!relationshipResult && !relationshipRequestSnapshot && !relationshipAi && !reunionTiming) return
     setRelationshipResult(null)

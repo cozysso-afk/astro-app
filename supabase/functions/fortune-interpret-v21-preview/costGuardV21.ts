@@ -220,7 +220,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const evidenceDirection=topicEvidenceDirection(payload,topic);
     const magnitude=/약|낮/.test(String(stat?.band??""))||avg<40?"활성도는 낮은 편":/강|높/.test(String(stat?.band??""))||avg>=60?"활성도는 높은 편":"활성도는 중간권";
     const direction=risk
-      ? (avg>=60?"경계 압력이 상대적으로 높은 편":avg<40?"경계 압력이 상대적으로 낮은 편":"경계 압력이 중간권")
+      ? (avg>=60?"경계 압력이 상대적으로 높은 편이야":avg<40?"경계 압력이 상대적으로 낮은 편이야":"경계 압력이 중간권이야")
       : evidenceDirection==="supportive"?`${magnitude}이고 도움 방향 근거가 연결돼 있어`
         : evidenceDirection==="challenging"?`${magnitude}이고 주의 방향 근거가 연결돼 있어`
           : evidenceDirection==="mixed"?`${magnitude}이며 도움과 주의 방향이 함께 있어`
@@ -245,7 +245,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
     else reasonParts.push("점수와 연결해 설명할 세부 계산근거가 충분하지 않아 사건 의미를 덧붙이지 않아.");
     if(singleDay)reasonParts.push(topicRealityCheck(topic));
     else{
-      reasonParts.push(`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}으로 ${direction}이야.${typeof stat?.spread==="number"&&Number.isFinite(stat.spread)?` 확인된 변동폭은 ${scoreText(spread)}점이야.`:" 변동폭은 계산 정보가 없어 판단하지 않아."}`);
+      reasonParts.push(`${topic} 기간 평균은 ${scoreText(avg)}점${stat?.band?`(${String(stat.band)})`:""}으로 ${direction}.${typeof stat?.spread==="number"&&Number.isFinite(stat.spread)?` 확인된 변동폭은 ${scoreText(spread)}점이야.`:" 변동폭은 계산 정보가 없어 판단하지 않아."}`);
       if(min?.date&&max?.date&&typeof min.score==="number"&&Number.isFinite(min.score)&&typeof max.score==="number"&&Number.isFinite(max.score)&&backedDateSet.has(String(min.date).slice(0,10))&&backedDateSet.has(String(max.date).slice(0,10)))reasonParts.push(`확인된 최저점은 ${min.date} ${scoreText(min.score)}점, 최고점은 ${max.date} ${scoreText(max.score)}점이야. 두 날짜는 강약 비교이며 그 사이가 계속 상승하거나 하락했다는 뜻은 아니야.`);
       if(typeof digest?.volatility==="number"&&Number.isFinite(digest.volatility))reasonParts.push(`일별 변동성은 ${scoreText(digest.volatility)}점이야.`);
       else reasonParts.push("일별 변동성 정보가 없어 흐름이 일정하다고 판단하지 않아.");
@@ -269,15 +269,18 @@ export function buildDeterministicTopicAnalysis(payload:any){
       }
     }
     const va=topicVerb(topic);
+    const groundedAction = INVESTMENT_TOPICS.has(topic) || !readable.summaries.length
+      ? va.action
+      : `${va.action} 이 기간에 연결된 계산 근거: ${readable.summaries[0]}. 실제 행동이나 연락 여부는 별도 기록과 대조해.`;
     // Repeated observations of one configuration are not independent corroboration.
     const independent=new Set(readable.rows.filter((row:any)=>/daily_actual|intraday_evidence/.test(String(row?.scope??""))||/^W:(daily|detail):/.test(String(row?.id??""))).map((row:any)=>String(row?.text??row?.label??"").replace(/\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|orb\s*[\d.]+°?/gi,"").replace(/\s+/g," ").trim()).filter(Boolean));
     const confidence=independent.size>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
     return {
       topic,importance,
-      verdict:singleDay?`${topicSubject(topic)} 이날 ${pointScoreText(avg)}점이며 ${direction}이야.`:`${topicSubject(topic)} 이번 기간에는 ${direction}.`,
+      verdict:singleDay?`${topicSubject(topic)} 이날 ${pointScoreText(avg)}점이며 ${direction}.`:`${topicSubject(topic)} 이번 기간에는 ${direction}.`,
       reason:reasonParts.join(" "),
       timing,
-      action:va.action,
+      action:groundedAction,
       avoid:va.avoid,
       confidence,
       confidence_reason:singleDay
