@@ -680,10 +680,10 @@ function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string
   const snapshot = fortuneEvidenceSnapshot(context.calculation, focus)
   if (direction === 'neutral' && snapshot.neutral) return `오늘 ${focus}${particle(focus,'은','는')} ${snapshot.neutral}의 중립적인 활성 근거가 있어. 좋거나 나쁜 사건을 확정할 신호는 아니야.`
   if (direction === 'mixed' && snapshot.support && snapshot.challenge) {
-    const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 쪽이 상대적으로 우세하지만'
-      : snapshot.dominantDirection === 'challenging' ? '부담 쪽이 상대적으로 우세하지만'
-        : '한쪽으로 확실히 기울지는 않아'
-    return `오늘 ${focus}${particle(focus,'은','는')} ${snapshot.support}의 도움 신호와 ${snapshot.challenge}의 부담 신호가 함께 보여. ${emphasis.replace(/지만$/, '지만').replace(/않아$/, '않아.') } 실제 결과를 확정하는 뜻은 아니야.`
+    const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 상대적으로 커.'
+      : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 상대적으로 커.'
+        : '한쪽이 뚜렷하게 우세하지 않아.'
+    return `오늘 ${focus}${particle(focus,'은','는')} 도움 근거(${snapshot.support})와 부담 근거(${snapshot.challenge})가 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.`
   }
   if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use} ${snapshot.support ? `주요 근거는 ${snapshot.support}야.` : ''}`
   if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution} ${snapshot.challenge ? `주요 근거는 ${snapshot.challenge}야.` : ''}`
