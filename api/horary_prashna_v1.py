@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from horary_prashna_router_v1 import CLASSIFIER_VERSION, ROUTER_VERSION, classify_question, get_policy
+from horary_prashna_chart_v1 import build_horary_chart_report
 
 
 router = APIRouter(prefix="/v1/horary-prashna", tags=["horary-prashna"])
@@ -91,4 +92,23 @@ def classify_horary_prashna_question(request: HoraryPrashnaClassifyRequest) -> d
             "classifier_version": CLASSIFIER_VERSION,
             "western_prashna_kept_separate": True,
         },
+    }
+
+@router.post("/analyze")
+def analyze_horary_prashna_question(request: HoraryPrashnaClassifyRequest) -> dict:
+    """Only run chart evidence with a stated location and sufficiently clear question."""
+    classified = classify_horary_prashna_question(request)
+    if classified["needs_clarification"]:
+        raise HTTPException(status_code=422, detail="질문 대상이 모호해. 누구/무엇에 관한 질문인지 한 가지로 구체화해줘.")
+    if request.latitude is None or request.longitude is None:
+        raise HTTPException(status_code=422, detail="차트 계산에는 질문 시각의 위도와 경도가 모두 필요해. 위치 사용 또는 수동 입력을 해줘.")
+    _local, instant_utc = _resolve_times(request)
+    try:
+        chart = build_horary_chart_report(instant_utc, request.latitude, request.longitude, classified)
+    except (ValueError, OverflowError) as exc:
+        raise HTTPException(status_code=422, detail=f"질문 시각 또는 위치로 차트를 계산할 수 없어: {exc}") from exc
+    return {
+        **classified,
+        "analysis": chart,
+        "next_stage": "chart_evidence_v1_interpretation_limited",
     }

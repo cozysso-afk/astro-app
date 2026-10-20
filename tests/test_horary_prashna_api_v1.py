@@ -104,3 +104,78 @@ def test_classifier_api_rejects_invalid_request_contracts():
     for payload in cases:
         response = client.post("/v1/horary-prashna/classify", json=payload)
         assert response.status_code == 422, response.text
+
+
+def test_chart_analysis_uses_actual_time_location_and_two_distinct_systems():
+    payload = {
+        **base_payload(),
+        "question": "오늘 약속한 사람과의 만남이 예정대로 성사될까? 지연될까?",
+        "latitude": 37.5665, "longitude": 126.9780,
+        "location_source": "manual",
+    }
+    res = client.post("/v1/horary-prashna/analyze", json=payload)
+    assert res.status_code == 200, res.text
+    result = res.json()
+    assert result["ok"] is True
+    assert result["next_stage"] == "chart_evidence_v1_interpretation_limited"
+    report = result["analysis"]
+    assert report["julian_day_ut"] > 2400000
+    assert report["western"]["house_system"] in ("Placidus", "Porphyry")
+    assert report["western"]["querent_lord"] in {
+        "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"
+    }
+    assert report["western"]["moon"]
+    assert report["prashna"]["ayanamsa"] == "Lahiri"
+    assert report["prashna"]["lagna"]
+    assert report["prashna"]["moon_bhava"] in range(1,13)
+    assert report["synthesis"]["limitations"]
+    assert "확정" in report["synthesis"]["conclusion"] or "부족" in report["synthesis"]["conclusion"]
+
+
+def test_chart_analysis_rejects_missing_location_and_clarification_without_guessing():
+    missing = client.post("/v1/horary-prashna/analyze",json={
+        **base_payload(), "question":"이 만남이 예정대로 이루어질까?"
+    })
+    assert missing.status_code == 422
+    assert "위도" in missing.json()["detail"]
+    vague = client.post("/v1/horary-prashna/analyze",json={
+        **base_payload(), "question":"이거 잘 될까?",
+        "latitude":34.7,"longitude":127.7,"location_source":"manual"
+    })
+    assert vague.status_code == 422
+    assert "모호" in vague.json()["detail"]
+
+
+def test_chart_analysis_changes_with_question_time_and_keeps_classifier_unchanged():
+    payload={
+        **base_payload(),
+        "question":"오늘 만나기로 한 사람과의 약속은 성사될까?",
+        "latitude":37.5665,"longitude":126.9780,"location_source":"manual"
+    }
+    a=client.post("/v1/horary-prashna/analyze",json=payload)
+    b=client.post("/v1/horary-prashna/analyze",json={
+        **payload,"question_time_local":"2026-10-07T04:30:00"
+    })
+    assert a.status_code == 200,a.text
+    assert b.status_code == 200,b.text
+    aa=a.json()["analysis"];bb=b.json()["analysis"]
+    assert aa["western"]["ascendant"] != bb["western"]["ascendant"] or aa["western"]["moon"] != bb["western"]["moon"]
+    assert aa["prashna"]["lagna"] != bb["prashna"]["lagna"] or aa["prashna"]["moon"] != bb["prashna"]["moon"]
+    still=client.post("/v1/horary-prashna/classify",json=payload)
+    assert still.status_code == 200
+    assert "analysis" not in still.json()
+
+def test_chart_aspects_distinguish_applying_ease_and_applying_tension():
+    from horary_prashna_chart_v1 import _aspects
+    a={"id":"Moon","longitude":0.0,"speed":1.0}
+    good={"id":"Venus","longitude":125.0,"speed":0.0}
+    caution={"id":"Saturn","longitude":95.0,"speed":0.0}
+    moving_away={"id":"Moon","longitude":0.0,"speed":-1.0}
+    easing=_aspects(a,good,"달-금성")
+    tension=_aspects(a,caution,"달-토성")
+    separating=_aspects(moving_away,good,"달-금성")
+    assert easing[0]["applying"] is True
+    assert easing[0]["quality"] == "완화"
+    assert tension[0]["applying"] is True
+    assert tension[0]["quality"] == "긴장"
+    assert separating[0]["applying"] is False
