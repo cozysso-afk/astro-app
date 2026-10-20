@@ -1,5 +1,5 @@
 import type { AiInterpretationResponse, AiTopicInterpretation, FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
-import { fortunePresentationTone, fortuneToneAssessment, evidenceDirection, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
+import { fortunePresentationTone, fortuneToneAssessment, fortuneEvidenceSnapshot, evidenceDirection, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
 type FlowLevel = 'low' | 'steady' | 'high'
@@ -665,11 +665,27 @@ const DAILY_FOLLOW_THROUGH: Record<string,string> = {
 
 function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
   const focus = (context.focusTopics ?? []).find(topic => DAILY_HEADLINE_SCENE[topic])
-  if (!focus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+  if (!focus) {
+    const evidenceTopics = (context.calculation.western.daily_scores ?? [])
+      .filter(day => day.date === context.calculation.period.start)
+      .flatMap(day => day.evidence ?? [])
+      .sort((a, b) => Math.abs(Number(b.contribution ?? 0)) - Math.abs(Number(a.contribution ?? 0)))
+      .flatMap(row => row.source_topics ?? [])
+    const evidenceFocus = evidenceTopics.find(topic => DAILY_HEADLINE_SCENE[topic])
+    if (!evidenceFocus) return fallbackDayHeadline(context, bestFlow, cautionFlow)
+    return focusedDayFallback({...context, focusTopics:[evidenceFocus]}, bestFlow, cautionFlow)
+  }
   const scene = DAILY_HEADLINE_SCENE[focus]
   const direction = fortuneToneAssessment(context.calculation, focus).direction
-  if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use}`
-  if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution}`
+  const snapshot = fortuneEvidenceSnapshot(context.calculation, focus)
+  if (direction === 'mixed' && snapshot.support && snapshot.challenge) {
+    const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 쪽이 상대적으로 우세하지만'
+      : snapshot.dominantDirection === 'challenging' ? '부담 쪽이 상대적으로 우세하지만'
+        : '한쪽으로 확실히 기울지는 않아'
+    return `오늘 ${focus}은 ${snapshot.support}의 도움 신호와 ${snapshot.challenge}의 부담 신호가 함께 보여. ${emphasis}, 실제 결과를 확정하는 뜻은 아니야.`
+  }
+  if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use} ${snapshot.support ? `주요 근거는 ${snapshot.support}야.` : ''}`
+  if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution} ${snapshot.challenge ? `주요 근거는 ${snapshot.challenge}야.` : ''}`
   return `${focus}만 놓고 보면 오늘은 좋거나 나쁜 사건을 강하게 가를 근거가 없어. ${NEUTRAL_PRACTICE[focus] ?? '평소 흐름을 유지하는 구간이야.'}`
 }
 
@@ -822,11 +838,22 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
     const arc = weeklyEvidenceHeadline(context)
     if (arc) return arc
   }
+  const candidateTopics = context.focusTopics?.length ? context.focusTopics : Object.keys(context.calculation.western.overall ?? {})
+  const evidenceTopic = candidateTopics.find(topic => {
+    const snapshot = fortuneEvidenceSnapshot(context.calculation, topic)
+    return Boolean(snapshot.support || snapshot.challenge)
+  })
+  const evidence = evidenceTopic ? fortuneEvidenceSnapshot(context.calculation, evidenceTopic) : null
+  const grounded = evidenceTopic && evidence?.support && evidence?.challenge
+    ? `${when} ${evidenceTopic}은 ${evidence.support}의 도움 근거와 ${evidence.challenge}의 부담 근거가 함께 잡혀. ${evidence.dominantDirection === 'balanced' ? '상반된 신호라 어느 한쪽으로 단정하기 어려워.' : evidence.dominantDirection === 'supportive' ? '도움 쪽의 기여도가 더 크지만 실제 결과는 별도로 확인해야 해.' : '부담 쪽의 기여도가 더 크지만 실제 결과는 별도로 확인해야 해.'}`
+    : evidenceTopic && (evidence?.support || evidence?.challenge)
+      ? `${when} ${evidenceTopic}의 주요 근거는 ${evidence.support ?? evidence.challenge}야. 사건 확정이 아니라 계산상 활성 신호로 읽어.`
+      : ''
   return bestFlow.length && cautionFlow.length
-    ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 괜찮지만, ${joinTopics(cautionFlow)} 쪽은 속도를 낮추는 편이 좋아.`
-    : bestFlow.length ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 좋은 편이야. 이쪽부터 계획을 잡아봐.`
-    : cautionFlow.length ? `${when}${particle(when, '은', '는')} ${joinTopics(cautionFlow)} 쪽의 기대를 낮추는 편이 좋아. 그 밖에 크게 밀어줄 분야는 뚜렷하지 않아.`
-    : `${when}${particle(when, '은', '는')} 좋거나 조심할 분야가 뚜렷하게 갈리지 않아. 평소 계획을 유지하면서 변화를 지켜봐.`
+    ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 괜찮지만, ${joinTopics(cautionFlow)} 쪽은 속도를 낮추는 편이 좋아. ${grounded}`
+    : bestFlow.length ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 좋은 편이야. ${grounded || '이쪽부터 계획을 잡아봐.'}`
+    : cautionFlow.length ? `${when}${particle(when, '은', '는')} ${joinTopics(cautionFlow)} 쪽의 기대를 낮추는 편이 좋아. ${grounded || '그 밖에 크게 밀어줄 분야는 뚜렷하지 않아.'}`
+    : grounded || `${when}${particle(when, '은', '는')} 좋거나 조심할 분야가 뚜렷하게 갈리지 않아. 평소 계획을 유지하면서 변화를 지켜봐.`
 }
 
 export function buildFortuneUserSummary(data: InterpretationData, context: FortuneUserSummaryContext): FortuneUserSummary {

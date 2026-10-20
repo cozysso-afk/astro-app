@@ -23,7 +23,7 @@ function proseFingerprint(value: string) {
   return String(value ?? '').replace(/[\s.,!?·~→:;()\[\]-]+/g, '').trim()
 }
 
-const META_EDITORIAL_RE = /계산\s*근거|기간 전체 운영|선택 기간(?:의)?|상대지수|판정은|같은 기간 안에서|별도 경계 신호|흐름을 계산|흐름을 .*확인하는|확인 단계|평소 리듬|두드러지게 밀어줄 분야|특정 분야 하나로|전 섹터/
+const META_EDITORIAL_RE = /\b(?:evidence_refs|applicability|threshold|schema|JSON)\b|스키마|클러스터|출력\s*형식|(?:계산\s*(?:엔진|로직))|(?:모델\s*(?:프롬프트|응답))|전\s*섹터/i
 const RAW_PERIOD_GUIDANCE_RE = /(?:evidence_refs|applicability|threshold|스키마|클러스터|출력\s*형식)/i
 
 export function editorialCopyUsable(value: string) {
@@ -158,8 +158,10 @@ export function PeriodFortuneNarrativeV2({
   const fallbackHero = overallFallback(summary)
   const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : ''
   const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
-  const heroHeadline = integratedHeroHeadline || fallbackHero.headline
-  const heroSummary = integratedHeroSummary || fallbackHero.summary
+  const fieldHeroHeadline = verifiedNarrative && field && editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : ''
+  const fieldHeroSummary = verifiedNarrative && field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
+  const heroHeadline = fieldHeroHeadline || integratedHeroHeadline || fallbackHero.headline
+  const heroSummary = fieldHeroSummary || integratedHeroSummary || fallbackHero.summary
   const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
