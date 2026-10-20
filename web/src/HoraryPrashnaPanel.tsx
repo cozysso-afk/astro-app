@@ -1,9 +1,28 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, LocateFixed, LoaderCircle, MapPin, RotateCcw, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Copy, LocateFixed, LoaderCircle, MapPin, RotateCcw, Sparkles } from 'lucide-react'
 
 import type { Gender } from './appTypes'
 
+type HoraryChartReport = {
+  engine_version: string
+  julian_day_ut: number
+  western: {
+    ascendant: string; house_system: string; house_fallback: boolean; question_house: number | null
+    querent_lord: string; quesited_lord: string | null
+    querent_position: string; quesited_position: string | null; moon: string
+    contacts: Array<{pair:string;aspect:string;orb:number;phase:string;applying:boolean;quality:string}>
+    summary: string
+  }
+  prashna: {
+    ayanamsa: string; lagna:string;lagna_lord:string;moon:string;moon_bhava:number
+    question_bhava:number|null;question_bhava_lord:string|null;question_lord_bhava:number|null
+    contacts:Array<{body:string;link:string;house:number}>; summary:string
+  }
+  synthesis: {status:string;conclusion:string;timing:string;limitations:string}
+}
 type HoraryClassifyResponse = {
+  analysis?: HoraryChartReport
+
   ok: boolean
   router_version: string
   classifier_version: string
@@ -96,11 +115,23 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<HoraryClassifyResponse | null>(null)
+  const [activeAction, setActiveAction] = useState<'analyze' | 'classify' | null>(null)
+  const [copyState, setCopyState] = useState('')
+  const invalidate = () => { setResult(null); setCopyState('') }
 
-  const resetQuestionTime = () => setQuestionTime(localDateTimeValue())
+  const resetQuestionTime = () => { setQuestionTime(localDateTimeValue()); invalidate() }
+  const setQuestionDate = (value: string) => {
+    setQuestionTime(value ? `${value}T${questionTime.slice(11,16) || '00:00'}` : '')
+    invalidate()
+  }
+  const setQuestionClock = (value: string) => {
+    setQuestionTime(value && questionTime.slice(0,10) ? `${questionTime.slice(0,10)}T${value}` : '')
+    invalidate()
+  }
 
   const useCurrentLocation = () => {
     setLocationError('')
+    invalidate()
     if (!('geolocation' in navigator)) {
       setLocationError('이 브라우저에서는 현재 위치 기능을 사용할 수 없어. 아래 좌표를 직접 입력해줘.')
       return
@@ -128,13 +159,14 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
   }
 
   const updateManualCoordinate = (kind: 'lat' | 'lon', value: string) => {
+    invalidate()
     if (kind === 'lat') setLatitude(value)
     else setLongitude(value)
     setAccuracy(null)
     setLocationSource(value || (kind === 'lat' ? longitude : latitude) ? 'manual' : 'none')
   }
 
-  const classify = async () => {
+  const submitQuestion = async (mode: 'analyze' | 'classify') => {
     setError('')
     setResult(null)
     if (question.trim().length < 2) {
@@ -152,9 +184,10 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
       return
     }
     setLoading(true)
+    setActiveAction(mode)
     try {
       const locationReady = lat !== null && lon !== null
-      const response = await fetch(`${apiBase}/v1/horary-prashna/classify`, {
+      const response = await fetch(`${apiBase}/v1/horary-prashna/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +205,7 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok || !payload?.ok) {
         const message = response.status === 404 && payload?.detail === 'Not Found'
-          ? '호라리 기능이 서버에 아직 연결되지 않았어. 잠시 후 다시 시도해줘.'
+          ? '해설 계산 API가 아직 배포되지 않았어. 질문 유형만 확인하거나 프롬프트를 복사할 수 있어.'
           : payload?.detail || payload?.error || '질문 분류에 실패했어.'
         throw new Error(message)
       }
@@ -181,6 +214,53 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
       setError(caught instanceof Error ? caught.message : '질문 분류 중 오류가 발생했어.')
     } finally {
       setLoading(false)
+      setActiveAction(null)
+    }
+  }
+
+  const makePrompt = () => {
+    const chart = result?.analysis
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '기기 시간대'
+    const lines = [
+      '호라리 · 프라슈나 질문 해설 요청',
+      '질문 원문: ' + question.trim(),
+      '질문 시각(기기 현지): ' + (questionTime || '미입력'),
+      '시간대: ' + tz + ' / UTC 오프셋: ' + (questionTime ? (-new Date(questionTime).getTimezoneOffset()/60) : '?') + '시간',
+      '위도/경도: ' + (latitude && longitude ? latitude + ', ' + longitude : '미입력 · 실제 차트 계산 전 위치 필요'),
+      '질문 분야: ' + (result ? (domainKo[result.primary_type] ?? result.primary_type) : '미분류'),
+      '요청: 서양 호라리(전통 1·질문 대상 하우스의 주인성, 달의 적용·분리각)와',
+      '프라슈나(D1 Lahiri 라그나, 질문 바바·주인성, 그라하 시선)를 독립적으로 검토한 뒤 비교해.',
+      '성사·지연·무산의 근거를 구분하고, 근거가 부족하면 확답을 하지 마.',
+      '실제 상대의 의사나 일정에 관한 사실은 차트로 지어내지 마. 시간·위치·천문력 계산을 먼저 검증해.',
+    ]
+    if (chart) {
+      lines.push('--- 실제 계산된 차트 근거(간이 v1) ---')
+      lines.push('Western Horary: ' + JSON.stringify(chart.western))
+      lines.push('Prashna D1: ' + JSON.stringify(chart.prashna))
+      lines.push('현재 계산 요약: ' + chart.synthesis.conclusion)
+      lines.push('미구현 판정: ' + chart.synthesis.limitations)
+      lines.push('정확한 성사 시각이나 예/아니오를 추정하려면 추가 전통 판단 및 확인된 근거를 밝혀.')
+    } else lines.push('이 프롬프트에는 실제 차트 위치·주인성 계산 결과가 아직 없어. 외부 도구에서 계산한 뒤 판단하고, 근거 없이 예측을 만들어내지 마.')
+    return lines.join('\n')
+  }
+  const copyPrompt = async () => {
+    try {
+      const copy = makePrompt()
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(copy)
+      else {
+        const textArea = document.createElement('textarea')
+        textArea.value = copy
+        textArea.style.position = 'fixed'
+        textArea.style.opacity = '0'
+        document.body.appendChild(textArea)
+        textArea.select()
+        const success = document.execCommand('copy')
+        document.body.removeChild(textArea)
+        if (!success) throw new Error('복사 권한이 없어')
+      }
+      setCopyState('복사 완료 · 다른 AI 채팅창에 붙여넣어 분석을 요청할 수 있어.')
+    } catch {
+      setCopyState('복사 실패 · 브라우저의 클립보드 권한을 확인해줘.')
     }
   }
 
@@ -197,8 +277,8 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
           value={question}
           maxLength={2000}
           rows={5}
-          onChange={(event) => setQuestion(event.target.value)}
-          placeholder="예: 현재 쿨픽스가 집 안에 있다면, 침실 수납 / 베란다 / 오래된 전자기기·서류 수납 중 어디가 가장 강한가?"
+          onChange={(event) => { setQuestion(event.target.value); invalidate() }}
+          placeholder="예: 오늘 예정된 만남은 예정대로 이루어질까, 지연될까?"
         />
       </label>
       <div className="horary-input-caption"><span>{question.length}/2000</span><span>한 번에 하나의 핵심 질문이 가장 정확해.</span></div>
@@ -206,9 +286,13 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
 
     <div className="subsection-title">질문 시각</div>
     <div className="horary-time-row">
-      <label className="field"><span>질문 시각 · 현재 기기 기준</span><input type="datetime-local" value={questionTime} onChange={(event) => setQuestionTime(event.target.value)}/></label>
-      <button className="horary-secondary-button" type="button" onClick={resetQuestionTime}><Clock3 size={16}/><span>지금</span></button>
+      <div className="horary-date-time-fields">
+        <label className="field"><span>질문 날짜</span><input aria-label="질문 날짜" type="date" value={questionTime.slice(0,10)} onChange={(event) => setQuestionDate(event.target.value)}/></label>
+        <label className="field"><span>질문 시간 · 기기 현지</span><input aria-label="질문 시간" type="time" step={60} value={questionTime.slice(11,16)} onChange={(event) => setQuestionClock(event.target.value)}/></label>
+      </div>
+      <button className="horary-secondary-button" type="button" onClick={resetQuestionTime}><Clock3 size={16}/><span>지금 시각</span></button>
     </div>
+    <p className="horary-form-hint">차트는 실제 질문을 떠올린 시각과 그때의 위치를 기준으로 계산해. 날짜·시간을 각각 수정할 수 있어.</p>
 
     <div className="subsection-title">질문 위치</div>
     <button className="horary-location-button" type="button" onClick={useCurrentLocation} disabled={locating}>
@@ -223,20 +307,55 @@ export function HoraryPrashnaPanel({ apiBase, gender }: Props) {
     {latitude && longitude && <div className="horary-location-ready"><CheckCircle2 size={15}/><span>{locationSource === 'browser_geolocation' ? `현재 위치 확인됨${accuracy !== null ? ` · 약 ${accuracy}m 정확도` : ''}` : '직접 입력한 위치 사용'}</span></div>}
 
     {error && <div className="status-banner error"><AlertTriangle size={17}/><span>{error}</span></div>}
-    <button className="primary-button horary-classify-button" type="button" disabled={loading} onClick={classify}>
-      {loading ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>}<span>{loading ? '질문 유형 확인 중…' : '질문 유형 확인'}</span>
-    </button>
-
+    <div className="horary-action-group">
+      <button className="primary-button horary-classify-button" type="button" disabled={loading} onClick={() => void submitQuestion('analyze')}>
+        {loading && activeAction === 'analyze' ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>}
+        <span>{loading && activeAction === 'analyze' ? '차트 계산 중…' : '차트 계산 · 해설 보기'}</span>
+      </button>
+      <div className="horary-action-secondary">
+        <button className="horary-secondary-button" type="button" disabled={loading} onClick={() => void submitQuestion('classify')}>
+          {loading && activeAction === 'classify' ? <LoaderCircle className="spin" size={16}/> : null}
+          <span>{loading && activeAction === 'classify' ? '유형 확인 중…' : '질문 유형만 확인'}</span>
+        </button>
+        <button className="horary-secondary-button" type="button" onClick={() => void copyPrompt()}><Copy size={16}/><span>해설 프롬프트 복사</span></button>
+      </div>
+    </div>
+    <p className="horary-form-hint">프롬프트를 복사하면 질문 시각·좌표와 계산한 근거도 포함돼. 공유할 채팅방을 확인해줘.</p>
+    {copyState && <p role="status" className="horary-copy-status">{copyState}</p>}
     {result && <section className="result-card horary-routing-result">
-      <div className="result-card-title"><span>QUESTION ROUTE</span><strong>{domainKo[result.primary_type] ?? result.primary_type}</strong></div>
-      <div className="horary-route-meta"><span>분류 신뢰도 <b>{Math.round(result.confidence * 100)}%</b></span><span>정책 <b>{result.policy_id}</b></span><span>안전 범위 <b>{result.risk_profile}</b></span></div>
+      <div className="result-card-title"><span>{result.analysis ? 'CHART EVIDENCE · 1차 해설' : '질문 분류 결과 · 차트 미계산'}</span><strong>{domainKo[result.primary_type] ?? result.primary_type}</strong></div>
+      <p className="horary-confidence-note">분류 신뢰도 {Math.round(result.confidence * 100)}%는 질문 유형에 대한 점수야. 약속이 성사될 확률이 아니야.</p>
       <div className="horary-intent-list">{result.intents.map((intent) => <span key={intent}>{intentKo[intent] ?? intent}</span>)}</div>
-      {result.options.length > 0 && <div className="horary-options"><span>선택지</span><ol>{result.options.map((option) => <li key={option}>{option}</li>)}</ol></div>}
+      {result.options.length > 0 && <div className="horary-options"><span>질문 선택지</span><ol>{result.options.map((option) => <li key={option}>{option}</li>)}</ol></div>}
       {result.subject && <p className="result-note">질문 대상: <b>{result.subject}</b></p>}
       {result.needs_clarification && result.clarification_question && <div className="status-banner subtle"><AlertTriangle size={16}/><span>{result.clarification_question}</span></div>}
-      <div className="horary-route-systems"><div><span>Western Horary</span><strong>독립 규칙 적용 예정</strong></div><div><span>Prashna D1</span><strong>독립 바바 규칙 적용 예정</strong></div></div>
-      <p className="result-note">지금 단계는 질문 라우팅까지만 연결했어. 차트 계산과 실제 판단을 아직 만들지 않기 때문에 이 화면에서는 결과를 예측하지 않아.</p>
-      <button className="horary-secondary-button" type="button" onClick={() => setResult(null)}><RotateCcw size={15}/><span>질문 수정</span></button>
+      {result.analysis ? <>
+        <div className="horary-interpretation">
+          <span className="eyebrow">독립 계산 근거를 종합한 1차 해설</span>
+          <strong>{result.analysis.synthesis.status}</strong>
+          <p>{result.analysis.synthesis.conclusion}</p>
+          <p className="horary-limit-note">{result.analysis.synthesis.timing}</p>
+        </div>
+        <div className="horary-route-systems">
+          <div><span>Western Horary · 실제 차트</span>
+            <strong>ASC {result.analysis.western.ascendant} · {result.analysis.western.house_system}</strong>
+            <p>{result.analysis.western.querent_lord} / {result.analysis.western.quesited_lord ?? '대상 하우스 미지정'} · 달 {result.analysis.western.moon}</p>
+            <p>{result.analysis.western.summary}</p>
+            {result.analysis.western.contacts.map((item,idx) => <p key={idx} className="horary-aspect-line">{item.pair}: {item.aspect} · {item.orb}° · {item.phase}</p>)}
+          </div>
+          <div><span>Prashna D1 · 독립 계산</span>
+            <strong>라그나 {result.analysis.prashna.lagna} · Lahiri</strong>
+            <p>라그나 주인성 {result.analysis.prashna.lagna_lord} · 질문 바바 {result.analysis.prashna.question_bhava ?? '미지정'} · 달 {result.analysis.prashna.moon}</p>
+            <p>{result.analysis.prashna.summary}</p>
+            {result.analysis.prashna.contacts.map((item,idx) => <p key={idx} className="horary-aspect-line">{item.body}: {item.link} · {item.house}바바</p>)}
+          </div>
+        </div>
+        <details className="horary-calc-limits"><summary>이 해설의 계산 범위와 한계</summary><p>{result.analysis.synthesis.limitations}</p></details>
+      </> : <div className="horary-classification-note">현재는 질문을 분류한 결과야. 실제 호라리·프라슈나 차트는 아직 계산하지 않았어. 위의 <b>차트 계산 · 해설 보기</b>를 눌러야 계산 근거가 나와.</div>}
+      <div className="horary-result-actions">
+        <button className="horary-secondary-button" type="button" onClick={() => void copyPrompt()}><Copy size={16}/><span>{result.analysis ? '계산 근거 + AI 해설 프롬프트 복사' : '질문 프롬프트 복사'}</span></button>
+        <button className="horary-secondary-button" type="button" onClick={() => setResult(null)}><RotateCcw size={15}/><span>질문 수정</span></button>
+      </div>
     </section>}
   </section>
 }
