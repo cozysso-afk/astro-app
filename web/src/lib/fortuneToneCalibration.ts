@@ -141,8 +141,8 @@ export function fortuneEvidenceBalance(calculation: CalculationSlice, topic: str
   const tilt=total ? (supportiveWeight-challengingWeight)/total : 0
   // 3:2 is a *slight* tilt, 1:1 remains balanced. No probability claim.
   const dominantDirection=total===0 ? 'neutral'
-    : tilt>=0.2 ? 'supportive'
-      : tilt<=-0.2 ? 'challenging' : 'balanced'
+    : tilt>=0.15 ? 'supportive'
+      : tilt<=-0.15 ? 'challenging' : 'balanced'
   return {direction,hasSupportiveEvidence,hasChallengingEvidence,supportiveWeight,challengingWeight,dominantDirection}
 }
 export function fortuneToneAssessment(calculation:CalculationSlice,topic:string):FortuneToneAssessment {
