@@ -271,7 +271,7 @@ export function buildDeterministicTopicAnalysis(payload:any){
     const va=topicVerb(topic);
     const groundedAction = INVESTMENT_TOPICS.has(topic) || !readable.summaries.length
       ? va.action
-      : `${va.action} 이 기간에 연결된 근거는 ${readable.summaries[0]}야. 실제 행동이나 연락 여부는 별도 기록과 대조해.`;
+      : `${va.action} 이 기간에 연결된 계산 근거: ${readable.summaries[0]}. 실제 행동이나 연락 여부는 별도 기록과 대조해.`;
     // Repeated observations of one configuration are not independent corroboration.
     const independent=new Set(readable.rows.filter((row:any)=>/daily_actual|intraday_evidence/.test(String(row?.scope??""))||/^W:(daily|detail):/.test(String(row?.id??""))).map((row:any)=>String(row?.text??row?.label??"").replace(/\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|orb\s*[\d.]+°?/gi,"").replace(/\s+/g," ").trim()).filter(Boolean));
     const confidence=independent.size>=2&&refs.length>=3?"높음":readable.rows.length>=1?"보통":"낮음";
