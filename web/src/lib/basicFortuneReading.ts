@@ -1,6 +1,6 @@
 import type { FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
-import { fortunePresentationTone } from './fortuneToneCalibration.ts'
+import { fortuneEvidenceSnapshot, fortunePresentationTone } from './fortuneToneCalibration.ts'
 
 export type BasicFortuneTone = 'good' | 'steady' | 'caution'
 export type BasicFortuneRow = {
@@ -96,13 +96,18 @@ function strongestEvidence(calculation: IntegratedApiResponse, topic: string): F
 }
 
 function evidenceReason(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat) {
-  const evidence = strongestEvidence(calculation, topic)
-  const scoreSentence = `선택 기간의 ${topic} 평균은 ${stat.average.toFixed(0)}점, 판정은 ${stat.band}으로 잡혔어. 이 점수는 사건이 일어날 확률이 아니라 같은 기간 안에서 이 분야가 상대적으로 얼마나 활성화되는지를 비교한 값이야.`
-  if (!evidence?.transit || !evidence?.target || !evidence?.aspect) return scoreSentence
-  const transit = PLANETS[evidence.transit] ?? evidence.transit
-  const target = PLANETS[evidence.target] ?? evidence.target
-  const aspect = ASPECTS[evidence.aspect] ?? evidence.aspect
-  return `${scoreSentence} 가장 크게 반영된 근거 중 하나는 운행 중인 ${transit}와 출생 차트의 ${target} 사이의 ${aspect} 계산이야. 이 한 가지 배치만으로 결과를 단정하지 않고 다른 계산값과 함께 반영했어.`
+  const scoreSentence = `선택 기간의 ${topic} 평균은 ${stat.average.toFixed(0)}점, 판정은 ${stat.band}으로 잡혔어. 이 점수는 사건 확률이 아니라 분야별 상대 활성도야.`
+  const snapshot = fortuneEvidenceSnapshot(calculation, topic)
+  if (snapshot.support && snapshot.challenge) {
+    const weight = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 더 큰 편이야.'
+      : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 더 큰 편이야.'
+        : '긍정·부정 근거가 비슷한 수준이라 방향을 하나로 확정하기 어려워.'
+    return `${scoreSentence} 도움: ${snapshot.support}. 부담: ${snapshot.challenge}. ${weight}`
+  }
+  if (snapshot.support || snapshot.challenge) {
+    return `${scoreSentence} 주요 ${snapshot.support ? '도움' : '부담'} 근거: ${snapshot.support ?? snapshot.challenge}. 한 가지 배치만으로 사건을 단정하지 않아.`
+  }
+  return scoreSentence
 }
 
 function timingFor(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat) {
@@ -120,6 +125,12 @@ function rowFor(calculation: IntegratedApiResponse, topic: string): BasicFortune
   if (!stat || !Number.isFinite(stat.average)) return null
   const tone = toneFor(calculation, topic, stat)
   const guide = TOPIC_GUIDE[topic] ?? { nuance:'이 분야는 점수 하나보다 실제 상황과 함께 읽어야 해.', practice:'지금 할 수 있는 행동을 하나 정해서 구체적으로 확인해.', caution:'한 번의 신호만으로 결과를 확정하지 마.' }
+  const evidence = fortuneEvidenceSnapshot(calculation, topic)
+  const activePractice = evidence.support && evidence.challenge
+    ? `실행에 힘을 보태는 ${evidence.support}과 부담을 나타내는 ${evidence.challenge}를 구분하고 실제 반응을 기록해.`
+    : evidence.support ? `${evidence.support}과 연결된 작은 실행 결과를 확인해.` : ''
+  const activeCaution = evidence.challenge
+    ? `부담 근거 ${evidence.challenge}만으로 부정적인 사건을 확정하지는 마.` : ''
   return {
     topic,
     score: stat.average,
@@ -128,8 +139,8 @@ function rowFor(calculation: IntegratedApiResponse, topic: string): BasicFortune
     meaning: meaningFor(topic, tone),
     nuance: guide.nuance,
     why: evidenceReason(calculation, topic, stat),
-    practice: guide.practice,
-    caution: guide.caution,
+    practice: activePractice ? `${guide.practice} ${activePractice}` : guide.practice,
+    caution: activeCaution ? `${guide.caution} ${activeCaution}` : guide.caution,
     timing: timingFor(calculation, topic, stat),
   }
 }
@@ -152,7 +163,17 @@ export function buildBasicFortuneReading(calculation: IntegratedApiResponse, per
   if (best && watch) headline = `${when}: ${best.topic}은 ${best.meaning} ${watch.topic}은 ${watch.meaning}`
   else if (best) headline = `${when}: ${best.topic}은 ${best.meaning}`
   else if (watch) headline = `${when}: ${watch.topic}은 ${watch.meaning}`
-  else if (field?.label) headline = `${when} ${field.label}은 크게 밀어붙이기보다 계획한 범위 안에서 움직이면 무난해.`
+  else {
+    const grounded = steady.map(row => ({row, evidence: fortuneEvidenceSnapshot(calculation, row.topic)}))
+      .find(item => item.evidence.support || item.evidence.challenge)
+    if (grounded) {
+      const {row, evidence} = grounded
+      const both = evidence.support && evidence.challenge
+      headline = both
+        ? `${when} ${row.topic}은 도움 근거 ${evidence.support}과 부담 근거 ${evidence.challenge}가 동시에 보여. 어느 한쪽으로 결과를 단정하기 어려워.`
+        : `${when} ${row.topic}에서는 ${evidence.support ?? evidence.challenge} 근거가 확인돼. 사건 확정은 아니야.`
+    } else if (field?.label) headline = `${when} ${field.label}은 크게 밀어붙이기보다 계획한 범위 안에서 움직이면 무난해.`
+  }
   const summary = field?.label
     ? `${field.label} 계산값을 바로 생활 언어로 풀었어. 아래에서 결론뿐 아니라 이유, 현실에서의 활용법, 주의할 점과 시기까지 이어서 볼 수 있어.`
     : '계산된 분야별 흐름을 바로 생활 언어로 풀었어. 아래에서 결론뿐 아니라 이유, 현실에서의 활용법, 주의할 점과 시기까지 이어서 볼 수 있어.'
