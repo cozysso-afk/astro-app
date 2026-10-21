@@ -79,7 +79,7 @@ test('fallback keeps model/fallback_from and cumulative usage',async()=>{
 });
 test('rolling cost guard blocks new generation with current limits',async()=>{
   const h=harness({count:6}),r=await h.run();assert.equal(r.body.cost_guard_blocked,true);assert.equal(r.body.rolling_job_guard,true);assert.equal(h.requests.length,0);assert.equal(h.inserts,0);
-  for(const literal of ['MAX_USER_NEW_JOBS_10M=6','MAX_USER_NEW_JOBS_24H=20','MAX_GLOBAL_NEW_JOBS_10M=18','MAX_GLOBAL_NEW_JOBS_24H=60','MAX_GEMINI_CALLS=2','MAX_PROMPT_BYTES=180000,MAX_AI_JOB_ESTIMATED_KRW=300'])assert(source.includes(literal));
+  for(const literal of ['MAX_USER_NEW_JOBS_10M=6','MAX_USER_NEW_JOBS_24H=20','MAX_GLOBAL_NEW_JOBS_10M=18','MAX_GLOBAL_NEW_JOBS_24H=60','MAX_GEMINI_CALLS=2','MAX_PROMPT_BYTES=180000','MAX_AI_JOB_ESTIMATED_KRW=300'])assert(source.includes(literal));
 });
 for(const success of [true,false])test(`${success?'done':'failed'} final update errors and rejections never claim success or leak`,async()=>{
   for(const flag of ['finalizeError','finalizeThrows','finalizeEmpty']){
