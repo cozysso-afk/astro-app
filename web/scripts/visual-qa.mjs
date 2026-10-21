@@ -47,8 +47,8 @@ try {
     })
 
     const systemGrid = document.querySelector('[data-qa-block="systems"] .system-overview-grid')
-    const reunionMeaning = document.querySelector('.reunion-v3-meaning')
-    const situations = document.querySelector('.reunion-v3-situations')
+    const reunionMeaning = document.querySelector('.reunion-v5-stages')
+    const situations = document.querySelector('.reunion-v5-directions')
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       systemDisplay: systemGrid ? getComputedStyle(systemGrid).display : 'missing',
@@ -56,9 +56,9 @@ try {
       systemCards: slackFor('[data-qa-block="systems"] .system-overview-grid > article'),
       reunionDisplay: reunionMeaning ? getComputedStyle(reunionMeaning).display : 'missing',
       reunionAlignItems: reunionMeaning ? getComputedStyle(reunionMeaning).alignItems : 'missing',
-      reunionCards: slackFor('.reunion-v3-meaning > .reunion-v3-card'),
+      reunionCards: slackFor('.reunion-v5-stages > article'),
       situationsDisplay: situations ? getComputedStyle(situations).display : 'missing',
-      situationCount: document.querySelectorAll('.reunion-v3-situation').length,
+      situationCount: document.querySelectorAll('.reunion-v5-answer').length,
       reunionOverflow: document.querySelector('[data-qa-block="reunion"]') ? Math.ceil(document.querySelector('[data-qa-block="reunion"]').scrollWidth-document.querySelector('[data-qa-block="reunion"]').clientWidth) : 999,
       exportSystemCards: document.querySelectorAll('[data-qa-block="export-source"] .reading-export-system-v7').length,
     }
@@ -70,7 +70,7 @@ try {
 
   assert(diagnostics.viewport.width === 430, `unexpected QA viewport: ${diagnostics.viewport.width}`)
   assert(diagnostics.systemCards.length === 3, 'system overview fixture did not render 3 cards')
-  assert(diagnostics.reunionCards.length === 2, 'reunion meaning fixture did not render 2 cards')
+  assert(diagnostics.reunionCards.length === 4, 'production reunion component did not render 4 stages')
   assert(diagnostics.systemAlignItems === 'flex-start', `system cards are stretching: align-items=${diagnostics.systemAlignItems}`)
   assert(diagnostics.reunionDisplay === 'grid', `reunion meaning cards must stay vertical on mobile, got ${diagnostics.reunionDisplay}`)
   assert(Math.max(...diagnostics.systemCards.map(card => Math.abs(card.slack))) < 32, `system card has excessive empty tail: ${JSON.stringify(diagnostics.systemCards)}`)
@@ -92,6 +92,27 @@ try {
   await quality.locator('summary').filter({hasText:/시기 .* 더 보기/}).click()
   assert((await quality.innerText()).includes('예정 구간'), 'upcoming window missing')
   await quality.screenshot({path:path.join(outDir, 'interpretation-v2-mobile.png')})
+
+  const reunion = page.locator('[data-qa-block="reunion"]')
+  const reunionText = await reunion.innerText()
+  assert(reunionText.includes('수신 · 상대 → 나') && reunionText.includes('발신 · 나 → 상대'), 'contact directions missing')
+  assert(reunionText.includes('불가능하다는 뜻은 아니에요'), 'missing timing incorrectly implies impossible reunion')
+  assert(!reunionText.split('\\n').some(line=>line.trim()==='0'), 'stray zero leaked into reading')
+  const mobileWidths = []
+  for (const width of [320, 393, 430]) {
+    await page.setViewportSize({width,height:932})
+    const size = await reunion.evaluate(el=>{
+      const title=el.querySelector('.reunion-v5-answer h3')
+      const body=el.querySelector('.reunion-v5-answer p')
+      return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,title:parseFloat(getComputedStyle(title).fontSize),body:parseFloat(getComputedStyle(body).fontSize)}
+    })
+    assert(size.overflow<=1, 'reunion horizontal overflow: '+JSON.stringify(size))
+    assert(size.title>=17 && size.title<=24 && size.body>=14 && size.body<=17, 'reunion font sizes out of range: '+JSON.stringify(size))
+    mobileWidths.push(size)
+    await reunion.screenshot({path:path.join(outDir,'reunion-mobile-'+width+'.png')})
+  }
+  diagnostics.mobileWidths = mobileWidths
+  await page.setViewportSize({width:430,height:932})
 
   await page.screenshot({ path: path.join(outDir, 'mobile-full.png'), fullPage: true })
   await page.locator('[data-qa-block="systems"]').screenshot({ path: path.join(outDir, 'systems-mobile.png') })
