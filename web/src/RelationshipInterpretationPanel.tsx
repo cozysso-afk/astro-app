@@ -205,7 +205,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
   return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
-    <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>
+    {!(reunion && hierarchyData) && <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>}
     <div className="reading-export-toolbar" data-reading-export-ignore="true">
       <button type="button" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>
         {imageExporting ? <LoaderCircle className="reading-export-spinner" size={17} aria-hidden="true"/> : <ImageDown size={17} aria-hidden="true"/>}
@@ -284,6 +284,6 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     </details>
 
     <p className="reading-safety-note">{partnerExact ? '계산된 관계 패턴이야. 실제 감정이나 관계의 결과를 확정하지 않아.' : '입력한 생시는 달·진행층·사주 시주 같은 잠정 계산에 활용하고, exact 검증이 필요한 요소는 정확한 값처럼 승격하지 않아. 실제 감정이나 관계의 결과를 확정하지 않아.'}</p>
-    <details className="relationship-technical"><summary>기술 근거 자세히 보기</summary>{technicalDetails}<div className="technical-aspects"><h4>관계 접점 원자료</h4>{view.ranked.map((a, i) => <p key={i}>{formatAspect(a)} · orb {a.orb.toFixed(2)}°</p>)}</div>{ai?.ok && ai.data && <div className="technical-ai"><h4>추가 해설 원문</h4><pre>{JSON.stringify(ai.data, null, 2)}</pre><h4>생성 정보</h4><pre>{JSON.stringify(ai.usage ?? {}, null, 2)}</pre></div>}</details>
+    <details className="relationship-technical"><summary>기술 근거 자세히 보기</summary>{technicalDetails}<div className="technical-aspects"><h4>관계 접점 원자료</h4>{view.ranked.map((a, i) => <p key={i}>{formatAspect(a)} · orb {a.orb.toFixed(2)}°</p>)}</div></details>
   </section>
 }
