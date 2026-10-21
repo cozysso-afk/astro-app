@@ -80,9 +80,9 @@ test('reunion UI distinguishes availability states instead of collapsing no-cand
     "현재 활성",
   ]) assert.ok(panel.includes(marker),`missing state marker: ${marker}`)
   assert.match(panel,/candidateCount === 0/)
-  assert.match(panel,/contact\.status/)
-  assert.match(panel,/지난 활성 구간/)
-  assert.match(panel,/사후 비교용이고 미래 예측으로 재사용하지 않아/)
+  assert.match(panel,/statusFor\(row\)/)
+  assert.match(panel,/지난 시기와 실제 기록 비교/)
+  assert.match(panel,/예측 적중률을 뜻하지 않아요/)
 })
 
 test('technical causal prose is retained when plain-language sentences do not fill the requested slots', () => {
@@ -93,6 +93,6 @@ test('technical causal prose is retained when plain-language sentences do not fi
 })
 
 test('reunion authored cache is invalidated for the temporal evidence contract', () => {
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.1-observation-history"/)
-  assert.match(cache,/relationship-v13\.1-observation-history-v1-consultation-depth-v3/)
+  assert.match(edge,/REUNION_VERSION="relationship-v13\.2-readable"/)
+  assert.match(cache,/relationship-v13\.2-readable-v1-consultation-depth-v3/)
 })

@@ -33,8 +33,8 @@ test('past analysis reuses the existing reunion endpoint as an independent bound
   assert.match(app,/fetchAuthorizedReunionRelationship/)
   assert.match(app,/start_date:reunionHistoryStart,end_date:reunionHistoryEnd/)
   assert.match(app,/과거 분석 범위는 한 번에 1~365일/)
-  assert.match(panel,/계산 완료 · 공개 근거 없음/)
-  assert.match(panel,/미계산/)
+  assert.match(panel,/선택한 과거 기간을 계산했지만 비교할 시기 신호를 찾지 못했어요/)
+  assert.match(panel,/과거 분석을 실행하면 기록과 비교할 수 있어요/)
 })
 
 test('event fixture preserves match mismatch no-evidence and uncalculated outcomes',()=>{
@@ -51,9 +51,9 @@ test('event fixture preserves match mismatch no-evidence and uncalculated outcom
 })
 
 test('initiative comparison remains visible but is separate from observed first contact',()=>{
-  assert.match(panel,/방향별 상대 활성도/)
-  assert.match(panel,/실제로 누가 먼저 연락할지를 예측하지 않아/)
-  assert.match(panel,/계산값과 별도 기록/)
+  assert.match(panel,/받는 연락 · 보내는 연락/)
+  assert.match(panel,/차트 활성도만으로 수신·발신 행동이나 먼저 연락할 사람을 정할 수 없어요/)
+  assert.match(panel,/입력한 실제 첫 연락/)
   assert.equal(fixture.expected.actual_initiator_is_observation,true)
 })
 

@@ -328,7 +328,7 @@ function evidenceLabel(row: Aspect) {
   const a = String(row.a ?? '')
   const b = String(row.b ?? '')
   const aspect = String(row.aspect ?? '')
-  const orb = Number.isFinite(Number(row.orb)) ? `${Number(row.orb).toFixed(2)}°` : ''
+  const orb = typeof row.orb === 'number' && Number.isFinite(row.orb) ? (row.orb < 0.01 ? '<0.01°' : `${row.orb.toFixed(2)}°`) : '오차 정보 없음'
   return [a,aspect,b,orb].filter(Boolean).join(' · ')
 }
 
@@ -384,88 +384,84 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const comparisons = compareObservedEvents(observation, historyHierarchyData ?? null, historyCalculated)
   const actualInitiator = observation.initiator === 'counterpart' ? '상대가 먼저' : observation.initiator === 'user' ? '내가 먼저' : observation.initiator === 'mutual' ? '서로 비슷한 시점' : observation.initiator === 'unknown' ? '확인 어려움' : ''
 
-  return <section className="reading-section reunion-hierarchy reunion-ui-v3 reunion-ui-v4">
-    <header className="reunion-result-meta" data-reading-export-tone="date"><small>기준일</small><strong>{hierarchyData.as_of_date}</strong></header>
-    {!valid ? <p role="alert">계산 검증을 통과하지 못해서 현재·미래 해설을 보류했어.</p> : <>
-      <section className="reunion-v3-hero reunion-v4-answer" data-reading-export-tone="love">
-        <span>이번 조회의 답</span><h3>{answerTitle}</h3><p>{answerText}</p>
+  const statusFor = (row: StageVerdict) => {
+    const stage = hierarchyData.stages[row.key]
+    if (observedLevel && REUNION_STAGE_ORDER.indexOf(row.key as typeof observedLevel) <= REUNION_STAGE_ORDER.indexOf(observedLevel)) return '이미 확인됨'
+    if (!stage || stage.candidate_count == null) return '정보 부족'
+    if (hierarchyData.current_windows.some(w => w.stage === row.key)) return '현재 신호 있음'
+    if (stage.candidate_count === 0) return '뚜렷한 시기 없음'
+    return strengthFromActivation(stage.activation) === '정보 부족' ? '시기 신호 있음' : strengthFromActivation(stage.activation)
+  }
+  const nextRow = nextObserved ? stageRows.find(row => row.key === nextObserved) : null
+  const nextSummary = nextRow
+    ? statusFor(nextRow) === '뚜렷한 시기 없음'
+      ? `이번 조회 기간에는 ${nextRow.label}을 뒷받침하는 뚜렷한 시기를 찾지 못했어요. 불가능하다는 뜻은 아니에요.`
+      : `다음으로 살펴볼 것은 ${nextRow.label}이에요. 계산 신호는 ‘${statusFor(nextRow)}’으로 나타나요.`
+    : '다시 합의한 관계가 이어지는지, 이전 문제를 함께 풀어가는지 살펴보세요.'
+  const stateTitle = observed.title.replace('관측 사실 · ', '')
+  const safeNarrative = (value?: string | null) => sentenceList(value)
+    .filter(row => !TECHNICAL_RE.test(row) && !/관문|후보|TOP|완전히 닫|통과 점수|활성도|검증|3일 이상/.test(row))
+    .slice(0, 2).join(' ')
+  const futureEvents = events.filter(event => {
+    const date = event.date.slice(0, 10)
+    const end = event.date.slice(-10)
+    return (end >= hierarchyData.as_of_date || date >= hierarchyData.as_of_date)
+  })
+  return <section className="reading-section reunion-hierarchy reunion-ui-v5">
+    <header className="reunion-result-meta"><span>기준일 {hierarchyData.as_of_date}</span></header>
+    {!valid ? <p role="alert">계산 확인이 필요해요. 다시 계산한 뒤 결과를 확인해 주세요.</p> : <>
+      <section className="reunion-v5-answer">
+        <span>재회 흐름 한눈에</span>
+        <h3>{observation.state ? stateTitle : '현재 관계 상태를 알려주세요'}</h3>
+        <p>{observation.state ? nextSummary : '실제 연락·만남 여부를 입력하면 지금 단계에 맞춰 읽을 수 있어요.'}</p>
       </section>
-
-      <section className="reunion-v4-stage-board">
-        <div className="period-ai-section-title"><span>재회 단계 한눈에</span><strong>생각·연락·만남·재구축은 단계별로 따로 봐</strong></div>
-        <div className="reunion-v4-stage-grid">{stageRows.map((row,index) => {
-          const stage=hierarchyData.stages?.[row.key]
-          const activation=typeof stage?.activation==='number'?Math.round(stage.activation):null
-          const isObserved=observedLevel===row.key
-          const isNext=nextObserved===row.key
-          const prior=index>0?stageRows[index-1]:null
-          return <article className="reunion-v3-card reunion-v4-stage-card" key={row.key} data-reading-export-tone={row.key === 'relationship_rebuilding' ? 'favorable' : row.key === 'contact_recontact' ? 'love' : 'system'}>
-          <small>{row.label}{isObserved?' · 관측 완료':isNext?' · 다음 미확인 단계':''}</small><b>{row.status}</b><p>{row.text}</p><dl className="reunion-stage-facts"><div><dt>계산 활성도</dt><dd>{activation==null?'미산출':activation}</dd></div><div><dt>근거</dt><dd>{stage?'계산됨':'미계산'}</dd></div><div><dt>이전 단계와 차이</dt><dd>{prior?`${prior.label}과 별도 판정`:'첫 배경 단계'}</dd></div><div><dt>다음 연결</dt><dd>{index<REUNION_STAGE_ORDER.length-1?'별도 근거 필요':'지속 행동은 계산 밖 관측'}</dd></div></dl>
-        </article>})}</div>
-      </section>
-
-      <section className="reunion-v3-hero reunion-v4-current" data-reading-export-tone="system">
-        <span>현재 단계</span><h3>{observed.title}</h3><p>{observation.state?observed.text:calculatedCurrentState(hierarchyData)}</p>
-      </section>
-
-      {(pastContext.length > 0 || currentContext.length > 0) && <section className="reunion-v3-temporal-context">
-        <div className="period-ai-section-title"><span>과거 · 현재 비교</span><strong>지난 구간은 사후 비교용이고 미래 예측으로 재사용하지 않아</strong></div>
-        <div className="reunion-v3-grid">
-          {!!pastContext.length && <article className="reunion-v3-card" data-reading-export-tone="date"><small>지난 활성 구간</small><h4>실제 기록과 대조할 사후 비교</h4><ul>{pastContext.map((row,index)=><li key={`past:${row.date}:${index}`}>{windowSummary(row)}</li>)}</ul></article>}
-          {!!currentContext.length && <article className="reunion-v3-card" data-reading-export-tone="system"><small>현재 활성 구간</small><h4>기준일에 실제로 걸려 있는 단계</h4><ul>{currentContext.map((row,index)=><li key={`current:${row.date}:${index}`}>{windowSummary(row)}</li>)}</ul></article>}
-        </div>
-      </section>}
-
-      <div className="reunion-v3-grid">
-        <section className="reunion-v3-card" data-reading-export-tone={contact.band === '낮음' ? 'caution' : 'love'}>
-          <small>연락 흐름</small><h4>연락 자체는 얼마나 열려 있나</h4><b>{contact.status}</b><p>{contactText}</p>{contact.first && <time>먼저 볼 미래 시기 · {contact.first}</time>}
-        </section>
-        <section className="reunion-v3-card" data-reading-export-tone="love">
-          <small>방향별 상대 활성도</small><h4>수신·발신 계산값 비교</h4><b>{initiative.label}</b><p>{initiativeText} 이 비교는 실제로 누가 먼저 연락할지를 예측하지 않아.</p>{actualInitiator&&<p className="reunion-observed-fact"><strong>관측된 실제 선연락</strong> {actualInitiator} · 계산값과 별도 기록</p>}
-        </section>
+      <div className="reunion-v5-stages" aria-label="재회 단계별 흐름">
+        {stageRows.map(row => <article key={row.key}>
+          <span>{row.label}</span><strong>{statusFor(row)}</strong>
+        </article>)}
       </div>
-
-      <section className="reunion-v3-history" data-reading-export-tone="date">
-        <div className="period-ai-section-title"><span>선택한 과거 기간</span><strong>실제 기록과 계산 신호를 사후 대조</strong></div>
-        {!historyCalculated&&<p className="reunion-history-empty"><b>미계산</b> 과거 분석 기간을 선택해 별도 계산하면 지난 단계별 신호와 실제 기록을 대조해.</p>}
-        {historyCalculated&&historyHierarchyData&&<><p className="reunion-history-range-label">계산 범위 · {historyHierarchyData.selection_policy?.requested_range?.start ?? '확인 불가'} ~ {historyHierarchyData.selection_policy?.requested_range?.end ?? '확인 불가'}</p>{historyRows.length?<div className="reunion-history-list">{historyRows.map((row,index)=><article key={`${row.stage}:${row.date}:${index}`}><time>{row.start===row.end?row.start:`${row.start} ~ ${row.end}`}</time><b>{STAGE_LABEL[row.stage]??row.label}</b><span>활성도 {Math.round(row.final)} · 지난 구간</span></article>)}</div>:<p className="reunion-history-empty"><b>계산 완료 · 공개 근거 없음</b> 선택 기간은 계산했지만 단계별 공개 후보를 찾지 못했어. “과거 분석 미실행”과는 다른 상태야.</p>}</>}
-        {!!comparisons.length&&<div className="reunion-history-comparisons">{comparisons.map(row=><article key={`${row.kind}:${row.date}`} data-status={row.status}><b>{row.label} · {row.date}</b><span>{row.status==='match'?'일치':row.status==='mismatch'?'불일치':row.status==='no_evidence'?'근거 없음':'미계산'}</span><p>{row.detail}</p></article>)}</div>}
+      <section className="reunion-v5-section">
+        <h4>받는 연락 · 보내는 연락</h4>
+        <div className="reunion-v5-directions">
+          <article><b>수신 · 상대 → 나</b><p>상대가 먼저 연락할지는 현재 계산으로 판단하기 어려워요.</p></article>
+          <article><b>발신 · 나 → 상대</b><p>내가 먼저 연락했을 때 답장이 올지, 대화가 잘 풀릴지는 별도 판단 근거가 없어요.</p></article>
+        </div>
+        {actualInitiator ? <p className="reunion-v5-note">입력한 실제 첫 연락: {actualInitiator}</p> : null}
+        {contactAlreadyObserved ? <p>연락은 이미 재개됐어요. 대화 지속 여부를 별도로 예측하는 점수는 없으니, 답장이 오가는지와 구체적인 만남 제안을 확인하세요.</p> : <p>{nextSummary}</p>}
       </section>
-
-      <section className="reunion-v3-card reunion-v3-change" data-reading-export-tone="favorable">
-        <small>행동 변화</small><h4>상대가 예전과 다르게 움직일 여지가 있나</h4><b>{change.label}</b><p>{behaviorText}</p>
+      <section className="reunion-v5-section">
+        <h4>앞으로 주목할 시기</h4>
+        {futureEvents.length > 0 ? <ReadingTimeline events={futureEvents} context={{now:new Date(hierarchyData.as_of_date+'T12:00:00+09:00')}}/> : <p>현재 공개된 계산 결과에는 강조할 미래 시기가 없어요.</p>}
+        <p className="reunion-v5-note">표시된 날짜는 해당 단계의 계산 신호가 있는 시기예요.</p>
       </section>
-
-      <section className="reunion-v3-card reunion-v3-next" data-reading-export-tone="system">
-        <small>다음 확인</small><h4>그래서 지금 무엇을 보면 되나</h4><b>{next.label}</b><p>{readerSentences(consultation?.meeting_gate,2) || next.text}</p>
-        {!!nextUp.length && <><strong>판단을 올릴 조건</strong><ul>{nextUp.map((item,index)=><li key={`up:${index}`}>{item}</li>)}</ul></>}
-        {!!down.length && <><strong>다시 낮춰 볼 조건</strong><ul>{down.map((item,index)=><li key={`down:${index}`}>{item}</li>)}</ul></>}
+      <section className="reunion-v5-section">
+        <h4>지금 확인할 것</h4>
+        <p>{contactAlreadyObserved ? meetingAlreadyObserved ? '만난 뒤에도 연락과 약속이 이어지는지, 관계를 어떻게 이어갈지 서로 합의하는지 살펴보세요.' : '대화가 이어지고, 날짜와 장소를 정한 만남 제안이 실제로 오가는지 살펴보세요.' : '연락이 실제로 닿는지부터 확인하세요. 생각이 난다는 신호만으로 상대의 행동을 단정할 수는 없어요.'}</p>
       </section>
-
-      {!!events.length && <section className="reunion-v3-timing" data-reading-export-tone="date"><div className="period-ai-section-title"><span>기억할 시기</span><strong>같은 단계 날짜는 반복하지 않아</strong></div><ReadingTimeline events={events}/></section>}
-
-      {(why || repeat || repeatPatterns.length || rebuildConditions.length) && <section className="reunion-v3-meaning">
-        {why && <article className="reunion-v3-card"><h4>왜 다시 생각날 수 있나</h4><p>{why}</p></article>}
-        <article className="reunion-v3-card"><h4>재회를 판단할 현실 기준</h4><p>{readerSentences(reunionV2?.rebuild?.conclusion,2) || `연락보다 만남, 이전 문제를 다르게 다루는 대화, 지속 행동이 붙는지가 중요해. ${sustainabilityText}`}</p>
-          {!!rebuildConditions.length && <ul>{rebuildConditions.map((item,index) => <li key={index}>{item}</li>)}</ul>}
-        </article>
-        {(repeat || repeatPatterns.length) && <article className="reunion-v3-card" data-reading-export-tone="caution"><h4>다시 만나면 반복될 수 있는 문제</h4>{repeat && <p>{repeat}</p>}{!!repeatPatterns.length && <ul>{repeatPatterns.map((item,index) => <li key={index}>{item}</li>)}</ul>}</article>}
-      </section>}
-
-      <section className="reunion-v3-situations">
-        <div className="period-ai-section-title"><span>내 현재 상황에 맞춰 읽기</span><strong>선택한 한 상태만 적용하고 다른 가정을 함께 붙이지 않아</strong></div>
-        <article className="reunion-v3-situation"><strong>{guide.title}</strong><p>{guide.text}</p></article>
-      </section>
-
-      <p className="reading-safety-note reunion-single-disclaimer">이 결과는 연락·만남·관계 재구축 단계를 서로 분리해서 보는 상대적 신호야. 실제 행동이나 상대의 속마음을 확정하지 않아.</p>
-
-      <details className="reading-more reunion-calculation-basis" data-reading-export-ignore="true"><summary>계산 근거 자세히 보기</summary>
-        <p>{hierarchyData.score_meaning}</p>
-        <div className="reunion-stage-activation-list">{Object.entries(hierarchyData.stages).map(([stageKey,stage]) => <p key={stageKey}><b>{STAGE_LABEL[stageKey] ?? stage.label}</b> {stage.activation == null ? '—' : Math.round(stage.activation)}</p>)}</div>
-        {!!evidenceRows.length && <div className="reunion-local-evidence-grid">{evidenceRows.map((row,index) => <article className="relationship-pattern reunion-local-evidence" key={`${row.a}:${row.aspect}:${row.b}:${index}`}><strong>{evidenceLabel(row)}</strong></article>)}</div>}
-        {reunionV2?.precision_note && <p>{sentences(reunionV2.precision_note,2)}</p>}
-        {hierarchyData.limitations.map(item => <p key={item}>{item}</p>)}
+      {reunionV2 ? <section className="reunion-v5-section">
+        <h4>관계를 이해하는 해설</h4>
+        {safeNarrative(reunionV2.why_reconnect?.interpretation) ? <p>{safeNarrative(reunionV2.why_reconnect.interpretation)}</p> : null}
+        {safeNarrative(reunionV2.repeat_risks?.conclusion) ? <p><b>반복되기 쉬운 문제</b><br/>{safeNarrative(reunionV2.repeat_risks.conclusion)}</p> : null}
+        <details><summary>관계 조언 더 보기</summary>
+          {rebuildConditions.map((item,index)=><p key={index}>{safeNarrative(item)}</p>)}
+          {repeatPatterns.map((item,index)=><p key={index}>{safeNarrative(item)}</p>)}
+        </details>
+      </section> : null}
+      <details className="reunion-v5-details"><summary>지난 시기와 실제 기록 비교</summary>
+        <p>이미 지난 날짜의 비교 자료예요. 예측 적중률을 뜻하지 않아요.</p>
+        {!historyCalculated ? <p>과거 분석을 실행하면 기록과 비교할 수 있어요.</p> : null}
+        {historyCalculated && historyRows.length === 0 ? <p>선택한 과거 기간을 계산했지만 비교할 시기 신호를 찾지 못했어요.</p> : null}
+        {historyRows.map((row,index)=><p key={index}><time>{row.start} ~ {row.end}</time> · {STAGE_LABEL[row.stage] ?? row.label}</p>)}
+        {comparisons.map(row=><p key={row.kind+row.date}>{row.label} · {row.date}: {row.detail}</p>)}
       </details>
+      <details className="reunion-v5-details"><summary>계산 근거와 점수 보기</summary>
+        <p>점수는 계산 신호의 상대적 강도이며 연락·만남·재회 확률이 아니에요.</p>
+        {stageRows.map(row=><p key={row.key}>{row.label}: {hierarchyData.stages[row.key]?.activation == null ? '점수 없음' : Math.round(hierarchyData.stages[row.key].activation!)}</p>)}
+        {directionRows.filter(row=>row.kind!=='reconnection').map(row=><p key={row.kind}>{row.kind==='incoming'?'상대 차트':'내 차트'} 활성도: {rowScore(row) ?? '정보 없음'}</p>)}
+        <p>차트 활성도만으로 수신·발신 행동이나 먼저 연락할 사람을 정할 수 없어요.</p>
+        {evidenceRows.map((row,index)=><p key={index}>{evidenceLabel(row)} <small>· 각도 오차</small></p>)}
+      </details>
+      <p className="reunion-v5-note">실제 연락·만남 기록과 계산 해석을 구분해 읽어주세요.</p>
     </>}
   </section>
 }
