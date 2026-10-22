@@ -1,4 +1,4 @@
-export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.5-structured-editorial-v6'
+export const PERIOD_NARRATIVE_VERSION = 'fortune-period-narrative-v23.6-daily-editorial-v7'
 
 export type PeriodKind = 'day' | 'week' | 'month' | 'annual'
 
@@ -238,6 +238,12 @@ export function buildPeriodNarrativeContext(payload: any) {
 
 function editorialV4Instruction(kind: PeriodKind) {
   const periodWord = kind === 'day' ? '오늘' : kind === 'week' ? '이번 주' : kind === 'month' ? '이번 달' : '올해'
+  const dayEditorial = kind === 'day' ? `
+- 오늘 headline은 계산법·점수 주의문이 아니라 사용자가 바로 이해할 수 있는 한 문장 결론으로 쓴다. 가장 두드러진 생활 장면과 그 장면에서 취할 태도가 드러나야 한다.
+- 오늘 overall.summary는 4~6문장으로 쓴다. 첫 문장은 하루 전체 결론, 다음 문장들은 서로 다른 두 생활 분야의 구체 장면, 마지막 문장은 오늘 바로 할 행동으로 구성한다.
+- "점수는 확률이 아니다", "흐름을 확인해", "신중해야 한다" 같은 주의문으로 headline이나 첫 문단을 시작하지 않는다. 필요한 한계는 구체 장면을 먼저 설명한 뒤 짧게 붙인다.
+- 현실 장면은 근거가 허용하는 범위에서 업무 요청·답변·약속·결제·공부 분량·휴식처럼 눈으로 확인 가능한 행동으로 쓴다. 승진·합격·재회처럼 근거에 없는 결과를 만들지 않는다.
+- 같은 결론을 headline, overall.summary, topic verdict에 말만 바꿔 반복하지 않는다.` : ''
   return `[EDITORIAL_V4 · 최종 사용자에게 보이는 원고]
 - 이것은 계산 메모가 아니라 사용자가 실제로 읽는 최종 해설 원고다. 추상적인 운세평을 길게 늘이지 말고 "그래서 내 생활에서 무슨 장면이 생기고, 나는 무엇을 보면 되는가"에 답해라.
 - overall.summary는 ${periodWord} 전 섹터를 통틀어 읽은 총평이다. 가장 강한 한 섹터의 verdict를 복사하거나 조금 바꿔 쓰면 실패다.
@@ -245,6 +251,7 @@ function editorialV4Instruction(kind: PeriodKind) {
 - headline도 한 섹터의 verdict 복사본이 아니라 전 기간의 핵심 대비나 공통 테마를 새 문장으로 만든다.
 - 각 분야 원고는 가능하면 2~3문장으로 쓴다. 1문장째는 결론, 2문장째는 실제 생활 장면이나 판단 기준, 3문장째는 사용자가 취할 행동 또는 확인할 변화를 쓴다. 근거가 약하면 사건을 만들지 말고 무엇까지 말할 수 없는지 분명히 한다.
 - "좋다/나쁘다/무난하다/신중해라/흐름을 봐/확인해"만으로 문단을 끝내면 실패다. 다른 날짜·다른 사람에게 그대로 붙일 수 있는 범용 조언도 실패다.
+${dayEditorial}
 
   [clusters structured editorial schema · 문자열 태그 금지]
   - clusters의 각 user-facing section은 문자열이 아니라 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 가진 객체다.

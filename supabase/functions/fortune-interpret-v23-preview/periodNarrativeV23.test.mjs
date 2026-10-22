@@ -78,6 +78,15 @@ test('editorial v4 supplies structured user prose sections for non-relationship 
   assert.match(text,/장면·판단 기준·행동을 추가/)
 })
 
+test('daily editorial leads with one direct conclusion and concrete observable scenes', () => {
+  const text=buildPeriodNarrativeInstruction(packet('day'))
+  assert.match(text,/사용자가 바로 이해할 수 있는 한 문장 결론/)
+  assert.match(text,/overall\.summary는 4~6문장/)
+  assert.match(text,/업무 요청·답변·약속·결제·공부 분량·휴식/)
+  assert.match(text,/승진·합격·재회처럼 근거에 없는 결과를 만들지 않는다/)
+  assert.doesNotMatch(buildPeriodNarrativeInstruction(packet('week')),/overall\.summary는 4~6문장/)
+})
+
 test('day favors triggers while annual favors recurring background patterns', () => {
   const base=packet('day');base.evidence_ledger.push(...['2026-01-15','2026-03-15','2026-06-15','2026-09-15'].map((date,index)=>({id:`W:bg:${index}`,system:'western',topic:'직장',scope:'background',date,direction:'context',text:'Saturn conjunction MC-like long context',observation:{transit:'Saturn',target:'Sun',aspect:'conjunction'}})))
   const dayTop=selectNarrativePhenomena(base,1)[0],annualTop=selectNarrativePhenomena({...base,period_kind:'annual',period:{start:'2026-01-01',end:'2026-12-31'}},1)[0];assert.notEqual(dayTop.id,annualTop.id);assert.equal(annualTop.role,'background')

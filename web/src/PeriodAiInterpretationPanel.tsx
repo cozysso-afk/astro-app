@@ -41,6 +41,12 @@ function signalClass(signal: string) {
   return 'is-mixed'
 }
 
+function splitReadingLead(value: string) {
+  const clean = value.trim()
+  const match = clean.match(/^(.+?[.!?])(?:\s+|$)([\s\S]*)$/)
+  return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: clean, detail: '' }
+}
+
 export function visibleTopicDepth(conclusion: string, observe?: string) {
   const base = String(conclusion ?? '').trim()
   const detail = String(observe ?? '').trim()
@@ -114,10 +120,15 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     : verifiedHero
       ? visibleAiText(data.overall.summary) || userSummary.summary
       : field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary
+  const dailyLead = period === 'today' ? splitReadingLead(heroHeadline) : { title: heroHeadline, detail: '' }
+  const dailyLeadCard = period === 'today'
+    ? [...userSummary.favorableCards, ...userSummary.cautionCards]
+      .sort((a,b)=>Math.abs(b.score-50)-Math.abs(a.score-50))[0]
+    : undefined
 
   return <section className="period-ai-card period-ai-v18">
     <div className="reading-copy-access"><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{heroHeadline}</h3><p className="reading-hero-subtitle">{heroSummary}</p></div></div>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{dailyLead.title}</h3><p className="reading-hero-subtitle">{[dailyLead.detail,heroSummary].filter(Boolean).join(' ')}</p>{dailyLeadCard&&<div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}><strong>{Math.round(dailyLeadCard.score)}점</strong><span><b>{dailyLeadCard.topic}</b>이 오늘 가장 두드러진 분야<small>분야별 상대 활성도 · 사건이 생길 확률은 아님</small></span></div>}</div></div>
 
     {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/>{!!referenceFlowCards.length&&<FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>}<FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
@@ -142,11 +153,12 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
       </article>
     </section> : null}
 
-    {!!userSummary.focusTopics.length && <section className="period-ai-window-section period-ai-user-focus">
-      <div className="period-ai-section-title"><span>{userSummary.focusTitle}</span><strong>현실에서 이렇게 봐</strong></div>
+    {!!userSummary.focusTopics.length && <section className={`period-ai-window-section period-ai-user-focus ${period==='today'?'is-daily-reading-story':''}`}>
+      <div className="period-ai-section-title"><span>{period==='today'?'오늘을 풀어보면':userSummary.focusTitle}</span><strong>{period==='today'?'결론부터 현실 장면까지':'현실에서 이렇게 봐'}</strong></div>
       <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=>{
         const visibleDepth = visibleTopicDepth(item.conclusion, item.observe)
-        return <article className="period-ai-topic" key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b>{visibleDepth&&<p>{visibleDepth}</p>}<details className="reading-topic-depth" open={userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action && item.observe !== visibleDepth ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</details></article>
+        const explanation = <><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action && item.observe !== visibleDepth ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</>
+        return <article className={`period-ai-topic ${period==='today'?'daily-reading-topic':''}`} key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b>{visibleDepth&&<p>{visibleDepth}</p>}{period==='today'&&userSummary.focusTopics.indexOf(item)<2?<div className="daily-reading-topic-depth">{explanation}</div>:<details className="reading-topic-depth" open={period!=='today'&&userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary>{explanation}</details>}</article>
       })}</div>
     </section>}
 
