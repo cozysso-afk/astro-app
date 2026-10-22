@@ -37,7 +37,7 @@ export function ReadingTimeline({ events, context = {} }: { events: ReadingEvent
     const badgeLabel=temporal.label
     return <div className={`reading-event signal-${e.kind}`} key={`${e.kind}-${i}`}>
       <div className="reading-event-heading"><ReadingBadge kind={e.kind} label={badgeLabel}/>{temporal.state !== 'past' && e.status && e.status!==badgeLabel&&<span className={`reading-state ${/확인 필요|주의/.test(e.status)?'is-caution':''}`}>{e.status}</span>}</div>
-      {temporal.state === 'past' ? <><p>이미 지난 구간이야. 당시 경험과 비교하는 정보로만 봐.</p><details><summary>{temporal.detailLabel}</summary><p>{e.label}</p>{e.detail && <p>{e.detail}</p>}</details></> : <><p>{e.label}</p>{e.detail&&<details><summary>{temporal.detailLabel}</summary><p>{e.detail}</p></details>}</>}
+      {temporal.state === 'past' ? <><p>{e.label}</p><small className="reading-event-past-note">이미 지난 구간이야. 당시 실제 경험과 비교하는 참고 정보로만 봐.</small>{e.detail&&<details><summary>{temporal.detailLabel}</summary><p>{e.detail}</p></details>}</> : <><p>{e.label}</p>{e.detail&&<details><summary>{temporal.detailLabel}</summary><p>{e.detail}</p></details>}</>}
     </div>
   })}</div></li>
   return <div className="reading-event-list"><ol>{dates.slice(0,2).map(group)}</ol>{dates.length>2&&<details className="reading-more"><summary>시기 {dates.length-2}개 더 보기</summary><ol>{dates.slice(2).map(group)}</ol></details>}</div>
