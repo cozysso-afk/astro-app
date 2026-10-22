@@ -6,6 +6,8 @@ const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../viewport-background-v60.css', import.meta.url), 'utf8')
 const readingCss = readFileSync(new URL('../reading-experience.css', import.meta.url), 'utf8')
 const reliability = readFileSync(new URL('../BirthTimeReliabilityFields.tsx', import.meta.url), 'utf8')
+const app = readFileSync(new URL('../AppNext.tsx', import.meta.url), 'utf8')
+const precisionTransport = readFileSync(new URL('./precisionTransport.ts', import.meta.url), 'utf8')
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const auroraBlock = css.match(/#app-aurora-layer\s*\{([^}]*)\}/)?.[1] ?? ''
 const winningBodyBlock = css.match(/body:has\(#root\)\s*\{([^}]*)\}/)?.[1] ?? ''
@@ -92,4 +94,20 @@ test('birth and location form uses one readable type and control scale', () => {
   assert.match(css, /\.app-shell \.field input,[\s\S]*\.app-shell \.stable-choice-trigger[\s\S]*font-size:\s*16px\s*!important/)
   assert.match(css, /\.stable-choice-option[\s\S]*font-size:\s*16px\s*!important/)
   assert.match(css, /\.app-shell \.birth-time-reliability-note[\s\S]*font-size:\s*14px\s*!important/)
+})
+
+test('birth-time correction keeps an explicit range without claiming the app generated it', () => {
+  assert.match(reliability, /생시 범위 시작/)
+  assert.match(reliability, /생시 범위 끝/)
+  assert.doesNotMatch(reliability, /exact\(정확 생시\)|ASC\(상승점\)/)
+  assert.match(reliability, /범위는 자동 생성하지 않아요/)
+  assert.match(app, /rectified_window:\s*rectifiedWindow/)
+  assert.match(precisionTransport, /source === 'rectified'/)
+})
+
+test('past reunion comparison uses plain language and visually active date controls', () => {
+  assert.match(app, /지난 기간 다시 보기/)
+  assert.match(app, /지금 결과와 비교해요/)
+  assert.match(app, /이 기간 다시 계산/)
+  assert.doesNotMatch(app, /과거 시기 독립 분석/)
 })

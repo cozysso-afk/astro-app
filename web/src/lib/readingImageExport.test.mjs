@@ -64,6 +64,16 @@ test('export filters empty cards and includes both primary and reference period 
   assert.match(exporter,/dedupeCards\(dates\)/)
 })
 
+test('current reunion layout exports the full reading instead of falling through to a sparse generic image',()=>{
+  assert.match(exporter,/\.reunion-ui-v3, \.reunion-ui-v5/)
+  assert.match(exporter,/\.reunion-v5-stages > article/)
+  assert.match(exporter,/card\.dataset\.readingExportDetail/)
+  assert.match(exporter,/\.reunion-v5-directions > article/)
+  assert.match(exporter,/title: '현재 연락 상태'/)
+  assert.match(exporter,/title: '현실에서 확인할 행동'/)
+  assert.match(exporter,/관계를 이해하는 해설/)
+})
+
 test('export keeps a stable rhythm and actively rebalances sparse tail pages',()=>{
   assert.match(exporter,/function itemHeight/)
   assert.match(exporter,/SECTION_HEIGHT/)

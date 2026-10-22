@@ -402,6 +402,15 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const safeNarrative = (value?: string | null) => sentenceList(value)
     .filter(row => !TECHNICAL_RE.test(row) && !/관문|후보|TOP|완전히 닫|통과 점수|활성도|검증|3일 이상/.test(row))
     .slice(0, 2).join(' ')
+  const whyNarrative = safeNarrative(reunionV2?.why_reconnect?.interpretation)
+    || safeNarrative(reunionV2?.why_reconnect?.conclusion)
+    || safeNarrative(why)
+  const riskNarrative = safeNarrative(reunionV2?.repeat_risks?.conclusion)
+    || safeNarrative(repeat)
+  const adviceNarratives = [...rebuildConditions, ...repeatPatterns]
+    .map(item => safeNarrative(item))
+    .filter((item, index, rows) => item && rows.indexOf(item) === index)
+    .slice(0, 4)
   const futureEvents = events.filter(event => {
     const date = event.date.slice(0, 10)
     const end = event.date.slice(-10)
@@ -416,7 +425,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         <p>{observation.state ? nextSummary : '실제 연락·만남 여부를 입력하면 지금 단계에 맞춰 읽을 수 있어요.'}</p>
       </section>
       <div className="reunion-v5-stages" aria-label="재회 단계별 흐름">
-        {stageRows.map(row => <article key={row.key}>
+        {stageRows.map(row => <article key={row.key} data-reading-export-detail={safeNarrative(row.text)}>
           <span>{row.label}</span><strong>{statusFor(row)}</strong>
         </article>)}
       </div>
@@ -440,12 +449,11 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
       </section>
       {reunionV2 ? <section className="reunion-v5-section">
         <h4>관계를 이해하는 해설</h4>
-        {safeNarrative(reunionV2.why_reconnect?.interpretation) ? <p>{safeNarrative(reunionV2.why_reconnect.interpretation)}</p> : null}
-        {safeNarrative(reunionV2.repeat_risks?.conclusion) ? <p><b>반복되기 쉬운 문제</b><br/>{safeNarrative(reunionV2.repeat_risks.conclusion)}</p> : null}
-        <details><summary>관계 조언 더 보기</summary>
-          {rebuildConditions.map((item,index)=><p key={index}>{safeNarrative(item)}</p>)}
-          {repeatPatterns.map((item,index)=><p key={index}>{safeNarrative(item)}</p>)}
-        </details>
+        {whyNarrative ? <p><b>다시 떠오르는 이유</b><br/>{whyNarrative}</p> : <p>이번 해설에는 다시 연결되는 정서적 이유를 단정할 만큼 충분한 문장이 없어요.</p>}
+        {riskNarrative ? <p><b>반복되기 쉬운 문제</b><br/>{riskNarrative}</p> : null}
+        {adviceNarratives.length > 0 ? <details><summary>관계 조언 더 보기</summary>
+          {adviceNarratives.map((item,index)=><p key={index}>{item}</p>)}
+        </details> : null}
       </section> : null}
       <details className="reunion-v5-details"><summary>지난 시기와 실제 기록 비교</summary>
         <p>이미 지난 날짜의 비교 자료예요. 예측 적중률을 뜻하지 않아요.</p>

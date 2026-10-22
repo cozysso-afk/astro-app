@@ -77,7 +77,10 @@
 .reunion-history-range{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
 .reunion-observation-dates label,.reunion-history-range label{display:grid;min-width:0;gap:6px;color:#71809a;font-size:.78rem;font-weight:760}
 .reunion-observation-dates input,.reunion-history-range input{width:100%;min-width:0;box-sizing:border-box}
-.reunion-history-controls>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;border:1px solid rgba(117,101,157,.18);border-radius:15px;background:rgba(255,255,255,.72);color:#65548d;font-weight:820}
+.reunion-history-range input{min-height:50px;padding:0 14px;border:1px solid rgba(117,101,157,.22);border-radius:15px;background:rgba(255,255,255,.9);color:#463d4d;color-scheme:light;font:inherit;font-size:1rem;font-weight:760;text-align:center;box-shadow:0 5px 14px rgba(88,70,112,.05)}
+.reunion-history-range input:focus{outline:2px solid rgba(117,101,157,.18);outline-offset:2px;border-color:rgba(117,101,157,.42)}
+.reunion-history-controls>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:48px;border:1px solid rgba(117,101,157,.22);border-radius:15px;background:rgba(255,255,255,.9);color:#65548d;font-weight:820;box-shadow:0 5px 14px rgba(88,70,112,.05)}
+.reunion-history-controls>button:disabled{opacity:.58;cursor:wait}
 .reunion-history-controls>small[role="alert"]{color:#a54c65}
 .reunion-stage-facts{display:grid;gap:4px;margin:12px 0 0;padding-top:10px;border-top:1px solid rgba(132,148,184,.13)}
 .reunion-stage-facts>div{display:flex;justify-content:space-between;gap:10px;color:#71809a;font-size:.74rem;line-height:1.45}

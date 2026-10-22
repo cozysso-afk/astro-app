@@ -44,7 +44,7 @@ export const timeSourceLabels: Array<[TimeSource, string]> = [
   ['family_memory', '가족의 기억'],
   ['user_estimate', '사용자 추정'],
   ['arbitrary_input', '계산을 위한 임시 입력'],
-  ['rectified', '사건 검증으로 보정한 시각'],
+  ['rectified', '전문 검증으로 보정 완료'],
   ['unknown', '출처 모름'],
 ]
 
@@ -311,10 +311,14 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
       />
     </div>
     {value.timeSource === 'rectified' && <>
-      <label className="field"><span>보정 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
-      <label className="field"><span>보정 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field"><span>생시 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field"><span>생시 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
     </>}
     {stagedForRecalculation && <div className="privacy-note field-wide birth-time-reliability-note"><span>출생시간 설정이 바뀌었어. 현재 결과는 이전 계산 기준이야. 실제 계산 실행을 누르면 새 설정으로 갱신돼.</span></div>}
-    {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>시각을 입력했다는 사실만으로 exact(정확 생시)로 보지 않아. 공식기록 또는 검증된 보정시각 + Exact일 때만 ASC(상승점)·하우스 등 생시 민감층을 exact로 사용해.</span></div>}
+    {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>{value.timeSource === 'rectified'
+      ? value.timeConfidence === 'exact'
+        ? '입력한 보정 시각을 정확 생시로 사용해요. 생시 범위는 앱이 자동으로 만들지 않으며, 직접 입력한 값만 보관해요.'
+        : '입력한 출생시간을 대표 시각으로 사용하고, 생시 범위 안에서 상승점·하우스 같은 시간 민감 결과가 유지되는지도 함께 비교해요. 범위는 자동 생성하지 않아요.'
+      : '입력한 시각은 그대로 사용해요. 공식 기록 또는 전문 보정 완료 + 정확 검증일 때만 상승점·하우스처럼 출생시간에 민감한 계산을 사용해요.'}</span></div>}
   </>
 }

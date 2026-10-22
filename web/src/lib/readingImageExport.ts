@@ -163,6 +163,88 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
 }
 
 function reunionModel(root: HTMLElement, label: string): ExportModel {
+  const modern = root.querySelector<HTMLElement>('.reunion-ui-v5')
+  if (modern) {
+    const date = textOf(modern, '.reunion-result-meta span').replace(/^기준일\s*/, '')
+    const hero = firstSentences(textOf(modern, '.reunion-v5-answer h3'), 1)
+    const subtitle = firstSentences(textOf(modern, '.reunion-v5-answer p'), 2)
+    const sections: ExportSection[] = []
+
+    const stageCards = dedupeCards(Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-stages > article')).map(card => ({
+      eyebrow: '재회 단계',
+      title: textOf(card, ':scope > span'),
+      body: firstSentences(`${textOf(card, ':scope > strong')}. ${normalizeText(card.dataset.readingExportDetail)}`, 3),
+      tone: 'love' as const,
+      compact: true,
+      editorial: true,
+    })))
+    if (stageCards.length) sections.push({ title: '단계별로 보면', cards: stageCards })
+
+    const directionCards = dedupeCards(Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-directions > article')).map(card => ({
+      title: textOf(card, ':scope > b'),
+      body: firstSentences(textOf(card, ':scope > p'), 2),
+      tone: 'love' as const,
+      editorial: true,
+    })))
+    const directionSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
+      .find(section => textOf(section, ':scope > h4') === '받는 연락 · 보내는 연락')
+    const observedContact = directionSection ? directParagraphs(directionSection).filter(row => !/^입력한 실제 첫 연락:/.test(row)).at(-1) ?? '' : ''
+    if (observedContact) directionCards.unshift({
+      title: '현재 연락 상태',
+      body: firstSentences(observedContact, 2),
+      tone: 'plain',
+      compact: true,
+      editorial: true,
+    })
+    if (directionCards.length) sections.push({ title: '연락 방향', cards: directionCards })
+
+    const timingSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
+      .find(section => textOf(section, ':scope > h4') === '앞으로 주목할 시기')
+    const dates: ExportCard[] = []
+    if (timingSection) {
+      for (const group of Array.from(timingSection.querySelectorAll<HTMLElement>('.reading-event-list > ol > li'))) {
+        const dateLabel = textOf(group, ':scope > time')
+        for (const event of Array.from(group.querySelectorAll<HTMLElement>('.reading-event'))) {
+          const body = firstSentences(textOf(event, ':scope > p'), 2)
+          if (dateLabel && body) dates.push({ eyebrow: textOf(event, '.reading-state') || '주목', title: dateLabel, body, tone: 'date', compact: true, editorial: true })
+        }
+      }
+      if (!dates.length) {
+        const body = directParagraphs(timingSection).find(row => !row.startsWith('표시된 날짜')) ?? ''
+        if (body) dates.push({ title: '뚜렷한 미래 시기', body, tone: 'date', editorial: true })
+      }
+    }
+
+    const checkSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
+      .find(section => textOf(section, ':scope > h4') === '지금 확인할 것')
+    if (checkSection) {
+      const body = firstSentences(directParagraphs(checkSection).join(' '), 3)
+      if (body) dates.push({ title: '현실에서 확인할 행동', body, tone: 'favorable', emphasis: true, editorial: true })
+    }
+    if (dates.length) sections.push({ title: '시기와 다음 행동', cards: dedupeCards(dates).slice(0, 5) })
+
+    const meaningSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
+      .find(section => textOf(section, ':scope > h4') === '관계를 이해하는 해설')
+    if (meaningSection) {
+      const meaningCards = dedupeCards([
+        ...Array.from(meaningSection.querySelectorAll<HTMLElement>(':scope > p')).map((paragraph, index) => ({
+          title: textOf(paragraph, ':scope > b') || (index === 0 ? '다시 떠오르는 이유' : '관계 해설'),
+          body: firstSentences(normalizeText(paragraph.innerText).replace(textOf(paragraph, ':scope > b'), '').trim(), 3),
+          tone: 'love' as const,
+          editorial: true,
+        })),
+        ...Array.from(meaningSection.querySelectorAll<HTMLElement>('details > p')).slice(0, 2).map((paragraph, index) => ({
+          title: index === 0 ? '다시 시작하려면' : '관계에서 지킬 것',
+          body: firstSentences(paragraph.innerText, 2),
+          tone: 'plain' as const,
+          editorial: true,
+        })),
+      ])
+      if (meaningCards.length) sections.push({ title: '관계를 이해하는 해설', cards: meaningCards })
+    }
+    return { title: label, date, hero, subtitle, sections }
+  }
+
   const date = textOf(root, '.reunion-result-meta strong')
   const hero = firstSentences(textOf(root, '.reunion-v3-hero p') || textOf(root, '.reading-conclusion'), 2)
   const sections: ExportSection[] = []
@@ -229,7 +311,7 @@ function genericModel(root: HTMLElement, label: string): ExportModel {
 
 export function buildReadingExportModel(root: HTMLElement, label: string): ExportModel {
   if (root.matches('[data-reading-export-root="period-fortune"]')) return periodModel(root, label)
-  if (root.querySelector('.reunion-ui-v3')) return reunionModel(root, label)
+  if (root.querySelector('.reunion-ui-v3, .reunion-ui-v5')) return reunionModel(root, label)
   return genericModel(root, label)
 }
 

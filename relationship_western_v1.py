@@ -580,9 +580,53 @@ def _diagnostic_profile_chart(profile, shift_minutes):
     return chart
 
 
+def _rectified_window_scan_spec(profile, reliability):
+    window = reliability.get("rectified_window") or {}
+    start_text = str(window.get("start") or "").strip()
+    end_text = str(window.get("end") or "").strip()
+    center_time = profile.get("birth_time")
+    if not start_text or not end_text or center_time is None:
+        return None
+    try:
+        start_time = dt_time.fromisoformat(start_text)
+        end_time = dt_time.fromisoformat(end_text)
+    except ValueError:
+        return None
+    base_date = profile["birth_date"]
+    start = datetime.combine(base_date, start_time)
+    end = datetime.combine(base_date, end_time)
+    if end <= start:
+        end += timedelta(days=1)
+    center = datetime.combine(base_date, center_time)
+    if center < start and center + timedelta(days=1) <= end:
+        center += timedelta(days=1)
+    if center < start or center > end:
+        return None
+    span_minutes = max(1, int(round((end - start).total_seconds() / 60)))
+    step = 15 if span_minutes <= 60 else 30 if span_minutes <= 180 else 60
+    candidates = []
+    cursor = start
+    while cursor <= end and len(candidates) < 25:
+        candidates.append(cursor)
+        cursor += timedelta(minutes=step)
+    candidates.extend([center, end])
+    shifts = sorted({int(round((candidate - center).total_seconds() / 60)) for candidate in candidates})
+    return {
+        "window_minutes": max(abs(value) for value in shifts),
+        "step_minutes": step,
+        "shifts_minutes": shifts,
+        "window_source": "rectified_range",
+        "range_start": start_text,
+        "range_end": end_text,
+        "policy": "user-provided rectified range is used for diagnostic birth-time sensitivity; the entered clock time remains the representative chart time.",
+    }
+
+
 def _birth_time_sensitivity_scan(variable_profile, fixed_chart, variable_side):
     reliability = resolve_birth_time_reliability(variable_profile)
     spec = sensitivity_scan_spec(reliability)
+    if spec is not None and reliability.get("time_source") == "rectified":
+        spec = _rectified_window_scan_spec(variable_profile, reliability) or spec
     if spec is None:
         reason = "verified exact birth time; diagnostic scan not required" if reliability.get("time_exact") else "no concrete birth time available to scan"
         return {"available": False, "reason": reason, "time_reliability": reliability}
@@ -653,6 +697,10 @@ def _birth_time_sensitivity_scan(variable_profile, fixed_chart, variable_side):
         "time_reliability": reliability,
         "window_minutes": spec["window_minutes"],
         "step_minutes": spec["step_minutes"],
+        "shifts_minutes": list(spec["shifts_minutes"]),
+        "window_source": spec.get("window_source", "confidence_default"),
+        "range_start": spec.get("range_start"),
+        "range_end": spec.get("range_end"),
         "sample_count": sample_count,
         "samples": samples,
         "robust_contacts": [row for row in contacts if row["scan_class"] == "robust"][:24],

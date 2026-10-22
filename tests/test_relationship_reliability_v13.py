@@ -165,6 +165,28 @@ def test_verified_exact_time_skips_sensitivity_scan():
     assert "not required" in scan["reason"]
 
 
+def test_provisional_rectified_range_drives_the_sensitivity_scan_without_changing_the_representative_time():
+    user = _profile()
+    counterpart = _profile(
+        birth_date=date(1992, 2, 29),
+        birth_time=dt_time(21, 25),
+        latitude=35.1595,
+        longitude=126.8526,
+        time_source="rectified",
+        time_confidence="low",
+    )
+    counterpart["rectified_window"] = {"start": "19:55", "end": "22:55"}
+    out = rw.build_relationship_western(user, counterpart, [], analysis_mode="reunion")
+    scan = out["sensitivity_scan"]["counterpart"]
+    assert scan["available"] is True
+    assert scan["window_source"] == "rectified_range"
+    assert scan["range_start"] == "19:55"
+    assert scan["range_end"] == "22:55"
+    assert scan["shifts_minutes"] == [-90, -60, -30, 0, 30, 60, 90]
+    center = next(row for row in scan["samples"] if row["shift_minutes"] == 0)
+    assert center["candidate_local"].endswith("T21:25")
+
+
 def test_transit_hits_report_layer_class_orb_grade_and_non_probability_contract():
     transit = {"positions": {"Mercury": {"lon": 10.0}, "Jupiter": {"lon": 10.0}}, "angles": {}}
     natal = {
