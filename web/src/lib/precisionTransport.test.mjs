@@ -94,6 +94,21 @@ test('request transport writes explicit unknown provenance when no snapshot is a
   } finally { Object.defineProperty(globalThis,'localStorage',{configurable:true,value:original}) }
 })
 
+test('provisional user-entered time range is transported even when the source is not rectified',()=>{
+  const original=globalThis.localStorage
+  const row={birthDate:'1991-03-21',birthTime:'07:26',placeKey:'yeosu',latitude:'34.7',longitude:'127.6',timeSource:'arbitrary_input',timeConfidence:'low',rectifiedWindowStart:'06:50',rectifiedWindowEnd:'08:10',updatedAt:1}
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{
+    getItem(key){return key==='starlight-destiny.birth-reliability-live.v2'?JSON.stringify([row]):null},setItem(){},
+  }})
+  try{
+    const request={profile:{birth_date:'1991-03-21',birth_time:'07:26',latitude:34.7,longitude:127.6,place_key:'yeosu'}}
+    applyIntegratedPrecisionToRequest(request)
+    assert.equal(request.profile.time_source,'arbitrary_input')
+    assert.equal(request.profile.time_confidence,'low')
+    assert.deepEqual(request.profile.rectified_window,{start:'06:50',end:'08:10'})
+  } finally { Object.defineProperty(globalThis,'localStorage',{configurable:true,value:original}) }
+})
+
 test('provisional external AI calculation strips Saju Thai angles and sensitive evidence',()=>{
   const calc={precision:provisionalPrecision(),saju:{pillars:{hour:'庚辰'}},thai:{thai_day:'Thursday'},western:{natal:{asc:1,mc:2,house_system:{used:'Placidus'}},detail_days:[{date:'2026-09-10'}],daily_scores:[{evidence:[{kind:'aspect',transit:'Moon',target:'Venus',text:'Moon→Venus trine'},{kind:'aspect',transit:'Venus',target:'Moon',text:'Venus→Moon trine'},{kind:'house',whole_house:7,text:'Venus Whole Sign 7H'}]}]}}
   const safe=sanitizeCalculationForExternalAi(calc)

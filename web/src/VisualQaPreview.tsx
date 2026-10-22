@@ -112,9 +112,27 @@ export function VisualQaPreview() {
         current_windows:[],past_windows:[],nearest_window:null,limitations:[],score_meaning:'상대 강도',
       })!}
         observation={{state:'messaging',initiator:'user',events:[]}}
-        evidence={[]} reunionV2={null}
-        directionRows={[{kind:'incoming',label:'상대 차트',text:'활성도 21.1'},{kind:'outgoing',label:'내 차트',text:'활성도 24.1'}]}
-        sustainabilityText=""/>
+        evidence={[]} reunionV2={{
+          summary:'연락은 다시 이어졌지만 실제 만남과 관계 합의는 아직 별도 단계다.',
+          consultation_answer:{
+            current_stage:'현재 연락과 대화는 확인됐다.', contact_type_if_any:'대화 재개는 확인됐다.', initiative:'실제 첫 연락은 사용자가 먼저 했다.',
+            continuity:'안부를 넘어 질문과 답이 이어지는지 확인해야 한다.', meeting_gate:'이번 기간에는 실제 만남을 뒷받침하는 뚜렷한 시기가 없다.',
+            rebuild_gate:'만남 전 단계가 비어 있어 관계 재구축 신호만으로 재회로 올려 읽지 않는다.',
+            behavior_change_evidence:'이전 갈등을 피하지 않고 구체적인 약속을 제안하고 지키는지가 변화의 증거다.',
+            next_stage_up_conditions:['날짜와 장소가 정해진 만남 제안이 실제로 오간다.','만난 뒤 다음 연락과 약속이 한 번 이상 이어진다.'],
+            down_conditions:['안부와 추억 이야기만 반복되고 만남 제안은 피한다.','불편한 문제를 꺼낼 때 다시 대화가 끊긴다.'],
+            repeat_risks:['관계를 정의하지 않은 채 감정 확인만 반복한다.'],
+            contextual_application:{complete_cutoff:'',no_contact:'',occasional_contact:'',meeting_again:'',ambiguous_relationship:''},evidence_refs:[],
+          },
+          why_reconnect:{conclusion:'서로를 다시 의식하게 만드는 정서적 잔존감은 남아 있다.',interpretation:'예전 대화를 다시 꺼내거나 익숙한 안부로 연결되는 장면으로 나타날 수 있다. 다만 익숙함이 곧 이전 문제의 해결을 뜻하지는 않는다.',evidence_refs:[]},
+          initiative:{conclusion:'방향 점수 차이는 작다.',interpretation:'실제 첫 연락 기록과 계산 활성도는 나눠 읽는다.',evidence_refs:[]},
+          timing:{conclusion:'다음 관문은 실제 만남이다.',windows:[],evidence_refs:[]},
+          rebuild:{conclusion:'관계를 다시 시작하려면 연락 횟수보다 만남과 관계 정의가 필요하다.',conditions:['구체적인 만남 약속을 잡고 지킨다.','이전 갈등을 다루는 방식을 함께 합의한다.'],evidence_refs:[]},
+          repeat_risks:{conclusion:'가장 큰 위험은 모호한 연락을 관계 회복으로 착각하는 것이다.',patterns:['명확한 약속 없이 감정 교류만 길어진다.'],evidence_refs:[]},
+          convergence:[],precision_note:'상대 활성도이며 사건 확률이 아니다.',
+        }}
+        directionRows={[{kind:'incoming',label:'상대 차트',score:21.1,band:'약함',text:'활성도 21.1'},{kind:'outgoing',label:'내 차트',score:24.1,band:'약함',text:'활성도 24.1'}]}
+        sustainabilityText="다시 시작해도 이전 문제를 다루는 방식이 달라지지 않으면 같은 지점에서 대화가 끊길 수 있어요."/>
     </section>
 
     <section ref={node => { exportRoot.current = node }} data-reading-export-root="period-fortune" className="fortune-experience period-ai-v4" data-qa-block="export-source">

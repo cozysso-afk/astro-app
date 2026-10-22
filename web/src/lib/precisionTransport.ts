@@ -97,7 +97,7 @@ export function applyIntegratedPrecisionToRequest<T extends Record<string, unkno
   p.time_known = timeKnown
   p.time_source = source
   p.time_confidence = confidence
-  p.rectified_window = source === 'rectified' && snapshot && (snapshot.rectifiedWindowStart || snapshot.rectifiedWindowEnd)
+  p.rectified_window = confidence !== 'exact' && snapshot && (snapshot.rectifiedWindowStart || snapshot.rectifiedWindowEnd)
     ? { start: snapshot.rectifiedWindowStart || null, end: snapshot.rectifiedWindowEnd || null }
     : null
   return request

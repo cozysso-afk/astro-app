@@ -247,6 +247,7 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
   const firstFieldRef = useRef<HTMLDivElement>(null)
   const [stagedForRecalculation, setStagedForRecalculation] = useState(false)
   const exactAllowed = exactSources.has(value.timeSource)
+  const showTimeRange = value.timeSource === 'rectified' || value.timeConfidence !== 'exact'
 
   useEffect(() => { rememberBirthTimeReliability(value) }, [value])
 
@@ -310,15 +311,17 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
         onChange={(nextValue, context) => emit({ timeConfidence: nextValue as TimeConfidence }, context.preserveRenderedResults)}
       />
     </div>
-    {value.timeSource === 'rectified' && <>
-      <label className="field birth-time-range-field"><span>생시 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
-      <label className="field birth-time-range-field"><span>생시 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+    {showTimeRange && <>
+      <label className="field birth-time-range-field"><span>가능 생시 범위 시작 · 선택</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field birth-time-range-field"><span>가능 생시 범위 끝 · 선택</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
     </>}
     {stagedForRecalculation && <div className="privacy-note field-wide birth-time-reliability-note"><span>출생시간 설정이 바뀌었어. 현재 결과는 이전 계산 기준이야. 실제 계산 실행을 누르면 새 설정으로 갱신돼.</span></div>}
     {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>{value.timeSource === 'rectified'
       ? value.timeConfidence === 'exact'
         ? '입력한 보정 시각을 정확 생시로 사용해요. 생시 범위는 앱이 자동으로 만들지 않으며, 직접 입력한 값만 보관해요.'
         : '입력한 출생시간을 대표 시각으로 사용하고, 생시 범위 안에서 상승점·하우스 같은 시간 민감 결과가 유지되는지도 함께 비교해요. 범위는 자동 생성하지 않아요.'
-      : '입력한 시각은 그대로 사용해요. 공식 기록 또는 전문 보정 완료 + 정확 검증일 때만 상승점·하우스처럼 출생시간에 민감한 계산을 사용해요.'}</span></div>}
+      : value.rectifiedWindowStart && value.rectifiedWindowEnd
+        ? '입력한 시각은 대표 시각으로 사용하고, 직접 적은 가능 범위 안에서 시간 민감 결과가 유지되는지도 함께 비교해요.'
+        : '입력한 시각은 대표 시각으로 사용해요. 시간이 정확하지 않다면 위의 가능 생시 범위를 선택해서 시간 민감 결과도 함께 비교할 수 있어요.'}</span></div>}
   </>
 }

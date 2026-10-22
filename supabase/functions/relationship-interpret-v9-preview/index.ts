@@ -7,7 +7,7 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { repairReunionGroundingV2 } from "./reunionGroundingV2.ts";
 
 const DEFAULT_MODEL="gemini-3.7-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v11.8-provisional-time-reference";
-const REUNION_VERSION="relationship-v13.2-readable";
+const REUNION_VERSION="relationship-v13.3-stage-answer";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -196,7 +196,10 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - Return에서 user/counterpart 쪽이 활성됐다는 사실은 선연락 방향 근거가 아니다. Return은 initiative(누가 먼저 움직이는가) 판정에 사용하지 말고, 방향은 initiative_gate가 available일 때만 따른다.
 - 사용자 본문에서는 Solar Return/Lunar Return 기술명을 앞세우지 말고 각각 '연간 배경', '월간 배경'으로 먼저 풀어 쓴다. 기술명은 정밀도·근거 설명에서만 병기한다.
 - 재회 모드에서는 원시 advanced/directional/transit 표를 중복 전달하지 않고 reunion_evidence_v2가 질문별로 압축한 근거를 사용한다.
-- "실제 행동을 봐", "속단하지 마", "대화가 중요해" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
+- "실제 행동을 봐", "속단하지 마", "대화가 중요해", "서로의 존재가 지워지지 않았다" 같은 범용 조언은 전체 해설에서 한 번을 넘기지 말고, 대신 계산 근거가 만드는 구체적 관계 역학을 설명한다.
+- reunion_observation.state가 messaging이면 연락 발생은 이미 끝난 질문이다. summary와 current_stage는 반드시 "연락은 이미 재개됐다"에서 출발하고, 연락 가능성·재접촉 가능성을 다시 예측하지 않는다. timing과 meeting_gate는 실제 만남, rebuild_gate는 관계 정의·지속 행동만 답한다.
+- 같은 결론을 summary, current_stage, contact_type_if_any, continuity에 말만 바꿔 반복하지 않는다. 각 필드는 각각 현재 판정, 연락의 형태, 대화 지속 조건이라는 새 정보를 하나씩 추가한다.
+- why_reconnect는 "다시 떠오른다", "정서적 배경이 있다"로 끝내지 않는다. 실제 근거가 허용하는 관계 패턴 1~2개를 쉬운 말로 번역하고, 이번 현실 연락에서 어떤 장면으로 드러날 수 있는지 연결한다. 개인화할 근거가 부족하면 심리 문구를 만들지 말고 부족하다고 쓴다.
 - 재회 해설은 독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라. 순서는 반드시 [현재 살아 있는 흐름] → [왜 다시 신경 쓰이는가] → [지금 어느 단계인가] → [누가/어떻게 움직일 여지] → [연락 창] → [만남 창] → [재구축 조건] → [반복 위험] 순서다.
 - 첫 2~3문장 안에서 감정 재활성화·연락/재접촉·실제 만남·관계 재구축 네 단계를 각각 현재 열림/미래 후보/후보 없음 중 무엇인지 구분해라.
 - "마음이 다시 움직이는 시기"와 "실제 관계가 움직이는 시기"를 반드시 분리해 설명해라. 감정 활성만으로 연락·만남·재구축을 승격하지 마라.

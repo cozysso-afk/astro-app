@@ -108,7 +108,9 @@ try {
   const reunion = page.locator('[data-qa-block="reunion"]')
   const reunionText = await reunion.innerText()
   assert(reunionText.includes('수신 · 상대 → 나') && reunionText.includes('발신 · 나 → 상대'), 'contact directions missing')
-  assert(reunionText.includes('불가능하다는 뜻은 아니에요'), 'missing timing incorrectly implies impossible reunion')
+  assert(reunionText.includes('재회 성립 쪽에 무게를 싣기는 어려워요'), 'direct reunion verdict missing')
+  assert(reunionText.includes('앞 단계 미확인'), 'later stage was not gated by the missing meeting stage')
+  assert(reunionText.includes('활성도 21.1') && reunionText.includes('활성도 24.1'), 'direction scores were hidden')
   assert(!reunionText.split('\\n').some(line=>line.trim()==='0'), 'stray zero leaked into reading')
   const mobileWidths = []
   for (const width of [320, 393, 430]) {
