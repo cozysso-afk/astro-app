@@ -311,8 +311,8 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
       />
     </div>
     {value.timeSource === 'rectified' && <>
-      <label className="field"><span>생시 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
-      <label className="field"><span>생시 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field birth-time-range-field"><span>생시 범위 시작</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <label className="field birth-time-range-field"><span>생시 범위 끝</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
     </>}
     {stagedForRecalculation && <div className="privacy-note field-wide birth-time-reliability-note"><span>출생시간 설정이 바뀌었어. 현재 결과는 이전 계산 기준이야. 실제 계산 실행을 누르면 새 설정으로 갱신돼.</span></div>}
     {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>{value.timeSource === 'rectified'

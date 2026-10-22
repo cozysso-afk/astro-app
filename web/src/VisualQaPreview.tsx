@@ -5,6 +5,8 @@ import { westernRankCopy } from './lib/westernRankCopy'
 import { useEffect, useRef, useState } from 'react'
 import { exportReadingImages } from './lib/readingImageExport'
 import { installReadingPresentationV5 } from './lib/readingPresentationV5'
+import { BirthTimeReliabilityFields } from './BirthTimeReliabilityFields'
+import type { BirthProfile } from './appTypes'
 
 function TopicCard({
   title,
@@ -41,6 +43,10 @@ export function VisualQaPreview() {
   const exportRoot = useRef<HTMLElement | null>(null)
   const [ready, setReady] = useState(false)
   const [exportState, setExportState] = useState('idle')
+  const [birthProfile, setBirthProfile] = useState<BirthProfile>({
+    name:'QA', birthDate:'1992-02-29', birthTime:'21:25', placeKey:'', latitude:'37.5665', longitude:'126.9780', utcOffset:'9', gender:'female',
+    timeSource:'rectified', timeConfidence:'low', rectifiedWindowStart:'19:55', rectifiedWindowEnd:'22:55',
+  })
 
   useEffect(() => {
     installReadingPresentationV5()
@@ -64,6 +70,13 @@ export function VisualQaPreview() {
       <strong>별빛의 운명 · 자동 시각 QA</strong>
       <p style={{margin:'6px 0 0'}}>실사용자가 캡처하지 않아도 모바일 카드 높이와 저장 이미지 결과를 CI에서 검수하기 위한 고정 fixture.</p>
     </header>
+
+    <section data-qa-block="birth-time-range" style={{marginBottom:28}}>
+      <h3>생시 범위 모바일 너비</h3>
+      <div className="field-grid">
+        <BirthTimeReliabilityFields value={birthProfile} onChange={patch=>setBirthProfile(current=>({...current,...patch}))}/>
+      </div>
+    </section>
 
     <section className="system-reading system-integrated" data-qa-block="systems" style={{marginBottom:28}}>
       <section className="system-overview">

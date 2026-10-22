@@ -232,6 +232,25 @@ html[data-celestial-motion='off'] #app-aurora-layer {
   background: #f4efe9 !important;
 }
 
+/* iOS gives native time controls a large intrinsic width. Keep the rectified
+   range inside its grid track and stack both controls on phone widths. */
+.app-shell .field-grid > .birth-time-range-field {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.app-shell .birth-time-range-field input[type='time'] {
+  display: block !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
 .app-shell .check-field,
 .app-shell .birth-time-reliability-note,
 .app-shell .birth-time-reliability-note > span {
@@ -332,7 +351,11 @@ html[data-celestial-motion='off'] #app-aurora-layer {
   opacity: .42;
 }
 
-@media (max-width: 420px) {
+@media (max-width: 480px) {
+  .app-shell .field-grid > .birth-time-range-field {
+    grid-column: 1 / -1 !important;
+  }
+
   .app-shell .field input,
   .app-shell .field select,
   .app-shell .stable-choice-trigger {

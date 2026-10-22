@@ -49,6 +49,12 @@ try {
     const systemGrid = document.querySelector('[data-qa-block="systems"] .system-overview-grid')
     const reunionMeaning = document.querySelector('.reunion-v5-stages')
     const situations = document.querySelector('.reunion-v5-directions')
+    const birthRange = document.querySelector('[data-qa-block="birth-time-range"]')
+    const birthRangeFields = Array.from(birthRange?.querySelectorAll('.birth-time-range-field') || []).map(node => {
+      const rect = node.getBoundingClientRect()
+      const input = node.querySelector('input')?.getBoundingClientRect()
+      return {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,inputLeft:input?.left ?? 0,inputRight:input?.right ?? 0}
+    })
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       systemDisplay: systemGrid ? getComputedStyle(systemGrid).display : 'missing',
@@ -61,6 +67,8 @@ try {
       situationCount: document.querySelectorAll('.reunion-v5-answer').length,
       reunionOverflow: document.querySelector('[data-qa-block="reunion"]') ? Math.ceil(document.querySelector('[data-qa-block="reunion"]').scrollWidth-document.querySelector('[data-qa-block="reunion"]').clientWidth) : 999,
       exportSystemCards: document.querySelectorAll('[data-qa-block="export-source"] .reading-export-system-v7').length,
+      birthRangeFields,
+      birthRangeOverflow: birthRange ? Math.ceil(birthRange.scrollWidth-birthRange.clientWidth) : 999,
     }
   })
 
@@ -79,6 +87,10 @@ try {
   assert(diagnostics.situationCount === 1, `only the selected observed state should render, got ${diagnostics.situationCount}`)
   assert(diagnostics.reunionOverflow <= 1, `reunion cards overflow the iPhone viewport by ${diagnostics.reunionOverflow}px`)
   assert(diagnostics.exportSystemCards === 1, `saved system synthesis bridge missing: ${diagnostics.exportSystemCards}`)
+  assert(diagnostics.birthRangeFields.length === 2, `birth-time range fixture did not render 2 fields`)
+  assert(diagnostics.birthRangeOverflow <= 1, `birth-time range overflows by ${diagnostics.birthRangeOverflow}px`)
+  assert(diagnostics.birthRangeFields[0].bottom <= diagnostics.birthRangeFields[1].top, `birth-time range fields overlap: ${JSON.stringify(diagnostics.birthRangeFields)}`)
+  assert(diagnostics.birthRangeFields.every(field=>field.inputLeft>=field.left-1&&field.inputRight<=field.right+1), `birth-time input escaped its field: ${JSON.stringify(diagnostics.birthRangeFields)}`)
 
   const quality = page.locator('[data-qa-block="interpretation-v2"]')
   const qualityText = await quality.innerText()
@@ -116,6 +128,7 @@ try {
 
   await page.screenshot({ path: path.join(outDir, 'mobile-full.png'), fullPage: true })
   await page.locator('[data-qa-block="systems"]').screenshot({ path: path.join(outDir, 'systems-mobile.png') })
+  await page.locator('[data-qa-block="birth-time-range"]').screenshot({ path: path.join(outDir, 'birth-time-range-mobile.png') })
   await page.locator('[data-qa-block="reunion"]').screenshot({ path: path.join(outDir, 'reunion-mobile.png') })
   await page.locator('[data-qa-block="export-source"]').screenshot({ path: path.join(outDir, 'export-source-mobile.png') })
 
