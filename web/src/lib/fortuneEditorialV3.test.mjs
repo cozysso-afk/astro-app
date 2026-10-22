@@ -233,7 +233,9 @@ test('overall hero accepts only verified reader-facing integrated editorial and 
   assert.match(panel,/const heroHeadline = fieldHeroHeadline \|\| integratedHeroHeadline \|\| fallbackHero\.headline/)
   assert.match(panel,/const heroSummary = fieldHeroSummary \|\| integratedHeroSummary \|\| fallbackHero\.summary/)
   assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
-  assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroHeadline\}<\/h3>/)
+  assert.match(panel,/const heroLead = period === 'today'[\s\S]*?relationshipDailyLead\(field, summary, calculation\.period\.start\) \?\? splitDailyHero\(heroHeadline\)/)
+  assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroLead\.title\}<\/h3>/)
+  assert.match(panel,/daily-reading-signal/)
 })
 
 test('main relationship and reference summaries cannot be overwritten by generic Gemini prose',()=>{
@@ -255,7 +257,7 @@ test('weak investment caution boilerplate is hidden from the reference list',()=
 test('hero subtitle removes the sentence already promoted into the headline',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/export function dedupeHeroSubtitle/)
-  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(heroSummary, heroHeadline\)/)
+  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(\[heroLead\.detail, heroSummary\]\.filter\(Boolean\)\.join\(' '\), heroLead\.title\)/)
   assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
   assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
 })
