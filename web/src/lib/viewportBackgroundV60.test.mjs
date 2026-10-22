@@ -99,10 +99,18 @@ test('birth and location form uses one readable type and control scale', () => {
 test('birth-time correction keeps an explicit range without claiming the app generated it', () => {
   assert.match(reliability, /생시 범위 시작/)
   assert.match(reliability, /생시 범위 끝/)
+  assert.match(reliability, /birth-time-range-field/)
   assert.doesNotMatch(reliability, /exact\(정확 생시\)|ASC\(상승점\)/)
   assert.match(reliability, /범위는 자동 생성하지 않아요/)
   assert.match(app, /rectified_window:\s*rectifiedWindow/)
   assert.match(precisionTransport, /source === 'rectified'/)
+})
+
+test('rectified birth-time range cannot overlap or escape the phone grid', () => {
+  assert.match(css, /\.app-shell \.field-grid > \.birth-time-range-field[\s\S]*overflow:\s*hidden\s*!important/)
+  assert.match(css, /\.app-shell \.birth-time-range-field input\[type='time'\][\s\S]*box-sizing:\s*border-box\s*!important/)
+  assert.match(css, /\.app-shell \.birth-time-range-field input\[type='time'\][\s\S]*max-width:\s*100%\s*!important/)
+  assert.match(css, /@media \(max-width: 480px\)[\s\S]*\.birth-time-range-field[\s\S]*grid-column:\s*1 \/ -1\s*!important/)
 })
 
 test('past reunion comparison uses plain language and visually active date controls', () => {
