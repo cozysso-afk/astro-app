@@ -95,6 +95,19 @@ export function thaiLifeSummary(keys:string[]) {
  return selected.length ? `${selected.join(', ')} 차례로 확인해봐.` : '이 분야와 연결된 생활 영역 자료가 없어.'
 }
 
+export function thaiLoveSummary(keys:string[]) {
+ const meanings:Record<string,string>={
+  boriwan:'평소 연락과 만남에서 챙김이 한쪽으로만 쏠리는지',
+  sri:'관계에서 편안함·신뢰·생활 여유 중 지금 지킬 조건이 무엇인지',
+  montri:'관계 고민을 혼자 단정하지 않고 조언을 구할 사람이 있는지',
+  kalakini:'관계를 막는 조건이 시간·거리·오해·역할 부담 중 무엇인지',
+ }
+ const selected=[...new Set(keys)].filter(k=>meanings[k]).slice(0,4).map(k=>meanings[k])
+ return selected.length
+  ? `${selected.join(', ')} 차례로 확인해봐. 상대의 마음이나 연애 성립을 판정한 결과는 아니야.`
+  : '이번 기간에는 애정 문제로 직접 연결할 태국점성술 생활 영역 근거가 부족해.'
+}
+
 export function thaiPeriodLabel(start:string,end:string) {
   return start===end ? `선택 날짜의 연간 배치 · ${start}` : `선택 기간의 연간 배치 · ${start}–${end}`
 }
@@ -111,7 +124,7 @@ export function lensForTopic(lens: Lens, topic: LifeTopic): Lens {
     비겁:['내 기준과 관계의 균형','관계 안에서 내 기준을 지키면서 상대와 균형을 맞추는 맥락이야. 친근함이 있어도 각자가 원하는 거리와 관계 방식이 다를 수 있어.','맞춰줄 수 있는 부분과 지키고 싶은 경계를 구체적으로 말해봐.'],
   }
   const copy = relationship[lens.key]
-  return copy ? {...lens,title:copy[0],meaning:copy[1],action:copy[2],limit:'계산된 십성을 관계의 생활 맥락으로 읽은 해설이야. 배우자성·상대 마음·연애 성립을 판정한 결과는 아니야.'} : lens
+  return copy ? {...lens,topic:'애정',title:copy[0],meaning:copy[1],action:copy[2],limit:'계산된 십성을 관계의 생활 맥락으로 읽은 해설이야. 배우자성·상대 마음·연애 성립을 판정한 결과는 아니야.'} : lens
 }
 
 export function thaiPlacementComparison(current: {bhumi_key:string;planet:{label:string}}, natal: Array<{bhumi_key:string;planet:{label:string}}>, isNatal: boolean): string {
