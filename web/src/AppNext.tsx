@@ -274,7 +274,7 @@ function parseOptionalNumber(value: string) {
 }
 function birthTimeRequestMeta(profile: BirthProfile, timeKnown = Boolean(profile.birthTime)) {
   const available = Boolean(timeKnown && profile.birthTime)
-  const rectifiedWindow = profile.timeSource === 'rectified' && (profile.rectifiedWindowStart || profile.rectifiedWindowEnd)
+  const rectifiedWindow = profile.timeConfidence !== 'exact' && (profile.rectifiedWindowStart || profile.rectifiedWindowEnd)
     ? { start: profile.rectifiedWindowStart || null, end: profile.rectifiedWindowEnd || null }
     : null
   return {

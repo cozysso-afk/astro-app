@@ -1,0 +1,206 @@
+/* V74 · one compact scale for reunion input, reading, and mobile cards. */
+.app-shell .reunion-observation-form {
+  gap: 10px !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+}
+
+.app-shell .reunion-observation-form > div:first-child {
+  gap: 3px;
+}
+
+.app-shell .reunion-observation-form > div:first-child > strong {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+}
+
+.app-shell .reunion-observation-form > div:first-child > span {
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+}
+
+.app-shell .reunion-observation-form .field {
+  gap: 5px !important;
+}
+
+.app-shell .reunion-observation-form .field > span {
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+}
+
+.app-shell .reunion-observation-form .field select {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding-inline: 12px 30px !important;
+  border-radius: 14px !important;
+  font-size: 15px !important;
+}
+
+.app-shell .reunion-observation-form .field small,
+.app-shell .reunion-observation-form details summary {
+  font-size: 12.5px !important;
+  line-height: 1.5 !important;
+}
+
+.relationship-experience[data-mode="reunion"] .reunion-ui-v5 :is(p, li, span, time, summary) {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-size: 14.5px;
+  line-height: 1.62;
+}
+
+.relationship-experience[data-mode="reunion"] .reunion-ui-v5 h3 {
+  margin: 4px 0 8px;
+  font-size: 19px;
+  line-height: 1.42;
+}
+
+.relationship-experience[data-mode="reunion"] .reunion-ui-v5 h4 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.reunion-ui-v5 .reunion-v5-answer {
+  padding: 16px;
+  border-radius: 15px;
+}
+
+.reunion-ui-v5 .reunion-v5-answer > span {
+  font-size: 12.5px !important;
+  font-weight: 750;
+}
+
+.reunion-ui-v5 .reunion-v5-stages {
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.reunion-ui-v5 .reunion-v5-stages article {
+  gap: 3px;
+  min-height: 68px;
+  padding: 11px 12px;
+  border-radius: 11px;
+}
+
+.reunion-ui-v5 .reunion-v5-stages article > span {
+  font-size: 12px !important;
+  color: #747e90;
+}
+
+.reunion-ui-v5 .reunion-v5-stages article > strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.reunion-ui-v5 .reunion-v5-stages article[data-stage-state="confirmed"] {
+  background: rgba(235, 247, 241, .86);
+}
+
+.reunion-ui-v5 .reunion-v5-stages article[data-stage-state="blocked"] {
+  background: rgba(246, 244, 248, .78);
+  color: #7c7584;
+}
+
+.reunion-ui-v5 .reunion-v5-section {
+  padding: 16px 0;
+}
+
+.reunion-ui-v5 .reunion-v5-directions {
+  gap: 9px;
+}
+
+.reunion-ui-v5 .reunion-v5-directions article {
+  display: grid;
+  gap: 5px;
+  padding: 12px 13px;
+  border-radius: 12px;
+}
+
+.reunion-ui-v5 .reunion-v5-directions article > b {
+  font-size: 14px;
+}
+
+.reunion-ui-v5 .reunion-v5-directions article > strong {
+  color: #675485;
+  font-size: 13px;
+}
+
+.reunion-ui-v5 .reunion-v5-directions article > p {
+  margin: 0;
+  font-size: 13.5px !important;
+  line-height: 1.58 !important;
+}
+
+.reunion-ui-v5 .reunion-v5-direction-summary {
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: rgba(241, 239, 248, .72);
+  font-size: 13.5px !important;
+}
+
+.reunion-ui-v5 .reunion-v5-meaning-grid,
+.reunion-ui-v5 .reunion-v5-conditions {
+  display: grid;
+  gap: 9px;
+}
+
+.reunion-ui-v5 .reunion-v5-meaning-card,
+.reunion-ui-v5 .reunion-v5-conditions > article {
+  padding: 13px 14px;
+  border: 1px solid #e0e3e8;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .78);
+}
+
+.reunion-ui-v5 .reunion-v5-meaning-card > b,
+.reunion-ui-v5 .reunion-v5-conditions b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.reunion-ui-v5 .reunion-v5-meaning-card > p {
+  margin: 0;
+}
+
+.reunion-ui-v5 .reunion-v5-conditions {
+  margin-top: 9px;
+}
+
+.reunion-ui-v5 .reunion-v5-conditions ul,
+.reunion-ui-v5 .reunion-v5-advice {
+  margin: 0;
+  padding-left: 19px;
+}
+
+.reunion-ui-v5 .reunion-v5-conditions li + li,
+.reunion-ui-v5 .reunion-v5-advice li + li {
+  margin-top: 5px;
+}
+
+/* Keep both birth-time endpoints inside one grid and visible for provisional times. */
+.app-shell .field-grid > .birth-time-range-field {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.app-shell .birth-time-range-field input[type="time"] {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+@media (min-width: 560px) {
+  .reunion-ui-v5 .reunion-v5-meaning-grid,
+  .reunion-ui-v5 .reunion-v5-conditions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .app-shell .field-grid > .birth-time-range-field {
+    grid-column: 1 / -1 !important;
+  }
+}

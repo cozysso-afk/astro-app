@@ -11,12 +11,12 @@ const PAGE_PADDING = 64
 const HEADER_HEIGHT = 148
 const FOOTER_HEIGHT = 58
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2
-const BODY_SIZE = 38
-const BODY_LINE = 50
-const SMALL_SIZE = 26
-const SMALL_LINE = 35
-const CARD_GAP = 22
-const SECTION_HEIGHT = 42
+const BODY_SIZE = 32
+const BODY_LINE = 44
+const SMALL_SIZE = 23
+const SMALL_LINE = 31
+const CARD_GAP = 18
+const SECTION_HEIGHT = 38
 
 const COLORS = {
   ink: '#34405d',
@@ -170,7 +170,9 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     const subtitle = firstSentences(textOf(modern, '.reunion-v5-answer p'), 2)
     const sections: ExportSection[] = []
 
-    const stageCards = dedupeCards(Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-stages > article')).map(card => ({
+    const stageCards = dedupeCards(Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-stages > article'))
+      .filter(card => card.dataset.stageState !== 'confirmed')
+      .map(card => ({
       eyebrow: '재회 단계',
       title: textOf(card, ':scope > span'),
       body: firstSentences(`${textOf(card, ':scope > strong')}. ${normalizeText(card.dataset.readingExportDetail)}`, 3),
@@ -181,21 +183,17 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     if (stageCards.length) sections.push({ title: '단계별로 보면', cards: stageCards })
 
     const directionCards = dedupeCards(Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-directions > article')).map(card => ({
+      eyebrow: textOf(card, ':scope > strong'),
       title: textOf(card, ':scope > b'),
       body: firstSentences(textOf(card, ':scope > p'), 2),
       tone: 'love' as const,
+      compact: true,
       editorial: true,
     })))
     const directionSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
       .find(section => textOf(section, ':scope > h4') === '받는 연락 · 보내는 연락')
-    const observedContact = directionSection ? directParagraphs(directionSection).filter(row => !/^입력한 실제 첫 연락:/.test(row)).at(-1) ?? '' : ''
-    if (observedContact) directionCards.unshift({
-      title: '현재 연락 상태',
-      body: firstSentences(observedContact, 2),
-      tone: 'plain',
-      compact: true,
-      editorial: true,
-    })
+    const observedContact = directionSection ? directParagraphs(directionSection).find(row => /^입력한 실제 첫 연락:/.test(row)) ?? '' : ''
+    if (observedContact && directionCards.length) directionCards[0].meta = observedContact
     if (directionCards.length) sections.push({ title: '연락 방향', cards: directionCards })
 
     const timingSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
@@ -226,20 +224,23 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
     const meaningSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
       .find(section => textOf(section, ':scope > h4') === '관계를 이해하는 해설')
     if (meaningSection) {
-      const meaningCards = dedupeCards([
-        ...Array.from(meaningSection.querySelectorAll<HTMLElement>(':scope > p')).map((paragraph, index) => ({
-          title: textOf(paragraph, ':scope > b') || (index === 0 ? '다시 떠오르는 이유' : '관계 해설'),
-          body: firstSentences(normalizeText(paragraph.innerText).replace(textOf(paragraph, ':scope > b'), '').trim(), 3),
+      const coreMeaningCards = Array.from(meaningSection.querySelectorAll<HTMLElement>('.reunion-v5-meaning-card'))
+        .filter(card => textOf(card, ':scope > b') !== '다시 만났을 때의 유지력')
+        .map((card, index) => ({
+          title: textOf(card, ':scope > b') || (index === 0 ? '왜 다시 연결됐나' : '관계 해설'),
+          body: firstSentences(textOf(card, ':scope > p'), 4),
           tone: 'love' as const,
+          compact: index > 0,
           editorial: true,
-        })),
-        ...Array.from(meaningSection.querySelectorAll<HTMLElement>('details > p')).slice(0, 2).map((paragraph, index) => ({
-          title: index === 0 ? '다시 시작하려면' : '관계에서 지킬 것',
-          body: firstSentences(paragraph.innerText, 2),
+        }))
+      const conditionCards = Array.from(meaningSection.querySelectorAll<HTMLElement>('.reunion-v5-conditions > article')).slice(0, 1).map(card => ({
+          title: textOf(card, ':scope > b'),
+          body: firstSentences(Array.from(card.querySelectorAll('li')).map(item=>normalizeText(item.textContent)).join(' '), 3),
           tone: 'plain' as const,
+          compact: true,
           editorial: true,
-        })),
-      ])
+        }))
+      const meaningCards = dedupeCards([...coreMeaningCards, ...conditionCards]).slice(0, 4)
       if (meaningCards.length) sections.push({ title: '관계를 이해하는 해설', cards: meaningCards })
     }
     return { title: label, date, hero, subtitle, sections }
@@ -388,10 +389,10 @@ async function ensureExportFonts() {
   if (typeof document === 'undefined' || !document.fonts) return
   try {
     await Promise.all([
-      document.fonts.load('500 38px "Nanum Myeongjo"'),
-      document.fonts.load('700 38px "Nanum Myeongjo"'),
-      document.fonts.load('500 38px "Noto Serif KR"'),
-      document.fonts.load('700 38px "Noto Serif KR"'),
+      document.fonts.load('500 32px "Nanum Myeongjo"'),
+      document.fonts.load('700 32px "Nanum Myeongjo"'),
+      document.fonts.load('500 32px "Noto Serif KR"'),
+      document.fonts.load('700 32px "Noto Serif KR"'),
     ])
   } catch {
     // AppleMyungjo/Batang remain deterministic local serif fallbacks on supported clients.
@@ -415,17 +416,17 @@ function cardMetrics(card: ExportCard) {
   const compact = Boolean(card.compact)
   return {
     compact,
-    titleSize: compact ? 31 : 34,
-    titleLine: compact ? 40 : 45,
-    bodySize: compact ? 34 : BODY_SIZE,
-    bodyLine: compact ? 44 : BODY_LINE,
-    smallSize: compact ? 24 : SMALL_SIZE,
-    smallLine: compact ? 32 : SMALL_LINE,
+    titleSize: compact ? 27 : 30,
+    titleLine: compact ? 36 : 40,
+    bodySize: compact ? 29 : BODY_SIZE,
+    bodyLine: compact ? 39 : BODY_LINE,
+    smallSize: compact ? 21 : SMALL_SIZE,
+    smallLine: compact ? 28 : SMALL_LINE,
     maxBodyLines: compact ? 3 : card.emphasis ? 5 : 6,
-    top: compact ? 28 : 34,
-    bottom: compact ? 26 : 32,
-    eyebrowHeight: card.eyebrow ? (compact ? 34 : 39) : 0,
-    xPad: compact ? 34 : 38,
+    top: compact ? 23 : 28,
+    bottom: compact ? 22 : 27,
+    eyebrowHeight: card.eyebrow ? (compact ? 30 : 34) : 0,
+    xPad: compact ? 31 : 34,
   }
 }
 

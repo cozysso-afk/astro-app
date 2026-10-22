@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const fortune=readFileSync(new URL('./fortuneUserSummary.ts',import.meta.url),'utf8')
 const fallback=readFileSync(new URL('./basicFortuneReading.ts',import.meta.url),'utf8')
-const panel=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
+const panel=readFileSync(new URL('../ReunionHierarchyPanelV3.tsx',import.meta.url),'utf8')
 const edge=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
 const qa=readFileSync(new URL('../EditorialQaPreview.tsx',import.meta.url),'utf8')
@@ -18,21 +18,23 @@ test('daily home headline never drops back to the generic topic-list sentence',(
 })
 
 test('hierarchy reunion shows a full human story before technical evidence',()=>{
-  assert.match(panel,/지금 두 사람 사이에서 살아 있는 흐름/)
-  assert.match(panel,/왜 다시 신경 쓰이거나 연결될 수 있나/)
-  assert.match(panel,/지금 어디까지 와 있나/)
-  assert.match(panel,/연락이 닿은 뒤, 재회까지는 뭐가 남나/)
-  assert.match(panel,/다시 멀어질 수 있는 지점/)
-  assert.match(panel,/여러 근거가 같이 가리키는 부분/)
-  assert.ok(panel.indexOf('지금 두 사람 사이에서 살아 있는 흐름') < panel.indexOf('앞으로의 후보 시기'))
+  assert.match(panel,/재회 흐름 한눈에/)
+  assert.match(panel,/받는 연락 · 보내는 연락/)
+  assert.match(panel,/앞으로 주목할 시기/)
+  assert.match(panel,/지금 확인할 것/)
+  assert.match(panel,/왜 다시 연결됐나/)
+  assert.match(panel,/재회로 넘어가려면/)
+  assert.match(panel,/다시 깨질 수 있는 지점/)
+  assert.ok(panel.indexOf('재회 흐름 한눈에') < panel.indexOf('계산 근거와 점수 보기'))
 })
 
 test('rich reunion prose has a new cache contract and explicit depth instruction',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.0-answerability-evidence"/)
-  assert.match(cache,/relationship-v13\.0-answerability-evidence-v1/)
-  assert.match(edge,/summary는 5~7문장/)
+  assert.match(edge,/REUNION_VERSION="relationship-v13\.3-stage-answer"/)
+  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
+  assert.match(edge,/summary는 2~3문장/)
   assert.match(edge,/why_reconnect는 conclusion\+interpretation을 합쳐 6~9문장/)
   assert.match(edge,/오브와 전문용어 나열은 기술 근거로 밀어라/)
+  assert.match(edge,/reunion_observation\.state가 messaging이면 연락 발생은 이미 끝난 질문이다/)
 })
 
 
@@ -45,12 +47,10 @@ test('display bands separate nearby scores without changing ranking thresholds',
 })
 
 test('reunion dates are framed as candidate windows and QA labels stay minimal',()=>{
-  assert.match(panel,/앞으로의 후보 시기/)
-  assert.match(panel,/사건 확정일 아님/)
-  assert.doesNotMatch(panel,/핵심 날짜 \{w\.date\}/)
-  assert.match(qa,/2026-10-21 전후/)
-  assert.match(qa,/해당 단계의 장기·중기·사건 촉발 근거가 함께 통과하는 기간/)
-  assert.doesNotMatch(qa,/QA fixture · 재회운 사람말 본문/)
+  assert.match(panel,/앞으로 주목할 시기/)
+  assert.match(panel,/표시된 날짜는 해당 단계의 계산 신호가 있는 시기예요/)
+  assert.match(panel,/event\.stage === nextObserved/)
+  assert.doesNotMatch(panel,/핵심 날짜/)
 })
 
 test('daily and weekly hero copy never leaks internal shorthand or checklist nouns',()=>{
@@ -61,18 +61,19 @@ test('daily and weekly hero copy never leaks internal shorthand or checklist nou
 })
 
 test('hierarchy numeric support uses stage-gated candidates rather than generic direction scores',()=>{
-  assert.match(panel,/reunion-stage-status/)
-  assert.match(panel,/contact_recontact/)
-  assert.match(panel,/미래 후보 \$\{stage\.candidate_count\}개/)
-  assert.match(panel,/사건 확률이나 현재 감정 세기가 아니라/)
-  assert.doesNotMatch(panel,/재접촉 활성도<\/b><strong>\{view\.reconnection\.score/)
+  assert.match(panel,/const stageState/)
+  assert.match(panel,/return 'blocked'/)
+  assert.match(panel,/앞 단계 미확인/)
+  assert.match(panel,/활성도 \$\{displayScore\(score\)\}/)
+  assert.match(panel,/실제 선연락이나 답장 여부를 뜻하는 확률은 아니에요/)
 })
 
 test('reunion prose contract is score-aware and validates every major human section',()=>{
   assert.match(edge,/candidate_count가 0이면 그 단계에는 공개할 미래 후보가 없다고 써라/)
   assert.match(edge,/generic incoming\/outgoing\/reconnection 점수로 hierarchy gate를 덮어쓰지 마라/)
-  assert.match(edge,/why\.length<need\(420\)/)
-  assert.match(edge,/timing\?\.conclusion.*need\(220\)/s)
-  assert.match(edge,/rebuild\?\.conclusion.*need\(240\)/s)
-  assert.match(edge,/repeat_risks\?\.conclusion.*need\(140\)/s)
+  assert.match(edge,/whyConclusion\.length<12/)
+  assert.match(edge,/whyInterpretation\.length<24/)
+  assert.match(edge,/timing\?\.conclusion.*length<12/s)
+  assert.match(edge,/rebuild\?\.conclusion.*length<12/s)
+  assert.match(edge,/repeat_risks\?\.conclusion.*length<12/s)
 })

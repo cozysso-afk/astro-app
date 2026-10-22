@@ -618,14 +618,14 @@ def _rectified_window_scan_spec(profile, reliability):
         "window_source": "rectified_range",
         "range_start": start_text,
         "range_end": end_text,
-        "policy": "user-provided rectified range is used for diagnostic birth-time sensitivity; the entered clock time remains the representative chart time.",
+        "policy": "user-provided birth-time range is used for diagnostic birth-time sensitivity; the entered clock time remains the representative chart time.",
     }
 
 
 def _birth_time_sensitivity_scan(variable_profile, fixed_chart, variable_side):
     reliability = resolve_birth_time_reliability(variable_profile)
     spec = sensitivity_scan_spec(reliability)
-    if spec is not None and reliability.get("time_source") == "rectified":
+    if spec is not None and reliability.get("provisional") and reliability.get("rectified_window"):
         spec = _rectified_window_scan_spec(variable_profile, reliability) or spec
     if spec is None:
         reason = "verified exact birth time; diagnostic scan not required" if reliability.get("time_exact") else "no concrete birth time available to scan"

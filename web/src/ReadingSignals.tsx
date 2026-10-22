@@ -14,7 +14,7 @@ export function ReadingBadge({ kind, label }: { kind: ReadingSignal; label?: str
   return <span className={`reading-badge signal-${kind}`}><Icon size={13} aria-hidden="true"/>{label ?? title}</span>
 }
 
-export type DirectionRow = { kind: 'incoming'|'outgoing'|'reconnection'; label: string; band?: string; text?: string; timing?: string }
+export type DirectionRow = { kind: 'incoming'|'outgoing'|'reconnection'; label: string; score?: number; band?: string; text?: string; timing?: string }
 export function ReadingDirections({ rows }: { rows: DirectionRow[] }) {
   return <div className="reading-direction-panel">{rows.map(row=>{
     const text=row.text ?? '이 방향을 판단할 계산 정보가 없어.'

@@ -187,6 +187,26 @@ def test_provisional_rectified_range_drives_the_sensitivity_scan_without_changin
     assert center["candidate_local"].endswith("T21:25")
 
 
+def test_provisional_estimate_range_also_drives_the_sensitivity_scan():
+    user = _profile()
+    counterpart = _profile(
+        birth_date=date(1992, 2, 29),
+        birth_time=dt_time(21, 25),
+        latitude=35.1595,
+        longitude=126.8526,
+        time_source="arbitrary_input",
+        time_confidence="low",
+    )
+    counterpart["rectified_window"] = {"start": "20:55", "end": "21:55"}
+    out = rw.build_relationship_western(user, counterpart, [], analysis_mode="reunion")
+    scan = out["sensitivity_scan"]["counterpart"]
+    assert scan["available"] is True
+    assert scan["window_source"] == "rectified_range"
+    assert scan["range_start"] == "20:55"
+    assert scan["range_end"] == "21:55"
+    assert scan["shifts_minutes"] == [-30, -15, 0, 15, 30]
+
+
 def test_transit_hits_report_layer_class_orb_grade_and_non_probability_contract():
     transit = {"positions": {"Mercury": {"lon": 10.0}, "Jupiter": {"lon": 10.0}}, "angles": {}}
     natal = {

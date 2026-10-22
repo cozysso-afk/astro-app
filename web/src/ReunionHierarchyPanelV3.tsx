@@ -2,12 +2,12 @@ import type { Aspect, RelationshipAiResponse, ReunionObservationContext } from '
 import { ReadingTimeline, type DirectionRow } from './ReadingSignals'
 import type { ReunionHierarchy } from './lib/reunionHierarchy'
 import { polishKoreanSentence } from './lib/fortuneNarrativePolish'
-import { compareObservedEvents, nextUnconfirmedStage, observationReading, observedStage, REUNION_STAGE_ORDER } from './lib/reunionObservation'
+import { compareObservedEvents, nextUnconfirmedStage, observationReading, observedStage, REUNION_STAGE_ORDER, type ReunionStage } from './lib/reunionObservation'
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
 type Strength = '낮음' | '보통' | '높음' | '정보 부족'
 type ContactAvailabilityState = 'not_calculated' | 'calculated_no_candidate' | 'candidate_not_top' | 'current_active' | 'future_candidate'
-type ScoredDirection = DirectionRow & { score?: number }
+type ScoredDirection = DirectionRow
 
 type StageVerdict = {
   key: string
@@ -127,6 +127,25 @@ function rowScore(row?: ScoredDirection) {
   return typeof row?.score === 'number' && Number.isFinite(row.score) ? row.score : null
 }
 
+function displayScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function directionReading(rows: DirectionRow[], kind:'incoming'|'outgoing') {
+  const row = directionRow(rows, kind)
+  const score = rowScore(row)
+  const direction = kind === 'incoming' ? '상대 쪽 흐름이 내 관계 영역을 건드리는 정도' : '내 쪽 흐름이 상대 관계 영역을 건드리는 정도'
+  if (score == null) return {
+    metric:'계산값 없음',
+    text:`${direction}를 따로 비교할 값이 없어요. 다른 방향의 점수로 대신 채우지 않아요.`,
+  }
+  const band = row?.band || strengthFromActivation(score)
+  return {
+    metric:`활성도 ${displayScore(score)} · ${band}`,
+    text:`${direction}를 나타내는 상대 활성도예요. 실제 선연락이나 답장 여부를 뜻하는 확률은 아니에요.`,
+  }
+}
+
 function bandRank(value?: string) {
   return value === '강함' ? 3 : value === '보통' ? 2 : value === '약함' ? 1 : 0
 }
@@ -140,29 +159,27 @@ function initiativeReading(rows: DirectionRow[]) {
     const diff = a - b
     const roundedA = Math.round(a)
     const roundedB = Math.round(b)
-    if (diff === 0) return { label:'판정상 동률', text:`상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 계산값이 같아서 어느 쪽이 먼저라고 구분되지 않아.` }
+    if (diff === 0) return { label:'두 방향 차이 없음', text:`수신 ${roundedA}, 발신 ${roundedB}로 같아요. 어느 쪽이 먼저 연락한다는 예측으로 바꾸지 않아요.` }
     if (Math.abs(diff) < 5) {
-      const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
-      const pointGap = Math.abs(roundedA - roundedB)
       return {
-        label:`${micro} 근소 우세`,
-        text:`연락 자체 강도와 별개로 상대 비교에서는 ${micro}가 ${pointGap}점 앞서. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 다만 차이가 근소해서 실제 선연락 주체를 확정한다는 뜻은 아니야.`,
+        label:'두 방향 차이 작음',
+        text:`수신 ${roundedA}, 발신 ${roundedB}로 차이가 작아요. 이 정도 차이로 실제 선연락 주체를 정하지 않아요.`,
       }
     }
-    const side = diff > 0 ? '상대 → 나' : '나 → 상대'
+    const side = diff > 0 ? '수신 쪽' : '발신 쪽'
     const pointGap = Math.abs(roundedA - roundedB)
     const weak = a < 40 && b < 40
     return {
-      label:`${side} 우세`,
+      label:`${side} 상대 활성도 높음`,
       text: weak
-        ? `두 방향 모두 연락 자체 강도는 낮지만 상대 비교에서는 ${side}가 ${pointGap}점 앞서. 상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}.`
-        : `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 상대 비교에서는 ${side}가 ${pointGap}점 앞서.`,
+        ? `수신 ${roundedA}, 발신 ${roundedB}로 둘 다 낮은 구간이지만 ${side}이 ${pointGap}점 높아요. 행동 예측이 아니라 두 계산축의 상대 비교예요.`
+        : `수신 ${roundedA}, 발신 ${roundedB}로 ${side}이 ${pointGap}점 높아요. 먼저 연락할 사람을 확정하는 값은 아니에요.`,
     }
   }
   const ar = bandRank(incoming?.band)
   const br = bandRank(outgoing?.band)
-  if (ar && br && ar !== br) return { label: ar > br ? '상대 → 나 약우세' : '나 → 상대 약우세', text:'두 방향의 등급 차이는 있지만 실제 선연락 행동을 확정하는 값은 아니야.' }
-  return { label:'판정 보류', text:'두 방향을 비교할 독립 계산값이 충분하지 않아 선연락 주체를 만들지 않아.' }
+  if (ar && br && ar !== br) return { label: ar > br ? '수신 쪽 등급 높음' : '발신 쪽 등급 높음', text:'두 방향의 등급 차이는 보여 주되 실제 선연락 행동을 확정하지 않아요.' }
+  return { label:'방향 비교 불가', text:'수신과 발신을 비교할 독립 계산값이 충분하지 않아요.' }
 }
 
 function calculatedCurrentState(hierarchy: ReunionHierarchy) {
@@ -303,7 +320,7 @@ function contextualGuide(context: ReunionObservationContext, contactBand: Streng
 
 function timeline(hierarchy: ReunionHierarchy) {
   const seenStages = new Set<string>()
-  const rows = [] as Array<{ date:string; kind:'rebuilding'|'incoming'|'reconnection'; label:string; status:string }>
+  const rows = [] as Array<{ date:string; kind:'rebuilding'|'incoming'|'reconnection'; label:string; status:string; stage:string }>
   for (const row of hierarchy.top_periods) {
     if (seenStages.has(row.stage)) continue
     seenStages.add(row.stage)
@@ -312,6 +329,7 @@ function timeline(hierarchy: ReunionHierarchy) {
       kind: row.stage === 'relationship_rebuilding' ? 'rebuilding' : row.stage === 'contact_recontact' ? 'incoming' : 'reconnection',
       label: STAGE_LABEL[row.stage] ?? row.label,
       status:'주목',
+      stage:row.stage,
     })
     if (rows.length >= 3) break
   }
@@ -345,6 +363,8 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const valid = hierarchyData.validation?.status === 'PASS'
   const contact = contactReading(hierarchyData)
   const initiative = initiativeReading(directionRows)
+  const incomingDirection = directionReading(directionRows, 'incoming')
+  const outgoingDirection = directionReading(directionRows, 'outgoing')
   const change = behaviorChangeReading(hierarchyData)
   const stages = stageSet(hierarchyData)
   const stageRows = stageVerdicts(hierarchyData)
@@ -392,21 +412,42 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
     if (stage.candidate_count === 0) return '뚜렷한 시기 없음'
     return strengthFromActivation(stage.activation) === '정보 부족' ? '시기 신호 있음' : strengthFromActivation(stage.activation)
   }
+  const stageHasEvidence = (key:string) => {
+    const stage = hierarchyData.stages[key]
+    return hierarchyData.current_windows.some(row=>row.stage===key)
+      || hierarchyData.top_periods.some(row=>row.stage===key)
+      || Boolean(stage && typeof stage.candidate_count === 'number' && stage.candidate_count > 0)
+  }
+  const stageState = (row:StageVerdict) => {
+    const rowIndex = REUNION_STAGE_ORDER.indexOf(row.key as ReunionStage)
+    const observedIndex = observedLevel ? REUNION_STAGE_ORDER.indexOf(observedLevel) : -1
+    if (observedIndex >= rowIndex) return 'confirmed'
+    for (let index=Math.max(0,observedIndex+1); index<rowIndex; index += 1) {
+      if (!stageHasEvidence(REUNION_STAGE_ORDER[index])) return 'blocked'
+    }
+    return stageHasEvidence(row.key) ? 'signal' : 'empty'
+  }
+  const stageDisplayStatus = (row:StageVerdict) => {
+    const state = stageState(row)
+    if (state === 'confirmed') return '확인됨'
+    if (state === 'blocked') return '앞 단계 미확인'
+    return statusFor(row)
+  }
   const nextRow = nextObserved ? stageRows.find(row => row.key === nextObserved) : null
-  const nextSummary = nextRow
-    ? statusFor(nextRow) === '뚜렷한 시기 없음'
-      ? `이번 조회 기간에는 ${nextRow.label}을 뒷받침하는 뚜렷한 시기를 찾지 못했어요. 불가능하다는 뜻은 아니에요.`
-      : `다음으로 살펴볼 것은 ${nextRow.label}이에요. 계산 신호는 ‘${statusFor(nextRow)}’으로 나타나요.`
-    : '다시 합의한 관계가 이어지는지, 이전 문제를 함께 풀어가는지 살펴보세요.'
   const stateTitle = observed.title.replace('관측 사실 · ', '')
+  const nextStatus = nextRow ? stageDisplayStatus(nextRow) : ''
+  const nextSummary = nextRow
+    ? nextStatus === '뚜렷한 시기 없음'
+      ? `연락·만남의 현재 사실은 그대로 두더라도, 이번 조회 기간에는 다음 단계인 ${nextRow.label}으로 넘어가는 뚜렷한 시기를 찾지 못했어요. 지금 결과만으로 재회 성립 쪽에 무게를 싣기는 어려워요.`
+      : `다음 관문은 ${nextRow.label}이에요. 이 단계의 계산 상태는 ‘${nextStatus}’예요.`
+    : '다시 합의한 관계가 이어지는지, 이전 문제를 함께 풀어가는지 살펴보세요.'
   const safeNarrative = (value?: string | null) => sentenceList(value)
     .filter(row => !TECHNICAL_RE.test(row) && !/관문|후보|TOP|완전히 닫|통과 점수|활성도|검증|3일 이상/.test(row))
     .slice(0, 2).join(' ')
-  const whyNarrative = safeNarrative(reunionV2?.why_reconnect?.interpretation)
-    || safeNarrative(reunionV2?.why_reconnect?.conclusion)
-    || safeNarrative(why)
-  const riskNarrative = safeNarrative(reunionV2?.repeat_risks?.conclusion)
-    || safeNarrative(repeat)
+  const whyNarrative = readerSentences(rawWhy, 4) || safeNarrative(why)
+  const rebuildNarrative = readerSentences(`${consultation?.meeting_gate ?? ''} ${consultation?.rebuild_gate ?? ''} ${reunionV2?.rebuild?.conclusion ?? ''}`, 4)
+  const riskNarrative = readerSentences(`${reunionV2?.repeat_risks?.conclusion ?? ''} ${(reunionV2?.repeat_risks?.patterns ?? []).join(' ')}`, 3) || safeNarrative(repeat)
+  const sustainabilityNarrative = readerSentences(sustainabilityText, 2)
   const adviceNarratives = [...rebuildConditions, ...repeatPatterns]
     .map(item => safeNarrative(item))
     .filter((item, index, rows) => item && rows.indexOf(item) === index)
@@ -414,7 +455,8 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const futureEvents = events.filter(event => {
     const date = event.date.slice(0, 10)
     const end = event.date.slice(-10)
-    return (end >= hierarchyData.as_of_date || date >= hierarchyData.as_of_date)
+    const isFuture = end >= hierarchyData.as_of_date || date >= hierarchyData.as_of_date
+    return isFuture && (!nextObserved || event.stage === nextObserved)
   })
   return <section className="reading-section reunion-hierarchy reunion-ui-v5">
     <header className="reunion-result-meta"><span>기준일 {hierarchyData.as_of_date}</span></header>
@@ -425,18 +467,18 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         <p>{observation.state ? nextSummary : '실제 연락·만남 여부를 입력하면 지금 단계에 맞춰 읽을 수 있어요.'}</p>
       </section>
       <div className="reunion-v5-stages" aria-label="재회 단계별 흐름">
-        {stageRows.map(row => <article key={row.key} data-reading-export-detail={safeNarrative(row.text)}>
-          <span>{row.label}</span><strong>{statusFor(row)}</strong>
+        {stageRows.map(row => <article key={row.key} data-stage-state={stageState(row)} data-reading-export-detail={safeNarrative(row.text)}>
+          <span>{row.label}</span><strong>{stageDisplayStatus(row)}</strong>
         </article>)}
       </div>
       <section className="reunion-v5-section">
         <h4>받는 연락 · 보내는 연락</h4>
         <div className="reunion-v5-directions">
-          <article><b>수신 · 상대 → 나</b><p>상대가 먼저 연락할지는 현재 계산으로 판단하기 어려워요.</p></article>
-          <article><b>발신 · 나 → 상대</b><p>내가 먼저 연락했을 때 답장이 올지, 대화가 잘 풀릴지는 별도 판단 근거가 없어요.</p></article>
+          <article><b>수신 · 상대 → 나</b><strong>{incomingDirection.metric}</strong><p>{incomingDirection.text}</p></article>
+          <article><b>발신 · 나 → 상대</b><strong>{outgoingDirection.metric}</strong><p>{outgoingDirection.text}</p></article>
         </div>
         {actualInitiator ? <p className="reunion-v5-note">입력한 실제 첫 연락: {actualInitiator}</p> : null}
-        {contactAlreadyObserved ? <p>연락은 이미 재개됐어요. 대화 지속 여부를 별도로 예측하는 점수는 없으니, 답장이 오가는지와 구체적인 만남 제안을 확인하세요.</p> : <p>{nextSummary}</p>}
+        <p className="reunion-v5-direction-summary"><b>{initiative.label}</b> · {initiative.text}</p>
       </section>
       <section className="reunion-v5-section">
         <h4>앞으로 주목할 시기</h4>
@@ -449,11 +491,16 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
       </section>
       {reunionV2 ? <section className="reunion-v5-section">
         <h4>관계를 이해하는 해설</h4>
-        {whyNarrative ? <p><b>다시 떠오르는 이유</b><br/>{whyNarrative}</p> : <p>이번 해설에는 다시 연결되는 정서적 이유를 단정할 만큼 충분한 문장이 없어요.</p>}
-        {riskNarrative ? <p><b>반복되기 쉬운 문제</b><br/>{riskNarrative}</p> : null}
-        {adviceNarratives.length > 0 ? <details><summary>관계 조언 더 보기</summary>
-          {adviceNarratives.map((item,index)=><p key={index}>{item}</p>)}
-        </details> : null}
+        <div className="reunion-v5-meaning-grid">
+          {whyNarrative ? <article className="reunion-v5-meaning-card"><b>왜 다시 연결됐나</b><p>{whyNarrative}</p></article> : <article className="reunion-v5-meaning-card"><b>왜 다시 연결됐나</b><p>정서적 이유를 개인화해서 설명할 계산 문장이 부족해요.</p></article>}
+          {rebuildNarrative ? <article className="reunion-v5-meaning-card"><b>재회로 넘어가려면</b><p>{rebuildNarrative}</p></article> : null}
+          {sustainabilityNarrative ? <article className="reunion-v5-meaning-card"><b>다시 만났을 때의 유지력</b><p>{sustainabilityNarrative}</p></article> : null}
+          {riskNarrative ? <article className="reunion-v5-meaning-card"><b>다시 깨질 수 있는 지점</b><p>{riskNarrative}</p></article> : null}
+        </div>
+        {(nextUp.length > 0 || down.length > 0) ? <div className="reunion-v5-conditions">
+          {nextUp.length > 0 ? <article><b>판정을 올리는 현실 신호</b><ul>{nextUp.slice(0,2).map((item,index)=><li key={index}>{item}</li>)}</ul></article> : null}
+          {down.length > 0 ? <article><b>다시 낮춰 봐야 할 신호</b><ul>{down.slice(0,2).map((item,index)=><li key={index}>{item}</li>)}</ul></article> : null}
+        </div> : adviceNarratives.length > 0 ? <ul className="reunion-v5-advice">{adviceNarratives.slice(0,2).map((item,index)=><li key={index}>{item}</li>)}</ul> : null}
       </section> : null}
       <details className="reunion-v5-details"><summary>지난 시기와 실제 기록 비교</summary>
         <p>이미 지난 날짜의 비교 자료예요. 예측 적중률을 뜻하지 않아요.</p>

@@ -93,6 +93,6 @@ test('technical causal prose is retained when plain-language sentences do not fi
 })
 
 test('reunion authored cache is invalidated for the temporal evidence contract', () => {
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.2-readable"/)
-  assert.match(cache,/relationship-v13\.2-readable-v1-consultation-depth-v3/)
+  assert.match(edge,/REUNION_VERSION="relationship-v13\.3-stage-answer"/)
+  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
 })
