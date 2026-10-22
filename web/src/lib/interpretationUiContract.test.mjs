@@ -141,7 +141,7 @@ test('period default view uses the natural view model and keeps raw prose in one
   const defaultMarkup = period.slice(renderStart, technicalStart)
   const technicalMarkup = period.slice(technicalStart)
 
-  assert.match(defaultMarkup, /heroHeadline/)
+  assert.match(defaultMarkup, /dailyLead\.title/)
   assert.match(defaultMarkup, /heroSummary/)
   assert.match(period.slice(0, renderStart), /const semanticHero = !westernOnly && \(period === 'today' \|\| period === 'week'\)/)
   assert.match(period.slice(0, renderStart), /const heroHeadline = semanticHero[\s\S]*userSummary\.headline[\s\S]*verifiedHero/)
@@ -178,7 +178,7 @@ test('relationship focus uses plain labels and only renders useful structured di
 })
 
 test('primary topics stay concise and reference topics are one-line collapsed items', () => {
-  const focusStart = period.indexOf('className="period-ai-window-section period-ai-user-focus"')
+  const focusStart = period.indexOf('period-ai-window-section period-ai-user-focus')
   const referenceStart = period.indexOf('className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"')
   const technicalStart = period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')
   assert.ok(focusStart >= 0 && referenceStart > focusStart && technicalStart > referenceStart)

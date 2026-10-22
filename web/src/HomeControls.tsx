@@ -53,7 +53,6 @@ function shiftPeriod(value: string, period: PeriodKey, amount: number) {
   return toDateValue(date)
 }
 function displayRange(value: string, period: PeriodKey) {
-  if (period === 'today') return value
   if (period === 'week') {
     const start = mondayOf(value); const end = shiftPeriod(start,'today',6)
     return `${start} → ${end} · 월~일`
@@ -64,13 +63,17 @@ function displayRange(value: string, period: PeriodKey) {
   }
   return `${value.slice(0,4)}년 · 1월 1일 → 12월 31일`
 }
+function shortKoreanDate(value: string) {
+  const [year,month,day] = value.split('-').map(Number)
+  return `${year}. ${month}. ${day}.`
+}
 
 export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthProfile, hasProfile, queryDate, period, selectedTool, apiStatus, apiLabel, onOpenProfile, onQueryDateChange, onPeriodSelect, onToolSelect }: HomeControlsProps) {
   const periodDriven = selectedTool === null || selectedTool === 'precision'
   const dateControlVisible = selectedTool !== 'integrated' && selectedTool !== 'location' && selectedTool !== 'horary'
   const effectivePeriod: PeriodKey = periodDriven ? period : 'today'
   const now = toDateValue(new Date())
-  const resetLabel = effectivePeriod === 'today' ? '오늘' : effectivePeriod === 'week' ? '이번 주' : effectivePeriod === 'month' ? '이번 달' : '올해'
+  const resetLabel = effectivePeriod === 'today' ? '오늘로' : effectivePeriod === 'week' ? '이번 주' : effectivePeriod === 'month' ? '이번 달' : '올해'
   const year = Number(queryDate.slice(0,4)) || new Date().getFullYear()
   const yearOptions = Array.from({length:16},(_,i)=>year-5+i)
   const pickerLabel = periodDriven ? (effectivePeriod === 'today' ? '운세 날짜' : effectivePeriod === 'week' ? '주간 선택 · 월요일~일요일' : effectivePeriod === 'month' ? '월간 선택 · 달력 월' : '연간 선택 · 달력 연도') : '관계 분석 기준 날짜'
@@ -91,7 +94,7 @@ export function HomeControls({ fieldHub, workspace='period', onWorkspace, birthP
         <div className="date-control period-date-control"><CalendarDays size={19}/>{effectivePeriod==='month'?<input id="query-date" type="month" value={queryDate.slice(0,7)} onChange={(e)=>e.target.value&&onQueryDateChange(`${e.target.value}-01`)}/>:effectivePeriod==='year'?<select id="query-date" value={String(year)} onChange={(e)=>onQueryDateChange(`${e.target.value}-01-01`)}>{yearOptions.map((item)=><option value={item} key={item}>{item}년</option>)}</select>:<input id="query-date" type="date" value={queryDate} onChange={(e)=>onQueryDateChange(e.target.value)}/>}</div>
         <button className="period-step-button" type="button" aria-label="다음 기간" onClick={()=>onQueryDateChange(shiftPeriod(queryDate,effectivePeriod,1))}><ChevronRight size={18}/></button>
       </div>
-      <div className="period-picker-caption"><strong>{displayRange(queryDate,effectivePeriod)}</strong><button type="button" onClick={()=>onQueryDateChange(resetDate)}>{resetLabel}</button></div>
+      <div className={`period-picker-caption ${effectivePeriod==='today'?'is-today-context':''}`}><strong>{effectivePeriod === 'today' ? <><span>선택한 운세일</span>{shortKoreanDate(queryDate)}</> : displayRange(queryDate,effectivePeriod)}</strong><button type="button" onClick={()=>onQueryDateChange(resetDate)}>{effectivePeriod==='today'?<><span>오늘</span>{shortKoreanDate(now)}</>:resetLabel}</button></div>
     </section>}
 
     <section className="section-block period-fortune-section home-fortune-group">
