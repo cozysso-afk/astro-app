@@ -73,6 +73,33 @@ export function dedupeHeroSubtitle(summary: string, headline: string) {
   return text
 }
 
+function splitDailyHero(value: string) {
+  const clean = String(value ?? '').trim()
+  const match = clean.match(/^(.+?[.!?])(?:\s+|$)([\s\S]*)$/)
+  return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: clean, detail: '' }
+}
+
+function localDateIso() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
+
+function relationshipDailyLead(field: FortuneField | undefined, summary: ReturnType<typeof polishFortuneSummary>, selectedDate: string) {
+  if (field?.id !== 'love' && field?.id !== 'contact') return null
+  const day = selectedDate === localDateIso() ? '오늘' : '선택한 운세일'
+  const incoming = summary.relationship?.incomingBand ?? '정보 부족'
+  const outgoing = summary.relationship?.outgoingBand ?? '정보 부족'
+  if (field.id === 'contact') return {
+    title: `${day} 연락운은 받는 연락과 내가 먼저 보낼 연락을 나눠 봐.`,
+    detail: `상대 → 나 수신 활성도는 ${incoming}, 나 → 상대 발신 적합도는 ${outgoing}이야. 점수보다 실제 답장 내용과 대화가 이어지는지를 확인해.`,
+  }
+  return {
+    title: `${day} 애정운은 마음을 추측하기보다 실제 대화와 다음 약속이 이어지는지 확인해.`,
+    detail: `상대 → 나 수신 활성도는 ${incoming}, 나 → 상대 발신 적합도는 ${outgoing}이야. 호감 표현 하나보다 질문과 답장이 오가고 만남 제안이 구체화되는지를 봐.`,
+  }
+}
+
 function importantWindowStatus(kind?: 'favorable' | 'caution' | 'mixed') {
   if (kind === 'favorable') return '진행 후보'
   if (kind === 'caution') return '확인 필요'
@@ -162,7 +189,17 @@ export function PeriodFortuneNarrativeV2({
   const fieldHeroSummary = verifiedNarrative && field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
   const heroHeadline = fieldHeroHeadline || integratedHeroHeadline || fallbackHero.headline
   const heroSummary = fieldHeroSummary || integratedHeroSummary || fallbackHero.summary
-  const heroSubtitle = dedupeHeroSubtitle(heroSummary, heroHeadline)
+  const heroLead = period === 'today'
+    ? relationshipDailyLead(field, summary, calculation.period.start) ?? splitDailyHero(heroHeadline)
+    : { title: heroHeadline, detail: '' }
+  const displayWhen = period === 'today'
+    ? (calculation.period.start === localDateIso() ? '오늘' : '선택한 운세일')
+    : summary.when
+  const heroSubtitle = dedupeHeroSubtitle([heroLead.detail, heroSummary].filter(Boolean).join(' '), heroLead.title)
+  const dailyLeadCard = period === 'today'
+    ? [...summary.favorableCards, ...summary.cautionCards]
+      .sort((a, b) => Math.abs(b.score - 50) - Math.abs(a.score - 50))[0]
+    : undefined
   const referenceFlowCards = relationshipReferenceFlowCards(summary, calculation)
   const visibleReferenceTopics = summary.referenceTopics.filter(item => !(item.topic === '투자주의' && /약/.test(item.band)))
   const showLongPeriodNarrative = verifiedNarrative && !field && (period === 'month' || period === 'year')
@@ -233,10 +270,14 @@ export function PeriodFortuneNarrativeV2({
   return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3 period-ai-v4" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
       <div>
-        <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {summary.when} 핵심</span>
-        <span className="reading-period-date" data-reading-export-tone="date">{periodLabel(calculation.period.start, calculation.period.end)}</span>
-        <h3 className="period-ai-hero-title-v4">{heroHeadline}</h3>
+        <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {displayWhen} 핵심</span>
+        <span className="reading-period-date" data-reading-export-tone="date">{calculation.period.start === calculation.period.end ? '운세일 · ' : '운세 기간 · '}{periodLabel(calculation.period.start, calculation.period.end)}</span>
+        {period === 'today' && calculation.period.start !== localDateIso() && <small className="reading-actual-today">실제 오늘 · {localDateIso()}</small>}
+        <h3 className="period-ai-hero-title-v4">{heroLead.title}</h3>
         {heroSubtitle && <p className="reading-hero-subtitle">{heroSubtitle}</p>}
+        {dailyLeadCard && <div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}>
+          <strong>{Math.round(dailyLeadCard.score)}점</strong><span><b>{dailyLeadCard.topic}</b>이 {displayWhen} 가장 두드러진 분야<small>분야별 상대 활성도 · 사건이 생길 확률은 아님</small></span>
+        </div>}
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-import type { FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
+import type { FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 import { fortuneEvidenceSnapshot, fortunePresentationTone } from './fortuneToneCalibration.ts'
 
@@ -63,11 +63,14 @@ const TOPIC_GUIDE: Record<string, TopicGuide> = {
   투자주의: { nuance:'주의 점수가 낮아도 안전하다는 뜻은 아니고, 높다고 반드시 하락한다는 뜻도 아니야. 위험을 얼마나 감당할 수 있는지 점검하는 지표야.', practice:'포지션 크기와 최대 손실 범위를 먼저 확인하고 시장 데이터가 달라지면 그 기준을 우선해.', caution:'운세의 위험 신호를 실제 가격 전망처럼 받아들이거나 포지션을 과하게 늘리지 마.' },
 }
 
-const PLANETS: Record<string,string> = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성' }
-const ASPECTS: Record<string,string> = { trine:'삼분위', sextile:'육십분위', square:'사분위', opposition:'충', conjunction:'합' }
+function localDateIso() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
 
-function periodWord(period: PeriodKey, dayCount: number) {
-  if (period === 'today' || dayCount <= 1) return '오늘'
+function periodWord(period: PeriodKey, dayCount: number, selectedDate: string) {
+  if (period === 'today' || dayCount <= 1) return selectedDate === localDateIso() ? '오늘' : '선택한 운세일'
   if (period === 'week' || dayCount <= 9) return '이번 주'
   if (period === 'month' || dayCount <= 45) return '이번 달'
   return '올해'
@@ -86,27 +89,9 @@ function subject(topic:string) {
   const mark=end>=0&&end<=11171&&end%28!==0?'은':'는'
   return topic+mark
 }
-function evidenceBrief(calculation:IntegratedApiResponse,topic:string) {
-  const e=fortuneEvidenceSnapshot(calculation,topic)
-  if(e.support&&e.challenge)return '도움 '+e.support+' / 부담 '+e.challenge
-  if(e.support)return '도움 '+e.support
-  if(e.challenge)return '부담 '+e.challenge
-  if(e.neutral)return '중립 '+e.neutral
-  return ''
-}
-
 function meaningFor(topic: string, tone: BasicFortuneTone) {
   const copy = ACTION_COPY[topic] ?? ['활용할 부분을 구체적으로 확인해.', '평소 계획을 유지하면서 변화를 봐.', '큰 결정보다 확인과 점검을 먼저 해.']
   return tone === 'good' ? copy[0] : tone === 'caution' ? copy[2] : copy[1]
-}
-
-function strongestEvidence(calculation: IntegratedApiResponse, topic: string): FortuneDailyEvidence | undefined {
-  const rows = (calculation.western.daily_scores ?? [])
-    .filter((day)=>day.date >= calculation.period.start && day.date <= calculation.period.end)
-    .flatMap((day)=>day.evidence ?? [])
-    .filter((evidence)=>evidence.source_topics?.includes(topic))
-    .sort((a,b)=>Math.abs(Number(b.contribution ?? 0))-Math.abs(Number(a.contribution ?? 0)))
-  return rows[0]
 }
 
 function evidenceReason(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat) {
@@ -116,10 +101,10 @@ function evidenceReason(calculation: IntegratedApiResponse, topic: string, stat:
     const weight = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 더 큰 편이야.'
       : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 더 큰 편이야.'
         : '긍정·부정 근거가 비슷한 수준이라 방향을 하나로 확정하기 어려워.'
-    return `${scoreSentence} 도움: ${snapshot.support}. 부담: ${snapshot.challenge}. ${weight}`
+    return `${scoreSentence} 도움 방향과 부담 방향이 함께 계산됐어. ${weight}`
   }
   if (snapshot.support || snapshot.challenge) {
-    return `${scoreSentence} 주요 ${snapshot.support ? '도움' : '부담'} 근거: ${snapshot.support ?? snapshot.challenge}. 한 가지 배치만으로 사건을 단정하지 않아.`
+    return `${scoreSentence} ${snapshot.support ? '도움' : '부담'} 방향이 상대적으로 더 두드러졌지만, 이것만으로 실제 사건을 단정하지 않아.`
   }
   return scoreSentence
 }
@@ -139,24 +124,16 @@ function rowFor(calculation: IntegratedApiResponse, topic: string): BasicFortune
   if (!stat || !Number.isFinite(stat.average)) return null
   const tone = toneFor(calculation, topic, stat)
   const guide = TOPIC_GUIDE[topic] ?? { nuance:'이 분야는 점수 하나보다 실제 상황과 함께 읽어야 해.', practice:'지금 할 수 있는 행동을 하나 정해서 구체적으로 확인해.', caution:'한 번의 신호만으로 결과를 확정하지 마.' }
-  const evidence = fortuneEvidenceSnapshot(calculation, topic)
-  const activePractice = evidence.support && evidence.challenge
-    ? `도움 근거(${evidence.support})와 부담 근거(${evidence.challenge})에 연결된 실제 반응을 별도로 기록해.`
-    : evidence.support ? `도움 근거(${evidence.support})가 보이는 시기의 실제 진행 상황을 확인해.`
-      : evidence.challenge ? `부담 근거(${evidence.challenge})가 있는 시기의 무리한 결정을 피하고 조건을 점검해.`
-        : evidence.neutral ? `중립 근거(${evidence.neutral})를 사건 예측으로 바꾸지 말고 실제 변화를 대조해.` : ''
-  const activeCaution = evidence.challenge
-    ? `부담 근거 ${evidence.challenge}만으로 부정적인 사건을 확정하지는 마.` : ''
   return {
     topic,
     score: stat.average,
     band: stat.band,
     tone,
-    meaning: evidenceBrief(calculation,topic) ? `${meaningFor(topic,tone)} 실제 근거: ${evidenceBrief(calculation,topic)}.` : meaningFor(topic,tone),
+    meaning: meaningFor(topic,tone),
     nuance: guide.nuance,
     why: evidenceReason(calculation, topic, stat),
-    practice: activePractice ? `${guide.practice} ${activePractice}` : guide.practice,
-    caution: activeCaution ? `${guide.caution} ${activeCaution}` : guide.caution,
+    practice: guide.practice,
+    caution: guide.caution,
     timing: timingFor(calculation, topic, stat),
   }
 }
@@ -167,7 +144,7 @@ function topicList(calculation: IntegratedApiResponse, field?: FortuneField) {
 }
 
 export function buildBasicFortuneReading(calculation: IntegratedApiResponse, period: PeriodKey, field?: FortuneField): BasicFortuneReading {
-  const when = periodWord(period, calculation.period.day_count)
+  const when = periodWord(period, calculation.period.day_count, calculation.period.start)
   const rows = topicList(calculation, field)
   const favorable = rows.filter((row)=>row.tone === 'good').sort((a,b)=>b.score-a.score).slice(0,2)
   const caution = rows.filter((row)=>row.tone === 'caution').sort((a,b)=>a.topic === '투자주의' ? -1 : b.topic === '투자주의' ? 1 : a.score-b.score).slice(0,2)
@@ -184,10 +161,9 @@ export function buildBasicFortuneReading(calculation: IntegratedApiResponse, per
       .find(item => item.evidence.support || item.evidence.challenge || item.evidence.neutral)
     if (grounded) {
       const {row, evidence} = grounded
-      const both = evidence.support && evidence.challenge
-      headline = both
-        ? `${when} ${subject(row.topic)} 도움 근거(${evidence.support})와 부담 근거(${evidence.challenge})가 동시에 보여. 어느 한쪽으로 결과를 단정하기 어려워.`
-        : `${when} ${row.topic}에서는 ${evidence.support ?? evidence.challenge ?? evidence.neutral} 근거가 확인돼. 사건 확정은 아니야.`
+      headline = evidence.support && evidence.challenge
+        ? `${when} ${subject(row.topic)} 도움과 부담 방향이 함께 보여. 한쪽으로 미리 결론 내리지 말고 실제 조건을 확인해.`
+        : `${when} ${subject(row.topic)} 평소보다 신경 써 볼 움직임이 있어. 실제 상황을 확인한 뒤 판단해.`
     } else if (field?.label) headline = `${when} ${field.label}은 크게 밀어붙이기보다 계획한 범위 안에서 움직이면 무난해.`
   }
   const summary = field?.label
