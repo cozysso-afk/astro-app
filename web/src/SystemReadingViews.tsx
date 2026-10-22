@@ -5,7 +5,7 @@ import type { FortuneField } from './lib/fortuneFields'
 import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
 import type { IntegratedApiResponse, FortuneStat } from './appTypes'
-import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, ganzhiWithReading, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
+import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiLoveSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, ganzhiWithReading, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
 import { ReadingExplanation } from './ReadingExplanation'
 
 const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
@@ -72,8 +72,9 @@ function sajuLeadSentence(lens:Lens) {
 }
 function sajuOverviewText(lenses:Lens[], fallback:string) {
   if (!lenses.length) return fallback
-  const concise = sajuLeadSentence(lenses[0])
-  const secondary = lenses[1] ? SAJU_SECONDARY_COPY[lenses[1].key] : ''
+  const relationshipScoped = lenses[0].topic === '애정'
+  const concise = relationshipScoped ? lenses[0].action : sajuLeadSentence(lenses[0])
+  const secondary = lenses[1] ? (relationshipScoped ? lenses[1].title : SAJU_SECONDARY_COPY[lenses[1].key]) : ''
   return `${concise}${secondary ? ` 이어서 ${secondary}도 확인해.` : ''}`
 }
 const WESTERN_NEUTRAL_COPY: Record<string,string> = {
@@ -164,8 +165,9 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const selectedBhumi=activeWheel.filter(r=>THAI_LIFE_KEYS[topic].includes(r.bhumi_key))
   const thaiReaderSummary = topic==='전체'
     ? thaiPeriodOverview(westernWhen(c.period.day_count))
-    : selectedBhumi.length ? thaiLifeSummary(selectedBhumi.map(r=>r.bhumi_key)) : '이 분야와 연결된 생활 영역 자료가 없어.'
+    : selectedBhumi.length ? (topic==='애정' ? thaiLoveSummary(selectedBhumi.map(r=>r.bhumi_key)) : thaiLifeSummary(selectedBhumi.map(r=>r.bhumi_key))) : '이 분야와 연결된 생활 영역 자료가 없어.'
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
+  const periodCaption = c.period.start === c.period.end ? `운세일 · ${period}` : `운세 기간 · ${period}`
   const westernPeriod = westernWhen(c.period.day_count)
   const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod,c)
   const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod,c)
@@ -182,7 +184,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
         {view.thai&&(view.natalWheel.length||view.wheels.length)>0 ? <article className="system-thai"><strong><Sparkles size={16}/>태국점성술</strong><p>{thaiReaderSummary}</p><small>행성 이름과 배치는 태국점성술 탭의 계산 상세에서 확인해.</small></article>:<p className="system-unavailable">태국점성술 · 현재 정밀도 또는 사용 가능한 배치가 부족해.</p>}
       </div><details className="system-synthesis"><summary>세 체계에서 지금 확인할 것</summary><p><b>서양점성술</b> · {westernOverviewSummary}</p>{view.saju&&view.contexts.length&&<p><b>사주</b> · {sajuOverviewSummary}</p>}{view.thai&&(view.natalWheel.length||view.wheels.length)>0&&<p><b>태국점성술</b> · {thaiReaderSummary}</p>}<small>세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해.</small></details></section>
   return <section className={`system-reading system-${system}`}>
-    <span className="reading-period-date">{period}</span>
+    <span className="reading-period-date">{periodCaption}</span>
     <div className="system-switcher" role="group" aria-label="해석 체계 선택">{SYSTEMS.map(({id,label,Icon})=><button type="button" aria-pressed={system===id} key={id} onClick={()=>{setSystem(id);setTopic(field?.lens ?? '전체')}}><Icon size={18} aria-hidden="true"/><span>{label}</span></button>)}</div>
     {!field&&<div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!available(t)} title={!available(t)?(system==='saju'&&SAJU_LIFE_KEYS[t].length===0?'현재 계산 자료만으로는 이 분야를 직접 설명할 근거가 부족해':'이 체계에서 연결된 근거가 부족해'):undefined} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
     {field&&<h3>{field.label} · {period}</h3>}
