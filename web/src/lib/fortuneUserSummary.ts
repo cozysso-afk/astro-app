@@ -678,15 +678,15 @@ function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string
   const scene = DAILY_HEADLINE_SCENE[focus]
   const direction = fortuneToneAssessment(context.calculation, focus).direction
   const snapshot = fortuneEvidenceSnapshot(context.calculation, focus)
-  if (direction === 'neutral' && snapshot.neutral) return `오늘 ${focus}${particle(focus,'은','는')} ${snapshot.neutral}의 중립적인 활성 근거가 있어. 좋거나 나쁜 사건을 확정할 신호는 아니야.`
+  if (direction === 'neutral' && snapshot.neutral) return `오늘 ${focus}${particle(focus,'은','는')} 평소 흐름에 가까워. 좋거나 나쁜 사건을 확정할 신호는 아니야.`
   if (direction === 'mixed' && snapshot.support && snapshot.challenge) {
     const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 상대적으로 커.'
       : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 상대적으로 커.'
         : '한쪽이 뚜렷하게 우세하지 않아.'
-    return `오늘 ${focus}${particle(focus,'은','는')} 도움 근거(${snapshot.support})와 부담 근거(${snapshot.challenge})가 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.`
+    return `오늘 ${focus}${particle(focus,'은','는')} 도움과 부담 방향이 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.`
   }
-  if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use} ${snapshot.support ? `주요 근거는 ${snapshot.support}야.` : ''}`
-  if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution} ${snapshot.challenge ? `주요 근거는 ${snapshot.challenge}야.` : ''}`
+  if (direction === 'supportive') return `${focus}만 놓고 보면 오늘은 ${scene.use}`
+  if (direction === 'challenging') return `${focus}만 놓고 보면 오늘은 ${scene.caution}`
   return `${focus}만 놓고 보면 오늘은 좋거나 나쁜 사건을 강하게 가를 근거가 없어. ${NEUTRAL_PRACTICE[focus] ?? '평소 흐름을 유지하는 구간이야.'}`
 }
 
@@ -846,9 +846,9 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
   })
   const evidence = evidenceTopic ? fortuneEvidenceSnapshot(context.calculation, evidenceTopic) : null
   const grounded = evidenceTopic && evidence?.support && evidence?.challenge
-    ? `${when} ${evidenceTopic}은 ${evidence.support}의 도움 근거와 ${evidence.challenge}의 부담 근거가 함께 잡혀. ${evidence.dominantDirection === 'balanced' ? '상반된 신호라 어느 한쪽으로 단정하기 어려워.' : evidence.dominantDirection === 'supportive' ? '도움 쪽의 기여도가 더 크지만 실제 결과는 별도로 확인해야 해.' : '부담 쪽의 기여도가 더 크지만 실제 결과는 별도로 확인해야 해.'}`
+    ? `${when} ${evidenceTopic}은 도움과 부담 방향이 함께 잡혀. ${evidence.dominantDirection === 'balanced' ? '한쪽으로 단정하기 어려우니 실제 반응을 확인해.' : evidence.dominantDirection === 'supportive' ? '도움 쪽이 더 두드러지지만 실제 결과는 별도로 확인해.' : '부담 쪽이 더 두드러지니 서두르지 말고 실제 조건을 확인해.'}`
     : evidenceTopic && (evidence?.support || evidence?.challenge)
-      ? `${when} ${evidenceTopic}의 주요 근거는 ${evidence.support ?? evidence.challenge}야. 사건 확정이 아니라 계산상 활성 신호로 읽어.`
+      ? `${when} ${evidenceTopic}은 평소보다 신경 써 볼 움직임이 있어. 사건 확정이 아니라 실제 상황을 확인할 신호로 읽어.`
       : ''
   return bestFlow.length && cautionFlow.length
     ? `${when}${particle(when, '은', '는')} ${joinTopics(bestFlow)}에 힘을 쓰기 괜찮지만, ${joinTopics(cautionFlow)} 쪽은 속도를 낮추는 편이 좋아. ${grounded}`
@@ -858,19 +858,7 @@ function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], 
 }
 
 function evidenceLedHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext): string {
-  const base = buildHeadline(when, bestFlow, cautionFlow, consistency, context)
-  const candidates = context.focusTopics?.length ? context.focusTopics : [...bestFlow, ...cautionFlow, ...Object.keys(context.calculation.western.overall ?? {})]
-  const topic = candidates.find(name => {
-    const snapshot=fortuneEvidenceSnapshot(context.calculation,name)
-    return snapshot.support || snapshot.challenge || snapshot.neutral
-  })
-  if (!topic) return base
-  const snapshot=fortuneEvidenceSnapshot(context.calculation,topic)
-  const refs = [snapshot.support ? '도움: '+snapshot.support : '',
-    snapshot.challenge ? '부담: '+snapshot.challenge : '',
-    snapshot.neutral && !snapshot.support && !snapshot.challenge ? '중립: '+snapshot.neutral : ''].filter(Boolean)
-  if (!refs.length || refs.every(text=>base.includes(text.split(': ').at(-1) ?? ''))) return base
-  return `${base} ${topic}의 핵심 근거는 ${refs.join(' / ')}. 계산 근거는 현실 사건의 확정이 아니야.`
+  return buildHeadline(when, bestFlow, cautionFlow, consistency, context)
 }
 
 export function buildFortuneUserSummary(data: InterpretationData, context: FortuneUserSummaryContext): FortuneUserSummary {
@@ -933,13 +921,10 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     const cautionText = topic === '재회'
       ? consistency.reconnectionCaution
       : snapshot.challenge
-        ? `${clean(narrative?.avoid) ?? copy.caution} 실제 부담 근거: ${snapshot.challenge}. 이것만으로 사건을 확정하지 마.`
+        ? `${clean(narrative?.avoid) ?? copy.caution} 부담 방향이 있어도 이것만으로 사건을 확정하지 마.`
         : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : undefined)
-    const groundedAction = snapshot.support || snapshot.challenge || snapshot.neutral
-    const actionWithEvidence = groundedAction && !action.includes(groundedAction)
-      ? `${action} 참고할 계산 근거는 ${groundedAction}이야. 해당 시기 실제 행동과 반응을 따로 대조해.` : action
     return { topic, conclusion, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level, direction),
-      timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action: actionWithEvidence, observe: realLifeDepth(topic) || copy.observe,
+      timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,
       caution: cautionText }
   }
   const focusTopics = selected.map(explainTopic)
@@ -952,7 +937,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
         : topic === '재회' ? consistency.reconnectionMeaning : (FLOW_COPY[topic]?.[level === 'low' ? 1 : 0] ?? '평소 계획 유지'),
     })})
   const windowTopics = [...new Map([...selected, ...best, ...caution].map(row => [row.topic, row])).values()]
-  const importantWindows: FortuneUserWindow[] = frame.kind === 'day' ? context.allowIntraday ? (context.calculation.western.detail_days ?? [])
+  const rawImportantWindows: FortuneUserWindow[] = frame.kind === 'day' ? context.allowIntraday ? (context.calculation.western.detail_days ?? [])
     .filter(day => day.date === context.calculation.period.start)
     .flatMap(day => windowTopics.flatMap(row => {
       const detail = day.topics[row.topic]
@@ -966,9 +951,22 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
           : `${row.topic} · ${FLOW_COPY[row.topic]?.[kind === 'caution' ? 1 : 0] ?? '흐름 살펴보기'}`
         return [{ date: `${point.start}–${point.end}`, kind, semantic: row.topic === '재회' ? 'reconnection' as const : undefined, guidance }]
       })
-    })).slice(0, 8) : [] : (data.key_windows ?? [])
+    })) : [] : (data.key_windows ?? [])
     .filter(window => window.signal !== '배경' && window.start >= context.calculation.period.start && (window.end || window.start) >= window.start && (window.end || window.start) <= context.calculation.period.end && window.topics?.length)
     .map(window => ({ date: !window.end || window.start === window.end ? window.start : `${window.start}~${window.end}`, kind: window.signal === '활용' ? 'favorable' as const : window.signal === '주의' ? 'caution' as const : 'mixed' as const, semantic: window.topics.length === 1 && window.topics[0] === '재회' ? 'reconnection' as const : undefined, guidance: naturalWindowGuidance(window.signal, window.topics) })).slice(0, 6)
+  const importantWindows: FortuneUserWindow[] = frame.kind === 'day'
+    ? [...new Map(rawImportantWindows.map(window => [window.date, window] as const)).keys()].map(date => {
+        const rows = rawImportantWindows.filter(window => window.date === date)
+        const favorableTopics = [...new Set(rows.filter(window => window.kind === 'favorable').map(window => window.guidance.split(' · ')[0]).filter(Boolean))]
+        const cautionTopics = [...new Set(rows.filter(window => window.kind === 'caution').map(window => window.guidance.split(' · ')[0]).filter(Boolean))]
+        const kind = favorableTopics.length && cautionTopics.length ? 'mixed' as const : cautionTopics.length ? 'caution' as const : 'favorable' as const
+        const guidance = favorableTopics.length && cautionTopics.length
+          ? `${favorableTopics.join('·')}은 활용 후보로, ${cautionTopics.join('·')}은 서두르지 말고 확인해.`
+          : favorableTopics.length ? `${favorableTopics.join('·')}에 힘을 쓰기 좋은 후보 시간대야.`
+            : `${cautionTopics.join('·')}은 결론을 서두르지 말고 조건을 다시 확인해.`
+        return { date, kind, guidance }
+      }).slice(0, 4)
+    : rawImportantWindows
   return {
     periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? daySummary(bestFlow, cautionFlow) : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
