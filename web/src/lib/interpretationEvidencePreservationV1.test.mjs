@@ -76,7 +76,7 @@ test('reunion UI distinguishes availability states instead of collapsing no-cand
     "current_active",
     "future_candidate",
     "계산됨 · 미래 후보 없음",
-    "핵심 TOP 미포함",
+    "우선 시기 미포함",
     "현재 활성",
   ]) assert.ok(panel.includes(marker),`missing state marker: ${marker}`)
   assert.match(panel,/candidateCount === 0/)
