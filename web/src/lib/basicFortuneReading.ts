@@ -101,12 +101,24 @@ function evidenceReason(calculation: IntegratedApiResponse, topic: string, stat:
     const weight = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 더 큰 편이야.'
       : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 더 큰 편이야.'
         : '긍정·부정 근거가 비슷한 수준이라 방향을 하나로 확정하기 어려워.'
-    return `${scoreSentence} 도움 방향과 부담 방향이 함께 계산됐어. ${weight}`
+    return `${scoreSentence} 도움 근거는 ${snapshot.support}, 부담 근거는 ${snapshot.challenge}로 잡혔어. ${weight}`
   }
   if (snapshot.support || snapshot.challenge) {
-    return `${scoreSentence} ${snapshot.support ? '도움' : '부담'} 방향이 상대적으로 더 두드러졌지만, 이것만으로 실제 사건을 단정하지 않아.`
+    const evidence = snapshot.support ?? snapshot.challenge
+    return `${scoreSentence} ${snapshot.support ? '도움' : '부담'} 근거는 ${evidence}로 잡혔지만, 이것만으로 실제 사건을 단정하지 않아.`
   }
+  if (snapshot.neutral) return `${scoreSentence} 중립 근거는 ${snapshot.neutral}로 잡혔어. 이 배치만으로 유리하거나 불리하다고 단정하지 않아.`
   return scoreSentence
+}
+
+function headlineEvidence(calculation: IntegratedApiResponse, topic: string) {
+  const snapshot = fortuneEvidenceSnapshot(calculation, topic)
+  const parts = [
+    snapshot.support ? `도움 근거 ${snapshot.support}` : '',
+    snapshot.challenge ? `부담 근거 ${snapshot.challenge}` : '',
+    snapshot.neutral ? `중립 근거 ${snapshot.neutral}` : '',
+  ].filter(Boolean)
+  return parts.length ? ` 계산 근거: ${parts.join(' / ')}.` : ''
 }
 
 function timingFor(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat) {
@@ -153,17 +165,17 @@ export function buildBasicFortuneReading(calculation: IntegratedApiResponse, per
   const watch = caution[0]
   const scope = field?.label ? `${field.label}에서 ` : ''
   let headline = `${when}은 크게 치우친 흐름보다 평소 계획을 지키는 쪽이 좋아.`
-  if (best && watch) headline = `${when}: ${subject(best.topic)} ${best.meaning} ${subject(watch.topic)} ${watch.meaning}`
-  else if (best) headline = `${when}: ${subject(best.topic)} ${best.meaning}`
-  else if (watch) headline = `${when}: ${subject(watch.topic)} ${watch.meaning}`
+  if (best && watch) headline = `${when}: ${subject(best.topic)} ${best.meaning} ${subject(watch.topic)} ${watch.meaning}${headlineEvidence(calculation, best.topic)}${watch.topic === best.topic ? '' : headlineEvidence(calculation, watch.topic)}`
+  else if (best) headline = `${when}: ${subject(best.topic)} ${best.meaning}${headlineEvidence(calculation, best.topic)}`
+  else if (watch) headline = `${when}: ${subject(watch.topic)} ${watch.meaning}${headlineEvidence(calculation, watch.topic)}`
   else {
     const grounded = steady.map(row => ({row, evidence: fortuneEvidenceSnapshot(calculation, row.topic)}))
       .find(item => item.evidence.support || item.evidence.challenge || item.evidence.neutral)
     if (grounded) {
       const {row, evidence} = grounded
       headline = evidence.support && evidence.challenge
-        ? `${when} ${subject(row.topic)} 도움과 부담 방향이 함께 보여. 한쪽으로 미리 결론 내리지 말고 실제 조건을 확인해.`
-        : `${when} ${subject(row.topic)} 평소보다 신경 써 볼 움직임이 있어. 실제 상황을 확인한 뒤 판단해.`
+        ? `${when} ${subject(row.topic)} 도움과 부담 방향이 함께 보여. 한쪽으로 미리 결론 내리지 말고 실제 조건을 확인해.${headlineEvidence(calculation, row.topic)}`
+        : `${when} ${subject(row.topic)} 평소보다 신경 써 볼 움직임이 있어. 실제 상황을 확인한 뒤 판단해.${headlineEvidence(calculation, row.topic)}`
     } else if (field?.label) headline = `${when} ${field.label}은 크게 밀어붙이기보다 계획한 범위 안에서 움직이면 무난해.`
   }
   const summary = field?.label

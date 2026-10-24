@@ -16,14 +16,14 @@ test('contact observed: advances to meeting and gives a direct reunion verdict',
  assert.doesNotMatch(html,/>0</)
  assert.doesNotMatch(html,/TOP|통과 점수|완전히 닫/)
 })
-test('incoming and outgoing are separately displayed without relabeling chart scores as action predictions',()=>{
+test('incoming and outgoing are visibly separated while chart scores stay non-predictive',()=>{
  const html=render({directionRows:[{kind:'incoming',score:21.1},{kind:'outgoing',score:24.1}]})
- assert.match(html,/상대 차트 쪽 활성/)
- assert.match(html,/내 차트 쪽 활성/)
+ assert.match(html,/수신 · 상대 → 나/)
+ assert.match(html,/발신 · 나 → 상대/)
  assert.match(html,/활성도 21.1/)
  assert.match(html,/활성도 24.1/)
  assert.match(html,/상대 차트 활성도: 21.1/)
- assert.doesNotMatch(html,/수신 ·|발신 ·|상대 → 나|나 → 상대/)
+ assert.match(html,/실제 선연락이나 답장 여부를 뜻하는 확률은 아니에요/)
  assert.doesNotMatch(html,/근소 우세/)
 })
 test('empty AI arrays never leak a zero node and missing activation is not coerced to zero',()=>{
@@ -34,7 +34,7 @@ test('empty AI arrays never leak a zero node and missing activation is not coerc
 test('failed validation never shows predictive content',()=>{
  const html=render({hierarchyData:{...hierarchy,validation:{status:'FAIL'}}})
  assert.match(html,/다시 계산/)
- assert.doesNotMatch(html,/상대 차트 쪽 활성/)
+ assert.doesNotMatch(html,/수신 · 상대 → 나/)
 })
 test('zero orb is an angular precision display while missing orb is excluded',()=>{
  const html=render({evidence:[{a:'Mars',b:'Saturn',aspect:'square',orb:0}]})

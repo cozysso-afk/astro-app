@@ -668,6 +668,16 @@ const DAILY_FOLLOW_THROUGH: Record<string,string> = {
   투자주의:'이미 정한 위험 한도 안에서 움직이고 있는지 확인해.',
 }
 
+function readableEvidenceNote(context: FortuneUserSummaryContext, topic: string) {
+  const snapshot = fortuneEvidenceSnapshot(context.calculation, topic)
+  const parts = [
+    snapshot.support ? `도움 근거 ${snapshot.support}` : '',
+    snapshot.challenge ? `부담 근거 ${snapshot.challenge}` : '',
+    snapshot.neutral ? `중립 근거 ${snapshot.neutral}` : '',
+  ].filter(Boolean)
+  return parts.length ? ` 계산 근거: ${parts.join(' / ')}.` : ''
+}
+
 function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string[], cautionFlow: string[]): string {
   const { dayLabel } = readingDateSemantics(context.calculation.period.start)
   const focus = (context.focusTopics ?? []).find(topic => DAILY_HEADLINE_SCENE[topic])
@@ -684,15 +694,15 @@ function focusedDayFallback(context: FortuneUserSummaryContext, bestFlow: string
   const scene = DAILY_HEADLINE_SCENE[focus]
   const direction = fortuneToneAssessment(context.calculation, focus).direction
   const snapshot = fortuneEvidenceSnapshot(context.calculation, focus)
-  if (direction === 'neutral' && snapshot.neutral) return `${dayLabel} ${focus}${particle(focus,'은','는')} 평소 흐름에 가까워. 좋거나 나쁜 사건을 확정할 신호는 아니야.`
+  if (direction === 'neutral' && snapshot.neutral) return `${dayLabel} ${focus}${particle(focus,'은','는')} 평소 흐름에 가까워. 좋거나 나쁜 사건을 확정할 신호는 아니야.${readableEvidenceNote(context, focus)}`
   if (direction === 'mixed' && snapshot.support && snapshot.challenge) {
     const emphasis = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 상대적으로 커.'
       : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 상대적으로 커.'
         : '한쪽이 뚜렷하게 우세하지 않아.'
-    return `${dayLabel} ${focus}${particle(focus,'은','는')} 도움과 부담 방향이 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.`
+    return `${dayLabel} ${focus}${particle(focus,'은','는')} 도움과 부담 방향이 함께 보여. ${emphasis} 실제 결과를 확정하는 뜻은 아니야.${readableEvidenceNote(context, focus)}`
   }
-  if (direction === 'supportive') return `${focus}만 놓고 보면 ${dayLabel}에는 ${scene.use}`
-  if (direction === 'challenging') return `${focus}만 놓고 보면 ${dayLabel}에는 ${scene.caution}`
+  if (direction === 'supportive') return `${focus}만 놓고 보면 ${dayLabel}에는 ${scene.use}${readableEvidenceNote(context, focus)}`
+  if (direction === 'challenging') return `${focus}만 놓고 보면 ${dayLabel}에는 ${scene.caution}${readableEvidenceNote(context, focus)}`
   return `${focus}만 놓고 보면 ${dayLabel}에는 좋거나 나쁜 사건을 강하게 가를 근거가 없어. ${NEUTRAL_PRACTICE[focus] ?? '평소 흐름을 유지하는 구간이야.'}`
 }
 
@@ -735,7 +745,7 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   const separating = /Separating|분리/i.test(motion)
   if (separating) {
     const followThrough = DAILY_FOLLOW_THROUGH[lead.topic] ?? '이미 시작된 일이 실제 행동으로 이어지는지 확인해.'
-    return `${lead.topic}에서 ${dayLabel} 남아 있는 핵심은 ${focus}이야. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}`
+    return `${lead.topic}에서 ${dayLabel} 남아 있는 핵심은 ${focus}이야. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}${readableEvidenceNote(context, lead.topic)}`
   }
   const phase = applying
     ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
@@ -745,12 +755,13 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   if (!scopedTopics.size) {
     const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== lead.topic && DAILY_HEADLINE_SCENE[topic])
     const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''
-    return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}이야. ${sceneText} ${phase}${secondaryText}`
+    return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}이야. ${sceneText} ${phase}${secondaryText}${readableEvidenceNote(context, lead.topic)}`
   }
   const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
-  if (variant === 0) return `${sceneText} ${dayLabel} ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}`
-  if (variant === 1) return `${lead.topic}에서 ${dayLabel} 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}`
-  return `${subjectLabel} ${sceneText} ${lead.topic}에서는 ${focus}이 먼저 보여. ${phase}`
+  const evidenceNote = readableEvidenceNote(context, lead.topic)
+  if (variant === 0) return `${sceneText} ${dayLabel} ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}${evidenceNote}`
+  if (variant === 1) return `${lead.topic}에서 ${dayLabel} 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}${evidenceNote}`
+  return `${subjectLabel} ${sceneText} ${lead.topic}에서는 ${focus}이 먼저 보여. ${phase}${evidenceNote}`
 }
 
 function daySummary(bestFlow: string[], cautionFlow: string[], dayLabel: string) {
@@ -820,13 +831,14 @@ function weeklyEvidenceHeadline(context: FortuneUserSummaryContext): string {
   // WEEKLY_ARC_HUMAN_V28: each phase is a complete real-life task, not a compressed checklist phrase.
   const sameBeat = (a: typeof beats[number], b: typeof beats[number]) => a.topic === b.topic && a.scene === b.scene
   const phrase = (beat: typeof beats[number]) => `${beat.topic}에서 ${beat.scene}`
+  const evidenceNote = [...new Set(beats.map(beat => beat.topic))].map(topic => readableEvidenceNote(context, topic)).join('')
   if (beats.length === 2) {
-    if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야.`
-    return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 돼.`
+    if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야.${evidenceNote}`
+    return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 돼.${evidenceNote}`
   }
-  if (sameBeat(beats[1], beats[2])) return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}부터 ${beats[2].label}까지는 ${phrase(beats[1])}이 중심이야.`
-  if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야. ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.`
-  return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 되고, ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.`
+  if (sameBeat(beats[1], beats[2])) return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}부터 ${beats[2].label}까지는 ${phrase(beats[1])}이 중심이야.${evidenceNote}`
+  if (sameBeat(beats[0], beats[1])) return `${beats[0].label}부터 ${beats[1].label}까지 ${phrase(beats[0])}이 중심이야. ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.${evidenceNote}`
+  return `${beats[0].label}엔 ${phrase(beats[0])}에 힘이 실려. ${beats[1].label}엔 ${phrase(beats[1])}이 중심이 되고, ${beats[2].label}엔 ${phrase(beats[2])}을 중심으로 마무리돼.${evidenceNote}`
 }
 
 function buildHeadline(when: string, bestFlow: string[], cautionFlow: string[], consistency: RelationshipConsistency, context: FortuneUserSummaryContext) {
@@ -920,16 +932,19 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
         : topic === '재회'
           ? consistency.reconnectionConclusion
           : clean(narrative?.verdict) ?? `${copy.conclusion} ${depthFor(topic, level, direction)}`
-    const action = topic === '연락' && directions
+    const baseAction = topic === '연락' && directions
       ? (/강/.test(directions.outgoingBand ?? '') ? '먼저 전할 말이 있다면 용건과 질문을 분명히 해봐. 기다리는 연락이라면 수신 흐름을 기준으로 읽어.' : /약/.test(directions.outgoingBand ?? '') ? '답을 재촉하거나 여러 번 보내기보다 필요한 말만 정리해. 기다리는 동안의 무응답을 관계의 최종 결론으로 단정하지는 마.' : '기다리는 연락과 내가 보낼 연락을 나눠 생각해. 먼저 보낼 필요가 있을 때만 짧고 명확하게 전해.')
       : topic === '재회'
         ? consistency.reconnectionAction
         : clean(narrative?.action) ?? copy.practice
     const snapshot = fortuneEvidenceSnapshot(context.calculation, topic)
+    const action = snapshot.support && topic !== '연락' && topic !== '재회'
+      ? `${baseAction} 이 행동을 참고할 도움 근거는 ${snapshot.support}야.`
+      : baseAction
     const cautionText = topic === '재회'
       ? consistency.reconnectionCaution
       : snapshot.challenge
-        ? `${clean(narrative?.avoid) ?? copy.caution} 부담 방향이 있어도 이것만으로 사건을 확정하지 마.`
+        ? `${clean(narrative?.avoid) ?? copy.caution} 부담 근거는 ${snapshot.challenge}야. 이 근거 하나로 사건을 확정하지 마.`
         : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : undefined)
     return { topic, conclusion, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level, direction),
       timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,

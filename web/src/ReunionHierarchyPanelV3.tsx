@@ -467,8 +467,8 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
       <section className="reunion-v5-section">
         <h4>양쪽 차트의 관계 활성</h4>
         <div className="reunion-v5-directions">
-          <article><b>상대 차트 쪽 활성</b><strong>{incomingDirection.metric}</strong><p>{incomingDirection.text}</p></article>
-          <article><b>내 차트 쪽 활성</b><strong>{outgoingDirection.metric}</strong><p>{outgoingDirection.text}</p></article>
+          <article><b>수신 · 상대 → 나</b><strong>{incomingDirection.metric}</strong><p>{incomingDirection.text}</p></article>
+          <article><b>발신 · 나 → 상대</b><strong>{outgoingDirection.metric}</strong><p>{outgoingDirection.text}</p></article>
         </div>
         {actualInitiator ? <p className="reunion-v5-note">입력한 실제 첫 연락: {actualInitiator}</p> : null}
         <p className="reunion-v5-direction-summary">{contactText}</p>
