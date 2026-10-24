@@ -381,7 +381,10 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const answerTitle = observation.state ? observed.title : answer.title
   const observedNextRow = nextObserved ? stageRows.find(row=>row.key===nextObserved) : null
   const observedNextText = observedNextRow ? `아직 확인되지 않은 다음 단계인 ${observedNextRow.label}의 계산 상태는 ‘${observedNextRow.status}’야. ${observedNextRow.text}` : '이미 합의된 관계의 실제 지속 여부는 이번 계산으로 확정하지 않아.'
-  const answerText = observation.state ? `${observed.text} ${observedNextText}` : readerSentences(consultation?.current_stage, 3) || answer.text
+  const observedVerdict = (observation.state === 'recontacted' || observation.state === 'messaging') && !stages.has('in_person_meeting')
+    ? '현재는 연락 단계까지 확인됐지만 실제 만남 근거가 없어 재회 성립 쪽에 무게를 싣기는 어려워요.'
+    : ''
+  const answerText = observation.state ? `${observed.text} ${observedVerdict} ${observedNextText}`.replace(/\s+/g, ' ').trim() : readerSentences(consultation?.current_stage, 3) || answer.text
   const contactAlreadyObserved = observedLevel ? REUNION_STAGE_ORDER.indexOf(observedLevel) >= REUNION_STAGE_ORDER.indexOf('contact_recontact') : false
   const contactText = contactAlreadyObserved ? `연락은 사용자가 확인한 관측 사실이야. ${contact.text}` : readerSentences(`${consultation?.contact_type_if_any ?? ''} ${consultation?.continuity ?? ''}`, 3) || contact.text
   const initiativeText = initiative.text

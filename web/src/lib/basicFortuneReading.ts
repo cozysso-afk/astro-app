@@ -97,17 +97,20 @@ function meaningFor(topic: string, tone: BasicFortuneTone) {
 function evidenceReason(calculation: IntegratedApiResponse, topic: string, stat: FortuneStat) {
   const scoreSentence = `선택 기간의 ${topic} 평균은 ${stat.average.toFixed(0)}점, 판정은 ${stat.band}으로 잡혔어. 이 점수는 사건 확률이 아니라 분야별 상대 활성도야.`
   const snapshot = fortuneEvidenceSnapshot(calculation, topic)
+  const discloseTechnical = topic === '연애' || topic === '연락' || topic === '재회'
   if (snapshot.support && snapshot.challenge) {
     const weight = snapshot.dominantDirection === 'supportive' ? '도움 근거의 기여도가 더 큰 편이야.'
       : snapshot.dominantDirection === 'challenging' ? '부담 근거의 기여도가 더 큰 편이야.'
         : '긍정·부정 근거가 비슷한 수준이라 방향을 하나로 확정하기 어려워.'
-    return `${scoreSentence} 도움 근거는 ${snapshot.support}, 부담 근거는 ${snapshot.challenge}로 잡혔어. ${weight}`
+    const detail = discloseTechnical ? ` 주요 도움 근거는 ${snapshot.support}, 부담 근거는 ${snapshot.challenge}야.` : ''
+    return `${scoreSentence} 도움 방향과 부담 방향이 함께 계산됐어.${detail} ${weight}`
   }
   if (snapshot.support || snapshot.challenge) {
     const evidence = snapshot.support ?? snapshot.challenge
-    return `${scoreSentence} ${snapshot.support ? '도움' : '부담'} 근거는 ${evidence}로 잡혔지만, 이것만으로 실제 사건을 단정하지 않아.`
+    const detail = discloseTechnical ? ` 주요 근거는 ${evidence}야.` : ''
+    return `${scoreSentence} ${snapshot.support ? '도움' : '부담'} 방향이 상대적으로 더 두드러졌어.${detail} 이것만으로 실제 사건을 단정하지 않아.`
   }
-  if (snapshot.neutral) return `${scoreSentence} 중립 근거는 ${snapshot.neutral}로 잡혔어. 이 배치만으로 유리하거나 불리하다고 단정하지 않아.`
+  if (snapshot.neutral) return `${scoreSentence} 중립 방향 근거가 잡혔어.${discloseTechnical ? ` 주요 근거는 ${snapshot.neutral}야.` : ''} 이 배치만으로 유리하거나 불리하다고 단정하지 않아.`
   return scoreSentence
 }
 

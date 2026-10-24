@@ -12,6 +12,7 @@ test('contact observed: advances to meeting and gives a direct reunion verdict',
  assert.match(html,/현재 서로 연락 중/)
  assert.match(html,/실제 만남의 계산 상태는 ‘계산됨 · 미래 후보 없음’/)
  assert.match(html,/기준일 이후 공개할 실제 만남 후보가 없어/)
+ assert.match(html,/재회 성립 쪽에 무게를 싣기는 어려워요/)
  assert.match(html,/관계 재구축<\/span><strong>앞 단계 미확인/)
  assert.doesNotMatch(html,/>0</)
  assert.doesNotMatch(html,/TOP|통과 점수|완전히 닫/)
