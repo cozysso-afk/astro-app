@@ -356,7 +356,7 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
       : '- 궁합의 정적 구조와 선택 기간의 시기 활성도를 구분한다.'
   const married = request.analysis_mode === 'marriage_married' || (kind === 'marriage' && request.relationship_status === 'married')
   const structure = married ? '[현재 부부 흐름] [정서적 거리] [대화] [생활 역할] [반복 갈등] [회복력] [장기 안정성] [현실적인 조정 포인트]'
-    : kind === 'reunion' ? '[재회 흐름 한눈에] [상대 → 나] [나 → 상대] [과거 인연 재접점] [재접촉 vs 관계 회복] [다시 붙었을 때 유지력] [반복 가능성이 높은 문제] [주요 시기] [현실적으로 확인해야 할 행동]'
+    : kind === 'reunion' ? '[재회 흐름 한눈에] [상대 차트 쪽 활성] [내 차트 쪽 활성] [과거 인연 재접점] [재접촉 vs 관계 회복] [다시 붙었을 때 유지력] [반복 가능성이 높은 문제] [주요 시기] [현실적으로 확인해야 할 행동]'
     : kind === 'marriage' ? '[결혼궁합 한눈에] [함께 살 때 강점] [감정과 친밀감] [대화와 갈등 해결] [책임 / 역할] [생활 리듬] [장기 유지력] [결혼 전에 확인할 현실 조건]'
     : '[궁합 한눈에] 3~5문장 [자연스럽게 잘 맞는 점] [부딪히기 쉬운 점] [대화와 사고방식] [감정과 친밀감] [끌림] [경계 / 힘의 균형] [장기 유지력] [현실적으로 맞춰야 할 것]'
   const intro = [
@@ -424,8 +424,8 @@ export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marr
   if (kind === 'reunion' && reunionContext) {
     lines.push('', '■ 재회 방향별 활성도')
     const directional: Array<[string, FortuneStat | null]> = [
-      ['수신 · 상대→나', reunionContext.incoming],
-      ['발신 · 나→상대', reunionContext.outgoing],
+      ['상대 차트 쪽 활성', reunionContext.incoming],
+      ['내 차트 쪽 활성', reunionContext.outgoing],
       ['과거인연 재접점', reunionContext.reconnection],
     ]
     directional.forEach(([name, stat]) => {

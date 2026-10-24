@@ -222,3 +222,63 @@ html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunio
   letter-spacing: -.018em !important;
   word-break: keep-all !important;
 }
+
+/* V63 · one-column mobile reading system
+ * Result cards and native time inputs must fit their parent instead of relying
+ * on document-level clipping. Keep one text scale for long consultation copy.
+ */
+@media (max-width: 600px) {
+  html body #root .app-shell .system-overview-grid,
+  html body #root .app-shell .reading-direction-panel,
+  html body #root .app-shell .period-ai-v4 .period-ai-relationship-section .reading-direction-panel {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 12px !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+  }
+
+  html body #root .app-shell .system-overview-grid > article,
+  html body #root .app-shell .system-overview-grid > .system-unavailable,
+  html body #root .app-shell .reading-direction-panel > article,
+  html body #root .app-shell .reunion-v5-directions > article {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  html body #root .app-shell .field-grid > .birth-time-range-field {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html body #root .app-shell .birth-time-range-field input[type='time'] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  html body #root .app-shell .period-ai-card.period-ai-v18 .reading-hero-subtitle,
+  html body #root .app-shell .period-ai-card.period-ai-v18 .period-ai-topic p,
+  html body #root .app-shell .period-ai-card.period-ai-v18 .reading-direction p,
+  html body #root .app-shell .relationship-experience[data-mode='reunion'] .reunion-v5-section p,
+  html body #root .app-shell .relationship-experience[data-mode='reunion'] .reunion-v5-answer p {
+    font-family: var(--reading-sans, -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif) !important;
+    font-size: 15px !important;
+    line-height: 1.72 !important;
+    letter-spacing: -.012em !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+@media (max-width: 480px) {
+  html body #root .app-shell .field-grid:has(.birth-time-range-field) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

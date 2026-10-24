@@ -228,8 +228,8 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     evidence={evidenceContract?.evidence ?? []}
     reunionV2={reunionV2}
     directionRows={[
-      {kind:'incoming',label:'상대 → 나',...view.incoming},
-      {kind:'outgoing',label:'나 → 상대',...view.outgoing},
+      {kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},
+      {kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},
       {kind:'reconnection',label:'과거 인연 재접점',...view.reconnection},
     ]}
     sustainabilityText={view.sustainabilityText}
@@ -242,7 +242,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       {reunion && reunionV2 ? <>
         <section className="reunion-ai-block"><h4>다시 연결될 여지가 있는 이유</h4><ReadableCopy text={reunionV2.why_reconnect.conclusion}/><ReadableCopy text={reunionV2.why_reconnect.interpretation}/></section>
         {returnContextBlock}
-        <section className="reunion-ai-snapshot"><h4>누가 먼저 움직일 흐름인가</h4><ReadableCopy className="reunion-initiative-summary" text={reunionV2.initiative.conclusion}/><ReadableCopy text={reunionV2.initiative.interpretation}/><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
+        <section className="reunion-ai-snapshot"><h4>양쪽 차트의 관계 활성</h4><ReadableCopy className="reunion-initiative-summary" text={reunionV2.initiative.conclusion}/><ReadableCopy text={reunionV2.initiative.interpretation}/><ReadingDirections rows={[{kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},{kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/><small>점수는 실제 연락 확률이나 선연락 주체가 아니라 선택 기간 안의 상대활성도 비교값이야.</small></section>
         <section className="reunion-ai-block"><h4>{!hierarchyData ? '이전 저장본 시기 해설 · 현재/미래 판단용 아님' : '접점이 강해지는 시기'}</h4><ReadableCopy text={reunionV2.timing.conclusion}/>{reunionV2.timing.windows.map((w,i)=><article className="reunion-v2-window" key={`${w.period}-${i}`}><b>{w.period}</b><ReadableCopy text={w.meaning}/></article>)}{dateFocus}</section>
         <section className="reunion-ai-block"><h4>다시 붙었을 때 관계 구조</h4><ReadableCopy text={reunionV2.rebuild.conclusion}/>{reunionV2.rebuild.conditions.length>0&&<ul>{reunionV2.rebuild.conditions.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
         <section className="reunion-ai-block"><h4>다시 깨뜨릴 수 있는 반복 패턴</h4><ReadableCopy text={reunionV2.repeat_risks.conclusion}/>{reunionV2.repeat_risks.patterns.length>0&&<ul>{reunionV2.repeat_risks.patterns.map((x,i)=><li key={i}>{x}</li>)}</ul>}</section>
@@ -250,14 +250,14 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         {!!reunionV2.precision_note&&<details className="reunion-precision-note"><summary>정밀도·제외 근거</summary><ReadableCopy text={reunionV2.precision_note}/></details>}
       </> : reunion && reunionAi ? <>
         <section className="reunion-ai-snapshot">
-          <h4>누가 먼저 움직일 흐름인가</h4>
+          <h4>양쪽 차트의 관계 활성</h4>
           <p className="reunion-initiative-summary">{reunionInitiativeSummary}</p>
-          <ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/>
+          <ReadingDirections rows={[{kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},{kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/>
           <small>점수는 실제 연락 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small>
         </section>
         <div className="reunion-ai-direction-copy">
-          {!!reunionAi.incoming && <section><h4>상대 → 나</h4><p>{reunionAi.incoming}</p></section>}
-          {!!reunionAi.outgoing && <section><h4>나 → 상대</h4><p>{reunionAi.outgoing}</p></section>}
+          {!!reunionAi.incoming && <section><h4>상대 차트 쪽 활성</h4><p>{reunionAi.incoming}</p></section>}
+          {!!reunionAi.outgoing && <section><h4>내 차트 쪽 활성</h4><p>{reunionAi.outgoing}</p></section>}
         </div>
         {!!reunionAi.windows && <section className="reunion-ai-block"><h4>재접촉 시기</h4><ReadableCopy text={reunionAi.windows}/>{dateFocus}{!!reunionAi.low && <p className="reunion-low-window"><b>피할 구간</b>{reunionAi.low}</p>}</section>}
         {!!reunionAi.filter && <section className="reunion-ai-block"><h4>연락 이후 관계 유지력</h4><p>{reunionAi.filter}</p></section>}
@@ -268,7 +268,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
-        <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 → 나',...view.incoming},{kind:'outgoing',label:'나 → 상대',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
+        <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},{kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
         {returnContextBlock}
         <section className="reading-section relationship-fallback-card"><div className="relationship-section-heading"><h3>{view.stabilityTitle}</h3><span className="relationship-section-meta"><ReadingBadge kind="rebuilding"/><span className="reading-state">{view.sustainability}</span></span></div><p className="relationship-section-copy">{view.sustainabilityText}</p></section>
         <section className="reading-section relationship-fallback-card"><h3>반복될 가능성이 높은 문제</h3>{view.friction.length ? compactPatterns(view.friction) : <p className="relationship-section-copy">반복 갈등을 뚜렷하게 짚을 접점이 부족해. 문제가 없다는 뜻은 아니야.</p>}</section>

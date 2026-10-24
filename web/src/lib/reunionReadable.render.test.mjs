@@ -10,19 +10,20 @@ export const render=(extra={})=>mod.exports.render({hierarchyData:hierarchy,obse
 test('contact observed: advances to meeting and gives a direct reunion verdict',()=>{
  const html=render()
  assert.match(html,/현재 서로 연락 중/)
- assert.match(html,/다음 단계인 실제 만남으로 넘어가는 뚜렷한 시기를 찾지 못했어요/)
- assert.match(html,/재회 성립 쪽에 무게를 싣기는 어려워요/)
+ assert.match(html,/실제 만남의 계산 상태는 ‘계산됨 · 미래 후보 없음’/)
+ assert.match(html,/기준일 이후 공개할 실제 만남 후보가 없어/)
  assert.match(html,/관계 재구축<\/span><strong>앞 단계 미확인/)
  assert.doesNotMatch(html,/>0</)
  assert.doesNotMatch(html,/TOP|통과 점수|완전히 닫/)
 })
 test('incoming and outgoing are separately displayed without relabeling chart scores as action predictions',()=>{
  const html=render({directionRows:[{kind:'incoming',score:21.1},{kind:'outgoing',score:24.1}]})
- assert.match(html,/수신 · 상대 → 나/)
- assert.match(html,/발신 · 나 → 상대/)
+ assert.match(html,/상대 차트 쪽 활성/)
+ assert.match(html,/내 차트 쪽 활성/)
  assert.match(html,/활성도 21.1/)
  assert.match(html,/활성도 24.1/)
- assert.match(html,/상대 차트.*21.1/)
+ assert.match(html,/상대 차트 활성도: 21.1/)
+ assert.doesNotMatch(html,/수신 ·|발신 ·|상대 → 나|나 → 상대/)
  assert.doesNotMatch(html,/근소 우세/)
 })
 test('empty AI arrays never leak a zero node and missing activation is not coerced to zero',()=>{
@@ -33,7 +34,7 @@ test('empty AI arrays never leak a zero node and missing activation is not coerc
 test('failed validation never shows predictive content',()=>{
  const html=render({hierarchyData:{...hierarchy,validation:{status:'FAIL'}}})
  assert.match(html,/다시 계산/)
- assert.doesNotMatch(html,/수신 · 상대/)
+ assert.doesNotMatch(html,/상대 차트 쪽 활성/)
 })
 test('zero orb is an angular precision display while missing orb is excluded',()=>{
  const html=render({evidence:[{a:'Mars',b:'Saturn',aspect:'square',orb:0}]})

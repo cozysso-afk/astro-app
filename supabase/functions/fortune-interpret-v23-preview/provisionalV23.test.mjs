@@ -46,7 +46,7 @@ function prose(data) {
 
 test('provisional V23 uses materially different narrative horizons',()=>{
   const outputs=Object.fromEntries(['day','week','month','annual'].map(kind=>[kind,prose(final(kind))]))
-  assert.match(outputs.day,/오늘|하루/)
+  assert.match(outputs.day,/선택한 날|해당 운세일|하루/)
   assert.match(outputs.week,/초반·중반·후반|이번 주/)
   assert.match(outputs.month,/월초·중순·월말|이번 달/)
   assert.match(outputs.annual,/분기|연중|올해/)

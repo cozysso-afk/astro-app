@@ -284,15 +284,15 @@ function directionSummary(calculation: IntegratedApiResponse) {
   const diff = a - b
   const roundedA = Math.round(a)
   const roundedB = Math.round(b)
-  if (diff === 0) return `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 계산상 같은 값이라 선연락 주체는 구분되지 않아.`
+  if (diff === 0) return `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 계산상 같은 값이며 선연락 주체를 뜻하지 않아.`
   if (Math.abs(diff) < 5) {
-    const micro = diff > 0 ? '상대 → 나' : '나 → 상대'
+    const micro = diff > 0 ? '상대 차트 쪽' : '내 차트 쪽'
     const pointGap = Math.round(Math.abs(diff) * 10) / 10
-    return `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 연락 자체의 강도와 별개로 상대 비교에서는 ${micro}가 ${pointGap}점 앞서 근소 우세야. 차이가 작아 실제 선연락 주체를 확정하는 뜻은 아니야.`
+    return `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 연락 자체의 강도와 별개로 ${micro}이 ${pointGap}점 높아. 실제 선연락 주체를 확정하는 뜻은 아니야.`
   }
   return diff > 0
-    ? `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 이번 범위에서는 상대 → 나 방향이 더 두드러져.`
-    : `상대 → 나 ${roundedA}, 나 → 상대 ${roundedB}. 이번 범위에서는 나 → 상대 방향이 더 두드러져.`
+    ? `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 이번 범위에서는 상대 차트 쪽 활성이 더 두드러져.`
+    : `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 이번 범위에서는 내 차트 쪽 활성이 더 두드러져.`
 }
 
 function contactEditorial(data: InterpretationData, calculation: IntegratedApiResponse, sections:any): EditorialContact {
@@ -311,11 +311,17 @@ function contactEditorial(data: InterpretationData, calculation: IntegratedApiRe
     || (relationshipPartUsable(topicAction) ? topicAction : '')
     || '연락이 생기면 한 번의 답장보다 질문과 답이 이어지고 실제 약속이 구체화되는지를 봐.'
   const continuity = `${contactContinuity} 소식은 전해 들은 말보다 공식 안내·날짜·다음 단계가 구체적으로 오는지를 기준으로 봐.`
+  const safeIncoming = relationshipPartUsable(incoming) && !/(상대\s*→\s*나|수신|먼저\s*(?:오|연락))/.test(incoming)
+    ? incoming
+    : '외부 연락 반응 신호는 특정 상대의 선연락을 확정하지 않아. 안부·질문·약속 제안이 실제로 들어오는지 확인해.'
+  const safeOutgoing = relationshipPartUsable(outgoing) && !/(나\s*→\s*상대|발신|선연락\s*주체)/.test(outgoing)
+    ? outgoing
+    : '내 연락 실행 적합도는 내가 용건을 정리해 말을 꺼낼 때의 상대적 조건이며, 상대의 답장 의향은 아니야. 보낼 때는 짧고 구체적으로 쓰고 답을 재촉하지 마.'
   return {
     activation,
     continuity,
-    incoming: relationshipPartUsable(incoming) ? incoming : '상대가 먼저 움직이는지는 안부·질문·약속 제안이 실제로 오는지 확인해.',
-    outgoing: relationshipPartUsable(outgoing) ? outgoing : '내가 먼저 연락한다면 짧고 구체적으로 보내고, 답장 속도 하나로 관계를 단정하지 마.',
+    incoming: safeIncoming,
+    outgoing: safeOutgoing,
     directionSummary: directionSummary(calculation),
     timing: relationshipPartUsable(timing) ? timing : undefined,
   }

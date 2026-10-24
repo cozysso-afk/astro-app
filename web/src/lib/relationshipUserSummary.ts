@@ -128,14 +128,14 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
     const band = typeof score !== 'number' || !Number.isFinite(score) ? '정보 부족' : score >= 60 ? '강함' : score < 40 ? '약함' : '보통'
     const copy = {
       incoming: {
-        강함: '상대 → 나 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 상대가 먼저 연락한다는 뜻은 아니야.',
-        약함: '상대 → 나 방향의 관계 자극은 약한 편이야. 상대가 먼저 연락하지 않는다는 예측으로 읽지는 마.',
-        보통: '상대 → 나 방향의 관계 자극은 중간대야. 실제 선연락 여부는 별도 행동 근거가 필요해.',
+        강함: '상대 차트 쪽 관계 활성이 비교적 강하게 잡혀 있어. 이 값만으로 상대가 먼저 연락한다는 뜻은 아니야.',
+        약함: '상대 차트 쪽 관계 활성은 약한 편이야. 상대가 먼저 연락하지 않는다는 예측으로 읽지는 마.',
+        보통: '상대 차트 쪽 관계 활성은 중간대야. 실제 선연락 여부는 별도 행동 근거가 필요해.',
       },
       outgoing: {
-        강함: '나 → 상대 방향의 관계 자극이 비교적 강하게 잡혀 있어. 이 값만으로 내가 먼저 연락해야 한다는 뜻은 아니야.',
-        약함: '나 → 상대 방향의 관계 자극은 약한 편이야. 연락을 미루라는 행동 지시로 읽지는 마.',
-        보통: '나 → 상대 방향의 관계 자극은 중간대야. 먼저 연락할지 여부와는 별개로 봐.',
+        강함: '내 차트 쪽 관계 활성이 비교적 강하게 잡혀 있어. 이 값만으로 내가 먼저 연락해야 한다는 뜻은 아니야.',
+        약함: '내 차트 쪽 관계 활성은 약한 편이야. 연락을 미루라는 행동 지시로 읽지는 마.',
+        보통: '내 차트 쪽 관계 활성은 중간대야. 먼저 연락할지 여부와는 별개로 봐.',
       },
       reconnection: {
         강함: '과거 인연 재접점 지표가 비교적 강해. 실제 대화 재개나 재회 성사와는 별도로 확인해야 해.',
@@ -157,7 +157,7 @@ export function buildRelationshipUserSummary(input: { aspects: Aspect[]; partner
       const point=stat[source]?.[0]
       if(!point || point.date<input.timing!.period.start || point.date>input.timing!.period.end)return []
       const caution=source==='caution_days'
-      return [{date:point.date,kind,label:{incoming:'상대 → 나 관계 자극이 상대적으로 두드러지는 때',outgoing:'나 → 상대 관계 자극이 상대적으로 두드러지는 때',reconnection:'과거 인연 재접점 지표가 상대적으로 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
+      return [{date:point.date,kind,label:{incoming:'상대 차트 쪽 관계 활성이 상대적으로 두드러지는 때',outgoing:'내 차트 쪽 관계 활성이 상대적으로 두드러지는 때',reconnection:'과거 인연 재접점 지표가 상대적으로 두드러지는 때'}[kind],band:point.score>=60?'강함':point.score<40?'약함':'보통',status:caution?'주의':'활용',detail:caution?'이 축에서 상대적으로 힘이 약한 날짜야. 다른 방향까지 약하다거나 연락이 끊긴다는 뜻은 아니야.':'이 축에서 상대적으로 힘이 실리는 날짜야. 실제 연락과 약속으로 이어지는지 살펴보되 관계 회복까지 확정하지는 않아.'}]
     })
   })
 
