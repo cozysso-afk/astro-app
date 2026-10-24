@@ -51,7 +51,8 @@ test('event fixture preserves match mismatch no-evidence and uncalculated outcom
 })
 
 test('initiative comparison remains visible but is separate from observed first contact',()=>{
-  assert.match(panel,/받는 연락 · 보내는 연락/)
+  assert.match(panel,/수신 · 상대 → 나/)
+  assert.match(panel,/발신 · 나 → 상대/)
   assert.match(panel,/차트 활성도만으로 수신·발신 행동이나 먼저 연락할 사람을 정할 수 없어요/)
   assert.match(panel,/입력한 실제 첫 연락/)
   assert.equal(fixture.expected.actual_initiator_is_observation,true)

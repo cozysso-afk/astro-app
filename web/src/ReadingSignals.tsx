@@ -3,7 +3,7 @@ import { orderTimelineDates, timelineWindowState, timelinePresentation, type Tim
 
 export type ReadingSignal = 'incoming' | 'outgoing' | 'reconnection' | 'rebuilding' | 'mixed' | 'caution' | 'favorable'
 const SIGNALS = {
-  incoming: [ArrowDownLeft, '상대 → 나'], outgoing: [ArrowUpRight, '나 → 상대'],
+  incoming: [ArrowDownLeft, '외부 연락 반응'], outgoing: [ArrowUpRight, '내 연락 실행'],
   reconnection: [RotateCcw, '재접점'], rebuilding: [Link2, '유지력'],
   mixed: [Layers3, '혼합'], caution: [ShieldAlert, '주의'], favorable: [Sparkles, '활용'],
 } as const

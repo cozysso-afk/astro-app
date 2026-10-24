@@ -12,6 +12,7 @@ import { FortuneFlowCards } from './FortuneFlowCards'
 import { ReadingDirections, ReadingTimeline } from './ReadingSignals'
 import { ReadingExplanation } from './ReadingExplanation'
 import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
+import { browserLocalDateIso, readingDateSemantics } from './lib/readingDateSemantics'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -79,24 +80,14 @@ function splitDailyHero(value: string) {
   return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: clean, detail: '' }
 }
 
-function localDateIso() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
-}
-
 function relationshipDailyLead(field: FortuneField | undefined, summary: ReturnType<typeof polishFortuneSummary>, selectedDate: string) {
-  if (field?.id !== 'love' && field?.id !== 'contact') return null
-  const day = selectedDate === localDateIso() ? '오늘' : '선택한 운세일'
+  if (field?.id !== 'contact') return null
+  const { dayLabel } = readingDateSemantics(selectedDate)
   const incoming = summary.relationship?.incomingBand ?? '정보 부족'
   const outgoing = summary.relationship?.outgoingBand ?? '정보 부족'
-  if (field.id === 'contact') return {
-    title: `${day} 연락운은 받는 연락과 내가 먼저 보낼 연락을 나눠 봐.`,
-    detail: `상대 → 나 수신 활성도는 ${incoming}, 나 → 상대 발신 적합도는 ${outgoing}이야. 점수보다 실제 답장 내용과 대화가 이어지는지를 확인해.`,
-  }
   return {
-    title: `${day} 애정운은 마음을 추측하기보다 실제 대화와 다음 약속이 이어지는지 확인해.`,
-    detail: `상대 → 나 수신 활성도는 ${incoming}, 나 → 상대 발신 적합도는 ${outgoing}이야. 호감 표현 하나보다 질문과 답장이 오가고 만남 제안이 구체화되는지를 봐.`,
+    title: `${dayLabel} 연락운은 외부 연락 환경과 내가 연락을 시작할 때의 조건을 나눠 봐.`,
+    detail: `외부 연락 반응 신호는 ${incoming}, 내 연락 실행 적합도는 ${outgoing}이야. 특정 상대가 먼저 연락할 사람을 판정하는 값은 아니야.`,
   }
 }
 
@@ -193,7 +184,7 @@ export function PeriodFortuneNarrativeV2({
     ? relationshipDailyLead(field, summary, calculation.period.start) ?? splitDailyHero(heroHeadline)
     : { title: heroHeadline, detail: '' }
   const displayWhen = period === 'today'
-    ? (calculation.period.start === localDateIso() ? '오늘' : '선택한 운세일')
+    ? readingDateSemantics(calculation.period.start).dayLabel
     : summary.when
   const heroSubtitle = dedupeHeroSubtitle([heroLead.detail, heroSummary].filter(Boolean).join(' '), heroLead.title)
   const dailyLeadCard = period === 'today'
@@ -265,14 +256,13 @@ export function PeriodFortuneNarrativeV2({
       .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
     : []
   const showContactDirectionDetails = Boolean(editorial.contact)
-    && !/동률권|같은 값|비교할 계산 정보가 충분하지 않아/.test(editorial.contact?.directionSummary ?? '')
 
   return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3 period-ai-v4" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
       <div>
         <span className="period-ai-kicker">{field?.label ?? '맞춤 운세 해설'} · {displayWhen} 핵심</span>
         <span className="reading-period-date" data-reading-export-tone="date">{calculation.period.start === calculation.period.end ? '운세일 · ' : '운세 기간 · '}{periodLabel(calculation.period.start, calculation.period.end)}</span>
-        {period === 'today' && calculation.period.start !== localDateIso() && <small className="reading-actual-today">실제 오늘 · {localDateIso()}</small>}
+        {period === 'today' && calculation.period.start !== browserLocalDateIso() && <small className="reading-actual-today">실제 오늘 · {browserLocalDateIso()}</small>}
         <h3 className="period-ai-hero-title-v4">{heroLead.title}</h3>
         {heroSubtitle && <p className="reading-hero-subtitle">{heroSubtitle}</p>}
         {dailyLeadCard && <div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}>
@@ -305,15 +295,15 @@ export function PeriodFortuneNarrativeV2({
     </section>}
 
     {field?.id === 'contact' && editorial.contact && <section className="contact-reading-v3" data-reading-export-tone="date">
-      <div className="period-ai-section-title"><span>연락·소식</span><strong>대화가 이어지는지와 누가 먼저 움직이는지를 따로 봐</strong></div>
+      <div className="period-ai-section-title"><span>연락·소식</span><strong>외부 연락 환경과 내 연락 실행 조건을 따로 봐</strong></div>
       {!domainAnsweredTopics.has('연락') && <article className="editorial-focus-card-v3 contact-activation-v3">
         <strong>연락이 오가는 흐름</strong><b>{editorial.contact.activation}</b><p>{editorial.contact.continuity}</p>
         {editorial.contact.timing && <time>주목 시기 · {editorial.contact.timing}</time>}
       </article>}
-      <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>먼저 움직이는 쪽</strong><b>{editorial.contact.directionSummary}</b></article>
+      <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>두 계산축 비교</strong><b>이 비교만으로 먼저 연락할 사람은 판정하지 않아요.</b></article>
       {showContactDirectionDetails && <ReadingDirections rows={[
-        { kind: 'incoming', label: '상대 → 나', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
-        { kind: 'outgoing', label: '나 → 상대', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
+        { kind: 'incoming', label: '외부 연락 반응', band: summary.relationship?.incomingBand, text: editorial.contact.incoming, timing: summary.relationship?.incomingTiming },
+        { kind: 'outgoing', label: '내 연락 실행 적합도', band: summary.relationship?.outgoingBand, text: editorial.contact.outgoing, timing: summary.relationship?.outgoingTiming },
       ]}/>} 
     </section>}
 
@@ -398,8 +388,8 @@ export function PeriodFortuneNarrativeV2({
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
       <article className="period-ai-window period-ai-relationship-summary"><p>{summary.relationship.summary}</p>
         <ReadingDirections rows={[
-          { kind: 'incoming', label: '상대가 먼저 오는 흐름', band: summary.relationship.incomingBand, text: summary.relationship.incoming, timing: summary.relationship.incomingTiming },
-          { kind: 'outgoing', label: '내가 먼저 연락하기', band: summary.relationship.outgoingBand, text: summary.relationship.outgoing, timing: summary.relationship.outgoingTiming },
+          { kind: 'incoming', label: '외부 연락 반응', band: summary.relationship.incomingBand, text: summary.relationship.incoming, timing: summary.relationship.incomingTiming },
+          { kind: 'outgoing', label: '내 연락 실행 적합도', band: summary.relationship.outgoingBand, text: summary.relationship.outgoing, timing: summary.relationship.outgoingTiming },
           ...(summary.relationship.reconnection ? [{ kind: 'reconnection' as const, label: '과거 인연 재접점', band: summary.relationship.reconnectionBand, text: summary.relationship.reconnection, timing: summary.relationship.reconnectionTiming }] : []),
         ]}/>
       </article>

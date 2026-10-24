@@ -16,6 +16,7 @@ import type { ReactNode } from 'react'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
 import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
 import { editorialGroupCopy } from './lib/fortuneEditorialV3'
+import { browserLocalDateIso, readingDateSemantics } from './lib/readingDateSemantics'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -125,10 +126,11 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     ? [...userSummary.favorableCards, ...userSummary.cautionCards]
       .sort((a,b)=>Math.abs(b.score-50)-Math.abs(a.score-50))[0]
     : undefined
+  const dateSemantics = readingDateSemantics(calculation.period.start)
 
   return <section className="period-ai-card period-ai-v18">
     <div className="reading-copy-access"><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span><h3>{dailyLead.title}</h3><p className="reading-hero-subtitle">{[dailyLead.detail,heroSummary].filter(Boolean).join(' ')}</p>{dailyLeadCard&&<div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}><strong>{Math.round(dailyLeadCard.score)}점</strong><span><b>{dailyLeadCard.topic}</b>이 오늘 가장 두드러진 분야<small>분야별 상대 활성도 · 사건이 생길 확률은 아님</small></span></div>}</div></div>
+    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span>{period === 'today' && !dateSemantics.isActualToday ? <small className="reading-actual-today">실제 오늘 · {browserLocalDateIso()}</small> : null}<h3>{dailyLead.title}</h3><p className="reading-hero-subtitle">{[dailyLead.detail,heroSummary].filter(Boolean).join(' ')}</p>{dailyLeadCard&&<div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}><strong>{Math.round(dailyLeadCard.score)}점</strong><span><b>{dailyLeadCard.topic}</b>이 {dateSemantics.dayLabel} 가장 두드러진 분야<small>분야별 상대 활성도 · 사건이 생길 확률은 아님</small></span></div>}</div></div>
 
     {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
     <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/>{!!referenceFlowCards.length&&<FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>}<FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
@@ -145,8 +147,8 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
       <article className="period-ai-window period-ai-relationship-summary"><p>{userSummary.relationship.summary}</p>
         <ReadingDirections rows={[
-          {kind:'incoming',label:'상대가 먼저 오는 흐름',band:userSummary.relationship.incomingBand,text:userSummary.relationship.incoming,timing:userSummary.relationship.incomingTiming},
-          {kind:'outgoing',label:'내가 먼저 연락하기',band:userSummary.relationship.outgoingBand,text:userSummary.relationship.outgoing,timing:userSummary.relationship.outgoingTiming},
+          {kind:'incoming',label:'외부 연락 반응',band:userSummary.relationship.incomingBand,text:userSummary.relationship.incoming,timing:userSummary.relationship.incomingTiming},
+          {kind:'outgoing',label:'내 연락 실행 적합도',band:userSummary.relationship.outgoingBand,text:userSummary.relationship.outgoing,timing:userSummary.relationship.outgoingTiming},
           ...(userSummary.relationship.reconnection?[{kind:'reconnection' as const,label:'과거 인연 재접점',band:userSummary.relationship.reconnectionBand,text:userSummary.relationship.reconnection,timing:userSummary.relationship.reconnectionTiming}]:[]),
         ]}/>
 
@@ -154,7 +156,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
     </section> : null}
 
     {!!userSummary.focusTopics.length && <section className={`period-ai-window-section period-ai-user-focus ${period==='today'?'is-daily-reading-story':''}`}>
-      <div className="period-ai-section-title"><span>{period==='today'?'오늘을 풀어보면':userSummary.focusTitle}</span><strong>{period==='today'?'결론부터 현실 장면까지':'현실에서 이렇게 봐'}</strong></div>
+      <div className="period-ai-section-title"><span>{period==='today'?`${dateSemantics.dayLabel}을 풀어보면`:userSummary.focusTitle}</span><strong>{period==='today'?'결론부터 현실 장면까지':'현실에서 이렇게 봐'}</strong></div>
       <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=>{
         const visibleDepth = visibleTopicDepth(item.conclusion, item.observe)
         const explanation = <><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action && item.observe !== visibleDepth ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</>

@@ -191,7 +191,7 @@ function reunionModel(root: HTMLElement, label: string): ExportModel {
       editorial: true,
     })))
     const directionSection = Array.from(modern.querySelectorAll<HTMLElement>('.reunion-v5-section'))
-      .find(section => textOf(section, ':scope > h4') === '받는 연락 · 보내는 연락')
+      .find(section => textOf(section, ':scope > h4') === '양쪽 차트의 관계 활성')
     const observedContact = directionSection ? directParagraphs(directionSection).find(row => /^입력한 실제 첫 연락:/.test(row)) ?? '' : ''
     if (observedContact && directionCards.length) directionCards[0].meta = observedContact
     if (directionCards.length) sections.push({ title: '연락 방향', cards: directionCards })

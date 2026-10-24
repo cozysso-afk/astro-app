@@ -28,11 +28,11 @@ function periodCopy(kind: string, focus: string, evidence: string, start: string
   const anchor = primaryEvidence ? ` 계산상 핵심 근거: ${primaryEvidence}.` : ' 연결된 세부 근거가 부족해 특정 사건을 단정하지 않아.'
 
   if (kind === 'day') return {
-    headline: `${range}은 ${focus}에서 오늘 바로 체감되는 변화와 실제 반응을 확인하는 날이야. ${anchor}`,
-    summary: `${focus}를 중심으로 오늘 직접 잡힌 근거가 어떻게 체감되는지 보는 게 핵심이야. 하루 운세이므로 기간 평균이나 장기 추세보다 오늘의 실제 일정·반응·컨디션을 우선해.`,
-    pattern: `오늘은 장기 결론보다 당일 촉발과 반응의 연결을 본다. 같은 점수라도 실제 근거가 붙은 분야만 우선해서 확인해.`,
-    best: `오늘 안에서 직접 근거가 연결된 순간에 실제 반응이 따라오는지 확인해.`,
-    caution: `오늘의 한 장면을 주간·월간·연간 흐름으로 확대하지 마.`,
+    headline: `${range}은 ${focus}에서 해당 운세일에 바로 체감되는 변화와 실제 반응을 확인하는 날이야. ${anchor}`,
+    summary: `${focus}를 중심으로 선택한 날에 직접 잡힌 근거가 어떻게 체감되는지 보는 게 핵심이야. 하루 운세이므로 기간 평균이나 장기 추세보다 해당 날의 실제 일정·반응·컨디션을 우선해.`,
+    pattern: `해당 운세일은 장기 결론보다 당일 촉발과 반응의 연결을 본다. 같은 점수라도 실제 근거가 붙은 분야만 우선해서 확인해.`,
+    best: `선택한 날 안에서 직접 근거가 연결된 순간에 실제 반응이 따라오는지 확인해.`,
+    caution: `해당 날의 한 장면을 주간·월간·연간 흐름으로 확대하지 마.`,
   }
   if (kind === 'week') return {
     headline: `${range}은 ${focus}가 이번 주 안에서 어떻게 이동하는지 보는 주간 흐름이야. ${anchor}`,
@@ -59,7 +59,7 @@ function periodCopy(kind: string, focus: string, evidence: string, start: string
 
 function periodAction(kind: string, topic: string, baseAction: string, timing: string) {
   const when = timing ? ` ${timing} 전후의 실제 반응을 비교하고,` : ''
-  if (kind === 'day') return `오늘 ${topic}은 즉시 확인 가능한 변화에 집중해.${baseAction ? ` ${baseAction}` : ''}`
+  if (kind === 'day') return `선택한 날의 ${topic}은 즉시 확인 가능한 변화에 집중해.${baseAction ? ` ${baseAction}` : ''}`
   if (kind === 'week') return `이번 주 ${topic}은 하루별 점수를 따로 쫓기보다${when} 초반·중반·후반의 흐름 차이를 확인해.${baseAction ? ` ${baseAction}` : ''}`
   if (kind === 'month') return `이번 달 ${topic}은 단일 고점보다 반복과 지속성을 우선해.${when}${baseAction ? ` ${baseAction}` : ''}`
   return `올해 ${topic}은 한 번의 고점보다 월별·분기별 누적 변화를 우선해.${when}${baseAction ? ` ${baseAction}` : ''}`
@@ -86,7 +86,7 @@ export function buildLocalPeriodAwareFallbackV23(payload: any) {
 
   const ordered = uniq(topics.map((row: any) => row.topic))
   base.priorities = ordered.slice(0, kind === 'annual' ? 3 : 2).map((topic: string) => {
-    if (kind === 'day') return `${topic}: 오늘 확인 가능한 반응을 우선해.`
+    if (kind === 'day') return `${topic}: 선택한 날에 확인 가능한 반응을 우선해.`
     if (kind === 'week') return `${topic}: 이번 주 전환점과 반복되는 흐름을 확인해.`
     if (kind === 'month') return `${topic}: 이번 달 반복성과 지속 여부를 확인해.`
     return `${topic}: 올해 월별·분기별 누적 변화를 확인해.`

@@ -62,7 +62,7 @@ test('same evidence receives different period narrative contracts', () => {
   const week = buildV23CorePrompt(payload('week')).text
   const month = buildV23CorePrompt(payload('month')).text
   const annual = buildV23CorePrompt(payload('annual')).text
-  assert.match(day, /오늘 안에서/)
+  assert.match(day, /선택한 운세일 안에서/)
   assert.match(week, /7일 안에서/)
   assert.match(month, /한 달 안에서/)
   assert.match(annual, /연중 구조적/)
@@ -83,7 +83,7 @@ test('human-language contract requires concrete scenes and semantic non-repetiti
   assert.match(day, /실제 생활에서 체감할 수 있는 구체적인 장면/)
   assert.match(day, /다른 날짜나 다른 사람에게 그대로 붙여도 말이 되는 범용 조언이면 실패/)
   assert.match(day, /"서두르지 마\/신중해\/천천히 봐"는 같은 의미/)
-  assert.match(day, /오늘만의 촉발·시간대·현실 장면/)
+  assert.match(day, /선택한 운세일만의 촉발·시간대·현실 장면/)
   assert.match(day, /분야 점수 요약만 쓰지 마/)
   assert.match(week, /7일의 이동이나 전환/)
   assert.match(week, /초반→중반→후반/)
@@ -134,6 +134,6 @@ test('day prioritizes a one-day trigger while week prioritizes a multi-day patte
   const week = buildPeriodNarrativeContext({period_kind:'week', evidence_ledger:evidence})
   assert.match(day.phenomena[0].label, /Mars square Saturn/)
   assert.match(week.phenomena[0].label, /Jupiter trine Sun/)
-  assert.match(buildV23CorePrompt(payload('day')).text, /오늘만의 촉발/)
+  assert.match(buildV23CorePrompt(payload('day')).text, /해당 운세일만의 촉발/)
   assert.match(buildV23CorePrompt(payload('week')).text, /초반→중반→후반/)
 })

@@ -7,6 +7,7 @@ import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
 import type { IntegratedApiResponse, FortuneStat } from './appTypes'
 import { lensForTopic, thaiPlacementComparison, thaiPlanetLabel, thaiLifeSummary, thaiLoveSummary, thaiPeriodLabel, buildSystemReading, BHUMI_LENSES, tenGodLens, ganzhiWithReading, SAJU_LIFE_KEYS, THAI_LIFE_KEYS, compactSystemPrompt, type LifeTopic, type SystemId, type Lens } from './lib/systemReading'
 import { ReadingExplanation } from './ReadingExplanation'
+import { readingDateSemantics } from './lib/readingDateSemantics'
 
 const SYSTEMS = [{id:'integrated',label:'통합',Icon:Layers3},{id:'western',label:'서양점성술',Icon:Orbit},{id:'saju',label:'사주',Icon:Columns3},{id:'thai',label:'태국점성술',Icon:Sparkles}] as const
 
@@ -90,8 +91,8 @@ function westernGuidance(name:string, stat:FortuneStat, calculation:IntegratedAp
   const tone = fortunePresentationTone(calculation,name,stat.average,String(stat.band ?? ''))
   return tone === 'good' ? pair[0] : tone === 'caution' ? pair[1] : WESTERN_NEUTRAL_COPY[name] ?? `${name}은 평소 흐름에 가까워.`
 }
-function westernWhen(dayCount:number) {
-  if (dayCount <= 1) return '오늘'
+function westernWhen(dayCount:number, startDate='') {
+  if (dayCount <= 1) return readingDateSemantics(startDate).dayLabel
   if (dayCount <= 9) return '이번 주'
   if (dayCount <= 45) return '이번 달'
   return '올해'
@@ -101,6 +102,7 @@ function periodReadingFrame(when:string) {
 }
 function thaiPeriodOverview(when:string) {
   if (when==='오늘') return '오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고, 일정 사이에 쉴 시간을 먼저 확보해. 돈·시간을 쓰는 일은 남은 여유를 확인한 뒤 결정해.'
+  if (when==='선택한 운세일') return '선택한 날에는 부탁을 받을 때 내가 맡을 범위부터 정하고, 일정 사이에 쉴 시간을 먼저 확보해. 돈·시간을 쓰는 일은 남은 여유를 확인한 뒤 결정해.'
   if (when==='이번 주') return '이번 주는 반복되는 부탁 중 내가 맡을 것과 넘길 것을 나누고, 수면·회복 시간을 일정에 먼저 넣어. 돈·시간은 며칠 동안 누적해서 얼마나 썼는지 확인해.'
   if (when==='이번 달') return '이번 달은 부탁과 책임이 한쪽에 몰리는지, 쉬는 시간이 실제로 지켜지는지, 돈·시간 사용이 계획 안에 있는지 주마다 확인해.'
   return '올해는 사람 관계의 책임을 한쪽에 몰지 말고, 쉬는 시간·내가 결정할 범위·돈과 시간을 장기 계획으로 나눠 관리해.'
@@ -164,15 +166,15 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const selectedLenses=view.lenses.filter(l=>SAJU_LIFE_KEYS[topic].includes(l.key)).map(l=>lensForTopic(l,topic))
   const selectedBhumi=activeWheel.filter(r=>THAI_LIFE_KEYS[topic].includes(r.bhumi_key))
   const thaiReaderSummary = topic==='전체'
-    ? thaiPeriodOverview(westernWhen(c.period.day_count))
+    ? thaiPeriodOverview(westernWhen(c.period.day_count, c.period.start))
     : selectedBhumi.length ? (topic==='애정' ? thaiLoveSummary(selectedBhumi.map(r=>r.bhumi_key)) : thaiLifeSummary(selectedBhumi.map(r=>r.bhumi_key))) : '이 분야와 연결된 생활 영역 자료가 없어.'
   const period = `${c.period.start}${c.period.end!==c.period.start?` — ${c.period.end}`:''}`
   const periodCaption = c.period.start === c.period.end ? `운세일 · ${period}` : `운세 기간 · ${period}`
-  const westernPeriod = westernWhen(c.period.day_count)
+  const westernPeriod = westernWhen(c.period.day_count, c.period.start)
   const westernReaderHeadline = westernHeadline(selectedWestern,westernPeriod,c)
   const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod,c)
   const westernDisplayRows = field || topic!=='전체' ? selectedWestern : representativeWesternRows(selectedWestern)
-  const sajuPeriod = westernWhen(c.period.day_count)
+  const sajuPeriod = westernWhen(c.period.day_count, c.period.start)
   const sajuReaderHeadline = sajuHeadline(selectedLenses,sajuPeriod)
   const sajuOverviewSummary = topic==='전체'
     ? sajuOverviewText(view.lenses, view.sajuSummary)
@@ -182,7 +184,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
         <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{westernOverviewSummary}</p><small>점수는 사건 확률이 아니라 같은 기간 안에서의 상대적 강약이야.</small></article>
         {view.saju&&view.contexts.length ? <article className="system-saju"><strong><Columns3 size={16}/>사주</strong><p>{sajuOverviewSummary}</p><small>간지·십성은 사주 탭의 계산 근거에서 따로 확인할 수 있어.</small></article>:<p className="system-unavailable">사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어.</p>}
         {view.thai&&(view.natalWheel.length||view.wheels.length)>0 ? <article className="system-thai"><strong><Sparkles size={16}/>태국점성술</strong><p>{thaiReaderSummary}</p><small>행성 이름과 배치는 태국점성술 탭의 계산 상세에서 확인해.</small></article>:<p className="system-unavailable">태국점성술 · 현재 정밀도 또는 사용 가능한 배치가 부족해.</p>}
-      </div><details className="system-synthesis"><summary>세 체계에서 지금 확인할 것</summary><p><b>서양점성술</b> · {westernOverviewSummary}</p>{view.saju&&view.contexts.length&&<p><b>사주</b> · {sajuOverviewSummary}</p>}{view.thai&&(view.natalWheel.length||view.wheels.length)>0&&<p><b>태국점성술</b> · {thaiReaderSummary}</p>}<small>세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해.</small></details></section>
+      </div><details className="system-synthesis"><summary>세 체계에서 지금 확인할 것</summary><p><b>서양점성술</b> · {westernOverviewSummary}</p>{view.saju && view.contexts.length > 0 ? <p><b>사주</b> · {sajuOverviewSummary}</p> : null}{view.thai && (view.natalWheel.length > 0 || view.wheels.length > 0) ? <p><b>태국점성술</b> · {thaiReaderSummary}</p> : null}<small>세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해.</small></details></section>
   return <section className={`system-reading system-${system}`}>
     <span className="reading-period-date">{periodCaption}</span>
     <div className="system-switcher" role="group" aria-label="해석 체계 선택">{SYSTEMS.map(({id,label,Icon})=><button type="button" aria-pressed={system===id} key={id} onClick={()=>{setSystem(id);setTopic(field?.lens ?? '전체')}}><Icon size={18} aria-hidden="true"/><span>{label}</span></button>)}</div>

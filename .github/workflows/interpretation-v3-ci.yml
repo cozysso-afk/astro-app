@@ -103,6 +103,7 @@ jobs:
           node --test web/src/lib/westernReadingUx.test.mjs
           node --test web/src/lib/reunionLocationMobile.test.mjs
           node --test web/src/lib/interpretationUiContract.test.mjs
+          node --test --experimental-strip-types web/src/lib/readingDateSemantics.test.mjs
           node --test web/src/lib/relationshipModeContract.test.mjs
           node --test web/src/lib/horaryPrashnaEntry.test.mjs
           node --test web/src/lib/relationshipEvidencePipeline.test.mjs

@@ -146,7 +146,7 @@ export function PeriodFortuneResults({
       {exportNotice && <small>{exportNotice}</small>}
     </div>
     {field?.id==='love'&&<aside className="love-context-note-v3"><strong>애정운은 관계 상태를 하나로 가정하지 않아.</strong><p>솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심을 각각 나눠 보여줘. 내 상황에 맞는 부분만 골라 읽으면 돼.</p></aside>}
-    {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>연락 전체 활성도와 상대→나·나→상대 방향은 서로 다른 값이야. 선연락 방향이 연락 지수 전체를 대신하지 않아.</p></aside>}
+    {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>외부 연락 반응 신호와 내 연락 실행 적합도는 서로 다른 계산축이야. 특정 상대가 먼저 연락할 사람을 판정하지는 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>} 
       <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>

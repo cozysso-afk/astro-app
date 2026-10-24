@@ -48,7 +48,7 @@ test('independent systems are not fused into the same phenomenon merely because 
 })
 
 test('each period gets a genuinely different editorial objective and reading sequence', () => {
-  const contexts=Object.fromEntries(['day','week','month','annual'].map(kind=>[kind,buildPeriodNarrativeContext(packet(kind))]));assert.match(contexts.day.objective,/오늘 안에서/);assert.match(contexts.week.objective,/7일 안에서/);assert.match(contexts.month.objective,/한 달 안에서/);assert.match(contexts.annual.objective,/연중 구조적/);assert.notDeepEqual(contexts.day.required_sequence,contexts.week.required_sequence);assert.notDeepEqual(contexts.week.required_sequence,contexts.month.required_sequence);assert.notDeepEqual(contexts.month.required_sequence,contexts.annual.required_sequence)
+  const contexts=Object.fromEntries(['day','week','month','annual'].map(kind=>[kind,buildPeriodNarrativeContext(packet(kind))]));assert.match(contexts.day.objective,/선택한 운세일 안에서/);assert.match(contexts.week.objective,/7일 안에서/);assert.match(contexts.month.objective,/한 달 안에서/);assert.match(contexts.annual.objective,/연중 구조적/);assert.notDeepEqual(contexts.day.required_sequence,contexts.week.required_sequence);assert.notDeepEqual(contexts.week.required_sequence,contexts.month.required_sequence);assert.notDeepEqual(contexts.month.required_sequence,contexts.annual.required_sequence)
 })
 
 test('period instructions remain distinct after excluding the intentionally shared product editorial contract', () => {

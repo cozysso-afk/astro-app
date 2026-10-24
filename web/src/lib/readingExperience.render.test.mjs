@@ -38,7 +38,7 @@ for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_marr
   assert.match(html,/<details class="relationship-technical"><summary>기술 근거 자세히 보기/)
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|Neptune|Uranus|W:|S:|T:/)
   if(mode==='reunion') {
-    for(const title of ['상대 → 나','나 → 상대','과거 인연 재접점','다시 붙었을 때 유지력','반복될 가능성이 높은 문제','주요 시기']) assert.ok(visible.includes(title))
+    for(const title of ['상대 차트 쪽 활성','내 차트 쪽 활성','과거 인연 재접점','다시 붙었을 때 유지력','반복될 가능성이 높은 문제','주요 시기']) assert.ok(visible.includes(title))
     assert.match(visible,/약함/);assert.match(visible,/강함/)
   } else {
     assert.doesNotMatch(visible,/재접촉|재회|상대 → 나|나 → 상대/)
@@ -90,9 +90,9 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} ca
   f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:3,polarity:-0.7})
   const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
-  assert.match(visible, /signal-incoming[\s\S]*?상대가 먼저 오는 흐름[\s\S]*?약함/)
-  assert.match(visible, /signal-outgoing[\s\S]*?내가 먼저 연락하기[\s\S]*?강함/)
-  assert.ok(visible.indexOf('상대가 먼저 오는 흐름')<visible.indexOf('period-ai-user-focus'))
+  assert.match(visible, /signal-incoming[\s\S]*?외부 연락 반응[\s\S]*?약함/)
+  assert.match(visible, /signal-outgoing[\s\S]*?내 연락 실행 적합도[\s\S]*?강함/)
+  assert.ok(visible.indexOf('외부 연락 반응')<visible.indexOf('period-ai-user-focus'))
 })
 test('personal spouse route uses existing hints without manufacturing a meeting or a person',()=>{
   const f=personalMarriageFixture();f.result.spouse_archetype.meeting_route='반복해서 참여하는 모임에서 천천히 알아가는 방식';f.result.spouse_archetype.identity_clues=['생활 리듬을 맞추는 관계']
@@ -126,7 +126,7 @@ for(const [kind,mode,title] of [['compatibility','compatibility','궁합 한눈�
   assert.ok(prompt.length<=28000)
   assert.equal(JSON.stringify(calculation),before)
   assert.doesNotThrow(()=>JSON.parse(prompt.split(/\[COMPACT_CALCULATED_DATA · 압축단계 \d\]\n/)[1]))
-  if(kind==='reunion') for(const label of ['상대 → 나','나 → 상대','과거 인연 재접점','유지력','reunion_dimensions','reunion_directional_context','reunion_transits','secondary support']) assert.ok(prompt.includes(label))
+  if(kind==='reunion') for(const label of ['상대 차트 쪽 활성','내 차트 쪽 활성','과거 인연 재접점','유지력','reunion_dimensions','reunion_directional_context','reunion_transits','secondary support']) assert.ok(prompt.includes(label))
   else assert.ok(!prompt.includes('[재회 흐름 한눈에]'))
   if(mode==='marriage_married') {assert.ok(!prompt.includes('[결혼 전에 확인할 현실 조건]'));assert.match(prompt,/미래 결혼 가능성을 예측하지 않는다/)}
 })

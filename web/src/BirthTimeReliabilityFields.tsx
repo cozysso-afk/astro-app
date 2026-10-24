@@ -314,14 +314,18 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
     {showTimeRange && <>
       <label className="field birth-time-range-field"><span>가능 생시 범위 시작 · 선택</span><input type="time" value={value.rectifiedWindowStart} disabled={disabled} onChange={(event)=>emit({rectifiedWindowStart:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
       <label className="field birth-time-range-field"><span>가능 생시 범위 끝 · 선택</span><input type="time" value={value.rectifiedWindowEnd} disabled={disabled} onChange={(event)=>emit({rectifiedWindowEnd:event.target.value}, shouldPreserveRenderedResults(event.currentTarget))}/></label>
+      <div className="privacy-note field-wide birth-time-reliability-note"><span>{value.rectifiedWindowStart && value.rectifiedWindowEnd
+        ? `저장된 가능 범위 ${value.rectifiedWindowStart}~${value.rectifiedWindowEnd} · 시간 민감 근거는 기능별 정밀도 규칙에 따라 제한돼요.`
+        : '가능 범위의 시작과 끝을 모두 입력해 주세요. 범위가 비어 있으면 시간 민감 근거는 제한돼요.'}</span></div>
     </>}
+    {!showTimeRange && <div className="privacy-note field-wide birth-time-reliability-note"><span>정확 생시 사용 중 · 가능 범위는 현재 계산에 사용하지 않아요.</span></div>}
     {stagedForRecalculation && <div className="privacy-note field-wide birth-time-reliability-note"><span>출생시간 설정이 바뀌었어. 현재 결과는 이전 계산 기준이야. 실제 계산 실행을 누르면 새 설정으로 갱신돼.</span></div>}
     {!disabled && <div className="privacy-note field-wide birth-time-reliability-note"><span>{value.timeSource === 'rectified'
       ? value.timeConfidence === 'exact'
-        ? '입력한 보정 시각을 정확 생시로 사용해요. 생시 범위는 앱이 자동으로 만들지 않으며, 직접 입력한 값만 보관해요.'
-        : '입력한 출생시간을 대표 시각으로 사용하고, 생시 범위 안에서 상승점·하우스 같은 시간 민감 결과가 유지되는지도 함께 비교해요. 범위는 자동 생성하지 않아요.'
+        ? '검증된 보정 시각을 대표 생시로 사용해요. 가능 범위는 직접 입력한 값만 보관해요.'
+        : '입력한 시간을 대표 시각으로 사용해요. 가능 범위는 저장되며, 범위를 실제로 재계산하지 않는 운세에서는 상승점·하우스 같은 시간 민감 근거를 제외하거나 낮은 정밀도로 표시해요.'
       : value.rectifiedWindowStart && value.rectifiedWindowEnd
-        ? '입력한 시각은 대표 시각으로 사용하고, 직접 적은 가능 범위 안에서 시간 민감 결과가 유지되는지도 함께 비교해요.'
-        : '입력한 시각은 대표 시각으로 사용해요. 시간이 정확하지 않다면 위의 가능 생시 범위를 선택해서 시간 민감 결과도 함께 비교할 수 있어요.'}</span></div>}
+        ? '입력한 시간을 대표 시각으로 사용해요. 가능 범위는 저장되며, 기능별 계산 방식에 따라 시간 민감 근거를 제한하거나 범위 안정성을 따로 확인해요.'
+        : '입력한 시간을 대표 시각으로 사용해요. 시간이 정확하지 않다면 가능 생시 범위를 입력해 주세요. 범위가 없으면 시간 민감 근거는 제한돼요.'}</span></div>}
   </>
 }

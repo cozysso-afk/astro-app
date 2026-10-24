@@ -106,15 +106,15 @@ function contactReading(hierarchy: ReunionHierarchy) {
     band,
     status:'계산됨 · 미래 후보 없음',
     candidateCount,
-    text:'연락 단계 계산은 완료됐지만 기준일 이후 공개할 미래 후보는 0개야. 계산 자체가 없다는 뜻은 아니며, 상대 → 나 / 나 → 상대 비교값과 지난 활성 구간은 별도로 읽어.',
+    text:'연락 단계 계산은 완료됐지만 기준일 이후 공개할 미래 후보는 없어요. 계산 자체가 없다는 뜻은 아니며, 상대 차트 쪽·내 차트 쪽 활성과 지난 구간은 별도로 읽어요.',
     first:'',
   }
   return {
     state:'candidate_not_top' as ContactAvailabilityState,
     band,
-    status:`미래 후보 ${candidateCount}개 · 핵심 TOP 미포함`,
+    status:`미래 후보 ${candidateCount}개 · 우선 시기 미포함`,
     candidateCount,
-    text:'연락 단계의 미래 후보는 계산됐지만 현재 공개된 핵심 TOP 시기에는 포함되지 않았어. 날짜를 새로 만들어 보충하지 않고 후보 존재와 핵심 시기 노출을 구분해.',
+    text:'연락 단계의 미래 후보는 계산됐지만 현재 공개된 우선 시기에는 포함되지 않았어. 날짜를 새로 만들어 보충하지 않고 후보 존재와 우선 시기 노출을 구분해.',
     first:'',
   }
 }
@@ -159,27 +159,27 @@ function initiativeReading(rows: DirectionRow[]) {
     const diff = a - b
     const roundedA = Math.round(a)
     const roundedB = Math.round(b)
-    if (diff === 0) return { label:'두 방향 차이 없음', text:`수신 ${roundedA}, 발신 ${roundedB}로 같아요. 어느 쪽이 먼저 연락한다는 예측으로 바꾸지 않아요.` }
+    if (diff === 0) return { label:'두 활성축 차이 없음', text:`상대 차트 ${roundedA}, 내 차트 ${roundedB}로 같아요. 어느 쪽이 먼저 연락한다는 예측으로 바꾸지 않아요.` }
     if (Math.abs(diff) < 5) {
       return {
         label:'두 방향 차이 작음',
-        text:`수신 ${roundedA}, 발신 ${roundedB}로 차이가 작아요. 이 정도 차이로 실제 선연락 주체를 정하지 않아요.`,
+        text:`상대 차트 ${roundedA}, 내 차트 ${roundedB}로 차이가 작아요. 이 정도 차이로 실제 선연락 주체를 정하지 않아요.`,
       }
     }
-    const side = diff > 0 ? '수신 쪽' : '발신 쪽'
+    const side = diff > 0 ? '상대 차트 쪽' : '내 차트 쪽'
     const pointGap = Math.abs(roundedA - roundedB)
     const weak = a < 40 && b < 40
     return {
       label:`${side} 상대 활성도 높음`,
       text: weak
-        ? `수신 ${roundedA}, 발신 ${roundedB}로 둘 다 낮은 구간이지만 ${side}이 ${pointGap}점 높아요. 행동 예측이 아니라 두 계산축의 상대 비교예요.`
-        : `수신 ${roundedA}, 발신 ${roundedB}로 ${side}이 ${pointGap}점 높아요. 먼저 연락할 사람을 확정하는 값은 아니에요.`,
+        ? `상대 차트 ${roundedA}, 내 차트 ${roundedB}로 둘 다 낮은 구간이지만 ${side}이 ${pointGap}점 높아요. 행동 예측이 아니라 두 계산축의 상대 비교예요.`
+        : `상대 차트 ${roundedA}, 내 차트 ${roundedB}로 ${side}이 ${pointGap}점 높아요. 먼저 연락할 사람을 확정하는 값은 아니에요.`,
     }
   }
   const ar = bandRank(incoming?.band)
   const br = bandRank(outgoing?.band)
-  if (ar && br && ar !== br) return { label: ar > br ? '수신 쪽 등급 높음' : '발신 쪽 등급 높음', text:'두 방향의 등급 차이는 보여 주되 실제 선연락 행동을 확정하지 않아요.' }
-  return { label:'방향 비교 불가', text:'수신과 발신을 비교할 독립 계산값이 충분하지 않아요.' }
+  if (ar && br && ar !== br) return { label: ar > br ? '상대 차트 쪽 등급 높음' : '내 차트 쪽 등급 높음', text:'두 활성축의 등급 차이는 보여 주되 실제 선연락 행동을 확정하지 않아요.' }
+  return { label:'활성축 비교 불가', text:'두 차트의 활성도를 비교할 독립 계산값이 충분하지 않아요.' }
 }
 
 function calculatedCurrentState(hierarchy: ReunionHierarchy) {
@@ -231,8 +231,8 @@ function stageVerdicts(hierarchy: ReunionHierarchy): StageVerdict[] {
     }
     if (candidateCount != null && candidateCount > 0) return {
       key,label,
-      status:`미래 후보 ${candidateCount}개 · 핵심 TOP 미포함`,
-      text:`${presentText(key)} 다만 현재 공개된 핵심 TOP 시기에는 들지 않아 날짜를 새로 만들어 강조하지 않아.`,
+      status:`미래 후보 ${candidateCount}개 · 우선 시기 미포함`,
+      text:`${presentText(key)} 다만 현재 공개된 우선 시기에는 들지 않아 날짜를 새로 만들어 강조하지 않아.`,
     }
     if (candidateCount === 0) return {
       key,label,
@@ -381,7 +381,10 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const answerTitle = observation.state ? observed.title : answer.title
   const observedNextRow = nextObserved ? stageRows.find(row=>row.key===nextObserved) : null
   const observedNextText = observedNextRow ? `아직 확인되지 않은 다음 단계인 ${observedNextRow.label}의 계산 상태는 ‘${observedNextRow.status}’야. ${observedNextRow.text}` : '이미 합의된 관계의 실제 지속 여부는 이번 계산으로 확정하지 않아.'
-  const answerText = observation.state ? `${observed.text} ${observedNextText}` : readerSentences(consultation?.current_stage, 3) || answer.text
+  const observedVerdict = (observation.state === 'recontacted' || observation.state === 'messaging') && !stages.has('in_person_meeting')
+    ? '현재는 연락 단계까지 확인됐지만 실제 만남 근거가 없어 재회 성립 쪽에 무게를 싣기는 어려워요.'
+    : ''
+  const answerText = observation.state ? `${observed.text} ${observedVerdict} ${observedNextText}`.replace(/\s+/g, ' ').trim() : readerSentences(consultation?.current_stage, 3) || answer.text
   const contactAlreadyObserved = observedLevel ? REUNION_STAGE_ORDER.indexOf(observedLevel) >= REUNION_STAGE_ORDER.indexOf('contact_recontact') : false
   const contactText = contactAlreadyObserved ? `연락은 사용자가 확인한 관측 사실이야. ${contact.text}` : readerSentences(`${consultation?.contact_type_if_any ?? ''} ${consultation?.continuity ?? ''}`, 3) || contact.text
   const initiativeText = initiative.text
@@ -433,14 +436,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
     if (state === 'blocked') return '앞 단계 미확인'
     return statusFor(row)
   }
-  const nextRow = nextObserved ? stageRows.find(row => row.key === nextObserved) : null
   const stateTitle = observed.title.replace('관측 사실 · ', '')
-  const nextStatus = nextRow ? stageDisplayStatus(nextRow) : ''
-  const nextSummary = nextRow
-    ? nextStatus === '뚜렷한 시기 없음'
-      ? `연락·만남의 현재 사실은 그대로 두더라도, 이번 조회 기간에는 다음 단계인 ${nextRow.label}으로 넘어가는 뚜렷한 시기를 찾지 못했어요. 지금 결과만으로 재회 성립 쪽에 무게를 싣기는 어려워요.`
-      : `다음 관문은 ${nextRow.label}이에요. 이 단계의 계산 상태는 ‘${nextStatus}’예요.`
-    : '다시 합의한 관계가 이어지는지, 이전 문제를 함께 풀어가는지 살펴보세요.'
   const safeNarrative = (value?: string | null) => sentenceList(value)
     .filter(row => !TECHNICAL_RE.test(row) && !/관문|후보|TOP|완전히 닫|통과 점수|활성도|검증|3일 이상/.test(row))
     .slice(0, 2).join(' ')
@@ -464,7 +460,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
       <section className="reunion-v5-answer">
         <span>재회 흐름 한눈에</span>
         <h3>{observation.state ? stateTitle : '현재 관계 상태를 알려주세요'}</h3>
-        <p>{observation.state ? nextSummary : '실제 연락·만남 여부를 입력하면 지금 단계에 맞춰 읽을 수 있어요.'}</p>
+        <p>{observation.state ? answerText : '실제 연락·만남 여부를 입력하면 지금 단계에 맞춰 읽을 수 있어요.'}</p>
       </section>
       <div className="reunion-v5-stages" aria-label="재회 단계별 흐름">
         {stageRows.map(row => <article key={row.key} data-stage-state={stageState(row)} data-reading-export-detail={safeNarrative(row.text)}>
@@ -472,13 +468,14 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         </article>)}
       </div>
       <section className="reunion-v5-section">
-        <h4>받는 연락 · 보내는 연락</h4>
+        <h4>양쪽 차트의 관계 활성</h4>
         <div className="reunion-v5-directions">
           <article><b>수신 · 상대 → 나</b><strong>{incomingDirection.metric}</strong><p>{incomingDirection.text}</p></article>
           <article><b>발신 · 나 → 상대</b><strong>{outgoingDirection.metric}</strong><p>{outgoingDirection.text}</p></article>
         </div>
         {actualInitiator ? <p className="reunion-v5-note">입력한 실제 첫 연락: {actualInitiator}</p> : null}
-        <p className="reunion-v5-direction-summary"><b>{initiative.label}</b> · {initiative.text}</p>
+        <p className="reunion-v5-direction-summary">{contactText}</p>
+        <p className="reunion-v5-direction-summary"><b>{initiative.label}</b> · {initiativeText}</p>
       </section>
       <section className="reunion-v5-section">
         <h4>앞으로 주목할 시기</h4>
@@ -486,8 +483,9 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         <p className="reunion-v5-note">표시된 날짜는 해당 단계의 계산 신호가 있는 시기예요.</p>
       </section>
       <section className="reunion-v5-section">
-        <h4>지금 확인할 것</h4>
-        <p>{contactAlreadyObserved ? meetingAlreadyObserved ? '만난 뒤에도 연락과 약속이 이어지는지, 관계를 어떻게 이어갈지 서로 합의하는지 살펴보세요.' : '대화가 이어지고, 날짜와 장소를 정한 만남 제안이 실제로 오가는지 살펴보세요.' : '연락이 실제로 닿는지부터 확인하세요. 생각이 난다는 신호만으로 상대의 행동을 단정할 수는 없어요.'}</p>
+        <h4>{next.label}</h4>
+        <p>{next.text}</p>
+        {meetingAlreadyObserved || observation.state === 'reunited' ? <p>{behaviorText}</p> : <p>{guide.text}</p>}
       </section>
       {reunionV2 ? <section className="reunion-v5-section">
         <h4>관계를 이해하는 해설</h4>
