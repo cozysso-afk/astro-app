@@ -1,4 +1,4 @@
-export const FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT = 'deterministic-provisional-single-day-evidence-v2'
+export const FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT = 'gemini-provisional-planet-only-v3'
 
 export function fortuneProvisionalSynthesisSignature(mode: string): Record<string, string> {
   return mode === 'provisional'

@@ -235,7 +235,7 @@ test("packet emits exact W:window evidence for intraday best and caution windows
 });
 
 
-test("day packet always keeps the selected date in key_dates and uses a day-specific policy",()=>{
+test("day packet keeps a non-today selected date without calling it today",()=>{
   const calc=calculation();
   calc.period={start:"2026-09-03",end:"2026-09-03",day_count:1};
   calc.western.daily_scores=[{
@@ -244,15 +244,50 @@ test("day packet always keeps the selected date in key_dates and uses a day-spec
     evidence:[],
   }];
   calc.western.detail_days=[{date:"2026-09-03",market_open:true,topics:{직장:{best_window:{start:"08:00",end:"09:30",score:72},caution_window:{start:"16:00",end:"17:00",score:31},evidence:["Jupiter trine MC intraday test"]}}}];
+  calc.time_context={current_date:"2026-10-25",timezone:"Asia/Seoul",generated_at:"2026-10-25T12:00:00+09:00"};
   const packet=compactCalculation(calc);
   const today=packet.key_dates.find(x=>x.date==="2026-09-03");
   assert.ok(today,"selected day must survive key-date ranking even without a salience hit");
   assert.ok(today.western_refs.includes("W:window:2026-09-03:직장:best"));
   assert.ok(today.western_refs.includes("W:detail:2026-09-03:직장:1"));
   assert.equal(packet.period_kind,"day");
-  assert.match(packet.integration_policy.important_date_rule,/오늘/);
+  assert.equal(packet.time_context.temporal_relation,"past");
+  assert.equal(packet.time_context.today_word_allowed,false);
+  assert.deepEqual(packet.time_context.permitted_deictics,["선택한 날","그날","해당 날짜"]);
+  assert.match(packet.integration_policy.important_date_rule,/선택 운세일\(2026-09-03\)/);
+  assert.doesNotMatch(packet.integration_policy.important_date_rule,/^오늘/);
   assert.match(packet.integration_policy.important_date_rule,/시간창/);
   assert.doesNotMatch(packet.integration_policy.important_date_rule,/365일/);
+});
+
+test("day packet permits today only when selected and current dates match",()=>{
+  const calc=calculation();
+  calc.period={start:"2026-10-25",end:"2026-10-25",day_count:1};
+  calc.time_context={current_date:"2026-10-25",timezone:"Asia/Seoul"};
+  const packet=compactCalculation(calc);
+  assert.equal(packet.time_context.temporal_relation,"today");
+  assert.equal(packet.time_context.today_word_allowed,true);
+  assert.match(packet.integration_policy.important_date_rule,/^오늘\(2026-10-25\)/);
+});
+
+test("missing current date fails closed and does not authorize today wording",()=>{
+  const calc=calculation();
+  calc.period={start:"2026-10-25",end:"2026-10-25",day_count:1};
+  const packet=compactCalculation(calc);
+  assert.equal(packet.time_context.temporal_relation,"unknown");
+  assert.equal(packet.time_context.today_word_allowed,false);
+  assert.match(packet.integration_policy.important_date_rule,/^선택 운세일\(2026-10-25\)/);
+});
+
+test("quality validation rejects today wording for a different selected date",()=>{
+  const calc=calculation();
+  calc.period={start:"2026-09-03",end:"2026-09-03",day_count:1};
+  calc.time_context={current_date:"2026-10-25",timezone:"Asia/Seoul"};
+  const packet=compactCalculation(calc);
+  const data=output(packet);
+  data.headline="오늘은 연락을 기다리는 날";
+  const report=inspectInterpretationQuality(validateOutput(data),packet);
+  assert.match(report.stages[2].issues.join(" / "),/실제 오늘과 다른데 '오늘' 표현 사용/);
 });
 
 test("week and month packet policies do not inherit annual 365-day wording",()=>{

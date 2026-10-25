@@ -69,20 +69,32 @@ function localClients(seen){
   }
 }
 
-test('provisional V23 opt-in remains local, zero-Gemini, and uses period-aware prose',async()=>{
-  const seen={fetchCalls:0,inserted:null}
+test('provisional V23 uses Gemini with a sanitized planet-only calculation',async()=>{
+  const seen={calls:[]}
   const calculation={precision:provisional,period:{start:'2026-09-14',end:'2026-09-20',day_count:7},western:{overall:{},daily_scores:[],months:[],relationship_signals:{}},saju:{},thai:{}}
-  const handler=await loadV22(async()=>{seen.fetchCalls+=1;throw new Error('provisional V23 must remain local')},localClients(seen))
+  const handler=await loadV22(async(url,init)=>{
+    seen.calls.push({url:String(url),body:JSON.parse(String(init?.body??'{}'))})
+    return new Response(JSON.stringify({ok:true,job_id:'gemini-provisional-job',status:'queued',interpreter_version:'supabase-ai-v23'}),{status:202})
+  })
   const response=await handler(req({narrative_engine:'v23',calculation}))
   const body=await response.json()
-  assert.equal(response.status,200)
-  assert.equal(body.status,'done')
-  assert.equal(body.narrative_engine,'v23')
-  assert.equal(body.gemini_paid_call,false)
-  assert.equal(seen.fetchCalls,0)
-  assert.match(seen.inserted.kind,/^supabase-ai-v22-integrated-precision-v2\.1:v23-period-aware:/)
-  assert.equal(seen.inserted.model,'deterministic-provisional-v23')
-  assert.match(seen.inserted.result_json.headline,/이번 주|주간 흐름/)
-  assert.equal(seen.inserted.result_json.systems.saju,'')
-  assert.equal(seen.inserted.result_json.systems.thai,'')
+  assert.equal(response.status,202)
+  assert.equal(body.status,'queued')
+  assert.equal(body.origin,'gemini')
+  assert.equal(body.precision_mode,'provisional')
+  assert.equal(response.headers.get('x-starlight-upstream'),'fortune-interpret-v23-preview')
+  assert.equal(response.headers.get('x-starlight-precision-mode'),'provisional')
+  assert.equal(seen.calls.length,1)
+  assert.equal(seen.calls[0].url,'https://project.supabase.test/functions/v1/fortune-interpret-v23-preview')
+  assert.equal(seen.calls[0].body.precision_mode,'provisional')
+  assert.equal(seen.calls[0].body.calculation.saju.provisional_excluded_from_ai,true)
+  assert.equal(seen.calls[0].body.calculation.thai.provisional_excluded_from_ai,true)
+  assert.equal(seen.calls[0].body.calculation.western.natal.asc,null)
+})
+
+test('V23 preserves the precision contract when it compacts the calculation packet',()=>{
+  const source=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8')
+  assert.match(source,/attachPrecisionPacketMetadata/)
+  assert.match(source,/precisionGateFromPayload/)
+  assert.match(source,/precisionGate\.ok\?attachPrecisionPacketMetadata\(compacted,b\.calculation\):compacted/)
 })

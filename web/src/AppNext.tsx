@@ -719,6 +719,7 @@ export default function AppNext() {
         if (data?.status === 'done') {
           const payload: AiInterpretationResponse = {
             ok: true,
+            origin: data.origin,
             model: data.model,
             fallback_from: data.fallback_from,
             interpreter_version: data.interpreter_version || 'unknown',
@@ -750,7 +751,7 @@ export default function AppNext() {
         if (data?.status === 'failed') {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
-          const failedPayload: AiInterpretationResponse = { ok:false, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
+          const failedPayload: AiInterpretationResponse = { ok:false, origin:data.origin, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
           setAiInterpretation(failedPayload)
           throw new Error(failedPayload.error)
         }
@@ -783,7 +784,22 @@ export default function AppNext() {
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
     if (!calculation) return
-    const requestForCache = requestOverride ?? { start_date: calculation.period.start, end_date: calculation.period.end }
+    const generatedAt = new Date()
+    const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null
+    const requestForCache = {
+      ...(requestOverride ?? { start_date: calculation.period.start, end_date: calculation.period.end }),
+      interpretation_current_date: currentDate,
+      interpretation_timezone: timezone,
+    }
+    const calculationForInterpretation = {
+      ...calculation,
+      time_context: {
+        current_date: currentDate,
+        timezone,
+        generated_at: generatedAt.toISOString(),
+      },
+    }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
     const ttlDays = fortuneCacheTtlDays(period, selectedTool)
     if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
@@ -808,7 +824,7 @@ export default function AppNext() {
       setAiCacheSource('')
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
-        body: { action: 'start', calculation, model: aiModel },
+        body: { action: 'start', calculation: calculationForInterpretation, model: aiModel },
       })
       startPayload = data
       if (error) throw error

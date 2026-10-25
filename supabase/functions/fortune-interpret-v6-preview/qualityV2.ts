@@ -156,6 +156,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
 
   const s3:string[]=[];
   const prose=claimStrings(data).join("\n");
+  if(payload?.time_context?.today_word_allowed===false&&/(^|[\s\"'“‘(])오늘(?:[\s\"'”’은이가도을를에의,.)]|$)/m.test(prose))s3.push("선택 운세일이 실제 오늘과 다른데 '오늘' 표현 사용");
   if(/\b\d+(?:\.\d+)?\s*%/.test(prose))s3.push("확률처럼 보이는 % 수치");
   if(hasUnnegatedProbabilityClaim(prose))s3.push("사건 확률 단정 표현");
   if(hasDeterministicClaim(prose))s3.push("결정론적 미래 단정");
@@ -235,9 +236,9 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));
     if(hasIntradayWindow){
       const timedDecisions=(data?.decisions??[]).filter((d:any)=>Boolean(clockWindow(d?.timing)));
-      if(!timedDecisions.length)s5.push("오늘 시간대 행동 가이드 누락");
+      if(!timedDecisions.length)s5.push("선택 운세일 시간대 행동 가이드 누락");
       const windowEvidence=[...map.entries()].filter(([ref,row]:any)=>String(ref).startsWith("W:window:")||row?.scope==="intraday_window");
-      if(!windowEvidence.length)s5.push("오늘 시간창 전용 W:window:* 계산근거 누락");
+      if(!windowEvidence.length)s5.push("선택 운세일 시간창 전용 W:window:* 계산근거 누락");
       if(windowEvidence.length&&timedDecisions.length){
         const periodDate=isoDate(payload?.period?.start);
         for(const d of timedDecisions){
@@ -252,7 +253,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
             const sameTopicDetailLinked=refs.some((detailRef:string)=>{const x:any=map.get(detailRef);return x?.scope==="intraday_evidence"&&isoDate(x?.date)===isoDate(row?.date)&&String(x?.topic??"")===String(row?.topic??"");});
             if(!sameTopicDetailAvailable||sameTopicDetailLinked){exactLinked=true;break;}
           }
-          if(!exactLinked)s5.push(`오늘 시간대 행동 가이드 근거 불일치: ${txt(d?.timing,45)} · 동일 시간창 W:window:* 및 같은 분야 W:detail:* 필요`);
+          if(!exactLinked)s5.push(`선택 운세일 시간대 행동 가이드 근거 불일치: ${txt(d?.timing,45)} · 동일 시간창 W:window:* 및 같은 분야 W:detail:* 필요`);
         }
       }
     }
@@ -370,7 +371,7 @@ export function strictQualityRetryInstruction(report:any){
 - topic reason에 직접 연결된 추세·시기·근거가 빠졌을 때만 보완해라. 이미 구체적인 문장을 길이만 맞추려고 늘리지 마라.
 - 관계·재회 focus_timing은 실제 relationship evidence_refs가 직접 지지하는 날짜/구간만 유지하고 필요한 현실 확인 방식만 보완해라. 길이만 늘리지 마라.
 - 교차검증 synthesis가 비어 있거나 의미가 빠졌을 때만 Western과 다른 체계의 공통점/차이를 보완해라. 길이만 늘리지 마라.
-  - 오늘 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라.
+  - 선택 운세일 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라. payload.time_context.today_word_allowed=false이면 '오늘'이라고 쓰지 마라.
   - structured editorial section마다 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 모두 채워라. 결론→현실 장면→지금 할 일→판단이 달라질 조건이 한 번에 읽혀야 한다.
   - overall은 narrative_plan의 supporting_topics와 caution_topics를 실제로 연결하고 단일 topic 문장을 재작성하지 마라.
   - 대인 5상황과 애정 6상태는 서로 바꿔 붙일 수 없는 고유한 현실 질문과 판단 기준을 가져야 한다.

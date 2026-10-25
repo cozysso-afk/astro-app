@@ -116,7 +116,7 @@ test("day quality guard requires exact W:window timing and same-topic detail evi
   const missing=inspectInterpretationQuality(data,payload);
   assert.equal(missing.ok,false);
   const missingIssues=missing.stages.flatMap(stage=>stage.issues??[]).join(" / ");
-  assert.match(missingIssues,/오늘 시간대 행동 가이드 누락/);
+  assert.match(missingIssues,/선택 운세일 시간대 행동 가이드 누락/);
 
   data.decisions[0].timing="2026-09-03 08:00~09:30";
   const unlinked=inspectInterpretationQuality(data,payload);

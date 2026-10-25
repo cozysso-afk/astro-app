@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildReunionReadingV4 } from './reunionReadingV4.ts'
-import { validateReaderManuscriptV4 } from './narrativeQualityV4.ts'
 
 function hierarchy(overrides = {}) {
   const stages = {
@@ -25,14 +24,12 @@ const directions = [
   {kind:'outgoing',label:'발신',score:39,band:'약함',text:''},
 ]
 
-test('연락 중이지만 만남 후보가 없으면 재회 성립이 아니라 재접촉 단계로 판정한다', () => {
+test('연락 중이지만 만남 후보가 없으면 구조 데이터는 재접촉 단계까지만 확인한다', () => {
   const result = buildReunionReadingV4({
     hierarchy:hierarchy(),
     observation:{state:'messaging',initiator:'user',events:[]},
     directionRows:directions,
   })
-  assert.match(result.manuscript.verdict.title,/재접촉 단계에 머물러 있어요/)
-  assert.match(result.manuscript.verdict.answer,/약속이 구체화되는지/)
   assert.equal(result.axes.find(row=>row.key==='recontact')?.state,'observed')
   assert.equal(result.axes.find(row=>row.key==='continuity')?.state,'observed')
   assert.equal(result.axes.find(row=>row.key==='meeting')?.state,'no_candidate')
@@ -40,14 +37,13 @@ test('연락 중이지만 만남 후보가 없으면 재회 성립이 아니라 
   assert.equal(result.observedInitiator,'내가 먼저')
 })
 
-test('상위 재구축 후보가 있어도 만남 단계가 닫혀 있으면 상단 판정을 건너뛰지 않는다', () => {
+test('상위 재구축 후보가 있어도 만남 단계가 닫혀 있으면 구조 단계는 건너뛰지 않는다', () => {
   const result = buildReunionReadingV4({
     hierarchy:hierarchy(),
     observation:{state:'recontacted',initiator:'',events:[]},
     directionRows:directions,
   })
   assert.equal(result.axes.find(row=>row.key==='agreement')?.state,'blocked')
-  assert.doesNotMatch(result.manuscript.verdict.answer,/관계 재구축 단계가 열려/)
 })
 
 test('실제 만남은 대화 지속을 자동 확인하지 않는다', () => {
@@ -99,14 +95,14 @@ test('유지력 설명이 있어도 지속 가능성을 미래 후보로 만들�
   assert.deepEqual(result.futureWindows,[])
 })
 
-test('모든 실제 관계 상태의 상단 원고가 중복·메타 언어 품질 계약을 통과한다', () => {
+test('구조 판독기는 사용자에게 보일 고정 원고를 만들지 않는다', () => {
   for (const state of ['','disconnected','recontacted','messaging','met','intimate_undefined','reunited']) {
     const result = buildReunionReadingV4({
       hierarchy:hierarchy(),
       observation:{state,initiator:'unknown',events:[]},
       directionRows:directions,
     })
-    assert.deepEqual(validateReaderManuscriptV4(result.manuscript),[],state || 'not_provided')
+    assert.equal('manuscript' in result,false,state || 'not_provided')
   }
 })
 

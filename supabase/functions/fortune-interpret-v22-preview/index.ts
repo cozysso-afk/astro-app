@@ -2,8 +2,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { compactCalculation, payloadHash } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { buildLocalQualityFallbackCore } from "../fortune-interpret-v21-preview/costGuardV21.ts";
-import { buildLocalPeriodAwareFallbackV23 } from "../fortune-interpret-v23-preview/provisionalV23.ts";
-import { provisionalV23JobKind } from "../fortune-interpret-v23-preview/cacheIdentityV23.ts";
 import { normalizeProxiedFortuneResponse, publicFortuneError } from "../_shared/fortuneAiPublicError.ts";
 import { auditProvisionalResidue, attachPrecisionPacketMetadata, buildProvisionalExternalPrompt, precisionGateFromPayload, sanitizeProvisionalCalculation, sanitizeProvisionalInterpretationOutput } from "./precisionV2.ts";
 
@@ -35,6 +33,26 @@ async function proxyExact(req:Request,body:any){
     return new Response(JSON.stringify(publicFortuneError("UPSTREAM_FAILED")),{status:502,headers:outHeaders});
   }
 }
+async function proxyProvisionalV23(req:Request,body:any,safeCalculation:any){
+  const upstream=V23_UPSTREAM;
+  const outHeaders=new Headers(CORS);
+  outHeaders.set("x-starlight-upstream",upstream);
+  outHeaders.set("x-starlight-precision-mode","provisional");
+  try{
+    const headers=new Headers();
+    for(const name of ["authorization","apikey","x-client-info"]){const value=req.headers.get(name);if(value)headers.set(name,value);}
+    headers.set("content-type","application/json");
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/${upstream}`,{method:"POST",headers,body:JSON.stringify({...body,calculation:safeCalculation,precision_mode:"provisional"})});
+    const parsed=await response.json().catch(()=>null);
+    const normalized=normalizeProxiedFortuneResponse(parsed,response.status,body?.action);
+    const responseBody=normalized.body&&typeof normalized.body==="object"
+      ? {...normalized.body,origin:"gemini",precision_mode:"provisional"}
+      : normalized.body;
+    return new Response(JSON.stringify(responseBody),{status:normalized.status,headers:outHeaders});
+  }catch{
+    return new Response(JSON.stringify(publicFortuneError("UPSTREAM_FAILED",undefined,{origin:"gemini",precision_mode:"provisional"})),{status:502,headers:outHeaders});
+  }
+}
 function zeroUsage(v23=false){return {prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,attempt_count:0,call_trace:[],gemini_paid_call:false,precision_contract:"integrated-precision-v2",precision_mode:"provisional",...(v23?{narrative_engine:"v23"}:{})};}
 
 Deno.serve(async(req)=>{
@@ -61,17 +79,17 @@ Deno.serve(async(req)=>{
   if(!packetAudit.ok)return res(publicFortuneError("PROVISIONAL_PACKET_AUDIT_FAILED",undefined,{gemini_paid_call:false}),409);
   if(body?.action==="inspect")return res({ok:true,interpreter_version:VERSION,precision_mode:"provisional",narrative_engine:usesV23(body)?"v23":"legacy",gemini_paid_call:false,payload_bytes:new TextEncoder().encode(JSON.stringify(packet)).byteLength});
   if(body?.action!=="start")return res(publicFortuneError("UNSUPPORTED_ACTION",undefined,{gemini_paid_call:false}),400);
+  if(usesV23(body))return proxyProvisionalV23(req,body,safeCalculation);
   const user=await currentUser(req);if(!user)return res(publicFortuneError("AUTH_REQUIRED",undefined,{gemini_paid_call:false}),401);
   try{
-    const v23=usesV23(body);
-    const raw=v23?buildLocalPeriodAwareFallbackV23(packet):buildLocalQualityFallbackCore(packet);const finalData=sanitizeProvisionalInterpretationOutput(raw);const finalAudit=auditProvisionalResidue(finalData);
+    const raw=buildLocalQualityFallbackCore(packet);const finalData=sanitizeProvisionalInterpretationOutput(raw);const finalAudit=auditProvisionalResidue(finalData);
     if(!finalAudit.ok)return res(publicFortuneError("PROVISIONAL_FINAL_AUDIT_FAILED",undefined,{gemini_paid_call:false}),409);
-    const hash=await payloadHash(packet);const hashPart=hash.slice(0,32);const kind=v23?provisionalV23JobKind(VERSION,packet,hash):`${VERSION}:${hashPart}`;const a=admin();
+    const hash=await payloadHash(packet);const hashPart=hash.slice(0,32);const kind=`${VERSION}:${hashPart}`;const a=admin();
     const {data:cached}=await a.from("ai_interpret_jobs").select("id,result_json").eq("user_id",user.id).eq("kind",kind).eq("status","done").order("completed_at",{ascending:false}).limit(1).maybeSingle();
-    if(cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false,narrative_engine:v23?"v23":"legacy",gemini_paid_call:false});
+    if(cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false,narrative_engine:"legacy",origin:"deterministic_safe",gemini_paid_call:false});
     const now=new Date().toISOString();
-    const {data,error}=await a.from("ai_interpret_jobs").insert({user_id:user.id,kind,status:"done",model:v23?"deterministic-provisional-v23":"deterministic-provisional-v2",fallback_from:null,period_start:packet?.period?.start||null,period_end:packet?.period?.end||null,result_json:finalData,usage_json:zeroUsage(v23),error:null,updated_at:now,completed_at:now}).select("id").single();
+    const {data,error}=await a.from("ai_interpret_jobs").insert({user_id:user.id,kind,status:"done",model:"deterministic-provisional-v2",fallback_from:null,period_start:packet?.period?.start||null,period_end:packet?.period?.end||null,result_json:finalData,usage_json:{...zeroUsage(false),origin:"deterministic_safe"},error:null,updated_at:now,completed_at:now}).select("id").single();
     if(error||!data?.id)return res(publicFortuneError("PROVISIONAL_DB_WRITE_FAILED",error,{gemini_paid_call:false}),500);
-    return res({ok:true,job_id:data.id,status:"done",interpreter_version:VERSION,reused:false,inflight:false,narrative_engine:v23?"v23":"legacy",gemini_paid_call:false},200);
+    return res({ok:true,job_id:data.id,status:"done",interpreter_version:VERSION,reused:false,inflight:false,narrative_engine:"legacy",origin:"deterministic_safe",gemini_paid_call:false},200);
   }catch(e){return res(publicFortuneError("PROVISIONAL_GENERATION_FAILED",e,{gemini_paid_call:false}),500);}
 });

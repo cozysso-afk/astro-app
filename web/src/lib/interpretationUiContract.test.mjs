@@ -308,7 +308,8 @@ test('every topic gets its own conclusion instead of a swapped-name template', (
 })
 
 test('period result labels natural presentation without claiming deterministic text came from Gemini', () => {
-  assert.match(period, /result\.model === 'deterministic-provisional-v2' \|\| localQualityFallback/)
+  assert.match(period, /isDeterministicFortuneModel\(result\.model\)/)
+  assert.match(period, /narrativeOrigin === 'deterministic_safe'/)
   assert.match(period, /자동 운세 해설/)
   assert.match(period, /맞춤 운세 해설/)
   const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'),period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>'))
