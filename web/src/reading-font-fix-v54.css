@@ -270,8 +270,8 @@ html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunio
   html body #root .app-shell .relationship-experience[data-mode='reunion'] .reunion-v5-section p,
   html body #root .app-shell .relationship-experience[data-mode='reunion'] .reunion-v5-answer p {
     font-family: var(--reading-sans, -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif) !important;
-    font-size: 15px !important;
-    line-height: 1.72 !important;
+    font-size: var(--reunion-body, 15px) !important;
+    line-height: 1.68 !important;
     letter-spacing: -.012em !important;
     overflow-wrap: anywhere !important;
   }

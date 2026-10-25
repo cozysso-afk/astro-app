@@ -5,6 +5,7 @@ import { compactReunionHierarchyForExternal, compactReunionTimingForExternal } f
 
 const edge = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
 const panel = readFileSync(new URL('../ReunionHierarchyPanelV3.tsx', import.meta.url), 'utf8')
+const readingV4 = readFileSync(new URL('./reunionReadingV4.ts', import.meta.url), 'utf8')
 const grounding = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts', import.meta.url), 'utf8')
 const cache = readFileSync(new URL('./readingCache.ts', import.meta.url), 'utf8')
 
@@ -70,26 +71,26 @@ test('production Gemini packet preserves history/current context but keeps futur
 
 test('reunion UI distinguishes availability states instead of collapsing no-candidate into no-calculation', () => {
   for (const marker of [
-    "not_calculated",
-    "calculated_no_candidate",
-    "candidate_not_top",
-    "current_active",
+    "observed",
+    "current_signal",
     "future_candidate",
-    "계산됨 · 미래 후보 없음",
-    "우선 시기 미포함",
-    "현재 활성",
-  ]) assert.ok(panel.includes(marker),`missing state marker: ${marker}`)
-  assert.match(panel,/candidateCount === 0/)
-  assert.match(panel,/statusFor\(row\)/)
+    "no_candidate",
+    "blocked",
+    "not_calculated",
+    "뚜렷한 시기 없음",
+    "판정 자료 없음",
+    "지금 주목",
+  ]) assert.ok(readingV4.includes(marker),`missing state marker: ${marker}`)
+  assert.match(readingV4,/info\.count === 0/)
+  assert.match(readingV4,/stateStatus\(key, state\)/)
   assert.match(panel,/지난 시기와 실제 기록 비교/)
   assert.match(panel,/예측 적중률을 뜻하지 않아요/)
 })
 
-test('technical causal prose is retained when plain-language sentences do not fill the requested slots', () => {
+test('technical causal prose is never restored just to fill reader-language slots', () => {
   const body=panel.slice(panel.indexOf('function readerSentences'),panel.indexOf('function stageSet'))
-  assert.match(body,/if \(plain\.length >= limit\)/)
-  assert.match(body,/selected\.push\(row\)/)
-  assert.doesNotMatch(body,/filter\(row => !TECHNICAL_RE\.test\(row\)\)\.slice/)
+  assert.match(body,/return plain\.slice\(0, limit\)\.join\(' '\)/)
+  assert.doesNotMatch(body,/selected\.push\(row\)/)
 })
 
 test('reunion authored cache is invalidated for the temporal evidence contract', () => {

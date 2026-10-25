@@ -13,15 +13,16 @@ test('reunion routes to hierarchy with AI synthesis',()=>{
  assert.match(panel,/<ReunionHierarchyPanel/)
  assert.match(wrapper,/ReunionHierarchyPanelV3/)
 })
-test('four stages remain visible and evidence stays collapsed',()=>{
+test('six relationship axes remain visible and evidence stays collapsed',()=>{
  const html=render()
- for(const label of ['다시 의식하기','연락·대화','실제 만남','관계 재구축']) assert.ok(html.includes(label),label)
+ for(const label of ['과거 관계가 다시 떠오름','연락이 닿음','대화가 이어짐','실제 만남','다시 만나기로 정함','관계 유지']) assert.ok(html.includes(label),label)
+ assert.equal((html.match(/data-stage-state=/g) || []).length,6)
  assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
  assert.doesNotMatch(html,/<details[^>]*\bopen/)
  assert.match(html,/연락·만남·재회 확률이 아니에요/)
 })
 test('missing observation does not claim actual contact',()=>{
  const html=render({observation:{state:'',initiator:'',events:[]}})
- assert.match(html,/현재 관계 상태를 알려주세요/)
- assert.doesNotMatch(html,/연락은 이미 재개됐어요/)
+ assert.match(html,/현재 상태를 입력하면/)
+ assert.doesNotMatch(html,/실제 연락은 이미 닿았어요|연락은 이미 재개됐어요/)
 })
