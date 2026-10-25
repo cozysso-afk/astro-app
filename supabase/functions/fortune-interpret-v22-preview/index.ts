@@ -28,7 +28,11 @@ async function proxyExact(req:Request,body:any){
     const response=await fetch(`${SUPABASE_URL}/functions/v1/${upstream}`,{method:"POST",headers,body:JSON.stringify(body)});
     const parsed=await response.json().catch(()=>null);
     const normalized=normalizeProxiedFortuneResponse(parsed,response.status,body?.action);
-    return new Response(JSON.stringify(normalized.body),{status:normalized.status,headers:outHeaders});
+    const declaredOrigin=parsed?.origin==="gemini"||parsed?.origin==="deterministic_safe"?parsed.origin:null;
+    const responseBody=declaredOrigin&&normalized.body&&typeof normalized.body==="object"
+      ? {...normalized.body,origin:declaredOrigin}
+      : normalized.body;
+    return new Response(JSON.stringify(responseBody),{status:normalized.status,headers:outHeaders});
   }catch{
     return new Response(JSON.stringify(publicFortuneError("UPSTREAM_FAILED")),{status:502,headers:outHeaders});
   }
