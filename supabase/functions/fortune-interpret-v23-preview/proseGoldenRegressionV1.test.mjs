@@ -164,13 +164,13 @@ test('golden 11: frontend focus card accepts concise authored prose instead of r
 })
 
 // Golden 12 — pipeline ordering keeps authored prose first, targeted repair explicit, and verified model hero visible.
-test('golden 12: backend and frontend ownership order cannot silently regress',()=>{
-  const mergePos=indexSource.indexOf('mergeAuthoredTopicAnalysis(core,buildDeterministicTopicAnalysis(payload),payload)')
-  const stabilizePos=indexSource.indexOf('stabilizeCoreForQuality(withTopics,payload)')
-  const repairPos=indexSource.indexOf('repairInterpretationQuality(data,payload)')
+test('golden 12: backend validates authored prose without deterministic co-writing',()=>{
+  const projectionPos=indexSource.indexOf('buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)')
   const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload)')
-  assert.ok(mergePos>=0&&stabilizePos>mergePos)
-  assert.ok(repairPos>=0&&validatePos>repairPos)
+  assert.ok(projectionPos>=0&&validatePos>projectionPos)
+  assert.doesNotMatch(indexSource,/stabilizeCoreForQuality\(withTopics,payload\)/)
+  assert.doesNotMatch(indexSource,/polishV23EditorialDepth\(data,payload\)/)
+  assert.doesNotMatch(indexSource,/buildLocalQualityFallbackCore\(payload\)/)
   assert.match(panelSource,/const semanticHero = !westernOnly && \(period === 'today' \|\| period === 'week'\) && !verifiedHero/)
   assert.match(panelSource,/verifiedHero \? visibleAiText\(data\.headline\)/)
   assert.match(panelSource,/verifiedHero[\s\S]*visibleAiText\(data\.overall\.summary\)/)

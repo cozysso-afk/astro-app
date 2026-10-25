@@ -41,6 +41,39 @@ export function txt(v: unknown,n:number){ return String(v??"").trim().slice(0,n)
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
 
+export function buildTimeContext(calc:any,period:any){
+  const start=isoDate(period?.start);
+  const end=isoDate(period?.end)||start;
+  const source=calc?.time_context??calc?.request_context??{};
+  const currentDate=isoDate(source?.current_date??calc?.current_date??calc?.as_of_date);
+  const timezone=String(source?.timezone??source?.timezone_id??calc?.timezone??"").trim()||null;
+  const generatedAt=String(source?.generated_at??calc?.generated_at??"").trim()||null;
+  let temporalRelation:"past"|"today"|"future"|"current_period"|"unknown"="unknown";
+  if(currentDate&&start&&end){
+    if(end<currentDate)temporalRelation="past";
+    else if(start>currentDate)temporalRelation="future";
+    else if(start===currentDate&&end===currentDate)temporalRelation="today";
+    else temporalRelation="current_period";
+  }
+  const permittedDeictics=temporalRelation==="today"
+    ?["오늘","해당 날짜"]
+    :temporalRelation==="past"
+      ?["선택한 날","그날","해당 날짜"]
+      :temporalRelation==="future"
+        ?["선택한 날","다가오는 날","해당 날짜"]
+        :["선택 운세일","해당 날짜"];
+  return {
+    requested_start:start||null,
+    requested_end:end||null,
+    current_date:currentDate||null,
+    timezone,
+    generated_at:generatedAt,
+    temporal_relation:temporalRelation,
+    permitted_deictics:permittedDeictics,
+    today_word_allowed:temporalRelation==="today",
+  };
+}
+
 export function annotate(s:string){
   let t=s;
   const pairs:[RegExp,string][]=[
@@ -218,8 +251,10 @@ export function compactCalculation(calc:any){
 
   const rank=Object.entries(overall).map(([topic,st]:any)=>({topic,average:num(st.average),band:st.band}));
   const period=calculationPeriod;
+  const timeContext=buildTimeContext(calc,period);
+  const selectedDay=timeContext.requested_start??"선택 운세일";
   const importantDateRule=calculationPeriodKind==="day"
-    ?"오늘 실제 일별 점수와 detail_days의 시간창·세부 근거를 우선하고 사주·Thai는 해당 날짜가 속한 독립 맥락으로만 교차"
+    ?`${timeContext.today_word_allowed?`오늘(${selectedDay})`:`선택 운세일(${selectedDay})`}의 실제 일별 점수와 detail_days의 시간창·세부 근거를 우선하고 사주·Thai는 해당 날짜가 속한 독립 맥락으로만 교차. time_context.today_word_allowed=false이면 본문에서 '오늘'을 쓰지 않는다.`
     :calculationPeriodKind==="week"
       ?"주간 실제 일별 점수·근거에서 초반·중반·후반 전환과 핵심 날짜를 선정하고 사주·Thai는 독립 맥락으로만 교차"
       :calculationPeriodKind==="month"
@@ -229,6 +264,7 @@ export function compactCalculation(calc:any){
     packet_version:PACKET_VERSION,
     api_version:calc?.api_version,engine:calc?.engine,period,
     period_kind:calculationPeriodKind,
+    time_context:timeContext,
     integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:importantDateRule},
     ranking:{strongest:[...rank].sort((a,b)=>b.average-a.average).slice(0,6),weakest:[...rank].sort((a,b)=>a.average-b.average).slice(0,6)},
     western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},

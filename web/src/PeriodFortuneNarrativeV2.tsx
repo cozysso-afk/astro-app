@@ -7,6 +7,7 @@ import { polishFortuneSummary } from './lib/fortuneNarrativePolish'
 import { buildFortuneEditorialV3 } from './lib/fortuneEditorialV3'
 import { normalizeTopicEntries, interpretationHeroEligible } from './lib/interpretationTopics'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
+import { fortuneNarrativeOrigin } from './lib/fortuneNarrativeOrigin'
 import { topicOrder } from './lib/fortuneTopics'
 import { FortuneFlowCards } from './FortuneFlowCards'
 import { ReadingDirections, ReadingTimeline } from './ReadingSignals'
@@ -153,7 +154,7 @@ export function PeriodFortuneNarrativeV2({
     .sort((a, b) => importanceRank(a[1]?.importance) - importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
   const verifiedNarrative = !westernOnly
-    && result.model !== 'deterministic-provisional-v2'
+    && fortuneNarrativeOrigin(result.model, result.origin) === 'gemini'
     && !result.usage?.local_quality_fallback
     && interpretationHeroEligible(result.usage?.quality_validation, result.usage)
   const scopedData = field

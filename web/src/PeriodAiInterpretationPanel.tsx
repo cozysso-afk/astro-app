@@ -17,6 +17,7 @@ import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
 import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
 import { editorialGroupCopy } from './lib/fortuneEditorialV3'
 import { browserLocalDateIso, readingDateSemantics } from './lib/readingDateSemantics'
+import { fortuneNarrativeOrigin, isDeterministicFortuneModel } from './lib/fortuneNarrativeOrigin'
 
 function periodLabel(start: string, end: string) {
   if (!start && !end) return ''
@@ -93,7 +94,8 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
   const readiness = fortuneAiPrecisionReadiness(calculation)
   const narrativeValidation = result.usage?.quality_validation
-  const verifiedNarrative = !westernOnly && result.model !== 'deterministic-provisional-v2' && !result.usage?.local_quality_fallback && interpretationHeroEligible(narrativeValidation, result.usage)
+  const narrativeOrigin = fortuneNarrativeOrigin(result.model, result.origin)
+  const verifiedNarrative = !westernOnly && narrativeOrigin === 'gemini' && !result.usage?.local_quality_fallback && interpretationHeroEligible(narrativeValidation, result.usage)
   const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
   const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
   const referenceFlowCards = relationshipReferenceFlowCards(userSummary, calculation)
@@ -109,7 +111,7 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   const technicalEvidence = (calculation.western.daily_scores ?? []).flatMap((day)=>
     (day.evidence ?? []).map((evidence)=>({ date: day.date, evidence })),
   ).slice(0, 16)
-  const deterministicLocal = result.model === 'deterministic-provisional-v2' || localQualityFallback
+  const deterministicLocal = isDeterministicFortuneModel(result.model) || narrativeOrigin === 'deterministic_safe' || localQualityFallback
   const verifiedHero = verifiedNarrative && !field && !westernOnly
   // Short-period semantic copy remains the fallback only when no verified model hero is available.
   const semanticHero = !westernOnly && (period === 'today' || period === 'week') && !verifiedHero

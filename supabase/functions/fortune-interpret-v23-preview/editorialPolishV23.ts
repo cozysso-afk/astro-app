@@ -101,6 +101,34 @@ export function mergeAuthoredTopicAnalysis(data:any,deterministic:any,payload:an
   }))
 }
 
+// Compatibility projection only: reader-facing prose comes exclusively from
+// Gemini-authored cluster fields. Deterministic rows may supply enum metadata,
+// but never fallback sentences.
+export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payload:any){
+  const rows=Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]
+  const map=new Map<string,any>(rows.map((row:any)=>[String(row?.id??''),row]))
+  const source=Array.isArray(deterministic)?deterministic:Object.entries(deterministic??{}).map(([topic,row]:any)=>({topic,...row}))
+  return Object.fromEntries(source.map((item:any)=>{
+    const topic=text(item?.topic)
+    const section=sectionFor(data,topic)
+    const linked=section&&['direct','conditional'].includes(String(section?.applicability??''))
+      ? refs(section?.evidence_refs).filter(ref=>map.has(ref))
+      : []
+    const authored=linked.length>0
+    return [topic,{
+      importance:['핵심','주목','참고'].includes(String(item?.importance??''))?item.importance:'참고',
+      verdict:authored?clip(text(section?.conclusion),240):'',
+      reason:authored?clip(text(section?.real_scene),680):'',
+      timing:'',
+      action:authored?clip(text(section?.action),260):'',
+      avoid:authored?clip(text(section?.change_condition),320):'',
+      confidence:['높음','보통','낮음'].includes(String(item?.confidence??''))?item.confidence:'낮음',
+      confidence_reason:'',
+      evidence_refs:linked.slice(0,8),
+    }]
+  }))
+}
+
 function enrichTopicAnalysis(data:any,map:Map<string,any>){
   if(!data?.topic_analysis||typeof data.topic_analysis!=='object')return
   for(const [topic,item] of Object.entries(data.topic_analysis) as any[]){

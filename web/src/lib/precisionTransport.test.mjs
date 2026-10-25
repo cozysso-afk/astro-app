@@ -73,7 +73,7 @@ test('provisional synthesis cache refresh leaves exact paid cache IDs unchanged'
   assert.match(JSON.stringify(oldCachedResult),/기간 평균은 37\.0점/)
   assert.match(JSON.stringify(oldCachedResult),/변동폭은 0\.0점/)
   assert.notEqual(currentFortuneAiCacheId(request,calculation,'deterministic-provisional-v2'),legacyFortuneAiCacheId(request,calculation,'deterministic-provisional-v2'))
-  assert.equal(FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT,'deterministic-provisional-single-day-evidence-v2')
+  assert.equal(FORTUNE_PROVISIONAL_SYNTHESIS_CONTRACT,'gemini-provisional-planet-only-v3')
 
   const exactCalculation={...calculation,precision:exactPrecision()}
   assert.equal(currentFortuneAiCacheId(request,exactCalculation,'gemini-3.7-flash'),legacyFortuneAiCacheId(request,exactCalculation,'gemini-3.7-flash'))

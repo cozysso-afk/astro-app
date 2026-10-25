@@ -6,6 +6,7 @@ const server=readFileSync(new URL('../../../supabase/functions/relationship-inte
 const publicError=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const hierarchyPanel=readFileSync(new URL('../ReunionHierarchyPanelV3.tsx',import.meta.url),'utf8')
+const reunionReadingV4=readFileSync(new URL('./reunionReadingV4.ts',import.meta.url),'utf8')
 const relationshipSummary=readFileSync(new URL('./relationshipUserSummary.ts',import.meta.url),'utf8')
 const types=readFileSync(new URL('../appTypes.ts',import.meta.url),'utf8')
 const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',import.meta.url),'utf8')
@@ -34,14 +35,13 @@ test('server compiles question-first evidence and validates returned evidence re
   assert.match(publicError,/publicReunionV2/)
 })
 
-test('web prefers v2 question flow while retaining old reunion fallback',()=>{
+test('web routes reunion v2 into the single-author hierarchy view',()=>{
   assert.match(types,/reunion_synthesis_v2\?:/)
   assert.match(panel,/const reunionV2/)
-  assert.match(panel,/다시 연결될 여지가 있는 이유/)
-  assert.match(panel,/누가 먼저 움직일 흐름인가/)
-  assert.match(panel,/접점이 강해지는 시기/)
-  assert.match(panel,/다시 붙었을 때 관계 구조/)
-  assert.match(panel,/다시 깨뜨릴 수 있는 반복 패턴/)
+  assert.match(panel,/<ReunionHierarchyPanel/)
+  assert.match(hierarchyPanel,/const aiSummary = readerSentences\(reunionV2\?\.summary/)
+  assert.match(hierarchyPanel,/const aiStage = readerSentences\(consultation\?\.current_stage/)
+  assert.doesNotMatch(hierarchyPanel,/manuscriptFor|readingV4\.manuscript/)
   assert.match(panel,/reunion && reunionAi/)
 })
 
@@ -65,7 +65,7 @@ test('reunion hierarchy puts concise consultation answers before technical engin
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
   assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
-  const headingMarkup=['재회 흐름 한눈에','aria-label="재회 단계별 흐름"','<h4>받는 연락 · 보내는 연락</h4>','<h4>앞으로 주목할 시기</h4>','<h4>지금 확인할 것</h4>','<h4>관계를 이해하는 해설</h4>','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
+  const headingMarkup=['현재 판정','관계가 어디까지 왔는지','앞으로 주목할 시기','연락 방향 참고값','다음 단계로 넘어가는 변화','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
   let cursor=-1
   for(const markup of headingMarkup){
     const next=hierarchyPanel.indexOf(markup)
@@ -99,52 +99,44 @@ test('reunion hierarchy puts concise consultation answers before technical engin
 })
 
 test('reunion quality guard preserves depth while moving technical detail behind disclosures',()=>{
-  assert.match(hierarchyPanel,/const stageState/)
-  assert.match(hierarchyPanel,/const nextSummary/)
-  assert.match(hierarchyPanel,/지금 결과만으로 재회 성립 쪽에 무게를 싣기는 어려워요/)
-  assert.match(hierarchyPanel,/앞 단계 미확인/)
+  assert.match(hierarchyPanel,/const hasObservedState = Boolean\(observation\.state\)/)
+  assert.match(hierarchyPanel,/const aiSummary = readerSentences/)
+  assert.match(hierarchyPanel,/현재 관계 상태를 먼저 입력해 주세요/)
+  assert.match(reunionReadingV4,/앞 단계 미확인/)
   assert.match(hierarchyPanel,/왜 다시 연결됐나/)
   assert.match(hierarchyPanel,/재회로 넘어가려면/)
   assert.match(hierarchyPanel,/다시 만났을 때의 유지력/)
   assert.match(hierarchyPanel,/다시 깨질 수 있는 지점/)
-  assert.match(hierarchyPanel,/판정을 올리는 현실 신호/)
-  assert.match(hierarchyPanel,/다시 낮춰 봐야 할 신호/)
+  assert.match(hierarchyPanel,/다음 단계로 보는 변화/)
+  assert.match(hierarchyPanel,/현재 단계에 머무는 신호/)
   assert.match(hierarchyPanel,/<details className="reunion-v5-details"><summary>지난 시기와 실제 기록 비교<\/summary>/)
   assert.match(hierarchyPanel,/<details className="reunion-v5-details"><summary>계산 근거와 점수 보기<\/summary>/)
 })
 
 test('reunion exposes relative contact direction and behavioral change without statistical probability',()=>{
-  assert.match(hierarchyPanel,/function directionReading/)
-  assert.match(hierarchyPanel,/활성도 \$\{displayScore\(score\)\}/)
-  assert.match(hierarchyPanel,/수신 · 상대 → 나/)
-  assert.match(hierarchyPanel,/발신 · 나 → 상대/)
-  assert.match(hierarchyPanel,/상대 활성도 높음/)
-  assert.match(hierarchyPanel,/입력한 실제 첫 연락/)
-  assert.match(hierarchyPanel,/날짜와 장소를 정한 만남 제안/)
+  assert.match(reunionReadingV4,/수신 · 상대 → 나/)
+  assert.match(reunionReadingV4,/발신 · 나 → 상대/)
+  assert.match(hierarchyPanel,/실제 첫 연락/)
+  assert.match(hierarchyPanel,/실제 첫 연락자는 별도 기록으로 확인해요/)
+  assert.match(hierarchyPanel,/next_stage_up_conditions/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성[^\n]{0,40}\d+%/)
 })
 
-test('reunion grounding deduplicates locally and closes initiative claims across section and summary',()=>{
-  assert.match(grounding,/function localText/)
-  assert.match(grounding,/function sectionPair/)
-  assert.match(grounding,/const why = sectionPair/)
-  assert.match(grounding,/const initiative = sectionPair/)
-  assert.doesNotMatch(grounding,/const state: DedupState = \{ sentences: new Set\(\), evidence: new Set\(\) \}\n  const whyConclusion/)
-  assert.match(grounding,/replace\(\/용수자리\/g, '진북교점'\)/)
-  assert.match(grounding,/누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다/)
-  assert.match(grounding,/실제 만남을 잡는지/)
-  assert.match(grounding,/시작\\s\*압력/)
-  assert.match(grounding,/v2\.summary = safeInitiativeDetail\(v2\?\.summary, provisional\)/)
+test('reunion grounding validates Gemini prose without composing or rewriting its output',()=>{
+  assert.doesNotMatch(grounding,/composeSummary|polishV2/)
+  assert.match(grounding,/missing_direct_consultation/)
+  assert.match(grounding,/unsupported_deterministic_claim/)
+  assert.match(grounding,/incomplete_direct_consultation/)
+  assert.match(grounding,/insufficient_grounded_content/)
+  assert.match(grounding,/const next = \{\.\.\.data,reunion_synthesis_v2:v2\}/)
 })
 
-test('legacy calculated reunion fallback never turns directional activation into first-contact prediction',()=>{
-  assert.match(relationshipSummary,/상대 → 나 방향의 관계 자극이 비교적 강하게 잡혀 있어/)
-  assert.match(relationshipSummary,/나 → 상대 방향의 관계 자극이 비교적 강하게 잡혀 있어/)
-  assert.match(relationshipSummary,/과거 인연 재접점 지표는 강한 편이야/)
-  assert.match(relationshipSummary,/상대 → 나 관계 자극이 상대적으로 두드러지는 때/)
-  assert.match(relationshipSummary,/나 → 상대 관계 자극이 상대적으로 두드러지는 때/)
+test('calculated direction axes never become a first-contact prediction',()=>{
+  assert.match(reunionReadingV4,/상대 쪽 흐름이 내 관계와 맞물리는 정도예요/)
+  assert.match(reunionReadingV4,/내 쪽 흐름이 상대와의 관계를 의식하기 쉬운 정도예요/)
+  assert.match(hierarchyPanel,/실제 첫 연락자는 별도 기록으로 확인해요/)
   for(const legacy of ['상대가 먼저 연락할 흐름은 약한 편이야','내가 먼저 짧게 말을 꺼내기 좋은 편이야','재접촉의 움직임은 살아 있어','다시 대화할 여지는 열려 있지만']) {
-    assert.equal(relationshipSummary.includes(legacy),false,`legacy directional copy must stay removed: ${legacy}`)
+    assert.equal(hierarchyPanel.includes(legacy),false,`legacy directional copy must stay removed: ${legacy}`)
   }
 })
 

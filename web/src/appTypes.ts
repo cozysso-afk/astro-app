@@ -430,6 +430,7 @@ export type AiEditorialClusters = {
 
 export type AiInterpretationResponse = {
   ok: boolean
+  origin?: 'gemini' | 'deterministic_safe'
   missing_key?: boolean
   error?: string
   model?: string

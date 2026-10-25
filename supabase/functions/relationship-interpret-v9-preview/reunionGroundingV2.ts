@@ -7,11 +7,6 @@ type RepairResult = {
   reason?: string
 }
 
-type DedupState = {
-  sentences: Set<string>
-  evidence: Set<string>
-}
-
 const arr = (v: unknown): any[] => Array.isArray(v) ? v : []
 const text = (v: unknown) => String(v ?? '').trim()
 const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))]
@@ -24,8 +19,6 @@ const PLANET_TERMS: Array<[string,string]> = [
 const ASPECT_TERMS: Array<[string,string]> = [
   ['conjunction','합'], ['sextile','육십분위'], ['square','사각'], ['trine','삼각'], ['quincunx','퀸컨스'], ['opposition','대립'],
 ]
-const BODY_KO = PLANET_TERMS.map(([,ko]) => ko)
-const ASPECT_KO = ASPECT_TERMS.map(([,ko]) => ko)
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -103,76 +96,16 @@ function splitSentences(value: string) {
   return t.replace(/([.!?])\s+/g, '$1\n').split('\n').map(x => x.trim()).filter(Boolean)
 }
 
-function sentenceFingerprint(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/\d+(?:\.\d+)?/g, '#')
-    .replace(/[°·,:;()\[\]{}'"“”‘’/\\\-–—]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function aspectToken(value: string) {
-  for (const term of ASPECT_KO) {
-    if (term !== '합' && value.includes(term)) return term
-  }
-  return /합(?:을|를|이|가|의|으로|과|과의|$|[\s,.!?])/.test(value) ? '합' : ''
-}
-
-function evidenceFingerprint(value: string) {
-  const bodies = uniq(BODY_KO.filter(term => value.includes(term))).sort()
-  const aspect = aspectToken(value)
-  const technical = Boolean(aspect) || value.includes('오브') || value.includes('°') || value.includes('조화각') || value.includes('긴장각')
-  if (bodies.length < 2 || !technical) return ''
-  return `${bodies.join('+')}|${aspect || '각'}`
-}
-
-function dedupeNarrative(value: unknown, state: DedupState, provisional: boolean, trackEvidence = true) {
-  const polished = polishReunionNarrativeText(value, provisional)
-  const sentences = splitSentences(polished)
-  if (sentences.length <= 1) {
-    const only = sentences[0] ?? polished
-    const fp = sentenceFingerprint(only)
-    const ev = trackEvidence ? evidenceFingerprint(only) : ''
-    if (fp) state.sentences.add(fp)
-    if (ev) state.evidence.add(ev)
-    return only
-  }
-
-  const kept: string[] = []
-  const candidates = sentences.map(sentence => {
-    const fp = sentenceFingerprint(sentence)
-    const ev = trackEvidence ? evidenceFingerprint(sentence) : ''
-    const duplicate = (fp && state.sentences.has(fp)) || (ev && state.evidence.has(ev))
-    return { sentence, fp, ev, duplicate }
-  })
-
-  for (const row of candidates) if (!row.duplicate) kept.push(row.sentence)
-  const finalRows = kept.length ? candidates.filter(row => kept.includes(row.sentence)) : candidates.slice(0,1)
-  for (const row of finalRows) {
-    if (row.fp) state.sentences.add(row.fp)
-    if (row.ev) state.evidence.add(row.ev)
-  }
-  return finalRows.map(row => row.sentence).join(' ')
-}
-
-function localText(value: unknown, provisional: boolean, trackEvidence = true) {
-  return dedupeNarrative(value, { sentences: new Set(), evidence: new Set() }, provisional, trackEvidence)
-}
-
-function sectionPair(section: any, provisional: boolean) {
-  const state: DedupState = { sentences: new Set(), evidence: new Set() }
-  return {
-    ...section,
-    conclusion: dedupeNarrative(section?.conclusion, state, provisional, false),
-    interpretation: dedupeNarrative(section?.interpretation, state, provisional, true),
-  }
-}
-
 function safeInitiativeDetail(value: unknown, provisional: boolean) {
   const polished = polishReunionNarrativeText(value, provisional)
   const blocked = /(?:누가\s*먼저|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합|시작\s*압력|(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?[^.!?]{0,32}(?:먼저|앞서|우세)|(?:먼저|앞서|우세)[^.!?]{0,32}(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?)/
   return splitSentences(polished).filter(sentence => !blocked.test(sentence)).join(' ')
+}
+
+function hasUnsupportedInitiativeDirection(value: unknown, provisional: boolean) {
+  const polished = polishReunionNarrativeText(value, provisional)
+  const allowedUncertainty = /(?:정하기|판단하기|확정하기|예측하기)\s*(?:어려|힘들)|(?:알|확정할|예측할)\s*수\s*없/
+  return splitSentences(polished).some(sentence => safeInitiativeDetail(sentence, provisional) !== sentence && !allowedUncertainty.test(sentence))
 }
 
 function validSet(payload: any) {
@@ -208,90 +141,6 @@ function hasCoreText(v: any) {
   return text(v?.conclusion).length >= 12 && text(v?.interpretation).length >= 24
 }
 
-function composeSummary(v2: any) {
-  const primary = uniq([
-    text(v2?.why_reconnect?.conclusion),
-    text(v2?.initiative?.conclusion),
-    text(v2?.timing?.conclusion),
-    text(v2?.rebuild?.conclusion),
-    text(v2?.repeat_risks?.conclusion),
-    ...arr(v2?.timing?.windows).slice(0,2).map((x: any) => text(x?.meaning)),
-  ])
-  let result = primary.join(' ')
-  if (result.length < 180) {
-    const backup = uniq([
-      text(v2?.why_reconnect?.interpretation),
-      text(v2?.initiative?.interpretation),
-      ...arr(v2?.rebuild?.conditions).slice(0,2).map(text),
-      ...arr(v2?.repeat_risks?.patterns).slice(0,2).map(text),
-    ])
-    for (const part of backup) {
-      if (!part || result.includes(part)) continue
-      result = `${result} ${part}`.trim()
-      if (result.length >= 180) break
-    }
-  }
-  return result.slice(0, 3200)
-}
-
-function polishV2(v2: any, provisional: boolean) {
-  const why = sectionPair(v2?.why_reconnect, provisional)
-  const initiative = sectionPair(v2?.initiative, provisional)
-  const timingConclusion = localText(v2?.timing?.conclusion, provisional, false)
-  const timingWindows = arr(v2?.timing?.windows).map((w: any) => ({
-    ...w,
-    period: text(w?.period),
-    meaning: localText(w?.meaning, provisional, true),
-  }))
-  const rebuildConclusion = localText(v2?.rebuild?.conclusion, provisional, false)
-  const rebuildConditions = arr(v2?.rebuild?.conditions).map((x: any) => localText(x, provisional, true)).filter(Boolean)
-  const repeatConclusion = localText(v2?.repeat_risks?.conclusion, provisional, false)
-  const repeatPatterns = arr(v2?.repeat_risks?.patterns).map((x: any) => localText(x, provisional, true)).filter(Boolean)
-
-  return {
-    ...v2,
-    summary: polishReunionNarrativeText(v2?.summary, provisional),
-    consultation_answer: {
-      ...v2?.consultation_answer,
-      current_stage: localText(v2?.consultation_answer?.current_stage, provisional, false),
-      contact_type_if_any: localText(v2?.consultation_answer?.contact_type_if_any, provisional, false),
-      initiative: localText(v2?.consultation_answer?.initiative, provisional, false),
-      continuity: localText(v2?.consultation_answer?.continuity, provisional, false),
-      meeting_gate: localText(v2?.consultation_answer?.meeting_gate, provisional, false),
-      rebuild_gate: localText(v2?.consultation_answer?.rebuild_gate, provisional, false),
-      behavior_change_evidence: localText(v2?.consultation_answer?.behavior_change_evidence, provisional, false),
-      next_stage_up_conditions: arr(v2?.consultation_answer?.next_stage_up_conditions).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
-      down_conditions: arr(v2?.consultation_answer?.down_conditions).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
-      repeat_risks: arr(v2?.consultation_answer?.repeat_risks).map((x:any)=>localText(x,provisional,false)).filter(Boolean),
-      contextual_application: Object.fromEntries(Object.entries(v2?.consultation_answer?.contextual_application??{}).map(([key,value])=>[key,localText(value,provisional,false)])),
-    },
-    why_reconnect: why,
-    initiative,
-    timing: { ...v2.timing, conclusion: timingConclusion, windows: timingWindows },
-    rebuild: { ...v2.rebuild, conclusion: rebuildConclusion, conditions: uniq(rebuildConditions) },
-    repeat_risks: { ...v2.repeat_risks, conclusion: repeatConclusion, patterns: uniq(repeatPatterns) },
-    convergence: arr(v2?.convergence).map((x: any) => ({
-      ...x,
-      theme: polishReunionNarrativeText(x?.theme, provisional),
-      meaning: polishReunionNarrativeText(x?.meaning, provisional),
-    })),
-    precision_note: polishReunionNarrativeText(v2?.precision_note, provisional),
-  }
-}
-
-function sanitizeUnsupportedClaims(value: any): any {
-  if (typeof value === 'string') return value
-    .replace(/끊어지지 않는 인연|끊을 수 없는 인연|서로를 지울 수 없다/g, '쉽게 정리되지 않는 느낌이 들 수 있는 관계')
-    .replace(/카르마적 인연|운명적 인연|천생연분/g, '강하게 체감될 수 있는 관계')
-    .replace(/운명적으로 다시 만난다/g, '다시 접점이 생길 수 있는 흐름이 보인다')
-    .replace(/반드시 연락한다/g, '연락을 확정할 수는 없지만 관련 신호가 있다')
-    .replace(/상대가 아직 사랑한다/g, '상대의 실제 감정은 차트만으로 확정할 수 없다')
-    .replace(/(연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/g, '$1 관련 점수는 사건 확률이 아니다')
-  if (Array.isArray(value)) return value.map(sanitizeUnsupportedClaims)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, sanitizeUnsupportedClaims(v)]))
-  return value
-}
-
 export function repairReunionGroundingV2(data: any, payload: any): RepairResult {
   const source = data?.reunion_synthesis_v2
   if (!source || typeof source !== 'object') return { ok: false, repaired: false, data, reason: 'missing_reunion_synthesis_v2' }
@@ -314,19 +163,9 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     repeat_risks: fallbackRefs(payload, 'repeat_risks', valid),
   }
 
-  const rawConsultation=source?.consultation_answer&&typeof source.consultation_answer==='object'&&text(source.consultation_answer.current_stage).length>=12?source.consultation_answer:{
-    current_stage:text(source?.timing?.conclusion)||'현재 단계와 다음 단계는 연락·만남·재구축을 분리해서 확인해야 한다.',
-    contact_type_if_any:text(source?.initiative?.conclusion)||'연락 후보가 있더라도 안부와 대화 재개, 구체적 약속을 서로 다른 단계로 봐야 한다.',
-    initiative:text(source?.initiative?.interpretation)||'누가 먼저냐보다 실제 대화가 이어지고 다음 행동이 구체화되는지가 더 중요하다.',
-    continuity:'한 번의 연락보다 질문과 답이 이어지고 후속 대화나 약속이 구체화되는지를 확인해야 한다.',
-    meeting_gate:text(source?.rebuild?.conclusion)||'연락 뒤 구체적인 약속 제안과 실제 만남이 생겨야 만남 단계로 올려 읽을 수 있다.',
-    rebuild_gate:'만남 뒤 관계 정의, 이전 문제를 다루는 대화, 약속을 지키는 행동이 이어져야 재구축 단계로 올려 읽을 수 있다.',
-    behavior_change_evidence:'상대가 바뀌었는지는 연락 자체가 아니라 불편한 문제를 피하지 않는 대화, 구체적 약속의 이행, 말과 행동의 일관성으로 판단해야 한다.',
-    next_stage_up_conditions:arr(source?.rebuild?.conditions).length?arr(source.rebuild.conditions):['질문과 답이 이어지고 구체적인 만남 제안이 실제 행동으로 연결된다.'],
-    down_conditions:['안부와 추억 이야기만 반복되고 구체적인 약속이나 이전 문제에 대한 대화가 생기지 않는다.'],
-    repeat_risks:arr(source?.repeat_risks?.patterns).length?arr(source.repeat_risks.patterns):['예전 갈등을 피한 채 연락 횟수만 늘어나면 같은 문제가 반복될 수 있다.'],
-    contextual_application:{complete_cutoff:'완전 단절 상태라면 차단 해제나 직접 접촉이 생기기 전까지는 관계 단계가 올라갔다고 보지 않는다.',no_contact:'무연락 상태라면 생각나는 배경과 실제 연락을 분리하고 직접 접촉이 생기는지부터 본다.',occasional_contact:'가끔 연락한다면 횟수보다 질문 지속과 구체적 약속이 생기는지를 본다.',meeting_again:'다시 만나고 있다면 만남 뒤 관계 정의와 약속 이행이 이어지는지를 본다.',ambiguous_relationship:'관계가 애매하다면 친밀감보다 서로 원하는 관계를 말로 합의하고 행동이 일치하는지를 본다.'},
-    evidence_refs:[],
+  const rawConsultation=source?.consultation_answer
+  if(!rawConsultation||typeof rawConsultation!=='object'){
+    return {ok:false,repaired:false,data,reason:'missing_direct_consultation'}
   }
 
   const before = JSON.stringify(data)
@@ -356,19 +195,11 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
   v2.timing = { ...v2.timing, windows: arr(v2?.timing?.windows).filter((w:any)=>timingWindowAllowed(w, timingDateGate)) }
   const gate = payload?.reunion_evidence_v2?.initiative_gate
   if (gate?.available !== true) {
-    v2.summary = safeInitiativeDetail(v2?.summary, provisional)
-    const preserved = safeInitiativeDetail(`${v2?.initiative?.conclusion ?? ''} ${v2?.initiative?.interpretation ?? ''}`, provisional)
-    v2.initiative = {
-      ...v2.initiative,
-      conclusion: '누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다.',
-      interpretation: `${preserved ? `${preserved} ` : ''}누가 먼저냐보다 연락이 생긴 뒤 대화가 이어지는지, 실제 만남을 잡는지, 예전 문제를 피하지 않는지를 보는 편이 더 중요하다.`.trim(),
-      evidence_refs: normalizeRefs(v2?.initiative?.evidence_refs, fallbacks.initiative, valid),
+    const directionalText=[v2?.summary,v2?.initiative?.conclusion,v2?.initiative?.interpretation,v2?.consultation_answer?.initiative].map(text).join(' ')
+    if(hasUnsupportedInitiativeDirection(directionalText,provisional)){
+      return {ok:false,repaired:false,data,reason:'unsupported_initiative_direction'}
     }
-    v2.consultation_answer = {...v2.consultation_answer,initiative:'누가 먼저 연락할지는 현재 계산만으로 정하기 어렵다. 실제 접촉이 생기면 질문과 답이 이어지는지, 구체적 만남을 제안하는지부터 확인해야 한다.'}
   }
-
-  if (text(v2.summary).length < 180) v2.summary = composeSummary(v2)
-  v2 = polishV2(v2, provisional)
 
   const allRefs = uniq([
     ...arr(v2?.consultation_answer?.evidence_refs),
@@ -389,24 +220,9 @@ export function repairReunionGroundingV2(data: any, payload: any): RepairResult 
     return { ok: false, repaired: false, data, reason: 'insufficient_grounded_content' }
   }
 
-  const next = {
-    ...data,
-    headline: polishReunionNarrativeText(data?.headline, provisional),
-    overview: polishReunionNarrativeText(data?.overview, provisional),
-    timing: polishReunionNarrativeText(data?.timing, provisional),
-    reunion_context: polishReunionNarrativeText(data?.reunion_context, provisional),
-    practical_advice: arr(data?.practical_advice).map((x: any) => polishReunionNarrativeText(x, provisional)),
-    top_aspects: arr(data?.top_aspects).map((x: any) => ({
-      ...x,
-      label: polishReunionNarrativeText(x?.label, provisional),
-      meaning: polishReunionNarrativeText(x?.meaning, provisional),
-    })),
-    limits: polishReunionNarrativeText(data?.limits, provisional),
-    reunion_synthesis_v2: v2,
-  }
-  const safeNext = sanitizeUnsupportedClaims(next)
-  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(safeNext))) {
+  const next = {...data,reunion_synthesis_v2:v2}
+  if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(next))) {
     return { ok:false, repaired:false, data, reason:'unsupported_deterministic_claim' }
   }
-  return { ok: true, repaired: before !== JSON.stringify(safeNext), data: safeNext }
+  return { ok: true, repaired: before !== JSON.stringify(next), data: next }
 }
