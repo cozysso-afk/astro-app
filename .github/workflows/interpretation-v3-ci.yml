@@ -113,6 +113,8 @@ jobs:
           node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
           node --test web/src/lib/relationshipReunionV3.contract.test.mjs
           node --experimental-strip-types --test web/src/lib/reunionObservationHistory.contract.test.mjs
+          node --experimental-strip-types --test web/src/lib/reunionReadingV4.test.mjs
+          node --experimental-strip-types --test web/src/lib/narrativeQualityV4.test.mjs
           node --test supabase/functions/relationship-interpret-v9-preview/jobStatusContract.test.mjs
           node --experimental-strip-types --check supabase/functions/relationship-interpret-v9-preview/index.ts
       - name: Web typecheck and production build

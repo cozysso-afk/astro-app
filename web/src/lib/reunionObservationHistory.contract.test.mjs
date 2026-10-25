@@ -5,6 +5,7 @@ import { compareObservedEvents, nextUnconfirmedStage, observationReading } from 
 
 const app=readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../ReunionHierarchyPanelV3.tsx',import.meta.url),'utf8')
+const readingV4=readFileSync(new URL('./reunionReadingV4.ts',import.meta.url),'utf8')
 const helper=readFileSync(new URL('./reunionObservation.ts',import.meta.url),'utf8')
 const css=readFileSync(new URL('../reunion-v3.css',import.meta.url),'utf8')
 const compact=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
@@ -51,10 +52,10 @@ test('event fixture preserves match mismatch no-evidence and uncalculated outcom
 })
 
 test('initiative comparison remains visible but is separate from observed first contact',()=>{
-  assert.match(panel,/수신 · 상대 → 나/)
-  assert.match(panel,/발신 · 나 → 상대/)
+  assert.match(readingV4,/수신 · 상대 → 나/)
+  assert.match(readingV4,/발신 · 나 → 상대/)
   assert.match(panel,/차트 활성도만으로 수신·발신 행동이나 먼저 연락할 사람을 정할 수 없어요/)
-  assert.match(panel,/입력한 실제 첫 연락/)
+  assert.match(panel,/실제 첫 연락/)
   assert.equal(fixture.expected.actual_initiator_is_observation,true)
 })
 

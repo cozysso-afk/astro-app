@@ -42,32 +42,142 @@
   line-height: 1.5 !important;
 }
 
+.relationship-experience[data-mode="reunion"] .reunion-ui-v5 {
+  --reunion-body: 15px;
+  --reunion-meta: 12.5px;
+  --reunion-title: 21px;
+  --reunion-section: 17px;
+}
+
 .relationship-experience[data-mode="reunion"] .reunion-ui-v5 :is(p, li, span, time, summary) {
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-  font-size: 14.5px;
-  line-height: 1.62;
+  font-size: var(--reunion-body);
+  line-height: 1.68;
 }
 
 .relationship-experience[data-mode="reunion"] .reunion-ui-v5 h3 {
   margin: 4px 0 8px;
-  font-size: 19px;
-  line-height: 1.42;
+  font-size: var(--reunion-title);
+  line-height: 1.5;
 }
 
 .relationship-experience[data-mode="reunion"] .reunion-ui-v5 h4 {
   margin: 0 0 10px;
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: var(--reunion-section);
+  line-height: 1.45;
 }
 
 .reunion-ui-v5 .reunion-v5-answer {
-  padding: 16px;
+  padding: 18px;
   border-radius: 15px;
 }
 
-.reunion-ui-v5 .reunion-v5-answer > span {
+.reunion-ui-v5 .reunion-v4-answer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reunion-ui-v5 .reunion-v4-answer-meta :is(span, time) {
   font-size: 12.5px !important;
   font-weight: 750;
+}
+
+.reunion-ui-v5 .reunion-v4-answer-meta time {
+  color: #81798a;
+  font-weight: 500;
+}
+
+.reunion-ui-v5 .reunion-v4-verdict-points {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.reunion-ui-v5 .reunion-v4-verdict-points > p {
+  display: grid;
+  grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(103, 84, 133, .16);
+}
+
+.reunion-ui-v5 .reunion-v4-verdict-points b {
+  color: #675485;
+  font-size: 13px;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, 42%);
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  min-width: 0;
+  padding: 10px 12px 10px 34px;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li::before {
+  position: absolute;
+  top: 18px;
+  left: 6px;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #cfc4dc;
+  border-radius: 999px;
+  background: #fff;
+  content: '';
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li:not(:last-child)::after {
+  position: absolute;
+  top: 30px;
+  bottom: -18px;
+  left: 12px;
+  width: 2px;
+  background: #ddd5e7;
+  content: '';
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li[data-stage-state='observed']::before {
+  border-color: #4f8a79;
+  background: #4f8a79;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li[data-stage-state='current_signal']::before,
+.reunion-ui-v5 .reunion-v4-stage-rail > li[data-stage-state='future_candidate']::before {
+  border-color: #77599b;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail > li[data-stage-state='blocked'],
+.reunion-ui-v5 .reunion-v4-stage-rail > li[data-stage-state='not_calculated'] {
+  color: #817a89;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail strong {
+  min-width: 0;
+  justify-self: end;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.reunion-ui-v5 .reunion-v4-stage-rail span {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .reunion-ui-v5 .reunion-v5-stages {
@@ -102,7 +212,7 @@
 }
 
 .reunion-ui-v5 .reunion-v5-section {
-  padding: 16px 0;
+  padding: 20px 0;
 }
 
 .reunion-ui-v5 .reunion-v5-directions {
@@ -116,11 +226,22 @@
   border-radius: 12px;
 }
 
-.reunion-ui-v5 .reunion-v5-directions article > b {
+.reunion-ui-v5 .reunion-v4-direction-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.reunion-ui-v5 .reunion-v4-direction-head > * {
+  min-width: 0;
+}
+
+.reunion-ui-v5 .reunion-v4-direction-head > b {
   font-size: 14px;
 }
 
-.reunion-ui-v5 .reunion-v5-directions article > strong {
+.reunion-ui-v5 .reunion-v4-direction-head > strong {
   color: #675485;
   font-size: 13px;
 }
@@ -178,6 +299,35 @@
   margin-top: 5px;
 }
 
+.reunion-ui-v5 .reunion-v4-next-checkpoint {
+  margin: 0 0 10px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: rgba(243, 237, 249, .78);
+  font-weight: 650;
+}
+
+.reunion-ui-v5 .reunion-v4-context > summary {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.reunion-ui-v5 .reunion-v4-disclosures {
+  margin-top: 8px;
+  border-top: 1px solid #e0e3e8;
+}
+
+.reunion-ui-v5 .reunion-v4-disclosures > details {
+  border-bottom: 1px solid #e0e3e8;
+}
+
+.reunion-ui-v5 .reunion-v4-disclosures > details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 0;
+}
+
 /* Keep both birth-time endpoints inside one grid and visible for provisional times. */
 .app-shell .field-grid > .birth-time-range-field {
   width: 100% !important;
@@ -202,5 +352,17 @@
 @media (max-width: 480px) {
   .app-shell .field-grid > .birth-time-range-field {
     grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 350px) {
+  .reunion-ui-v5 .reunion-v4-stage-rail > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .reunion-ui-v5 .reunion-v4-stage-rail > li > strong {
+    justify-self: start;
+    text-align: left;
   }
 }
