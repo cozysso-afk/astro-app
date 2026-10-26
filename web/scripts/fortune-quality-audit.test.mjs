@@ -15,6 +15,8 @@ test('20 synthetic profiles across four period kinds test the audit harness only
   assert.equal(report.fixture_only, true)
   assert.equal(report.live_gemini_cases, 0)
   assert.match(renderHtml(report), /NO LIVE GEMINI RESPONSES TESTED/)
+  assert.match(renderHtml(report), /통과한 사례 80건 펼치기/)
+  assert.match(renderHtml(report), /검출된 문제 없음/)
 })
 test('invalid evidence IDs and out-of-period dates fail without prose in the report', () => {
   const row = sample()
