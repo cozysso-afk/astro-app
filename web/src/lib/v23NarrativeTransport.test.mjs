@@ -23,7 +23,7 @@ async function capture(action,extra={}){
   }
 }
 
-test('active exact start prompt and inspect opt into V23 while status stays compatibility-safe',async()=>{
+test('legacy V21 compatibility adapter preserves historical status routing',async()=>{
   for(const action of ['start','prompt','inspect']){
     const seen=await capture(action,{calculation:{precision:exact()}})
     assert.match(seen.url,/fortune-interpret-v22-preview$/)
@@ -36,9 +36,20 @@ test('active exact start prompt and inspect opt into V23 while status stays comp
 
 test('browser Fortune cache keeps interpreter identity and invalidates day/week under daily editorial v7',()=>{
   const source=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
-  assert.match(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v21\.4-e2e-evidence'/)
+  assert.match(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23\.9-gemini-single-author-v1'/)
   assert.match(source,/FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'/)
   assert.match(source,/FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v5-daily-editorial-v7'/)
   assert.match(source,/periodKind === 'day' \|\| periodKind === 'week'/)
   assert.match(source,/narrative_contract: narrativeContract/)
+})
+
+test('main Fortune entrypoint sends every AI lifecycle call through V22 with V23 selected',()=>{
+  const app=readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8')
+  const jobs=readFileSync(new URL('./fortuneAiJob.ts',import.meta.url),'utf8')
+  assert.ok(app.includes("FORTUNE_AI_FUNCTION = 'fortune-interpret-v22-preview'"))
+  assert.ok(app.includes("FORTUNE_AI_NARRATIVE_ENGINE = 'v23'"))
+  assert.equal(app.split('supabase.functions.invoke(FORTUNE_AI_FUNCTION,').length-1,6)
+  assert.equal(app.split('narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE,').length-1,6)
+  assert.ok(jobs.includes('fortune-ai-job-release-v23-gemini-single-author'))
+  assert.ok(jobs.includes('starlight-destiny.ai-job.v8'))
 })

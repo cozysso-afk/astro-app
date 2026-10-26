@@ -222,9 +222,10 @@ test('V21 runtime source has one generateContent path, hard cap 2, and no split 
   assert.ok(usageBuild>=0 && inactiveCheck>usageBuild,'usage must be built before canceled-job early return');
 });
 
-test('fortune UI is wired only to the V21 cost-guarded function and exposes prompt/cancel controls',()=>{
+test('fortune UI uses the V22 precision gateway with V23 Gemini and keeps prompt/cancel controls',()=>{
   const app=fs.readFileSync(new URL('../../../web/src/AppNext.tsx',import.meta.url),'utf8');
-  assert.match(app,/FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'/);
+  assert.match(app,/FORTUNE_AI_FUNCTION = 'fortune-interpret-v22-preview'/);
+  assert.match(app,/FORTUNE_AI_NARRATIVE_ENGINE = 'v23'/);
   assert.doesNotMatch(app,/supabase\.functions\.invoke\('fortune-interpret-v6-preview'/);
   assert.match(app,/action:'prompt'/);
   assert.match(app,/action:'cancel'/);
@@ -425,8 +426,8 @@ test('V11 E2E prompt keeps complete bounded Saju baseline/months and Thai limita
   assert.equal(budget.ok,true,`expanded V11 evidence must remain inside ${budget.max_bytes} byte budget; got ${budget.bytes}`);
 });
 
-test('V11 server interpreter version and browser fortune AI cache contract stay identical',()=>{
-  const runtime=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+test('V23 interpreter version and browser fortune AI cache contract stay identical',()=>{
+  const runtime=fs.readFileSync(new URL('../fortune-interpret-v23-preview/index.ts',import.meta.url),'utf8');
   const cache=fs.readFileSync(new URL('../../../web/src/lib/readingCache.ts',import.meta.url),'utf8');
   const runtimeVersion=runtime.match(/const VERSION=\"([^\"]+)\";/)?.[1];
   const cacheVersion=cache.match(/FORTUNE_AI_CACHE_CONTRACT = '([^']+)'/)?.[1];

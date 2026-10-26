@@ -6,8 +6,8 @@ function precisionModeFromProvenance(source: unknown, confidence: unknown, timeK
   return confidence === 'exact' && (source === 'official_record' || source === 'rectified') ? 'exact' : 'provisional'
 }
 
-export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-release-v22-integrated-precision-v2'
-export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v7'
+export const FORTUNE_AI_JOB_CONTRACT = 'fortune-ai-job-release-v23-gemini-single-author'
+export const FORTUNE_AI_JOB_STORAGE_KEY = 'starlight-destiny.ai-job.v8'
 
 export type PendingFortuneAiJob = {
   contract: string
