@@ -45,6 +45,13 @@ test('same topic text across two distinct profiles requires review', () => {
   assert.equal(report.summary.review, 1)
   assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PROFILE_IDENTICAL_PROSE'))
 })
+test('identical long topic prose across two periods for one profile is flagged', () => {
+  const a = sample(), b = structuredClone(fixtureMatrix()[1])
+  b.result.data.topic_analysis['직장'].verdict = a.result.data.topic_analysis['직장'].verdict
+  const report = evaluateCases([a, b], { mode: 'fixture' })
+  assert.equal(report.summary.review, 1)
+  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PERIOD_IDENTICAL_PROSE'))
+})
 test('live mode rejects fake provenance and incomplete V23 output', () => {
   const row = sample()
   const report = evaluateCases([row], { mode: 'live' })
