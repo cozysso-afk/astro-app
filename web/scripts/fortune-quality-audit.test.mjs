@@ -43,14 +43,14 @@ test('same topic text across two distinct profiles requires review', () => {
   b.result.data.topic_analysis['직장'].verdict = a.result.data.topic_analysis['직장'].verdict
   const report = evaluateCases([a, b], { mode: 'fixture' })
   assert.equal(report.summary.review, 1)
-  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PROFILE_IDENTICAL_PROSE'))
+  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PROFILE_REPEATED_PROSE'))
 })
 test('identical long topic prose across two periods for one profile is flagged', () => {
   const a = sample(), b = structuredClone(fixtureMatrix()[1])
   b.result.data.topic_analysis['직장'].verdict = a.result.data.topic_analysis['직장'].verdict
   const report = evaluateCases([a, b], { mode: 'fixture' })
   assert.equal(report.summary.review, 1)
-  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PERIOD_IDENTICAL_PROSE'))
+  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PERIOD_REPEATED_PROSE'))
 })
 test('live mode rejects fake provenance and incomplete V23 output', () => {
   const row = sample()
@@ -69,10 +69,37 @@ test('real Gemini provenance is counted only with a V23 version', () => {
   assert.equal(report.live_gemini_cases, 1)
   assert.ok(report.summary.failed >= 1) // synthetic data is not valid real interpretation
 })
+test('live mode requires referenced evidence from western, saju and thai systems', () => {
+  const row = sample()
+  row.result.origin = 'gemini'
+  row.result.interpreter_version = 'supabase-ai-v23.9-gemini-single-author-v1'
+  const report = evaluateCases([row], { mode: 'live' })
+  assert.ok(report.cases[0].issues.some(i => i.code === 'CALCULATION_SYSTEM_EVIDENCE_MISSING' && i.system === 'saju'))
+  assert.ok(report.cases[0].issues.some(i => i.code === 'CALCULATION_SYSTEM_EVIDENCE_MISSING' && i.system === 'thai'))
+})
+test('live mode rejects authored dates outside the requested period and percentage claims', () => {
+  const row = sample()
+  row.result.origin = 'gemini'
+  row.result.interpreter_version = 'supabase-ai-v23.9-gemini-single-author-v1'
+  row.result.data.topic_analysis['직장'].verdict = '2027-01-01에 승진 확률은 80%다.'
+  const report = evaluateCases([row], { mode: 'live' })
+  assert.ok(report.cases[0].issues.some(i => i.code === 'AUTHORED_DATE_OUTSIDE_PERIOD'))
+  assert.ok(report.cases[0].issues.some(i => i.code === 'UNSUPPORTED_EVENT_PROBABILITY'))
+})
+test('live execution failure code is preserved without response prose', () => {
+  const row = sample()
+  row.result = null
+  row.failure_code = 'INTEGRATED_CALCULATION_FAILED'
+  const report = evaluateCases([row], { mode: 'live' })
+  const failure = report.cases[0].issues.find(i => i.code === 'LIVE_CASE_EXECUTION_FAILED')
+  assert.equal(failure.failure_code, 'INTEGRATED_CALCULATION_FAILED')
+})
 test('visual diagnostics detect overflow and saved-image count mismatch', () => {
   const visual = {
     systemCards: [{}, {}, {}], reunionOverflow: 18, birthRangeOverflow: 0,
-    downloadCount: 1, mobileWidths: [{ width: 320, overflow: 18, stageOverlap: true }],
+    downloadCount: 1, mobileWidths: [{ width: 320, overflow: 18, stageOverlap: true,
+      fortuneVisible: false, fortuneOverflow: 18, fortuneTopicCards: 0,
+      fortuneDateVisible: false, fortuneClippedText: true }],
   }
   const report = evaluateCases([sample()], { mode: 'fixture', visual })
   assert.equal(report.visual.status, 'failed')

@@ -11,8 +11,9 @@ import { inspectInterpretationQuality } from '../../supabase/functions/fortune-i
 export const PERIODS = ['day', 'week', 'month', 'annual']
 export const AUDIT_VERSION = 'fortune-quality-audit-v1'
 const ISO = /^\d{4}-\d{2}-\d{2}$/
-const TEXT_FIELDS = ['verdict', 'conclusion']
+const TEXT_FIELDS = ['verdict', 'conclusion', 'reason', 'timing', 'action', 'avoid', 'confidence_reason']
 const MIN_COMPARE_CHARS = 32
+const REQUIRED_SYSTEMS = ['western', 'saju', 'thai']
 
 function clean(value) {
   return String(value ?? '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')
@@ -30,10 +31,31 @@ function sections(data) {
   const topics = data?.topic_analysis
   if (topics && typeof topics === 'object' && !Array.isArray(topics)) {
     return Object.entries(topics).map(([topic, section]) => ({
-      topic, text: String(section?.verdict ?? section?.conclusion ?? '').trim(),
+      topic,
+      text: TEXT_FIELDS.map(field => String(section?.[field] ?? '').trim()).filter(Boolean).join(' '),
+      refs: Array.isArray(section?.evidence_refs) ? section.evidence_refs.filter(ref => typeof ref === 'string' && ref) : [],
     })).filter(row => row.text)
   }
   return []
+}
+function authoredDates(value, dates = [], depth = 0) {
+  if (depth > 12 || value == null) return dates
+  if (typeof value === 'string') {
+    for (const match of value.matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)) dates.push(match[0])
+    return dates
+  }
+  if (Array.isArray(value)) {
+    for (const child of value) authoredDates(child, dates, depth + 1)
+    return dates
+  }
+  if (typeof value === 'object') {
+    for (const child of Object.values(value)) authoredDates(child, dates, depth + 1)
+  }
+  return dates
+}
+function systemName(value) {
+  const name = String(value ?? '').toLowerCase()
+  return REQUIRED_SYSTEMS.find(system => name === system || name.startsWith(system + '_')) ?? ''
 }
 function allRefs(value, refs = [], depth = 0) {
   if (!value || typeof value !== 'object' || depth > 12) return refs
@@ -72,6 +94,7 @@ function evaluateOne(row, mode) {
   const profile = String(row?.profile_id ?? '')
   const start = String(payload?.period?.start ?? '')
   const end = String(payload?.period?.end ?? '')
+  const ledger = Array.isArray(payload?.evidence_ledger) ? payload.evidence_ledger : []
   if (!id || !profile) problems.push(issue('CASE_ID_OR_PROFILE_MISSING'))
   if (!PERIODS.includes(period)) problems.push(issue('INVALID_PERIOD_KIND'))
   if (!ISO.test(start) || !ISO.test(end) || start > end) problems.push(issue('INVALID_PERIOD_RANGE'))
@@ -80,8 +103,12 @@ function evaluateOne(row, mode) {
     if (origin !== 'gemini') problems.push(issue('GEMINI_ORIGIN_UNVERIFIED'))
     if (!version.startsWith('supabase-ai-v23.')) problems.push(issue('V23_VERSION_UNVERIFIED'))
   }
-  const known = new Set((Array.isArray(payload?.evidence_ledger) ? payload.evidence_ledger : [])
-    .map(entry => entry?.id).filter(x => typeof x === 'string' && x))
+  if (row?.failure_code) problems.push(issue('LIVE_CASE_EXECUTION_FAILED', 'error', {
+    failure_code: String(row.failure_code).slice(0, 80),
+  }))
+  const known = new Set(ledger.map(entry => entry?.id).filter(x => typeof x === 'string' && x))
+  const ledgerById = new Map(ledger.filter(entry => typeof entry?.id === 'string' && entry.id)
+    .map(entry => [entry.id, entry]))
   const refs = allRefs(data)
   for (const ref of new Set(refs)) {
     if (!known.has(ref)) problems.push(issue('UNKNOWN_EVIDENCE_REF', 'error', { evidence_id: ref.slice(0, 100) }))
@@ -93,6 +120,25 @@ function evaluateOne(row, mode) {
     }
   }
   const authored = sections(data)
+  for (const topic of authored) {
+    if (mode === 'live' && topic.refs.length === 0) {
+      problems.push(issue('TOPIC_EVIDENCE_REFS_MISSING', 'error', { topic: topic.topic }))
+    }
+  }
+  if (mode === 'live' && data && typeof data === 'object') {
+    for (const date of new Set(authoredDates(data))) {
+      if (!inPeriod(date, start, end)) problems.push(issue('AUTHORED_DATE_OUTSIDE_PERIOD', 'error'))
+    }
+    if (/\d+(?:\.\d+)?\s*%/u.test(authored.map(row => row.text).join(' '))) {
+      problems.push(issue('UNSUPPORTED_EVENT_PROBABILITY', 'error'))
+    }
+    const presentSystems = new Set(ledger.map(entry => systemName(entry?.system)).filter(Boolean))
+    const referencedSystems = new Set(refs.map(ref => systemName(ledgerById.get(ref)?.system)).filter(Boolean))
+    for (const system of REQUIRED_SYSTEMS) {
+      if (!presentSystems.has(system)) problems.push(issue('CALCULATION_SYSTEM_EVIDENCE_MISSING', 'error', { system }))
+      else if (!referencedSystems.has(system)) problems.push(issue('SYSTEM_EVIDENCE_NOT_REFERENCED', 'error', { system }))
+    }
+  }
   for (let a = 0; a < authored.length; a++) {
     for (let b = a + 1; b < authored.length; b++) {
       if (similar(authored[a].text, authored[b].text)) {
@@ -119,26 +165,27 @@ function evaluateOne(row, mode) {
     id, profile_id: profile, period_kind: period,
     status: problems.some(p => p.severity === 'error') ? 'failed' : problems.length ? 'review' : 'passed',
     origin_verified: mode === 'live' && origin === 'gemini' && version.startsWith('supabase-ai-v23.'),
-    evidence_refs_checked: refs.length, topics_checked: authored.length, issues: problems,
+    evidence_refs_checked: refs.length, topics_checked: authored.length,
+    evidence_systems: [...new Set(refs.map(ref => systemName(ledgerById.get(ref)?.system)).filter(Boolean))].sort(),
+    issues: problems,
     _topics: authored,
   }
 }
 function checkAcrossCases(cases) {
-  const seen = new Map()
-  for (const row of cases) {
+  for (let index = 0; index < cases.length; index++) {
+    const row = cases[index]
     for (const topic of row._topics) {
-      const norm = clean(topic.text)
-      if (norm.length < MIN_COMPARE_CHARS) continue
-      const key = topic.topic + ':' + norm
-      const prior = seen.get(key)
-      if (prior && prior.id !== row.id) {
-        const code = prior.profile_id !== row.profile_id
-          ? 'CROSS_PROFILE_IDENTICAL_PROSE' : 'CROSS_PERIOD_IDENTICAL_PROSE'
+      const prior = cases.slice(0, index).flatMap(item => item._topics
+        .filter(candidate => candidate.topic === topic.topic && similar(candidate.text, topic.text))
+        .map(candidate => ({ row: item, topic: candidate }))).at(-1)
+      if (prior) {
+        const code = prior.row.profile_id !== row.profile_id
+          ? 'CROSS_PROFILE_REPEATED_PROSE' : 'CROSS_PERIOD_REPEATED_PROSE'
         row.issues.push(issue(code, 'warning', {
-          topic: topic.topic, compared_case: prior.id,
+          topic: topic.topic, compared_case: prior.row.id,
         }))
         if (row.status === 'passed') row.status = 'review'
-      } else if (!prior) seen.set(key, { id: row.id, profile_id: row.profile_id })
+      }
     }
   }
 }
@@ -150,7 +197,9 @@ function checkVisual(diagnostics) {
   if (Number(diagnostics.birthRangeOverflow) > 1) issues.push(issue('VISUAL_BIRTH_RANGE_OVERFLOW'))
   if (Number(diagnostics.downloadCount) !== 2) issues.push(issue('VISUAL_EXPORT_COUNT_MISMATCH'))
   for (const width of diagnostics.mobileWidths ?? []) {
-    if (Number(width.overflow) > 1 || width.stageOverlap) {
+    if (Number(width.overflow) > 1 || width.stageOverlap || !width.fortuneVisible ||
+        Number(width.fortuneOverflow) > 1 || Number(width.fortuneTopicCards) < 3 ||
+        !width.fortuneDateVisible || width.fortuneClippedText) {
       issues.push(issue('VISUAL_MOBILE_LAYOUT', 'error', { width: Number(width.width) }))
     }
   }
@@ -158,7 +207,9 @@ function checkVisual(diagnostics) {
     status: issues.length ? 'failed' : 'passed',
     issues,
     screenshots: ['mobile-full.png', 'systems-mobile.png', 'interpretation-v2-mobile.png',
-      'reunion-mobile.png', 'export-source-mobile.png', 'saved-result-1.png', 'saved-result-2.png'],
+      'reunion-mobile.png', 'export-source-mobile.png', 'fortune-mobile-320.png',
+      'fortune-mobile-350.png', 'fortune-mobile-393.png', 'fortune-mobile-430.png',
+      'saved-result-1.png', 'saved-result-2.png'],
   }
 }
 export function evaluateCases(input, { mode = 'live', visual = null } = {}) {

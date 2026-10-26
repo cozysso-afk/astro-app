@@ -1,15 +1,16 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { compactCalculation } from '../../supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from '../../supabase/functions/fortune-interpret-v22-preview/precisionV2.ts'
 import { evaluateCases, renderHtml } from './fortune-quality-audit.mjs'
 
 /**
  * Opt-in, paid-call-capable QA for synthetic profiles only.
- * Requires manual workflow_dispatch confirmation plus four QA-only secrets.
+ * Requires manual workflow_dispatch confirmation plus five QA-only secrets.
  * Never persists Gemini prose, birth profiles, auth tokens, or calculation payloads.
  */
-const cases = [
+export const cases = [
   { id: 'synthetic-live-01', birth_date: '1987-06-15', birth_time: '08:30:00',
     latitude: 37.5665, longitude: 126.978, utc_offset_hours: 9, gender: 'female',
     kind: 'day', start: '2026-10-26', end: '2026-10-26' },
@@ -26,10 +27,10 @@ const cases = [
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 function requiredEnv(name) {
   const value = String(process.env[name] ?? '').trim()
-  if (!value) throw new Error('Missing QA-only secret: ' + name)
+  if (!value) throw new Error('MISSING_' + name)
   return value
 }
-async function postJson(url, body, headers = {}, timeoutMs = 180000) {
+export async function postJson(url, body, headers = {}, timeoutMs = 180000) {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -37,8 +38,20 @@ async function postJson(url, body, headers = {}, timeoutMs = 180000) {
     signal: AbortSignal.timeout(timeoutMs),
   })
   const data = await response.json().catch(() => null)
-  if (!response.ok || !data) throw new Error('QA upstream HTTP status ' + response.status)
+  if (!response.ok || !data) throw new Error('UPSTREAM_HTTP_' + response.status)
   return data
+}
+export async function loginQaUser({ supabase, anon, email, password }, post = postJson) {
+  const session = await post(
+    supabase + '/auth/v1/token?grant_type=password',
+    { email, password },
+    { apikey: anon },
+    30_000,
+  )
+  if (!session?.access_token || !session?.user?.email || session?.user?.is_anonymous === true) {
+    throw new Error('QA_AUTH_IDENTITY_INVALID')
+  }
+  return session.access_token
 }
 function profile(row) {
   return {
@@ -48,37 +61,44 @@ function profile(row) {
     utc_offset_hours: row.utc_offset_hours, gender: row.gender,
   }
 }
-async function runCase(row, config) {
-  const calculation = await postJson(config.calcApi, {
+export async function calculateForQa(row, config, post = postJson) {
+  return post(config.calcApi, {
     profile: profile(row), start_date: row.start, end_date: row.end,
-  })
+  }, config.headers)
+}
+export async function runCase(row, config, { post = postJson, pause = sleep } = {}) {
+  const calculation = await calculateForQa(row, config, post)
   if (!calculation.ok || !calculation.western?.ok || !calculation.saju?.ok || !calculation.thai?.ok) {
-    throw new Error('Integrated calculation failed')
+    throw new Error('INTEGRATED_CALCULATION_FAILED')
   }
   const gate = precisionGateFromPayload(calculation)
-  if (!gate.ok || gate.mode !== 'exact') throw new Error('Exact precision gate failed')
+  if (!gate.ok || gate.mode !== 'exact') throw new Error('EXACT_PRECISION_GATE_FAILED')
   const payload = attachPrecisionPacketMetadata(compactCalculation(calculation), calculation)
-  const request = body => postJson(config.fortuneUrl, { narrative_engine: 'v23', ...body }, config.headers)
+  const request = body => post(config.fortuneUrl, { narrative_engine: 'v23', ...body }, config.headers)
   const inspection = await request({ action: 'inspect', calculation })
   if (!inspection.ok || inspection.prompt_budget_ok !== true ||
       !String(inspection.interpreter_version ?? '').startsWith('supabase-ai-v23.')) {
-    throw new Error('V23 inspection/budget gate failed; paid start was not attempted')
+    throw new Error('V23_INSPECTION_OR_BUDGET_GATE_FAILED')
   }
   const started = await request({ action: 'start', calculation })
-  if (!started.ok || !started.job_id) throw new Error('V23 start failed')
+  if (!started.ok || !started.job_id) throw new Error('V23_START_FAILED')
   let status
   for (let attempt = 0; attempt < 90; attempt++) {
-    status = await request({ action: 'status', job_id: started.job_id }, config.headers)
+    status = await request({ action: 'status', job_id: started.job_id })
     if (status?.status === 'done' || status?.status === 'failed') break
-    await sleep(2000)
+    await pause(2000)
   }
-  if (status?.status !== 'done' || !status?.data) throw new Error('V23 job failed or timed out')
+  if (status?.status !== 'done' || !status?.data) throw new Error('V23_JOB_FAILED_OR_TIMED_OUT')
   return {
     id: row.id + '-' + row.kind, profile_id: row.id, period_kind: row.kind,
     payload,
     result: { data: status.data, origin: status.origin,
       interpreter_version: status.interpreter_version },
   }
+}
+function safeFailureCode(error) {
+  const value = String(error?.message ?? 'UNKNOWN_FAILURE')
+  return /^[A-Z0-9_]{3,80}$/.test(value) ? value : 'UNKNOWN_FAILURE'
 }
 async function main() {
   if (process.env.QA_LIVE_APPROVED !== 'YES') throw new Error('Explicit QA_LIVE_APPROVED=YES required')
@@ -91,7 +111,12 @@ async function main() {
   const out = path.resolve(arg('--out') || 'fortune-live-qa-artifacts')
   const supabase = requiredEnv('QA_SUPABASE_URL').replace(/\/$/, '')
   const anon = requiredEnv('QA_SUPABASE_ANON_KEY')
-  const token = requiredEnv('QA_USER_ACCESS_TOKEN')
+  const token = await loginQaUser({
+    supabase,
+    anon,
+    email: requiredEnv('QA_USER_EMAIL'),
+    password: requiredEnv('QA_USER_PASSWORD'),
+  })
   const config = {
     calcApi: requiredEnv('QA_CALC_API_URL'),
     fortuneUrl: supabase + '/functions/v1/fortune-interpret-v22-preview',
@@ -102,13 +127,14 @@ async function main() {
     try {
       results.push(await runCase(row, config))
       console.log('Completed synthetic live QA case ' + row.id + ' (' + row.kind + ')')
-    } catch {
+    } catch (error) {
       // Never log payloads, Gemini text, auth details or user-identifying data.
-      console.error('Synthetic live QA case failed: ' + row.id)
+      const failureCode = safeFailureCode(error)
+      console.error('Synthetic live QA case failed: ' + row.id + ' [' + failureCode + ']')
       results.push({
         id: row.id + '-' + row.kind, profile_id: row.id, period_kind: row.kind,
         payload: { period_kind: row.kind, period: { start: row.start, end: row.end }, evidence_ledger: [] },
-        result: null,
+        result: null, failure_code: failureCode,
       })
     }
   }
@@ -120,8 +146,10 @@ async function main() {
     report_dir: out }))
   if (report.summary.failed || report.summary.review) process.exitCode = 1
 }
-main().catch(error => {
-  // Configuration errors are deliberately explicit but never print secret values.
-  console.error('Live QA not started: ' + error.message)
-  process.exitCode = 1
-})
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch(error => {
+    // Configuration errors are deliberately explicit but never print secret values.
+    console.error('Live QA not started: ' + safeFailureCode(error))
+    process.exitCode = 1
+  })
+}
