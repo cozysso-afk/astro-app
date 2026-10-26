@@ -398,3 +398,21 @@ test("Thai Suriyayat daily position facts stay neutral and reach Gemini",async()
   assert.equal(prompt.thai.suriyayat_daily_coverage.computed_days,1);
   assert.equal(prompt.integration_policy.thai_predictive_vote,false);
 });
+
+test("month prompt retains both Saju and Thai daily evidence under the context cap",async()=>{
+  const {buildPromptPacket}=await import("../fortune-interpret-v21-preview/costGuardV21.ts");
+  const calc=calculation();
+  calc.period={start:"2026-10-01",end:"2026-10-20",day_count:20};
+  const dates=Array.from({length:20},(_,i)=>`2026-10-${String(i+1).padStart(2,"0")}`);
+  calc.saju.daily=dates.map(date=>({date,ganzhi:"甲子",stem_ten_god:"비견",branch_links:[]}));
+  calc.thai.suriyayat_daily=dates.map(date=>({date,positions:{
+    sun:{longitude_deg:210,sign_index:7,sign_ko:"전갈자리",natal_longitude_deg:100,natal_sign_index:3,same_natal_sign:false,same_planet_separation_deg:110},
+  }}));
+  const prompt=buildPromptPacket(compactCalculation(calc));
+  const context=prompt.evidence_ledger.filter(x=>x.system!=="western");
+  assert.ok(context.some(x=>x.id.startsWith("S:daily:")));
+  assert.ok(context.some(x=>x.id.startsWith("T:daily:")));
+  assert.ok(context.filter(x=>x.system==="saju").length>=4);
+  assert.ok(context.filter(x=>x.system==="thai").length>=4);
+  assert.equal(prompt.integration_policy.score_merging,false);
+});
