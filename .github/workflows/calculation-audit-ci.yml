@@ -108,6 +108,7 @@ jobs:
           astrocartography_v1.py
           thai_lagna_v1.py
           thai_suriyayat_v1.py
+          thai_astrology_v2.py
           scripts/reunion_generalization_audit.py
           scripts/reunion_outcome_blind_validation.py
           api/main.py
@@ -150,4 +151,5 @@ jobs:
             tests/test_thai_lagna_v1.py \
             tests/test_thai_aspects_v1.py \
             tests/test_thai_dignities_v1.py \
-            tests/test_thai_houses_v1.py
+            tests/test_thai_houses_v1.py \
+            tests/test_thai_suriyayat_daily_facts_v1.py
