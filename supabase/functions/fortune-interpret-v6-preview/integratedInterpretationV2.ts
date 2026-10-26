@@ -1,7 +1,7 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
 export const VERSION = "supabase-ai-v20-release-cache-break";
-export const PACKET_VERSION = "fortune-interpretation-packet-v4-intraday-window";
+export const PACKET_VERSION = "fortune-interpretation-packet-v5-saju-daily-evidence";
 export const QUALITY_VERSION = "fortune-interpretation-quality-v6-semantic-usefulness";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
@@ -239,12 +239,29 @@ export function compactCalculation(calc:any){
   const sajuAnnual=(Array.isArray(s?.annual)?s.annual.slice(0,8):[]).map((x:any,index:number)=>{const id=`S:annual:${index+1}:${isoDate(x?.segment_start)||x?.year||""}`;addEvidence({id,system:"saju",scope:"annual_segment",direction:"context",start:x?.segment_start,end:x?.segment_end_exclusive,text:`세운 ${x?.ganzhi??""} · 십성 ${x?.stem_ten_god??""}${Array.isArray(x?.branch_links)&&x.branch_links.length?` · 지지관계 ${x.branch_links.join(", ")}`:""}`});return {...x,evidence_id:id};});
   const sajuMonthly=(Array.isArray(s?.monthly)?s.monthly.slice(0,18):[]).map((x:any,index:number)=>{const id=`S:month:${index+1}:${isoDate(x?.segment_start)||x?.calendar_month||""}`;addEvidence({id,system:"saju",scope:"monthly_segment",direction:"context",start:x?.segment_start,end:x?.segment_end_exclusive,text:`월운 ${x?.ganzhi??""} · 십성 ${x?.stem_ten_god??""}${Array.isArray(x?.branch_links)&&x.branch_links.length?` · 지지관계 ${x.branch_links.join(", ")}`:""} · ${x?.jie_name_ko??x?.jie_name??""} 절입 구간`});return {...x,evidence_id:id};});
 
+  // Keep every date for short periods, but only date-specific highlights for long
+  // periods. The full daily calculation stays in the calculation result.
+  const sajuDailyRaw=Array.isArray(s?.daily)?s.daily:[];
+  const sajuHighlightDates=new Set(keyDates.map((x:any)=>String(x?.date??"")));
+  const sajuDaily=(calculationPeriodKind==="day"||calculationPeriodKind==="week"||calculationPeriodKind==="month"
+    ?sajuDailyRaw.slice(0,45)
+    :sajuDailyRaw.filter((x:any)=>sajuHighlightDates.has(String(x?.date??""))).slice(0,24)
+  ).map((x:any)=>{
+    const date=String(x?.date??"");
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!/^.{2}$/.test(String(x?.ganzhi??"")))return null;
+    const id=`S:daily:${date}`;
+    const links=Array.isArray(x?.branch_links)?x.branch_links.slice(0,4):[];
+    addEvidence({id,system:"saju",scope:"daily_pillar",direction:"context",date,
+      text:`${date} 일진 ${x.ganzhi} · 일간 대비 십성 ${x?.stem_ten_god??""}${links.length?` · 원국 지지관계 ${links.join(", ")}`:""} · 현지 달력일 정오 대표값`});
+    return {date,ganzhi:x.ganzhi,stem_ten_god:String(x?.stem_ten_god??""),branch_links:links,representative_local_time:"12:00",evidence_id:id};
+  }).filter(Boolean);
   const th=calc?.thai??{},sy=th?.suriyayat??{};
   const takSegments=(Array.isArray(th?.taksajorn?.segments)?th.taksajorn.segments.slice(0,8):[]).map((x:any,index:number)=>{const id=`T:taksajorn:${index+1}:${isoDate(x?.start)}`;addEvidence({id,system:"thai",scope:"taksajorn_context",direction:"context",start:x?.start,end:x?.end,text:`Taksajorn(탁사쫀) 구간 · 연간 보리완 ${x?.annual_boriwan?.label??x?.annual_boriwan?.key??""} · 중심궁 도달 ${Boolean(x?.landed_center)?"있음":"없음"}`});return {start:x?.start,end:x?.end,age_in_progress:x?.age_in_progress,annual_boriwan:x?.annual_boriwan?{key:x.annual_boriwan.key,label:x.annual_boriwan.label,thai_name:x.annual_boriwan.thai_name}:null,landed_center:Boolean(x?.landed_center),wheel:wheel(x?.wheel),evidence_id:id};});
   if(th?.mahathaksa?.available){addEvidence({id:"T:mahathaksa:natal",system:"thai",scope:"mahathaksa_baseline",direction:"context",text:`Mahathaksa(마하탁사) 출생 기본 8궁 배치 · 방법 ${th?.mahathaksa?.method??""}`});}
 
   const crossSystemTimeline=keyDates.map((k)=>{
     const srefs=[...sajuAnnual,...sajuMonthly].filter((x:any)=>dayIntersects(k.date,x?.segment_start,x?.segment_end_exclusive)).map((x:any)=>x.evidence_id);
+    for(const daily of sajuDaily)if(daily.date===k.date)srefs.push(daily.evidence_id);
     const trefs=takSegments.filter((x:any)=>dayIntersects(k.date,x?.start,x?.end)).map((x:any)=>x.evidence_id);
     return {date:k.date,salience:k.salience,topics:k.topics,western_refs:uniq(k.western_refs),saju_context_refs:uniq(srefs),thai_context_refs:uniq(trefs),policy:"사주·Thai는 Western 점수에 합산하지 않으며 독립 맥락으로만 교차 확인"};
   });
@@ -270,7 +287,7 @@ export function compactCalculation(calc:any){
     western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
     key_dates:keyDates,
     cross_system_timeline:crossSystemTimeline,
-    saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
+    saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,daily:sajuDaily,daily_coverage:{computed_days:sajuDailyRaw.length,selected_days:sajuDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},daily_policy:s?.daily_policy??null,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
     thai:{engine:th?.engine,thai_day:th?.thai_day,birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel),evidence_id:th?.mahathaksa?.available?"T:mahathaksa:natal":null}:null,taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,suriyayat:compactThaiProductSuriyayat(sy),predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
     evidence_ledger:evidence,
   };

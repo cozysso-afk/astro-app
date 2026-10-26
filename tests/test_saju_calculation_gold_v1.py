@@ -9,6 +9,8 @@ from integrated_fortune_v1 import (
     _lichun_for_year,
     _month_jie_segments,
     _saju_payload,
+    _saju_daily_rows,
+    _ten_god,
     _true_solar_datetime,
 )
 from relationship_saju_v1 import _pillars
@@ -99,3 +101,29 @@ def test_relationship_and_integrated_saju_share_identical_true_solar_pillars():
         "hour": relationship["hour"],
     }
     assert relationship["precision"] == "exact_true_solar"
+
+
+def test_daily_saju_pillar_changes_by_civil_date_and_stays_non_predictive():
+    branches = {"일지": "子"}
+    rows = _saju_daily_rows(date(2026, 10, 26), date(2026, 10, 27), "甲", branches)
+    assert [r["date"] for r in rows] == ["2026-10-26", "2026-10-27"]
+    assert rows[0]["ganzhi"] != rows[1]["ganzhi"]
+    for row in rows:
+        assert len(row["ganzhi"]) == 2
+        assert row["stem_ten_god"] == _ten_god("甲", row["ganzhi"][0])
+        assert row["representative_local_time"] == "12:00"
+        assert all("六合" in x or "六沖" in x for x in row["branch_links"])
+        assert "score" not in row and "event_probability" not in row
+
+
+def test_daily_saju_is_included_without_altering_legacy_solar_term_segments():
+    result = _saju_payload(
+        birth_date=date(2000, 1, 1), birth_time=dt_time(12, 0),
+        longitude=120.0, utc_offset_hours=8.0, gender="female",
+        start_date=date(2026, 10, 26), end_date=date(2026, 10, 27),
+    )
+    assert result["ok"] is True, result
+    assert len(result["daily"]) == 2
+    assert result["daily"][0]["date"] == "2026-10-26"
+    assert result["annual"] and result["monthly"]
+    assert "신강·신약" in result["not_calculated"]

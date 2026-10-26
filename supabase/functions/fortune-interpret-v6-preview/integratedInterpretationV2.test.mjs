@@ -359,3 +359,23 @@ test("Gemini compact topic array schema normalizes back to the stable topic map"
   const duplicate={...arrayForm,topic_analysis:[...arrayForm.topic_analysis.slice(0,-1),arrayForm.topic_analysis[0]]};
   assert.equal(validateOutput(duplicate),null);
 });
+
+
+test("selected Saju daily evidence stays independent and reaches the Gemini prompt packet",async()=>{
+  const {buildPromptPacket}=await import("../fortune-interpret-v21-preview/costGuardV21.ts");
+  const calc=calculation();
+  calc.period={start:"2026-10-26",end:"2026-10-26",day_count:1};
+  calc.western.daily_scores=[{date:"2026-10-26",label:"2026-10-26",market_open:true,scores:Object.fromEntries(TOPICS.map(t=>[t,48])),evidence:[]}];
+  calc.saju.daily=[{date:"2026-10-26",ganzhi:"癸酉",stem_ten_god:"正印(정인)",branch_links:["일지 子와 六合(육합)"],representative_local_time:"12:00"}];
+  calc.saju.daily_policy="local civil date noon representative";
+  const packet=compactCalculation(calc);
+  assert.equal(packet.saju.daily[0].date,"2026-10-26");
+  assert.equal(packet.saju.daily[0].ganzhi,"癸酉");
+  const dailyRef="S:daily:2026-10-26";
+  assert.ok(packet.evidence_ledger.some(x=>x.id===dailyRef&&x.direction==="context"&&x.system==="saju"));
+  const prompt=buildPromptPacket(packet);
+  assert.ok(prompt.saju.daily.some(x=>x.evidence_id===dailyRef));
+  assert.ok(prompt.evidence_ledger.some(x=>x.id===dailyRef));
+  assert.equal(prompt.saju.daily_coverage.computed_days,1);
+  assert.equal(prompt.integration_policy.score_merging,false);
+});
