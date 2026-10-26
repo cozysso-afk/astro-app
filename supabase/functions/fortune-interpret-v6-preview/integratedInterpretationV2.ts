@@ -1,7 +1,7 @@
 import { compactThaiProductSuriyayat } from "./thaiContract.ts";
 
 export const VERSION = "supabase-ai-v20-release-cache-break";
-export const PACKET_VERSION = "fortune-interpretation-packet-v5-saju-daily-evidence";
+export const PACKET_VERSION = "fortune-interpretation-packet-v6-thai-daily-facts";
 export const QUALITY_VERSION = "fortune-interpretation-quality-v6-semantic-usefulness";
 export const MODELS: Record<string,string> = {
   "gemini-3.7-flash": "Gemini 3.7 Flash · 정밀 우선",
@@ -256,6 +256,30 @@ export function compactCalculation(calc:any){
     return {date,ganzhi:x.ganzhi,stem_ten_god:String(x?.stem_ten_god??""),branch_links:links,representative_local_time:"12:00",evidence_id:id};
   }).filter(Boolean);
   const th=calc?.thai??{},sy=th?.suriyayat??{};
+  const thaiDailyRaw=Array.isArray(th?.suriyayat_daily)?th.suriyayat_daily:[];
+  const thaiDates=new Set(keyDates.map((x:any)=>String(x?.date??"")));
+  const thaiDaily=(calculationPeriodKind==="annual"
+    ?thaiDailyRaw.filter((x:any)=>thaiDates.has(String(x?.date??""))).slice(0,16)
+    :thaiDailyRaw.slice(0,45)
+  ).map((x:any)=>{
+    const date=String(x?.date??"");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
+    const keys=["sun","moon","mars","mercury","jupiter","venus","saturn","rahu","ketu","uranus"];
+    const positions=Object.fromEntries(Object.entries(x?.positions??{}).filter(([key,p]:any)=>
+      keys.includes(key)&&Number.isFinite(Number(p?.longitude_deg))
+      &&Number.isFinite(Number(p?.natal_longitude_deg))&&Number.isFinite(Number(p?.same_planet_separation_deg))
+    ).map(([key,p]:any)=>[key,{
+      longitude_deg:p.longitude_deg,sign_index:p.sign_index,sign_ko:p.sign_ko,
+      natal_longitude_deg:p.natal_longitude_deg,natal_sign_index:p.natal_sign_index,
+      same_natal_sign:Boolean(p.same_natal_sign),same_planet_separation_deg:p.same_planet_separation_deg,
+    }]));
+    if(!Object.keys(positions).length)return null;
+    const id=`T:daily:${date}`;
+    const sample=["sun","moon","saturn"].filter(k=>positions[k]).map(k=>`${k} ${positions[k].longitude_deg}° (출생 ${positions[k].natal_longitude_deg}°)`).join(" · ");
+    addEvidence({id,system:"thai",scope:"suriyayat_daily_position_facts",direction:"context",date,
+      text:`Suriyayat ${date} 현지 정오 행성 위치 및 동일 행성 출생 위치 비교 · ${sample} · 각도 차이는 중립적 기하값이며 태국식 애스펙트·길흉·사건·점수 판정 아님`});
+    return {date,representative_local_time:"12:00",positions,evidence_id:id};
+  }).filter(Boolean);
   const takSegments=(Array.isArray(th?.taksajorn?.segments)?th.taksajorn.segments.slice(0,8):[]).map((x:any,index:number)=>{const id=`T:taksajorn:${index+1}:${isoDate(x?.start)}`;addEvidence({id,system:"thai",scope:"taksajorn_context",direction:"context",start:x?.start,end:x?.end,text:`Taksajorn(탁사쫀) 구간 · 연간 보리완 ${x?.annual_boriwan?.label??x?.annual_boriwan?.key??""} · 중심궁 도달 ${Boolean(x?.landed_center)?"있음":"없음"}`});return {start:x?.start,end:x?.end,age_in_progress:x?.age_in_progress,annual_boriwan:x?.annual_boriwan?{key:x.annual_boriwan.key,label:x.annual_boriwan.label,thai_name:x.annual_boriwan.thai_name}:null,landed_center:Boolean(x?.landed_center),wheel:wheel(x?.wheel),evidence_id:id};});
   if(th?.mahathaksa?.available){addEvidence({id:"T:mahathaksa:natal",system:"thai",scope:"mahathaksa_baseline",direction:"context",text:`Mahathaksa(마하탁사) 출생 기본 8궁 배치 · 방법 ${th?.mahathaksa?.method??""}`});}
 
@@ -263,6 +287,7 @@ export function compactCalculation(calc:any){
     const srefs=[...sajuAnnual,...sajuMonthly].filter((x:any)=>dayIntersects(k.date,x?.segment_start,x?.segment_end_exclusive)).map((x:any)=>x.evidence_id);
     for(const daily of sajuDaily)if(daily.date===k.date)srefs.push(daily.evidence_id);
     const trefs=takSegments.filter((x:any)=>dayIntersects(k.date,x?.start,x?.end)).map((x:any)=>x.evidence_id);
+    for(const daily of thaiDaily)if(daily.date===k.date)trefs.push(daily.evidence_id);
     return {date:k.date,salience:k.salience,topics:k.topics,western_refs:uniq(k.western_refs),saju_context_refs:uniq(srefs),thai_context_refs:uniq(trefs),policy:"사주·Thai는 Western 점수에 합산하지 않으며 독립 맥락으로만 교차 확인"};
   });
 
@@ -288,7 +313,7 @@ export function compactCalculation(calc:any){
     key_dates:keyDates,
     cross_system_timeline:crossSystemTimeline,
     saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,daily:sajuDaily,daily_coverage:{computed_days:sajuDailyRaw.length,selected_days:sajuDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},daily_policy:s?.daily_policy??null,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
-    thai:{engine:th?.engine,thai_day:th?.thai_day,birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel),evidence_id:th?.mahathaksa?.available?"T:mahathaksa:natal":null}:null,taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,suriyayat:compactThaiProductSuriyayat(sy),predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
+    thai:{engine:th?.engine,thai_day:th?.thai_day,birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel),evidence_id:th?.mahathaksa?.available?"T:mahathaksa:natal":null}:null,taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,suriyayat:compactThaiProductSuriyayat(sy),suriyayat_daily:thaiDaily,suriyayat_daily_coverage:{computed_days:thaiDailyRaw.length,selected_days:thaiDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},suriyayat_daily_policy:th?.suriyayat_daily_policy??null,predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
     evidence_ledger:evidence,
   };
   return deep(packet);

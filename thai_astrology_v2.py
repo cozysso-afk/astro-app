@@ -44,7 +44,7 @@ from thai_ai_safe_packet_v1 import build_ai_safe_packet_research
 from thai_lagna_promotion_audit_v1 import build_lagna_promotion_audit
 from thai_lagna_product_v1 import build_lagna_product_promotion
 
-ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.17-phase2g5-1-fail-closed"
+ENGINE_VERSION = "thai-mahathaksa-taksajorn-suriyayat-v2.18-daily-facts-only"
 
 # Traditional Ashtagraha/Taksa walking order used in Thai Mahathaksa tables.
 _PLANET_ORDER = ("sun", "moon", "mars", "mercury", "saturn", "jupiter", "rahu", "venus")
@@ -349,6 +349,36 @@ def _suriyayat_layer(
     }
 
 
+def _suriyayat_daily_facts(start_date: date, end_date: date, utc_offset_hours: float, natal_snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    """Local-noon daily positions and same-planet natal geometry only, not Thai aspects or predictions."""
+    natal_positions = natal_snapshot.get("positions") or {}
+    rows = []
+    day = start_date
+    while day <= end_date:
+        instant = datetime.combine(day, dt_time(12, 0), tzinfo=timezone(timedelta(hours=float(utc_offset_hours))))
+        snapshot = calculate_positions_for_instant(instant)
+        positions = {}
+        for key, transit in (snapshot.get("positions") or {}).items():
+            natal = natal_positions.get(key) or {}
+            transit_arcmin, natal_arcmin = transit.get("arcmin"), natal.get("arcmin")
+            if not isinstance(transit_arcmin, int) or not isinstance(natal_arcmin, int):
+                continue
+            separation = abs((transit_arcmin - natal_arcmin) % 21600)
+            positions[key] = {
+                "longitude_deg": transit["longitude_deg"],
+                "sign_index": transit["sign_index"],
+                "sign_ko": transit["sign_ko"],
+                "natal_longitude_deg": natal["longitude_deg"],
+                "natal_sign_index": natal["sign_index"],
+                "same_natal_sign": transit["sign_index"] == natal["sign_index"],
+                "same_planet_separation_deg": round(min(separation, 21600 - separation) / 60, 4),
+            }
+        rows.append({"date": day.isoformat(), "representative_local_time": "12:00",
+                     "time_basis": snapshot["time_basis"], "positions": positions})
+        day += timedelta(days=1)
+    return rows
+
+
 def build_thai_fortune(
     birth_date: date,
     birth_time: dt_time,
@@ -403,6 +433,8 @@ def build_thai_fortune(
             "method_variance_note": "Thai schools use more than one Taksajorn counting convention; this engine exposes the selected one-year-per-bhumi method instead of treating it as the only school.",
         },
         "suriyayat": suriyayat,
+        "suriyayat_daily": _suriyayat_daily_facts(start_date, end_date, utc_offset_hours, suriyayat["natal"]),
+        "suriyayat_daily_policy": "12:00 local civil-date sample; same-planet natal separation is neutral geometry, not an aspect, valence, event or score",
         "predictive_status": "mahathaksa_taksajorn_plus_verified_suriyayat_positions_with_promoted_descriptive_lagna_context_no_prediction",
         "consensus_policy": "Mahathaksa/Taksajorn and cross-validated Suriyayat positions remain interpreted Thai layers. The independently validated numeric Lagna and whitelist-only source house -> house lord -> destination house context are product-enabled for descriptive, non-predictive explanation only. Research-only dignity/aspect/pair details, school-policy exceptions, final good/bad judgement, event claims, timing, probability and scores remain disabled.",
         "reliability": {
