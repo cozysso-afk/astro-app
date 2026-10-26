@@ -263,7 +263,7 @@ export function compactCalculation(calc:any){
     :thaiDailyRaw.slice(0,45)
   ).map((x:any)=>{
     const date=String(x?.date??"");
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return null;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
     const keys=["sun","moon","mars","mercury","jupiter","venus","saturn","rahu","ketu","uranus"];
     const positions=Object.fromEntries(Object.entries(x?.positions??{}).filter(([key,p]:any)=>
       keys.includes(key)&&Number.isFinite(Number(p?.longitude_deg))
