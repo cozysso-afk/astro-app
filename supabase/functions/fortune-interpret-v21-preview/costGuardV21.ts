@@ -329,10 +329,24 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
     return p(a)-p(b);
   });
   const limit=payload?.period_kind==="annual"?110:80;
-  const context=ordered.filter((row:any)=>String(row?.system??"")!=="western").sort((a:any,b:any)=>Number(b?.scope==="daily_pillar")-Number(a?.scope==="daily_pillar"));
+  const context=ordered.filter((row:any)=>String(row?.system??"")!=="western");
   const western=ordered.filter((row:any)=>String(row?.system??"")==="western");
   const reserve=Math.min(context.length,payload?.period_kind==="annual"?16:12,limit);
-  return [...western.slice(0,limit-reserve),...context.slice(0,reserve)];
+  // Preserve evidence from both independent systems, even when 30+ daily
+  // rows would otherwise crowd the other system out of the prompt ledger.
+  const keyDateSet=new Set(keyDates.map((x:any)=>String(x?.date??"")));
+  const priority=(row:any)=>keyDateSet.has(String(row?.date??""))?0:
+    row?.scope==="daily_pillar"||row?.scope==="suriyayat_daily_position_facts"?1:2;
+  const bySystem=["saju","thai"].map(system=>context.filter((r:any)=>r?.system===system)
+    .sort((a:any,b:any)=>priority(a)-priority(b)));
+  const selected:any[]=[];
+  while(selected.length<reserve&&bySystem.some(rows=>rows.length)){
+    for(const rows of bySystem){
+      if(selected.length>=reserve)break;
+      if(rows.length)selected.push(rows.shift());
+    }
+  }
+  return [...western.slice(0,limit-reserve),...selected];
 }
 
 function compactSaju(saju:any){
