@@ -39,7 +39,8 @@ assert.equal(supabase.includes("url.includes('/functions/v1/relationship-interpr
 assert.equal(supabase.includes('period: { ...period, narrative_contract: REUNION_NARRATIVE_CONTRACT }'), true, 'reunion narrative contract must survive inside the server-hashed period payload')
 assert.equal(supabase.includes('return {\n      ...init,\n      body: JSON.stringify'), true, 'reunion request rewrite must preserve method headers and other fetch init fields')
 
-assert.equal(app.includes("const FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'"), true, 'current fortune AI must use the guarded v21 endpoint')
+assert.equal(app.includes("const FORTUNE_AI_FUNCTION = 'fortune-interpret-v22-preview'"), true, 'current fortune AI must use the guarded v22 precision gateway')
+assert.equal(app.includes("const FORTUNE_AI_NARRATIVE_ENGINE = 'v23'"), true, 'current fortune AI must use Gemini V23 for the full request lifecycle')
 assert.equal(app.includes("functions.invoke('relationship-interpret-v9-preview'"), true, 'current relationship AI must use the guarded v9 endpoint')
 assert.equal(precision.includes("'fortune-interpret-v22-preview'"), true, 'fortune v21 browser invokes must be transported through the current v22 gateway')
 for (const legacy of [

@@ -27,7 +27,7 @@ from western_house_system_v1 import calculate_quadrant_houses
 
 ENGINE_VERSION = "integrated-fortune-v2.12-polar-safe-houses"
 WESTERN_ENGINE_VERSION = "western-period-engine-v12-polar-safe-houses"
-SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-absolute-jie-v5"
+SAJU_ENGINE_VERSION = "lunar_python-1.4.8-true-solar-absolute-jie-v5-daily-v1"
 
 KST = pytz.timezone("Asia/Seoul")
 UTC = pytz.UTC
@@ -1500,6 +1500,35 @@ def _annual_lichun_segments(start_date: date, end_date: date, offset_hours: floa
     return rows
 
 
+
+def _saju_daily_rows(start_date: date, end_date: date, day_master: str, natal_branches: dict):
+    """Calculate local calendar-day pillars at noon, independently of annual/Jie segments.
+
+    The midday point avoids claiming an exact intraday influence or an event time.
+    This matches the existing natal day-pillar civil-date basis (EightChar sect=2);
+    zodiac relationships are limited to the existing verified Liuhe/Liuchong rules.
+    It does not derive spouse stars, strong/weak day masters, or favourable elements.
+    """
+    rows = []
+    current = start_date
+    while current <= end_date:
+        lunar = Solar.fromYmdHms(
+            current.year, current.month, current.day, 12, 0, 0
+        ).getLunar()
+        ganzhi = lunar.getDayInGanZhiExact2()
+        if not ganzhi or len(ganzhi) < 2:
+            raise ValueError(f"day pillar unavailable for {current.isoformat()}")
+        rows.append({
+            "date": current.isoformat(),
+            "ganzhi": ganzhi,
+            "stem_ten_god": _ten_god(day_master, ganzhi[0]),
+            "branch_links": _branch_links(ganzhi[1], natal_branches),
+            "representative_local_time": "12:00",
+        })
+        current += timedelta(days=1)
+    return rows
+
+
 def _saju_payload(
     birth_date: date,
     birth_time: dt_time,
@@ -1602,6 +1631,8 @@ def _saju_payload(
             "dayun": dayuns,
             "annual": years,
             "monthly": months,
+            "daily": _saju_daily_rows(start_date, end_date, day_master, branches),
+            "daily_policy": "local civil date noon representative; lunar_python getDayInGanZhiExact2; context only, not a score or precise event time",
             "not_calculated": ["신강·신약", "용신·희신·기신", "형·파·해 전체 자동판정"],
         }
     except Exception as exc:

@@ -26,7 +26,7 @@ function provisionalRequest() {
   return { profile: { birth_time:'07:26', time_known:true, time_source:'family_memory', time_confidence:'medium' }, period:'today' }
 }
 
-test('pending fortune AI job round-trips only with the V22 precision contract', () => {
+test('pending fortune AI job round-trips with the V23 Gemini contract', () => {
   const raw = encodePendingFortuneAiJob({
     jobId: 'job-123', periodStart: '2026-09-03', periodEnd: '2026-09-03',
     cacheId: 'fortune-ai:test', ttlDays: 180, request: exactRequest(),
@@ -36,8 +36,8 @@ test('pending fortune AI job round-trips only with the V22 precision contract', 
   assert.equal(parsed?.precisionMode, 'exact')
   assert.equal(parsed?.jobId, 'job-123')
   assert.equal(parsed?.request?.period, 'today')
-  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v7$/)
-  assert.match(FORTUNE_AI_JOB_CONTRACT, /v22-integrated-precision-v2$/)
+  assert.match(FORTUNE_AI_JOB_STORAGE_KEY, /\.v8$/)
+  assert.match(FORTUNE_AI_JOB_CONTRACT, /v23-gemini-single-author$/)
 })
 
 test('provisional pending job records and verifies its precision mode', () => {

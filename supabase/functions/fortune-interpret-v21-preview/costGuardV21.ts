@@ -321,13 +321,14 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
     for(const ref of cross?.saju_context_refs??[])allowed.add(String(ref));
     for(const ref of cross?.thai_context_refs??[])allowed.add(String(ref));
   }
+  for(const day of payload?.saju?.daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
   const rows=(Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).filter((row:any)=>allowed.has(String(row?.id??"")));
   const ordered=[...rows].sort((a:any,b:any)=>{
     const p=(row:any)=>String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
     return p(a)-p(b);
   });
   const limit=payload?.period_kind==="annual"?110:80;
-  const context=ordered.filter((row:any)=>String(row?.system??"")!=="western");
+  const context=ordered.filter((row:any)=>String(row?.system??"")!=="western").sort((a:any,b:any)=>Number(b?.scope==="daily_pillar")-Number(a?.scope==="daily_pillar"));
   const western=ordered.filter((row:any)=>String(row?.system??"")==="western");
   const reserve=Math.min(context.length,payload?.period_kind==="annual"?16:12,limit);
   return [...western.slice(0,limit-reserve),...context.slice(0,reserve)];
@@ -344,6 +345,9 @@ function compactSaju(saju:any){
     dayun:Array.isArray(saju?.dayun)?saju.dayun.slice(0,5):[],
     annual:Array.isArray(saju?.annual)?saju.annual:[],
     monthly:Array.isArray(saju?.monthly)?saju.monthly:[],
+    daily:Array.isArray(saju?.daily)?saju.daily.slice(0,45):[],
+    daily_coverage:saju?.daily_coverage??null,
+    daily_policy:saju?.daily_policy??null,
     pillar_boundary_policy:saju?.pillar_boundary_policy??null,
     yun_policy:saju?.yun_policy??null,
     not_calculated:Array.isArray(saju?.not_calculated)?saju.not_calculated.slice(0,8):[],

@@ -77,7 +77,8 @@ import { aspectText, planetLabels, integratedPromptText, integratedResultText, r
 
 const DEFAULT_API_BASE = 'https://astro-app-api-f7fn.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE).replace(/\/$/, '')
-const FORTUNE_AI_FUNCTION = 'fortune-interpret-v21-preview'
+const FORTUNE_AI_FUNCTION = 'fortune-interpret-v22-preview'
+const FORTUNE_AI_NARRATIVE_ENGINE = 'v23'
 const PROFILE_STORAGE_KEY = 'starlight-destiny.birth-profile.v1'
 const UI_SETTINGS_STORAGE_KEY = 'starlight-destiny.ui-settings.v1'
 const AI_MODEL_STORAGE_KEY = 'starlight-destiny.ai-model.v1'
@@ -482,7 +483,7 @@ export default function AppNext() {
   ;(async () => {
     try {
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action: 'meta' } })
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'meta' } })
       if (error) throw error
       if (!cancelled) setAiConfigured(Boolean(data?.configured))
     } catch {
@@ -713,7 +714,7 @@ export default function AppNext() {
       for (let attempt = 0; attempt < 180; attempt++) {
         if (document.visibilityState === 'hidden') return
         const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
-          body: { action: 'status', job_id: jobId },
+          body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'status', job_id: jobId },
         })
         if (error) throw error
         if (data?.status === 'done') {
@@ -824,7 +825,7 @@ export default function AppNext() {
       setAiCacheSource('')
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
-        body: { action: 'start', calculation: calculationForInterpretation, model: aiModel },
+        body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', calculation: calculationForInterpretation, model: aiModel },
       })
       startPayload = data
       if (error) throw error
@@ -1287,7 +1288,7 @@ export default function AppNext() {
         return
       }
       await ensureSupabaseSession()
-      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { action:'prompt', calculation } })
+      const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
       await copyExternalPrompt((fortuneFieldId==='love'?lovePromptContext(loveStatus):'') + THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
@@ -1303,7 +1304,7 @@ export default function AppNext() {
     for (let attempt=0; attempt<14; attempt++) {
       await new Promise((resolve)=>window.setTimeout(resolve, attempt<4 ? 1800 : 3000))
       try {
-        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'status', job_id:jobId } })
+        const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action:'status', job_id:jobId } })
         if (error) continue
         const total=Number(data?.usage?.total_tokens ?? 0)
         if (total>0) {
@@ -1329,7 +1330,7 @@ export default function AppNext() {
     }
     try {
       await ensureSupabaseSession()
-      const { error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ action:'cancel', job_id:jobId } })
+      const { error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body:{ narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action:'cancel', job_id:jobId } })
       if (error) throw error
       removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
       aiRequestRef.current = ''
