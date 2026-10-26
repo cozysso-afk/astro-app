@@ -115,6 +115,16 @@ try {
   assert((await quality.innerText()).includes('예정 구간'), 'upcoming window missing')
   await quality.screenshot({path:path.join(outDir, 'interpretation-v2-mobile.png')})
 
+  const exportSource = page.locator('[data-qa-block="export-source"]')
+  const firstTopicDepth = exportSource.locator('.period-ai-topic details').first()
+  assert((await firstTopicDepth.getAttribute('open')) !== null, 'fortune calculation rationale did not initialize open')
+  assert((await firstTopicDepth.innerText()).includes('달과 화성이 긴장을 만들고'), 'fortune calculation rationale is not visible')
+  await firstTopicDepth.locator('summary').click()
+  assert((await firstTopicDepth.getAttribute('open')) === null, 'fortune calculation rationale did not collapse')
+  await firstTopicDepth.locator('summary').click()
+  assert((await firstTopicDepth.getAttribute('open')) !== null, 'fortune calculation rationale did not expand again')
+  await firstTopicDepth.locator('summary').click()
+
   const reunion = page.locator('[data-qa-block="reunion"]')
   const reunionText = await reunion.innerText()
   assert(reunionText.includes('수신 · 상대 → 나') && reunionText.includes('발신 · 나 → 상대'), 'contact directions missing')
@@ -127,7 +137,7 @@ try {
   const mobileWidths = []
   for (const width of [320, 350, 393, 430]) {
     await page.setViewportSize({width,height:932})
-    const size = await reunion.evaluate(el=>{
+    const size = await reunion.evaluate((el, qualitySelector)=>{
       const title=el.querySelector('.reunion-v5-answer h3')
       const body=el.querySelector('.reunion-v5-answer p')
       const current=el.querySelectorAll('[aria-current="step"]').length
@@ -136,14 +146,28 @@ try {
         const status=row.querySelector('strong')?.getBoundingClientRect()
         return label&&status&&label.right>status.left+1&&label.bottom>status.top+1&&status.bottom>label.top+1
       })
-      return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,title:parseFloat(getComputedStyle(title).fontSize),body:parseFloat(getComputedStyle(body).fontSize),current,stageOverlap}
-    })
+      const fortune=document.querySelector(qualitySelector)
+      const topicCards=fortune?.querySelectorAll('.period-ai-topic')??[]
+      const clippedText=Array.from(fortune?.querySelectorAll('h3,p,strong,b,small')??[])
+        .filter(node=>!node.closest('.reading-reason-more,[aria-hidden="true"]'))
+        .some(node=>{const style=getComputedStyle(node);const clips=['hidden','clip'].includes(style.overflow)||['hidden','clip'].includes(style.overflowX)||['hidden','clip'].includes(style.overflowY);return clips&&(node.scrollWidth>node.clientWidth+1||node.scrollHeight>node.clientHeight+1)})
+      return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,title:parseFloat(getComputedStyle(title).fontSize),body:parseFloat(getComputedStyle(body).fontSize),current,stageOverlap,
+        fortuneVisible:Boolean(fortune&&fortune.getBoundingClientRect().height>0),fortuneOverflow:fortune?fortune.scrollWidth-fortune.clientWidth:999,
+        fortuneTopicCards:topicCards.length,fortuneDateVisible:Boolean(fortune?.querySelector('.reading-period-date')?.textContent?.includes('2026-10-02')),
+        fortuneClippedText:clippedText}
+    }, '[data-qa-block="export-source"]')
     assert(size.overflow<=1, 'reunion horizontal overflow: '+JSON.stringify(size))
     assert(size.title>=20 && size.title<=23 && size.body>=14.5 && size.body<=16, 'reunion font sizes out of range: '+JSON.stringify(size))
     assert(size.current<=1, 'reunion has more than one current stage: '+JSON.stringify(size))
     assert(!size.stageOverlap, 'reunion stage label and status overlap: '+JSON.stringify(size))
+    assert(size.fortuneVisible, 'fortune result is blank: '+JSON.stringify(size))
+    assert(size.fortuneOverflow<=1, 'fortune result overflows: '+JSON.stringify(size))
+    assert(size.fortuneTopicCards>=3, 'fortune topic cards missing: '+JSON.stringify(size))
+    assert(size.fortuneDateVisible, 'fortune date missing: '+JSON.stringify(size))
+    assert(!size.fortuneClippedText, 'fortune text is clipped: '+JSON.stringify(size))
     mobileWidths.push(size)
     await reunion.screenshot({path:path.join(outDir,'reunion-mobile-'+width+'.png')})
+    await exportSource.screenshot({path:path.join(outDir,'fortune-mobile-'+width+'.png')})
   }
   diagnostics.mobileWidths = mobileWidths
   await page.setViewportSize({width:430,height:932})
@@ -156,7 +180,7 @@ try {
   await page.locator('[data-qa-block="systems"]').screenshot({ path: path.join(outDir, 'systems-mobile.png') })
   await page.locator('[data-qa-block="birth-time-range"]').screenshot({ path: path.join(outDir, 'birth-time-range-mobile.png') })
   await page.locator('[data-qa-block="reunion"]').screenshot({ path: path.join(outDir, 'reunion-mobile.png') })
-  await page.locator('[data-qa-block="export-source"]').screenshot({ path: path.join(outDir, 'export-source-mobile.png') })
+  await exportSource.screenshot({ path: path.join(outDir, 'export-source-mobile.png') })
 
   await page.locator('[data-qa-export]').click()
   await page.waitForFunction(() => {
