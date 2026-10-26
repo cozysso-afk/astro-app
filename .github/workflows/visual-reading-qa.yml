@@ -66,6 +66,13 @@ jobs:
       - name: Capture iPhone screens and saved result images
         run: node scripts/visual-qa.mjs
 
+      - name: Build shareable QA report with screenshot links
+        run: >-
+          node --experimental-strip-types scripts/fortune-quality-audit.mjs
+          --fixture-matrix
+          --visual visual-qa-artifacts/diagnostics.json
+          --out visual-qa-artifacts/fortune-quality-audit
+
       - name: Preserve preview log
         if: always()
         run: cp /tmp/reading-visual-qa-vite.log visual-qa-artifacts/vite.log || true
