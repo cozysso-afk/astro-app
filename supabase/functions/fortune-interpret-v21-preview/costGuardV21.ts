@@ -322,6 +322,7 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
     for(const ref of cross?.thai_context_refs??[])allowed.add(String(ref));
   }
   for(const day of payload?.saju?.daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
+  for(const day of payload?.thai?.suriyayat_daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
   const rows=(Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).filter((row:any)=>allowed.has(String(row?.id??"")));
   const ordered=[...rows].sort((a:any,b:any)=>{
     const p=(row:any)=>String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
@@ -361,6 +362,9 @@ function compactThai(thai:any){
     mahathaksa:thai?.mahathaksa?{available:thai.mahathaksa.available,method:thai.mahathaksa.method,evidence_id:thai.mahathaksa.evidence_id}:null,
     taksajorn:thai?.taksajorn?{available:thai.taksajorn.available,segments:(thai.taksajorn.segments??[]).map((x:any)=>({start:x.start,end:x.end,annual_boriwan:x.annual_boriwan,landed_center:x.landed_center,evidence_id:x.evidence_id}))}:null,
     suriyayat:thai?.suriyayat?{available:thai.suriyayat.available,lagna:thai.suriyayat.lagna?{available:thai.suriyayat.lagna.available,display:thai.suriyayat.lagna.display,interpretation_scope:thai.suriyayat.lagna.interpretation_scope}:null,interpretation_status:thai.suriyayat.interpretation_status}:null,
+    suriyayat_daily:Array.isArray(thai?.suriyayat_daily)?thai.suriyayat_daily.slice(0,45):[],
+    suriyayat_daily_coverage:thai?.suriyayat_daily_coverage??null,
+    suriyayat_daily_policy:thai?.suriyayat_daily_policy??null,
     predictive_status:thai?.predictive_status,consensus_policy:thai?.consensus_policy,reliability:thai?.reliability??null,not_calculated:Array.isArray(thai?.not_calculated)?thai.not_calculated.slice(0,8):[],
   };
 }
