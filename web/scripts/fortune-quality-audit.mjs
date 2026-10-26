@@ -232,11 +232,13 @@ export function renderHtml(report) {
   const status = report.fixture_only
     ? 'TEST HARNESS ONLY — NO LIVE GEMINI RESPONSES TESTED'
     : 'LIVE GEMINI RESULT AUDIT'
-  const rows = report.cases.map(row =>
+  const rowHtml = row =>
     '<tr><td>' + escapeHtml(row.id) + '</td><td>' + escapeHtml(row.period_kind) +
     '</td><td>' + escapeHtml(row.status) + '</td><td>' +
     escapeHtml(row.issues.map(i => i.code).join(', ') || '—') + '</td></tr>'
-  ).join('\n')
+  const flagged = report.cases.filter(row => row.status !== 'passed').map(rowHtml).join('\n')
+  const passed = report.cases.filter(row => row.status === 'passed').map(rowHtml).join('\n')
+  const tableStart = '<table><thead><tr><th>Case</th><th>Period</th><th>Status</th><th>Issue codes</th></tr></thead><tbody>'
   const screenshots = report.visual.status === 'not_provided' ? '<p>No visual diagnostics supplied.</p>'
     : '<p>Visual: ' + escapeHtml(report.visual.status) + '</p><p>' +
       report.visual.screenshots.map(file => '<a href="../' + escapeHtml(file) + '">' + escapeHtml(file) + '</a>').join(' · ') + '</p>'
@@ -247,9 +249,10 @@ export function renderHtml(report) {
     ' · Review: ' + s.review + ' · Failed: ' + s.failed + ' · Errors: ' + s.errors +
     ' · Warnings: ' + s.warnings + ' · Live Gemini: ' + report.live_gemini_cases + '</p>' +
     '<p>Period coverage: ' + escapeHtml(JSON.stringify(s.period_coverage)) + '</p>' +
-    screenshots + '<h2>Cases (no personal data or generated prose)</h2>' +
-    '<table><thead><tr><th>Case</th><th>Period</th><th>Status</th><th>Issue codes</th></tr></thead><tbody>' +
-    rows + '</tbody></table></html>'
+    screenshots + '<h2>문제 사례 (검토 및 실패)</h2>' +
+    tableStart + (flagged || '<tr><td colspan="4">검출된 문제 없음</td></tr>') + '</tbody></table>' +
+    '<details><summary>통과한 사례 ' + s.passed + '건 펼치기</summary>' +
+    tableStart + passed + '</tbody></table></details></html>'
 }
 async function cli() {
   const args = process.argv.slice(2)
