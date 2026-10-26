@@ -131,8 +131,10 @@ function checkAcrossCases(cases) {
       if (norm.length < MIN_COMPARE_CHARS) continue
       const key = topic.topic + ':' + norm
       const prior = seen.get(key)
-      if (prior && prior.profile_id !== row.profile_id) {
-        row.issues.push(issue('CROSS_PROFILE_IDENTICAL_PROSE', 'warning', {
+      if (prior && prior.id !== row.id) {
+        const code = prior.profile_id !== row.profile_id
+          ? 'CROSS_PROFILE_IDENTICAL_PROSE' : 'CROSS_PERIOD_IDENTICAL_PROSE'
+        row.issues.push(issue(code, 'warning', {
           topic: topic.topic, compared_case: prior.id,
         }))
         if (row.status === 'passed') row.status = 'review'
