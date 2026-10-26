@@ -248,7 +248,7 @@ export function compactCalculation(calc:any){
     :sajuDailyRaw.filter((x:any)=>sajuHighlightDates.has(String(x?.date??""))).slice(0,24)
   ).map((x:any)=>{
     const date=String(x?.date??"");
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!/^.{2}$/.test(String(x?.ganzhi??"")))return null;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^.{2}$/.test(String(x?.ganzhi??"")))return null;
     const id=`S:daily:${date}`;
     const links=Array.isArray(x?.branch_links)?x.branch_links.slice(0,4):[];
     addEvidence({id,system:"saju",scope:"daily_pillar",direction:"context",date,
