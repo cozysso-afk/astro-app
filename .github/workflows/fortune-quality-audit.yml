@@ -1,0 +1,102 @@
+name: Fortune Quality Audit
+
+on:
+  pull_request:
+    paths:
+      - 'web/scripts/fortune-quality-audit.mjs'
+      - 'web/scripts/fortune-quality-audit.test.mjs'
+      - 'web/scripts/fortune-live-qa.mjs'
+      - 'web/src/**'
+      - 'integrated_fortune_v1.py'
+      - 'thai_astrology_v2.py'
+      - 'thai_suriyayat_v1.py'
+      - 'supabase/functions/fortune-interpret-v6-preview/**'
+      - 'supabase/functions/fortune-interpret-v21-preview/**'
+      - 'supabase/functions/fortune-interpret-v22-preview/**'
+      - 'supabase/functions/fortune-interpret-v23-preview/**'
+      - '.github/workflows/fortune-quality-audit.yml'
+      - 'docs/fortune-auto-qa.md'
+  push:
+    branches: [main]
+    paths:
+      - 'web/scripts/fortune-quality-audit.mjs'
+      - 'web/scripts/fortune-quality-audit.test.mjs'
+      - 'web/scripts/fortune-live-qa.mjs'
+      - 'web/src/**'
+      - 'integrated_fortune_v1.py'
+      - 'thai_astrology_v2.py'
+      - 'thai_suriyayat_v1.py'
+      - 'supabase/functions/fortune-interpret-v6-preview/**'
+      - 'supabase/functions/fortune-interpret-v21-preview/**'
+      - 'supabase/functions/fortune-interpret-v22-preview/**'
+      - 'supabase/functions/fortune-interpret-v23-preview/**'
+      - '.github/workflows/fortune-quality-audit.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_paid_calls:
+        description: 'Type YES to permit up to 1-4 synthetic Gemini V23 jobs'
+        required: true
+        default: 'NO'
+      max_jobs:
+        description: 'Maximum synthetic Gemini jobs (1-4, default 2)'
+        required: true
+        default: '2'
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-audit:
+    name: 20-profile x 4-period QA harness regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check live runner syntax without executing or paying for Gemini
+        run: node --experimental-strip-types --check web/scripts/fortune-live-qa.mjs
+      - name: Validate evaluator against positive and negative controls
+        run: node --experimental-strip-types --test web/scripts/fortune-quality-audit.test.mjs
+      - name: Generate synthetic-only QA report
+        run: node --experimental-strip-types web/scripts/fortune-quality-audit.mjs --fixture-matrix --out web/fortune-quality-artifacts
+      - name: Upload fixture report (not Gemini results)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-quality-fixture-${{ github.sha }}
+          path: web/fortune-quality-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  live-gemini-audit:
+    name: Manually approved synthetic Gemini V23 audit
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run capped synthetic profiles through calculation API and Gemini V23
+        env:
+          QA_LIVE_APPROVED: 'YES'
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_ACCESS_TOKEN: ${{ secrets.QA_USER_ACCESS_TOKEN }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_MAX_JOBS: ${{ inputs.max_jobs }}
+        run: |
+          node --experimental-strip-types web/scripts/fortune-live-qa.mjs \
+            --max-jobs "$QA_MAX_JOBS" \
+            --out web/fortune-live-qa-artifacts
+      - name: Upload report without raw Gemini prose or profiles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-quality-live-${{ github.sha }}
+          path: web/fortune-live-qa-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
