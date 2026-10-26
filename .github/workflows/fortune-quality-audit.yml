@@ -39,6 +39,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check live runner syntax without executing or paying for Gemini
+        run: node --experimental-strip-types --check web/scripts/fortune-live-qa.mjs
       - name: Validate evaluator against positive and negative controls
         run: node --experimental-strip-types --test web/scripts/fortune-quality-audit.test.mjs
       - name: Generate synthetic-only QA report
