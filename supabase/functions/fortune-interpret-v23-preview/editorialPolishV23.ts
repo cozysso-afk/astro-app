@@ -115,14 +115,26 @@ export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payloa
       ? refs(section?.evidence_refs).filter(ref=>map.has(ref))
       : []
     const authored=linked.length>0
+    const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean)
+    const hasWestern=linkedRows.some((row:any)=>row?.system==='western')
+    const relationshipAxis=new Set(['수신신호','발신적합','과거인연접점','연애','연락','재회'])
+    const hasRelationshipAxis=linkedRows.some((row:any)=>relationshipAxis.has(String(row?.topic??'')))
+    const requestedImportance=['핵심','주목','참고'].includes(String(item?.importance??''))?item.importance:'참고'
+    const requestedConfidence=['높음','보통','낮음'].includes(String(item?.confidence??''))?item.confidence:'낮음'
+    const relationshipTopic=['연애','연락','재회'].includes(topic)
+    const evidenceStrong=linked.length>=2&&hasWestern
+    const importance=relationshipTopic&&!hasRelationshipAxis
+      ? '참고'
+      : requestedImportance==='핵심'&&!evidenceStrong?'주목':requestedImportance
+    const confidence=requestedConfidence==='높음'&&!evidenceStrong?'보통':requestedConfidence
     return [topic,{
-      importance:['핵심','주목','참고'].includes(String(item?.importance??''))?item.importance:'참고',
+      importance,
       verdict:authored?clip(text(section?.conclusion),240):'',
       reason:authored?clip(text(section?.real_scene),680):'',
       timing:'',
       action:authored?clip(text(section?.action),260):'',
       avoid:authored?clip(text(section?.change_condition),320):'',
-      confidence:['높음','보통','낮음'].includes(String(item?.confidence??''))?item.confidence:'낮음',
+      confidence,
       confidence_reason:'',
       evidence_refs:linked.slice(0,8),
     }]
