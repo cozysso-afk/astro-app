@@ -23,16 +23,18 @@ V22 정밀도 게이트 → V23 Gemini → 상태 조회 → 검증 보고서를
 검사기는 **무료 inspect 및 비용 한도 검사에 통과하기 전에는 start를 호출하지 않습니다.**
 이 경로는 사용자의 실제 계정/개인정보가 아닌 가상 프로필만 사용합니다.
 
-이 작업은 GitHub Actions secrets에 아래 4개가 구성되어야 동작합니다.
+이 작업은 GitHub Actions secrets에 아래 5개가 구성되어야 동작합니다.
 
 - QA_SUPABASE_URL: 별빛의 운명 QA 환경의 Supabase URL
 - QA_SUPABASE_ANON_KEY: QA 환경 anon key
-- QA_USER_ACCESS_TOKEN: QA 전용 로그인 계정의 유효한 사용자 JWT
+- QA_USER_EMAIL: 실제 사용자와 분리된 QA 전용 계정 이메일
+- QA_USER_PASSWORD: QA 전용 계정 비밀번호
 - QA_CALC_API_URL: 통합 계산 POST 전체 URL (.../v1/fortune/integrated)
 
 설정되지 않았다면 **실제 Gemini 검증은 실행되지 않습니다.**
 개인 사용자의 JWT나 실제 운세 입력을 GitHub 코드/이슈/아티팩트에 올리지 마세요.
-QA 토큰은 만료될 수 있으므로 갱신/권한 제한이 필요합니다.
+워크플로는 실행할 때마다 QA 전용 계정으로 로그인해 짧게 유지되는 사용자 JWT를 새로 받습니다.
+하위 호환을 위한 `QA_USER_ACCESS_TOKEN`도 지원하지만, 만료되므로 자동 QA에는 권장하지 않습니다.
 실제 서비스와 분리된 QA 프로젝트 및 비용 제한을 권장합니다.
 
 ## 기존 실제 응답 JSON 검증

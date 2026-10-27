@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { compactCalculation } from '../../supabase/functions/fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from '../../supabase/functions/fortune-interpret-v22-preview/precisionV2.ts'
 import { evaluateCases, renderHtml } from './fortune-quality-audit.mjs'
@@ -24,11 +25,6 @@ const cases = [
     kind: 'annual', start: '2026-01-01', end: '2026-12-31' },
 ]
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-function requiredEnv(name) {
-  const value = String(process.env[name] ?? '').trim()
-  if (!value) throw new Error('Missing QA-only secret: ' + name)
-  return value
-}
 async function postJson(url, body, headers = {}, timeoutMs = 180000) {
   const response = await fetch(url, {
     method: 'POST',
@@ -39,6 +35,42 @@ async function postJson(url, body, headers = {}, timeoutMs = 180000) {
   const data = await response.json().catch(() => null)
   if (!response.ok || !data) throw new Error('QA upstream HTTP status ' + response.status)
   return data
+}
+export async function resolveQaAccessToken({ supabase, anon, accessToken, email, password }) {
+  if (String(accessToken ?? '').trim()) return String(accessToken).trim()
+  if (!String(email ?? '').trim() || !String(password ?? '').trim()) {
+    throw new Error('Missing QA authentication secrets: QA_USER_EMAIL and QA_USER_PASSWORD')
+  }
+  const session = await postJson(
+    supabase + '/auth/v1/token?grant_type=password',
+    { email: String(email).trim(), password: String(password) },
+    { apikey: anon },
+    30_000,
+  )
+  const token = String(session?.access_token ?? '').trim()
+  if (!token) throw new Error('QA account login did not return an access token')
+  return token
+}
+export async function buildQaConfig(env = process.env) {
+  const supabase = String(env.QA_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+  const anon = String(env.QA_SUPABASE_ANON_KEY ?? '').trim()
+  const calcApi = String(env.QA_CALC_API_URL ?? '').trim()
+  if (!supabase) throw new Error('Missing QA-only secret: QA_SUPABASE_URL')
+  if (!anon) throw new Error('Missing QA-only secret: QA_SUPABASE_ANON_KEY')
+  if (!calcApi) throw new Error('Missing QA-only secret: QA_CALC_API_URL')
+  const token = await resolveQaAccessToken({
+    supabase,
+    anon,
+    accessToken: env.QA_USER_ACCESS_TOKEN,
+    email: env.QA_USER_EMAIL,
+    password: env.QA_USER_PASSWORD,
+  })
+  return {
+    calcApi,
+    fortuneUrl: supabase + '/functions/v1/fortune-interpret-v22-preview',
+    headers: { apikey: anon, Authorization: 'Bearer ' + token },
+    calcHeaders: { Authorization: 'Bearer ' + token },
+  }
 }
 function profile(row) {
   return {
@@ -51,7 +83,7 @@ function profile(row) {
 async function runCase(row, config) {
   const calculation = await postJson(config.calcApi, {
     profile: profile(row), start_date: row.start, end_date: row.end,
-  })
+  }, config.calcHeaders)
   if (!calculation.ok || !calculation.western?.ok || !calculation.saju?.ok || !calculation.thai?.ok) {
     throw new Error('Integrated calculation failed')
   }
@@ -89,14 +121,7 @@ async function main() {
     throw new Error('max-jobs must be an integer from 1 to 4')
   }
   const out = path.resolve(arg('--out') || 'fortune-live-qa-artifacts')
-  const supabase = requiredEnv('QA_SUPABASE_URL').replace(/\/$/, '')
-  const anon = requiredEnv('QA_SUPABASE_ANON_KEY')
-  const token = requiredEnv('QA_USER_ACCESS_TOKEN')
-  const config = {
-    calcApi: requiredEnv('QA_CALC_API_URL'),
-    fortuneUrl: supabase + '/functions/v1/fortune-interpret-v22-preview',
-    headers: { apikey: anon, Authorization: 'Bearer ' + token },
-  }
+  const config = await buildQaConfig()
   const results = []
   for (const row of cases.slice(0, maxJobs)) {
     try {
@@ -120,8 +145,10 @@ async function main() {
     report_dir: out }))
   if (report.summary.failed || report.summary.review) process.exitCode = 1
 }
-main().catch(error => {
-  // Configuration errors are deliberately explicit but never print secret values.
-  console.error('Live QA not started: ' + error.message)
-  process.exitCode = 1
-})
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch(error => {
+    // Configuration errors are deliberately explicit but never print secret values.
+    console.error('Live QA not started: ' + error.message)
+    process.exitCode = 1
+  })
+}
