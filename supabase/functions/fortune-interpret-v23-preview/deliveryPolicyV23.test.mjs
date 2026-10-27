@@ -29,6 +29,15 @@ test('V23 completion recovery makes the response sparse instead of lowering its 
   assert.doesNotMatch(source, /정확히 \$\{EDITORIAL_SECTION_KEYS\.length\}개의 배열 항목/)
 })
 
+test('sparse omissions remain non-authored metadata instead of failing prose ownership', () => {
+  const quality = readFileSync(new URL('../fortune-interpret-v6-preview/qualityV2.ts', import.meta.url), 'utf8')
+  const projection = readFileSync(new URL('./editorialPolishV23.ts', import.meta.url), 'utf8')
+  assert.match(quality, /if\(mode==="insufficient"\)continue/)
+  assert.match(quality, /if\(importance==="참고"&&!authoredTopic\)continue/)
+  assert.match(projection, /const importance=authored\?groundedImportance:'참고'/)
+  assert.match(projection, /const confidence=authored\?.*:'낮음'/)
+})
+
 test('V23 provenance is derived from stored successful calls and the stored generation version', () => {
   assert.match(source, /generation_version:VERSION/)
   assert.match(source, /function verifiedGeminiJob\(data:any\)/)

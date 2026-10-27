@@ -124,10 +124,11 @@ export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payloa
     const requestedConfidence=['높음','보통','낮음'].includes(String(item?.confidence??''))?item.confidence:'낮음'
     const relationshipTopic=['연애','연락','재회'].includes(topic)
     const evidenceStrong=linked.length>=2&&hasWestern
-    const importance=relationshipTopic&&!hasRelationshipAxis
+    const groundedImportance=relationshipTopic&&!hasRelationshipAxis
       ? '참고'
       : requestedImportance==='핵심'&&!evidenceStrong?'주목':requestedImportance
-    const confidence=requestedConfidence==='높음'&&!evidenceStrong?'보통':requestedConfidence
+    const importance=authored?groundedImportance:'참고'
+    const confidence=authored?(requestedConfidence==='높음'&&!evidenceStrong?'보통':requestedConfidence):'낮음'
     return [topic,{
       importance,
       verdict:authored?text(section?.conclusion):'',
