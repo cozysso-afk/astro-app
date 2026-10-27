@@ -97,6 +97,7 @@ export function buildProviderCoreSchema(fullSchema:any){
   if(!section?.properties)throw new Error("editorial section schema missing");
   core.properties.domain_answers={
     type:"ARRAY",
+    maxItems:8,
     items:{
       type:"OBJECT",
       properties:{
@@ -112,6 +113,7 @@ export function buildProviderCoreSchema(fullSchema:any){
   if(!core.required.includes("domain_answers"))core.required.push("domain_answers");
   core.properties.clusters={
     type:"ARRAY",
+    maxItems:10,
     items:{
       type:"OBJECT",
       properties:{
@@ -130,6 +132,13 @@ export function buildProviderCoreSchema(fullSchema:any){
       required:["key",...EDITORIAL_FIELDS],
     },
   };
+  // Bound repeated authored structures. The quality gate still enforces the
+  // period-specific minimums, while these ceilings prevent a provider from
+  // spending the entire response budget on duplicated windows or advice.
+  const arrayLimits:Record<string,number>={key_windows:6,year_phases:4,cross_checks:4,decisions:4,priorities:4};
+  for(const [key,maxItems] of Object.entries(arrayLimits)){
+    if(core?.properties?.[key]?.type==="ARRAY")core.properties[key].maxItems=maxItems;
+  }
   return core;
 }
 

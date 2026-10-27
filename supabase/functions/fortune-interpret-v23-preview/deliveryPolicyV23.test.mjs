@@ -21,6 +21,14 @@ test('V23 starts with the model that leaves a second call for semantic quality r
   assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:V23_DEFAULT_MODEL/)
 })
 
+test('V23 completion recovery makes the response sparse instead of lowering its token ceiling', () => {
+  assert.match(source, /const clusterLimit=compact\?6:10/)
+  assert.match(source, /실제 근거로 직접 해설할 수 있는 key만 sparse 배열/)
+  assert.match(source, /서버가 생략 key를 빈 insufficient 상태로 채운다/)
+  assert.match(source, /coreInstruction\(compact\)/)
+  assert.doesNotMatch(source, /정확히 \$\{EDITORIAL_SECTION_KEYS\.length\}개의 배열 항목/)
+})
+
 test('V23 provenance is derived from stored successful calls and the stored generation version', () => {
   assert.match(source, /generation_version:VERSION/)
   assert.match(source, /function verifiedGeminiJob\(data:any\)/)
