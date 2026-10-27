@@ -45,6 +45,36 @@ test('same topic text across two distinct profiles requires review', () => {
   assert.equal(report.summary.review, 1)
   assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PROFILE_IDENTICAL_PROSE'))
 })
+test('same authored cluster prose across distinct profiles requires review', () => {
+  const a = sample(), b = structuredClone(fixtureMatrix()[4])
+  const prose = {
+    conclusion: '관계 속도보다 실제 약속의 구체성이 중요하게 작동하는 구간이야.',
+    real_scene: '연락 횟수보다 날짜와 장소가 정해지는지를 먼저 확인해.',
+    action: '한 번 묻고 답변의 구체성을 기록해.',
+    change_condition: '약속이 구체화되면 판단을 올리고 아니면 보류해.',
+    evidence_refs: [], applicability: 'conditional',
+  }
+  a.result.data.clusters = { relationship: { summary: prose } }
+  b.result.data.clusters = { relationship: { summary: structuredClone(prose) } }
+  const report = evaluateCases([a, b], { mode: 'fixture' })
+  assert.equal(report.summary.review, 1)
+  assert.ok(report.cases[1].issues.some(i => i.code === 'CROSS_PROFILE_IDENTICAL_PROSE'))
+})
+test('server insufficient and not-calculated placeholders are excluded from repetition review', () => {
+  const a = sample(), b = structuredClone(fixtureMatrix()[4])
+  for (const row of [a, b]) {
+    row.result.data.clusters = { relationship: { summary: {
+      conclusion: '이 항목은 이번 응답에서 직접 해설 근거가 충분하지 않아.',
+      real_scene: '', action: '확인 가능한 사실을 우선해.',
+      change_condition: '근거가 보강되면 갱신해.', evidence_refs: [], applicability: 'insufficient',
+    } } }
+    row.result.data.domain_answers = [{
+      topic: '재회', question_key: 'timing', answer: '', status: 'not_calculated', evidence_refs: [],
+    }]
+  }
+  const report = evaluateCases([a, b], { mode: 'fixture' })
+  assert.equal(report.summary.review, 0)
+})
 test('identical long topic prose across two periods for one profile is flagged', () => {
   const a = sample(), b = structuredClone(fixtureMatrix()[1])
   b.result.data.topic_analysis['직장'].verdict = a.result.data.topic_analysis['직장'].verdict

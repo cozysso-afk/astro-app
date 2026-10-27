@@ -6,6 +6,7 @@ on:
       - 'web/scripts/fortune-quality-audit.mjs'
       - 'web/scripts/fortune-quality-audit.test.mjs'
       - 'web/scripts/fortune-live-qa.mjs'
+      - 'web/scripts/fortune-live-qa.test.mjs'
       - 'web/src/**'
       - 'integrated_fortune_v1.py'
       - 'thai_astrology_v2.py'
@@ -22,6 +23,7 @@ on:
       - 'web/scripts/fortune-quality-audit.mjs'
       - 'web/scripts/fortune-quality-audit.test.mjs'
       - 'web/scripts/fortune-live-qa.mjs'
+      - 'web/scripts/fortune-live-qa.test.mjs'
       - 'web/src/**'
       - 'integrated_fortune_v1.py'
       - 'thai_astrology_v2.py'
@@ -58,7 +60,10 @@ jobs:
       - name: Check live runner syntax without executing or paying for Gemini
         run: node --experimental-strip-types --check web/scripts/fortune-live-qa.mjs
       - name: Validate evaluator against positive and negative controls
-        run: node --experimental-strip-types --test web/scripts/fortune-quality-audit.test.mjs
+        run: >-
+          node --experimental-strip-types --test
+          web/scripts/fortune-quality-audit.test.mjs
+          web/scripts/fortune-live-qa.test.mjs
       - name: Generate synthetic-only QA report
         run: node --experimental-strip-types web/scripts/fortune-quality-audit.mjs --fixture-matrix --out web/fortune-quality-artifacts
       - name: Upload fixture report (not Gemini results)
@@ -85,7 +90,8 @@ jobs:
           QA_LIVE_APPROVED: 'YES'
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
-          QA_USER_ACCESS_TOKEN: ${{ secrets.QA_USER_ACCESS_TOKEN }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
           QA_MAX_JOBS: ${{ inputs.max_jobs }}
         run: |

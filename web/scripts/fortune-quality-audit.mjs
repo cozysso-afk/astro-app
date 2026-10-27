@@ -11,7 +11,6 @@ import { inspectInterpretationQuality } from '../../supabase/functions/fortune-i
 export const PERIODS = ['day', 'week', 'month', 'annual']
 export const AUDIT_VERSION = 'fortune-quality-audit-v1'
 const ISO = /^\d{4}-\d{2}-\d{2}$/
-const TEXT_FIELDS = ['verdict', 'conclusion']
 const MIN_COMPARE_CHARS = 32
 
 function clean(value) {
@@ -27,13 +26,39 @@ function similar(a, b) {
   return shared / (ax.size + bx.size - shared) >= 0.88
 }
 function sections(data) {
-  const topics = data?.topic_analysis
-  if (topics && typeof topics === 'object' && !Array.isArray(topics)) {
-    return Object.entries(topics).map(([topic, section]) => ({
-      topic, text: String(section?.verdict ?? section?.conclusion ?? '').trim(),
-    })).filter(row => row.text)
+  const rows = []
+  const add = (topic, ...values) => {
+    const text = values.map(value => String(value ?? '').trim()).filter(Boolean).join(' ')
+    if (text) rows.push({ topic, text })
   }
-  return []
+  const topics = data?.topic_analysis
+  if (topics && typeof topics === 'object') {
+    const entries = Array.isArray(topics)
+      ? topics.map((section, index) => [String(section?.topic ?? index), section])
+      : Object.entries(topics)
+    for (const [topic, section] of entries) {
+      add('topic:' + topic, section?.verdict, section?.reason, section?.timing,
+        section?.action, section?.avoid, section?.confidence_reason)
+    }
+  }
+  for (const [group, value] of Object.entries(data?.clusters ?? {})) {
+    for (const [key, section] of Object.entries(value ?? {})) {
+      if (section?.applicability === 'insufficient') continue
+      add('cluster:' + group + '.' + key, section?.conclusion, section?.real_scene,
+        section?.action, section?.change_condition)
+    }
+  }
+  for (const answer of data?.domain_answers ?? []) {
+    if (answer?.status === 'not_calculated') continue
+    add('answer:' + answer?.topic + ':' + answer?.question_key, answer?.answer)
+  }
+  for (const window of data?.key_windows ?? []) {
+    add('window:' + (window?.topics ?? []).join('|'), window?.summary, window?.action, window?.avoid)
+  }
+  for (const decision of data?.decisions ?? []) {
+    add('decision', decision?.action, decision?.reason, decision?.watch, decision?.avoid)
+  }
+  return rows
 }
 function allRefs(value, refs = [], depth = 0) {
   if (!value || typeof value !== 'object' || depth > 12) return refs
