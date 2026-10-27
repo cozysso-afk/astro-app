@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
-import { MODELS, DEFAULT_MODEL, FALLBACK_MODEL, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
+import { MODELS, FALLBACK_MODEL, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-preview/costGuardV21.ts";
@@ -25,6 +25,10 @@ const MAX_USER_NEW_JOBS_10M=6;
 const MAX_USER_NEW_JOBS_24H=20;
 const MAX_GLOBAL_NEW_JOBS_10M=18;
 const MAX_GLOBAL_NEW_JOBS_24H=60;
+// Gemini 3.7 repeatedly exhausted the first-call timeout in live QA. Starting
+// with 3.6 leaves the second paid call available for a targeted semantic
+// rewrite when the quality gate reports concrete evidence/consistency issues.
+const V23_DEFAULT_MODEL="gemini-3.6-flash";
 const enc=new TextEncoder();
 
 function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status,headers:CORS});}
@@ -218,7 +222,7 @@ Deno.serve(async(req)=>{
     if(error)return res(publicFortuneError("JOB_CANCEL_FAILED",error),500);return res({ok:true,job_id:id,canceled:Boolean(data?.id)});
   }
   if(!b?.calculation)return res(publicFortuneError("CALCULATION_REQUIRED"),400);
-  const preferred=MODELS[b.model]?b.model:DEFAULT_MODEL;
+  const preferred=MODELS[b.model]?b.model:V23_DEFAULT_MODEL;
   const compacted=compactCalculation(b.calculation);
   const precisionGate=precisionGateFromPayload(b.calculation);
   const payload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,b.calculation):compacted;
