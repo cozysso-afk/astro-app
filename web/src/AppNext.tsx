@@ -300,7 +300,7 @@ function loadUiSettings() {
 
 function loadAiModel() {
   const saved = readLocalStorage(AI_MODEL_STORAGE_KEY)
-  return saved === 'gemini-3.6-flash' ? saved : 'gemini-3.7-flash'
+  return saved === 'gemini-3.7-flash' ? saved : 'gemini-3.6-flash'
 }
 
 function loadStoredProfile(): BirthProfile {
