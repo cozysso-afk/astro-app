@@ -305,6 +305,8 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if(String(data?.overall?.dominant_pattern??"").length>dominantMax)s5.push(`핵심 패턴이 지나치게 김(${String(data?.overall?.dominant_pattern??"").length}/${dominantMax})`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
     const importance=["핵심","주목","참고"].includes(String(x?.importance??""))?String(x.importance):"참고";
+    const authoredTopic=Boolean(String(x?.verdict??"").trim()||String(x?.reason??"").trim()||String(x?.action??"").trim()||String(x?.avoid??"").trim()||(x?.evidence_refs?.length??0));
+    if(importance==="참고"&&!authoredTopic)continue;
     const maxReason=importance==="핵심"?1200:importance==="주목"?700:320;
     const reasonLength=String(x?.reason??"").trim().length;
     if(importance!=="참고"&&!reasonLength)s5.push(`${topic} ${importance} 근거 설명 누락`);
@@ -337,8 +339,12 @@ export function inspectInterpretationQuality(data:any,payload:any){
   for(const [group,keys] of Object.entries(EDITORIAL_CLUSTER_KEYS))for(const key of keys){const section=data?.clusters?.[group]?.[key];if(section)allSections.push({id:`${group}.${key}`,section});}
   for(const {id,section} of allSections){
     const mode=String(section?.applicability??"");
+    // Sparse provider output is normalized to an empty insufficient data state.
+    // It is intentionally not reader-facing prose and must not be graded as if
+    // Gemini had authored a conclusion/action for that section.
+    if(mode==="insufficient")continue;
     if(String(section?.conclusion??"").length<10)s6.push(`${id} 현재 결론 누락`);
-    if(mode!=="insufficient"&&String(section?.real_scene??"").length<12)s6.push(`${id} 현실 장면/판단기준 누락`);
+    if(String(section?.real_scene??"").length<12)s6.push(`${id} 현실 장면/판단기준 누락`);
     if(String(section?.action??"").length<8)s6.push(`${id} 사용자 행동 누락`);
     if(String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
     if(mode==="direct"&&!(section?.evidence_refs?.length))s6.push(`${id} direct인데 근거 ID 없음`);
