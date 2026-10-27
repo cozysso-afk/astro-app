@@ -450,3 +450,69 @@ export function buildFortuneEditorialV3(data: InterpretationData, calculation: I
     domainAnswers: domainAnswers(data),
   }
 }
+
+
+/**
+ * V23.9 Gemini ownership boundary.
+ * This renderer may select or omit authored sections, but must never synthesize
+ * interpretive sentences from scores, defaults or UI fallback dictionaries.
+ * Legacy deterministic presentations continue through buildFortuneEditorialV3.
+ */
+export function buildGeminiAuthoredEditorialV23(data: InterpretationData, field?: FortuneField): FortuneEditorialV3 {
+  const relationship: any = data.clusters?.relationship ?? {}
+  const allClusters: any = data.clusters ?? {}
+  const direct = (value: unknown) => clean(value)
+  const section = (value: unknown) => relationshipSectionCopy(value)
+  const authoredTopics = topicEditorial(data)
+  // Undo the older presentation-only conditional prefix: Gemini is the author.
+  const topics = Object.fromEntries(Object.entries(authoredTopics).map(([key]) => {
+    const candidate: any = {
+      '대인관계': relationship.summary, '연애': relationship.love_general,
+      '연락': relationship.contact_activation, '재회': relationship.love_reunion_interest,
+      '직장': allClusters.work_study?.work, '이직': allClusters.work_study?.career_change,
+      '시험': allClusters.work_study?.exam, '학업': allClusters.work_study?.study,
+      '컨디션': allClusters.condition?.condition, '금전': allClusters.money_news?.money,
+      '소식': allClusters.money_news?.news, '투자심리': allClusters.investment?.psychology,
+      '수익실현': allClusters.investment?.realization, '신규진입': allClusters.investment?.entry,
+    }[key]
+    const copy = topicSectionCopy(candidate)
+    return [key, copy]
+  }).filter(([, value]) => readerFacing(value))) as Record<string,string>
+  const first = field?.topics?.[0] ?? ''
+  const fieldSections: Record<string, any> = {
+    love: relationship.love_general, social: relationship.summary,
+    contact: relationship.contact_activation,
+  }
+  const fieldSection = field ? fieldSections[field.id] : undefined
+  const heroHeadline = !field
+    ? direct(data.headline)
+    : (direct(fieldSection?.conclusion) || direct(topic(data, first)?.verdict))
+  const heroSummary = !field
+    ? direct(data.overall?.summary)
+    : (section(fieldSection) || topics[first] || direct(topic(data, first)?.reason))
+  const loveContextsAuthored = LOVE_CONTEXTS
+    .map(item => ({ key: item.key, label: item.label, text: section(relationship[item.field]) }))
+    .filter(row => Boolean(row.text))
+  const socialContextsAuthored = INTERPERSONAL_CONTEXTS
+    .map(item => ({ key: item.key, label: item.label, text: section(relationship[item.field]) }))
+    .filter(row => Boolean(row.text))
+  const contactActivation = section(relationship.contact_activation)
+  const contactContinuity = section(relationship.contact_continuity)
+  const incoming = direct(data.contact_flow?.incoming)
+  const outgoing = direct(data.contact_flow?.outgoing)
+  return {
+    heroHeadline,
+    heroSummary,
+    interpersonal: field?.id === 'social' && section(relationship.summary)
+      ? { summary: section(relationship.summary), action: direct(topic(data, '대인관계')?.action), watch: direct(topic(data, '대인관계')?.avoid) }
+      : undefined,
+    interpersonalContexts: field?.id === 'social' ? socialContextsAuthored : undefined,
+    contact: field?.id === 'contact' && (contactActivation || contactContinuity)
+      ? { activation: contactActivation, continuity: contactContinuity, incoming, outgoing, directionSummary: '', timing: direct(topic(data, '연락')?.timing) || undefined }
+      : undefined,
+    loveContexts: field?.id === 'love' ? loveContextsAuthored : undefined,
+    loveGeneral: field?.id === 'love' ? section(relationship.love_general) : undefined,
+    topicEditorial: topics,
+    domainAnswers: domainAnswers(data),
+  }
+}
