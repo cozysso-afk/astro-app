@@ -225,16 +225,16 @@ test('verified non-relationship fields surface structured editorial in main focu
   assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
 })
 
-test('overall hero accepts only verified reader-facing integrated editorial and keeps deterministic fallback',()=>{
+test('overall hero keeps Gemini authorship and reserves deterministic fallback for unverified results',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/META_EDITORIAL_RE/)
   assert.match(panel,/const fallbackHero = overallFallback\(summary\)/)
   assert.match(panel,/const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
   assert.match(panel,/const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
-  assert.match(panel,/const heroHeadline = fieldHeroHeadline \|\| integratedHeroHeadline \|\| fallbackHero\.headline/)
-  assert.match(panel,/const heroSummary = fieldHeroSummary \|\| integratedHeroSummary \|\| fallbackHero\.summary/)
+  assert.match(panel,/const heroHeadline = verifiedNarrative[\s\S]*?: fallbackHero\.headline/)
+  assert.match(panel,/const heroSummary = verifiedNarrative[\s\S]*?: fallbackHero\.summary/)
   assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
-  assert.match(panel,/const heroLead = period === 'today'[\s\S]*?relationshipDailyLead\(field, summary, calculation\.period\.start\) \?\? splitDailyHero\(heroHeadline\)/)
+  assert.match(panel,/verifiedNarrative \? splitDailyHero\(heroHeadline\)/)
   assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroLead\.title\}<\/h3>/)
   assert.match(panel,/daily-reading-signal/)
 })

@@ -9,6 +9,8 @@ import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApi
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
+import { fortuneNarrativeOrigin } from './lib/fortuneNarrativeOrigin'
+import { interpretationHeroEligible } from './lib/interpretationTopics'
 import { BasicFortuneReading } from './BasicFortuneReading'
 import { exportReadingImages } from './lib/readingImageExport'
 import './reading-image-export.css'
@@ -138,7 +140,13 @@ export function PeriodFortuneResults({
     </section>
   </>
 
-  const hasNaturalReading = Boolean(aiInterpretation?.ok && aiInterpretation.data)
+  // Do not promote a provisional/unchecked result into a Gemini-authored reading.
+  const hasNaturalReading = Boolean(
+    aiInterpretation?.ok && aiInterpretation.data
+    && fortuneNarrativeOrigin(aiInterpretation.model, aiInterpretation.origin) === 'gemini'
+    && !aiInterpretation.usage?.local_quality_fallback
+    && interpretationHeroEligible(aiInterpretation.usage?.quality_validation, aiInterpretation.usage)
+  )
   return <div ref={exportRootRef} data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
     <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
     <div className="reading-export-toolbar" data-reading-export-ignore="true">

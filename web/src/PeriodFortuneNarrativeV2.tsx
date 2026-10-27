@@ -4,7 +4,7 @@ import type { FortuneField } from './lib/fortuneFields'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
 import { polishFortuneSummary } from './lib/fortuneNarrativePolish'
-import { buildFortuneEditorialV3 } from './lib/fortuneEditorialV3'
+import { buildFortuneEditorialV3, buildGeminiAuthoredEditorialV23 } from './lib/fortuneEditorialV3'
 import { normalizeTopicEntries, interpretationHeroEligible } from './lib/interpretationTopics'
 import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
 import { fortuneNarrativeOrigin } from './lib/fortuneNarrativeOrigin'
@@ -172,17 +172,24 @@ export function PeriodFortuneNarrativeV2({
     topicEntries,
     allowIntraday: readiness.ok && readiness.mode === 'exact',
   })
-  const summary = polishFortuneSummary(base)
-  const editorial = buildFortuneEditorialV3(data, calculation, summary, field)
+  // Validated Gemini prose must not pass through rule-based Korean sentence rewrites.
+  const summary = verifiedNarrative ? base : polishFortuneSummary(base)
+  const editorial = verifiedNarrative
+    ? buildGeminiAuthoredEditorialV23(data, field)
+    : buildFortuneEditorialV3(data, calculation, summary, field)
   const fallbackHero = overallFallback(summary)
   const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : ''
   const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
   const fieldHeroHeadline = verifiedNarrative && field && editorialCopyUsable(editorial.heroHeadline) ? editorial.heroHeadline : ''
   const fieldHeroSummary = verifiedNarrative && field && editorialCopyUsable(editorial.heroSummary) ? editorial.heroSummary : ''
-  const heroHeadline = fieldHeroHeadline || integratedHeroHeadline || fallbackHero.headline
-  const heroSummary = fieldHeroSummary || integratedHeroSummary || fallbackHero.summary
+  const heroHeadline = verifiedNarrative
+    ? (fieldHeroHeadline || integratedHeroHeadline || String(data.headline ?? ''))
+    : fallbackHero.headline
+  const heroSummary = verifiedNarrative
+    ? (fieldHeroSummary || integratedHeroSummary || String(data.overall?.summary ?? ''))
+    : fallbackHero.summary
   const heroLead = period === 'today'
-    ? relationshipDailyLead(field, summary, calculation.period.start) ?? splitDailyHero(heroHeadline)
+    ? (verifiedNarrative ? splitDailyHero(heroHeadline) : relationshipDailyLead(field, summary, calculation.period.start) ?? splitDailyHero(heroHeadline))
     : { title: heroHeadline, detail: '' }
   const displayWhen = period === 'today'
     ? readingDateSemantics(calculation.period.start).dayLabel
@@ -272,14 +279,14 @@ export function PeriodFortuneNarrativeV2({
       </div>
     </div>
 
-    {!field && <div className="reading-flows">
+    {!verifiedNarrative && !field && <div className="reading-flows">
       <h4 className="reading-section-heading">분야별 흐름</h4>
       {!!summary.favorableCards.length && <FortuneFlowCards title={summary.doTitle} items={summary.favorableCards}/>} 
       {!!referenceFlowCards.length && <FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>} 
       <FortuneFlowCards title={summary.cautionTitle} items={summary.cautionCards} caution/>
     </div>}
 
-    {field?.id === 'love' && editorial.loveContexts && <section className="love-context-grid-v3" data-reading-export-tone="love">
+    {field?.id === 'love' && !!editorial.loveContexts?.length && <section className="love-context-grid-v3" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>내 상황에 맞춰 읽기</span><strong>애정운을 한 가지 관계 상태로 가정하지 않아</strong></div>
       {!domainAnsweredTopics.has('연애') && editorial.loveGeneral && <p className="love-context-general-v3">{editorial.loveGeneral}</p>}
       <div className="love-context-cards-v3">{editorial.loveContexts.map(item => <article className="love-context-card-v3" key={item.key}>
@@ -375,7 +382,7 @@ export function PeriodFortuneNarrativeV2({
       <article className="period-ai-window"><p>{longPeriodLimit}</p></article>
     </section>}
 
-    {!!summary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows" data-reading-export-tone="date">
+    {!verifiedNarrative && !!summary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows" data-reading-export-tone="date">
       <div className="period-ai-section-title"><span>기억할 시기</span><strong>날짜별 행동·확인 기준</strong></div>
       <ReadingTimeline context={{referenceDate: calculation.period.start}} events={summary.importantWindows.map(window => ({
         date: window.date,
@@ -385,7 +392,7 @@ export function PeriodFortuneNarrativeV2({
       }))}/>
     </section>}
 
-    {!dedicatedRelationshipField && summary.relationship && <section className="period-ai-window-section period-ai-relationship-section" data-reading-export-tone="love">
+    {!verifiedNarrative && !dedicatedRelationshipField && summary.relationship && <section className="period-ai-window-section period-ai-relationship-section" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>연락 흐름</span></div>
       <article className="period-ai-window period-ai-relationship-summary"><p>{summary.relationship.summary}</p>
         <ReadingDirections rows={[
@@ -396,9 +403,9 @@ export function PeriodFortuneNarrativeV2({
       </article>
     </section>}
 
-    {!dedicatedRelationshipField && summary.focusTopics.some(item => !domainAnsweredTopics.has(item.topic)) && <section className="period-ai-window-section period-ai-user-focus">
+    {!dedicatedRelationshipField && summary.focusTopics.some(item => !domainAnsweredTopics.has(item.topic) && (!verifiedNarrative || Boolean(editorial.topicEditorial[item.topic]))) && <section className="period-ai-window-section period-ai-user-focus">
       <div className="period-ai-section-title"><span>{summary.focusTitle}</span><strong>결론 · 지금 할 일</strong></div>
-      <div className="period-ai-topic-list">{summary.focusTopics.filter(item => !domainAnsweredTopics.has(item.topic)).map(item => {
+      <div className="period-ai-topic-list">{summary.focusTopics.filter(item => !domainAnsweredTopics.has(item.topic) && (!verifiedNarrative || Boolean(editorial.topicEditorial[item.topic]))).map(item => {
         const deepEditorial = verifiedNarrative && !field ? focusEditorialParts(editorial.topicEditorial[item.topic] ?? '') : null
         return <article className="period-ai-topic" data-reading-export-tone={topicTone(item.topic)} key={`v4-${item.topic}`}>
           <strong>{item.topic}</strong>
@@ -420,7 +427,7 @@ export function PeriodFortuneNarrativeV2({
       })}</div>
     </section>}
 
-    {!dedicatedRelationshipField && !!visibleReferenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
+    {!verifiedNarrative && !dedicatedRelationshipField && !!visibleReferenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference">
       <summary>다른 분야 보기</summary>
       <div className="period-ai-topic-list">{visibleReferenceTopics.map(item => <article className="period-ai-topic is-reference" data-reading-export-tone={topicTone(item.topic)} key={`v4-ref-${item.topic}`}>
         <strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion || item.summary}</p>
