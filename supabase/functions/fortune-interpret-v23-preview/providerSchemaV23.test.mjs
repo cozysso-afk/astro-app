@@ -19,12 +19,18 @@ test('provider schema flattens repeated editorial object branches into one compa
   const original=SCHEMA.properties.clusters
   assert.equal(clusters.type,'ARRAY')
   assert.equal(clusters.minItems,undefined)
-  assert.equal(clusters.maxItems,undefined)
+  assert.equal(clusters.maxItems,10)
   assert.deepEqual(clusters.items.properties.key,{type:'STRING'})
   assert.equal(new Set(EDITORIAL_SECTION_KEYS).size,EDITORIAL_SECTION_KEYS.length)
   assert.equal(provider.properties.topic_analysis,undefined)
   assert.ok(!provider.required.includes('topic_analysis'))
   assert.ok(JSON.stringify(clusters).length<JSON.stringify(original).length)
+  assert.equal(provider.properties.domain_answers.maxItems,8)
+  assert.equal(provider.properties.key_windows.maxItems,6)
+  assert.equal(provider.properties.year_phases.maxItems,4)
+  assert.equal(provider.properties.cross_checks.maxItems,4)
+  assert.equal(provider.properties.decisions.maxItems,4)
+  assert.equal(provider.properties.priorities.maxItems,4)
 })
 
 test('provider editorial array normalizes back to the existing grouped API shape with every key exactly once',()=>{
