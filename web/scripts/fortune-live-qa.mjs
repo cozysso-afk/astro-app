@@ -96,7 +96,9 @@ async function runCase(row, config) {
       !String(inspection.interpreter_version ?? '').startsWith('supabase-ai-v23.')) {
     throw new Error('V23 inspection/budget gate failed; paid start was not attempted')
   }
-  const started = await request({ action: 'start', calculation })
+  // Use the production V23 default explicitly so a model-default regression is
+  // visible in the audit instead of depending on a stale caller preference.
+  const started = await request({ action: 'start', calculation, model: 'gemini-3.6-flash' })
   if (!started.ok || !started.job_id) throw new Error('V23 start failed')
   let status
   for (let attempt = 0; attempt < 90; attempt++) {

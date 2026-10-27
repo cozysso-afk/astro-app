@@ -14,3 +14,9 @@ test('V23 validates Gemini prose without deterministic rewriting or local long-f
   assert.match(source, /safe_summary_required:true/)
   assert.match(source, /if\(first\.ok\)return \{\.\.\.first,attempt_count:budget\.used,call_trace:budget\.calls\}/)
 })
+
+
+test('V23 starts with the model that leaves a second call for semantic quality rewrite', () => {
+  assert.match(source, /const V23_DEFAULT_MODEL="gemini-3\.6-flash"/)
+  assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:V23_DEFAULT_MODEL/)
+})
