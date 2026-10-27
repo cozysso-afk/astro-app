@@ -721,6 +721,7 @@ export default function AppNext() {
           const payload: AiInterpretationResponse = {
             ok: true,
             origin: data.origin,
+            provenance_verified: data.provenance_verified === true,
             model: data.model,
             fallback_from: data.fallback_from,
             interpreter_version: data.interpreter_version || 'unknown',
@@ -752,7 +753,7 @@ export default function AppNext() {
         if (data?.status === 'failed') {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
-          const failedPayload: AiInterpretationResponse = { ok:false, origin:data.origin, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
+          const failedPayload: AiInterpretationResponse = { ok:false, origin:data.origin, provenance_verified:data.provenance_verified === true, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
           setAiInterpretation(failedPayload)
           throw new Error(failedPayload.error)
         }

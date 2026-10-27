@@ -7,7 +7,7 @@ import { buildFortuneUserSummary } from './fortuneUserSummary.ts'
 import { interpretationHeroEligible, normalizeTopicEntries } from './interpretationTopics.ts'
 
 const annual = readFileSync(new URL('../AiInterpretationPanel.tsx', import.meta.url), 'utf8')
-const period = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')
+const period = readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx', import.meta.url), 'utf8')
 const systemViews = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
 const topicOrder = ['금전','학업','시험','직장','이직','대인관계','연애','연락','재회','소식','컨디션','투자심리','수익실현','신규진입','투자주의']
 
@@ -134,32 +134,19 @@ test('annual reading separates TOP 3, action cards, and date detail', () => {
   assert.match(windows, /item\.avoid/)
 })
 
-test('period default view uses the natural view model and keeps raw prose in one technical disclosure', () => {
-  const renderStart = period.indexOf('return <section className="period-ai-card period-ai-v18">')
+test('period default view uses only provenance-verified Gemini prose', () => {
+  const renderStart = period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2')
   const technicalStart = period.indexOf('<summary>계산 근거 자세히 보기</summary>', renderStart)
   assert.ok(renderStart >= 0 && technicalStart > renderStart)
   const defaultMarkup = period.slice(renderStart, technicalStart)
-  const technicalMarkup = period.slice(technicalStart)
-
-  assert.match(defaultMarkup, /dailyLead\.title/)
-  assert.match(defaultMarkup, /heroSummary/)
-  assert.match(period.slice(0, renderStart), /const semanticHero = !westernOnly && \(period === 'today' \|\| period === 'week'\)/)
-  assert.match(period.slice(0, renderStart), /const heroHeadline = semanticHero[\s\S]*userSummary\.headline[\s\S]*verifiedHero/)
-  assert.match(period.slice(0, renderStart), /const heroSummary = semanticHero[\s\S]*userSummary\.summary[\s\S]*verifiedHero/)
-  assert.match(defaultMarkup, /userSummary\.favorableCards/)
-  assert.match(defaultMarkup, /userSummary\.cautionCards/)
-  assert.match(defaultMarkup, /userSummary\.focusTopics/)
-  assert.match(defaultMarkup, /userSummary\.importantWindows/)
-  assert.doesNotMatch(defaultMarkup, /data\.(?:headline|overall|clusters|systems|priorities)|item\.(?:verdict|confidence)|technicalEvidence/)
+  assert.match(period.slice(0, renderStart), /result\.provenance_verified === true/)
+  assert.match(period.slice(0, renderStart), /const summary = authoredSummaryOnly\(base, data\)/)
+  assert.match(period.slice(0, renderStart), /if \(!verifiedNarrative\)/)
+  assert.match(defaultMarkup, /summary\.favorableCards/)
+  assert.match(defaultMarkup, /summary\.cautionCards/)
+  assert.match(defaultMarkup, /summary\.focusTopics/)
+  assert.match(defaultMarkup, /summary\.importantWindows/)
   assert.match(defaultMarkup, /ReadingExplanation kind="reason"/)
-
-  assert.equal((period.slice(renderStart).match(/<summary>계산 근거 자세히 보기<\/summary>/g) || []).length, 1)
-  assert.match(technicalMarkup, /data\.overall\.summary/)
-  assert.match(technicalMarkup, /calculation\.western\.overall/)
-  assert.match(technicalMarkup, /technicalEvidence\.map/)
-  assert.match(technicalMarkup, /item\.confidence/)
-  assert.match(technicalMarkup, /data\.systems/)
-  assert.match(technicalMarkup, /data\.limits/)
 })
 
 test('relationship focus uses plain labels and only renders useful structured directions', () => {
@@ -170,11 +157,11 @@ test('relationship focus uses plain labels and only renders useful structured di
   assert.equal((annual.match(/className="ai-direction-grid ai-relationship-direction"/g) || []).length, 1)
 
   assert.match(period, />연락 흐름</)
-  assert.match(period, /kind:'incoming',\s*label:'외부 연락 반응'/)
-  assert.match(period, /kind:'outgoing',\s*label:'내 연락 실행 적합도'/)
-  assert.match(period, /kind:'reconnection' as const,label:'과거 인연 재접점'/)
-  assert.match(period, /userSummary\.relationship\.(?:incoming|outgoing|reconnection)/)
-  assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'), period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
+  assert.match(period, /kind: 'incoming',\s*label: '외부 연락 반응'/)
+  assert.match(period, /kind: 'outgoing',\s*label: '내 연락 실행 적합도'/)
+  assert.match(period, /kind: 'reconnection' as const,\s*label: '과거 인연 재접점'/)
+  assert.match(period, /summary\.relationship\.(?:incoming|outgoing|reconnection)/)
+  assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2'), period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
 })
 
 test('primary topics stay concise and reference topics are one-line collapsed items', () => {
@@ -184,7 +171,7 @@ test('primary topics stay concise and reference topics are one-line collapsed it
   assert.ok(focusStart >= 0 && referenceStart > focusStart && technicalStart > referenceStart)
 
   const focus = period.slice(focusStart, referenceStart)
-  assert.match(focus, /userSummary\.focusTopics\.map/)
+  assert.match(focus, /summary\.focusTopics\.filter[\s\S]*\.map/)
   assert.match(focus, /item\.conclusion/)
   assert.match(focus, /item\.observe/)
   assert.match(focus, /item\.caution/)
@@ -195,7 +182,7 @@ test('primary topics stay concise and reference topics are one-line collapsed it
 
   const reference = period.slice(referenceStart, technicalStart)
   assert.match(reference, /<summary>다른 분야 보기<\/summary>/)
-  assert.match(reference, /userSummary\.referenceTopics\.map/)
+  assert.match(reference, /visibleReferenceTopics\.map/)
   assert.match(reference, /item\.summary/)
   assert.doesNotMatch(reference, /item\.(?:reason|timing|action|avoid|confidence)/)
 })
@@ -308,11 +295,11 @@ test('every topic gets its own conclusion instead of a swapped-name template', (
 })
 
 test('period result labels natural presentation without claiming deterministic text came from Gemini', () => {
-  assert.match(period, /isDeterministicFortuneModel\(result\.model\)/)
-  assert.match(period, /narrativeOrigin === 'deterministic_safe'/)
-  assert.match(period, /자동 운세 해설/)
+  assert.match(period, /result\.provenance_verified === true/)
+  assert.match(period, /fortuneNarrativeOrigin\(result\.model, result\.origin\) === 'gemini'/)
+  assert.match(period, /검증된 Gemini 해설이 아니어서 표시하지 않았어/)
   assert.match(period, /맞춤 운세 해설/)
-  const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18">'),period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>'))
+  const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2'),period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>'))
   assert.doesNotMatch(defaultMarkup,/계산근거 기반 자동 해설|AI\(인공지능\) 기간 해설/)
 })
 

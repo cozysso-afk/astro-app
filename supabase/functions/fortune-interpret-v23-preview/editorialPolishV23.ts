@@ -12,7 +12,8 @@ const TOPIC_CLUSTER_PATHS: Record<string, string[]> = {
   '투자심리': ['investment','psychology'],
   '수익실현': ['investment','realization'],
   '신규진입': ['investment','entry'],
-  '투자주의': ['investment','psychology'],
+  // 투자주의 is objective safety metadata. Reusing investment.psychology here
+  // duplicated one Gemini paragraph under two reader-facing topics.
   '컨디션': ['condition','condition'],
 }
 
@@ -117,7 +118,7 @@ export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payloa
     const authored=linked.length>0
     const linkedRows=linked.map(ref=>map.get(ref)).filter(Boolean)
     const hasWestern=linkedRows.some((row:any)=>row?.system==='western')
-    const relationshipAxis=new Set(['수신신호','발신적합','과거인연접점','연애','연락','재회'])
+    const relationshipAxis=new Set(['수신신호','발신적합','과거인연접점'])
     const hasRelationshipAxis=linkedRows.some((row:any)=>relationshipAxis.has(String(row?.topic??'')))
     const requestedImportance=['핵심','주목','참고'].includes(String(item?.importance??''))?item.importance:'참고'
     const requestedConfidence=['높음','보통','낮음'].includes(String(item?.confidence??''))?item.confidence:'낮음'
@@ -129,11 +130,11 @@ export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payloa
     const confidence=requestedConfidence==='높음'&&!evidenceStrong?'보통':requestedConfidence
     return [topic,{
       importance,
-      verdict:authored?clip(text(section?.conclusion),240):'',
-      reason:authored?clip(text(section?.real_scene),680):'',
+      verdict:authored?text(section?.conclusion):'',
+      reason:authored?text(section?.real_scene):'',
       timing:'',
-      action:authored?clip(text(section?.action),260):'',
-      avoid:authored?clip(text(section?.change_condition),320):'',
+      action:authored?text(section?.action):'',
+      avoid:authored?text(section?.change_condition):'',
       confidence,
       confidence_reason:'',
       evidence_refs:linked.slice(0,8),

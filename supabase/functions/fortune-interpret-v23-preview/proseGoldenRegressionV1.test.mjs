@@ -163,7 +163,7 @@ test('golden 11: frontend focus card accepts concise authored prose instead of r
   assert.match(narrativeSource,/sceneAction: sentences\.length >= 3/)
 })
 
-// Golden 12 — pipeline ordering keeps authored prose first, targeted repair explicit, and verified model hero visible.
+// Golden 12 — pipeline ordering keeps authored prose first and the UI fails closed to verified Gemini only.
 test('golden 12: backend validates authored prose without deterministic co-writing',()=>{
   const projectionPos=indexSource.indexOf('buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)')
   const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload)')
@@ -171,7 +171,8 @@ test('golden 12: backend validates authored prose without deterministic co-writi
   assert.doesNotMatch(indexSource,/stabilizeCoreForQuality\(withTopics,payload\)/)
   assert.doesNotMatch(indexSource,/polishV23EditorialDepth\(data,payload\)/)
   assert.doesNotMatch(indexSource,/buildLocalQualityFallbackCore\(payload\)/)
-  assert.match(panelSource,/const semanticHero = !westernOnly && \(period === 'today' \|\| period === 'week'\) && !verifiedHero/)
-  assert.match(panelSource,/verifiedHero \? visibleAiText\(data\.headline\)/)
-  assert.match(panelSource,/verifiedHero[\s\S]*visibleAiText\(data\.overall\.summary\)/)
+  assert.match(panelSource,/return <PeriodFortuneNarrativeV2/)
+  assert.match(narrativeSource,/result\.provenance_verified === true/)
+  assert.match(narrativeSource,/if \(!verifiedNarrative\)/)
+  assert.match(narrativeSource,/const summary = authoredSummaryOnly\(base, data\)/)
 })

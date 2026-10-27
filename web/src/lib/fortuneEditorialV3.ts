@@ -1,7 +1,6 @@
 import type { AiDomainAnswer, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 import type { FortuneUserSummary } from './fortuneUserSummary'
-import { fortuneEvidenceSnapshot } from './fortuneToneCalibration.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
 type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
@@ -47,14 +46,6 @@ const INTERPERSONAL_CONTEXTS: Array<{ key: InterpersonalContextKey; label: strin
   { key: 'new_people', label: '새 인맥 · 모임', field: 'new_people' },
   { key: 'boundaries', label: '갈등 · 경계', field: 'boundaries' },
 ]
-
-const INTERPERSONAL_FALLBACK_COPY: Record<InterpersonalContextKey, string> = {
-  friends: '친구·지인과는 약속 변경과 도움의 균형을 봐. 먼저 일정과 부탁 범위를 분명히 해.',
-  coworkers: '직장동료·협업 상대와는 담당자·마감·완료 기준을 문장으로 맞춰.',
-  family: '가족·가까운 사람과는 도울 수 있는 범위와 어려운 요구를 나눠 말해.',
-  new_people: '새 인맥은 첫 인사보다 두 번째 대화와 후속 약속이 생기는지 봐.',
-  boundaries: '갈등·경계에서는 가능한 범위와 불가능한 범위를 짧게 말하고, 이후 그 경계가 존중되는지 확인해.',
-}
 
 const TECHNICAL_RE = /(?:태양|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|노드|하우스|트랜짓|프로그레스|컴포지트|시너스트리|삼분|사분|육합|육파|오브|\d+도각|사주\s*(?:일지|월지|시주)|[甲乙丙丁戊己庚辛壬癸寅卯辰巳午未申酉戌亥子丑])/i
 const RELATIONSHIP_META_RE = /(?:AI\s*원고|원고가 아직|별도\s*계산값|계산\s*(?:값|정보|근거|엔진|로직)|계산상|상대지수|활성도|판정상|threshold|스키마|클러스터|evidence_refs|applicability|출력\s*형식)/i
@@ -191,15 +182,6 @@ function topic(data: InterpretationData, name: string) {
   return data.topic_analysis?.[name]
 }
 
-function score(calculation: IntegratedApiResponse, name: string) {
-  const value = calculation.western.overall?.[name]?.average
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function bandLabel(calculation: IntegratedApiResponse, name: string) {
-  return clean(calculation.western.overall?.[name]?.band) || '정보 부족'
-}
-
 function domainAnswers(data: InterpretationData) {
   const rows=(Array.isArray(data.domain_answers)?data.domain_answers:[]) as AiDomainAnswer[]
   const grouped:Record<string,DomainAnswerReading[]>={}
@@ -233,70 +215,27 @@ function topicEditorial(data: InterpretationData) {
   return Object.fromEntries(Object.entries(candidates).flatMap(([key, section]) => {
     const value = clean(topicSectionCopy(section))
     if (!readerFacing(value)) return []
-    const readerCopy = sectionApplicability(section) === 'conditional' ? `조건부로 보면, ${value}` : value
-    return [[key, readerCopy]]
+    return [[key, value]]
   })) as Record<string, string>
-}
-
-function fallbackLoveText(key: LoveContextKey, data: InterpretationData) {
-  const love = clean(topic(data, '연애')?.verdict) || relationshipSectionCopy(data.clusters?.relationship?.love_general)
-  const prefix = love ? `${love} ` : ''
-  const contact = clean(topic(data, '연락')?.verdict)
-  switch (key) {
-    case 'single': return `${prefix}특정 상대가 없다면 새 사람을 만날 접점과 실제 만남을 받아들일 여유를 중심으로 읽어.`
-    case 'crush': return `${prefix}마음 가는 사람이 있다면 호감 표현 하나보다 서로 질문하고 다음 약속을 잡는 반응이 있는지 확인해.`
-    case 'flirting': return `${prefix}알아가는 중이라면 대화가 실제 만남과 관계 기대 확인으로 이어지는지가 중요해.`
-    case 'ambiguous': return `${prefix}관계가 애매하다면 친밀감보다 서로 원하는 관계와 만남 전후의 일관성을 따로 확인해.`
-    case 'couple': return `${prefix}연애 중이라면 ${contact || '연락 횟수'}보다 함께 보내는 시간, 갈등 뒤 회복, 생활 리듬을 중심으로 읽어.`
-    case 'reunion_interest': return `${prefix}재회를 생각한다면 과거가 떠오르는 것과 실제 재접촉·만남·관계 재구축은 서로 다른 단계로 봐.`
-  }
 }
 
 function loveContexts(data: InterpretationData) {
   const sections:any = data.clusters?.relationship ?? {}
-  return LOVE_CONTEXTS.map(item => ({
-    key: item.key,
-    label: item.label,
-    text: relationshipSectionCopy(sections[item.field]) || fallbackLoveText(item.key, data),
-  }))
+  return LOVE_CONTEXTS.flatMap(item => {
+    const text = relationshipSectionCopy(sections[item.field])
+    return text ? [{ key: item.key, label: item.label, text }] : []
+  })
 }
 
 function interpersonalContexts(data: InterpretationData) {
   const sections:any = data.clusters?.relationship ?? {}
-  const general = relationshipSectionCopy(sections.summary)
-  return INTERPERSONAL_CONTEXTS.map(item => {
+  return INTERPERSONAL_CONTEXTS.flatMap(item => {
     const specific = relationshipSectionCopy(sections[item.field])
-    return {
-      key: item.key,
-      label: item.label,
-      text: specific || (general ? `${general} 이 관계에서는 실제 약속·역할·거리 변화가 이어지는지 확인해.` : INTERPERSONAL_FALLBACK_COPY[item.key]),
-    }
+    return specific ? [{ key: item.key, label: item.label, text: specific }] : []
   })
 }
 
-function directionSummary(calculation: IntegratedApiResponse) {
-  const rel = calculation.western.relationship_signals ?? {}
-  const incoming = rel['수신신호']?.average
-  const outgoing = rel['발신적합']?.average
-  if (!Number.isFinite(incoming) || !Number.isFinite(outgoing)) return '선연락 방향은 비교할 계산 정보가 충분하지 않아.'
-  const a = Number(incoming)
-  const b = Number(outgoing)
-  const diff = a - b
-  const roundedA = Math.round(a)
-  const roundedB = Math.round(b)
-  if (diff === 0) return `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 계산상 같은 값이며 선연락 주체를 뜻하지 않아.`
-  if (Math.abs(diff) < 5) {
-    const micro = diff > 0 ? '상대 차트 쪽' : '내 차트 쪽'
-    const pointGap = Math.round(Math.abs(diff) * 10) / 10
-    return `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 연락 자체의 강도와 별개로 ${micro}이 ${pointGap}점 높아. 실제 선연락 주체를 확정하는 뜻은 아니야.`
-  }
-  return diff > 0
-    ? `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 이번 범위에서는 상대 차트 쪽 활성이 더 두드러져.`
-    : `상대 차트 ${roundedA}, 내 차트 ${roundedB}. 이번 범위에서는 내 차트 쪽 활성이 더 두드러져.`
-}
-
-function contactEditorial(data: InterpretationData, calculation: IntegratedApiResponse, sections:any): EditorialContact {
-  const contactScore = score(calculation, '연락')
+function contactEditorial(data: InterpretationData, _calculation: IntegratedApiResponse, sections:any): EditorialContact | undefined {
   const topicVerdict = clean(topic(data, '연락')?.verdict)
   const topicAction = clean(topic(data, '연락')?.action)
   const incoming = clean(data.contact_flow?.incoming)
@@ -304,25 +243,22 @@ function contactEditorial(data: InterpretationData, calculation: IntegratedApiRe
   const timing = clean(topic(data, '연락')?.timing)
   const activation = relationshipSectionCopy(sections?.contact_activation)
     || (relationshipPartUsable(topicVerdict) ? topicVerdict : '')
-    || (contactScore == null
-      ? '연락 흐름을 한 문장으로 정리할 정보가 충분하지 않아. 실제 연락이 생기면 질문과 답이 이어지고 약속이 구체화되는지 확인해.'
-      : `연락 관련 점수는 ${bandLabel(calculation, '연락')}이야. 한 번의 답장보다 질문과 답이 이어지고 약속이 구체화되는지 확인해.`)
   const contactContinuity = relationshipSectionCopy(sections?.contact_continuity)
     || (relationshipPartUsable(topicAction) ? topicAction : '')
-    || '연락이 생기면 한 번의 답장보다 질문과 답이 이어지고 실제 약속이 구체화되는지를 봐.'
-  const continuity = `${contactContinuity} 소식은 전해 들은 말보다 공식 안내·날짜·다음 단계가 구체적으로 오는지를 기준으로 봐.`
+  const continuity = contactContinuity
   const safeIncoming = relationshipPartUsable(incoming) && !/(상대\s*→\s*나|수신|먼저\s*(?:오|연락))/.test(incoming)
     ? incoming
-    : '외부 연락 반응 신호는 특정 상대의 선연락을 확정하지 않아. 안부·질문·약속 제안이 실제로 들어오는지 확인해.'
+    : ''
   const safeOutgoing = relationshipPartUsable(outgoing) && !/(나\s*→\s*상대|발신|선연락\s*주체)/.test(outgoing)
     ? outgoing
-    : '내 연락 실행 적합도는 내가 용건을 정리해 말을 꺼낼 때의 상대적 조건이며, 상대의 답장 의향은 아니야. 보낼 때는 짧고 구체적으로 쓰고 답을 재촉하지 마.'
+    : ''
+  if (!activation && !continuity && !safeIncoming && !safeOutgoing) return undefined
   return {
     activation,
     continuity,
     incoming: safeIncoming,
     outgoing: safeOutgoing,
-    directionSummary: directionSummary(calculation),
+    directionSummary: '',
     timing: relationshipPartUsable(timing) ? timing : undefined,
   }
 }
@@ -331,11 +267,9 @@ function interpersonalEditorial(data: InterpretationData, sections:any) {
   const base = topic(data, '대인관계')
   const action = clean(base?.action)
   const watch = clean(base?.avoid)
-  return {
-    summary: relationshipSectionCopy(sections?.summary) || (relationshipPartUsable(base?.verdict) ? clean(base?.verdict) : '') || '친구·지인, 직장동료, 가족·가까운 사람처럼 관계 종류별로 나눠 읽어.',
-    action: relationshipPartUsable(action) ? action : '누구와 무엇을 조율해야 하는지 관계별 실제 장면을 먼저 봐.',
-    watch: relationshipPartUsable(watch) ? watch : '한 관계에서 생긴 일을 모든 인간관계의 결론으로 확대하지 마.',
-  }
+  const summary = relationshipSectionCopy(sections?.summary) || (relationshipPartUsable(base?.verdict) ? clean(base?.verdict) : '')
+  if (!summary) return undefined
+  return { summary, action: relationshipPartUsable(action) ? action : '', watch: relationshipPartUsable(watch) ? watch : '' }
 }
 
 function singleSectorCopies(data: InterpretationData, base: FortuneUserSummary) {
@@ -365,44 +299,14 @@ function isSectorStitch(value: string, copies: string[]) {
   return matched.length >= 2
 }
 
-function listTopics(values: string[]) {
-  const unique = [...new Set(values)].slice(0, 2)
-  if (!unique.length) return ''
-  return unique.length === 1 ? unique[0] : `${unique[0]}·${unique[1]}`
-}
-
-function integratedFallback(base: FortuneUserSummary, _calculation: IntegratedApiResponse) {
-  // bestFlow/cautionFlow already separate activation magnitude from evidence direction.
-  // Re-ranking raw scores here would turn low activation back into a negative verdict.
-  const positive = base.bestFlow
-  const caution = base.cautionFlow
-  const good = listTopics(positive)
-  const watch = listTopics(caution.filter(name => !positive.includes(name)))
-  const generatedHeadline = good && watch
-    ? `${base.when}은 ${good} 쪽은 비교적 받쳐주고, ${watch} 쪽은 한 번 더 확인하면서 움직이는 흐름이야.`
-    : good ? `${base.when}은 ${good} 쪽이 상대적으로 받쳐줘. 다른 분야까지 무리하게 확대하지 말고 이 강점을 필요한 곳에 써.`
-      : watch ? `${base.when}은 ${watch} 쪽에 실제 부담 근거가 있어 조건을 나눠 보는 흐름이야. 나머지는 평소 계획에 가까워.`
-        : `${base.when}은 특정 분야를 좋거나 나쁘다고 가를 근거가 두드러지지 않아. 평소 흐름을 유지하는 구간이야.`
-  const generatedSummary = good && watch
-    ? `${good}에서는 계획을 진행할 여지가 있고 ${watch}에서는 확인 절차를 더 둬. 기간 전체로는 잘 되는 분야에 힘을 몰아주되, 약한 분야의 결정을 성급하게 확정하지 마.`
-    : good ? `${good}의 상대적 강점을 활용하되 다른 분야까지 같은 강도로 좋다고 확대하지 마. 기간 전체에서는 우선순위를 좁혀 실제로 끝낼 일을 만들어.`
-      : watch ? `${watch}에는 실제 주의 방향 근거가 연결돼 있어 부담 조건을 구분할 필요가 있어. 나머지 분야는 평소 리듬을 유지해.`
-        : `이번 기간에는 분야별 활성도 차이가 사건의 좋고 나쁨을 뜻하지 않아. 뚜렷한 촉발이 없는 분야는 기존 계획을 이어가면 충분해.`
-  return {
-    headline: clean(base.headline) || generatedHeadline,
-    summary: generatedSummary,
-  }
-}
-
 function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse, base: FortuneUserSummary, field: FortuneField | undefined, sections:any, editorialTopics: Record<string,string>) {
   if (!field) {
     const copies = singleSectorCopies(data, base)
     const aiHeadline = clean(data.headline)
     const aiSummary = clean(data.overall?.summary)
-    const fallback = integratedFallback(base, calculation)
     return {
-      headline: readerFacing(aiHeadline) && !isSingleSectorCopy(aiHeadline, copies) && !isSectorStitch(aiHeadline, copies) ? aiHeadline : fallback.headline,
-      summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) && !isSectorStitch(aiSummary, copies) ? aiSummary : fallback.summary,
+      headline: readerFacing(aiHeadline) && !isSingleSectorCopy(aiHeadline, copies) && !isSectorStitch(aiHeadline, copies) ? aiHeadline : '',
+      summary: readerFacing(aiSummary) && !isSingleSectorCopy(aiSummary, copies) && !isSectorStitch(aiSummary, copies) ? aiSummary : '',
     }
   }
   if (field.id === 'love' || field.id === 'social' || field.id === 'contact') {
@@ -411,26 +315,20 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
       : field.id === 'social' ? sections?.summary : sections?.contact_activation
     const clusterText = relationshipSectionCopy(cluster)
     const authored = clean(topic(data, name)?.verdict)
-    const snapshot = fortuneEvidenceSnapshot(calculation, name)
-    const specific = [snapshot.support ? '도움: ' + snapshot.support : '',
-      snapshot.challenge ? '부담: ' + snapshot.challenge : ''].filter(Boolean).join(' / ')
-    const chosen = [firstSentence(clusterText), authored, base.focusTopics.find(row => row.topic === name)?.conclusion]
+    const chosen = [firstSentence(clusterText), authored]
       .find(part => readerFacing(clean(part)) && relationshipPartUsable(part)) ?? ''
-    const calculatedHeadline = specific ? base.when + ' ' + name + ' · ' + specific : base.headline
     const relatedSummary = clean(topic(data, name)?.reason)
     return {
-      headline: chosen || calculatedHeadline,
-      summary: clusterText || relatedSummary || (specific
-        ? name + '에 연결된 실제 계산 근거: ' + specific + '. 근거는 사건이 일어날 확률이나 상대의 의도를 뜻하지 않아.'
-        : base.focusTopics.find(row => row.topic === name)?.reason || base.summary),
+      headline: chosen,
+      summary: clusterText || relatedSummary,
     }
   }
   const firstTopic = field.topics[0]
   const row = topic(data, firstTopic)
   const aiTopic = clean(editorialTopics[firstTopic])
   return {
-    headline: aiTopic ? firstSentence(aiTopic) : clean(row?.verdict) || base.headline,
-    summary: aiTopic || clean(row?.reason) || clean(data.overall?.summary) || base.summary,
+    headline: aiTopic ? firstSentence(aiTopic) : clean(row?.verdict),
+    summary: aiTopic || clean(row?.reason) || clean(data.overall?.summary),
   }
 }
 
@@ -438,13 +336,15 @@ export function buildFortuneEditorialV3(data: InterpretationData, calculation: I
   const sections = data.clusters?.relationship ?? {}
   const editorialTopics = topicEditorial(data)
   const hero = fieldHero(data, calculation, base, field, sections, editorialTopics)
+  const loveRows = field?.id === 'love' ? loveContexts(data) : []
+  const interpersonalRows = field?.id === 'social' ? interpersonalContexts(data) : []
   return {
     heroHeadline: hero.headline,
     heroSummary: hero.summary,
     interpersonal: field?.id === 'social' ? interpersonalEditorial(data, sections) : undefined,
-    interpersonalContexts: field?.id === 'social' ? interpersonalContexts(data) : undefined,
+    interpersonalContexts: interpersonalRows.length ? interpersonalRows : undefined,
     contact: field?.id === 'contact' ? contactEditorial(data, calculation, sections) : undefined,
-    loveContexts: field?.id === 'love' ? loveContexts(data) : undefined,
+    loveContexts: loveRows.length ? loveRows : undefined,
     loveGeneral: field?.id === 'love' ? relationshipSectionCopy(sections?.love_general) : undefined,
     topicEditorial: editorialTopics,
     domainAnswers: domainAnswers(data),

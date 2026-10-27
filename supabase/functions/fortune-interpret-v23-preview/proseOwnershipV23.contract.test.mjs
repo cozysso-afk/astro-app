@@ -9,6 +9,7 @@ const polish=fs.readFileSync(new URL('./editorialPolishV23.ts',import.meta.url),
 const stabilizer=fs.readFileSync(new URL('../fortune-interpret-v21-preview/costGuardV21.ts',import.meta.url),'utf8')
 const frontend=fs.readFileSync(new URL('../../../web/src/lib/fortuneEditorialV3.ts',import.meta.url),'utf8')
 const narrative=fs.readFileSync(new URL('../../../web/src/PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
+const narrativePolish=fs.readFileSync(new URL('../../../web/src/lib/fortuneNarrativePolish.ts',import.meta.url),'utf8')
 
 test('normal V23 path gives authored clusters prose ownership',()=>{
   assert.match(index,/topic_analysis:buildAuthoredTopicAnalysisOnly\(core,buildDeterministicTopicAnalysis\(payload\),payload\)/)
@@ -95,4 +96,13 @@ test('frontend preserves concise authored blocks instead of discarding them whol
   assert.match(readerFacing,/계산\\s\*/)
   assert.match(narrative,/if \(sentences\.length < 2\) return null/)
   assert.doesNotMatch(narrative,/if \(sentences\.length < 4\) return null/)
+})
+
+test('verified V23 UI projects Gemini prose only and never authors replacement copy',()=>{
+  assert.match(narrative,/if \(!verifiedNarrative\)/)
+  assert.match(narrative,/const summary = authoredSummaryOnly\(base, data\)/)
+  assert.match(narrative,/result\.provenance_verified === true/)
+  assert.doesNotMatch(frontend,/fallbackLoveText|INTERPERSONAL_FALLBACK_COPY|integratedFallback/)
+  const cleanup=narrativePolish.slice(narrativePolish.indexOf('export function polishKoreanSentence'),narrativePolish.indexOf('export function narrativeClaimFamily'))
+  assert.doesNotMatch(cleanup,/\.replace\(/)
 })

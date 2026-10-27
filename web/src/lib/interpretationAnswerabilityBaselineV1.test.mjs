@@ -16,6 +16,7 @@ const periodNarrative = read('../../../supabase/functions/fortune-interpret-v23-
 const relationshipWestern = read('../../../relationship_western_v1.py')
 const relationshipEdge = read('../../../supabase/functions/relationship-interpret-v9-preview/index.ts')
 const fortuneEditorial = read('./fortuneEditorialV3.ts')
+const fortuneNarrative = read('../PeriodFortuneNarrativeV2.tsx')
 const toneCalibration = read('./fortuneToneCalibration.ts')
 
 test('A1 baseline: reunion engine calculates past, current and future hierarchy windows', () => {
@@ -90,9 +91,10 @@ test('A9 preserved: relationship direction values exist but side activation alon
 })
 
 test('A10 preserved: fortune presentation has an explicit incoming/outgoing comparison path', () => {
-  assert.match(fortuneEditorial, /function directionSummary/)
-  assert.match(fortuneEditorial, /['"]수신신호['"]/)
-  assert.match(fortuneEditorial, /['"]발신적합['"]/)
+  assert.doesNotMatch(fortuneEditorial, /function directionSummary/)
+  assert.match(fortuneNarrative, /label: '외부 연락 반응'/)
+  assert.match(fortuneNarrative, /label: '내 연락 실행 적합도'/)
+  assert.match(fortuneNarrative, /data\.contact_flow/)
 })
 
 test('A11 baseline compression boundary: compact fortune packet caps evidence and date depth', () => {

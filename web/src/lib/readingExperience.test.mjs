@@ -132,7 +132,7 @@ test('hour windows require explicit exact readiness and remain absent for provis
   const exact=buildFortuneUserSummary(data,{...context,allowIntraday:true})
   assert.equal(exact.importantWindows[0].date,'07:00–08:30')
   assert.match(exact.importantWindows[0].guidance,/대인관계/)
-  const panel=readFileSync(new URL('../PeriodAiInterpretationPanel.tsx',import.meta.url),'utf8')
+  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/allowIntraday: readiness.ok && readiness.mode === 'exact'/)
 })
 

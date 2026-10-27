@@ -49,12 +49,13 @@ async function proxyProvisionalV23(req:Request,body:any,safeCalculation:any){
     const response=await fetch(`${SUPABASE_URL}/functions/v1/${upstream}`,{method:"POST",headers,body:JSON.stringify({...body,calculation:safeCalculation,precision_mode:"provisional"})});
     const parsed=await response.json().catch(()=>null);
     const normalized=normalizeProxiedFortuneResponse(parsed,response.status,body?.action);
+    const declaredOrigin=parsed?.origin==="gemini"||parsed?.origin==="deterministic_safe"?parsed.origin:null;
     const responseBody=normalized.body&&typeof normalized.body==="object"
-      ? {...normalized.body,origin:"gemini",precision_mode:"provisional"}
+      ? {...normalized.body,...(declaredOrigin?{origin:declaredOrigin}:{}),precision_mode:"provisional"}
       : normalized.body;
     return new Response(JSON.stringify(responseBody),{status:normalized.status,headers:outHeaders});
   }catch{
-    return new Response(JSON.stringify(publicFortuneError("UPSTREAM_FAILED",undefined,{origin:"gemini",precision_mode:"provisional"})),{status:502,headers:outHeaders});
+    return new Response(JSON.stringify(publicFortuneError("UPSTREAM_FAILED")),{status:502,headers:outHeaders});
   }
 }
 function zeroUsage(v23=false){return {prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,attempt_count:0,call_trace:[],gemini_paid_call:false,precision_contract:"integrated-precision-v2",precision_mode:"provisional",...(v23?{narrative_engine:"v23"}:{})};}

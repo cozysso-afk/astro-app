@@ -13,6 +13,11 @@
   근거 누락/기간 오류는 **실패(failed)**입니다.
 - 실제 V23 결과에 대해서는 기존 6단계 해설 품질 검사기를 다시 실행합니다.
   규칙 기반 검사는 사실성/문장 품질을 100% 보증하지 않습니다.
+- `live_gemini_cases`는 응답의 문자열만 믿지 않습니다. 저장된 V23 생성 버전,
+  최종 모델과 일치하는 2xx Gemini 호출 trace, 서버의 `provenance_verified=true`,
+  품질 검증 6단계 전부 통과가 함께 확인된 건만 실제 Gemini 성공으로 셉니다.
+- 검증되지 않은 저장본이나 이전 캐시는 사용자 운세 해설로 표시하지 않습니다.
+  프론트엔드는 Gemini가 작성한 필드만 배치하고, 누락된 문장을 고정 문구로 채우지 않습니다.
 
 ## 실제 Gemini 검증 — 명시적 유료 호출 승인 시에만
 
@@ -48,11 +53,14 @@ node --experimental-strip-types web/scripts/fortune-quality-audit.mjs \
 
 입력은 배열 또는 { "cases": [...] } 형식입니다. 각 항목은
 id, profile_id, period_kind, payload(기간·evidence_ledger 포함),
-result(V23 status 응답의 data, origin, interpreter_version 포함)를 가집니다.
+result(V23 status 응답의 data, origin, provenance_verified, interpreter_version,
+model, usage.generation_version, usage.call_trace, usage.quality_validation 포함)를 가집니다.
 
 **보고서에는 계산 원문, 출생정보, Gemini 해설 전문을 저장하지 않습니다.**
 케이스 ID와 오류 코드/근거 ID/건수만 남기므로 ID도 가명으로 구성하세요.
 원본 입력 JSON은 민감할 수 있으므로 비공개 보관 후 삭제하세요.
+실패 보고서에는 원문 오류나 프롬프트 대신 모델, 호출 종류, HTTP 결과 분류,
+finish reason, 토큰 수, 6단계 통과 여부만 남겨 비용·실패 원인을 안전하게 감사합니다.
 
 ## 결과 해석
 

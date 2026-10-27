@@ -431,6 +431,7 @@ export type AiEditorialClusters = {
 export type AiInterpretationResponse = {
   ok: boolean
   origin?: 'gemini' | 'deterministic_safe'
+  provenance_verified?: boolean
   missing_key?: boolean
   error?: string
   model?: string
@@ -450,8 +451,9 @@ export type AiInterpretationResponse = {
     thai_safety_fallback?: boolean
     quality_validation?: AiQualityValidation | null
     prompt_budget?: { bytes?: number; max_bytes?: number; estimated_input_tokens?: number } | null
-    call_trace?: Array<{ call:number; model:string; kind:string; prompt_bytes:number; elapsed_ms:number; http_status:number; usage?: { prompt_tokens?:number; candidate_tokens?:number; thought_tokens?:number; total_tokens?:number }; error?:string }>
+    call_trace?: Array<{ call:number; model:string; kind:string; prompt_bytes:number; elapsed_ms:number; http_status:number; finish_reason?:string; outcome?:'success'|'http_error'|'timeout_or_network'; usage?: { prompt_tokens?:number; candidate_tokens?:number; thought_tokens?:number; total_tokens?:number } }>
     cost_guard_version?: string
+    generation_version?: string
     local_thai_scrub?: boolean
     degraded_quality?: boolean
     local_quality_fallback?: boolean

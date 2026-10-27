@@ -20,3 +20,11 @@ test('V23 starts with the model that leaves a second call for semantic quality r
   assert.match(source, /const V23_DEFAULT_MODEL="gemini-3\.6-flash"/)
   assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:V23_DEFAULT_MODEL/)
 })
+
+test('V23 provenance is derived from stored successful calls and the stored generation version', () => {
+  assert.match(source, /generation_version:VERSION/)
+  assert.match(source, /function verifiedGeminiJob\(data:any\)/)
+  assert.match(source, /trace\.some\(\(row:any\)=>Number\(row\?\.http_status\)>=200/)
+  assert.match(source, /stages\.length===6&&stages\.every/)
+  assert.match(source, /provenance_verified:provenanceVerified/)
+})
