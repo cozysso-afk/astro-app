@@ -17,17 +17,39 @@ before(async () => {
 })
 after(async()=>{await server?.close()})
 const noAction=()=>{throw new Error('Rendering must never call a provider or account action')}
+const verifiedResult=(data,period='today')=>({
+  ok:true,
+  model:'gemini-3.6-flash',
+  origin:'gemini',
+  provenance_verified:true,
+  data:{
+    ...data,
+    headline:'계획의 순서를 정하면 움직임이 선명해져.',
+    overall:{...data.overall,summary:'먼저 확인할 일과 미룰 일을 나누면 흐름을 안정적으로 쓸 수 있어.'},
+    topic_analysis:Object.fromEntries(Object.entries(data.topic_analysis).map(([topic,row])=>[topic,{
+      ...row,
+      verdict:`${topic}에서는 우선순위를 분명히 정해.`,
+      reason:'수성과 목성의 계산 근거가 판단과 확장의 균형을 함께 보여줘.',
+      action:`${topic}에서 가장 작은 실행 하나를 먼저 끝내.`,
+      avoid:`${topic}의 결론을 서둘러 단정하지 마.`,
+    }])),
+    key_windows:data.key_windows?.length ? data.key_windows : period==='today' ? [] : [{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용',summary:'대화의 핵심을 먼저 정리해.'}],
+    relationship_reading:{context:'연락 환경과 내 실행 조건을 나눠 확인해.',flow:'두 방향은 서로 다른 계산축이야.',focus_timing:'일정을 확인한 뒤 판단해.',watch:'실제 답변을 확인해.',avoid:'상대 행동을 단정하지 마.'},
+    contact_flow:{incoming:'외부 연락 반응은 계산상 약한 구간이야.',outgoing:'내 연락 실행 적합도는 계산상 강한 구간이야.',reconnection:''},
+  },
+  usage:{cost_guard_version:'supabase-ai-v23.9-gemini-single-author-v2',quality_validation:{score:100,stages:Array.from({length:6},(_,index)=>({stage:index+1,passed:true}))}},
+})
 
 for(const period of ['today','week','month','year']) test(`actual Fortune ${period} markup preserves structure and hides raw data`,()=>{
   const fixture=fortuneFixture(period)
-  const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:fixture.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:fixture.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:fixture.calculation,result:verifiedResult(fixture.data,period),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
   assert.equal((visible.match(/class="flow-tile"/g)||[]).length,3)
   assert.match(visible,/대인관계/)
   assert.match(visible,/왜 이렇게 보냐면/)
   assert.match(visible,/수성과 목성/)
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|W:fixture|기술 원문|private-auth-logout/)
-  assert.match(html,/<details class="period-ai-details"><summary>계산 근거 자세히 보기/)
+  assert.match(html,/<details class="period-ai-details"[^>]*><summary>계산 근거 자세히 보기/)
   if(period==='today') assert.doesNotMatch(visible,/2026-09-14|2026-09-17/)
   else assert.match(visible,/2026-09-14/)
 })
@@ -77,7 +99,7 @@ test('portrait prompt is only existing hints plus explicit creative art directio
 })
 test('reason action and caution render as separately labelled accessible layers',()=>{
   const f=fortuneFixture()
-  const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   for(const kind of ['reason','practice','caution']) assert.match(html,new RegExp('reading-explanation is-'+kind))
   assert.match(html,/reading-hero-subtitle/)
   assert.match(html,/reading-period-date/)
@@ -88,7 +110,7 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} ca
   f.calculation.western.overall.연락={...f.calculation.western.overall.연락,average:44}
   f.data.topic_analysis.연락.evidence_refs=['W:contact']
   f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:3,polarity:-0.7})
-  const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:verifiedResult(f.data,period),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
   assert.match(visible, /signal-incoming[\s\S]*?외부 연락 반응[\s\S]*?약함/)
   assert.match(visible, /signal-outgoing[\s\S]*?내 연락 실행 적합도[\s\S]*?강함/)
@@ -101,9 +123,9 @@ test('personal spouse route uses existing hints without manufacturing a meeting 
   assert.doesNotMatch(html,/178|181|연예인|고양이상/)
 })
 
-test('same date groups utilization and caution without losing either meaning',()=>{
-  const f=fortuneFixture('week');f.data.key_windows=[{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용'},{start:'2026-09-14',end:'2026-09-14',topics:['컨디션'],signal:'주의'}]
-  const html=renderToStaticMarkup(createElement(Fortune,{period:'week',calculation:f.calculation,result:{ok:true,model:'deterministic-provisional-v2',data:f.data},loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+test('same date groups authored utilization and caution without losing either meaning',()=>{
+  const f=fortuneFixture('week');f.data.key_windows=[{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용',summary:'대화의 핵심을 먼저 정리해.'},{start:'2026-09-14',end:'2026-09-14',topics:['컨디션'],signal:'주의',summary:'무리한 일정은 줄여.'}]
+  const html=renderToStaticMarkup(createElement(Fortune,{period:'week',calculation:f.calculation,result:verifiedResult(f.data,'week'),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
   assert.equal((visible.match(/<time>(?:지난 · )?2026-09-14<\/time>/g)||[]).length,1)
   assert.match(visible,/reading-event signal-favorable/)

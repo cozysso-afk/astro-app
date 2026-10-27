@@ -14,7 +14,7 @@ import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v1";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v2";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -194,12 +194,22 @@ async function job(id:string,payload:any,model:string,key:string){
   const a=admin();await a.from("ai_interpret_jobs").update({status:"running",updated_at:new Date().toISOString()}).eq("id",id);
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:publicCallTrace(r.call_trace),prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.origin??(r.ok?"gemini":"deterministic_safe"),safe_summary_required:Boolean(r.safe_summary_required),local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,editorial_trace:r.editorial_trace??null};
+    const callTrace=publicCallTrace(r.call_trace);
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.origin??(r.ok?"gemini":"deterministic_safe"),safe_summary_required:Boolean(r.safe_summary_required),local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,editorial_trace:r.editorial_trace??null};
     if(!(await jobActive(id))){await a.from("ai_interpret_jobs").update({usage_json:usageJson,updated_at:new Date().toISOString()}).eq("id",id);return;}
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     await a.from("ai_interpret_jobs").update(r.ok?done:failed).eq("id",id);
   }catch(e){publicFortuneError("JOB_GENERATION_FAILED",e);await a.from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_GENERATION_FAILED"),updated_at:new Date().toISOString(),completed_at:new Date().toISOString()}).eq("id",id);}
+}
+
+function verifiedGeminiJob(data:any){
+  if(data?.status!=="done"||!data?.result_json||data?.usage_json?.origin!=="gemini")return false;
+  if(data?.usage_json?.generation_version!==VERSION||data?.usage_json?.cost_guard_version!==VERSION)return false;
+  const trace=Array.isArray(data?.usage_json?.call_trace)?data.usage_json.call_trace:[];
+  const successful=trace.some((row:any)=>Number(row?.http_status)>=200&&Number(row?.http_status)<300&&String(row?.model??"")===String(data?.model??""));
+  const stages=data?.usage_json?.quality_validation?.stages;
+  return successful&&Array.isArray(stages)&&stages.length===6&&stages.every((stage:any)=>stage?.passed===true);
 }
 
 Deno.serve(async(req)=>{
@@ -214,8 +224,10 @@ Deno.serve(async(req)=>{
     if(error)return res(publicFortuneError("JOB_STATUS_READ_FAILED",error),500);if(!data)return res(publicFortuneError("JOB_NOT_FOUND"),404);
     if(["queued","running"].includes(String(data.status))&&Date.now()-Date.parse(String(data.updated_at??data.created_at))>MAX_JOB_MS+30000){await a.from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_TIMEOUT"),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);data.status="failed";data.error=storedFortuneJobError("JOB_TIMEOUT");}
     const failureFields=data.status==="failed"?publicFortuneFailureFields(storedFortuneJobErrorCode(data.error)):null;
-    const origin=/^deterministic-provisional-v\d+(?:\.|$)/i.test(String(data.model??""))||data.usage_json?.origin==="deterministic_safe"?"deterministic_safe":"gemini";
-    return res({ok:true,job_id:data.id,status:data.status,origin,model:data.model,fallback_from:data.fallback_from,data:data.result_json,usage:data.status==="failed"?publicFailedUsage(data.usage_json):publicJobUsage(data.usage_json),error:failureFields?.error??null,...(failureFields??{}),created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:VERSION});
+    const provenanceVerified=verifiedGeminiJob(data);
+    const origin=provenanceVerified?"gemini":"deterministic_safe";
+    const storedVersion=typeof data.usage_json?.generation_version==="string"?data.usage_json.generation_version:"unverified";
+    return res({ok:true,job_id:data.id,status:data.status,origin,provenance_verified:provenanceVerified,model:data.model,fallback_from:data.fallback_from,data:data.result_json,usage:data.status==="failed"?publicFailedUsage(data.usage_json):publicJobUsage(data.usage_json),error:failureFields?.error??null,...(failureFields??{}),created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:data.status==="done"?storedVersion:VERSION});
   }
   if(b?.action==="cancel"){
     const id=txt(b.job_id,100);const now=new Date().toISOString();const {data,error}=await admin().from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_CANCELED"),updated_at:now,completed_at:now}).eq("id",id).eq("user_id",u.id).in("status",["queued","running"]).select("id,status").maybeSingle();

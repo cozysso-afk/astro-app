@@ -80,7 +80,7 @@ test('provisional V23 uses Gemini with a sanitized planet-only calculation',asyn
   const body=await response.json()
   assert.equal(response.status,202)
   assert.equal(body.status,'queued')
-  assert.equal(body.origin,'gemini')
+  assert.equal(body.origin,undefined)
   assert.equal(body.precision_mode,'provisional')
   assert.equal(response.headers.get('x-starlight-upstream'),'fortune-interpret-v23-preview')
   assert.equal(response.headers.get('x-starlight-precision-mode'),'provisional')

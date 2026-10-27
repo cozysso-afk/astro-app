@@ -35,10 +35,12 @@ const DOMAIN_ANSWER_STATUS = new Set(["direct","partial","not_calculated"]);
 
 function insufficientProviderSection(){
   return {
-    conclusion:"이 항목은 이번 응답에서 직접 해설 근거가 충분하지 않아.",
+    // Missing or malformed provider sections are represented as data state only.
+    // TypeScript must never fill a Gemini-owned reader-facing field with prose.
+    conclusion:"",
     real_scene:"",
-    action:"확인 가능한 사실과 다른 정상 해설 항목을 우선해.",
-    change_condition:"직접 근거가 보강되면 이 항목의 판단을 다시 갱신해.",
+    action:"",
+    change_condition:"",
     evidence_refs:[],
     applicability:"insufficient",
   };

@@ -19,15 +19,17 @@ test('frontend ownership keeps valid authored prose instead of rejecting whole s
   assert.match(narrative, /sceneAction: sentences\.length >= 3/)
 })
 
-test('frontend ownership still keeps explicit fallbacks and safety/meta filters', () => {
+test('frontend ownership fails closed and keeps safety/meta filters without authored fallback prose', () => {
   assert.match(editorial, /function relationshipPartUsable\(/)
   assert.match(editorial, /!TECHNICAL_RE\.test\(text\) && !RELATIONSHIP_META_RE\.test\(text\)/)
-  assert.match(panel, /const semanticHero = !westernOnly && \(period === 'today' \|\| period === 'week'\) && !verifiedHero/)
-  assert.match(panel, /semanticHero\s*\? userSummary\.headline[\s\S]*verifiedHero \? visibleAiText\(data\.headline\)/)
-  assert.match(panel, /verifiedHero[\s\S]*visibleAiText\(data\.overall\.summary\)/)
+  assert.match(panel, /return <PeriodFortuneNarrativeV2/)
+  assert.match(narrative, /result\.provenance_verified === true/)
+  assert.match(narrative, /검증된 Gemini 해설이 아니어서 표시하지 않았어/)
+  assert.match(narrative, /const summary = authoredSummaryOnly\(base, data\)/)
   assert.match(summary, /const FLOW_COPY:/)
   assert.match(summary, /function topicCopy\(/)
-  assert.match(polish, /'오늘은 \$1부터 확인해\.'/)
+  assert.doesNotMatch(polish, /'오늘은 \$1부터 확인해\.'/)
+  assert.match(polish, /return String\(value \?\? ''\)\.replace\(\/\\s\+\/g, ' '\)\.trim\(\)/)
 })
 
 test('frontend ownership path remains observable from stored prose to reader-visible prose', () => {
@@ -35,6 +37,7 @@ test('frontend ownership path remains observable from stored prose to reader-vis
   assert.match(editorial, /function topicEditorial\(/)
   assert.match(narrative, /export function focusEditorialParts\(/)
   assert.match(narrative, /buildFortuneEditorialV3/)
-  assert.match(panel, /buildFortuneUserSummary/)
-  assert.match(panel, /editorialGroupCopy/)
+  assert.match(narrative, /buildFortuneUserSummary/)
+  assert.match(narrative, /authoredSummaryOnly/)
+  assert.doesNotMatch(panel, /buildFortuneUserSummary/)
 })

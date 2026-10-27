@@ -76,13 +76,28 @@ export function storedFortuneJobErrorCode(value: unknown): 'JOB_TIMEOUT' | 'JOB_
   return 'JOB_GENERATION_FAILED'
 }
 
-export function publicFailedUsage(value: unknown) {
+function publicUsageCounters(value: unknown) {
   if (!isRecord(value)) return undefined
   const out: Record<string, number | boolean> = {}
   for (const key of ['prompt_tokens','candidate_tokens','thought_tokens','total_tokens','attempt_count'] as const) {
     if (Number.isFinite(value[key])) out[key] = Math.max(0, Number(value[key]))
   }
   if (typeof value.gemini_paid_call === 'boolean') out.gemini_paid_call = value.gemini_paid_call
+  return Object.keys(out).length ? out : undefined
+}
+
+export function publicFailedUsage(value: unknown) {
+  if (!isRecord(value)) return undefined
+  const out: Record<string, unknown> = { ...(publicUsageCounters(value) ?? {}) }
+  const trace = publicCallTrace(value.call_trace)
+  if (trace.length) out.call_trace = trace
+  const quality = publicQualityValidation(value.quality_report ?? value.quality_validation)
+  if (quality) out.quality_validation = quality
+  const firstQuality = publicQualityValidation(value.first_quality_report)
+  if (firstQuality) out.first_quality_validation = firstQuality
+  if (typeof value.generation_version === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(value.generation_version)) {
+    out.generation_version = value.generation_version
+  }
   return Object.keys(out).length ? out : undefined
 }
 
@@ -97,10 +112,14 @@ export function publicCallTrace(value: unknown) {
     for (const key of ['model','kind','finish_reason'] as const) {
       if (typeof entry[key] === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(entry[key] as string)) out[key] = entry[key]
     }
-    const usage = publicFailedUsage(entry.usage)
+    if (Number.isFinite(entry.http_status)) {
+      const status = Number(entry.http_status)
+      out.outcome = status >= 200 && status < 300 ? 'success' : status > 0 ? 'http_error' : 'timeout_or_network'
+    }
+    const usage = publicUsageCounters(entry.usage)
     if (usage) out.usage = usage
     return out
-  })
+  }).filter(entry => Object.keys(entry).length > 0)
 }
 
 // Fixed labels are produced by qualitySummary; never echo historical diagnostic names.
@@ -133,6 +152,9 @@ export function publicJobUsage(value: unknown) {
   }
   if (typeof value.cost_guard_version === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(value.cost_guard_version)) {
     out.cost_guard_version = value.cost_guard_version
+  }
+  if (typeof value.generation_version === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(value.generation_version)) {
+    out.generation_version = value.generation_version
   }
   if (isRecord(value.prompt_budget)) {
     const budget: Record<string, number> = {}
@@ -219,6 +241,7 @@ function publicProxySuccess(payload: Record<string, unknown>, action: ProxyActio
         if (isRecord(payload.result_json)) out.result_json = payload.result_json
       } else if (payload.data === null) out.data = null
       out.error = null
+      pick(['provenance_verified'], boolean)
       out.usage = publicJobUsage(payload.usage)
     }
     return out

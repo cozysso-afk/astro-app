@@ -38,49 +38,18 @@ function summaryFixture(overrides = {}) {
   }
 }
 
-test('work headline is rewritten into natural subject-predicate Korean', () => {
+test('client preserves Gemini-authored Korean instead of rewriting it', () => {
   const source = '말로만 오가던 요청을 담당자·마감·완료 기준까지 구체화하기 좋은 날이야.'
-  assert.equal(
-    polishKoreanSentence(source),
-    '말로만 오가던 요청은 담당자를 정하고, 마감일과 완료 기준까지 분명하게 정리해.',
-  )
+  assert.equal(polishKoreanSentence(source), source)
 })
 
-test('generic motion filler is removed instead of repeated across every sector', () => {
+test('client does not delete model-authored sentences', () => {
   const source = '직장에서 오늘 가장 눈에 띄는 건 업무 범위야. 이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
-  const polished = polishKoreanSentence(source)
-  assert.doesNotMatch(polished, /이 흐름은 아직 강해지는 중|첫 반응 하나보다 실제 변화/)
-  assert.match(polished, /업무 범위/)
+  assert.equal(polishKoreanSentence(source), source)
 })
 
-test('vague steady-state templates are rewritten into concrete user actions', () => {
-  assert.equal(
-    polishKoreanSentence('이번 달 금전 흐름은 무난한 편이니 계획한 범위 안에서 움직여.'),
-    '이번 달 금전은 새 지출을 늘리기보다 정한 예산 안에서 처리해.',
-  )
-  assert.equal(
-    polishKoreanSentence('이번 주 업무는 맡은 일의 순서를 분명히 하면 무난하게 풀 수 있어.'),
-    '이번 주 업무는 요청받은 일과 마감 순서를 먼저 정리해.',
-  )
-  assert.equal(
-    polishKoreanSentence('오늘 사람 관계는 무리하게 맞추기보다 적당한 거리를 지키면 무난해.'),
-    '오늘 사람 관계는 필요한 말만 분명히 하고, 상대 반응은 이후 행동으로 판단해.',
-  )
-})
-
-test('soft advice templates from real captures become direct reader-facing Korean', () => {
-  assert.equal(
-    polishKoreanSentence('오늘은 집중이 쉽게 흐트러질 수 있으니 목표를 작게 잡는 편이 좋아.'),
-    '오늘은 집중이 쉽게 흩어질 수 있어. 목표를 넓히기보다 끝낼 단위를 하나로 좁혀.',
-  )
-  assert.equal(
-    polishKoreanSentence('답장 속도 하나를 마음의 결론처럼 확대해석하지 않는 편이 좋아.'),
-    '답장 속도를 마음의 결론으로 해석하지 마. 내용과 다음 행동을 봐.',
-  )
-  assert.equal(
-    polishKoreanSentence('오늘은 기다리는 답이 늦어질 수 있으니 한 번에 결론 내리지 않는 편이 좋아.'),
-    '오늘은 기다리는 답이 늦어질 수 있어. 지연 자체를 결과로 해석하지 마.',
-  )
+test('presentation cleanup only collapses whitespace', () => {
+  assert.equal(polishKoreanSentence('  Gemini가   쓴 문장.  '), 'Gemini가 쓴 문장.')
 })
 
 test('daily hero prefers favorable and caution roles instead of blindly concatenating first focus topics', () => {
@@ -94,7 +63,7 @@ test('daily hero prefers favorable and caution roles instead of blindly concaten
     ],
   }))
   assert.match(result.headline, /투자 판단/)
-  assert.match(result.headline, /집중이 쉽게 흩어질 수 있어/)
+  assert.match(result.headline, /집중이 쉽게 흐트러질 수 있으니/)
   assert.doesNotMatch(result.headline, /답장 속도/)
 })
 
@@ -116,13 +85,11 @@ test('reference fields lead with an observable scene instead of generic coaching
   assert.doesNotMatch(result.referenceTopics[0].detail.conclusion, /편이 좋아/)
 })
 
-test('quiet-hour communication windows become preparation guidance instead of send-now advice', () => {
+test('quiet-hour communication guidance remains Gemini-authored', () => {
   const result = polishFortuneSummary(summaryFixture({
     importantWindows:[{date:'00:30–02:00',kind:'favorable',guidance:'연락 · 안부·질문·약속을 먼저 꺼내보기'}],
   }))
-  assert.match(result.importantWindows[0].guidance, /지금 바로 연락하기보다/)
-  assert.match(result.importantWindows[0].guidance, /상대 생활시간대/)
-  assert.doesNotMatch(result.importantWindows[0].guidance, /먼저 꺼내보기/)
+  assert.match(result.importantWindows[0].guidance, /먼저 꺼내보기/)
 })
 
 test('vague period hero falls back to concrete topic conclusions and next actions', () => {

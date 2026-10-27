@@ -89,30 +89,22 @@ test('all ten user fields keep a concrete deterministic floor when structured AI
   }
 })
 
-test('dedicated relationship screens remain useful with every structured relationship section insufficient', () => {
+test('dedicated relationship screens never synthesize prose when Gemini sections are insufficient', () => {
   const data = blankData()
   const calc = calculation()
 
   const loveField = FORTUNE_FIELDS.find(field => field.id === 'love')
   const love = buildFortuneEditorialV3(data, calc, summaryFor(loveField), loveField)
-  assert.equal(love.loveContexts?.length, 6)
-  for (const row of love.loveContexts ?? []) assert.ok(row.text.length >= 25, `love/${row.key}: fallback too thin`)
-  assert.match(love.loveContexts?.find(row => row.key === 'reunion_interest')?.text ?? '', /재접촉|관계 재구축/)
+  assert.equal(love.loveContexts, undefined)
 
   const socialField = FORTUNE_FIELDS.find(field => field.id === 'social')
   const social = buildFortuneEditorialV3(data, calc, summaryFor(socialField), socialField)
-  assert.equal(social.interpersonalContexts?.length, 5)
-  assert.match(social.interpersonalContexts?.find(row => row.key === 'coworkers')?.text ?? '', /담당자·마감·완료 기준/)
-  assert.match(social.interpersonalContexts?.find(row => row.key === 'boundaries')?.text ?? '', /가능한 범위|경계/)
+  assert.equal(social.interpersonalContexts, undefined)
 
   const contactField = FORTUNE_FIELDS.find(field => field.id === 'contact')
   const contactBase = summaryFor(contactField)
   const contact = buildFortuneEditorialV3(data, calc, contactBase, contactField)
-  assert.ok(contact.contact?.activation.length >= 20)
-  assert.ok(contact.contact?.continuity.length >= 30)
-  assert.match(contact.contact?.continuity ?? '', /공식 안내·날짜·다음 단계/)
-  assert.match(contact.contact?.incoming ?? '', /안부·질문·약속 제안/)
-  assert.match(contact.contact?.outgoing ?? '', /짧고 구체적으로/)
+  assert.equal(contact.contact, undefined)
   assert.ok(contactBase.focusTopics.some(row => row.topic === '소식'), 'contact/news deterministic source disappeared')
   assert.equal(contact.topicEditorial['소식'], undefined, 'test must exercise deterministic news fallback, not structured news')
 })

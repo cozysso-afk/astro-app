@@ -14,11 +14,10 @@ function emptyClusters(){return {relationship:Object.fromEntries(['summary','fri
 function data(overrides={}){return {headline:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',overall:{summary:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',dominant_pattern:'',best_phase:'',caution_phase:'',evidence_refs:[]},clusters:emptyClusters(),contact_flow:{incoming:'상대 → 나 방향은 보통이야.',outgoing:'나 → 상대 방향은 보통이야.',reconnection:''},topic_analysis:{컨디션:{verdict:'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.',reason:'',timing:'',action:'쉬어',avoid:'',importance:'핵심',confidence:'보통',confidence_reason:'',evidence_refs:[]},연락:{verdict:'연락 보통',reason:'',timing:'',action:'대화 지속',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]},대인관계:{verdict:'대인 기본',reason:'',timing:'',action:'역할 합의',avoid:'',importance:'주목',confidence:'보통',confidence_reason:'',evidence_refs:[]}},...overrides}}
 function assertFourParts(text,name){for(const marker of [`${name} 결론을 분명히 정리해.`,`${name}에서 실제 장면을 구체적으로 확인해.`,`${name}에서 지금 할 행동을 하나 정해.`,`${name}의 확인 조건이 바뀌면 판단을 다시 해.`]) assert.ok(String(text??'').includes(marker),`${name}: missing ${marker}`)}
 
-test('integrated hero rejects strongest-sector copy and synthesizes supportive plus caution sectors',()=>{
+test('integrated hero rejects strongest-sector copy without synthesizing replacement prose',()=>{
   const result=buildFortuneEditorialV3(data(),calc(),base())
   assert.notEqual(result.heroSummary,'무작정 버티기보다 집중할 일정과 쉴 시간을 나눠 쓰기 좋은 날이야.')
-  assert.match(result.heroSummary,/컨디션|직장/)
-  assert.match(result.heroSummary,/금전|소식/)
+  assert.equal(result.heroSummary,'')
 })
 
 test('structured relationship schema exposes six love contexts at once',()=>{
@@ -50,7 +49,7 @@ test('interpersonal reading exposes friend coworker family new-network and bound
   assert.doesNotMatch(result.interpersonal.summary,/메시지/)
 })
 
-test('missing relationship editorial falls back to concrete user actions instead of AI status',()=>{
+test('missing relationship editorial stays empty instead of using client-authored fallback',()=>{
   const clusters=emptyClusters()
   for(const key of ['summary','friends','coworkers','family','new_people','boundaries','contact_activation','contact_continuity']) clusters.relationship[key]=blankSection()
   const source=data()
@@ -58,11 +57,8 @@ test('missing relationship editorial falls back to concrete user actions instead
   const payload=data({clusters,contact_flow:{incoming:'',outgoing:'',reconnection:''},topic_analysis:topicAnalysis})
   const social=buildFortuneEditorialV3(payload,calc(),base(),{id:'social',label:'대인관계',topics:['대인관계']})
   const contact=buildFortuneEditorialV3(payload,calc(),base(),{id:'contact',label:'연락·소식',topics:['연락','소식']})
-  assert.match(social.interpersonalContexts.find(row=>row.key==='coworkers').text,/담당자·마감·완료 기준/)
-  assert.doesNotMatch(JSON.stringify(social.interpersonalContexts),/AI 원고|원고가 아직|별도 계산값/)
-  assert.match(contact.contact.incoming,/안부·질문·약속 제안/)
-  assert.match(contact.contact.outgoing,/짧고 구체적으로/)
-  assert.doesNotMatch(JSON.stringify(contact.contact),/AI 원고|별도 계산값|전체 활성도/)
+  assert.equal(social.interpersonalContexts,undefined)
+  assert.equal(contact.contact,undefined)
 })
 
 test('Gemini structured cluster prose remains available for user-facing topic copy',()=>{
@@ -104,11 +100,10 @@ test('applicability blocks insufficient copy and marks conditional depth without
   assert.equal(result.topicEditorial['직장'],undefined)
   assert.match(result.topicEditorial['학업'],/^공부할 범위를 좁히고/)
   assert.doesNotMatch(result.topicEditorial['학업'],/^조건부로 보면,/)
-  assert.match(result.topicEditorial['금전'],/^조건부로 보면,/)
+  assert.doesNotMatch(result.topicEditorial['금전'],/^조건부로 보면,/)
   const love=buildFortuneEditorialV3(data({clusters}),calc(),base(),{id:'love',label:'애정',topics:['연애','연락','재회']})
-  const crush=love.loveContexts.find(row=>row.key==='crush').text
-  assert.doesNotMatch(crush,/근거가 부족한데도 상대 마음/)
-  assert.match(crush,/마음 가는 사람이 있다면/)
+  const crush=love.loveContexts?.find(row=>row.key==='crush')
+  assert.equal(crush,undefined)
   assert.equal(editorialGroupCopy({hidden:{...section('이 문장도 숨겨야 해.'),applicability:'insufficient'}}),'')
 })
 
@@ -187,14 +182,9 @@ test('contact overall reading keeps useful scene and action separate from direct
   assert.doesNotMatch(result.contact.activation,/계산 근거|활성도/)
   assert.match(result.contact.activation,/안부 뒤 질문/)
   assert.match(result.contact.activation,/답장을 재촉하지 말고/)
-  assert.doesNotMatch(result.contact.directionSummary,/판정상 동률권/)
-  assert.match(result.contact.directionSummary,/연락 자체의 강도와 별개로/)
-  assert.match(result.contact.directionSummary,/내 차트 쪽이 2점 높아/)
-  assert.match(result.contact.directionSummary,/상대 차트 43/)
-  assert.match(result.contact.directionSummary,/내 차트 45/)
-  assert.match(result.contact.directionSummary,/실제 선연락 주체를 확정하는 뜻은 아니야/)
-  assert.match(result.contact.incoming,/외부 연락 반응/)
-  assert.match(result.contact.outgoing,/내 연락 실행 적합도/)
+  assert.equal(result.contact.directionSummary,'')
+  assert.equal(result.contact.incoming,'')
+  assert.equal(result.contact.outgoing,'')
 })
 
 test('contact UI always shows both honestly named calculation axes',()=>{
@@ -221,20 +211,21 @@ test('verified non-relationship fields surface structured editorial in main focu
   assert.match(panel,/deepEditorial\.sceneAction/)
   assert.match(panel,/판단 바뀌는 조건/)
   assert.match(panel,/deepEditorial\.change/)
-  assert.match(panel,/<em>실제로는<\/em> \{item\.action\}/)
+  assert.match(panel,/<ReadingExplanation kind="practice">\{item\.action\}<\/ReadingExplanation>/)
   assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
 })
 
-test('overall hero keeps Gemini authorship and reserves deterministic fallback for unverified results',()=>{
+test('overall hero uses authored Gemini hero only after provenance verification',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/META_EDITORIAL_RE/)
-  assert.match(panel,/const fallbackHero = overallFallback\(summary\)/)
+  assert.doesNotMatch(panel,/overallFallback|polishFortuneSummary/)
   assert.match(panel,/const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
   assert.match(panel,/const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
-  assert.match(panel,/const heroHeadline = verifiedNarrative[\s\S]*?: fallbackHero\.headline/)
-  assert.match(panel,/const heroSummary = verifiedNarrative[\s\S]*?: fallbackHero\.summary/)
+  assert.match(panel,/const heroHeadline = fieldHeroHeadline \|\| integratedHeroHeadline/)
+  assert.match(panel,/const heroSummary = fieldHeroSummary \|\| integratedHeroSummary/)
   assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
-  assert.match(panel,/verifiedNarrative \? splitDailyHero\(heroHeadline\)/)
+  assert.match(panel,/const heroLead = period === 'today'[\s\S]*?splitDailyHero\(heroHeadline\)/)
+  assert.doesNotMatch(panel,/relationshipDailyLead/)
   assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroLead\.title\}<\/h3>/)
   assert.match(panel,/daily-reading-signal/)
 })

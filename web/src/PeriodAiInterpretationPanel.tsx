@@ -1,53 +1,13 @@
-import { singleLoveScenarios, applyLoveContext, type LoveStatus } from './lib/loveReadingContext'
-import type { FortuneField } from './lib/fortuneFields'
-import { ReadingDirections, ReadingTimeline } from './ReadingSignals'
-import { ExternalPromptCopy } from './ExternalPromptCopy'
-import type { ExternalCopyMode } from './lib/compactDeepPrompt'
-import { ReadingExplanation } from './ReadingExplanation'
-import { CheckCircle2, CircleStop, LoaderCircle, Sparkles } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { CircleStop, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse, IntegratedApiResponse, PeriodKey } from './appTypes'
+import type { LoveStatus } from './lib/loveReadingContext'
+import type { FortuneField } from './lib/fortuneFields'
+import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { periodAiCostPreview } from './lib/aiCostPreview'
-import { topicOrder } from './lib/fortuneTopics'
-import { buildFortuneUserSummary } from './lib/fortuneUserSummary'
-import { normalizeTopicEntries, interpretationHeroEligible, interpretationQualityPassed } from './lib/interpretationTopics'
-import { FortuneFlowCards } from './FortuneFlowCards'
-import type { ReactNode } from 'react'
-import { fortuneAiPrecisionReadiness } from './lib/precisionTransport'
-import { relationshipReferenceFlowCards } from './lib/relationshipReferenceFlow'
-import { editorialGroupCopy } from './lib/fortuneEditorialV3'
-import { browserLocalDateIso, readingDateSemantics } from './lib/readingDateSemantics'
-import { fortuneNarrativeOrigin, isDeterministicFortuneModel } from './lib/fortuneNarrativeOrigin'
-
-function periodLabel(start: string, end: string) {
-  if (!start && !end) return ''
-  if (!end || start === end) return start
-  return `${start} → ${end}`
-}
-
-function visibleAiText(value: string | undefined) {
-  return String(value ?? '')
-    .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
-    .replace(/\(\s*계산 근거\s*\)/g, '')
-    .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
-    .replace(/이직\s*및\s*진로\s*타깃\s*시간/g, '이직·진로 집중 시간')
-    .replace(/타깃/g, '집중')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-}
-
-function signalClass(signal: string) {
-  if (signal === '활용') return 'is-use'
-  if (signal === '주의') return 'is-caution'
-  if (signal === '배경') return 'is-background'
-  return 'is-mixed'
-}
-
-function splitReadingLead(value: string) {
-  const clean = value.trim()
-  const match = clean.match(/^(.+?[.!?])(?:\s+|$)([\s\S]*)$/)
-  return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: clean, detail: '' }
-}
+import { ExternalPromptCopy } from './ExternalPromptCopy'
+import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
 
 export function visibleTopicDepth(conclusion: string, observe?: string) {
   const base = String(conclusion ?? '').trim()
@@ -57,7 +17,23 @@ export function visibleTopicDepth(conclusion: string, observe?: string) {
   return base.length < 120 && sentenceCount < 2 ? detail : ''
 }
 
-export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, systemSummary, westernOnly=false, field, period, calculation, result, loading, error, cacheSource, onRetry, onCopyPrompt, onCancel, canCancel, technicalDetails }: {
+export function PeriodAiInterpretationPanel({
+  loveStatus,
+  systemOverview,
+  systemSummary,
+  westernOnly = false,
+  field,
+  period,
+  calculation,
+  result,
+  loading,
+  error,
+  onRetry,
+  onCopyPrompt,
+  onCancel,
+  canCancel,
+  technicalDetails,
+}: {
   loveStatus?: LoveStatus
   systemOverview?: ReactNode
   systemSummary?: string
@@ -76,129 +52,52 @@ export function PeriodAiInterpretationPanel({ loveStatus, systemOverview, system
   canCancel: boolean
 }) {
   const costPreview = periodAiCostPreview(period)
-  const technicalFallback = technicalDetails ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details> : null
-  if (!loading && !error && (!result || !result.data)) return <><section className="period-ai-card period-ai-ready"><div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div><p className="period-ai-summary">계산은 끝났어. 해설이 자동으로 시작되지 않았거나 저장본이 없으면 여기서 불러올 수 있어.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>{technicalFallback}</>
-  if (loading && !result) return <><section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls"><ExternalPromptCopy onCopy={onCopyPrompt}/>{canCancel&&<button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>{technicalFallback}</>
-  const failedUsage = estimateGeminiUsage(result?.usage)
+  const technicalFallback = technicalDetails
+    ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>
+    : null
+
+  if (!loading && !error && (!result || !result.data)) {
+    return <>
+      <section className="period-ai-card period-ai-ready">
+        <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>자연어 해설 준비됨</h3></div></div>
+        <p className="period-ai-summary">계산은 끝났어. 검증된 Gemini 해설이 저장되어 있지 않으면 여기서 불러올 수 있어.</p>
+        <p className="ai-preflight-cost">{costPreview}</p>
+        <div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
+      </section>
+      {technicalFallback}
+    </>
+  }
+
+  if (loading && !result) {
+    return <>
+      <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls"><ExternalPromptCopy onCopy={onCopyPrompt}/>{canCancel && <button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+      {technicalFallback}
+    </>
+  }
+
   if (error && !result?.data) {
+    const failedUsage = estimateGeminiUsage(result?.usage)
     const quotaLimited = /Gemini HTTP 429|RESOURCE_EXHAUSTED/i.test(error)
     const message = quotaLimited
       ? '운세 계산은 정상 완료됐어. 지금은 해설 서버의 사용 한도가 소진돼 자연어 해설만 잠시 만들 수 없어. 한도가 복구된 뒤 다시 불러오면 계산 결과는 그대로 이어서 해설할 수 있어.'
       : error
-    return <><section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>{technicalFallback}</>
+    return <>
+      <section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens ?? 0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(failedUsage.thought_tokens ?? 0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count ?? 1}회 · 약 {Math.round(failedUsage.estimated_krw ?? 0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>
+      {technicalFallback}
+    </>
   }
+
   if (!result?.ok || !result.data) return technicalFallback
 
-  const data = westernOnly ? {...result.data,cross_checks:[],systems:{western:result.data.systems?.western,saju:'',thai:''}} : result.data
-  const importanceRank = (value?: string) => value === '핵심' ? 0 : value === '주목' ? 1 : 2
-  const topicEntries = normalizeTopicEntries(data.topic_analysis, topicOrder).filter(([topic])=>!field||field.topics.includes(topic)).sort((a,b)=>importanceRank(a[1]?.importance)-importanceRank(b[1]?.importance))
-  const readiness = fortuneAiPrecisionReadiness(calculation)
-  const narrativeValidation = result.usage?.quality_validation
-  const narrativeOrigin = fortuneNarrativeOrigin(result.model, result.origin)
-  const verifiedNarrative = !westernOnly && narrativeOrigin === 'gemini' && !result.usage?.local_quality_fallback && interpretationHeroEligible(narrativeValidation, result.usage)
-  const baseSummary = buildFortuneUserSummary(field ? {...data,key_windows:data.key_windows?.filter(w=>w.topics?.some(t=>field.topics.includes(t))).map(w=>({...w,topics:w.topics.filter(t=>field.topics.includes(t))}))} : data, { verifiedNarrative, focusTopics:field?.topics, period, calculation, topicEntries, allowIntraday: readiness.ok && readiness.mode === 'exact' })
-  const userSummary = field?.id==='love' ? applyLoveContext(baseSummary, calculation, loveStatus ?? 'single') : baseSummary
-  const referenceFlowCards = relationshipReferenceFlowCards(userSummary, calculation)
-  const usage = estimateGeminiUsage(result.usage)
-  const cached = cacheSource === 'local' || cacheSource === 'server'
-  const validation = result.usage?.quality_validation
-  const validationPassed = interpretationQualityPassed(validation)
-  const localQualityFallback = Boolean(result.usage?.local_quality_fallback)
-  const degradedQuality = Boolean(result.usage?.degraded_quality)
-  const decisions = data.decisions ?? []
-  const keyWindows = data.key_windows ?? []
-  const crossChecks = data.cross_checks ?? []
-  const technicalEvidence = (calculation.western.daily_scores ?? []).flatMap((day)=>
-    (day.evidence ?? []).map((evidence)=>({ date: day.date, evidence })),
-  ).slice(0, 16)
-  const deterministicLocal = isDeterministicFortuneModel(result.model) || narrativeOrigin === 'deterministic_safe' || localQualityFallback
-  const verifiedHero = verifiedNarrative && !field && !westernOnly
-  // Short-period semantic copy remains the fallback only when no verified model hero is available.
-  const semanticHero = !westernOnly && (period === 'today' || period === 'week') && !verifiedHero
-  const heroHeadline = semanticHero
-    ? userSummary.headline
-    : verifiedHero ? visibleAiText(data.headline) || userSummary.headline : userSummary.headline
-  const heroSummary = semanticHero
-    ? userSummary.summary
-    : verifiedHero
-      ? visibleAiText(data.overall.summary) || userSummary.summary
-      : field?.id!=='love'&&!westernOnly&&systemSummary ? systemSummary : userSummary.summary
-  const dailyLead = period === 'today' ? splitReadingLead(heroHeadline) : { title: heroHeadline, detail: '' }
-  const dailyLeadCard = period === 'today'
-    ? [...userSummary.favorableCards, ...userSummary.cautionCards]
-      .sort((a,b)=>Math.abs(b.score-50)-Math.abs(a.score-50))[0]
-    : undefined
-  const dateSemantics = readingDateSemantics(calculation.period.start)
-
-  return <section className="period-ai-card period-ai-v18">
-    <div className="reading-copy-access"><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
-    <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">{field?.label ?? (deterministicLocal ? '자동 운세 해설' : '맞춤 운세 해설')} · {userSummary.when} 핵심</span><span className="reading-period-date">{periodLabel(calculation.period.start, calculation.period.end)}</span>{period === 'today' && !dateSemantics.isActualToday ? <small className="reading-actual-today">실제 오늘 · {browserLocalDateIso()}</small> : null}<h3>{dailyLead.title}</h3><p className="reading-hero-subtitle">{[dailyLead.detail,heroSummary].filter(Boolean).join(' ')}</p>{dailyLeadCard&&<div className="daily-reading-signal" aria-label={`${dailyLeadCard.topic} 분야 상대 활성도 ${Math.round(dailyLeadCard.score)}점`}><strong>{Math.round(dailyLeadCard.score)}점</strong><span><b>{dailyLeadCard.topic}</b>이 {dateSemantics.dayLabel} 가장 두드러진 분야<small>분야별 상대 활성도 · 사건이 생길 확률은 아님</small></span></div>}</div></div>
-
-    {field?.id==='investment'&&<p className="reading-safety-note">실제 시장 데이터와 투자 원칙이 우선이야. 신규진입·수익실현 점수는 매수·매도 시점이나 가격 예측이 아니야.</p>}
-    <div className="reading-flows"><h4 className="reading-section-heading">한눈에 보는 흐름</h4><FortuneFlowCards title={userSummary.doTitle} items={userSummary.favorableCards}/>{!!referenceFlowCards.length&&<FortuneFlowCards title="참고할 흐름" items={referenceFlowCards}/>}<FortuneFlowCards title={userSummary.cautionTitle} items={userSummary.cautionCards} caution/></div>
-
-    {field?.id==='love' && (loveStatus??'single')==='single' && <section className="single-love-scenarios"><h4>내 상황에 맞춰 읽기</h4><p>여러 상황이 함께 있어도 돼. 해당하는 해설을 함께 읽어봐.</p>{singleLoveScenarios(calculation).map(item=><details key={item.title}><summary>{item.title}</summary><p>{item.text}</p></details>)}</section>}
-    {!westernOnly&&systemOverview}
-
-    {!!userSummary.importantWindows.length && <section className="period-ai-quick-dates period-ai-user-windows">
-      <div className="period-ai-section-title"><span>중요한 시기</span><strong>활용 시기와 주의 시기</strong></div>
-      <ReadingTimeline events={userSummary.importantWindows.map(w=>({date:w.date,kind:w.semantic ?? w.kind ?? 'mixed',label:w.guidance,status:w.kind==='caution'?'주의':w.kind==='favorable'?'활용':'혼합'}))}/>
-    </section>}
-
-    {userSummary.relationship ? <section className="period-ai-window-section period-ai-relationship-section">
-      <div className="period-ai-section-title"><span>연락 흐름</span></div>
-      <article className="period-ai-window period-ai-relationship-summary"><p>{userSummary.relationship.summary}</p>
-        <ReadingDirections rows={[
-          {kind:'incoming',label:'외부 연락 반응',band:userSummary.relationship.incomingBand,text:userSummary.relationship.incoming,timing:userSummary.relationship.incomingTiming},
-          {kind:'outgoing',label:'내 연락 실행 적합도',band:userSummary.relationship.outgoingBand,text:userSummary.relationship.outgoing,timing:userSummary.relationship.outgoingTiming},
-          ...(userSummary.relationship.reconnection?[{kind:'reconnection' as const,label:'과거 인연 재접점',band:userSummary.relationship.reconnectionBand,text:userSummary.relationship.reconnection,timing:userSummary.relationship.reconnectionTiming}]:[]),
-        ]}/>
-
-      </article>
-    </section> : null}
-
-    {!!userSummary.focusTopics.length && <section className={`period-ai-window-section period-ai-user-focus ${period==='today'?'is-daily-reading-story':''}`}>
-      <div className="period-ai-section-title"><span>{period==='today'?`${dateSemantics.dayLabel}을 풀어보면`:userSummary.focusTitle}</span><strong>{period==='today'?'결론부터 현실 장면까지':'현실에서 이렇게 봐'}</strong></div>
-      <div className="period-ai-topic-list">{userSummary.focusTopics.map((item)=>{
-        const visibleDepth = visibleTopicDepth(item.conclusion, item.observe)
-        const explanation = <><ReadingExplanation kind="reason">{item.reason}</ReadingExplanation>{item.timing&&<ReadingExplanation kind="timing">{item.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.action} {item.observe !== item.action && item.observe !== visibleDepth ? item.observe : null}</ReadingExplanation>{item.caution&&<ReadingExplanation kind="caution">{item.caution}</ReadingExplanation>}</>
-        return <article className={`period-ai-topic ${period==='today'?'daily-reading-topic':''}`} key={`user-topic-${item.topic}`}><strong>{item.topic}</strong><b>{item.conclusion}</b>{visibleDepth&&<p>{visibleDepth}</p>}{period==='today'&&userSummary.focusTopics.indexOf(item)<2?<div className="daily-reading-topic-depth">{explanation}</div>:<details className="reading-topic-depth" open={period!=='today'&&userSummary.focusTopics.indexOf(item)<2}><summary>이 분야의 해설</summary>{explanation}</details>}</article>
-      })}</div>
-    </section>}
-
-    {!!userSummary.referenceTopics.length && <details className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"><summary>다른 분야 보기</summary><div className="period-ai-topic-list">{userSummary.referenceTopics.map((item)=><article className="period-ai-topic is-reference" key={`user-reference-${item.topic}`}><strong>{item.topic} · {item.band}</strong><p>{item.detail?.conclusion ?? item.summary}</p>{item.detail && <details><summary>이 분야의 해설</summary><ReadingExplanation kind="reason">{item.detail.reason}</ReadingExplanation>{item.detail.timing && <ReadingExplanation kind="timing">{item.detail.timing}</ReadingExplanation>}<ReadingExplanation kind="practice">{item.detail.action}</ReadingExplanation>{item.detail.caution && <ReadingExplanation kind="caution">{item.detail.caution}</ReadingExplanation>}</details>}</article>)}</div></details>}
-
-    <details className="period-ai-details">
-      <summary>계산 근거 자세히 보기</summary>
-      <div className="period-ai-detail-body">
-        {technicalDetails}
-        {(localQualityFallback || degradedQuality) ? <div className="period-ai-quality-fallback"><CheckCircle2 size={15}/><div><strong>{localQualityFallback ? '검증 실패 부분 안전 보정본' : '핵심 검증 통과 · 일부 깊이 보정'}</strong><span>{result.usage?.quality_warning || (localQualityFallback ? '추가 Gemini 호출 없이 계산 근거만으로 보정해 표시했어.' : '결과를 숨기지 않고 통과한 근거를 기준으로 표시했어.')}</span></div></div> : null}
-        {validation?.stages?.length ? <div className={`period-ai-validation ${validationPassed ? 'is-passed' : 'is-partial'}`}><CheckCircle2 size={15}/><strong>{validationPassed ? '5단계 검증 통과' : '해설 검증 결과'}</strong><span>{validation.score ?? 0}/100</span></div> : null}
-        <div className="period-ai-cache-note"><CheckCircle2 size={14}/><span>{cached ? '저장된 검증 해설 조회 · 이번 Gemini API 재호출 0회' : '최초 검증 해설 자동 저장 · 같은 계산값 재조회는 Gemini API 0회'}</span></div>
-
-        <div className="period-ai-section"><strong>원문 전체 요약</strong><p>{data.headline}{'\n\n'}{data.overall.summary}{data.overall.dominant_pattern ? `\n\n${data.overall.dominant_pattern}` : ''}</p></div>
-        <div className="period-ai-section"><strong>분야별 원점수</strong><p>{topicEntries.map(([topic])=>{const stat=calculation.western.overall?.[topic];return stat?`${topic} ${stat.average.toFixed(1)}점 · ${stat.band}`:''}).filter(Boolean).join('\n')}</p></div>
-
-        {!!keyWindows.length && <div className="period-ai-section"><strong>날짜와 구간 원문</strong><div className="period-ai-windows">{keyWindows.map((item,index)=><article className={`period-ai-window ${signalClass(item.signal)}`} key={`technical-window-${item.start}-${index}`}><div className="period-ai-window-head"><div><b>{periodLabel(item.start,item.end)}</b><strong>{visibleAiText(item.label)}</strong></div><span>{item.signal}</span></div>{!!item.topics?.length&&<div className="period-ai-window-topics">{item.topics.map((topic)=><span key={topic}>{topic}</span>)}</div>}<p>{visibleAiText(item.summary)}</p>{item.action&&<div className="period-ai-window-line"><b>활용</b><span>{item.action}</span></div>}{item.avoid&&<div className="period-ai-window-line is-avoid"><b>주의</b><span>{item.avoid}</span></div>}</article>)}</div></div>}
-
-        {!!decisions.length && <div className="period-ai-section"><strong>행동 판단 원문</strong><div className="period-ai-actions">{decisions.map((item,index)=><article key={`technical-decision-${index}-${item.action}`}><span className="period-ai-action-index">{index+1}</span><div><strong>{visibleAiText(item.action)}</strong>{item.timing&&<b className="period-ai-action-time">{item.timing}</b>}{item.reason&&<p>{visibleAiText(item.reason)}</p>}{item.watch&&<p className="period-ai-condition"><b>판단</b><span>{visibleAiText(item.watch)}</span></p>}{item.avoid&&<p className="period-ai-condition is-avoid"><b>주의</b><span>{visibleAiText(item.avoid)}</span></p>}</div></article>)}</div></div>}
-
-        <div className="period-ai-section"><strong>분야별 종합 원문</strong><p>{[`관계 · ${editorialGroupCopy(data.clusters.relationship)}`,`일·학업 · ${editorialGroupCopy(data.clusters.work_study)}`,`돈·소식 · ${editorialGroupCopy(data.clusters.money_news)}`,`투자 · ${editorialGroupCopy(data.clusters.investment)}`,`컨디션 · ${editorialGroupCopy(data.clusters.condition)}`].join('\n\n')}</p></div>
-        {!!data.priorities?.length && <div className="period-ai-section"><strong>우선순위 원문</strong><p>{data.priorities.map((item,index)=>`${index+1}. ${item}`).join('\n')}</p></div>}
-
-        {data.relationship_reading ? <div className="period-ai-section"><strong>관계 해설 원문</strong><p>{[data.relationship_reading.context,data.relationship_reading.flow,data.relationship_reading.focus_timing,data.relationship_reading.watch,data.relationship_reading.avoid,data.contact_flow?.incoming,data.contact_flow?.outgoing,data.contact_flow?.reconnection].filter(Boolean).map((item)=>visibleAiText(String(item))).join('\n\n')}</p></div> : null}
-
-        {!!technicalEvidence.length && <div className="period-ai-section"><strong>점성 근거 원문</strong><p>{technicalEvidence.map(({date,evidence})=>`${date} · ${evidence.text || [evidence.transit,evidence.aspect,evidence.target].filter(Boolean).join(' ')}${Number.isFinite(evidence.orb) ? ` · orb ${Number(evidence.orb).toFixed(2)}°` : ''}${evidence.motion ? ` · ${evidence.motion}` : ''}`).join('\n')}</p></div>}
-
-        {!!crossChecks.length && <div className="period-ai-section period-ai-cross-section"><strong>체계 교차검증</strong><p className="period-ai-cross-note">세 체계를 합산하거나 다수결하지 않고 같은 시기의 독립 근거를 비교해.</p><div className="period-ai-cross-list">{crossChecks.map((item,index)=><article key={`${item.start}-${item.label}-${index}`}><div><b>{periodLabel(item.start,item.end)}</b><span>{item.mode}</span></div><strong>{visibleAiText(item.label)}</strong><p><b>Western</b> {item.western}</p><p><b>사주</b> {item.saju}</p><p><b>Thai</b> {item.thai}</p><p className="period-ai-cross-synthesis"><b>종합</b> {item.synthesis}</p></article>)}</div></div>}
-
-        {!!topicEntries.length && <div className="period-ai-section"><strong>분야별 해설과 확신도</strong><div className="period-ai-topic-list">{topicEntries.map(([topic,item])=><article className="period-ai-topic" key={`technical-topic-${topic}`}><strong>{topic} · {item.importance}</strong><b>{visibleAiText(item.verdict)}</b>{item.reason&&<p>근거 · {visibleAiText(item.reason)}</p>}{item.timing&&<p>시기 · {item.timing}</p>}{item.action&&<p>활용 · {item.action}</p>}{item.avoid&&<p>주의 · {item.avoid}</p>}<p>확신도 · {item.confidence}{item.confidence_reason?` · ${visibleAiText(item.confidence_reason)}`:''}</p></article>)}</div></div>}
-
-        <div className="period-ai-section"><strong>체계별 계산 해설</strong><p>{[data.systems?.western&&`서양점성술 · ${data.systems.western}`,data.systems?.saju&&`사주 · ${data.systems.saju}`,data.systems?.thai&&`태국점성술 · ${data.systems.thai}`].filter(Boolean).join('\n\n')}</p></div>
-        {data.limits && <div className="period-ai-section"><strong>해설 한계</strong><p>{data.limits}</p></div>}
-        {usage?.total_tokens ? <div className="period-ai-cost"><span>입력 {(usage.prompt_tokens??0).toLocaleString()} · 출력 {(usage.candidate_tokens??0).toLocaleString()} · 사고 {(usage.thought_tokens??0).toLocaleString()} tokens</span><b>${Number(usage.estimated_usd??0).toFixed(4)} ≈ {Math.round(usage.estimated_krw??0).toLocaleString()}원</b><small>{`실제 Gemini 호출 ${usage.attempt_count??1}회 · 최대 2회 · `}{usage.thai_safety_fallback?'Thai 안전 대체 결과 · ':usage.thai_safety_retry?'Thai 안전 재검증 통과 · ':''}저장본 재조회 비용 0원</small></div> : null}
-
-      </div>
-    </details>
-  </section>
+  return <PeriodFortuneNarrativeV2
+    loveStatus={loveStatus}
+    systemOverview={systemOverview}
+    systemSummary={systemSummary}
+    westernOnly={westernOnly}
+    field={field}
+    period={period}
+    calculation={calculation}
+    result={result}
+    technicalDetails={technicalDetails}
+  />
 }

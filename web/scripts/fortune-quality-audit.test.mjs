@@ -87,14 +87,22 @@ test('live mode rejects fake provenance and incomplete V23 output', () => {
   const report = evaluateCases([row], { mode: 'live' })
   assert.equal(report.summary.failed, 1)
   assert.equal(report.live_gemini_cases, 0)
-  assert.ok(report.cases[0].issues.some(i => i.code === 'GEMINI_ORIGIN_UNVERIFIED'))
+  assert.ok(report.cases[0].issues.some(i => i.code === 'GEMINI_PROVENANCE_UNVERIFIED'))
   assert.ok(report.cases[0].issues.some(i => i.code === 'V23_VERSION_UNVERIFIED'))
   assert.ok(report.cases[0].issues.some(i => i.code === 'V23_QUALITY_STAGE_FAILED'))
 })
 test('real Gemini provenance is counted only with a V23 version', () => {
   const row = sample()
   row.result.origin = 'gemini'
-  row.result.interpreter_version = 'supabase-ai-v23.9-gemini-single-author-v1'
+  row.result.provenance_verified = true
+  row.result.model = 'gemini-3.6-flash'
+  row.result.interpreter_version = 'supabase-ai-v23.9-gemini-single-author-v2'
+  row.result.usage = {
+    generation_version: row.result.interpreter_version,
+    attempt_count: 1,
+    call_trace: [{ call:1, model:row.result.model, kind:'initial', http_status:200, usage:{ total_tokens:100 } }],
+    quality_validation: { stages:[1,2,3,4,5,6].map(stage => ({ stage, passed:true })) },
+  }
   const report = evaluateCases([row], { mode: 'live' })
   assert.equal(report.live_gemini_cases, 1)
   assert.ok(report.summary.failed >= 1) // synthetic data is not valid real interpretation

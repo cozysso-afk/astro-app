@@ -11,7 +11,6 @@ import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
 import { fortuneNarrativeOrigin } from './lib/fortuneNarrativeOrigin'
 import { interpretationHeroEligible } from './lib/interpretationTopics'
-import { BasicFortuneReading } from './BasicFortuneReading'
 import { exportReadingImages } from './lib/readingImageExport'
 import './reading-image-export.css'
 
@@ -157,10 +156,6 @@ export function PeriodFortuneResults({
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>외부 연락 반응 신호와 내 연락 실행 적합도는 서로 다른 계산축이야. 특정 상대가 먼저 연락할 사람을 판정하지는 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>} 
-      <details className="period-fallback-reading" open={!hasNaturalReading && !aiLoading}>
-        <summary><span>기본 해설 보기</span><small>{hasNaturalReading ? 'AI 해설을 보충하는 계산 요약' : 'AI 해설이 지연되면 먼저 확인'}</small></summary>
-        <BasicFortuneReading calculation={result} period={period} field={field}/>
-      </details>
     </></SystemReadingViews>
     {field?.id==='love'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>

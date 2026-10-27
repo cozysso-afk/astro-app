@@ -106,13 +106,32 @@ async function runCase(row, config) {
     if (status?.status === 'done' || status?.status === 'failed') break
     await sleep(2000)
   }
-  if (status?.status !== 'done' || !status?.data) throw new Error('V23 job failed or timed out')
+  if (status?.status !== 'done' || !status?.data) {
+    return {
+      id: row.id + '-' + row.kind, profile_id: row.id, period_kind: row.kind,
+      payload,
+      result: { data: null, origin: status?.origin, provenance_verified: status?.provenance_verified === true,
+        model: status?.model, usage: status?.usage, interpreter_version: status?.interpreter_version },
+      runner_error_code: status?.status === 'failed' ? 'V23_JOB_FAILED' : 'V23_JOB_TIMEOUT',
+    }
+  }
   return {
     id: row.id + '-' + row.kind, profile_id: row.id, period_kind: row.kind,
     payload,
-    result: { data: status.data, origin: status.origin,
-      interpreter_version: status.interpreter_version },
+    result: { data: status.data, origin: status.origin, provenance_verified: status.provenance_verified === true,
+      model: status.model, usage: status.usage, interpreter_version: status.interpreter_version },
   }
+}
+
+function safeRunnerErrorCode(error) {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  if (message.startsWith('QA upstream HTTP status ')) return 'UPSTREAM_HTTP_ERROR'
+  if (message === 'Integrated calculation failed') return 'CALCULATION_FAILED'
+  if (message === 'Exact precision gate failed') return 'PRECISION_GATE_FAILED'
+  if (message.startsWith('V23 inspection/budget gate failed')) return 'V23_INSPECTION_FAILED'
+  if (message === 'V23 start failed') return 'V23_START_FAILED'
+  if (message === 'V23 job failed or timed out') return 'V23_JOB_FAILED'
+  return 'LIVE_RUNNER_ERROR'
 }
 async function main() {
   if (process.env.QA_LIVE_APPROVED !== 'YES') throw new Error('Explicit QA_LIVE_APPROVED=YES required')
@@ -129,13 +148,14 @@ async function main() {
     try {
       results.push(await runCase(row, config))
       console.log('Completed synthetic live QA case ' + row.id + ' (' + row.kind + ')')
-    } catch {
+    } catch (error) {
       // Never log payloads, Gemini text, auth details or user-identifying data.
       console.error('Synthetic live QA case failed: ' + row.id)
       results.push({
         id: row.id + '-' + row.kind, profile_id: row.id, period_kind: row.kind,
         payload: { period_kind: row.kind, period: { start: row.start, end: row.end }, evidence_ledger: [] },
         result: null,
+        runner_error_code: safeRunnerErrorCode(error),
       })
     }
   }

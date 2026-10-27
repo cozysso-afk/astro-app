@@ -190,7 +190,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
   if(relationshipSalient){
     const rr=data?.relationship_reading??{};
     const rows=(rr?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
-    const directional=new Set(["수신신호","발신적합","과거인연접점","연애","연락","재회"]);
+    const directional=new Set(["수신신호","발신적합","과거인연접점"]);
     if(rows.length<2)s4.push("관계·재회 핵심 흐름 근거 2개 미만");
     if(!rows.some(r=>directional.has(String(r?.topic??""))))s4.push("관계·재회 핵심 흐름에 관계 방향축 근거 없음");
   }

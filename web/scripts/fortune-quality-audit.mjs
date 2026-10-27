@@ -20,10 +20,15 @@ function similar(a, b) {
   const x = clean(a), y = clean(b)
   if (x.length < MIN_COMPARE_CHARS || y.length < MIN_COMPARE_CHARS) return false
   if (x === y) return true
+  const shorter = x.length <= y.length ? x : y
+  const longer = x.length > y.length ? x : y
+  if (shorter.length >= 40 && longer.includes(shorter) && shorter.length / longer.length >= 0.68) return true
   const ax = new Set(x.split(' ')), bx = new Set(y.split(' '))
-  if (ax.size < 8 || bx.size < 8) return false
+  if (ax.size < 5 || bx.size < 5) return false
   const shared = [...ax].filter(token => bx.has(token)).length
-  return shared / (ax.size + bx.size - shared) >= 0.88
+  const jaccard = shared / (ax.size + bx.size - shared)
+  const containment = shared / Math.min(ax.size, bx.size)
+  return jaccard >= 0.72 || containment >= 0.84
 }
 function sections(data) {
   const rows = []
@@ -77,13 +82,35 @@ function issue(code, severity = 'error', details = {}) {
   return { code, severity, ...details }
 }
 function unwrap(result) {
-  if (!result || typeof result !== 'object') return { data: null, origin: '', version: '' }
+  if (!result || typeof result !== 'object') return { data: null, origin: '', version: '', usage: {}, model: '', provenanceVerified: false }
   const data = result.result_json ?? result.data ?? (result.topic_analysis ? result : null)
   return {
     data,
     origin: String(result.origin ?? result.usage?.origin ?? ''),
     version: String(result.interpreter_version ?? result.version ?? ''),
+    usage: result.usage && typeof result.usage === 'object' ? result.usage : {},
+    model: String(result.model ?? ''),
+    provenanceVerified: result.provenance_verified === true,
   }
+}
+
+function providerAudit(result) {
+  const { origin, version, usage, model, provenanceVerified } = unwrap(result)
+  const trace = Array.isArray(usage.call_trace) ? usage.call_trace.slice(0, 2).map(row => ({
+    call: Number(row?.call ?? 0), model: String(row?.model ?? ''), kind: String(row?.kind ?? ''),
+    http_status: Number(row?.http_status ?? 0), finish_reason: String(row?.finish_reason ?? ''),
+    outcome: String(row?.outcome ?? ''),
+    prompt_tokens: Number(row?.usage?.prompt_tokens ?? 0), candidate_tokens: Number(row?.usage?.candidate_tokens ?? 0),
+    thought_tokens: Number(row?.usage?.thought_tokens ?? 0), total_tokens: Number(row?.usage?.total_tokens ?? 0),
+  })) : []
+  const successfulCalls = trace.filter(row => row.http_status >= 200 && row.http_status < 300 && row.model === model).length
+  const stages = Array.isArray(usage?.quality_validation?.stages)
+    ? usage.quality_validation.stages.map(row => ({ stage: Number(row?.stage), passed: row?.passed === true })) : []
+  const generationVersion = String(usage?.generation_version ?? '')
+  const verified = provenanceVerified && origin === 'gemini' && version.startsWith('supabase-ai-v23.')
+    && generationVersion === version && successfulCalls > 0 && stages.length === 6 && stages.every(row => row.passed)
+  return { verified, model, generation_version: generationVersion, successful_calls: successfulCalls,
+    attempt_count: Number(usage?.attempt_count ?? trace.length), call_trace: trace, quality_stages: stages }
 }
 function inPeriod(date, start, end) {
   return ISO.test(date) && ISO.test(start) && ISO.test(end) && date >= start && date <= end
@@ -91,6 +118,7 @@ function inPeriod(date, start, end) {
 function evaluateOne(row, mode) {
   const problems = []
   const { data, origin, version } = unwrap(row?.result)
+  const provider = providerAudit(row?.result)
   const payload = row?.payload ?? {}
   const period = row?.period_kind ?? payload?.period_kind
   const id = String(row?.id ?? '')
@@ -102,7 +130,7 @@ function evaluateOne(row, mode) {
   if (!ISO.test(start) || !ISO.test(end) || start > end) problems.push(issue('INVALID_PERIOD_RANGE'))
   if (!data || typeof data !== 'object' || Array.isArray(data)) problems.push(issue('RESULT_MISSING'))
   if (mode === 'live') {
-    if (origin !== 'gemini') problems.push(issue('GEMINI_ORIGIN_UNVERIFIED'))
+    if (!provider.verified) problems.push(issue('GEMINI_PROVENANCE_UNVERIFIED'))
     if (!version.startsWith('supabase-ai-v23.')) problems.push(issue('V23_VERSION_UNVERIFIED'))
   }
   const known = new Set((Array.isArray(payload?.evidence_ledger) ? payload.evidence_ledger : [])
@@ -120,7 +148,10 @@ function evaluateOne(row, mode) {
   const authored = sections(data)
   for (let a = 0; a < authored.length; a++) {
     for (let b = a + 1; b < authored.length; b++) {
-      if (similar(authored[a].text, authored[b].text)) {
+      const repeated = mode === 'live'
+        ? similar(authored[a].text, authored[b].text)
+        : clean(authored[a].text) === clean(authored[b].text)
+      if (repeated) {
         problems.push(issue('REPEATED_TOPIC_PROSE', 'warning', {
           topics: [authored[a].topic, authored[b].topic],
         }))
@@ -143,27 +174,31 @@ function evaluateOne(row, mode) {
   return {
     id, profile_id: profile, period_kind: period,
     status: problems.some(p => p.severity === 'error') ? 'failed' : problems.length ? 'review' : 'passed',
-    origin_verified: mode === 'live' && origin === 'gemini' && version.startsWith('supabase-ai-v23.'),
+    origin_verified: mode === 'live' && provider.verified,
+    provider,
+    runner_error_code: String(row?.runner_error_code ?? ''),
     evidence_refs_checked: refs.length, topics_checked: authored.length, issues: problems,
     _topics: authored,
   }
 }
-function checkAcrossCases(cases) {
+function checkAcrossCases(cases, mode) {
   const seen = new Map()
   for (const row of cases) {
     for (const topic of row._topics) {
-      const norm = clean(topic.text)
-      if (norm.length < MIN_COMPARE_CHARS) continue
-      const key = topic.topic + ':' + norm
-      const prior = seen.get(key)
-      if (prior && prior.id !== row.id) {
+      const priorRows = seen.get(topic.topic) ?? []
+      const prior = priorRows.find(candidate => candidate.id !== row.id && (mode === 'live'
+        ? similar(candidate.text, topic.text)
+        : clean(candidate.text) === clean(topic.text)))
+      if (prior) {
         const code = prior.profile_id !== row.profile_id
           ? 'CROSS_PROFILE_IDENTICAL_PROSE' : 'CROSS_PERIOD_IDENTICAL_PROSE'
         row.issues.push(issue(code, 'warning', {
           topic: topic.topic, compared_case: prior.id,
         }))
         if (row.status === 'passed') row.status = 'review'
-      } else if (!prior) seen.set(key, { id: row.id, profile_id: row.profile_id })
+      }
+      priorRows.push({ id: row.id, profile_id: row.profile_id, text: topic.text })
+      seen.set(topic.topic, priorRows)
     }
   }
 }
@@ -198,7 +233,7 @@ export function evaluateCases(input, { mode = 'live', visual = null } = {}) {
     }
     ids.add(row.id)
   }
-  checkAcrossCases(cases)
+  checkAcrossCases(cases, mode)
   const profiles = new Set(cases.map(row => row.profile_id))
   const visualResult = checkVisual(visual)
   const safeCases = cases.map(({ _topics, ...row }) => row)
@@ -258,7 +293,7 @@ export function renderHtml(report) {
   const s = report.summary
   const status = report.fixture_only
     ? 'TEST HARNESS ONLY — NO LIVE GEMINI RESPONSES TESTED'
-    : 'LIVE GEMINI RESULT AUDIT'
+    : report.live_gemini_cases > 0 ? 'LIVE GEMINI RESULT AUDIT' : 'LIVE AUDIT — NO VERIFIED GEMINI RESULT'
   const rowHtml = row =>
     '<tr><td>' + escapeHtml(row.id) + '</td><td>' + escapeHtml(row.period_kind) +
     '</td><td>' + escapeHtml(row.status) + '</td><td>' +
