@@ -43,6 +43,40 @@ test('single-author projection never leaks deterministic fallback prose',()=>{
   assert.equal(authored['직장'].avoid,'Gemini 조건')
 })
 
+test('single-author metadata cannot claim high confidence or core importance without strong evidence',()=>{
+  const deterministic=[{
+    topic:'직장',importance:'핵심',confidence:'높음',evidence_refs:['W:work'],
+  }]
+  const data={clusters:{work_study:{work:{
+    conclusion:'Gemini 결론',real_scene:'Gemini 장면',action:'Gemini 행동',change_condition:'Gemini 조건',
+    evidence_refs:['W:work'],applicability:'direct',
+  }}}}
+  const weak=buildAuthoredTopicAnalysisOnly(data,deterministic,{evidence_ledger:[{id:'W:work',system:'western'}]})
+  assert.equal(weak['직장'].importance,'주목')
+  assert.equal(weak['직장'].confidence,'보통')
+
+  const strong=structuredClone(data)
+  strong.clusters.work_study.work.evidence_refs.push('S:work')
+  const supported=buildAuthoredTopicAnalysisOnly(strong,deterministic,{evidence_ledger:[
+    {id:'W:work',system:'western'},{id:'S:work',system:'saju'},
+  ]})
+  assert.equal(supported['직장'].importance,'핵심')
+  assert.equal(supported['직장'].confidence,'높음')
+})
+
+test('relationship salience requires a relationship-direction evidence axis',()=>{
+  const deterministic=[{topic:'연애',importance:'핵심',confidence:'높음'}]
+  const data={clusters:{relationship:{love_general:{
+    conclusion:'Gemini 결론',real_scene:'Gemini 장면',action:'Gemini 행동',change_condition:'Gemini 조건',
+    evidence_refs:['W:generic','S:generic'],applicability:'direct',
+  }}}}
+  const projected=buildAuthoredTopicAnalysisOnly(data,deterministic,{evidence_ledger:[
+    {id:'W:generic',system:'western',topic:'대인관계'},
+    {id:'S:generic',system:'saju',topic:'대인관계'},
+  ]})
+  assert.equal(projected['연애'].importance,'참고')
+})
+
 test('stabilizer preserves grounded authored prose and falls back only when needed',()=>{
   assert.match(stabilizer,/out\.summary=String\(out\?\.summary/)
   assert.match(stabilizer,/data\.overall\.summary=String\(data\.overall\.summary/)
