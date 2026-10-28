@@ -27,11 +27,11 @@ jobs:
         run: |
           npm ci
           npm run build -- --base=/astro-app/mobile/
-      - name: Publish generated mobile build to review branch
+      - name: Publish generated mobile build to the single review branch
         shell: bash
         run: |
           set -euo pipefail
-          BRANCH="deploy/mobile-pages-${GITHUB_SHA:0:12}"
+          BRANCH="deploy/mobile-pages-latest"
           rm -rf mobile
           mkdir -p mobile
           cp -R web/dist/. mobile/
@@ -39,11 +39,39 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f mobile
-          if git diff --cached --quiet; then
-            echo 'Mobile build is already current.'
-            exit 0
-          fi
           git checkout -B "$BRANCH"
-          git commit -m 'deploy: refresh mobile frontend on GitHub Pages [skip render]'
-          git push --force-with-lease origin "HEAD:refs/heads/$BRANCH"
+          git commit --allow-empty -m 'deploy: refresh mobile frontend on GitHub Pages [skip render]'
+          git push --force origin "HEAD:refs/heads/$BRANCH"
           echo "Mobile review branch: $BRANCH"
+
+      - name: Remove superseded generated and merged work branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t LEGACY_DEPLOY_BRANCHES < <(
+            git ls-remote --heads origin 'refs/heads/deploy/mobile-pages-*' |
+              awk '{sub("refs/heads/", "", $2); print $2}' |
+              grep -E '^deploy/mobile-pages-[0-9a-f]{12}$' || true
+          )
+          MERGED_WORK_BRANCHES=(
+            'fix/v23-temporal-wording-v9'
+            'fix/v23-structure-retry-v10'
+            'fix/v23-bundle-without-jsr-types'
+            'fix/v23-topic-scoped-window-v11'
+            'fix/v23-projection-dedupe'
+            'test/v23-live-mobile-qa'
+            'fix/v23-stored-status-route'
+            'fix/historical-gemini-provenance'
+            'fix/fortune-audit-timezone-windows'
+            'test/stored-v12-quality-replay'
+          )
+          TO_DELETE=("${LEGACY_DEPLOY_BRANCHES[@]}")
+          for branch in "${MERGED_WORK_BRANCHES[@]}"; do
+            if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
+              TO_DELETE+=("$branch")
+            fi
+          done
+          for ((offset=0; offset<${#TO_DELETE[@]}; offset+=25)); do
+            git push origin --delete "${TO_DELETE[@]:offset:25}"
+          done
+          echo "Removed ${#TO_DELETE[@]} superseded branches."
