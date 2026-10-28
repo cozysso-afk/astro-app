@@ -104,6 +104,20 @@ test('reason action and caution render as separately labelled accessible layers'
   assert.match(html,/reading-hero-subtitle/)
   assert.match(html,/reading-period-date/)
 })
+test('field hero does not repeat its projected cluster in a second detail card',()=>{
+  const f=fortuneFixture('today')
+  const conclusion='중복표시검증 결론은 담당자와 마감일을 먼저 확정하는 쪽이야.'
+  f.data.clusters={work_study:{work:{
+    conclusion,
+    real_scene:'업무 요청에 담당자와 완료 기준이 함께 적혀 있는지가 현실 장면이야.',
+    action:'담당자와 마감일을 한 문장으로 확인해.',
+    change_condition:'담당자가 마감일을 확정하면 진행하고 답이 없으면 보류해.',
+    evidence_refs:['W:fixture'],applicability:'direct',
+  }}}
+  const html=renderToStaticMarkup(createElement(Fortune,{field:{id:'work',label:'직업운',desc:'현재 업무와 책임',topics:['직장'],lens:'직업'},period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
+  const visible=html.split('<details class="period-ai-details"')[0]
+  assert.equal((visible.match(/중복표시검증/g)||[]).length,1)
+})
 
 for(const period of ['today','week','month','year']) test(`rendered ${period} caution contact directions precede long interpretation`,()=>{
   const f=fortuneFixture(period)
