@@ -173,3 +173,30 @@ test("week and month require available W:daily evidence in key windows",()=>{
     assert.equal(fixed.score,100);
   }
 });
+
+test("salient investment accepts the grounded V23 cluster without duplicate legacy copy",()=>{
+  const {data,payload}=buildCase("day");
+  const ref=payload.evidence_ledger[0].id;
+  data.topic_analysis["수익실현"]={
+    ...data.topic_analysis["수익실현"],
+    importance:"주목",
+    evidence_refs:[ref],
+  };
+  data.investment_reading.realization="";
+  data.clusters={
+    ...data.clusters,
+    investment:{
+      realization:{
+        conclusion:"수익실현은 보유 조건과 현금 필요를 함께 점검할 구간이야.",
+        real_scene:"목표 가격보다 사전에 정한 정리 기준이 실제로 충족됐는지 확인하게 돼.",
+        action:"보유 이유와 정리 기준을 다시 적어 봐.",
+        change_condition:"계획한 기준이 충족되지 않았다면 결론을 미뤄.",
+        evidence_refs:[ref],
+        applicability:"direct",
+      },
+    },
+  };
+  const report=inspectInterpretationQuality(data,payload);
+  assert.equal(report.ok,true,JSON.stringify(report,null,2));
+  assert.equal(report.score,100);
+});
