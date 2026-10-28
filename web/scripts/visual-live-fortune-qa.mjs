@@ -18,6 +18,20 @@ const localInput = process.env.LIVE_FORTUNE_QA_INPUT || process.argv[2] || ''
 const jobId = String(process.env.LIVE_FORTUNE_QA_JOB_ID || '').trim()
 if (!localInput && !jobId) throw new Error('LIVE_FORTUNE_QA_INPUT or LIVE_FORTUNE_QA_JOB_ID is required')
 
+function hasStoredGeminiEvidence(status) {
+  const usage = status?.usage
+  const generationVersion = String(usage?.generation_version ?? '')
+  const trace = Array.isArray(usage?.call_trace) ? usage.call_trace : []
+  const stages = usage?.quality_validation?.stages
+  return status?.status === 'done' && Boolean(status?.data)
+    && generationVersion.startsWith('supabase-ai-v23.')
+    && usage?.cost_guard_version === generationVersion
+    && usage?.gemini_paid_call === true
+    && trace.some(row => Number(row?.http_status) >= 200 && Number(row?.http_status) < 300
+      && String(row?.model ?? '') === String(status?.model ?? ''))
+    && Array.isArray(stages) && stages.length === 6 && stages.every(stage => stage?.passed === true)
+}
+
 async function loadStoredResult() {
   if (localInput) return JSON.parse(await readFile(path.resolve(localInput), 'utf8'))
   const { buildQaConfig } = await import('./fortune-live-qa.mjs')
@@ -29,7 +43,7 @@ async function loadStoredResult() {
     signal: AbortSignal.timeout(30_000),
   })
   const status = await response.json().catch(() => null)
-  if (!response.ok || status?.status !== 'done' || !status?.data || status?.provenance_verified !== true) {
+  if (!response.ok || !hasStoredGeminiEvidence(status)) {
     throw new Error('Stored verified Gemini QA job was not available')
   }
   return {
