@@ -121,6 +121,18 @@ export function dedupeHeroSubtitle(summary: string, headline: string) {
   return text
 }
 
+export function isHeroProjectionDuplicate(value: string, ...heroParts: string[]) {
+  const candidate = proseFingerprint(value)
+  if (!candidate) return false
+  return heroParts.some(part => {
+    const hero = proseFingerprint(part)
+    if (!hero) return false
+    if (candidate === hero) return true
+    return Math.min(candidate.length, hero.length) >= 18
+      && (candidate.includes(hero) || hero.includes(candidate))
+  })
+}
+
 function splitDailyHero(value: string) {
   const clean = String(value ?? '').trim()
   const match = clean.match(/^(.+?[.!?])(?:\s+|$)([\s\S]*)$/)
@@ -298,8 +310,13 @@ export function PeriodFortuneNarrativeV2({
       .map(topic => ({ topic, text: editorial.topicEditorial[topic] ?? '' }))
       .filter(item => !domainAnsweredTopics.has(item.topic))
       .filter(item => !['연애','대인관계','연락','재회','투자주의'].includes(item.topic) && editorialCopyUsable(item.text))
+      .filter(item => !isHeroProjectionDuplicate(item.text, heroLead.title, heroSubtitle))
     : []
   const showContactDirectionDetails = Boolean(editorial.contact)
+  const distinctLoveGeneral = isHeroProjectionDuplicate(editorial.loveGeneral ?? '', heroLead.title, heroSubtitle) ? '' : editorial.loveGeneral
+  const distinctInterpersonalSummary = isHeroProjectionDuplicate(editorial.interpersonal?.summary ?? '', heroLead.title, heroSubtitle) ? '' : editorial.interpersonal?.summary
+  const distinctContactActivation = isHeroProjectionDuplicate(editorial.contact?.activation ?? '', heroLead.title, heroSubtitle) ? '' : editorial.contact?.activation
+  const distinctContactContinuity = isHeroProjectionDuplicate(editorial.contact?.continuity ?? '', heroLead.title, heroSubtitle) ? '' : editorial.contact?.continuity
 
   return <section className="period-ai-card period-ai-v18 period-ai-v2 period-ai-v3 period-ai-v4" data-reading-export-tone={field?.id === 'love' ? 'love' : undefined}>
     <div className="period-ai-head">
@@ -324,7 +341,7 @@ export function PeriodFortuneNarrativeV2({
 
     {field?.id === 'love' && !!editorial.loveContexts?.length && <section className="love-context-grid-v3" data-reading-export-tone="love">
       <div className="period-ai-section-title"><span>내 상황에 맞춰 읽기</span><strong>애정운을 한 가지 관계 상태로 가정하지 않아</strong></div>
-      {!domainAnsweredTopics.has('연애') && editorial.loveGeneral && <p className="love-context-general-v3">{editorial.loveGeneral}</p>}
+      {!domainAnsweredTopics.has('연애') && distinctLoveGeneral && <p className="love-context-general-v3">{distinctLoveGeneral}</p>}
       <div className="love-context-cards-v3">{editorial.loveContexts.map(item => <article className="love-context-card-v3" key={item.key}>
         <strong>{item.label}</strong><p>{item.text}</p>
       </article>)}</div>
@@ -332,7 +349,7 @@ export function PeriodFortuneNarrativeV2({
 
     {field?.id === 'social' && editorial.interpersonal && <section className="interpersonal-reading-v3 interpersonal-reading-v4" data-reading-export-tone="system">
       <div className="period-ai-section-title"><span>대인관계</span><strong>친구·지인, 직장동료, 가족·가까운 사람을 따로 읽어</strong></div>
-      <article className="editorial-focus-card-v3"><b>{editorial.interpersonal.summary}</b></article>
+      {distinctInterpersonalSummary && <article className="editorial-focus-card-v3"><b>{distinctInterpersonalSummary}</b></article>}
       {!!editorial.interpersonalContexts?.length && <div className="love-context-cards-v3 interpersonal-context-cards-v4">{editorial.interpersonalContexts.map(item => <article className="love-context-card-v3 interpersonal-context-card-v4" key={item.key}>
         <strong>{item.label}</strong><p>{item.text}</p>
       </article>)}</div>}
@@ -340,8 +357,8 @@ export function PeriodFortuneNarrativeV2({
 
     {field?.id === 'contact' && editorial.contact && <section className="contact-reading-v3" data-reading-export-tone="date">
       <div className="period-ai-section-title"><span>연락·소식</span><strong>외부 연락 환경과 내 연락 실행 조건을 따로 봐</strong></div>
-      {!domainAnsweredTopics.has('연락') && <article className="editorial-focus-card-v3 contact-activation-v3">
-        <strong>연락이 오가는 흐름</strong><b>{editorial.contact.activation}</b><p>{editorial.contact.continuity}</p>
+      {!domainAnsweredTopics.has('연락') && (distinctContactActivation || distinctContactContinuity) && <article className="editorial-focus-card-v3 contact-activation-v3">
+        <strong>연락이 오가는 흐름</strong>{distinctContactActivation && <b>{distinctContactActivation}</b>}{distinctContactContinuity && <p>{distinctContactContinuity}</p>}
         {editorial.contact.timing && <time>주목 시기 · {editorial.contact.timing}</time>}
       </article>}
       <article className="editorial-focus-card-v3 contact-direction-summary-v3"><strong>두 계산축 비교</strong><b>이 비교만으로 먼저 연락할 사람은 판정하지 않아요.</b></article>
