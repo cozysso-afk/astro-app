@@ -7,7 +7,7 @@ const workflow = readFileSync(new URL('../../.github/workflows/fortune-live-mobi
 const entry = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8')
 
 test('stored-result mobile QA can only read status and cannot start a paid Gemini job', () => {
-  assert.match(runner, /JSON\.stringify\(\{ action:'status', job_id:jobId \}\)/)
+  assert.match(runner, /JSON\.stringify\(\{ narrative_engine:'v23', action:'status', job_id:jobId \}\)/)
   assert.doesNotMatch(runner, /action:\s*['"]start['"]/) 
   assert.match(workflow, /confirm_no_paid_call == 'NO_PAID_CALL'/)
   assert.match(workflow, /LIVE_FORTUNE_QA_JOB_ID/)
