@@ -34,6 +34,7 @@ type SafeExtras = {
   gemini_paid_call?: boolean
   configured?: boolean
   quality_guard_failed?: boolean
+  structure_guard_failed?: boolean
   cost_guard_blocked?: boolean
   rolling_job_guard?: boolean
   retry_after_seconds?: number
@@ -50,7 +51,7 @@ export function isFortunePublicErrorCode(value: unknown): value is FortunePublic
 function safeExtras(value: unknown): SafeExtras {
   if (!isRecord(value)) return {}
   const out: SafeExtras = {}
-  for (const key of ['missing_key','gemini_paid_call','configured','quality_guard_failed','cost_guard_blocked','rolling_job_guard'] as const) {
+  for (const key of ['missing_key','gemini_paid_call','configured','quality_guard_failed','structure_guard_failed','cost_guard_blocked','rolling_job_guard'] as const) {
     if (typeof value[key] === 'boolean') out[key] = value[key] as boolean
   }
   if (Number.isFinite(value.retry_after_seconds)) out.retry_after_seconds = Math.max(0, Math.min(86400, Number(value.retry_after_seconds)))
@@ -95,10 +96,27 @@ export function publicFailedUsage(value: unknown) {
   if (quality) out.quality_validation = quality
   const firstQuality = publicQualityValidation(value.first_quality_report)
   if (firstQuality) out.first_quality_validation = firstQuality
+  const structure = publicStructureValidation(value.structure_report)
+  if (structure) out.structure_validation = structure
+  const firstStructure = publicStructureValidation(value.first_structure_report)
+  if (firstStructure) out.first_structure_validation = firstStructure
   if (typeof value.generation_version === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(value.generation_version)) {
     out.generation_version = value.generation_version
   }
   return Object.keys(out).length ? out : undefined
+}
+
+export function publicStructureValidation(value: unknown) {
+  if (!isRecord(value) || value.version !== 'fortune-provider-structure-v1'
+    || value.passed !== false || !Array.isArray(value.issues)) return undefined
+  const issues = [...new Set(value.issues.filter((item): item is string =>
+    typeof item === 'string' && /^[a-z0-9_]{1,60}$/.test(item)))].slice(0, 12)
+  if (!issues.length) return undefined
+  const out: Record<string, unknown> = { version: value.version, passed: false, issues }
+  for (const key of ['topic_count','cluster_section_count'] as const) {
+    if (Number.isInteger(value[key]) && Number(value[key]) >= 0 && Number(value[key]) <= 100) out[key] = Number(value[key])
+  }
+  return out
 }
 
 export function publicCallTrace(value: unknown) {
