@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildV23CorePrompt } from './promptV23.ts'
+import { buildTemporalWordingInstruction, buildV23CorePrompt } from './promptV23.ts'
 import { buildPeriodNarrativeContext } from './periodNarrativeV23.ts'
 
 function payload(kind='week') {
@@ -44,6 +44,26 @@ test('V23 prompt carries phenomenon-first contract instead of topic-first narrat
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
   assert.match(out.text, /Mercury trine Jupiter/)
+})
+
+test('non-today packets hard-ban today wording across every user-facing field', () => {
+  const instruction = buildTemporalWordingInstruction({
+    time_context: {
+      requested_start: '2026-10-26',
+      requested_end: '2026-10-26',
+      current_date: '2026-10-28',
+      today_word_allowed: false,
+      permitted_deictics: ['선택한 날', '그날', '해당 날짜'],
+    },
+  })
+  assert.match(instruction, /모든 사용자 문장 필드/)
+  assert.match(instruction, /단어 "오늘"/)
+  assert.match(instruction, /2026-10-26/)
+  assert.match(instruction, /선택한 날 \/ 그날 \/ 해당 날짜/)
+})
+
+test('actual-today packets do not receive a contradictory hard ban', () => {
+  assert.equal(buildTemporalWordingInstruction({ time_context: { today_word_allowed: true } }), '')
 })
 
 test('V23 prompt carries domain-specific user questions without inventing missing sub-calculations', () => {
