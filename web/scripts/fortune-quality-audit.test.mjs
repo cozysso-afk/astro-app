@@ -107,6 +107,19 @@ test('real Gemini provenance is counted only with a V23 version', () => {
   assert.equal(report.live_gemini_cases, 1)
   assert.ok(report.summary.failed >= 1) // synthetic data is not valid real interpretation
 })
+test('live structural failures are distinct from a generic missing result', () => {
+  const row = sample()
+  row.result = {
+    data: null, model: 'gemini-3.6-flash', interpreter_version: 'supabase-ai-v23.9-gemini-single-author-v10',
+    usage: {
+      generation_version: 'supabase-ai-v23.9-gemini-single-author-v10',
+      structure_validation: { version: 'fortune-provider-structure-v1', passed: false, issues: ['topic_count_mismatch'] },
+    },
+  }
+  const report = evaluateCases([row], { mode: 'live' })
+  assert.ok(report.cases[0].issues.some(i => i.code === 'PROVIDER_STRUCTURE_INVALID'))
+  assert.deepEqual(report.cases[0].provider.structure_issues, ['topic_count_mismatch'])
+})
 test('visual diagnostics detect overflow and saved-image count mismatch', () => {
   const visual = {
     systemCards: [{}, {}, {}], reunionOverflow: 18, birthRangeOverflow: 0,
