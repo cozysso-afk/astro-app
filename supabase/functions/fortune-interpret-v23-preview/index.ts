@@ -1,4 +1,3 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { MODELS, FALLBACK_MODEL, TOPICS, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
