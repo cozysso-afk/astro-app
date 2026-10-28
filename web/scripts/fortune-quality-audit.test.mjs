@@ -30,6 +30,23 @@ test('invalid evidence IDs and out-of-period dates fail without prose in the rep
   assert.ok(report.cases[0].issues.some(i => i.code === 'WINDOW_OUTSIDE_PERIOD'))
   assert.doesNotMatch(JSON.stringify(report), /QA_ONLY_SENTINEL/)
 })
+test('timezone-qualified windows on the period day are accepted', () => {
+  const row = sample()
+  const day = row.payload.period.start
+  row.result.data.key_windows = [{
+    start: `${day}T00:00:00+09:00`, end: `${day}T23:59:59+09:00`, evidence_refs: [],
+  }]
+  const report = evaluateCases([row], { mode: 'fixture' })
+  assert.ok(!report.cases[0].issues.some(i => i.code === 'WINDOW_OUTSIDE_PERIOD'))
+})
+test('timezone-qualified windows outside the period still fail', () => {
+  const row = sample()
+  row.result.data.key_windows = [{
+    start: '2099-01-01T00:00:00Z', end: '2099-01-01T01:00:00Z', evidence_refs: [],
+  }]
+  const report = evaluateCases([row], { mode: 'fixture' })
+  assert.equal(report.cases[0].issues.filter(i => i.code === 'WINDOW_OUTSIDE_PERIOD').length, 2)
+})
 test('same long authored verdict across unrelated topics requires human review', () => {
   const row = sample()
   row.result.data.topic_analysis['연애'].verdict =

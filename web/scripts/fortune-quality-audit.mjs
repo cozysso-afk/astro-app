@@ -9,8 +9,9 @@ import { inspectInterpretationQuality } from '../../supabase/functions/fortune-i
  * Reports contain IDs and issue codes, never birth data or generated prose.
  */
 export const PERIODS = ['day', 'week', 'month', 'annual']
-export const AUDIT_VERSION = 'fortune-quality-audit-v2-projection-aware'
+export const AUDIT_VERSION = 'fortune-quality-audit-v3-timezone-aware'
 const ISO = /^\d{4}-\d{2}-\d{2}$/
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/
 const MIN_COMPARE_CHARS = 32
 const TOPIC_CLUSTER_PROJECTIONS = new Set([
   'topic:대인관계|cluster:relationship.summary',
@@ -137,7 +138,8 @@ function providerAudit(result) {
     structure_issues: structureIssues }
 }
 function inPeriod(date, start, end) {
-  return ISO.test(date) && ISO.test(start) && ISO.test(end) && date >= start && date <= end
+  const day = ISO.test(date) ? date : (ISO_TIMESTAMP.test(date) ? date.slice(0, 10) : '')
+  return Boolean(day) && ISO.test(start) && ISO.test(end) && day >= start && day <= end
 }
 function evaluateOne(row, mode) {
   const problems = []
