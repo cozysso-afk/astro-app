@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:visual:live": "node scripts/visual-live-fortune-qa.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",

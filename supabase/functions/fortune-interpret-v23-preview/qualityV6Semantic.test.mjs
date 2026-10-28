@@ -42,3 +42,13 @@ test("V6 rejects interchangeable interpersonal copy", () => {
   assert.equal(report.stages[5].passed, false);
   assert.match(report.stages[5].issues.join(" "), /바꿔 붙일 수 있음/);
 });
+
+test("V9 rejects a broken Korean pacing idiom before it reaches the reader", () => {
+  const data = {
+    overall: { summary: "업무 판단은 빠르게 하되 감정적인 대화에서는 한 바이트 쉬어가는 편이 좋아." },
+    clusters: {}, topic_analysis: {}, key_windows: [], cross_checks: [], decisions: [], priorities: [],
+  };
+  const report = inspectInterpretationQuality(data, { evidence_ledger: [] });
+  assert.equal(report.stages[5].passed, false);
+  assert.match(report.stages[5].issues.join(" "), /기술 단위 표현: 바이트/);
+});

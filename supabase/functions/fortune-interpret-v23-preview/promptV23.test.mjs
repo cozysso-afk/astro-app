@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.7-sparse-single-author')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.8-korean-idiom-sanity')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -135,6 +135,8 @@ test('Korean editorial contract enforces grammar and separates love from contact
   assert.match(text, /headline·overall·topic verdict·action은 각자 다른 역할/)
   assert.match(text, /연애와 연락은 같은 분야가 아니야/)
   assert.match(text, /연애 해설을 답장과 연락 여부만으로 채우지 마/)
+  assert.match(text, /한 바이트 쉬다/)
+  assert.match(text, /문맥에 맞지 않는 단어 결합/)
 })
 
 test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {

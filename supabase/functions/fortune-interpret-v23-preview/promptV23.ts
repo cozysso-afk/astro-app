@@ -2,7 +2,7 @@ import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-previe
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.7-sparse-single-author'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.8-korean-idiom-sanity'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
@@ -43,6 +43,7 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 해설의 첫 문장과 headline은 점수·등급·추상적인 운세평이 아니라, 이 기간에 실제 생활에서 체감할 수 있는 구체적인 장면이나 변화로 시작해.
 - 한국어 문장은 주어와 서술어가 무엇을 가리키는지 분명하게 맞춰. 주어가 바뀌면 억지로 한 문장에 붙이지 말고 문장을 나눠.
 - 목적어와 서술어의 의미 호응을 확인해. "변화 욕구를 비교로 바꾼다", "시기가 관계 회복으로 이어진다", "근거를 낮게 읽는다"처럼 문법 형식은 맞아도 뜻이 어색한 결합은 쓰지 마.
+- 박자·숨·호흡처럼 일상적인 관용 표현을 기술 단위와 혼동하지 마. 특히 "한 바이트 쉬다"처럼 문맥에 맞지 않는 단어 결합은 금지해.
 - 병렬 항목은 같은 문법 단위로 맞춰. 담당자·마감·완료처럼 모호하게 명사를 붙이지 말고 필요하면 "담당자를 정하고, 마감일과 완료 기준을 확인한다"처럼 각각의 동작을 밝혀.
 - 한 문장에는 핵심 주장 하나를 우선해. 수식어와 명사구가 길어져 두 번 읽어야 이해되는 문장은 둘로 나눠.
 - "흐름·신호·구조·자극·배경·접점·활성" 같은 추상명사를 연속해서 쌓지 마. 가능하면 사람·일·돈·일정·대화·만남·행동처럼 실제 대상을 주어 또는 목적어로 써.
