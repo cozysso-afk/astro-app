@@ -49,6 +49,14 @@ on:
         description: 'Maximum synthetic Gemini jobs (1-4, default 2)'
         required: true
         default: '2'
+      existing_job_id:
+        description: 'Optional completed QA job ID to re-audit without a Gemini call'
+        required: false
+        default: ''
+      confirm_no_paid_call:
+        description: 'Type NO_PAID_CALL when re-auditing an existing job'
+        required: false
+        default: 'NO'
 
 permissions:
   contents: read
@@ -86,7 +94,7 @@ jobs:
 
   live-gemini-audit:
     name: Manually approved synthetic Gemini V23 audit
-    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES'
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES' && inputs.existing_job_id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -112,6 +120,39 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fortune-quality-live-${{ github.sha }}
+          path: web/fortune-live-qa-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  stored-gemini-audit:
+    name: Existing Gemini V23 result audit (no paid call)
+    if: github.event_name == 'workflow_dispatch' && inputs.existing_job_id != '' && inputs.confirm_no_paid_call == 'NO_PAID_CALL'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Recalculate evidence and re-audit the stored Gemini result
+        env:
+          QA_REPLAY_APPROVED: 'YES'
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id }}
+        run: |
+          node --experimental-strip-types web/scripts/fortune-live-qa.mjs \
+            --max-jobs 1 \
+            --existing-job-id "$QA_EXISTING_JOB_ID" \
+            --out web/fortune-live-qa-artifacts
+      - name: Upload re-audit report without raw Gemini prose or profiles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-quality-replay-${{ github.sha }}
           path: web/fortune-live-qa-artifacts/
           if-no-files-found: warn
           retention-days: 14

@@ -91,20 +91,28 @@ async function runCase(row, config) {
   if (!gate.ok || gate.mode !== 'exact') throw new Error('Exact precision gate failed')
   const payload = attachPrecisionPacketMetadata(compactCalculation(calculation), calculation)
   const request = body => postJson(config.fortuneUrl, { narrative_engine: 'v23', ...body }, config.headers)
-  const inspection = await request({ action: 'inspect', calculation })
-  if (!inspection.ok || inspection.prompt_budget_ok !== true ||
-      !String(inspection.interpreter_version ?? '').startsWith('supabase-ai-v23.')) {
-    throw new Error('V23 inspection/budget gate failed; paid start was not attempted')
-  }
-  // Use the production V23 default explicitly so a model-default regression is
-  // visible in the audit instead of depending on a stale caller preference.
-  const started = await request({ action: 'start', calculation, model: 'gemini-3.6-flash' })
-  if (!started.ok || !started.job_id) throw new Error('V23 start failed')
+  const existingJobId = String(config.existingJobId ?? '')
   let status
-  for (let attempt = 0; attempt < 90; attempt++) {
-    status = await request({ action: 'status', job_id: started.job_id }, config.headers)
-    if (status?.status === 'done' || status?.status === 'failed') break
-    await sleep(2000)
+  if (existingJobId) {
+    status = await request({ action: 'status', job_id: existingJobId })
+    if (status?.period_start !== row.start || status?.period_end !== row.end) {
+      throw new Error('Stored QA job period did not match the synthetic case')
+    }
+  } else {
+    const inspection = await request({ action: 'inspect', calculation })
+    if (!inspection.ok || inspection.prompt_budget_ok !== true ||
+        !String(inspection.interpreter_version ?? '').startsWith('supabase-ai-v23.')) {
+      throw new Error('V23 inspection/budget gate failed; paid start was not attempted')
+    }
+    // Use the production V23 default explicitly so a model-default regression is
+    // visible in the audit instead of depending on a stale caller preference.
+    const started = await request({ action: 'start', calculation, model: 'gemini-3.6-flash' })
+    if (!started.ok || !started.job_id) throw new Error('V23 start failed')
+    for (let attempt = 0; attempt < 90; attempt++) {
+      status = await request({ action: 'status', job_id: started.job_id }, config.headers)
+      if (status?.status === 'done' || status?.status === 'failed') break
+      await sleep(2000)
+    }
   }
   if (status?.status !== 'done' || !status?.data) {
     return {
@@ -130,19 +138,30 @@ function safeRunnerErrorCode(error) {
   if (message === 'Exact precision gate failed') return 'PRECISION_GATE_FAILED'
   if (message.startsWith('V23 inspection/budget gate failed')) return 'V23_INSPECTION_FAILED'
   if (message === 'V23 start failed') return 'V23_START_FAILED'
+  if (message === 'Stored QA job period did not match the synthetic case') return 'STORED_JOB_PERIOD_MISMATCH'
   if (message === 'V23 job failed or timed out') return 'V23_JOB_FAILED'
   return 'LIVE_RUNNER_ERROR'
 }
 async function main() {
-  if (process.env.QA_LIVE_APPROVED !== 'YES') throw new Error('Explicit QA_LIVE_APPROVED=YES required')
   const args = process.argv.slice(2)
   const arg = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1] }
+  const existingJobId = String(arg('--existing-job-id') || '').trim()
+  if (existingJobId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existingJobId)) {
+    throw new Error('existing-job-id must be a UUID')
+  }
+  if (existingJobId) {
+    if (process.env.QA_REPLAY_APPROVED !== 'YES') throw new Error('Explicit QA_REPLAY_APPROVED=YES required')
+  } else if (process.env.QA_LIVE_APPROVED !== 'YES') {
+    throw new Error('Explicit QA_LIVE_APPROVED=YES required')
+  }
   const maxJobs = Number(arg('--max-jobs') || 2)
   if (!Number.isInteger(maxJobs) || maxJobs < 1 || maxJobs > 4) {
     throw new Error('max-jobs must be an integer from 1 to 4')
   }
+  if (existingJobId && maxJobs !== 1) throw new Error('existing-job-id replay requires max-jobs 1')
   const out = path.resolve(arg('--out') || 'fortune-live-qa-artifacts')
   const config = await buildQaConfig()
+  config.existingJobId = existingJobId
   const results = []
   for (const row of cases.slice(0, maxJobs)) {
     try {
