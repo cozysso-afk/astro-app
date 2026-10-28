@@ -15,11 +15,9 @@ function periodKind(payload: any) {
 
 function sameTopicDetails(ledger: any[], date: string, windowRow: any) {
   const topic = text(windowRow?.topic)
-  const direction = text(windowRow?.direction)
   return ledger
     .filter(row => text(row?.id).startsWith(`W:detail:${date}:${topic}:`))
     .filter(row => isoDate(row?.date) === date)
-    .filter(row => !direction || !text(row?.direction) || text(row?.direction) === direction)
     .map(row => text(row?.id))
     .slice(0, 2)
 }
