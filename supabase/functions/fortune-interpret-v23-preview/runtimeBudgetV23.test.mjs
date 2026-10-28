@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { publicCallTrace } from '../_shared/fortuneAiPublicError.ts'
-import { v23FinishReason, v23OutputTokenLimit } from './runtimeBudgetV23.ts'
+import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from './runtimeBudgetV23.ts'
 
 test('V23 structured output has completion headroom for every period', () => {
   assert.equal(v23OutputTokenLimit('day', false), 8200)
@@ -27,4 +27,8 @@ test('MAX_TOKENS is observable in the persisted safe call trace', () => {
   }])
   assert.equal(trace[0].max_output_tokens, 9000)
   assert.equal(trace[0].finish_reason, 'MAX_TOKENS')
+})
+
+test('initial generation preserves completion room and the semantic rewrite call', () => {
+  assert.equal(v23ThinkingLevel(), 'low')
 })
