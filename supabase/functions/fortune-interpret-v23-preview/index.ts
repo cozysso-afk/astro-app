@@ -9,13 +9,13 @@ import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget,
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
-import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
+import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v8";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v9";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -91,7 +91,7 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   try{
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:CORE_SCHEMA,maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:compact?"low":"medium"}}}),
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:CORE_SCHEMA,maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:v23ThinkingLevel()}}}),
     });
     const rawText=await r.text();
     let raw:any=null;try{raw=JSON.parse(rawText);}catch{}
