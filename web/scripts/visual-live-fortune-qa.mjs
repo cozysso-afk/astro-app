@@ -25,7 +25,7 @@ async function loadStoredResult() {
   const response = await fetch(config.fortuneUrl, {
     method: 'POST',
     headers: { 'Content-Type':'application/json', ...config.headers },
-    body: JSON.stringify({ action:'status', job_id:jobId }),
+    body: JSON.stringify({ narrative_engine:'v23', action:'status', job_id:jobId }),
     signal: AbortSignal.timeout(30_000),
   })
   const status = await response.json().catch(() => null)
