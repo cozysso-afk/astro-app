@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
-import { MODELS, FALLBACK_MODEL, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
+import { MODELS, FALLBACK_MODEL, TOPICS, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
 import { addGeminiUsage, inspectThaiOutputSafety, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-preview/costGuardV21.ts";
@@ -15,7 +15,8 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v9";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v10";
+const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -36,6 +37,22 @@ function res(x:unknown,status=200){return new Response(JSON.stringify(x),{status
 function usage(raw:any){const u=raw?.usageMetadata??{};return {prompt_tokens:Number(u.promptTokenCount??0),candidate_tokens:Number(u.candidatesTokenCount??0),thought_tokens:Number(u.thoughtsTokenCount??0),total_tokens:Number(u.totalTokenCount??0)};}
 function qualitySummary(quality:any){return quality?{version:quality.version,score:quality.score,stages:(quality.stages??[]).map((s:any)=>({stage:s.stage,name:s.name,passed:s.passed}))}:null;}
 function qualityFailure(result:any,quality:any){const failed=(quality?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>`${s.stage}:${s.name}`).join(", ");return {...result,ok:false,error:`Quality V6 해설 검증 미통과(${failed})`,quality_guard_failed:true,quality_report:quality,candidate_data:result?.data,validation:undefined};}
+
+function structureReport(value:any){
+  const issues:string[]=[];
+  if(!value||typeof value!=="object"||Array.isArray(value))issues.push("root_object_missing");
+  if(!value?.overall||typeof value.overall!=="object")issues.push("overall_missing");
+  if(!value?.systems||typeof value.systems!=="object")issues.push("systems_missing");
+  if(!value?.clusters||typeof value.clusters!=="object")issues.push("clusters_missing");
+  const topicKeys=value?.topic_analysis&&typeof value.topic_analysis==="object"&&!Array.isArray(value.topic_analysis)?Object.keys(value.topic_analysis):[];
+  if(topicKeys.length!==TOPICS.length)issues.push("topic_count_mismatch");
+  if(topicKeys.some(topic=>!TOPICS.includes(topic as any)))issues.push("topic_unknown");
+  const clusterSections=EDITORIAL_SECTION_KEYS.filter(key=>{const [group,section]=key.split(".");return value?.clusters?.[group]?.[section]&&typeof value.clusters[group][section]==="object";});
+  if(clusterSections.length!==EDITORIAL_SECTION_KEYS.length)issues.push("cluster_section_missing");
+  return {version:STRUCTURE_VERSION,passed:false,issues,topic_count:topicKeys.length,cluster_section_count:clusterSections.length};
+}
+function structureFailure(result:any,value:any){const report=structureReport(value);if(!report.issues.length)report.issues.push("validator_rejected_normalized_core");return {...result,ok:false,error:"provider 구조화 응답 검증 실패",structure_guard_failed:true,structure_report:report,candidate_data:result?.data,validation:undefined};}
+function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
 
 const CORE_SCHEMA:any=buildProviderCoreSchema(SCHEMA);
 
@@ -73,10 +90,10 @@ function coreInstruction(compact=false){const clusterLimit=compact?6:10;return `
 - day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
 - annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.`;}
 
-type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;max_output_tokens:number;finish_reason?:string;error?:string};
+type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;max_output_tokens:number;finish_reason?:string;error?:string};
 type Budget={used:number;deadline:number;calls:CallTrace[]};
 function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadline;}
-async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"fallback",compact=false,qualityRetry=""){
+async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback",compact=false,qualityRetry=""){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
   const authoredPrompt=buildV23CorePromptFromPacket(promptPayload);
   const prompt=`${authoredPrompt.text}\n\n${coreInstruction(compact)}${qualityRetry}`;
@@ -132,7 +149,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   const validated=validateOutput(withTopics);
   if(!validated){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
-    return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,editorial_trace,...resultMeta};
+    return structureFailure({model,usage:u,data:withTopics,origin:"gemini",editorial_trace,...resultMeta},withTopics);
   }
   const data=attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload);
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
@@ -150,7 +167,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   return {ok:true,data,model,origin:"gemini",interpreter_version:VERSION,validation:quality,degraded_quality:false,local_quality_fallback:false,editorial_trace,usage:{...(u??{}),quality_validation:qualitySummary(quality)},...resultMeta};
 }
 
-async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"|"semantic_rewrite"="initial",compact=false,qualityRetry=""){
+async function generate(payload:any,model:string,key:string,budget:Budget,kind:"initial"|"fallback"|"semantic_rewrite"|"structure_rewrite"="initial",compact=false,qualityRetry=""){
   const pb=buildV23PromptBudget(payload);
   if(!pb.ok)return {ok:false,error:`V23 AI 해설 예상 최대 비용이 약 ${Math.round(pb.estimated_max_job_krw)}원으로 작업 상한 ${pb.max_job_krw}원을 넘어 Gemini 호출을 막았어.`,model,cost_guard_blocked:true,prompt_budget:pb};
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
@@ -169,12 +186,13 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   if(!(await shouldContinue()))return {ok:false,error:"AI 해설 생성이 취소됐어.",model:preferred,canceled:true,usage:first.usage,attempt_count:budget.used,call_trace:budget.calls};
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
   let second:any;
-  if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report));
+  if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
+  else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report));
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답"))second=await generate(payload,secondModel,key,budget,"fallback",true,"");
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
-  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
-  return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,origin:"deterministic_safe",safe_summary_required:true,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report};
+  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,first_structure_report:first?.structure_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,origin:"deterministic_safe",safe_summary_required:true,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -197,7 +215,7 @@ async function job(id:string,payload:any,model:string,key:string){
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
     const callTrace=publicCallTrace(r.call_trace);
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.origin??(r.ok?"gemini":"deterministic_safe"),safe_summary_required:Boolean(r.safe_summary_required),local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,editorial_trace:r.editorial_trace??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.origin??(r.ok?"gemini":"deterministic_safe"),safe_summary_required:Boolean(r.safe_summary_required),local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,first_structure_report:r.first_structure_report??null,structure_report:r.structure_report??null,editorial_trace:r.editorial_trace??null};
     if(!(await jobActive(id))){await a.from("ai_interpret_jobs").update({usage_json:usageJson,updated_at:new Date().toISOString()}).eq("id",id);return;}
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
@@ -219,7 +237,7 @@ Deno.serve(async(req)=>{
   if(req.method!=="POST")return res(publicFortuneError("METHOD_NOT_ALLOWED"),405);
   let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
-  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
+  if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,structure_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
   const u=await user(req);if(!u)return res(publicFortuneError("AUTH_REQUIRED"),401);
   if(b?.action==="status"){
     const id=txt(b.job_id,100);const a=admin();const {data,error}=await a.from("ai_interpret_jobs").select("id,status,model,fallback_from,result_json,usage_json,error,created_at,updated_at,completed_at,period_start,period_end").eq("id",id).eq("user_id",u.id).maybeSingle();
