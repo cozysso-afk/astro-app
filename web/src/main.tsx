@@ -4,6 +4,7 @@ import App from './AppNext'
 import { AuthGate } from './AuthGate'
 import { EditorialQaPreview } from './EditorialQaPreview'
 import { VisualQaPreview } from './VisualQaPreview'
+import { LiveFortuneQaPreview } from './LiveFortuneQaPreview'
 import { installIntegratedPrecisionFetch } from './lib/precisionTransport'
 import { installReadingPresentationV5 } from './lib/readingPresentationV5'
 import './styles.css'
@@ -64,16 +65,19 @@ const editorialQaHost = host.endsWith('.vercel.app') && host.includes('git-fix-r
 const qaMode = params?.get('qa') ?? ''
 const editorialQaPreview = editorialQaHost && qaMode === 'editorial'
 const visualQaPreview = localQaHost && qaMode === 'visual'
+const liveFortuneQaPreview = localQaHost && qaMode === 'fortune-live'
 
-if (!editorialQaPreview && !visualQaPreview) {
+if (!editorialQaPreview && !visualQaPreview && !liveFortuneQaPreview) {
   installIntegratedPrecisionFetch()
   installReadingPresentationV5()
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {visualQaPreview
-      ? <VisualQaPreview/>
+    {liveFortuneQaPreview
+      ? <LiveFortuneQaPreview/>
+      : visualQaPreview
+        ? <VisualQaPreview/>
       : editorialQaPreview
         ? <EditorialQaPreview/>
         : <AuthGate><App /></AuthGate>}

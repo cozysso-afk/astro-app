@@ -1,0 +1,81 @@
+name: Stored Gemini Mobile QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Existing QA-owned completed Gemini job ID'
+        required: true
+      confirm_no_paid_call:
+        description: 'Type NO_PAID_CALL to confirm this run may only read the stored result'
+        required: true
+        default: 'NO'
+
+permissions:
+  contents: read
+
+jobs:
+  stored-gemini-mobile:
+    name: Real-response iPhone + saved-image QA
+    if: inputs.confirm_no_paid_call == 'NO_PAID_CALL'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Start QA-only preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/fortune-live-mobile-vite.log 2>&1 &
+          for i in {1..40}; do
+            if curl --fail --silent 'http://127.0.0.1:4173/?qa=fortune-live' >/dev/null; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/fortune-live-mobile-vite.log
+          exit 1
+
+      - name: Reuse stored Gemini result and capture iPhone screens
+        env:
+          LIVE_FORTUNE_QA_JOB_ID: ${{ inputs.job_id }}
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+        run: node --experimental-strip-types scripts/visual-live-fortune-qa.mjs
+
+      - name: Preserve preview log
+        if: always()
+        run: cp /tmp/fortune-live-mobile-vite.log visual-live-fortune-artifacts/vite.log || true
+
+      - name: Upload real-response mobile QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stored-gemini-mobile-${{ github.sha }}
+          path: web/visual-live-fortune-artifacts/
+          if-no-files-found: warn
+          retention-days: 14

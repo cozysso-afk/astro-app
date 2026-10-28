@@ -62,6 +62,16 @@ model, usage.generation_version, usage.call_trace, usage.quality_validation 포�
 실패 보고서에는 원문 오류나 프롬프트 대신 모델, 호출 종류, HTTP 결과 분류,
 finish reason, 토큰 수, 6단계 통과 여부만 남겨 비용·실패 원인을 안전하게 감사합니다.
 
+## 저장된 실제 응답 모바일 검증 — 추가 Gemini 호출 없음
+
+워크플로 **Stored Gemini Mobile QA**는 QA 전용 계정이 소유한 완료 작업 ID를
+`status`로 다시 읽어 iPhone 320·350·393·430px 화면, 계산 근거 펼치기,
+PNG 이미지 저장을 확인합니다. `start`나 Gemini API를 호출하지 않습니다.
+
+실행할 때 기존 QA 작업 ID와 `confirm_no_paid_call=NO_PAID_CALL`을 입력합니다.
+결과 아티팩트에는 가상 프로필의 화면 캡처와 진단 JSON만 포함되며,
+인증 토큰·비밀번호·출생 프로필·계산 입력은 저장하지 않습니다.
+
 ## 결과 해석
 
 - fixture_only: true, live_gemini_cases: 0: 검증기 및 화면 테스트만 성공한 상태

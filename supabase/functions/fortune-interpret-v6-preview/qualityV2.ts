@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v8-topic-scoped-window-consistency";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v9-korean-idiom-sanity";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -345,6 +345,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
 
   const s6:string[]=[];
   const summary=String(data?.overall?.summary??"");
+  if(/바이트/.test(prose))s6.push("운세 문맥과 맞지 않는 기술 단위 표현: 바이트");
   for(const [topic,row] of Object.entries(data?.topic_analysis??{}) as any[]){
     const candidate=[row?.verdict,row?.reason,row?.action].join(" ");
     if(candidate.length>=45&&semanticSimilarity(summary,candidate)>=.78){s6.push(`overall이 단일 분야 ${topic}의 재진술에 가까움`);break;}
@@ -395,5 +396,6 @@ export function strictQualityRetryInstruction(report:any){
   - structured editorial section마다 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 모두 채워라. 결론→현실 장면→지금 할 일→판단이 달라질 조건이 한 번에 읽혀야 한다.
   - overall은 narrative_plan의 supporting_topics와 caution_topics를 실제로 연결하고 단일 topic 문장을 재작성하지 마라.
   - 대인 5상황과 애정 6상태는 서로 바꿔 붙일 수 없는 고유한 현실 질문과 판단 기준을 가져야 한다.
+  - 문맥과 맞지 않는 기술 단위나 깨진 관용구를 자연스러운 한국어로 다시 써라. 특히 '바이트'를 박자·숨·호흡의 뜻으로 쓰지 마라.
   - 확률이 아니라는 한계 설명 자체는 유지해도 된다.\n${failed}`;
 }

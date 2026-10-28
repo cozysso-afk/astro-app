@@ -7,6 +7,8 @@ on:
       - 'web/scripts/fortune-quality-audit.test.mjs'
       - 'web/scripts/fortune-live-qa.mjs'
       - 'web/scripts/fortune-live-qa.test.mjs'
+      - 'web/scripts/visual-live-fortune-qa.mjs'
+      - 'web/scripts/visual-live-fortune-qa.test.mjs'
       - 'web/src/**'
       - 'integrated_fortune_v1.py'
       - 'thai_astrology_v2.py'
@@ -16,6 +18,7 @@ on:
       - 'supabase/functions/fortune-interpret-v22-preview/**'
       - 'supabase/functions/fortune-interpret-v23-preview/**'
       - '.github/workflows/fortune-quality-audit.yml'
+      - '.github/workflows/fortune-live-mobile-qa.yml'
       - 'docs/fortune-auto-qa.md'
   push:
     branches: [main]
@@ -24,6 +27,8 @@ on:
       - 'web/scripts/fortune-quality-audit.test.mjs'
       - 'web/scripts/fortune-live-qa.mjs'
       - 'web/scripts/fortune-live-qa.test.mjs'
+      - 'web/scripts/visual-live-fortune-qa.mjs'
+      - 'web/scripts/visual-live-fortune-qa.test.mjs'
       - 'web/src/**'
       - 'integrated_fortune_v1.py'
       - 'thai_astrology_v2.py'
@@ -33,6 +38,7 @@ on:
       - 'supabase/functions/fortune-interpret-v22-preview/**'
       - 'supabase/functions/fortune-interpret-v23-preview/**'
       - '.github/workflows/fortune-quality-audit.yml'
+      - '.github/workflows/fortune-live-mobile-qa.yml'
   workflow_dispatch:
     inputs:
       confirm_paid_calls:
@@ -58,12 +64,15 @@ jobs:
         with:
           node-version: '22'
       - name: Check live runner syntax without executing or paying for Gemini
-        run: node --experimental-strip-types --check web/scripts/fortune-live-qa.mjs
+        run: |
+          node --experimental-strip-types --check web/scripts/fortune-live-qa.mjs
+          node --experimental-strip-types --check web/scripts/visual-live-fortune-qa.mjs
       - name: Validate evaluator against positive and negative controls
         run: >-
           node --experimental-strip-types --test
           web/scripts/fortune-quality-audit.test.mjs
           web/scripts/fortune-live-qa.test.mjs
+          web/scripts/visual-live-fortune-qa.test.mjs
       - name: Generate synthetic-only QA report
         run: node --experimental-strip-types web/scripts/fortune-quality-audit.mjs --fixture-matrix --out web/fortune-quality-artifacts
       - name: Upload fixture report (not Gemini results)
