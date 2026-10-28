@@ -13,8 +13,9 @@ import { v23FinishReason, v23OutputTokenLimit } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
+import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v5";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v6";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const ANON=(Deno.env.get("SUPABASE_ANON_KEY")??"").trim();
@@ -133,7 +134,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
     return {ok:false,error:"1단계 구조 검증 실패",model,usage:u,editorial_trace,...resultMeta};
   }
-  const data=normalizeDirectionalWindows(validated,payload);
+  const data=attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload);
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
   if(!guard.safe){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini"});
