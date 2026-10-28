@@ -9,9 +9,30 @@ import { inspectInterpretationQuality } from '../../supabase/functions/fortune-i
  * Reports contain IDs and issue codes, never birth data or generated prose.
  */
 export const PERIODS = ['day', 'week', 'month', 'annual']
-export const AUDIT_VERSION = 'fortune-quality-audit-v1'
+export const AUDIT_VERSION = 'fortune-quality-audit-v2-projection-aware'
 const ISO = /^\d{4}-\d{2}-\d{2}$/
 const MIN_COMPARE_CHARS = 32
+const TOPIC_CLUSTER_PROJECTIONS = new Set([
+  'topic:대인관계|cluster:relationship.summary',
+  'topic:연애|cluster:relationship.love_general',
+  'topic:연락|cluster:relationship.contact_activation',
+  'topic:재회|cluster:relationship.love_reunion_interest',
+  'topic:직장|cluster:work_study.work',
+  'topic:이직|cluster:work_study.career_change',
+  'topic:시험|cluster:work_study.exam',
+  'topic:학업|cluster:work_study.study',
+  'topic:금전|cluster:money_news.money',
+  'topic:소식|cluster:money_news.news',
+  'topic:투자심리|cluster:investment.psychology',
+  'topic:수익실현|cluster:investment.realization',
+  'topic:신규진입|cluster:investment.entry',
+  'topic:컨디션|cluster:condition.condition',
+])
+
+function compatibilityProjectionPair(left, right) {
+  return TOPIC_CLUSTER_PROJECTIONS.has(`${left}|${right}`)
+    || TOPIC_CLUSTER_PROJECTIONS.has(`${right}|${left}`)
+}
 
 function clean(value) {
   return String(value ?? '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')
@@ -154,6 +175,11 @@ function evaluateOne(row, mode) {
   const authored = sections(data)
   for (let a = 0; a < authored.length; a++) {
     for (let b = a + 1; b < authored.length; b++) {
+      // topic_analysis is a compatibility view of the same Gemini-authored
+      // cluster. It is one source shown at summary/detail depth, not two
+      // independently authored passages. Cross-topic and cross-case checks
+      // remain active below.
+      if (compatibilityProjectionPair(authored[a].topic, authored[b].topic)) continue
       const repeated = mode === 'live'
         ? similar(authored[a].text, authored[b].text)
         : clean(authored[a].text) === clean(authored[b].text)
