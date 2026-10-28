@@ -22,6 +22,13 @@ export function v23OutputTokenLimit(kind: unknown, compact = false) {
   return compact ? row.compact : row.full
 }
 
+// Gemini counts thinking tokens against maxOutputTokens. Live V8 spent 7,871
+// thinking tokens and returned only 311 candidate tokens, consuming the first
+// of two paid calls before a quality-guided rewrite was possible.
+export function v23ThinkingLevel() {
+  return 'low' as const
+}
+
 export function v23FinishReason(raw: any) {
   const value = String(raw?.candidates?.[0]?.finishReason ?? '').trim()
   return /^[A-Z0-9_]{1,40}$/.test(value) ? value : ''
