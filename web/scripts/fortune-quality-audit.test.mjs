@@ -38,6 +38,24 @@ test('same long authored verdict across unrelated topics requires human review',
   assert.equal(report.summary.review, 1)
   assert.ok(report.cases[0].issues.some(i => i.code === 'REPEATED_TOPIC_PROSE'))
 })
+test('topic compatibility projection is one Gemini source, not repeated authorship', () => {
+  const row = sample()
+  const source = {
+    conclusion: '현실 조건을 먼저 확인해야 금전 판단을 안정적으로 이어갈 수 있는 구간이야.',
+    real_scene: '청구 금액과 실제 입금일이 문서에 함께 적혀 있는지가 판단 장면이야.',
+    action: '확정 금액과 날짜를 한 번 대조해.',
+    change_condition: '입금일이 확정되면 계획을 진행하고 미정이면 보류해.',
+    evidence_refs: [], applicability: 'conditional',
+  }
+  row.result.data.clusters = { money_news: { money: source } }
+  row.result.data.topic_analysis['금전'] = {
+    ...row.result.data.topic_analysis['금전'], verdict: source.conclusion,
+    reason: source.real_scene, action: source.action, avoid: source.change_condition,
+  }
+  const report = evaluateCases([row], { mode: 'fixture' })
+  assert.equal(report.summary.review, 0)
+  assert.ok(!report.cases[0].issues.some(i => i.code === 'REPEATED_TOPIC_PROSE'))
+})
 test('same topic text across two distinct profiles requires review', () => {
   const a = sample(), b = structuredClone(fixtureMatrix()[4])
   b.result.data.topic_analysis['직장'].verdict = a.result.data.topic_analysis['직장'].verdict
