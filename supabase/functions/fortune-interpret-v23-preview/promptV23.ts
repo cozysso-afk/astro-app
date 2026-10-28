@@ -104,9 +104,26 @@ export function buildV23PromptBudget(payload:any) {
   }
 }
 
+export function buildTemporalWordingInstruction(packet:any) {
+  const context = packet?.time_context
+  if (context?.today_word_allowed !== false) return ''
+  const start = String(context?.requested_start ?? '').trim()
+  const end = String(context?.requested_end ?? '').trim() || start
+  const selected = start && end && start !== end ? `${start}~${end}` : start
+  const permitted = Array.isArray(context?.permitted_deictics)
+    ? context.permitted_deictics.map((value:any) => String(value ?? '').trim()).filter(Boolean)
+    : []
+  return `[DATE WORDING · HARD GATE]
+- 선택 기간=${selected || '날짜 미상'}, 실제 기준일=${String(context?.current_date ?? '미상')}이며 같은 날로 검증되지 않았다.
+- 출력 JSON의 모든 사용자 문장 필드에서 단어 "오늘"과 "오늘은/오늘의/오늘도/오늘에/오늘을/오늘이/오늘로"를 한 번도 쓰지 마. limits, systems, decisions, clusters, domain_answers를 포함한 모든 문자열에 적용한다.
+- 날짜를 가리켜야 하면 ${permitted.length ? permitted.join(' / ') : '선택 운세일 / 해당 날짜'} 중 하나 또는 계산 근거에 있는 정확한 날짜를 사용해.
+- 이 규칙을 어기면 응답 전체가 폐기된다.`
+}
+
 export function buildV23CorePromptFromPacket(packet:any) {
   const narrativeInstruction = buildPeriodNarrativeInstruction(packet)
-  const text = `${narrativeInstruction}\n\n${HUMAN_LANGUAGE_CONTRACT}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 Gemini 호출 전에 서버가 확정한 전체 총평 설계다. supporting_topics와 caution_topics를 함께 연결하고 core_tension과 period_operation에 직접 답해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(packet)}`
+  const temporalInstruction = buildTemporalWordingInstruction(packet)
+  const text = `${narrativeInstruction}\n\n${temporalInstruction ? `${temporalInstruction}\n\n` : ''}${HUMAN_LANGUAGE_CONTRACT}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 Gemini 호출 전에 서버가 확정한 전체 총평 설계다. supporting_topics와 caution_topics를 함께 연결하고 core_tension과 period_operation에 직접 답해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(packet)}`
   return {
     version: V23_PROMPT_VERSION,
     narrative_version: PERIOD_NARRATIVE_VERSION,
