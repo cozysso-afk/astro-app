@@ -296,7 +296,12 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const ir=data?.investment_reading??{};
     const investmentFields:Record<string,string>={"투자심리":"psychology","수익실현":"realization","신규진입":"entry","투자주의":"risk"};
     for(const [topic,field] of Object.entries(investmentFields)){
-      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&!String(ir?.[field]??"").trim())s5.push(`${topic} 중요 분야인데 투자 상세 설명 누락`);
+      const section=field==="risk"?null:data?.clusters?.investment?.[field];
+      const authoredClusterDetail=section
+        && ["direct","conditional"].includes(String(section?.applicability??""))
+        && Boolean(sectionText(section).trim())
+        && (section?.evidence_refs?.length??0)>0;
+      if(["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??""))&&!String(ir?.[field]??"").trim()&&!authoredClusterDetail)s5.push(`${topic} 중요 분야인데 투자 상세 설명 누락`);
     }
   }
   const sectionMax=kind==="annual"?1500:kind==="month"?1200:950;
