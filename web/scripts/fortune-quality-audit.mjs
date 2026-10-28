@@ -107,10 +107,13 @@ function providerAudit(result) {
   const stages = Array.isArray(usage?.quality_validation?.stages)
     ? usage.quality_validation.stages.map(row => ({ stage: Number(row?.stage), passed: row?.passed === true })) : []
   const generationVersion = String(usage?.generation_version ?? '')
+  const structureIssues = Array.isArray(usage?.structure_validation?.issues)
+    ? usage.structure_validation.issues.map(String).filter(code => /^[a-z0-9_]{1,60}$/.test(code)).slice(0, 12) : []
   const verified = provenanceVerified && origin === 'gemini' && version.startsWith('supabase-ai-v23.')
     && generationVersion === version && successfulCalls > 0 && stages.length === 6 && stages.every(row => row.passed)
   return { verified, model, generation_version: generationVersion, successful_calls: successfulCalls,
-    attempt_count: Number(usage?.attempt_count ?? trace.length), call_trace: trace, quality_stages: stages }
+    attempt_count: Number(usage?.attempt_count ?? trace.length), call_trace: trace, quality_stages: stages,
+    structure_issues: structureIssues }
 }
 function inPeriod(date, start, end) {
   return ISO.test(date) && ISO.test(start) && ISO.test(end) && date >= start && date <= end
@@ -128,7 +131,10 @@ function evaluateOne(row, mode) {
   if (!id || !profile) problems.push(issue('CASE_ID_OR_PROFILE_MISSING'))
   if (!PERIODS.includes(period)) problems.push(issue('INVALID_PERIOD_KIND'))
   if (!ISO.test(start) || !ISO.test(end) || start > end) problems.push(issue('INVALID_PERIOD_RANGE'))
-  if (!data || typeof data !== 'object' || Array.isArray(data)) problems.push(issue('RESULT_MISSING'))
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    problems.push(issue('RESULT_MISSING'))
+    if (provider.structure_issues.length) problems.push(issue('PROVIDER_STRUCTURE_INVALID', 'error', { reasons: provider.structure_issues }))
+  }
   if (mode === 'live') {
     if (!provider.verified) problems.push(issue('GEMINI_PROVENANCE_UNVERIFIED'))
     if (!version.startsWith('supabase-ai-v23.')) problems.push(issue('V23_VERSION_UNVERIFIED'))
