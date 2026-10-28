@@ -14,7 +14,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v10";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v11";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();

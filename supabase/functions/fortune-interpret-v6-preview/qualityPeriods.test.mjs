@@ -91,6 +91,30 @@ for(const kind of ["day","week","month"]){
   });
 }
 
+test("same-day windows for different topics are not treated as contradictory",()=>{
+  const {data,payload}=buildCase("day");
+  payload.evidence_ledger.push({id:"W:test:day:money",system:"western",scope:"test_window",topic:"금전",direction:"caution",date:"2026-09-03",score:35,text:"2026-09-03 금전 주의 계산 근거"});
+  data.key_windows.push({
+    label:"금전 주의",start:"2026-09-03",end:"2026-09-03",signal:"주의",topics:["금전"],
+    summary:"직장 활용 흐름과 별개로 금전 분야에서는 확인되지 않은 지출을 경계해야 하는 구간이야.",
+    action:"지출 전 확정 금액과 조건을 다시 확인해.",avoid:"직장 흐름이 좋다는 이유로 금전 판단까지 낙관하지 마.",evidence_refs:["W:test:day:money"],
+  });
+  const report=inspectInterpretationQuality(data,payload);
+  assert.doesNotMatch(report.stages[3].issues.join(" / "),/상충 신호/);
+});
+
+test("same-day opposing windows for the same topic remain contradictory",()=>{
+  const {data,payload}=buildCase("day");
+  payload.evidence_ledger.push({id:"W:test:day:work-caution",system:"western",scope:"test_window",topic:"직장",direction:"caution",date:"2026-09-03",score:35,text:"2026-09-03 직장 주의 계산 근거"});
+  data.key_windows.push({
+    label:"직장 주의",start:"2026-09-03",end:"2026-09-03",signal:"주의",topics:["직장"],
+    summary:"같은 직장 분야에 활용과 주의를 별도 창으로 동시에 선언한 충돌 테스트야.",
+    action:"상충 신호를 혼합으로 정리해.",avoid:"같은 분야를 활용과 주의로 분리해 단정하지 마.",evidence_refs:["W:test:day:work-caution"],
+  });
+  const report=inspectInterpretationQuality(data,payload);
+  assert.match(report.stages[3].issues.join(" / "),/같은 기간·분야에 상충 신호/);
+});
+
 
 test("short periods do not force filler decisions or priorities",()=>{
   for(const [kind,decisionCount,priorityCount] of [["day",1,1],["week",2,2],["month",2,2]]){

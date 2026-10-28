@@ -1,6 +1,6 @@
 import { TOPICS, txt } from "./integratedInterpretationV2.ts";
 
-export const QUALITY_VERSION = "fortune-interpretation-quality-v7-no-padding-gates";
+export const QUALITY_VERSION = "fortune-interpretation-quality-v8-topic-scoped-window-consistency";
 
 function isoDate(v: unknown){ const s=String(v??""); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:""; }
 function uniq<T>(xs:T[]){ return [...new Set(xs)]; }
@@ -170,8 +170,17 @@ export function inspectInterpretationQuality(data:any,payload:any){
   stages.push(qualityStage(3,"의미 방향 검증",uniq(s3).slice(0,30)));
 
   const s4:string[]=[];
-  const seen=new Map<string,string>();
-  for(const w of data?.key_windows??[]){const key=`${w?.start}|${w?.end}`;const prev=seen.get(key);if(prev&&prev!==w?.signal&&prev!=="혼합"&&w?.signal!=="혼합")s4.push(`같은 기간에 상충 신호: ${key}`);seen.set(key,w?.signal);}
+  const windows=Array.isArray(data?.key_windows)?data.key_windows:[];
+  for(let i=0;i<windows.length;i++)for(let j=i+1;j<windows.length;j++){
+    const a=windows[i],b=windows[j];
+    const keyA=`${a?.start}|${a?.end}`,keyB=`${b?.start}|${b?.end}`;
+    if(keyA!==keyB||![["활용","주의"],["주의","활용"]].some(([x,y])=>a?.signal===x&&b?.signal===y))continue;
+    const topicsA=new Set((Array.isArray(a?.topics)?a.topics:[]).map((x:any)=>String(x).trim()).filter(Boolean));
+    const topicsB=new Set((Array.isArray(b?.topics)?b.topics:[]).map((x:any)=>String(x).trim()).filter(Boolean));
+    const overlappingTopic=[...topicsA].some(topic=>topicsB.has(topic));
+    const sameLabel=String(a?.label??"").trim()!==""&&String(a?.label??"").trim()===String(b?.label??"").trim();
+    if(overlappingTopic||sameLabel)s4.push(`같은 기간·분야에 상충 신호: ${keyA}`);
+  }
   const coreTopics=Object.entries(data?.topic_analysis??{}).filter(([,x]:any)=>x?.importance==="핵심");
   if(coreTopics.length>5)s4.push(`핵심 분야가 너무 많음: ${coreTopics.length}/5`);
   for(const [topic,x] of Object.entries(data?.topic_analysis??{}) as any[]){
