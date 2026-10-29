@@ -176,11 +176,15 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const compactPatterns = (rows: RelationshipPattern[]) => <>{rows.slice(0,2).map(interpretation)}{rows.length>2&&<details className="reading-more"><summary>패턴 {rows.length-2}개 더 보기</summary>{rows.slice(2).map(interpretation)}</details>}</>
 
   const generatedCost = relationshipGenerationCost(ai)
+  const verifiedAi = ai?.ok === true
+    && ai.origin === 'gemini'
+    && ai.provenance_verified === true
+    && !!ai.data
   // Calculated signals remain available in the technical/hierarchy views, but
   // TypeScript must never present locally composed prose as the relationship reading.
   const showCalculatedNarrative = false
-  const reunionV2 = reunion && ai?.ok ? ai.data?.reunion_synthesis_v2 ?? null : null
-  const reunionAi = reunion && ai?.ok && ai.data?.reunion_reading ? {
+  const reunionV2 = reunion && verifiedAi ? ai.data?.reunion_synthesis_v2 ?? null : null
+  const reunionAi = reunion && verifiedAi && ai.data?.reunion_reading ? {
     bottom: firstSentences(ai.data.reunion_reading.bottom_line || ai.data.overview, 3),
     incoming: firstSentences(ai.data.reunion_reading.incoming_contact, 2),
     outgoing: firstSentences(ai.data.reunion_reading.outgoing_contact, 2),
@@ -208,7 +212,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const dateFocus = reunionDateHighlights.length ? <div className="reunion-date-focus"><div className="reunion-date-focus-head"><strong>날짜로 좁혀 보면</strong><small>월 흐름 안에서 계산값이 특히 도드라지는 날</small></div><div className="reunion-date-focus-list">{reunionDateHighlights.map((row)=><article key={row.date}><time>{row.date}</time><b>{row.labels.join(' · ')}</b><span>{row.score>=60?'강함':row.score<40?'약함':'보통'}</span></article>)}</div><small>날짜 점수도 실제 연락·재회 확률이 아니라 선택 기간 안의 상대활성도 비교값이야.</small></div> : null
 
   return <section ref={exportRef} className="relationship-experience reading-experience" data-mode={analysisMode} data-reading-export-root="relationship">
-    {!(reunion && hierarchyData) && <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{view.headline}</h3><p className="reading-hero-subtitle">{reunion ? '누가 먼저 움직이는지, 언제 접점이 생기는지, 연락 이후 관계가 버틸 수 있는지를 나눠서 봐.' : analysisMode === 'marriage_married' ? '이미 함께하는 생활 안에서 지킬 것과 조정할 것을 살펴봐.' : analysisMode === 'marriage_unmarried' ? '끌림뿐 아니라 함께 살아갈 때의 약속과 부담까지 살펴봐.' : '잘 맞는 부분과 서로 배워야 할 부분을 함께 읽어봐.'}</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>}
+    {!(reunion && hierarchyData) && <header className="reading-hero"><span className="celestial-mark" aria-hidden="true"><Orbit size={26}/></span><p className="eyebrow">{view.title}</p><h3>{imageExportLabel}</h3><p className="reading-hero-subtitle">계산 근거와 검증된 Gemini 해설을 구분해 보여줘.</p>{view.timePrecisionNote&&<p className="reading-precision-note">{view.timePrecisionNote}</p>}</header>}
     <div className="reading-export-toolbar" data-reading-export-ignore="true">
       <button type="button" onClick={saveResultImages} disabled={imageExporting} aria-busy={imageExporting}>
         {imageExporting ? <LoaderCircle className="reading-export-spinner" size={17} aria-hidden="true"/> : <ImageDown size={17} aria-hidden="true"/>}
@@ -238,7 +242,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     sustainabilityText={view.sustainabilityText}
   />}
 
-    {ai?.ok && ai.data && (!reunion || !hierarchyData) ? <section className="reading-section relationship-natural-reading">
+    {verifiedAi && ai.data && (!reunion || !hierarchyData) ? <section className="reading-section relationship-natural-reading">
       <h3>{reunion && !hierarchyData ? '이전 저장 해설 · 참고용' : ai.data.headline}</h3>
       {reunion ? <ReadableCopy className="reading-conclusion" text={reunionV2?.summary || reunionAi?.bottom || ai.data.overview}/> : <p className="reading-conclusion">{analysisMode.startsWith('marriage_') ? ai.data.marriage_reading?.bottom_line || ai.data.overview : ai.data.overview}</p>}
       {!!generatedCost && <p className="ai-generated-cost">{generatedCost}</p>}
@@ -266,9 +270,9 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         {!!reunionAi.filter && <section className="reunion-ai-block"><h4>연락 이후 관계 유지력</h4><p>{reunionAi.filter}</p></section>}
         {!!reunionAi.precision && <details className="reunion-precision-note"><summary>정밀도·제외 근거</summary><p>{reunionAi.precision}</p></details>}
       </> : analysisMode.startsWith('marriage_') ? <><ReadingExplanation kind="reason">{[ai.data.marriage_reading?.bond,ai.data.marriage_reading?.emotional_home].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.marriage_reading?.daily_life,ai.data.marriage_reading?.intimacy_resources,ai.data.marriage_reading?.conflict_repair].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.marriage_reading?.commitment_or_current_cycle,ai.data.marriage_reading?.timing].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.marriage_reading?.caution,ai.data.marriage_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : <><ReadingExplanation kind="reason">{[ai.data.chemistry,ai.data.emotional_dynamic,ai.data.communication].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.long_term,...(ai.data.practical_advice??[])].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{ai.data.timing}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.conflict_pattern,ai.data.power_boundaries].filter(Boolean).join(' ')}</ReadingExplanation></>}
-    </section> : !(reunion && hierarchyData && ai?.ok && ai.data) ? <section className="reading-section relationship-natural-reading is-ready"><h3>{reunion && hierarchyData ? '추가 자연어 해설 · 선택' : 'Gemini 자연어 해설'}</h3><p>{reunion && hierarchyData ? '위 계산 결과 확인에는 필요 없어. 더 긴 서술형 해설이 필요할 때만 생성해.' : '계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.'}</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section> : null}
+    </section> : !(reunion && hierarchyData && verifiedAi) ? <section className="reading-section relationship-natural-reading is-ready"><h3>{reunion && hierarchyData ? '추가 자연어 해설 · 선택' : 'Gemini 자연어 해설'}</h3><p>{reunion && hierarchyData ? '위 계산 결과 확인에는 필요 없어. 더 긴 서술형 해설이 필요할 때만 생성해.' : '계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.'}</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section> : null}
 
-    {showCalculatedNarrative && <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
+    {showCalculatedNarrative && <details className="relationship-calculated-fallback" open={!hierarchyData && !verifiedAi}><summary>계산 근거·보조 해설</summary>
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
         <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},{kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
