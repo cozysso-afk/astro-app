@@ -31,7 +31,9 @@ test('V23 completion recovery makes the response sparse instead of lowering its 
 
 test('relationship focus dates require direct relationship timing evidence', () => {
   assert.match(source, /relationship_reading\.focus_timing은 relationship_reading\.evidence_refs를 먼저 고른 뒤/)
-  assert.match(source, /직접 관계 날짜 근거가 없으면 날짜를 쓰지 말고 날짜 없는 현실 확인 조건으로 작성해/)
+  assert.match(source, /그 근거 행의 date와 정확히 같은 날짜만 써/)
+  assert.match(source, /start\/end 구간이나 다른 분야 근거 날짜는 관계 주목 날짜로 쓰지 마/)
+  assert.match(source, /date가 있는 직접 관계 근거가 없으면 모든 정확한 날짜를 빼고/)
 })
 
 test('sparse omissions remain non-authored metadata instead of failing prose ownership', () => {
