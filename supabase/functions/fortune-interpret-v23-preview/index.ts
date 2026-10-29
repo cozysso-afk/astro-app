@@ -14,7 +14,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v13";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v14";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -84,6 +84,7 @@ function coreInstruction(periodKind:unknown,compact=false){const clusterLimit=co
 - 같은 날짜·점수·근거를 여러 섹션에서 반복 설명하지 마. 한 번 설명한 세부 근거는 다른 섹션에서는 결론만 참조해.
 - 정확한 날짜 범위는 연결한 evidence_refs가 실제로 그 범위를 덮을 때만 사용해. 한 날짜 근거를 임의 범위로 늘리지 마.
 - key_window는 evidence_refs를 먼저 고른 다음, 그 근거 행의 date 또는 start/end가 직접 포함하는 날짜만 start/end로 복사해. 근거가 덮지 않는 인접 날짜·월말·분기 경계를 임의로 넣지 마.
+- relationship_reading.focus_timing은 relationship_reading.evidence_refs를 먼저 고른 뒤 수신신호·발신적합·과거인연접점의 직접 날짜 근거 행이 date 또는 start/end로 실제 포함하는 날짜만 써. 직접 관계 날짜 근거가 없으면 날짜를 쓰지 말고 날짜 없는 현실 확인 조건으로 작성해.
 - ${kind} 필수 개수: ${periodMinimum}. responseSchema의 minItems보다 적게 반환하지 마.
 - 모든 decision은 최소 하나의 evidence_ref를 실제 key_window와 공유해.
 - day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
