@@ -29,6 +29,11 @@ test('V23 completion recovery makes the response sparse instead of lowering its 
   assert.doesNotMatch(source, /정확히 \$\{EDITORIAL_SECTION_KEYS\.length\}개의 배열 항목/)
 })
 
+test('relationship focus dates require direct relationship timing evidence', () => {
+  assert.match(source, /relationship_reading\.focus_timing은 relationship_reading\.evidence_refs를 먼저 고른 뒤/)
+  assert.match(source, /직접 관계 날짜 근거가 없으면 날짜를 쓰지 말고 날짜 없는 현실 확인 조건으로 작성해/)
+})
+
 test('sparse omissions remain non-authored metadata instead of failing prose ownership', () => {
   const quality = readFileSync(new URL('../fortune-interpret-v6-preview/qualityV2.ts', import.meta.url), 'utf8')
   const projection = readFileSync(new URL('./editorialPolishV23.ts', import.meta.url), 'utf8')
