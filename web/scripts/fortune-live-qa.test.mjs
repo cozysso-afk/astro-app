@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildQaConfig, resolveQaAccessToken } from './fortune-live-qa.mjs'
+import { buildQaConfig, resolveQaAccessToken, selectQaCases } from './fortune-live-qa.mjs'
 
 const runner = readFileSync(new URL('./fortune-live-qa.mjs', import.meta.url), 'utf8')
 const workflow = readFileSync(new URL('../../.github/workflows/fortune-quality-audit.yml', import.meta.url), 'utf8')
@@ -63,6 +63,12 @@ test('missing automatic-login secrets fails before any paid call', async () => {
     }),
     /QA_USER_EMAIL and QA_USER_PASSWORD/,
   )
+})
+
+test('paid QA can target only failed period kinds without repeating successful calls', () => {
+  assert.deepEqual(selectQaCases('month,annual', 2).map(row => row.kind), ['month', 'annual'])
+  assert.throws(() => selectQaCases('month,month', 2), /unique comma-separated subset/)
+  assert.throws(() => selectQaCases('quarter', 1), /unique comma-separated subset/)
 })
 
 test('existing-job replay is status-only and requires the no-paid-call workflow gate', () => {
