@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   publish:
@@ -46,6 +47,8 @@ jobs:
 
       - name: Remove superseded generated and merged work branches
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mapfile -t LEGACY_DEPLOY_BRANCHES < <(
@@ -53,20 +56,20 @@ jobs:
               awk '{sub("refs/heads/", "", $2); print $2}' |
               grep -E '^deploy/mobile-pages-[0-9a-f]{12}$' || true
           )
-          MERGED_WORK_BRANCHES=(
-            'fix/v23-temporal-wording-v9'
-            'fix/v23-structure-retry-v10'
-            'fix/v23-bundle-without-jsr-types'
-            'fix/v23-topic-scoped-window-v11'
-            'fix/v23-projection-dedupe'
-            'test/v23-live-mobile-qa'
-            'fix/v23-stored-status-route'
-            'fix/historical-gemini-provenance'
-            'fix/fortune-audit-timezone-windows'
-            'test/stored-v12-quality-replay'
+          mapfile -t MERGED_WORK_BRANCHES < <(
+            gh pr list --state merged --limit 1000 --json headRefName \
+              --jq '.[].headRefName' | sort -u
           )
-          TO_DELETE=("${LEGACY_DEPLOY_BRANCHES[@]}")
-          for branch in "${MERGED_WORK_BRANCHES[@]}"; do
+          declare -A SEEN=()
+          TO_DELETE=()
+          for branch in "${LEGACY_DEPLOY_BRANCHES[@]}" "${MERGED_WORK_BRANCHES[@]}"; do
+            case "$branch" in
+              ''|'main'|'deploy/mobile-pages-latest') continue ;;
+            esac
+            if [[ -n "${SEEN[$branch]:-}" ]]; then
+              continue
+            fi
+            SEEN[$branch]=1
             if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
               TO_DELETE+=("$branch")
             fi
