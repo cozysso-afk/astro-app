@@ -24,6 +24,14 @@ const cases = [
     latitude: 35.6762, longitude: 139.6503, utc_offset_hours: 9, gender: 'male',
     kind: 'annual', start: '2026-01-01', end: '2026-12-31' },
 ]
+const PERIOD_KINDS = new Set(['day', 'week', 'month', 'annual'])
+export function selectQaCases(value, maxJobs) {
+  const requested = String(value || 'day,week,month,annual').split(',').map(kind => kind.trim()).filter(Boolean)
+  if (!requested.length || requested.some(kind => !PERIOD_KINDS.has(kind)) || new Set(requested).size !== requested.length) {
+    throw new Error('period-kinds must be a unique comma-separated subset of day,week,month,annual')
+  }
+  return requested.map(kind => cases.find(row => row.kind === kind)).filter(Boolean).slice(0, maxJobs)
+}
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function postJson(url, body, headers = {}, timeoutMs = 180000) {
   const response = await fetch(url, {
@@ -159,11 +167,12 @@ async function main() {
     throw new Error('max-jobs must be an integer from 1 to 4')
   }
   if (existingJobId && maxJobs !== 1) throw new Error('existing-job-id replay requires max-jobs 1')
+  const selectedCases = selectQaCases(arg('--period-kinds'), maxJobs)
   const out = path.resolve(arg('--out') || 'fortune-live-qa-artifacts')
   const config = await buildQaConfig()
   config.existingJobId = existingJobId
   const results = []
-  for (const row of cases.slice(0, maxJobs)) {
+  for (const row of selectedCases) {
     try {
       results.push(await runCase(row, config))
       console.log('Completed synthetic live QA case ' + row.id + ' (' + row.kind + ')')

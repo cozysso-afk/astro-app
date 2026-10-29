@@ -31,6 +31,20 @@ test('provider schema flattens repeated editorial object branches into one compa
   assert.equal(provider.properties.key_windows.maxItems,undefined)
 })
 
+test('provider schema enforces the quality gate minimums for each period',()=>{
+  const month=buildProviderCoreSchema(SCHEMA,'month')
+  assert.equal(month.properties.key_windows.minItems,3)
+  assert.equal(month.properties.decisions.minItems,2)
+  assert.equal(month.properties.priorities.minItems,2)
+  assert.equal(month.properties.year_phases.minItems,undefined)
+  const annual=buildProviderCoreSchema(SCHEMA,'annual')
+  assert.equal(annual.properties.key_windows.minItems,5)
+  assert.equal(annual.properties.decisions.minItems,3)
+  assert.equal(annual.properties.priorities.minItems,3)
+  assert.equal(annual.properties.year_phases.minItems,4)
+  assert.equal(annual.properties.cross_checks.minItems,3)
+})
+
 test('provider editorial array normalizes back to the existing grouped API shape with every key exactly once',()=>{
   const rows=EDITORIAL_SECTION_KEYS.map(section)
   const normalized=normalizeProviderCore({headline:'테스트',clusters:rows})

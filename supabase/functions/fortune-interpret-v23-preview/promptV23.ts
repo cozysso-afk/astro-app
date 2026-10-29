@@ -2,7 +2,7 @@ import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-previe
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.8-korean-idiom-sanity'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.9-grounded-cardinality'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }

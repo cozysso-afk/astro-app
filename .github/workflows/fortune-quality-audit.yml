@@ -49,6 +49,10 @@ on:
         description: 'Maximum synthetic Gemini jobs (1-4, default 2)'
         required: true
         default: '2'
+      period_kinds:
+        description: 'Comma-separated periods to run, in order'
+        required: true
+        default: 'day,week,month,annual'
       existing_job_id:
         description: 'Optional completed QA job ID to re-audit without a Gemini call'
         required: false
@@ -111,9 +115,11 @@ jobs:
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
           QA_MAX_JOBS: ${{ inputs.max_jobs }}
+          QA_PERIOD_KINDS: ${{ inputs.period_kinds }}
         run: |
           node --experimental-strip-types web/scripts/fortune-live-qa.mjs \
             --max-jobs "$QA_MAX_JOBS" \
+            --period-kinds "$QA_PERIOD_KINDS" \
             --out web/fortune-live-qa-artifacts
       - name: Upload report without raw Gemini prose or profiles
         if: always()
@@ -143,9 +149,11 @@ jobs:
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
           QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id }}
+          QA_PERIOD_KINDS: ${{ inputs.period_kinds }}
         run: |
           node --experimental-strip-types web/scripts/fortune-live-qa.mjs \
             --max-jobs 1 \
+            --period-kinds "$QA_PERIOD_KINDS" \
             --existing-job-id "$QA_EXISTING_JOB_ID" \
             --out web/fortune-live-qa-artifacts
       - name: Upload re-audit report without raw Gemini prose or profiles

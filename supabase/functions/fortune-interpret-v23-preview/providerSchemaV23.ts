@@ -89,7 +89,12 @@ function validProviderSection(row:any){
   return APPLICABILITY.has(String(row?.applicability??""));
 }
 
-export function buildProviderCoreSchema(fullSchema:any){
+function normalizePeriodKind(value:unknown){
+  const kind=String(value??"").trim().toLowerCase();
+  return kind==="day"||kind==="week"||kind==="month"||kind==="annual"?kind:"annual";
+}
+
+export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
   const core:any=structuredClone(fullSchema);
   delete core?.properties?.topic_analysis;
   core.required=(core.required??[]).filter((key:string)=>key!=="topic_analysis");
@@ -130,6 +135,22 @@ export function buildProviderCoreSchema(fullSchema:any){
       required:["key",...EDITORIAL_FIELDS],
     },
   };
+  if(periodKind!==undefined){
+    const kind=normalizePeriodKind(periodKind);
+    const minimums={
+      day:{key_windows:1,decisions:1,priorities:1},
+      week:{key_windows:2,decisions:2,priorities:2},
+      month:{key_windows:3,decisions:2,priorities:2},
+      annual:{key_windows:5,decisions:3,priorities:3},
+    }[kind];
+    for(const [field,minItems] of Object.entries(minimums)){
+      if(core.properties?.[field]?.type==="ARRAY")core.properties[field].minItems=minItems;
+    }
+    if(kind==="annual"){
+      core.properties.year_phases.minItems=4;
+      core.properties.cross_checks.minItems=3;
+    }
+  }
   return core;
 }
 

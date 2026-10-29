@@ -25,7 +25,7 @@ test('V23 completion recovery makes the response sparse instead of lowering its 
   assert.match(source, /const clusterLimit=compact\?6:10/)
   assert.match(source, /실제 근거로 직접 해설할 수 있는 key만 sparse 배열/)
   assert.match(source, /서버가 생략 key를 빈 insufficient 상태로 채운다/)
-  assert.match(source, /coreInstruction\(compact\)/)
+  assert.match(source, /coreInstruction\(fullPayload\?\.period_kind,compact\)/)
   assert.doesNotMatch(source, /정확히 \$\{EDITORIAL_SECTION_KEYS\.length\}개의 배열 항목/)
 })
 

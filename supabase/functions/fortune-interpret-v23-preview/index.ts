@@ -14,7 +14,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.9-gemini-single-author-v12";
+const VERSION="supabase-ai-v23.9-gemini-single-author-v13";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -53,8 +53,6 @@ function structureReport(value:any){
 function structureFailure(result:any,value:any){const report=structureReport(value);if(!report.issues.length)report.issues.push("validator_rejected_normalized_core");return {...result,ok:false,error:"provider 구조화 응답 검증 실패",structure_guard_failed:true,structure_report:report,candidate_data:result?.data,validation:undefined};}
 function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
 
-const CORE_SCHEMA:any=buildProviderCoreSchema(SCHEMA);
-
 const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
 절대규칙:
 - PROMPT_DATA와 evidence_ledger 밖의 사실·날짜·상대 속마음·사건 확률을 만들지 않는다.
@@ -74,7 +72,7 @@ const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이
 - 한 문단에는 새로운 판단 하나만 넣고, 근거의 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결한다.
 - 한국어 반말. JSON만 반환한다.`;
 
-function coreInstruction(compact=false){const clusterLimit=compact?6:10;return `
+function coreInstruction(periodKind:unknown,compact=false){const clusterLimit=compact?6:10;const kind=String(periodKind??"annual");const periodMinimum=kind==="annual"?"key_windows 5개 이상, year_phases 4개 이상, cross_checks 3개 이상, decisions 3개 이상, priorities 3개 이상":kind==="month"?"key_windows 3개 이상, decisions 2개 이상, priorities 2개 이상":kind==="week"?"key_windows 2개 이상, decisions 2개 이상, priorities 2개 이상":"key_windows 1개 이상, decisions 1개 이상, priorities 1개 이상";return `
 [OUTPUT]
 - topic_analysis는 출력하지 마. 서버가 계산근거와 함께 별도로 붙인다.
 - clusters는 중첩 객체가 아니라 실제 근거로 직접 해설할 수 있는 key만 sparse 배열로 최대 ${clusterLimit}개 출력해. 모든 key를 채우지 마. 서버가 생략 key를 빈 insufficient 상태로 채운다.
@@ -85,6 +83,8 @@ function coreInstruction(compact=false){const clusterLimit=compact?6:10;return `
 - 전체 결론, key_windows, annual이면 year_phases 4개, cross_checks, decisions, 관계가 중요할 경우 relationship_reading/contact_flow, 투자 중요 시 investment_reading, systems, priorities, limits를 작성해.
 - 같은 날짜·점수·근거를 여러 섹션에서 반복 설명하지 마. 한 번 설명한 세부 근거는 다른 섹션에서는 결론만 참조해.
 - 정확한 날짜 범위는 연결한 evidence_refs가 실제로 그 범위를 덮을 때만 사용해. 한 날짜 근거를 임의 범위로 늘리지 마.
+- key_window는 evidence_refs를 먼저 고른 다음, 그 근거 행의 date 또는 start/end가 직접 포함하는 날짜만 start/end로 복사해. 근거가 덮지 않는 인접 날짜·월말·분기 경계를 임의로 넣지 마.
+- ${kind} 필수 개수: ${periodMinimum}. responseSchema의 minItems보다 적게 반환하지 마.
 - 모든 decision은 최소 하나의 evidence_ref를 실제 key_window와 공유해.
 - day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
 - annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.`;}
@@ -95,7 +95,7 @@ function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadl
 async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback",compact=false,qualityRetry=""){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
   const authoredPrompt=buildV23CorePromptFromPacket(promptPayload);
-  const prompt=`${authoredPrompt.text}\n\n${coreInstruction(compact)}${qualityRetry}`;
+  const prompt=`${authoredPrompt.text}\n\n${coreInstruction(fullPayload?.period_kind,compact)}${qualityRetry}`;
   const promptBytes=enc.encode(prompt).byteLength;
   const callNo=++budget.used;
   const started=Date.now();
@@ -107,7 +107,7 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   try{
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:CORE_SCHEMA,maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:v23ThinkingLevel()}}}),
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:buildProviderCoreSchema(SCHEMA,fullPayload?.period_kind),maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:v23ThinkingLevel()}}}),
     });
     const rawText=await r.text();
     let raw:any=null;try{raw=JSON.parse(rawText);}catch{}
@@ -258,7 +258,7 @@ Deno.serve(async(req)=>{
   const precisionGate=precisionGateFromPayload(b.calculation);
   const payload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,b.calculation):compacted;
   const pb=buildV23PromptBudget(payload);
-  if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0,narrative_phenomena:pb.packet?.period_narrative?.phenomena?.length??0,narrative_kind:pb.packet?.period_narrative?.kind??null,provider_schema_bytes:enc.encode(JSON.stringify(CORE_SCHEMA)).byteLength,provider_editorial_sections:EDITORIAL_SECTION_KEYS.length});
+  if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0,narrative_phenomena:pb.packet?.period_narrative?.phenomena?.length??0,narrative_kind:pb.packet?.period_narrative?.kind??null,provider_schema_bytes:enc.encode(JSON.stringify(buildProviderCoreSchema(SCHEMA,payload?.period_kind))).byteLength,provider_editorial_sections:EDITORIAL_SECTION_KEYS.length});
   if(b?.action==="prompt"){const p=buildV23CorePrompt(payload);return res({ok:true,interpreter_version:VERSION,prompt:p.text,prompt_bytes:enc.encode(p.text).byteLength,estimated_input_tokens:Math.ceil(enc.encode(p.text).byteLength/2.6),prompt_budget_bytes:pb.max_bytes,narrative_version:p.narrative_version});}
   if(b?.action!=="start")return res(publicFortuneError("UNSUPPORTED_ACTION"),400);
   if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);
