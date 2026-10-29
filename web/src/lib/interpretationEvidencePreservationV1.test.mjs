@@ -66,7 +66,8 @@ test('production Gemini packet preserves history/current context but keeps futur
   assert.match(edge,/미래 후보로 승격하지 않는다/)
   assert.match(edge,/계산 자체가 없다는 뜻으로 바꾸지 마라/)
   assert.match(edge,/상대적 활성 방향 자체는 숨기지 말고/)
-  assert.match(grounding,/x >= payload\.reunion_hierarchy\.as_of_date/)
+  assert.match(grounding,/item >= asOf/)
+  assert.match(grounding,/unsupported_timing_window/)
 })
 
 test('reunion UI distinguishes availability states instead of collapsing no-candidate into no-calculation', () => {
@@ -94,6 +95,6 @@ test('technical causal prose is never restored just to fill reader-language slot
 })
 
 test('reunion authored cache is invalidated for the temporal evidence contract', () => {
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.3-stage-answer"/)
-  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
+  assert.match(edge,/REUNION_VERSION="relationship-v14\.0-gemini-single-author"/)
+  assert.match(cache,/relationship-v14\.0-gemini-single-author/)
 })
