@@ -1,0 +1,89 @@
+name: Relationship Quality Audit
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/relationship-interpret-v9-preview/**'
+      - 'web/src/RelationshipInterpretationPanel.tsx'
+      - 'web/src/ReunionHierarchyPanelV3.tsx'
+      - 'web/src/lib/readingCache.ts'
+      - 'web/scripts/relationship-*.mjs'
+      - '.github/workflows/relationship-quality-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/relationship-interpret-v9-preview/**'
+      - 'web/src/RelationshipInterpretationPanel.tsx'
+      - 'web/src/ReunionHierarchyPanelV3.tsx'
+      - 'web/src/lib/readingCache.ts'
+      - 'web/scripts/relationship-*.mjs'
+      - '.github/workflows/relationship-quality-audit.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_paid_calls:
+        description: 'Type YES to permit up to 2 synthetic relationship Gemini jobs'
+        required: true
+        default: 'NO'
+      max_jobs:
+        description: 'Maximum jobs (1-2)'
+        required: true
+        default: '2'
+      purposes:
+        description: 'Unique comma-separated subset of compatibility,reunion'
+        required: true
+        default: 'compatibility,reunion'
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-audit:
+    name: Relationship evaluator and single-author regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Validate runner without a Gemini call
+        run: |
+          node --check web/scripts/relationship-live-qa.mjs
+          node --test web/scripts/relationship-quality-audit.test.mjs
+          node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.test.mjs supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs
+          node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+      - name: Build mobile web
+        run: npm run build
+        working-directory: web
+
+  live-gemini-audit:
+    name: Manually approved compatibility and reunion Gemini audit
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run capped QA-only Gemini calls
+        env:
+          QA_RELATIONSHIP_LIVE_APPROVED: 'YES'
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+        run: node web/scripts/relationship-live-qa.mjs --max-jobs "${{ inputs.max_jobs }}" --purposes "${{ inputs.purposes }}" --out web/relationship-live-qa-artifacts
+      - name: Upload report without prose, profiles, or credentials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relationship-quality-live-${{ github.sha }}
+          path: web/relationship-live-qa-artifacts/
+          if-no-files-found: warn
+          retention-days: 14

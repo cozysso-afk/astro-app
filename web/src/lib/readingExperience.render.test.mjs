@@ -54,21 +54,13 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
   else assert.match(visible,/2026-09-14/)
 })
 
-for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']) test(`actual ${mode} markup has only its own question structure`,()=>{
+for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']) test(`actual ${mode} without verified Gemini provenance never exposes calculated prose`,()=>{
   const html=renderToStaticMarkup(createElement(Relationship,{aspects,partnerExact:false,analysisMode:mode,timing,ai:null,aiLoading:false,aiError:'',onAi:noAction,timeSensitivePoints:new Set(['Moon','ASC']),formatAspect:a=>`${a.a} ${a.aspect} ${a.b}`}))
   const visible=html.split('<details class="relationship-technical"')[0]
   assert.match(html,/<details class="relationship-technical"><summary>기술 근거 자세히 보기/)
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|Neptune|Uranus|W:|S:|T:/)
-  if(mode==='reunion') {
-    for(const title of ['상대 차트 쪽 활성','내 차트 쪽 활성','과거 인연 재접점','다시 붙었을 때 유지력','반복될 가능성이 높은 문제','주요 시기']) assert.ok(visible.includes(title))
-    assert.match(visible,/약함/);assert.match(visible,/강함/)
-  } else {
-    assert.doesNotMatch(visible,/재접촉|재회|상대 → 나|나 → 상대/)
-    for(const title of ['감정 · 친밀감','관계의 힘의 균형']) assert.ok(visible.includes(title))
-    if(mode==='compatibility') assert.doesNotMatch(visible,/결혼 전|우리 부부|결혼 궁합/)
-    if(mode==='marriage_unmarried') assert.match(visible,/결혼 전 확인할 것/)
-    if(mode==='marriage_married') { assert.match(visible,/지금 우리 부부/);assert.doesNotMatch(visible,/미래 배우자|결혼 전|결혼 가능성/) }
-  }
+  assert.match(visible,/Gemini 자연어 해설/)
+  assert.doesNotMatch(visible,/감정 · 친밀감|관계의 힘의 균형|상대 차트 쪽 활성|내 차트 쪽 활성|과거 인연 재접점|다시 붙었을 때 유지력|반복될 가능성이 높은 문제|주요 시기/)
   const reasons=[...visible.matchAll(/<article class="relationship-pattern">.*?<p>(.*?)<\/p>/g)].map(m=>m[1])
   assert.equal(new Set(reasons).size,reasons.length)
 })

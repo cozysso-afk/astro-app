@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { repairReunionGroundingV2 } from '../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts'
+import { validateReunionGroundingV2 } from '../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts'
 
 const server=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
@@ -10,14 +10,14 @@ test('reunion Gemini packet has a tighter target and compact hierarchy windows',
   assert.match(server,/REUNION_PROMPT_TARGET_BYTES=40000/)
   assert.match(server,/target_ok:bytes<=targetBytes/)
   assert.match(server,/purpose===\"reunion\"&&budget\.target_ok/)
-  assert.match(server,/relationship-v13\.3-stage-answer/)
+  assert.match(server,/relationship-v14\.0-gemini-single-author/)
   assert.match(server,/slice\(0,limit\)\.map\(compactHierarchyWindow\)/)
   assert.match(server,/fast_evidence:compactList\(x\?\.fast_evidence,2\)/)
   assert.match(server,/period_support:compactList\(x\?\.period_support,2\)/)
   assert.doesNotMatch(server,/top_periods:h\.top_periods/)
   assert.match(server,/past_windows:\(Array\.isArray\(h\?\.past_windows\)/)
   assert.match(server,/current_windows:\(Array\.isArray\(h\?\.current_windows\)/)
-  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
+  assert.match(cache,/relationship-v14\.0-gemini-single-author/)
 })
 
 test('unsupported deterministic wording is rejected for targeted Gemini repair',()=>{
@@ -37,7 +37,7 @@ test('unsupported deterministic wording is rejected for targeted Gemini repair',
     repeat_risks:{conclusion:'서로를 지울 수 없다는 식의 표현 대신 반복 위험을 설명한다.',patterns:[],evidence_refs:[ids[4]]},
     convergence:[],precision_note:''
   }}
-  const out=repairReunionGroundingV2(data,payload)
+  const out=validateReunionGroundingV2(data,payload)
   assert.equal(out.ok,false)
   assert.equal(out.reason,'unsupported_deterministic_claim')
   assert.equal(out.data,data)
