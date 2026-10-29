@@ -176,6 +176,9 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
   const compactPatterns = (rows: RelationshipPattern[]) => <>{rows.slice(0,2).map(interpretation)}{rows.length>2&&<details className="reading-more"><summary>패턴 {rows.length-2}개 더 보기</summary>{rows.slice(2).map(interpretation)}</details>}</>
 
   const generatedCost = relationshipGenerationCost(ai)
+  // Calculated signals remain available in the technical/hierarchy views, but
+  // TypeScript must never present locally composed prose as the relationship reading.
+  const showCalculatedNarrative = false
   const reunionV2 = reunion && ai?.ok ? ai.data?.reunion_synthesis_v2 ?? null : null
   const reunionAi = reunion && ai?.ok && ai.data?.reunion_reading ? {
     bottom: firstSentences(ai.data.reunion_reading.bottom_line || ai.data.overview, 3),
@@ -265,7 +268,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
       </> : analysisMode.startsWith('marriage_') ? <><ReadingExplanation kind="reason">{[ai.data.marriage_reading?.bond,ai.data.marriage_reading?.emotional_home].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.marriage_reading?.daily_life,ai.data.marriage_reading?.intimacy_resources,ai.data.marriage_reading?.conflict_repair].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{[ai.data.marriage_reading?.commitment_or_current_cycle,ai.data.marriage_reading?.timing].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.marriage_reading?.caution,ai.data.marriage_reading?.precision_note].filter(Boolean).join(' ')}</ReadingExplanation></> : <><ReadingExplanation kind="reason">{[ai.data.chemistry,ai.data.emotional_dynamic,ai.data.communication].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="practice">{[ai.data.long_term,...(ai.data.practical_advice??[])].filter(Boolean).join(' ')}</ReadingExplanation><ReadingExplanation kind="timing">{ai.data.timing}</ReadingExplanation><ReadingExplanation kind="caution">{[ai.data.conflict_pattern,ai.data.power_boundaries].filter(Boolean).join(' ')}</ReadingExplanation></>}
     </section> : !(reunion && hierarchyData && ai?.ok && ai.data) ? <section className="reading-section relationship-natural-reading is-ready"><h3>{reunion && hierarchyData ? '추가 자연어 해설 · 선택' : 'Gemini 자연어 해설'}</h3><p>{reunion && hierarchyData ? '위 계산 결과 확인에는 필요 없어. 더 긴 서술형 해설이 필요할 때만 생성해.' : '계산은 끝났어. 저장된 자연어 해설이 없으면 한 번 생성해. 생성한 해설은 다시 비용이 들지 않도록 저장해둘게.'}</p><p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p><button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading ? '관계 흐름을 정리하고 있어…' : '자연어 해설 생성'}</button>{aiError && <p className="reading-alert" role="status"><AlertTriangle size={16}/>{aiError}</p>}</section> : null}
 
-    <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
+    {showCalculatedNarrative && <details className="relationship-calculated-fallback" open={!hierarchyData && !(ai?.ok && ai.data)}><summary>계산 근거·보조 해설</summary>
       <section className="reading-section relationship-full-reading"><h3>{overview.title}</h3><p className="reading-conclusion">{overview.conclusion}</p><ReadingExplanation kind="reason">{overview.reason}</ReadingExplanation><ReadingExplanation kind="practice">{overview.practice}</ReadingExplanation><ReadingExplanation kind="caution">{overview.caution}</ReadingExplanation></section>
       {reunion ? <>
         <section className="reading-section"><h3>재접촉 흐름</h3><ReadingDirections rows={[{kind:'incoming',label:'상대 차트 쪽 활성',...view.incoming},{kind:'outgoing',label:'내 차트 쪽 활성',...view.outgoing},{kind:'reconnection',label:'과거 인연 재접점',...view.reconnection}]}/></section>
@@ -281,7 +284,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
         <section className="reading-section"><h3>{view.practicalTitle}</h3><ReadingExplanation kind="practice">{view.practical}</ReadingExplanation></section>
       </>}
       {!!sajuRows.length&&<section className="system-saju system-lens relationship-saju-context"><h3>{reunion ? '사주에서 읽는 재회 맥락' : '사주에서 읽는 관계 맥락'}</h3>{sajuRows.map(r=>{const copy=reunion ? reunionSajuCopy(r.value,r.lens,r.label) : {title:`${r.label} · ${r.value}`,meaning:r.lens.meaning,action:r.lens.action};return <article className="relationship-saju-row" key={r.label}><h4>{copy.title}</h4><p>{copy.meaning}</p><p className="relationship-saju-action">{copy.action}</p></article>})}<p className="reading-muted">두 일간의 관계를 읽는 별도 층이야. 서양점성 점수와 합산하거나 상대의 감정을 확정하지 않아.</p></section>}
-    </details>
+    </details>}
 
     <p className="reading-safety-note">{partnerExact ? '계산된 관계 패턴이야. 실제 감정이나 관계의 결과를 확정하지 않아.' : '입력한 생시는 달·진행층·사주 시주 같은 잠정 계산에 활용하고, exact 검증이 필요한 요소는 정확한 값처럼 승격하지 않아. 실제 감정이나 관계의 결과를 확정하지 않아.'}</p>
     <details className="relationship-technical"><summary>기술 근거 자세히 보기</summary>{technicalDetails}<div className="technical-aspects"><h4>관계 접점 원자료</h4>{view.ranked.map((a, i) => <p key={i}>{formatAspect(a)} · orb {a.orb.toFixed(2)}°</p>)}</div></details>

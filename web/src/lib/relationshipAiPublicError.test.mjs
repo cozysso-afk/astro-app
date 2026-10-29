@@ -59,7 +59,7 @@ function success(){
   data.felt_scenarios=['합성'];data.practical_advice=['합성'];data.top_aspects=[{label:'합성',meaning:'합성'}]
   data.reunion_reading=Object.fromEntries(['bottom_line','contact_recontact','emotional_reactivation','relationship_rebuilding','incoming_contact','outgoing_contact','reconnection_windows','low_windows','relationship_filter','precision_note'].map(k=>[k,'']))
   data.marriage_reading=Object.fromEntries(['mode','bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(k=>[k,'']))
-  return {ok:true,model:'gemini-3.7-flash',interpreter_version:'relationship-v11.6-reunion-compact-evidence',data,usage:{total_tokens:33}}
+  return {ok:true,origin:'gemini',provenance_verified:true,model:'gemini-3.6-flash',interpreter_version:'relationship-v12.0-gemini-single-author',data,usage:{total_tokens:33,generation_version:'relationship-v12.0-gemini-single-author',attempt_count:1,call_trace:[{call:1,model:'gemini-3.6-flash',kind:'initial',http_status:200,finish_reason:'STOP',outcome:'success'}]}}
 }
 test('unexpected 2xx success envelopes cannot populate state/cache',async()=>{
   for(const payload of [{message:canaries[0]},{ok:true,data:{debug:canaries[0]}},{ok:1,data:{}},[]]){const r=await invoke(async()=>json(payload));assert.equal(r.error,boundary.RELATIONSHIP_ERROR_FALLBACK);assert.equal(r.state,null);assert.equal(r.saved,null)}

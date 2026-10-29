@@ -169,11 +169,13 @@ export type RelationshipApiResponse = {
 
 export type RelationshipAiResponse = {
   ok: boolean
+  origin?: 'gemini'
+  provenance_verified?: boolean
   error?: string
   model?: string
   fallback_from?: string
   interpreter_version?: string
-  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number }
+  usage?: { prompt_tokens?: number; candidate_tokens?: number; thought_tokens?: number; total_tokens?: number; estimated_usd?: number; estimated_krw?: number; attempt_count?: number; generation_version?: string; call_trace?: Array<{call?:number; model?:string; kind?:'initial'|'semantic_rewrite'; http_status?:number; finish_reason?:string; outcome?:'success'|'failed'|'timeout'|'invalid_json'}> }
   data?: {
     headline: string
     overview: string

@@ -94,10 +94,12 @@ test('compatibility and both marriage modes prioritize different real-life quest
   assert.match(panel, /index<2/)
 })
 
-test('relationship modes keep Gemini natural language primary and deterministic prose as fallback', () => {
+test('relationship modes never render deterministic prose as the authored reading', () => {
   assert.match(panel, /relationship-natural-reading/)
   assert.match(panel, /Gemini 자연어 해설/)
   assert.match(panel, /relationship-calculated-fallback/)
+  assert.match(panel, /const showCalculatedNarrative = false/)
+  assert.match(panel, /showCalculatedNarrative && <details className="relationship-calculated-fallback"/)
   assert.ok(panel.indexOf('relationship-natural-reading') < panel.indexOf('relationship-calculated-fallback'))
 })
 
@@ -111,8 +113,8 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v11\.8-provisional-time-reference'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v13\.3-stage-answer-v1'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.0-gemini-single-author'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.0-gemini-single-author'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -124,8 +126,8 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
-  assert.match(relationshipFn, /relationship-v11\.8-provisional-time-reference/)
-  assert.match(relationshipFn, /relationship-v13\.3-stage-answer/)
+  assert.match(relationshipFn, /relationship-v12\.0-gemini-single-author/)
+  assert.match(relationshipFn, /relationship-v14\.0-gemini-single-author/)
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.

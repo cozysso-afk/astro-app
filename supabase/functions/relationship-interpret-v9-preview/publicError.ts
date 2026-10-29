@@ -17,12 +17,23 @@ export function record(value: unknown): Record<string, any> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null;
 }
 export function publicUsage(value: unknown) {
-  const r=record(value), out: Record<string, number>={};
+  const r=record(value), out: Record<string, any>={};
   if(!r)return out;
   for(const k of ['prompt_tokens','candidate_tokens','thought_tokens','total_tokens','attempt_count','estimated_usd','estimated_krw']) {
     const n=r[k];
     if(typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=Number.MAX_SAFE_INTEGER)out[k]=n;
   }
+  if(typeof r.generation_version==='string'&&version(r.generation_version))out.generation_version=r.generation_version;
+  if(Array.isArray(r.call_trace))out.call_trace=r.call_trace.slice(0,2).map((value:unknown)=>{
+    const row=record(value)??{}, projected:Record<string,unknown>={};
+    if(typeof row.call==='number'&&Number.isInteger(row.call)&&row.call>=1&&row.call<=2)projected.call=row.call;
+    if(model(row.model))projected.model=row.model;
+    if(row.kind==='initial'||row.kind==='semantic_rewrite')projected.kind=row.kind;
+    if(typeof row.http_status==='number'&&Number.isInteger(row.http_status)&&row.http_status>=0&&row.http_status<=599)projected.http_status=row.http_status;
+    if(typeof row.finish_reason==='string'&&row.finish_reason.length<=80)projected.finish_reason=row.finish_reason;
+    if(typeof row.outcome==='string'&&['success','failed','timeout','invalid_json'].includes(row.outcome))projected.outcome=row.outcome;
+    return projected;
+  });
   return out;
 }
 const model=(v:unknown)=>v==='gemini-3.7-flash'||v==='gemini-3.6-flash';
@@ -31,6 +42,8 @@ function metadata(value:unknown) {
   const r=record(value)??{}, out:Record<string,any>={};
   for(const k of ['model','fallback_from'])if(model(r[k]))out[k]=r[k];
   if(version(r.interpreter_version))out.interpreter_version=r.interpreter_version;
+  if(r.origin==='gemini')out.origin='gemini';
+  if(r.provenance_verified===true)out.provenance_verified=true;
   if(r.usage!==undefined)out.usage=publicUsage(r.usage);
   return out;
 }
@@ -74,9 +87,10 @@ export function publicInterpretation(value:unknown) {
   return out;
 }
 export function publicRelationshipResult(value:unknown,usageValue?:unknown) {
-  const r=record(value);if(!r||r.ok!==true||!model(r.model)||!version(r.interpreter_version))return null;
+  const r=record(value),safeUsage=publicUsage(usageValue===undefined?r?.usage:usageValue);if(!r||r.ok!==true||!model(r.model)||!version(r.interpreter_version)||r.origin!=='gemini'||r.provenance_verified!==true)return null;
+  if(safeUsage.generation_version!==r.interpreter_version||!Array.isArray(safeUsage.call_trace)||!safeUsage.call_trace.some((row:any)=>row.outcome==='success'&&row.http_status>=200&&row.http_status<300))return null;
   const data=publicInterpretation(r.data);if(!data)return null;
-  return {ok:true,data,...metadata(r),usage:publicUsage(usageValue??r.usage)};
+  return {ok:true,data,...metadata(r),usage:safeUsage};
 }
 export function publicCachedResult(value:unknown,usageValue?:unknown) {
   const safe=publicRelationshipResult(value,usageValue);
