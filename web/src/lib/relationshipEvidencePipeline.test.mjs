@@ -38,7 +38,7 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
 
 test('relationship interpretation cache versions track the Gemini single-author contracts', () => {
   assert.match(edge, /VERSION="relationship-v12\.0-gemini-single-author"/)
-  assert.match(edge, /REUNION_VERSION="relationship-v14\.0-gemini-single-author"/)
+  assert.match(edge, /REUNION_VERSION="relationship-v14\.1-gemini-single-author"/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.0-gemini-single-author'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.0-gemini-single-author'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.1-gemini-single-author'/)
 })

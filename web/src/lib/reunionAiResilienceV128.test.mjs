@@ -10,14 +10,15 @@ test('reunion Gemini packet has a tighter target and compact hierarchy windows',
   assert.match(server,/REUNION_PROMPT_TARGET_BYTES=40000/)
   assert.match(server,/target_ok:bytes<=targetBytes/)
   assert.match(server,/purpose===\"reunion\"&&budget\.target_ok/)
-  assert.match(server,/relationship-v14\.0-gemini-single-author/)
+  assert.match(server,/relationship-v14\.1-gemini-single-author/)
+  assert.match(server,/thinkingLevel:purpose==="reunion"\?"low":"medium"/)
   assert.match(server,/slice\(0,limit\)\.map\(compactHierarchyWindow\)/)
   assert.match(server,/fast_evidence:compactList\(x\?\.fast_evidence,2\)/)
   assert.match(server,/period_support:compactList\(x\?\.period_support,2\)/)
   assert.doesNotMatch(server,/top_periods:h\.top_periods/)
   assert.match(server,/past_windows:\(Array\.isArray\(h\?\.past_windows\)/)
   assert.match(server,/current_windows:\(Array\.isArray\(h\?\.current_windows\)/)
-  assert.match(cache,/relationship-v14\.0-gemini-single-author/)
+  assert.match(cache,/relationship-v14\.1-gemini-single-author/)
 })
 
 test('unsupported deterministic wording is rejected for targeted Gemini repair',()=>{
