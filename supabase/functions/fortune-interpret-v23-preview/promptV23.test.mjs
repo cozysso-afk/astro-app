@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.9-relationship-date-grounding')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.9-relationship-row-date')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)

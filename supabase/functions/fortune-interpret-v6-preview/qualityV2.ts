@@ -390,7 +390,7 @@ export function strictQualityRetryInstruction(report:any){
 - supportive와 caution 근거가 함께 연결된 key_window는 signal='혼합'으로 고쳐라.
 - 모든 decision은 적어도 하나의 evidence_ref를 출력한 key_window와 공유하고 timing도 그 핵심 시기와 직접 연결해라.
 - topic reason에 직접 연결된 추세·시기·근거가 빠졌을 때만 보완해라. 이미 구체적인 문장을 길이만 맞추려고 늘리지 마라.
-- 관계·재회 focus_timing은 실제 relationship evidence_refs가 직접 지지하는 날짜/구간만 유지하고 필요한 현실 확인 방식만 보완해라. 길이만 늘리지 마라.
+- 관계·재회 focus_timing의 정확한 날짜는 relationship evidence_refs 근거 행의 date와 정확히 일치할 때만 유지해라. start/end나 다른 분야 날짜로 대체하지 마라. 일치하는 date 근거가 없으면 정확한 날짜를 전부 빼고 날짜 없는 현실 확인 조건으로 다시 써라.
 - 교차검증 synthesis가 비어 있거나 의미가 빠졌을 때만 Western과 다른 체계의 공통점/차이를 보완해라. 길이만 늘리지 마라.
   - 선택 운세일 시간대 행동 누락이면 W:window의 정확한 HH:MM~HH:MM과 같은 분야 W:detail 근거를 decision에 함께 연결해라. payload.time_context.today_word_allowed=false이면 '오늘'이라고 쓰지 마라.
   - structured editorial section마다 conclusion, real_scene, action, change_condition, evidence_refs, applicability를 모두 채워라. 결론→현실 장면→지금 할 일→판단이 달라질 조건이 한 번에 읽혀야 한다.
