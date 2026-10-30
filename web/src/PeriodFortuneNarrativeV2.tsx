@@ -243,7 +243,10 @@ export function PeriodFortuneNarrativeV2({
     ? readingDateSemantics(calculation.period.start).dayLabel
     : summary.when
   const heroSubtitle = dedupeHeroSubtitle([heroLead.detail, heroSummary].filter(Boolean).join(' '), heroLead.title)
-  const dailyLeadCard = period === 'today'
+  // The integrated daily overview must stay a whole-day synthesis. A single
+  // specialist domain (study, work, investment, reunion, etc.) can still lead
+  // its dedicated field page, but must not take over the integrated hero.
+  const dailyLeadCard = period === 'today' && field
     ? [...summary.favorableCards, ...summary.cautionCards]
       .sort((a, b) => Math.abs(b.score - 50) - Math.abs(a.score - 50))[0]
     : undefined
