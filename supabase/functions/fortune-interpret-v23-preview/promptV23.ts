@@ -2,26 +2,40 @@ import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-previe
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.9-relationship-row-date'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.10-integrated-daily-overview'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
 function bandRole(row:any) {
   const band=String(row?.band??'').trim()
-  if (/약|낮/.test(band)) return 'caution' as const
   if (/강|높/.test(band)) return 'support' as const
+  return 'neutral' as const
+}
+
+function phenomenonRole(phenomena:any[], topic:string) {
+  const rows=phenomena.filter((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic))
+  const directions=new Set(rows.flatMap((row:any)=>Array.isArray(row?.directions)?row.directions:[]).map(String))
+  const caution=rows.some((row:any)=>row?.role==='caution'||row?.role==='tension')||directions.has('caution')||directions.has('challenging')
+  const support=rows.some((row:any)=>row?.role==='support')||directions.has('supportive')
+  if(caution&&support)return 'mixed' as const
+  if(caution)return 'caution' as const
+  if(support)return 'support' as const
   return 'neutral' as const
 }
 
 export function buildNarrativePlan(packet:any) {
   const strongest = Array.isArray(packet?.ranking?.strongest) ? packet.ranking.strongest : []
   const weakest = Array.isArray(packet?.ranking?.weakest) ? packet.ranking.weakest : []
-  const supporting_topics = unique(strongest.filter((row:any)=>bandRole(row)==='support' && row?.topic!=="투자주의").map((row:any)=>row?.topic)).slice(0,4)
+  const phenomena = Array.isArray(packet?.period_narrative?.phenomena) ? packet.period_narrative.phenomena : []
+  const ranked=[...strongest,...weakest]
+  const supporting_topics = unique(strongest.filter((row:any)=>{
+    const role=phenomenonRole(phenomena,String(row?.topic??''))
+    return row?.topic!=="투자주의"&&role!=='caution'&&role!=='mixed'&&(bandRole(row)==='support'||role==='support')
+  }).map((row:any)=>row?.topic)).slice(0,4)
   const caution_topics = unique([
-    ...weakest.filter((row:any)=>bandRole(row)==='caution').map((row:any)=>row?.topic),
+    ...ranked.filter((row:any)=>['caution','mixed'].includes(phenomenonRole(phenomena,String(row?.topic??'')))).map((row:any)=>row?.topic),
     ...strongest.filter((row:any)=>row?.topic==="투자주의"&&bandRole(row)==='support').map((row:any)=>row?.topic),
   ]).filter(topic=>!supporting_topics.includes(topic)).slice(0,4)
-  const phenomena = Array.isArray(packet?.period_narrative?.phenomena) ? packet.period_narrative.phenomena : []
   const evidence_refs = unique(phenomena.filter((row:any)=>{
     const topics=Array.isArray(row?.topics)?row.topics:[]
     return topics.some((topic:string)=>supporting_topics.includes(topic)||caution_topics.includes(topic))
@@ -55,6 +69,9 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 같은 뜻의 조언을 동의어로 바꿔 반복하지 마. "서두르지 마/신중해/천천히 봐"는 같은 의미로 취급해 한 번만 써.
 - headline·overall·topic verdict·action은 각자 다른 역할을 맡아. headline에서 말한 결론을 topic에서 다시 풀어 쓰지 말고, topic은 그 분야에서 새로 확인할 장면이나 행동을 추가해.
 - overall.summary는 최소 두 개의 서로 다른 생활 분야를 실제로 연결해 총평을 만들어. 한 분야의 verdict/reason을 길게 바꿔 쓴 것이 전체 총평의 대부분이면 실패야.
+- 통합 일간 headline과 overall.summary는 사용자가 현재 직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마. 입력에 생활 역할이 없으므로 직장·학업·시험·이직·투자·재회를 사용자의 실제 일정처럼 단정하면 실패야.
+- 통합 일간의 첫 화면에서는 직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마. 여러 세부 분야가 같은 현상을 공유하면 "집중이 필요한 일", "확인할 기준과 마감", "돈·대화·휴식"처럼 누구에게나 실제 확인 가능한 생활 장면으로 종합해. 세부 분야명과 조건부 해설은 topic_analysis와 clusters에서만 풀어.
+- 점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마. 낮은 활성도는 그 분야가 덜 두드러진다는 뜻일 수 있으며, caution 방향의 직접 근거가 있을 때만 경계 분야로 다뤄.
 - 사용자에게 직접 보이는 각 분야 원고는 단순 결론으로 끝내지 마. 가능하면 2~3문장 안에서 ① 결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건 중 최소 세 요소를 담아.
 - "확인해", "지켜봐", "신중해"라고만 끝내지 말고 무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지를 구체적으로 써. 사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패야.
 - 서로 다른 분야 원고에서 topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마. 특히 직장·학업·대인·애정·연락·금전은 서로 다른 생활 장면과 판단 기준을 가져야 해.
