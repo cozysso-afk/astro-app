@@ -31,7 +31,9 @@ export function publicUsage(value: unknown) {
     if(row.kind==='initial'||row.kind==='semantic_rewrite')projected.kind=row.kind;
     if(typeof row.http_status==='number'&&Number.isInteger(row.http_status)&&row.http_status>=0&&row.http_status<=599)projected.http_status=row.http_status;
     if(typeof row.finish_reason==='string'&&row.finish_reason.length<=80)projected.finish_reason=row.finish_reason;
-    if(typeof row.outcome==='string'&&['success','failed','timeout','invalid_json'].includes(row.outcome))projected.outcome=row.outcome;
+    if(typeof row.outcome==='string'&&['success','failed','timeout','invalid_json','validation_failed'].includes(row.outcome))projected.outcome=row.outcome;
+    if(typeof row.validation_stage==='string'&&['single_author_shape','reunion_grounding','grounded','parse_or_validation_exception'].includes(row.validation_stage))projected.validation_stage=row.validation_stage;
+    if(typeof row.validation_reason==='string'&&/^[a-z0-9_]{1,80}$/.test(row.validation_reason))projected.validation_reason=row.validation_reason;
     return projected;
   });
   return out;

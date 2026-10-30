@@ -51,6 +51,14 @@ test('invalid reunion prose is retried with Gemini and never composed locally',a
   const h=harness({fetch:()=>provider(repairable)}),r=await h.run('reunion');
   assert.equal(r.body.ok,false);assert.equal(r.body.error_code,'REL_RESULT_INVALID');assert.equal(h.requests.length,2);
   assert.equal(h.writes[0].status,'failed');assert.equal(r.body.data,undefined);
+  assert.equal(h.writes[0].usage_json.call_trace[0].outcome,'validation_failed');
+  assert.equal(h.writes[0].usage_json.call_trace[0].validation_stage,'reunion_grounding');
+  assert.equal(h.writes[0].usage_json.call_trace[0].validation_reason,'invalid_question_evidence_refs');
+  assert.match(h.requests[1].contents[0].parts[0].text,/앞선 응답 검증 실패=reunion_grounding:invalid_question_evidence_refs/);
+  assert.match(h.requests[1].contents[0].parts[0].text,/why_reconnect\.evidence_refs는 다음 ID만 사용/);
+  const reunionSchema=h.requests[0].generationConfig.responseSchema.properties.reunion_synthesis_v2.properties;
+  assert.equal(reunionSchema.timing.properties.windows.maxItems,4);
+  assert.equal(reunionSchema.consultation_answer.properties.evidence_refs.minItems,3);
 });
 test('generation exceptions produce fixed HTTP response and safe failed storage',async()=>{
   const h=harness({fetch:()=>{throw new Error(canary)}}),r=await h.run();assert.equal(r.body.error_code,'REL_GENERATION_FAILED');assert.equal(h.requests.length,2);assert.equal(h.writes[0].status,'failed');assert.equal(h.writes[0].error,r.body.error);safe(r);safe(h.writes);
