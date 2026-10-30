@@ -6,7 +6,7 @@ const server=readFileSync(new URL('../../../supabase/functions/relationship-inte
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const wrapper=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 test('calculation and AI grounding contracts remain intact',()=>{
- for(const marker of ['relationship-v14.1-gemini-single-author','buildReunionEvidenceV2','validateReunionGroundingV2','validEvidenceRefs','reunion_synthesis_v2:REUNION_V2_SCHEMA']) assert.ok(server.includes(marker),marker)
+ for(const marker of ['relationship-v14.2-gemini-single-author','buildReunionEvidenceV2','validateReunionGroundingV2','validEvidenceRefs','reunion_synthesis_v2:REUNION_V2_SCHEMA']) assert.ok(server.includes(marker),marker)
 })
 test('reunion routes to hierarchy with AI synthesis',()=>{
  assert.match(panel,/const reunionV2/)
