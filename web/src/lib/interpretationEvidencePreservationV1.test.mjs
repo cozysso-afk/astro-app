@@ -95,6 +95,6 @@ test('technical causal prose is never restored just to fill reader-language slot
 })
 
 test('reunion authored cache is invalidated for the temporal evidence contract', () => {
-  assert.match(edge,/REUNION_VERSION="relationship-v14\.2-gemini-single-author"/)
-  assert.match(cache,/relationship-v14\.2-gemini-single-author/)
+  assert.match(edge,/REUNION_VERSION="relationship-v14\.3-gemini-single-author"/)
+  assert.match(cache,/relationship-v14\.3-gemini-single-author/)
 })

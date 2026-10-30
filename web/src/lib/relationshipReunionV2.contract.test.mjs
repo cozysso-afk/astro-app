@@ -13,7 +13,7 @@ const reunionCss=readFileSync(new URL('../reunion-reading-product-v13.css',impor
 const grounding=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
 
 test('reunion v2 is reunion-only and preserves other relationship cache version',()=>{
-  assert.match(server,/REUNION_VERSION="relationship-v14\.2-gemini-single-author"/)
+  assert.match(server,/REUNION_VERSION="relationship-v14\.3-gemini-single-author"/)
   assert.match(server,/versionForPurpose=\(purpose:Purpose\)=>purpose==="reunion"\?REUNION_VERSION:VERSION/)
   assert.match(server,/stable\(\{version:versionForPurpose\(purpose\),purpose,preferred,payload\}\)/)
 })
@@ -64,7 +64,7 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
 test('reunion hierarchy puts concise consultation answers before technical engine state',()=>{
   const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
   const hierarchy=readFileSync(new URL('./reunionHierarchy.ts',import.meta.url),'utf8')
-  assert.match(cache,/relationship-v14\.2-gemini-single-author/)
+  assert.match(cache,/relationship-v14\.3-gemini-single-author/)
   const headingMarkup=['현재 판정','관계가 어디까지 왔는지','앞으로 주목할 시기','연락 방향 참고값','다음 단계로 넘어가는 변화','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
   let cursor=-1
   for(const markup of headingMarkup){
