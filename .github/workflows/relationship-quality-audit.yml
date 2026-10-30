@@ -55,7 +55,7 @@ jobs:
           node --check web/scripts/relationship-live-qa.mjs
           node --test web/scripts/relationship-quality-audit.test.mjs
           node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.test.mjs supabase/functions/relationship-interpret-v9-preview/reunionEvidenceV2.test.mjs
-          node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs
+          node --test supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs supabase/functions/relationship-interpret-v9-preview/singleAuthorOutput.contract.test.mjs
       - name: Build mobile web
         run: npm run build
         working-directory: web
