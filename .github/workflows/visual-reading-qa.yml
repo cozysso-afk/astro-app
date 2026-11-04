@@ -23,7 +23,7 @@ permissions:
 jobs:
   mobile-visual-qa:
     name: iPhone reading + saved-image QA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     defaults:
       run:
