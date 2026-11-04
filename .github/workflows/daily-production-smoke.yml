@@ -1,0 +1,53 @@
+name: Daily production smoke
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      existing_job_id:
+        description: 'QA-owned completed job to reuse with zero paid generation'
+        required: true
+        default: 'cd1abe43-8046-4083-a82a-c223df3a9a85'
+permissions:
+  contents: read
+concurrency:
+  group: daily-production-smoke
+  cancel-in-progress: false
+jobs:
+  production:
+    # One post-merge replay only; no paid generation is enabled by this workflow.
+    if: inputs.existing_job_id != '' || (github.event.pull_request.number == 333 && github.event.pull_request.merged == true)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Install browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify actual production with one synthetic generation maximum
+        env:
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id || 'cd1abe43-8046-4083-a82a-c223df3a9a85' }}
+        run: node scripts/daily-production-smoke.mjs
+      - name: Save synthetic-only verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-production-smoke
+          path: web/daily-production-artifacts/
+          retention-days: 7
+          if-no-files-found: warn

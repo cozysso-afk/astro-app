@@ -1,0 +1,86 @@
+{
+  "source": "Actual Gemini output for synthetic QA profile; not handwritten copy",
+  "replay_policy": "Local replay of the completed production Gemini result after scope and image-height fixes; no new generation",
+  "job_id": "cd1abe43-8046-4083-a82a-c223df3a9a85",
+  "model": "gemini-3.7-flash",
+  "date": "2026-11-04",
+  "widths": [
+    {
+      "width": 320,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 350,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 393,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 430,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    }
+  ],
+  "scopes": [
+    {
+      "label": "전체",
+      "state": "ready",
+      "heading": "지출 규모가 계획한 예산을 넘기기 쉬운 날이야.",
+      "blockCount": 5,
+      "exportTextParity": true
+    },
+    {
+      "label": "애정",
+      "state": "ready",
+      "heading": "만남의 호감 표현은 부드럽게 오갈 수 있지만 관계 속도를 급하게 키우면 기대치가 엇갈리기 쉬워.",
+      "blockCount": 2,
+      "exportTextParity": true
+    },
+    {
+      "label": "대인",
+      "state": "ready",
+      "heading": "대화와 소통은 원활하게 통하지만 갑작스러운 태도 변화나 과도한 제안에는 의견 차이가 생길 수 있어.",
+      "blockCount": 2,
+      "exportTextParity": true
+    },
+    {
+      "label": "학업",
+      "state": "ready",
+      "heading": "새로운 정보를 이해하고 기존 내용을 차분하게 정리하는 흐름은 안정적으로 받쳐줘.",
+      "blockCount": 2,
+      "exportTextParity": true
+    },
+    {
+      "label": "직업",
+      "state": "ready",
+      "heading": "업무 목표와 방향을 잡는 일은 힘을 받지만 일정이나 심리적 압박으로 인한 진행 지연은 신경 써야 해.",
+      "blockCount": 2,
+      "exportTextParity": true
+    },
+    {
+      "label": "금전",
+      "state": "ready",
+      "heading": "지출을 통제하려는 의도와 달리 즉흥적인 구매나 과도한 소비 욕구가 예산을 흔들기 쉬워.",
+      "blockCount": 2,
+      "exportTextParity": true
+    },
+    {
+      "label": "컨디션",
+      "state": "ready",
+      "heading": "기본적인 활동력은 유지되지만 무리하게 버티려 하면 피로와 부담감이 누적되기 쉬워.",
+      "blockCount": 2,
+      "exportTextParity": true
+    }
+  ],
+  "exportedImages": 7,
+  "errors": []
+}
