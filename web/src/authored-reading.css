@@ -12,4 +12,7 @@
 .authored-reading .authored-reading-save{width:100%;min-height:44px;border:1px solid #b7a9c7;border-radius:12px;background:#ffffffba;color:#5d4774;font:700 14px/1.6 var(--reading-ui);padding:12px;margin-top:12px}
 .authored-reading .authored-reading-save:disabled{opacity:.6}
 .authored-reading .authored-reading-state,.authored-reading .authored-reading-notice{font:400 14px/1.8 var(--reading-ui);color:#625c6d;overflow-wrap:anywhere}
+.authored-reading .authored-reading-coverage{margin-top:14px;border-top:1px solid #74628922;padding-top:8px}
+.authored-reading .authored-reading-coverage ul{margin:8px 0;padding-left:20px;font:400 14px/1.8 var(--reading-ui);color:#625c6d}
+.authored-reading .authored-reading-coverage li{margin:4px 0;overflow-wrap:anywhere}
 @media(max-width:350px){.authored-reading{padding:20px 16px}.authored-reading .authored-reading-headline{font-size:20px}.authored-reading .authored-reading-block p{font-size:15px}}

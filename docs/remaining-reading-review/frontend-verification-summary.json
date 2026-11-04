@@ -1,0 +1,86 @@
+{
+  "review_date": "2026-11-04",
+  "status": "draft_only_not_deployed",
+  "paid_calls": 0,
+  "new_generation_quality_verified": false,
+  "sources": {
+    "legacy_period_gemini_outputs": 3,
+    "legacy_compatibility_gemini_outputs": 1,
+    "synthetic_relationship_contract_modes": 4,
+    "daily_previously_generated_production_result": 1
+  },
+  "automated_checks": {
+    "ui_contract_tests": {
+      "passed": 78,
+      "failed": 0
+    },
+    "backend_ui_contract_tests": {
+      "passed": 38,
+      "failed": 0
+    },
+    "typescript": "passed"
+  },
+  "browser_full_replay": {
+    "cases": 38,
+    "width_checks": 152,
+    "widths": [
+      320,
+      350,
+      393,
+      430
+    ],
+    "saved_images": 10,
+    "text_parity": "passed for every exported core block",
+    "states": [
+      {
+        "source": "legacy-real-gemini",
+        "state": "missing",
+        "cases": 8
+      },
+      {
+        "source": "legacy-real-gemini",
+        "state": "partial",
+        "cases": 9
+      },
+      {
+        "source": "legacy-real-gemini",
+        "state": "ready",
+        "cases": 17
+      },
+      {
+        "source": "synthetic-contract-only",
+        "state": "ready",
+        "cases": 4
+      }
+    ],
+    "note": "Layout and text preservation checks, not new model output quality approval."
+  },
+  "final_compact_state_recheck": {
+    "cases": [
+      "legacy-compatibility",
+      "legacy-month-contact"
+    ],
+    "width_checks": 8,
+    "exports": 0,
+    "expected": "Legacy incomplete cores do not expose export; available authored prose precedes collapsed missing-item labels.",
+    "visual_review": "passed"
+  },
+  "daily_recheck": {
+    "tabs": 7,
+    "widths": [
+      320,
+      350,
+      393,
+      430
+    ],
+    "saved_images": 7,
+    "text_parity": true,
+    "note": "Previously generated seven primary readings replayed; newly restored secondary-question generation has not been live-tested."
+  },
+  "limitations": [
+    "No new paid provider generation was performed.",
+    "Legacy missing or insufficient sections remain explicit states; they were not filled with replacement prose.",
+    "Independent system calculation-reference views keep their existing export path.",
+    "Screenshots and raw readings are private and excluded from this public report."
+  ]
+}

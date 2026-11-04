@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import {buildPeriodReadingDocument} from './authoredReadingDocument.ts'
+import {fortuneField} from './fortuneFields.ts'
 import {
   distinctNarrativeParts,
   inspectKoreanNarrative,
@@ -132,24 +134,23 @@ test('Korean QA catches semantic predicate mismatch and repeated claims', () => 
   assert.ok(issues.some(issue => /동일 의미 반복/.test(issue)))
 })
 
-test('love UI exposes six conditional contexts at once instead of requiring a preselected status', () => {
-  for (const marker of ['솔로 · 새 인연','짝사랑 · 마음 가는 사람','썸 · 알아가는 중','관계가 애매한 사이','연애 중','재회를 생각하는 경우']) {
-    assert.match(editorialV3, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-  }
-  assert.doesNotMatch(periodResults, /LOVE_STATUS_OPTIONS\.map/)
-  assert.match(periodResults, /솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심/)
-  assert.match(narrativeV2, /editorial\.loveContexts\.map/)
-  assert.match(narrativeV2, /내 상황에 맞춰 읽기/)
+test('love reading retains every authored conditional context without preselection', () => {
+  const keys=['love_general','love_single','love_crush','love_flirting','love_ambiguous','love_couple','love_reunion_interest']
+  const relationship=Object.fromEntries(keys.map(key=>[key,{conclusion:`${key}의 고유 답`,real_scene:`${key}의 이유`,action:`${key}의 확인점`,change_condition:'',evidence_refs:['W:test'],applicability:'direct'}]))
+  const doc=buildPeriodReadingDocument({clusters:{relationship}},'week','2026-11-02','2026-11-08',fortuneField('love'),true,'test')
+  assert.equal(doc.state,'ready')
+  for(const key of keys.slice(1))assert.equal(doc.sections.find(s=>s.id===`relationship.${key}`).blocks[0].text,relationship[key].conclusion)
+  assert.doesNotMatch(periodResults,/LOVE_STATUS_OPTIONS\.map/)
 })
 
-test('completed period results consume the verified integrated hero and remain exportable', () => {
-  assert.match(periodResults, /PeriodFortuneNarrativeV2/)
-  assert.match(periodResults, /data-reading-export-root="period-fortune"/)
-  assert.match(periodResults, /결과 이미지 저장/)
-  assert.match(narrativeV2, /buildFortuneEditorialV3/)
-  assert.match(narrativeV2, /integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
-  assert.match(narrativeV2, /integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
-  assert.match(narrativeV2, /분야별 흐름/)
-  assert.doesNotMatch(narrativeV2, /전 분야를 통틀어 보면/)
-  assert.match(narrativeV2, /기억할 시기/)
+test('period core keeps verified authored text and explicit export IDs', () => {
+  const data={headline:'합성 원고의 제목',overall:{summary:'요약 원문',dominant_pattern:'판단 이유 원문',evidence_refs:['W:test']},decisions:[{action:'행동 원문',reason:'행동 이유 원문',watch:'조건 원문',evidence_refs:['W:test']}],clusters:{}}
+  const doc=buildPeriodReadingDocument(data,'month','2026-11-01','2026-11-30',undefined,true,'test')
+  assert.equal(doc.headline,data.headline)
+  assert.equal(doc.core.find(b=>b.id==='overall:summary').text,data.overall.summary)
+  assert.ok(doc.exportBlockIds.includes('decision:primary:watch'))
+  const unverified=buildPeriodReadingDocument(data,'month','2026-11-01','2026-11-30',undefined,false,'test')
+  assert.equal(unverified.state,'unverified')
+  assert.deepEqual(unverified.exportBlockIds,[])
+  assert.equal(unverified.headline,'')
 })

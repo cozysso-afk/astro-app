@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { buildPeriodReadingDocument } from './authoredReadingDocument.ts'
+import { fortuneField } from './fortuneFields.ts'
 
 const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
 const periodPanel = readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx', import.meta.url), 'utf8')
@@ -41,52 +43,52 @@ test('western date detail uses relative score labels and tells users how to act'
   assert.match(view, /불리한 사건이나 피해야 할 날이라는 뜻은 아니야/)
 })
 
-test('important windows use action checks instead of fortune-style verdict labels', () => {
-  assert.match(periodPanel, /<span>기억할 시기<\/span><strong>날짜별 행동·확인 기준<\/strong>/)
-  assert.match(periodPanel, /return '진행 후보'/)
-  assert.match(periodPanel, /return '확인 필요'/)
-  assert.match(periodPanel, /return '변동 확인'/)
-  assert.doesNotMatch(periodPanel, /importantWindowCheck/)
-  assert.match(periodPanel, /label: window.guidance/)
-  assert.match(periodPanel, /referenceDate: calculation.period.start/)
-  assert.doesNotMatch(periodPanel, /활용·주의 구간/)
-  assert.doesNotMatch(periodPanel, /status: window\.kind === 'caution' \? '주의'/)
-  assert.match(signals, /timelinePresentation/)
-  assert.match(signals, /temporal.state === 'past'/)
+function periodFixture(){
+  const section={conclusion:'직업의 고유 판단',real_scene:'직업의 적용 장면 원문',action:'맡은 일의 범위를 확인해.',change_condition:'동의한 범위가 달라지면 다시 판단해.',evidence_refs:['W:work'],applicability:'conditional'}
+  return {headline:'기간 전체 판단',overall:{summary:'기간 전체 요약 원문',dominant_pattern:'기간의 이유 원문',evidence_refs:['W:work']},clusters:{work_study:{work:section}},
+    decisions:[{action:'기간 행동 원문',reason:'기간 이유 원문',timing:'조건이 확인된 뒤',watch:'조건이 바뀌면 다시 판단해.',avoid:'확인 전에는 확정하지 마.',evidence_refs:['W:work']}],
+    limits:'기간 해석의 제한 원문',
+    key_windows:[{start:'2026-11-05',end:'2026-11-05',topics:['직장'],summary:'직업 시기의 원문',action:'직업 시기의 행동 원문',avoid:'직업 시기의 조건 원문',evidence_refs:['W:work']},{start:'2026-11-08',end:'2026-11-08',topics:['금전'],summary:'금전 시기의 원문',action:'금전 시기의 행동 원문',avoid:'금전 시기의 조건 원문',evidence_refs:['W:money']}],
+    year_phases:[{label:'근거 있는 구간',start:'2026-11-01',end:'2026-11-30',theme:'구간 흐름 원문',change:'구간 차이 원문',evidence_refs:['W:period']}],
+    priorities:['기간 우선순위 원문'],cross_checks:[{label:'독립 체계 비교',start:'2026-11-05',end:'2026-11-05',western:'서양 원문',saju:'사주 원문',thai:'태국 원문',synthesis:'통합의 제한을 설명한 원문',evidence_refs:['W:work','S:period']}],
+  }
+}
+const documentTexts=doc=>[doc.headline,...doc.core.map(b=>b.text),...doc.sections.flatMap(s=>s.blocks.map(b=>b.text))]
+
+test('important windows retain authored actions and conditions and obey the selected topic', () => {
+  const data=periodFixture(),before=structuredClone(data)
+  const overview=buildPeriodReadingDocument(data,'month','2026-11-01','2026-11-30',undefined,true)
+  for(const window of data.key_windows)for(const key of ['summary','action','avoid'])assert.ok(documentTexts(overview).includes(window[key]))
+  assert.equal(overview.sections.find(s=>s.id==='window:0').label,'2026-11-05')
+  const work=buildPeriodReadingDocument(data,'month','2026-11-01','2026-11-30',fortuneField('work'),true)
+  assert.ok(documentTexts(work).includes(data.key_windows[0].action))
+  assert.ok(!documentTexts(work).includes(data.key_windows[1].action))
+  assert.deepEqual(data,before)
 })
 
-test('month and year restore period-level decisions limits and annual phase changes only in integrated view', () => {
-  assert.match(periodPanel, /const showLongPeriodNarrative = verifiedNarrative && !field && \(period === 'month' \|\| period === 'year'\)/)
-  assert.match(periodPanel, /const longPeriodDecisions = showLongPeriodNarrative/)
-  assert.match(periodPanel, /\(data\.decisions \?\? \[\]\)\.map/)
-  assert.match(periodPanel, /const yearPhaseRows = verifiedNarrative && !field && period === 'year'/)
-  assert.match(periodPanel, /\(data\.year_phases \?\? \[\]\)\.map/)
-  assert.match(periodPanel, /const longPeriodLimit = showLongPeriodNarrative && periodGuidanceUsable\(data\.limits\)/)
-  assert.match(periodPanel, /<span>연간 흐름 지도<\/span><strong>한 해 안에서 분위기가 바뀌는 구간<\/strong>/)
-  assert.match(periodPanel, /<span>판단 기준<\/span><strong>이 기간에 실제로 결정할 일<\/strong>/)
-  assert.match(periodPanel, /<b>다시 볼 조건<\/b>/)
-  assert.match(periodPanel, /<span>해석 한계<\/span><strong>여기까지는 단정하지 않아<\/strong>/)
-  assert.match(periodPanel, /periodGuidanceText/)
-  assert.match(periodPanel, /RAW_PERIOD_GUIDANCE_RE/)
+test('month and year preserve period decisions, conditions and phases without substituting them for field prose', () => {
+  const data=periodFixture()
+  for(const period of ['month','year']){
+    const doc=buildPeriodReadingDocument(data,period,'2026-01-01','2026-12-31',undefined,true)
+    assert.equal(doc.state,'ready')
+    for(const key of ['action','reason','timing','watch','avoid'])assert.ok(doc.core.some(b=>b.text===data.decisions[0][key]))
+    assert.ok(doc.core.some(b=>b.text===data.limits))
+    for(const key of ['theme','change'])assert.ok(doc.sections.find(s=>s.id==='phase:0').blocks.some(b=>b.text===data.year_phases[0][key]))
+    const work=buildPeriodReadingDocument(data,period,'2026-01-01','2026-12-31',fortuneField('work'),true)
+    assert.equal(work.headline,data.clusters.work_study.work.conclusion)
+    for(const text of [data.overall.summary,data.decisions[0].action,data.year_phases[0].theme])assert.ok(!documentTexts(work).includes(text))
+    const unverified=buildPeriodReadingDocument(data,period,'2026-01-01','2026-12-31',undefined,false)
+    assert.equal(unverified.state,'unverified');assert.deepEqual(unverified.core,[]);assert.deepEqual(unverified.sections,[])
+  }
 })
 
-test('period priorities and cross checks are consumed without leaking whole-period prose into topic tabs', () => {
-  assert.match(periodPanel, /const priorityRows = verifiedNarrative && !field/)
-  assert.match(periodPanel, /\(data\.priorities \?\? \[\]\)/)
-  assert.match(periodPanel, /const showPriorityRows = priorityRows\.length > 0 && \(!showLongPeriodNarrative \|\| longPeriodDecisions\.length === 0\)/)
-  assert.match(periodPanel, /<span>이번 기간 우선순위<\/span><strong>먼저 챙길 것<\/strong>/)
-  assert.match(periodPanel, /const crossCheckRows = verifiedNarrative && !field/)
-  assert.match(periodPanel, /\(data\.cross_checks \?\? \[\]\)\.map/)
-  assert.match(periodPanel, /crossCheckModeLabel\(item\.mode\)/)
-  assert.match(periodPanel, /<span>세 체계 교차해설<\/span><strong>같은 시기를 서로 다른 계산 체계로 확인<\/strong>/)
-  assert.match(periodPanel, /세 체계의 점수나 기준을 합산하거나 다수결하지 않고/)
-  assert.match(periodPanel, /<b>서양점성술<\/b><span>\{item\.western\}<\/span>/)
-  assert.match(periodPanel, /<b>사주<\/b><span>\{item\.saju\}<\/span>/)
-  assert.match(periodPanel, /<b>태국점성술<\/b><span>\{item\.thai\}<\/span>/)
-  assert.match(periodPanel, /<strong>같이 보면<\/strong><p>\{item\.synthesis\}<\/p>/)
-  assert.match(periodPanel, /여러 체계에서 함께 확인/)
-  assert.match(periodPanel, /체계별 해석이 다름/)
-  assert.match(periodPanel, /서양점성술 단독 근거/)
+test('period priorities and each independent cross-check explanation survive without leaking into topic tabs', () => {
+  const data=periodFixture()
+  const overview=buildPeriodReadingDocument(data,'week','2026-11-04','2026-11-10',undefined,true)
+  assert.ok(documentTexts(overview).includes(data.priorities[0]))
+  for(const key of ['western','saju','thai','synthesis'])assert.ok(overview.sections.find(s=>s.id==='cross:0').blocks.some(b=>b.text===data.cross_checks[0][key]))
+  const field=buildPeriodReadingDocument(data,'week','2026-11-04','2026-11-10',fortuneField('work'),true)
+  assert.equal(field.sections.some(s=>s.id.startsWith('priority:')||s.id.startsWith('cross:')),false)
 })
 
 test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {

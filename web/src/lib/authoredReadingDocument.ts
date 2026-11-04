@@ -39,6 +39,16 @@ function editorialSection(id:string,label:string,section:AiEditorialSection|unde
     ...block(`${id}:condition`,'판단이 달라지는 조건',section?.change_condition),
   ]:[]}
 }
+function authoredSupplementSections(data:NonNullable<AiInterpretationResponse['data']>,field?:FortuneField):AuthoredSection[] {
+  const sections:AuthoredSection[]=[]
+  const add=(id:string,label:string,value:unknown)=>{if(text(value))sections.push({id,label,state:'ready',blocks:block(`${id}:text`,'해설',value)})}
+  if(!field||field.topics.some(topic=>['연애','연락','재회','대인관계'].includes(topic))) {
+    for(const [key,label] of [['incoming','외부 연락 반응'],['outgoing','내 연락 실행 조건'],['reconnection','과거 인연과의 재접점']] as const)if(!field||key!=='reconnection'||field.topics.includes('재회'))add(`contact:${key}`,label,data.contact_flow?.[key])
+    if(!field)for(const [key,label] of [['context','관계의 배경'],['flow','관계의 흐름'],['focus_timing','관계에서 살필 시기'],['watch','관계에서 확인할 점'],['avoid','관계에서 피할 것']] as const)add(`relationship:${key}`,label,data.relationship_reading?.[key])
+  }
+  if(!field||field.topics.includes('투자심리'))for(const [key,label] of [['psychology','투자 판단'],['realization','수익 실현'],['entry','신규 진입'],['risk','투자 위험']] as const)add(`investment:${key}`,label,data.investment_reading?.[key])
+  return sections
+}
 // Migration is intentionally lossless: no sentence slicing, score-derived prose,
 // paraphrasing or substitution of the overall summary for a missing field.
 export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResponse['data']>,period:PeriodKey,start:string,end:string,field:FortuneField|undefined,verified:boolean,version='legacy'):AuthoredReadingDocument {
@@ -56,8 +66,8 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
       doc.sections=doc.sections.slice(1)
     }
     // Every authored question stays in its selected field; missing questions stay visible.
-    const questions=(data.domain_answers??[]).filter(answer=>field.topics.includes(answer.topic)).map(answer=>({id:`question:${answer.topic}:${answer.question_key}`,label:answer.label,state:answer.status!=='not_calculated'&&text(answer.answer)&&answer.evidence_refs?.length?'ready' as const:'missing' as const,blocks:answer.status!=='not_calculated'?block(`question:${answer.topic}:${answer.question_key}:answer`,'해설',answer.answer):[]}))
-    doc.sections=[...questions,...doc.sections]
+    const questions=(data.domain_answers??[]).filter(answer=>field.topics.includes(answer.topic)).map(answer=>({id:`question:${answer.topic}:${answer.question_key}`,label:`${answer.topic} · ${answer.label}${answer.status==='partial'?' · 부분 근거':''}`,state:answer.status!=='not_calculated'&&text(answer.answer)&&answer.evidence_refs?.length?'ready' as const:'missing' as const,blocks:answer.status!=='not_calculated'?block(`question:${answer.topic}:${answer.question_key}:answer`,'해설',answer.answer):[]}))
+    doc.sections=[...questions,...doc.sections,...authoredSupplementSections(data,field)]
     const windows=(data.key_windows??[]).filter(w=>w.topics?.some(topic=>field.topics.includes(topic)))
     windows.forEach((w,i)=>doc.sections.push({id:`window:${i}`,label:`${w.start}${w.end&&w.end!==w.start?` → ${w.end}`:''}`,state:'ready',blocks:[...block(`window:${i}:summary`,'이 시기의 흐름',w.summary),...block(`window:${i}:action`,'할 일',w.action),...block(`window:${i}:avoid`,'확인할 조건',w.avoid)]}))
     return finish(doc,primary?.state==='ready',version)
@@ -73,6 +83,9 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
   ;(data.year_phases??[]).forEach((p,i)=>doc.sections.push({id:`phase:${i}`,label:`${p.label} · ${p.start} → ${p.end}`,state:'ready',blocks:[...block(`phase:${i}:theme`,'흐름',p.theme),...block(`phase:${i}:change`,'달라지는 점',p.change)]}))
   for(const [key,label] of [['western','서양점성술'],['saju','사주'],['thai','태국점성술']] as const)if(text(data.systems?.[key]))doc.sections.push({id:`system:${key}`,label,state:'ready',blocks:block(`system:${key}:text`,'체계별 해설',data.systems[key])})
   ;(data.cross_checks??[]).forEach((c,i)=>doc.sections.push({id:`cross:${i}`,label:`${c.label} · ${c.start} → ${c.end}`,state:'ready',blocks:([['western','서양점성술'],['saju','사주'],['thai','태국점성술'],['synthesis','함께 보면']] as const).flatMap(([key,label])=>block(`cross:${i}:${key}`,label,c[key]))}))
+  ;(data.priorities??[]).forEach((value,i)=>doc.sections.push({id:`priority:${i}`,label:'기간 우선순위',state:'ready',blocks:block(`priority:${i}:text`,'원고의 우선순위',value)}))
+  for(const answer of data.domain_answers??[])doc.sections.push({id:`question:${answer.topic}:${answer.question_key}`,label:`${answer.topic} · ${answer.label}${answer.status==='partial'?' · 부분 근거':''}`,state:answer.status!=='not_calculated'&&text(answer.answer)&&answer.evidence_refs?.length?'ready':'missing',blocks:answer.status!=='not_calculated'?block(`question:${answer.topic}:${answer.question_key}:answer`,'해설',answer.answer):[]})
+  doc.sections.push(...authoredSupplementSections(data))
   // Preserve all question slots in the detailed view, including unavailable slots.
   for(const [scope,slots] of Object.entries(sectionMap))if(['love','social','study','work','money','condition'].includes(scope))for(const [group,key,label] of slots){const id=`${group}.${key}`;if(!doc.sections.some(s=>s.id===id))doc.sections.push(editorialSection(id,label,(data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>)?.[group]?.[key],data.editorial_delivery?.[id]))}
   const completed=finish(doc,Boolean(doc.headline&&text(data.overall?.summary)&&data.overall?.evidence_refs?.length),version)
@@ -117,5 +130,6 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
   } else for(const [key,label] of [['chemistry','서로 끌리는 지점'],['emotional_dynamic','감정을 주고받는 방식'],['communication','소통 방식'],['conflict_pattern','반복 갈등'],['power_boundaries','관계의 경계'],['long_term','오래 이어가는 조건'],['stability','관계의 안정'],['tensions','긴장과 차이'],['timing','선택 기간의 시기']] as const)add(key,label,data[key])
   ;(data.practical_advice??[]).forEach((value,i)=>add(`advice:${i}`,'현실에서 확인할 점',value))
   ;(data.felt_scenarios??[]).forEach((value,i)=>add(`scene:${i}`,'생활 장면',value))
+  ;(data.top_aspects??[]).forEach((value,i)=>add(`aspect:${i}`,value.label,value.meaning))
   return finish(doc,Boolean(doc.headline&&text(core.core_summary)&&text(core.core_reason)&&text(core.core_action)&&Array.isArray(core.core_conditions)&&core.core_conditions.length<=4&&core.core_conditions.every(value=>Boolean(text(value)))),ai.interpreter_version??'legacy')
 }

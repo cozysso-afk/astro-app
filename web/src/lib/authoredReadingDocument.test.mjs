@@ -96,3 +96,13 @@ test('unverified source cannot expose prose and export manifest cannot reference
   const ready=documents.buildPeriodReadingDocument(fixture(),'week','a','b',undefined,true)
   assert.throws(()=>exporter.authoredReadingExportModel({...ready,exportBlockIds:['lost']}),/빠졌어/)
 })
+test('missing questions keep all labels in one collapsed list after available authored details',()=>{
+  const data=fixture();delete data.clusters.relationship.contact_activation
+  data.domain_answers.push({topic:'소식',question_key:'time',label:'시기',answer:'',status:'not_calculated',evidence_refs:[]},{topic:'연락',question_key:'time',label:'시기',answer:'',status:'not_calculated',evidence_refs:[]})
+  const doc=documents.buildPeriodReadingDocument(data,'month','a','b',fields.fortuneField('contact'),true)
+  const html=renderToStaticMarkup(createElement(Panel,{doc}))
+  assert.match(html,/<details class="authored-reading-coverage"><summary>아직 작성되지 않은 항목 3개/)
+  assert.ok(html.includes('소식 · 시기'));assert.ok(html.includes('연락 · 시기'));assert.ok(html.includes('연락 흐름'))
+  assert.ok(html.indexOf('data-reading-section="relationship.contact_continuity"')<html.indexOf('authored-reading-coverage'))
+  assert.doesNotMatch(html,/이 질문의 해설은 아직 작성되지 않았어/)
+})

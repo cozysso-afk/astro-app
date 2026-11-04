@@ -1,17 +1,32 @@
-import test from 'node:test'
+import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { render } from './reunionReadable.render.test.mjs'
-const server=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
+import {createServer} from 'vite'
+import {fileURLToPath} from 'node:url'
+import {createElement} from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+let server,Panel
+before(async()=>{
+ server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+ Panel=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
+})
+after(async()=>server?.close())
+const serverSource=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const wrapper=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 test('calculation and AI grounding contracts remain intact',()=>{
- for(const marker of ['relationship-v14.3-gemini-single-author','buildReunionEvidenceV2','validateReunionGroundingV2','validEvidenceRefs','reunion_synthesis_v2:REUNION_V2_SCHEMA']) assert.ok(server.includes(marker),marker)
+ for(const marker of ['relationship-v14.4-question-reading-contract','buildReunionEvidenceV2','validateReunionGroundingV2','validEvidenceRefs','reunion_synthesis_v2:REUNION_V2_SCHEMA']) assert.ok(serverSource.includes(marker),marker)
 })
-test('reunion routes to hierarchy with AI synthesis',()=>{
- assert.match(panel,/const reunionV2/)
- assert.match(panel,/<ReunionHierarchyPanel/)
+test('reunion keeps authored synthesis separate from calculated hierarchy without losing either',()=>{
  assert.match(wrapper,/ReunionHierarchyPanelV3/)
+ const data={headline:'합성 재회 제목',overview:'상세 원고 보존',core_summary:'합성 재회 핵심 원문',core_reason:'합성 근거 원문',core_action:'합성 확인 원문',core_conditions:[],limits:'조건 원문',reunion_synthesis_v2:{summary:'재회 상세 요약 원문',consultation_answer:{current_stage:'입력 기록에서는 연락을 주고받았어.',next_stage_up_conditions:[],down_conditions:[],repeat_risks:[]},why_reconnect:{conclusion:'연결 이유 원문',interpretation:'연결 해석 원문'},initiative:{conclusion:'주체 미확인 원문',interpretation:'방향 제한 원문'},timing:{conclusion:'시기 설명 원문',windows:[]},rebuild:{conclusion:'재구축 조건 원문',conditions:[]},repeat_risks:{conclusion:'반복 위험 원문',patterns:[]},convergence:[],precision_note:'정밀도 원문'}}
+ const hierarchy={version:'test',as_of_date:'2026-11-04',validation:{status:'PASS'},stages:{emotional_reactivation:{activation:50,candidate_count:1},contact_recontact:{activation:40,candidate_count:1},in_person_meeting:{activation:null,candidate_count:0},relationship_rebuilding:{activation:null,candidate_count:0}},top_periods:[],current_windows:[],past_windows:[],limitations:[]}
+ const html=renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai:{ok:true,origin:'gemini',provenance_verified:true,data},aiLoading:false,aiError:'',onAi:()=>{},analysisMode:'reunion',timeSensitivePoints:new Set(),formatAspect:()=>'',hierarchy,observation:{state:'messaging',initiator:'user',events:[]}}))
+ for(const value of [data.core_summary,data.reunion_synthesis_v2.summary,data.reunion_synthesis_v2.consultation_answer.current_stage])assert.equal(html.split(value).length-1,1,value)
+ assert.match(html,/data-authored-scope="reunion"/)
+ assert.equal((html.match(/data-stage-state=/g)||[]).length,6)
+ assert.match(html,/계산 근거와 점수 보기/)
 })
 test('six relationship axes remain visible and evidence stays collapsed',()=>{
  const html=render()

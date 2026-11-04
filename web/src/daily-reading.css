@@ -17,4 +17,7 @@
 .daily-reading .daily-reading-notice,.daily-reading .daily-reading-state {font:400 14px/1.7 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;margin:14px 0;color:#625c6d;}
 .daily-reading .daily-reading-coverage{margin-top:18px;padding-top:14px;border-top:1px solid #74628921}
 .daily-reading .daily-reading-coverage h4{font:700 13px/1.6 "Noto Sans KR",system-ui,sans-serif;color:#6d557f;margin:0 0 8px}
+.daily-reading .daily-reading-coverage summary{font:700 14px/1.7 "Noto Sans KR",system-ui,sans-serif;cursor:pointer}
+.daily-reading .daily-reading-coverage ul{margin:8px 0;padding-left:20px;font:400 14px/1.8 "Noto Sans KR",system-ui,sans-serif;color:#625c6d}
+.daily-reading .daily-reading-coverage li{margin:4px 0;overflow-wrap:anywhere}
 @media(max-width:350px) {.daily-reading{padding:20px 16px}.daily-reading .daily-reading-headline{font-size:20px}.daily-reading .daily-reading-block p{font-size:15px}}

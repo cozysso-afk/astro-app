@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import {createRequire} from 'node:module'
+const require=createRequire(import.meta.url)
+const ts=require('typescript')
+function cacheApi(source){
+  const module={exports:{}}
+  const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
+  new Function('module','exports','require',compiled)(module,module.exports,()=>({}))
+  return module.exports
+}
 
 const engine = readFileSync(new URL('../../../relationship_western_v1.py', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../api/main.py', import.meta.url), 'utf8')
@@ -36,9 +45,20 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
   assert.match(edge, /reunion_timing_windows:base\.reunion_timing_windows/)
 })
 
-test('relationship interpretation cache versions track the Gemini single-author contracts', () => {
-  assert.match(edge, /VERSION="relationship-v12\.0-gemini-single-author"/)
-  assert.match(edge, /REUNION_VERSION="relationship-v14\.3-gemini-single-author"/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.0-gemini-single-author'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.3-gemini-single-author'/)
+test('new question contracts invalidate old cache while retaining mode and observation identity', () => {
+  const current=cacheApi(cache),legacy=cacheApi(cache.replaceAll('relationship-v12.1-question-reading-contract','relationship-v12.0-gemini-single-author').replaceAll('relationship-v14.4-question-reading-contract','relationship-v14.3-gemini-single-author'))
+  const versions={compatibility:'relationship-v12.1-question-reading-contract',reunion:'relationship-v14.4-question-reading-contract'}
+  for(const [purpose,version] of Object.entries(versions)){
+    assert.ok(edge.includes(`="${version}"`),`${purpose}: server contract`)
+    assert.ok(cache.includes(`= '${version}'`),`${purpose}: browser contract`)
+  }
+  const calc={period:{start:'2026-11-04',end:'2026-11-04'},result:{synthetic:true}},model='gemini-3.6-flash'
+  const keys=['compatibility','reunion','marriage_unmarried','marriage_married'].map(mode=>{
+    const key=current.relationshipAiCacheId(calc,mode,model)
+    assert.notEqual(key,legacy.relationshipAiCacheId(calc,mode,model))
+    assert.equal(key,current.relationshipAiCacheId({result:calc.result,period:calc.period},mode,model))
+    return key
+  })
+  assert.equal(new Set(keys).size,4)
+  assert.notEqual(current.relationshipAiCacheId(calc,'reunion',model,{reunion_observation:{state:'messaging'}}),current.relationshipAiCacheId(calc,'reunion',model,{reunion_observation:{state:'disconnected'}}))
 })

@@ -16,6 +16,9 @@ export function AuthoredReadingPanel({doc,technicalDetails}:{doc:AuthoredReading
   const job=useRef<AbortController|null>(null)
   const [saving,setSaving]=useState(false)
   const [notice,setNotice]=useState('')
+  const authored=doc.sections.filter(section=>section.state==='ready'&&section.blocks.length)
+  const missing=doc.sections.filter(section=>section.state==='missing')
+  const insufficient=doc.sections.filter(section=>section.state==='insufficient')
   useEffect(()=>{setSaving(false);setNotice('');return()=>{job.current?.abort();job.current=null}},[doc.revision])
   async function save(){
     if(job.current||doc.state!=='ready')return
@@ -33,7 +36,9 @@ export function AuthoredReadingPanel({doc,technicalDetails}:{doc:AuthoredReading
       {doc.state==='ready'&&!!doc.exportBlockIds.length&&<button className="authored-reading-save" type="button" onClick={save} disabled={saving}>{saving?'이미지 만드는 중…':`${doc.title} 핵심 이미지 저장`}</button>}
       {doc.state==='ready'&&!doc.exportBlockIds.length&&<p className="authored-reading-state">이 원고에는 행동·확인점이 따로 작성되지 않았어. 기간 해설은 그대로 읽을 수 있어.</p>}
       {notice&&<p className="authored-reading-notice" role="status">{notice}</p>}
-      {!!doc.sections.length&&<details className="authored-reading-details" open={doc.state!=='ready'}><summary>질문별 상세 해설</summary>{doc.sections.map(section=><section className="authored-reading-section" key={section.id} data-reading-section={section.id}><h3>{section.label}</h3>{section.state==='ready'?<Blocks blocks={section.blocks}/>:<p className="authored-reading-state">{section.state==='insufficient'?'이 질문에 답할 근거가 충분하지 않다고 표시된 항목이야.':'이 질문의 해설은 아직 작성되지 않았어.'}</p>}</section>)}</details>}
+      {!!authored.length&&<details className="authored-reading-details" open={doc.state!=='ready'}><summary>질문별 상세 해설</summary>{authored.map(section=><section className="authored-reading-section" key={section.id} data-reading-section={section.id}><h3>{section.label}</h3><Blocks blocks={section.blocks}/></section>)}</details>}
+      {!!missing.length&&<details className="authored-reading-coverage"><summary>아직 작성되지 않은 항목 {missing.length}개</summary><ul>{missing.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="missing">{section.label}</li>)}</ul></details>}
+      {!!insufficient.length&&<details className="authored-reading-coverage"><summary>근거가 부족한 항목 {insufficient.length}개</summary><ul>{insufficient.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="insufficient">{section.label}</li>)}</ul></details>}
     </>}
     {technicalDetails&&<details className="authored-reading-technical"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>}
   </section>

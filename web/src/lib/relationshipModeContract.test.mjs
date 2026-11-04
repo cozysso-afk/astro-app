@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import test, {before,after} from 'node:test'
+import {createServer} from 'vite'
+import {fileURLToPath} from 'node:url'
+import {createElement} from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+import {validateRelationshipEditorial} from '../../../supabase/functions/relationship-interpret-v9-preview/relationshipEditorialV1.ts'
+
+let server,documents,Panel,external
+before(async()=>{
+  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+  documents=await server.ssrLoadModule('/src/lib/authoredReadingDocument.ts')
+  Panel=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
+  external=await server.ssrLoadModule('/src/lib/resultFormatters.ts')
+})
+after(async()=>server?.close())
+const fixture=()=>({headline:'합성 핵심 제목',overview:'전체 상세 원고',core_summary:'이것은 원문 전달 검사용 핵심이야.',core_reason:'계산 원고의 이유를 보존해.',core_action:'실제 행동을 확인해.',core_conditions:[],chemistry:'끌림 원문',emotional_dynamic:'정서 원문',communication:'대화 원문',conflict_pattern:'갈등 원문',power_boundaries:'경계 원문',long_term:'지속 원문',timing:'기간 원문',reunion_context:'',felt_scenarios:['생활 장면 원문'],practical_advice:[],top_aspects:[],limits:'해석 범위 원문',marriage_reading:Object.fromEntries(['bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(key=>[key,`${key} 원문`]))})
+const aiFor=data=>({ok:true,origin:'gemini',provenance_verified:true,data})
+const renderPanel=(analysisMode,ai)=>renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai,aiLoading:false,aiError:'',onAi:()=>{},analysisMode,timeSensitivePoints:new Set(),formatAspect:()=>'',readingPeriod:{start:'2026-11-04',end:'2026-11-04'}}))
 
 const app = readFileSync(new URL('../AppNext.tsx', import.meta.url), 'utf8')
 const panel = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')
@@ -59,9 +76,8 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(relationshipFn, /같은 파생계열 반복은 수렴 근거로 세지 않는다/)
   assert.match(relationshipFn, /reunion_synthesis_v2:REUNION_V2_SCHEMA/)
   assert.match(relationshipFn, /특정 상대가 있는 미혼 결혼궁합/)
-  assert.match(relationshipFn, /공식화될 가능성/)
-  assert.match(relationshipFn, /프러포즈·약혼·결혼 결정/)
-  assert.match(relationshipFn, /확정 사실처럼 단정하지/)
+  assert.match(relationshipFn, /생활가치·역할·현실조건/)
+  assert.match(relationshipFn, /결혼 성립 날짜·프러포즈·약혼 사건은 만들지 않는다/)
   assert.match(relationshipFn, /이미 결혼한 두 사람의 결혼생활 분석/)
   assert.match(relationshipFn, /결혼 가능성 표현은 금지/)
   assert.match(relationshipFn, /intimacy_resources/)
@@ -70,13 +86,13 @@ test('relationship AI keeps compatibility reunion unmarried-partner and married 
   assert.match(app, /analysisMode === 'reunion' && !reunionTiming/)
 })
 
-test('marriage UI uses mode-specific deterministic view and preserves validated enrichment', () => {
-  assert.match(panel, /buildRelationshipUserSummary/)
-  assert.match(panel, /data-mode=\{analysisMode\}/)
-  assert.match(panel, /analysisMode\.startsWith\('marriage_'\)/)
-  assert.match(panel, /ai\.data\.marriage_reading\?\.bottom_line/)
-  assert.match(panel, /<summary>기술 근거 자세히 보기<\/summary>/)
-  assert.doesNotMatch(panel, /JSON\.stringify\(ai\.data/)
+test('marriage UI preserves each authored question and excludes generic duplicate fields', () => {
+  for(const mode of ['marriage_unmarried','marriage_married']){
+    const data=fixture(),html=renderPanel(mode,aiFor(data))
+    assert.ok(html.includes(`data-mode="${mode}"`))
+    for(const [key,value] of Object.entries(data.marriage_reading)){assert.ok(html.includes(`data-reading-section="marriage:${key}"`));assert.ok(html.includes(value))}
+    assert.ok(!html.includes(data.chemistry));assert.ok(html.includes('기술 근거 자세히 보기'))
+  }
 })
 
 test('compatibility and both marriage modes prioritize different real-life questions', () => {
@@ -91,16 +107,24 @@ test('compatibility and both marriage modes prioritize different real-life quest
   assert.match(relationshipSummary, /이번에 함께 바꿀 것/)
   assert.match(relationshipSummary, /생활비·집안일·돌봄·가족행사·혼자 쉴 시간/)
   assert.match(relationshipSummary, /말이 꼬였을 때 서로 뜻을 확인하고 다시 대화를 이어갈 수 있는지가 핵심/)
-  assert.match(panel, /index<2/)
+  const data=fixture()
+  const unmarried=documents.buildRelationshipReadingDocument(aiFor(data),'marriage_unmarried','2026-11-04')
+  const married=documents.buildRelationshipReadingDocument(aiFor(data),'marriage_married','2026-11-04')
+  assert.equal(unmarried.sections.find(s=>s.id==='marriage:commitment_or_current_cycle').label,'약속과 결혼의 조건')
+  assert.equal(married.sections.find(s=>s.id==='marriage:commitment_or_current_cycle').label,'현재 관계의 과제')
+  const compatibility=documents.buildRelationshipReadingDocument(aiFor(data),'compatibility','2026-11-04')
+  for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term'])assert.equal(compatibility.sections.find(s=>s.id===key).blocks[0].text,data[key])
 })
 
 test('relationship modes never render deterministic prose as the authored reading', () => {
-  assert.match(panel, /relationship-natural-reading/)
-  assert.match(panel, /Gemini 자연어 해설/)
-  assert.match(panel, /relationship-calculated-fallback/)
-  assert.match(panel, /const showCalculatedNarrative = false/)
-  assert.match(panel, /showCalculatedNarrative && <details className="relationship-calculated-fallback"/)
-  assert.ok(panel.indexOf('relationship-natural-reading') < panel.indexOf('relationship-calculated-fallback'))
+  for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']){
+    const data=fixture(),unverified=renderPanel(mode,{...aiFor(data),provenance_verified:false})
+    assert.ok(unverified.includes('관계 해설이 아직 작성되지 않았어'))
+    assert.ok(!unverified.includes(data.core_summary));assert.ok(!unverified.includes(data.overview))
+    const verified=renderPanel(mode,aiFor(data))
+    assert.ok(verified.includes(data.core_summary));assert.ok(verified.includes(data.overview))
+    assert.ok(!verified.includes('relationship-calculated-fallback'))
+  }
 })
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
@@ -113,8 +137,8 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.0-gemini-single-author'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.3-gemini-single-author'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.1-question-reading-contract'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.4-question-reading-contract'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -126,9 +150,24 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)
-  assert.match(relationshipFn, /relationship-v12\.0-gemini-single-author/)
-  assert.match(relationshipFn, /relationship-v14\.3-gemini-single-author/)
+  for(const kind of ['compatibility','reunion','marriage']){
+    const prompt=external.relationshipPromptText(kind,{analysis_mode:kind==='marriage'?'marriage_unmarried':kind,user:{name:'합성'},counterpart:{time_known:false}},{result:{natal_synastry:{aspects:[]},raw_private_marker:'DO_NOT_COPY_RAW'},period:{start:'2026-11-04',end:'2026-11-04'}})
+    assert.ok(prompt.length<=28000);assert.ok(!prompt.includes('DO_NOT_COPY_RAW'));assert.match(prompt,/출생시간 모름/)
+  }
+})
+
+test('marriage generation requires exact mode and preserves complete question answers',()=>{
+  for(const mode of ['marriage_unmarried','marriage_married']){
+    const data=fixture();data.marriage_reading.mode=mode
+    for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term','timing'])data[key]=''
+    data.felt_scenarios=[]
+    assert.equal(validateRelationshipEditorial(data,mode).ok,true)
+    data.marriage_reading.mode=mode==='marriage_married'?'marriage_unmarried':'marriage_married'
+    assert.equal(validateRelationshipEditorial(data,mode).reason,'marriage_mode_mismatch')
+  }
 })
 
 // Run the executable browser boundary suite through the existing CI entrypoint.
 import './relationshipAiPublicError.test.mjs'
+// These execute the real handler with mocked provider/DB boundaries: no paid calls.
+import '../../../supabase/functions/relationship-interpret-v9-preview/publicError.test.mjs'
