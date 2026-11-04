@@ -41,7 +41,7 @@ test('single-author projection never leaks deterministic fallback prose',()=>{
   assert.equal(authored['직장'].verdict,'Gemini 결론')
   assert.equal(authored['직장'].reason,'Gemini 장면')
   assert.equal(authored['직장'].action,'Gemini 행동')
-  assert.equal(authored['직장'].avoid,'Gemini 조건')
+  assert.equal(authored['직장'].avoid,'')
 })
 
 test('single-author metadata cannot claim high confidence or core importance without strong evidence',()=>{

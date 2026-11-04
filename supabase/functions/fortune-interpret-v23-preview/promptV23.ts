@@ -1,8 +1,9 @@
 import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
+import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.10-integrated-daily-overview'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.11-daily-reading-contract'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
@@ -30,7 +31,7 @@ export function buildNarrativePlan(packet:any) {
   const ranked=[...strongest,...weakest]
   const supporting_topics = unique(strongest.filter((row:any)=>{
     const role=phenomenonRole(phenomena,String(row?.topic??''))
-    return row?.topic!=="투자주의"&&role!=='caution'&&role!=='mixed'&&(bandRole(row)==='support'||role==='support')
+    return row?.topic!=="투자주의"&&role==='support'
   }).map((row:any)=>row?.topic)).slice(0,4)
   const caution_topics = unique([
     ...ranked.filter((row:any)=>['caution','mixed'].includes(phenomenonRole(phenomena,String(row?.topic??'')))).map((row:any)=>row?.topic),
@@ -41,7 +42,11 @@ export function buildNarrativePlan(packet:any) {
     return topics.some((topic:string)=>supporting_topics.includes(topic)||caution_topics.includes(topic))
   }).flatMap((row:any)=>row?.evidence_refs??[])).slice(0,12)
   const kind=String(packet?.period_kind??packet?.period_narrative?.kind??"annual")
-  const period_operation=kind==="day"
+  const hasDirections=supporting_topics.length>0 || caution_topics.length>0
+  const mode=!hasDirections?'context_only':supporting_topics.length&&caution_topics.length?'mixed':supporting_topics.length?'support_only':'caution_only'
+  const period_operation=!hasDirections
+    ? "방향성이 확인되지 않았다. 전달된 현상과 해석 가능한 범위만 설명하고 지원·주의·우선순위를 만들지 않는다."
+    : kind==="day"
     ? "선택한 운세일에 직접 확인되는 장면을 먼저 처리하고, 약한 분야는 결론을 미룬다."
     : kind==="week"
       ? "주간 전환을 따라 받쳐주는 분야에 먼저 시간을 쓰고, 경계 분야는 확인조건이 생기기 전 확대하지 않는다."
@@ -50,7 +55,8 @@ export function buildNarrativePlan(packet:any) {
         : "연중 누적되는 분야를 우선하고, 짧은 피크와 구조적 경계를 분리해 운영한다."
   const support=supporting_topics.join("·")||"뚜렷한 지원 분야 없음"
   const caution=caution_topics.join("·")||"뚜렷한 경계 분야 없음"
-  return {supporting_topics,caution_topics,core_tension:`받쳐주는 ${support}와 경계할 ${caution}을 동시에 운영해야 한다.`,period_operation,evidence_refs}
+  const core_tension=mode==='mixed'?`받쳐주는 ${support}와 경계할 ${caution}의 근거를 구분한다.`:null
+  return {mode,supporting_topics,caution_topics,core_tension,period_operation,evidence_refs}
 }
 
 const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
@@ -68,11 +74,13 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 점수는 확률이 아니다. 숫자가 결론의 주어가 되지 않게 하고, 이미 말한 해석의 강약을 보조하는 경우에만 사용해.
 - 같은 뜻의 조언을 동의어로 바꿔 반복하지 마. "서두르지 마/신중해/천천히 봐"는 같은 의미로 취급해 한 번만 써.
 - headline·overall·topic verdict·action은 각자 다른 역할을 맡아. headline에서 말한 결론을 topic에서 다시 풀어 쓰지 말고, topic은 그 분야에서 새로 확인할 장면이나 행동을 추가해.
-- overall.summary는 최소 두 개의 서로 다른 생활 분야를 실제로 연결해 총평을 만들어. 한 분야의 verdict/reason을 길게 바꿔 쓴 것이 전체 총평의 대부분이면 실패야.
+- headline은 핵심 판단, overall.summary는 그 판단을 이해하는 데 필요한 맥락을 맡아. 문장 수를 맞추려고 조건을 삭제하거나 같은 뜻을 늘여 쓰지 마. 한 문장을 접속어로 길게 늘이거나 세부 분야를 열거하지 마.
+- overall.summary는 근거가 있는 생활 맥락을 종합해. 서로 다른 분야를 연결할 근거가 있을 때만 연결하고, 두 분야를 채우려고 없는 대비를 만들지 마. 한 분야의 verdict/reason을 길게 바꿔 쓴 것이 전체 총평의 대부분이면 실패야.
 - 통합 일간 headline과 overall.summary는 사용자가 현재 직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마. 입력에 생활 역할이 없으므로 직장·학업·시험·이직·투자·재회를 사용자의 실제 일정처럼 단정하면 실패야.
 - 통합 일간의 첫 화면에서는 직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마. 여러 세부 분야가 같은 현상을 공유하면 "집중이 필요한 일", "확인할 기준과 마감", "돈·대화·휴식"처럼 누구에게나 실제 확인 가능한 생활 장면으로 종합해. 세부 분야명과 조건부 해설은 topic_analysis와 clusters에서만 풀어.
 - 점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마. 낮은 활성도는 그 분야가 덜 두드러진다는 뜻일 수 있으며, caution 방향의 직접 근거가 있을 때만 경계 분야로 다뤄.
 - 사용자에게 직접 보이는 각 분야 원고는 단순 결론으로 끝내지 마. 가능하면 2~3문장 안에서 ① 결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건 중 최소 세 요소를 담아.
+- 각 분야의 verdict·reason·action은 그 분야의 고유 장면을 담고, overall.summary를 복사하거나 일부 단어만 바꿔 재사용하지 마. 분야 원고가 비어 종합 요약으로 대체되는 결과는 실패야.
 - "확인해", "지켜봐", "신중해"라고만 끝내지 말고 무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지를 구체적으로 써. 사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패야.
 - 서로 다른 분야 원고에서 topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마. 특히 직장·학업·대인·애정·연락·금전은 서로 다른 생활 장면과 판단 기준을 가져야 해.
 - domain_answer_contracts는 각 분야에서 사용자가 실제로 묻는 질문 목록이다. conclusion/action에 억지로 섞지 말고, evidence_refs로 직접 또는 부분 답변할 수 있는 질문만 domain_answers 행으로 출력해. 근거가 없는 질문은 생략하고 일반론으로 채우지 마. 서버가 생략된 질문을 not_calculated로 처리한다.
@@ -90,12 +98,14 @@ export function buildV23PromptPacket(payload:any) {
   const narrative = buildPeriodNarrativeContext(base)
   const packet:any = {
     ...base,
+    time_context:payload?.time_context,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
     domain_answer_contract_version: DOMAIN_ANSWER_CONTRACT_VERSION,
     domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
   packet.narrative_plan=buildNarrativePlan(packet)
+  if(packet.period_kind==='day')packet.daily_editorial_brief=dailyEditorialBrief(packet)
   return packet
 }
 
@@ -139,9 +149,18 @@ export function buildTemporalWordingInstruction(packet:any) {
 }
 
 export function buildV23CorePromptFromPacket(packet:any) {
-  const narrativeInstruction = buildPeriodNarrativeInstruction(packet)
+  const writerPacket=packet?.period_kind==='day'?dailyReaderPacket(packet):packet
+  // Daily copy has one writing contract. The multi-period contract asks for
+  // several contrasting themes and a timeline, which dilutes a one-day answer.
+  if(packet?.period_kind==='day')return {
+    version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,
+    text:`${DAILY_EDITORIAL_INSTRUCTION}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
+  }
+  // The legacy contract asks for all 25 nested sections; daily delivery now
+  // requests six sparse primary sections. Never send both instructions.
+  const narrativeInstruction = buildPeriodNarrativeInstruction(writerPacket, packet?.period_kind!=='day')
   const temporalInstruction = buildTemporalWordingInstruction(packet)
-  const text = `${narrativeInstruction}\n\n${temporalInstruction ? `${temporalInstruction}\n\n` : ''}${HUMAN_LANGUAGE_CONTRACT}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 Gemini 호출 전에 서버가 확정한 전체 총평 설계다. supporting_topics와 caution_topics를 함께 연결하고 core_tension과 period_operation에 직접 답해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(packet)}`
+  const text = `${narrativeInstruction}\n\n${temporalInstruction ? `${temporalInstruction}\n\n` : ''}${HUMAN_LANGUAGE_CONTRACT}\n\n${packet?.period_kind==='day'?DAILY_EDITORIAL_INSTRUCTION:''}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 근거에서 확인한 방향 구분이다. mode=context_only이면 지원·주의 대비나 우선순위를 만들지 마. 한쪽만 있으면 반대쪽을 꾸미지 말고, mixed일 때만 양쪽 근거를 연결해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
   return {
     version: V23_PROMPT_VERSION,
     narrative_version: PERIOD_NARRATIVE_VERSION,

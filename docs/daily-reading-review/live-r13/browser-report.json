@@ -1,0 +1,86 @@
+{
+  "source": "Actual Gemini output for synthetic QA profile; not handwritten copy",
+  "replay_policy": "r13 actual Gemini response replayed through final daily exception-omission policy; all retained prose and evidence are unchanged",
+  "job_id": "5caa0c3d-f844-4408-95dc-9d51ffe45788",
+  "model": "gemini-3.7-flash",
+  "date": "2026-11-04",
+  "widths": [
+    {
+      "width": 320,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 350,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 393,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 430,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    }
+  ],
+  "scopes": [
+    {
+      "label": "전체",
+      "state": "ready",
+      "heading": "의견 교환은 수월하지만 결제나 구매에서는 지출이 커지기 쉬워",
+      "blockCount": 6,
+      "exportTextParity": true
+    },
+    {
+      "label": "애정",
+      "state": "ready",
+      "heading": "호감을 나누는 대화는 부드럽게 이어지기 쉬우나 관계의 속도를 급하게 올리면 기대치 차이가 드러날 수 있어.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "대인",
+      "state": "ready",
+      "heading": "정보를 나누고 의견을 맞추는 교류는 원활하지만 예상 밖의 요청이나 기준 차이로 긴장이 생길 수 있어.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "학업",
+      "state": "ready",
+      "heading": "이해한 내용을 차분하게 구조화하고 기존 메모를 점검하는 정리 작업이 수월해.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "직업",
+      "state": "ready",
+      "heading": "진행 중인 업무의 방향을 잡고 협력 관계를 다지는 흐름은 좋지만 추진 과정에서 피로가 겹칠 수 있어.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "금전",
+      "state": "ready",
+      "heading": "장기적인 안목을 세우기에는 무난하지만 기분에 휩쓸려 지출을 늘리거나 충동 구매를 하기 쉬워.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "컨디션",
+      "state": "ready",
+      "heading": "활동하려는 의욕은 충분하지만 몸의 회복 속도가 따라가지 못해 후반부 피로감이 누적될 수 있어.",
+      "blockCount": 3,
+      "exportTextParity": true
+    }
+  ],
+  "exportedImages": 8,
+  "errors": []
+}

@@ -240,7 +240,7 @@ function editorialV4Instruction(kind: PeriodKind) {
   const periodWord = kind === 'day' ? '선택한 운세일' : kind === 'week' ? '이번 주' : kind === 'month' ? '이번 달' : '올해'
   const dayEditorial = kind === 'day' ? `
 - 일간 headline은 계산법·점수 주의문이 아니라 사용자가 바로 이해할 수 있는 한 문장 결론으로 쓴다. 가장 두드러진 생활 장면과 그 장면에서 취할 태도가 드러나야 한다. 실제 오늘 여부를 모르면 '오늘'이라고 단정하지 않는다.
-- 일간 overall.summary는 4~6문장으로 쓴다. 첫 문장은 하루 전체 결론, 다음 문장들은 서로 다른 두 생활 분야의 구체 장면, 마지막 문장은 해당 날 바로 할 행동으로 구성한다.
+- 일간 headline은 25~60자, overall.summary는 80~180자를 목표로 한다. 글자 수를 채우려고 반복하거나 중요한 조건을 빼지 않는다. summary는 하루 전체의 핵심과 이유를 연결하고, 행동과 판단 변경조건은 decisions 및 clusters의 해당 필드에 따로 쓴다. 전체 총평을 특정 직업·학업·연애 상태로 가정하지 않는다.
 - "점수는 확률이 아니다", "흐름을 확인해", "신중해야 한다" 같은 주의문으로 headline이나 첫 문단을 시작하지 않는다. 필요한 한계는 구체 장면을 먼저 설명한 뒤 짧게 붙인다.
 - 현실 장면은 근거가 허용하는 범위에서 업무 요청·답변·약속·결제·공부 분량·휴식처럼 눈으로 확인 가능한 행동으로 쓴다. 승진·합격·재회처럼 근거에 없는 결과를 만들지 않는다.
 - 같은 결론을 headline, overall.summary, topic verdict에 말만 바꿔 반복하지 않는다.` : ''
@@ -273,7 +273,7 @@ ${dayEditorial}
 - 기술용어는 세부 근거에서만 사용하고 사용자 원고에는 사람·일·돈·약속·대화·만남 같은 생활 언어를 우선한다.`
 }
 
-export function buildPeriodNarrativeInstruction(payload: any): string {
+export function buildPeriodNarrativeInstruction(payload: any, includeLegacyEditorial = true): string {
   const ctx = buildPeriodNarrativeContext(payload)
   const phenomena = ctx.phenomena.map((p, i) =>
     `${i + 1}. ${p.label} | role=${p.role} | dates=${p.dates.join(',') || '-'} | topics=${p.topics.join(',') || '-'} | refs=${p.evidence_refs.join(',')}`
@@ -302,7 +302,7 @@ ${phenomena}
 [해석 원칙]
 ${ctx.interpretation_policy.map(x => `- ${x}`).join('\n')}
 
-${editorialV4Instruction(ctx.kind)}
+${includeLegacyEditorial ? editorialV4Instruction(ctx.kind) : ''}
 
 중요: day/week/month/annual은 같은 문장을 기간명만 바꿔 재사용하지 마. 이 기간유형의 시간해상도와 서사 순서에 맞춰 새로 조직해.`
 }

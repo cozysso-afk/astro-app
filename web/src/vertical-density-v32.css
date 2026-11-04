@@ -103,7 +103,7 @@
     border-radius: 16px !important;
   }
   .app-shell .system-overview-grid { gap: 8px !important; }
-  .app-shell .system-reading h3 { margin-bottom: 8px !important; }
+  .app-shell .system-reading h3:not(.daily-reading-headline) { margin-bottom: 8px !important; }
   .app-shell .system-reading h4 { margin-bottom: 7px !important; }
   .app-shell .system-reading p { margin: 5px 0 !important; }
   .app-shell .system-reading .bhumi-grid > details {

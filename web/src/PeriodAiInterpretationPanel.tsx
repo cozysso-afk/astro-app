@@ -99,5 +99,6 @@ export function PeriodAiInterpretationPanel({
     calculation={calculation}
     result={result}
     technicalDetails={technicalDetails}
+    onRetry={onRetry}
   />
 }

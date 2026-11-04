@@ -104,8 +104,11 @@ try {
 
   const quality = page.locator('[data-qa-block="interpretation-v2"]')
   const qualityText = await quality.innerText()
-  assert(qualityText.includes('연애·연락·재회 중 재회의 점수가 가장 높아.'), 'relative comparison missing')
-  assert(qualityText.includes('다른 분야보다 높더라도 재회 활성도는 ‘약함’'), 'absolute activation missing')
+  const rankText = await quality.locator(':scope > p').first().innerText()
+  assert(/재회 흐름이 상대적으로 가장 두드러져/.test(rankText), 'highest relative activation must identify reunion')
+  assert(/활성도는 약함 수준/.test(rankText), 'relative leader must retain its weak absolute band')
+  assert(/낮은 활성도는 실패나 불리한 사건을 뜻하지 않아/.test(rankText), 'weak activation must not imply failure or an adverse event')
+  assert(!/(?:연애|연락) 흐름이 상대적으로 가장 두드러져/.test(rankText), 'lower-ranked field must not replace the leader')
   assert(!qualityText.includes('흐름이 점수가'), 'double subject returned')
   const past = quality.locator('.reading-event').filter({hasText:'지난 구간 · 회고'})
   assert(await past.count() === 1, 'past window must remain retrospective')

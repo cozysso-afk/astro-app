@@ -38,10 +38,11 @@
   html body #root .app-shell .fortune-experience.period-today .system-reading.system-integrated
   .period-ai-card.period-ai-v18 .period-ai-head h3.period-ai-hero-title-v4 {
     margin: 10px 0 0 !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif !important;
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
     font-size: 19px !important;
-    font-weight: 760 !important;
-    line-height: 1.52 !important;
+    font-weight: 700 !important;
+    line-height: 1.62 !important;
     letter-spacing: -.022em !important;
     word-break: keep-all !important;
   }
@@ -50,8 +51,11 @@
   .period-ai-card.period-ai-v18 .period-ai-head .reading-hero-subtitle {
     margin: 11px 0 0 !important;
     padding-top: 11px !important;
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+    font-weight: 500 !important;
     font-size: 13.5px !important;
-    line-height: 1.68 !important;
+    line-height: 1.76 !important;
   }
 
   html body #root .app-shell .reading-actual-today {
@@ -280,5 +284,28 @@ html body #root .app-shell .relationship-experience[data-mode="reunion"] .reunio
 @media (max-width: 480px) {
   html body #root .app-shell .field-grid:has(.birth-time-range-field) {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* V77 · all daily system hero prose uses the same editorial face. Keep this
+ * final so the generic mobile body rule above cannot turn only the integrated
+ * summary back into sans-serif. */
+@media (max-width: 600px) {
+  html body #root .app-shell .fortune-experience.period-today .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head h3.period-ai-hero-title-v4,
+  html body #root .app-shell .fortune-experience.period-today .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head .reading-hero-subtitle {
+    font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif !important;
+    font-synthesis: none !important;
+  }
+
+  html body #root .app-shell .fortune-experience.period-today .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head h3.period-ai-hero-title-v4 {
+    font-weight: 700 !important;
+  }
+
+  html body #root .app-shell .fortune-experience.period-today .system-reading.system-integrated
+  .period-ai-card.period-ai-v18 .period-ai-head .reading-hero-subtitle {
+    font-weight: 500 !important;
   }
 }

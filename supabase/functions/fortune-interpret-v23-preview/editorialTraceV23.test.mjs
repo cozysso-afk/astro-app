@@ -48,3 +48,11 @@ test('initial trace samples are bounded and whitespace-normalized', () => {
   assert.equal(row.sample.includes('  '), false)
   assert.ok(row.len > row.sample.length)
 })
+
+test('the raw model focus is auditable even after the public validator removes it',()=>{
+  const raw={headline:'짧은 판단',editorial_focus:{reader_question:'무엇을 볼까?',judgment:'판단',applicable_situation:'조건',interpretation_reason:'해석 이유',limitation:'한계',evidence_refs:['W:a']}}
+  const trace=buildEditorialTrace([captureEditorialStage('provider_raw',raw),captureEditorialStage('validated',{headline:raw.headline})])
+  assert.equal(trace.initial.fields['editorial_focus.reader_question'].sample,'무엇을 볼까?')
+  assert.equal(trace.initial.fields['editorial_focus.evidence_refs'].sample,'W:a')
+  assert.ok(trace.transitions[0].changes.some(c=>c.path==='editorial_focus.judgment'&&c.kind==='deleted'))
+})

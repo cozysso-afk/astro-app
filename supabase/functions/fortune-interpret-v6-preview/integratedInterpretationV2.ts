@@ -18,6 +18,7 @@ type Evidence = {
   system: "western"|"saju"|"thai";
   scope: string;
   topic?: string;
+  source_topics?: string[];
   direction: "supportive"|"caution"|"neutral"|"context";
   date?: string;
   start?: string;
@@ -213,7 +214,7 @@ export function compactCalculation(calc:any){
   }
   for(const kd of keyDates){
     const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
-    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",direction:"context",date:kd.date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
+    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",source_topics:Array.isArray(ev?.source_topics)?ev.source_topics.filter((x:any)=>typeof x==="string"):[],direction:"context",date:kd.date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
     kd.western_refs=uniq(kd.western_refs);
   }
 

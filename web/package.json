@@ -10,6 +10,8 @@
     "test:visual:live": "node scripts/visual-live-fortune-qa.mjs"
   },
   "dependencies": {
+    "@fontsource/nanum-myeongjo": "^5.3.0",
+    "@fontsource/noto-sans-kr": "^5.3.1",
     "@supabase/supabase-js": "^2.57.0",
     "admdongkor": "^0.5.1",
     "lucide-react": "^0.468.0",

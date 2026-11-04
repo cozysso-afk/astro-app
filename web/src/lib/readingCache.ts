@@ -15,9 +15,9 @@ const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
-const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.10-gemini-single-author-v16'
+const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.11-daily-reading-contract-v18'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'
-const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v5-daily-editorial-v7'
+const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v6-daily-reading-contract-v9'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
 const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12.0-gemini-single-author'
 const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14.3-gemini-single-author'
@@ -150,8 +150,8 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
     api_version: calculation.api_version, engine: calculation.engine, period,
     western_engine: western.engine, overall: western.overall, relationship_signals: western.relationship_signals,
     western_months: western.months, western_detail_days: western.detail_days, western_key_dates: western.key_dates, western_daily_scores: western.daily_scores,
-    saju_engine: saju.engine, saju_annual: saju.annual, saju_monthly: saju.monthly,
-    thai_engine: thai.engine, thai_mahathaksa: thai.mahathaksa, thai_taksajorn: thai.taksajorn, thai_suriyayat: thai.suriyayat,
+    saju_engine: saju.engine, saju_annual: saju.annual, saju_monthly: saju.monthly, saju_daily: saju.daily,
+    thai_engine: thai.engine, thai_mahathaksa: thai.mahathaksa, thai_taksajorn: thai.taksajorn, thai_suriyayat: thai.suriyayat, thai_suriyayat_daily: thai.suriyayat_daily,
   }
   return `fortune-ai:${hashText(stableStringify(signature))}`
 }

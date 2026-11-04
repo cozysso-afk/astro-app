@@ -25,7 +25,8 @@ test('unverified or unidentified model cannot be displayed as Gemini authored', 
   assert.equal(origin(''), 'deterministic_safe')
   assert.equal(origin(undefined), 'deterministic_safe')
   assert.equal(origin('mystery-fallback'), 'deterministic_safe')
-  assert.equal(origin('gemini-3.6-flash'), 'gemini')
+  assert.equal(origin('gemini-3.6-flash'), 'deterministic_safe')
+  assert.equal(origin('gemini-3.6-flash', 'gemini'), 'gemini')
   assert.equal(origin('gemini-3.7-flash', 'deterministic_safe'), 'deterministic_safe')
 })
 

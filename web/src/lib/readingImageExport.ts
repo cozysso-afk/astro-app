@@ -1,6 +1,7 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
-type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean }
+import type { DailyReadingDocument } from './dailyReadingDocument'
+type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean; complete?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
 type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[] }
 type LayoutItem = { section?: string; card: ExportCard }
@@ -99,11 +100,57 @@ function periodTopicCards(root: HTMLElement) {
   return dedupeCards(cards)
 }
 
+function systemDetailCards(root: HTMLElement, integrated: boolean) {
+  if (integrated) {
+    return dedupeCards(Array.from(root.querySelectorAll<HTMLElement>('.system-overview-grid > article')).slice(0, 3).map(card => ({
+      title: textOf(card, ':scope > strong'),
+      body: firstSentences(textOf(card, ':scope > p'), 1),
+      tone: 'system' as const,
+      compact: true,
+      editorial: true,
+    })))
+  }
+  const western = Array.from(root.querySelectorAll<HTMLElement>('.western-score-grid > details')).slice(0, 3).map(card => ({
+    eyebrow: textOf(card, '.western-score-band'),
+    title: textOf(card, '.western-score-topline strong'),
+    body: firstSentences(textOf(card, '.western-score-guidance'), 1),
+    meta: textOf(card, '.western-score-topline b') ? `상대 활성도 ${textOf(card, '.western-score-topline b')}점` : '',
+    tone: 'plain' as const,
+    compact: true,
+    editorial: true,
+  }))
+  const saju = Array.from(root.querySelectorAll<HTMLElement>('.saju-reader-topics .system-lens')).slice(0, 3).map(card => ({
+    title: textOf(card, ':scope > h4'),
+    body: firstSentences(`${textOf(card, ':scope > p')} ${textOf(card, '.reading-explanation.is-practice p')}`, 2),
+    tone: 'plain' as const,
+    compact: true,
+    editorial: true,
+  }))
+  const thai = Array.from(root.querySelectorAll<HTMLElement>('.thai-life-map .bhumi-grid > details')).slice(0, 3).map(card => ({
+    title: textOf(card, ':scope > summary strong'),
+    body: firstSentences(`${textOf(card, '.thai-lens-reading > p')} ${textOf(card, '.reading-explanation.is-practice p')}`, 2),
+    tone: 'system' as const,
+    compact: true,
+    editorial: true,
+  }))
+  return dedupeCards([...western, ...saju, ...thai])
+}
+
 function periodModel(root: HTMLElement, label: string): ExportModel {
   const date = textOf(root, '.reading-period-date') || textOf(root, '.result-headline span')
-  const hero = firstSentences(textOf(root, '.period-ai-head h3'), 2)
-  const subtitle = firstSentences(textOf(root, '.reading-hero-subtitle'), 2)
+  const systemRoot = root.querySelector<HTMLElement>('.system-reading')
+  const integrated = !systemRoot || systemRoot.classList.contains('system-integrated')
+  const hero = firstSentences(textOf(root, integrated ? '.period-ai-head h3' : '.system-hero h3'), 1)
+  const subtitle = firstSentences(textOf(
+    root,
+    integrated
+      ? '.reading-hero-subtitle:not(.reading-export-subtitle-v7)'
+      : '.system-hero > p',
+  ), 2)
   const sections: ExportSection[] = []
+
+  const systemCards = systemDetailCards(root, integrated)
+  if (systemCards.length) sections.push({ title: integrated ? '세 체계 핵심' : '지금 확인할 것', cards: systemCards })
 
   for (const section of Array.from(root.querySelectorAll<HTMLElement>('.flow-section'))) {
     const cards = dedupeCards(Array.from(section.querySelectorAll<HTMLElement>('.flow-tile')).map(tile => ({
@@ -422,7 +469,7 @@ function cardMetrics(card: ExportCard) {
     bodyLine: compact ? 39 : BODY_LINE,
     smallSize: compact ? 21 : SMALL_SIZE,
     smallLine: compact ? 28 : SMALL_LINE,
-    maxBodyLines: compact ? 3 : card.emphasis ? 5 : 6,
+    maxBodyLines: card.complete ? Infinity : compact ? 3 : card.emphasis ? 5 : 6,
     top: compact ? 23 : 28,
     bottom: compact ? 22 : 27,
     eyebrowHeight: card.eyebrow ? (compact ? 30 : 34) : 0,
@@ -593,8 +640,26 @@ function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
   const groups: LayoutItem[] = []
   if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true } })
   for (const section of model.sections) {
-    const clean = dedupeCards(section.cards)
-    clean.forEach((card, index) => groups.push({ section: index === 0 ? section.title : undefined, card }))
+    const clean = section.cards.some(c=>c.complete) ? section.cards : dedupeCards(section.cards)
+    clean.forEach((card, index) => {
+      if (!card.complete || !card.body) { groups.push({ section: index === 0 ? section.title : undefined, card }); return }
+      // Split by measured capacity, keeping every source character. A long legacy
+      // paragraph may take multiple cards/pages, never an invisible line clamp.
+      let remaining = Array.from(card.body)
+      let part = 0
+      while (remaining.length) {
+        const title = part ? `${card.title} · 계속` : card.title
+        let low = 1, high = remaining.length, fit = 0
+        while (low <= high) {
+          const mid = Math.floor((low+high)/2)
+          const candidate = {...card,title,body:remaining.slice(0,mid).join('')}
+          if (measureCard(ctx,candidate) <= pageCapacity()-HEADER_HEIGHT-SECTION_HEIGHT) {fit=mid;low=mid+1} else high=mid-1
+        }
+        if (!fit) throw new Error('저장 이미지에 문장을 배치하지 못했어.')
+        groups.push({section:index===0 && part===0 ? section.title:undefined,card:{...card,title,body:remaining.slice(0,fit).join('')}})
+        remaining = remaining.slice(fit); part++
+      }
+    })
   }
 
   const pages: LayoutItem[][] = [[]]
@@ -690,10 +755,36 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 
 export async function exportReadingImages(root: HTMLElement, label: string): Promise<ExportResult> {
   const model = buildReadingExportModel(root, label)
+  return exportModelImages(model, label)
+}
+
+export function dailyReadingExportModel(doc: DailyReadingDocument): ExportModel {
+  if (doc.state !== 'ready' || !doc.headline || !doc.blocks.length) throw new Error('완성된 해설이 있어야 저장할 수 있어.')
+  return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[
+    {title:'이 날의 핵심',body:doc.headline,tone:'love',editorial:true,complete:true},
+    ...doc.blocks.map(b=>({title:b.label,body:b.text,tone:'plain' as const,editorial:true,complete:true})),
+  ]}]}
+}
+
+export async function exportDailyReadingImages(doc: DailyReadingDocument, signal: AbortSignal): Promise<ExportResult> {
+  const model = dailyReadingExportModel(doc)
+  // A font failure must not silently change the saved typography.
+  const copy = [doc.headline,...doc.blocks.map(b=>b.text)].join(' ')
+  const fonts = await Promise.all([400,700].map(weight=>document.fonts.load(`${weight} 32px "Nanum Myeongjo"`,copy)))
+  const labels = `${doc.title} 별빛의 운명 이 날의 핵심 점수는 사건 확률이 아니라 선택 기간 안의 상대적 활성도야. ${doc.blocks.map(b=>b.label).join(' ')}`
+  const labelFonts = await document.fonts.load('700 32px "Noto Sans KR"',labels)
+  if (fonts.some(f=>!f.length) || !labelFonts.length) throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
+  signal.throwIfAborted()
+  return exportModelImages(model, `${doc.title} ${doc.date}`, signal)
+}
+
+async function exportModelImages(model: ExportModel, label: string, signal?: AbortSignal): Promise<ExportResult> {
   if (!model.hero && !model.sections.some(section => section.cards.length)) throw new Error('저장할 결과 내용을 찾지 못했어.')
   await ensureExportFonts()
+  signal?.throwIfAborted()
   const canvases = renderPages(model)
   const blobs = await Promise.all(canvases.map(canvasToBlob))
+  signal?.throwIfAborted()
   const base = safeFileName(label)
   const stamp = localDateStamp()
   const files = blobs.map((blob, index) => new File([blob], `${base}_${stamp}_${index + 1}of${blobs.length}.png`, { type: 'image/png' }))

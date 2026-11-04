@@ -31,7 +31,7 @@
   /* Navigation, topic names, section labels and scores stay in the UI sans face. */
   html body .app-shell .system-reading .system-switcher,
   html body .app-shell .system-reading .system-topic-selector,
-  html body .app-shell .system-reading h3:not(.system-hero h3),
+  html body .app-shell .system-reading h3:not(.system-hero h3):not(.daily-reading-headline),
   html body .app-shell .system-reading h4,
   html body .app-shell .fortune-experience .period-ai-section-title,
   html body .app-shell .fortune-experience .period-ai-user-focus .period-ai-topic > strong,
@@ -44,7 +44,7 @@
 
   html body .app-shell .fortune-experience .period-ai-section-title > span,
   html body .app-shell .relationship-experience .reading-section > h3,
-  html body .app-shell .system-reading section > h3,
+  html body .app-shell .system-reading section > h3:not(.daily-reading-headline),
   html body .app-shell .system-reading > h3 {
     font-weight: 700 !important;
     line-height: 1.5 !important;

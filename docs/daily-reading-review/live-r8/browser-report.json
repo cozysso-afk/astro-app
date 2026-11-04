@@ -1,0 +1,85 @@
+{
+  "source": "Actual Gemini output for synthetic QA profile; not handwritten copy",
+  "job_id": "01babb13-4d2c-4703-86eb-1dbc92fe4e32",
+  "model": "gemini-3.6-flash",
+  "date": "2026-11-04",
+  "widths": [
+    {
+      "width": 320,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 350,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 393,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 430,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    }
+  ],
+  "scopes": [
+    {
+      "label": "전체",
+      "state": "ready",
+      "heading": "의욕과 교류의 접점은 생기지만 기대가 앞서면 관계와 씀씀이에서 속도가 엇갈릴 수 있어.",
+      "blockCount": 6,
+      "exportTextParity": true
+    },
+    {
+      "label": "애정",
+      "state": "ready",
+      "heading": "마음이 동하고 친밀감을 키우고 싶어지지만, 애정 표현의 속도를 너무 서두르면 부담이 될 수 있어.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "대인",
+      "state": "ready",
+      "heading": "대화와 소통이 활발해지지만, 돌발적인 상황이나 감정 과잉으로 인한 오해를 조심해야 해.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "학업",
+      "state": "ready",
+      "heading": "이해력과 사고의 흐름이 좋아 내용 정리와 복습에 집중하기 유리한 흐름이야.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "직업",
+      "state": "ready",
+      "heading": "목표를 현실화하고 신뢰를 쌓기 좋은 기운이 들어와 업무 성과를 내기 좋아.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "금전",
+      "state": "ready",
+      "heading": "기분 전환을 위한 즉흥 소비나 과시형 지출 유혹이 커질 수 있어 경계가 필요해.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "컨디션",
+      "state": "ready",
+      "heading": "적극적인 움직임이 가능하지만 동시에 압박감도 들어올 수 있어 적절한 페이스 조절이 필요해.",
+      "blockCount": 4,
+      "exportTextParity": true
+    }
+  ],
+  "exportedImages": 8,
+  "errors": []
+}

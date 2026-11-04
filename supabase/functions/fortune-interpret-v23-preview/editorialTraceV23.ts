@@ -88,6 +88,8 @@ function collectIndexed(out: Record<string, TraceValue>, prefix: string, rows: a
 export function captureEditorialStage(stage: string, data: any): EditorialTraceStage {
   const fields: Record<string, TraceValue> = {}
   add(fields, 'headline', data?.headline)
+  for(const key of ['reader_question','judgment','applicable_situation','interpretation_reason','limitation'])add(fields, `editorial_focus.${key}`, data?.editorial_focus?.[key])
+  add(fields,'editorial_focus.evidence_refs',data?.editorial_focus?.evidence_refs?.join(', '))
   for (const field of ['summary','dominant_pattern','best_phase','caution_phase']) add(fields, `overall.${field}`, data?.overall?.[field])
   collectClusters(fields, data?.clusters)
   collectTopics(fields, data?.topic_analysis)

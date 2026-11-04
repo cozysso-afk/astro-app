@@ -135,7 +135,9 @@ export function buildAuthoredTopicAnalysisOnly(data:any,deterministic:any,payloa
       reason:authored?text(section?.real_scene):'',
       timing:'',
       action:authored?text(section?.action):'',
-      avoid:authored?text(section?.change_condition):'',
+      // A condition for revising the reading is not an action to avoid.
+      // The original condition remains in the authored cluster.
+      avoid:'',
       confidence,
       confidence_reason:'',
       evidence_refs:linked.slice(0,8),

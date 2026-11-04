@@ -81,10 +81,10 @@ test('editorial v4 supplies structured user prose sections for non-relationship 
 test('daily editorial leads with one direct conclusion and concrete observable scenes', () => {
   const text=buildPeriodNarrativeInstruction(packet('day'))
   assert.match(text,/사용자가 바로 이해할 수 있는 한 문장 결론/)
-  assert.match(text,/overall\.summary는 4~6문장/)
+  assert.match(text,/overall\.summary는 80~180자/)
   assert.match(text,/업무 요청·답변·약속·결제·공부 분량·휴식/)
   assert.match(text,/승진·합격·재회처럼 근거에 없는 결과를 만들지 않는다/)
-  assert.doesNotMatch(buildPeriodNarrativeInstruction(packet('week')),/overall\.summary는 4~6문장/)
+  assert.doesNotMatch(buildPeriodNarrativeInstruction(packet('week')),/overall\.summary는 80~180자/)
 })
 
 test('day favors triggers while annual favors recurring background patterns', () => {
