@@ -98,7 +98,7 @@ function hasDeterministicClaim(prose:string){
   return re.test(prose);
 }
 
-export function inspectInterpretationQuality(data:any,payload:any,options:{requireDailyTimedDecision?:boolean}={}){
+export function inspectInterpretationQuality(data:any,payload:any,options:{requireDailyTimedDecision?:boolean;allowEmptyDailyChangeCondition?:boolean}={}){
   const map=ledgerMap(payload),kind=String(payload?.period_kind??"day"),stages:any[]=[];
 
   const s1:string[]=[];
@@ -361,7 +361,7 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
     if(String(section?.conclusion??"").length<10)s6.push(`${id} 현재 결론 누락`);
     if(String(section?.real_scene??"").length<12)s6.push(`${id} 현실 장면/판단기준 누락`);
     if(String(section?.action??"").length<8)s6.push(`${id} 사용자 행동 누락`);
-    if(String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
+    if(!(payload?.period_kind==="day"&&options.allowEmptyDailyChangeCondition===true&&!String(section?.change_condition??"").trim())&&String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
     if(mode==="direct"&&!(section?.evidence_refs?.length))s6.push(`${id} direct인데 근거 ID 없음`);
     const combined=sectionText(section);
     if(/^(?:확인해|지켜봐|신중해|서두르지 마|천천히 봐)[.!\s]*$/.test(combined))s6.push(`${id} 안전하지만 무용한 원고`);

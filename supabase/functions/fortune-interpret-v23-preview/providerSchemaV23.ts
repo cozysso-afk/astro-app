@@ -150,6 +150,21 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       core.properties.year_phases.minItems=4;
       core.properties.cross_checks.minItems=3;
     }
+    if(kind==="day"){
+      // Write field interpretations before the first-screen answer. This plan
+      // is model-authored working data, never a server-written fortune.
+      const focus={type:"OBJECT",properties:{
+        reader_question:{type:"STRING"},judgment:{type:"STRING"},
+        applicable_situation:{type:"STRING"},interpretation_reason:{type:"STRING"},
+        limitation:{type:"STRING"},evidence_refs:{type:"ARRAY",items:{type:"STRING"}},
+      },required:["reader_question","judgment","applicable_situation","interpretation_reason","limitation","evidence_refs"]};
+      const {clusters,headline,overall,...rest}=core.properties;
+      core.properties={clusters,editorial_focus:focus,overall,headline,...rest};
+      core.required=[...core.required,"editorial_focus"];
+      core.propertyOrdering=Object.keys(core.properties);
+      core.properties.headline.description="분야별 해석과 editorial_focus를 작성한 뒤, 구체적 대상에 대한 판단 하나를 짧은 한국어 한 문장으로 써. 이유·행동·제한을 전부 압축하지 마.";
+      core.properties.overall.properties.summary.description="editorial_focus의 적용 상황과 해석 이유를 짧은 한국어 두 문장으로 설명해. 제목을 반복하거나 여러 분야를 나열하지 마.";
+    }
   }
   return core;
 }

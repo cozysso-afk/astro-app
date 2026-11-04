@@ -19,8 +19,8 @@ for(const [period,when] of [['today','오늘'],['week','이번 주'],['month','�
  const {calculation,data,context}=fixture(period)
  const before=structuredClone(calculation)
  const text=westernRankCopy(Object.entries(calculation.western.overall),when)
- assert.match(text,/연애·연락·재회 중 재회의 점수가 가장 높아/)
- assert.match(text,/다른 분야보다 높더라도 재회 활성도는 ‘약함’/)
+ assert.match(text,/재회 흐름이 상대적으로 가장 두드러져/)
+ assert.match(text,/활성도는 약함 수준/)
  assert.doesNotMatch(text,/흐름이 점수가|연애은|재회은/)
  const summary=polishFortuneSummary(buildFortuneUserSummary(data,context))
  assert.equal(new Set(summary.focusTopics.map(t=>t.action).filter(Boolean)).size,summary.focusTopics.filter(t=>t.action).length)
@@ -29,9 +29,9 @@ for(const [period,when] of [['today','오늘'],['week','이번 주'],['month','�
  assert.deepEqual(calculation,before)
 })
 test('ties and missing values never produce an invented ranking or band',()=>{
- assert.match(westernRankCopy([['연애',stat(30)],['연락',stat(30)],['재회',stat(null)]],'오늘'),/점수가 모두 같아/)
+ assert.match(westernRankCopy([['연애',stat(30)],['연락',stat(30)],['재회',stat(null)]],'오늘'),/한 가지를 핵심으로 고르기 어려워/)
  assert.match(westernRankCopy([['연애',stat(NaN)]],'오늘'),/점수가 없어/)
- assert.match(westernRankCopy([['연애',stat(80,'강함')]],'오늘'),/‘강함’/)
+ assert.match(westernRankCopy([['연애',stat(80,'강함')]],'오늘'),/활성도는 강함 수준/)
 })
 test('support and friction cite distinct evidence, explicit direction takes precedence over unsigned contribution',()=>{
  const evidence=[{kind:'aspect',transit:'Moon',target:'Venus',aspect:'trine',direction:'supportive',contribution:2,source_topics:topics,text:'달 금성 삼분위'}, {kind:'house',transit:'Moon',whole_house:8,direction:'caution',contribution:4,source_topics:topics,text:'달 8하우스'}]

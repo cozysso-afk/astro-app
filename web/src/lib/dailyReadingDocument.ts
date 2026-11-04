@@ -30,7 +30,7 @@ function blocksFor(section: AiEditorialSection, prefix: string): DailyBlock[] {
 }
 function ready(section: AiEditorialSection | undefined): boolean {
   return Boolean(section && section.applicability !== 'insufficient' && section.evidence_refs?.length &&
-    [section.conclusion,section.real_scene,section.action,section.change_condition].every(clean))
+    [section.conclusion,section.real_scene,section.action].every(clean))
 }
 
 // Migration adapter: preserve provider-owned prose verbatim. In particular,

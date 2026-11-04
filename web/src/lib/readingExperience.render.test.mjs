@@ -8,7 +8,7 @@ import { fortuneFixture, personalMarriageFixture, aspects, timing } from './read
 
 let server, Fortune, Relationship, Account, Personal, portraitConcept, Formatters
 before(async () => {
-  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true},appType:'custom'})
+  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true},appType:'custom'})
   Formatters=await server.ssrLoadModule('/src/lib/resultFormatters.ts')
   Fortune=(await server.ssrLoadModule('/src/PeriodAiInterpretationPanel.tsx')).PeriodAiInterpretationPanel
   Relationship=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
@@ -25,7 +25,11 @@ const verifiedResult=(data,period='today')=>({
   data:{
     ...data,
     headline:'계획의 순서를 정하면 움직임이 선명해져.',
-    overall:{...data.overall,summary:'먼저 확인할 일과 미룰 일을 나누면 흐름을 안정적으로 쓸 수 있어.'},
+    overall:{...data.overall,summary:'먼저 확인할 일과 미룰 일을 나누면 흐름을 안정적으로 쓸 수 있어.',...(period==='today'?{dominant_pattern:'수성과 목성의 계산 근거가 판단과 확장의 균형을 함께 보여줘.',evidence_refs:['W:fixture']}: {})},
+    ...(period==='today'?{
+      decisions:[{action:'답변이 필요한 요청부터 한 가지 골라 처리해.',timing:'상대와 확인할 시간이 맞을 때 적용해.',reason:'요청의 범위를 좁히면 판단할 조건을 구체적으로 확인할 수 있어.',watch:'요청 조건이 달라지면 기존 결정을 다시 확인해.',avoid:'확인되지 않은 조건을 확정된 것으로 취급하지 마.',evidence_refs:['W:fixture']}],
+      systems:{western:'대인관계의 협의 조건은 실제 답변과 함께 확인해.'},
+    }:{}),
     topic_analysis:Object.fromEntries(Object.entries(data.topic_analysis).map(([topic,row])=>[topic,{
       ...row,
       verdict:`${topic}에서는 우선순위를 분명히 정해.`,
@@ -44,6 +48,17 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
   const fixture=fortuneFixture(period)
   const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:fixture.calculation,result:verifiedResult(fixture.data,period),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
+  if(period==='today') {
+    const authored=verifiedResult(fixture.data,period).data
+    assert.match(html,/data-daily-scope="overall" data-daily-state="ready"/)
+    assert.ok(html.includes(`<h3 class="daily-reading-headline">${authored.headline}</h3>`))
+    for(const value of [authored.overall.summary,authored.overall.dominant_pattern,...['action','timing','watch','avoid','reason'].map(key=>authored.decisions[0][key]),authored.systems.western]) assert.ok(html.includes(`<p>${value}</p>`),value)
+    assert.doesNotMatch(html.replace(/<[^>]*>/g,''),/orb|W:fixture|기술 원문|private-auth-logout|2026-09-14|2026-09-17/)
+    assert.match(html,/핵심 해설 이미지 저장/)
+    assert.ok(html.indexOf('daily-reading-headline')<html.indexOf('data-daily-block="overall:summary"'))
+    assert.ok(html.indexOf('data-daily-block="overall:summary"')<html.indexOf('daily-reading-details'))
+    return
+  }
   assert.equal((visible.match(/class="flow-tile"/g)||[]).length,3)
   assert.match(visible,/대인관계/)
   assert.match(visible,/왜 이렇게 보냐면/)
@@ -58,12 +73,27 @@ test('integrated daily hero does not promote one specialist topic score',()=>{
   const f=fortuneFixture('today')
   f.calculation.western.overall.학업={...f.calculation.western.overall.학업,average:37,band:'약함'}
   f.calculation.western.daily_scores[0].evidence.push({source_topics:['학업'],transit:'Moon',target:'Sun',aspect:'square',contribution:4,polarity:-.8})
+  f.data.clusters={work_study:{study:{conclusion:'학업에서는 이미 푼 문제의 근거를 다시 설명해봐.',real_scene:'답을 맞혔더라도 풀이 순서를 말로 설명할 수 있는지 확인해.',action:'막힌 풀이 한 개만 다시 적어봐.',change_condition:'풀이를 혼자 설명할 수 있으면 다음 문제로 넘어가.',evidence_refs:['W:fixture'],applicability:'direct'}}}
   const common={period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}
   const integrated=renderToStaticMarkup(createElement(Fortune,common)).split('<details class="period-ai-details"')[0]
   const field=renderToStaticMarkup(createElement(Fortune,{...common,field:{id:'study',label:'학업운',desc:'집중·이해·복습',topics:['학업'],lens:'학업'}})).split('<details class="period-ai-details"')[0]
   assert.doesNotMatch(integrated,/daily-reading-signal/)
-  assert.match(field,/daily-reading-signal/)
-  assert.match(field,/학업/)
+  assert.match(field,/data-daily-scope="study" data-daily-state="ready"/)
+  assert.ok(field.includes(f.data.clusters.work_study.study.conclusion))
+  assert.ok(!integrated.includes(f.data.clusters.work_study.study.conclusion))
+  assert.ok(!field.includes(common.result.data.overall.summary))
+  assert.doesNotMatch(field,/daily-reading-signal/)
+})
+
+test('daily missing authored field does not fall back to overall or deterministic topic prose',()=>{
+  const f=fortuneFixture('today')
+  const result=verifiedResult(f.data)
+  const html=renderToStaticMarkup(createElement(Fortune,{field:{id:'study',label:'학업운',topics:['학업'],lens:'학업'},period:'today',calculation:f.calculation,result,loading:false,onRetry:noAction,onCopyPrompt:noAction}))
+  assert.match(html,/data-daily-state="missing"/)
+  assert.match(html,/해설이 아직 완성되지 않았어/)
+  assert.ok(!html.includes(result.data.overall.summary))
+  assert.ok(!html.includes(result.data.topic_analysis.학업.verdict))
+  assert.doesNotMatch(html,/daily-reading-headline|핵심 해설 이미지 저장/)
 })
 
 for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']) test(`actual ${mode} without verified Gemini provenance never exposes calculated prose`,()=>{
@@ -101,12 +131,13 @@ test('portrait prompt is only existing hints plus explicit creative art directio
   fixture.result.spouse_archetype.appearance_hints=[]
   assert.equal(portraitConcept(fixture.result.spouse_archetype),'')
 })
-test('reason action and caution render as separately labelled accessible layers',()=>{
+test('daily reason action and conditions render as separately labelled accessible blocks',()=>{
   const f=fortuneFixture()
   const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
-  for(const kind of ['reason','practice','caution']) assert.match(html,new RegExp('reading-explanation is-'+kind))
-  assert.match(html,/reading-hero-subtitle/)
-  assert.match(html,/reading-period-date/)
+  for(const [kind,label] of [['summary','핵심 요약'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
+  assert.match(html,/<time dateTime="2026-09-12">2026-09-12<\/time>/)
+  assert.ok(html.indexOf('overall:reason')<html.indexOf('overall:action'))
+  assert.ok(html.indexOf('overall:action')<html.indexOf('overall:watch'))
 })
 test('field hero does not repeat its projected cluster in a second detail card',()=>{
   const f=fortuneFixture('today')
@@ -123,13 +154,21 @@ test('field hero does not repeat its projected cluster in a second detail card',
   assert.equal((visible.match(/중복표시검증/g)||[]).length,1)
 })
 
-for(const period of ['today','week','month','year']) test(`rendered ${period} caution contact directions precede long interpretation`,()=>{
+for(const period of ['today','week','month','year']) test(`rendered ${period} primary reading precedes long interpretation`,()=>{
   const f=fortuneFixture(period)
   f.calculation.western.overall.연락={...f.calculation.western.overall.연락,average:44}
   f.data.topic_analysis.연락.evidence_refs=['W:contact']
   f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:3,polarity:-0.7})
   const html=renderToStaticMarkup(createElement(Fortune,{period,calculation:f.calculation,result:verifiedResult(f.data,period),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
+  if(period==='today') {
+    assert.match(html,/data-daily-state="ready"/)
+    assert.doesNotMatch(html,/signal-incoming|signal-outgoing/)
+    for(const block of ['overall:summary','overall:reason','overall:action','overall:watch','overall:avoid']) assert.ok(html.indexOf(`data-daily-block="${block}"`)>=0 && html.indexOf(`data-daily-block="${block}"`)<html.indexOf('daily-reading-details'),block)
+    assert.match(html,/<details class="daily-reading-details"><summary>상세 해설<\/summary>/)
+    assert.ok(html.includes(verifiedResult(f.data).data.decisions[0].reason))
+    return
+  }
   assert.match(visible, /signal-incoming[\s\S]*?외부 연락 반응[\s\S]*?약함/)
   assert.match(visible, /signal-outgoing[\s\S]*?내 연락 실행 적합도[\s\S]*?강함/)
   assert.ok(visible.indexOf('외부 연락 반응')<visible.indexOf('period-ai-user-focus'))

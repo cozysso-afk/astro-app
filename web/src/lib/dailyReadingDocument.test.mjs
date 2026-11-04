@@ -59,3 +59,11 @@ test('old overly long or repeated copy requires refresh instead of hidden client
   const long=data();long.clusters.relationship.love_general.real_scene='가'.repeat(501)
   assert.equal(buildDailyReadingDocument(long,'2026-11-04',fortuneGroup('애정'),true).state,'needs_refresh')
 })
+
+test('an optional empty exception keeps the grounded daily reading and export ready',()=>{
+ const d=data();d.clusters.relationship.love_general.change_condition=''
+ const doc=buildDailyReadingDocument(d,'2026-11-04',fortuneGroup('애정'),true)
+ assert.equal(doc.state,'ready')
+ assert.ok(!doc.blocks.some(b=>b.id.endsWith(':condition')))
+ assert.deepEqual(dailyReadingExportModel(doc).sections.flatMap(s=>s.cards).map(c=>c.body),[doc.headline,...doc.blocks.map(b=>b.text)])
+})

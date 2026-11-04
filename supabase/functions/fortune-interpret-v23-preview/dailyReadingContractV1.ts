@@ -13,7 +13,7 @@ export function inspectDailyProviderDocument(core:any, kind:unknown) {
     if (found.length!==1) {issues.push(`daily_primary_missing_or_duplicate:${key}`);continue}
     const row=found[0]
     if (row.applicability==='insufficient') continue
-    if (!['conclusion','real_scene','action','change_condition'].every(k=>text(row[k])) || !row.evidence_refs?.length) issues.push(`daily_primary_incomplete:${key}`)
+    if (!['conclusion','real_scene','action'].every(k=>text(row[k])) || typeof row.change_condition!=='string' || !row.evidence_refs?.length) issues.push(`daily_primary_incomplete:${key}`)
     if (text(row.conclusion).length>180) issues.push(`daily_headline_too_long:${key}`)
     for(const [field,max] of [['real_scene',500],['action',300],['change_condition',300]] as const) {
       if(text(row[field]).length>max)issues.push(`daily_block_too_long:${key}:${field}`)

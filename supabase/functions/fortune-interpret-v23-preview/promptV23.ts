@@ -98,6 +98,7 @@ export function buildV23PromptPacket(payload:any) {
   const narrative = buildPeriodNarrativeContext(base)
   const packet:any = {
     ...base,
+    time_context:payload?.time_context,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
     domain_answer_contract_version: DOMAIN_ANSWER_CONTRACT_VERSION,
@@ -149,6 +150,12 @@ export function buildTemporalWordingInstruction(packet:any) {
 
 export function buildV23CorePromptFromPacket(packet:any) {
   const writerPacket=packet?.period_kind==='day'?dailyReaderPacket(packet):packet
+  // Daily copy has one writing contract. The multi-period contract asks for
+  // several contrasting themes and a timeline, which dilutes a one-day answer.
+  if(packet?.period_kind==='day')return {
+    version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,
+    text:`${DAILY_EDITORIAL_INSTRUCTION}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
+  }
   // The legacy contract asks for all 25 nested sections; daily delivery now
   // requests six sparse primary sections. Never send both instructions.
   const narrativeInstruction = buildPeriodNarrativeInstruction(writerPacket, packet?.period_kind!=='day')

@@ -106,3 +106,28 @@ test('final editorial review: priorities cannot mix life roles or assert measure
   assert.ok(issues.includes('mixed_life_roles_in_overview'))
   assert.equal(issues.filter(c=>c==='unmeasured_physical_state').length,2)
 })
+
+test('daily field selection preserves late opposing facts without a second truncation',()=>{
+  const rows=Array.from({length:8},(_,i)=>({id:`W:${i}`,system:'western',topic:'연애',scope:'daily_actual',direction:i===7?'caution':'supportive'}))
+  const packet=dailyReaderPacket({period_kind:'day',evidence_ledger:rows})
+  assert.equal(packet.evidence_ledger.length,8)
+  assert.ok(packet.evidence_ledger.some(r=>r.id==='W:7'))
+  assert.ok(packet.evidence_ledger.some(r=>r.direction==='supportive'))
+  assert.deepEqual(packet.evidence_ledger,rows)
+})
+
+test('daily shared observations retain their explicit source-topic mapping',()=>{
+  const fact={id:'W:daily:x',system:'western',scope:'daily_actual_aspect_house',source_topics:['연애','금전'],direction:'context',observation:{polarity:-0.4},text:'실제 계산 관측'}
+  const packet=dailyReaderPacket({period_kind:'day',evidence_ledger:[fact]})
+  assert.deepEqual(packet.evidence_ledger,[fact])
+  assert.ok(packet.daily_editorial_brief.questions.find(q=>q.section==='relationship.love_general').fact_refs.includes(fact.id))
+  assert.deepEqual(packet.daily_editorial_brief.questions.find(q=>q.section==='work_study.study').fact_refs,[])
+})
+
+test('unsupported permission in an exception is rejected; empty daily conditions are optional only in V23',()=>{
+ assert.ok(codes({clusters:{money_news:{money:{change_condition:'예산 안이면 그대로 진행해도 문제없어.'}}}}).includes('unsupported_permission_in_condition'))
+ const d={overall:{},topic_analysis:{},clusters:{money_news:{money:{conclusion:'금전의 원래 결론을 보존해.',real_scene:'실제 상황에 대한 해석을 담고 있어.',action:'필요한 항목을 비교해.',change_condition:'',applicability:'conditional',evidence_refs:['W:love']}}}}
+ assert.ok(inspectInterpretationQuality(d,payload()).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+ assert.ok(!inspectInterpretationQuality(d,payload(),{allowEmptyDailyChangeCondition:true}).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+ assert.ok(inspectInterpretationQuality(d,{...payload(),period_kind:'week'},{allowEmptyDailyChangeCondition:true}).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+})

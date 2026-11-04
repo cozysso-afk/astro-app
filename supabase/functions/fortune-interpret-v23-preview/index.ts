@@ -9,7 +9,7 @@ import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
-import { buildDailyRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
+import { buildDailyClarityRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
 import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
@@ -17,7 +17,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.11-daily-reading-contract-v17";
+const VERSION="supabase-ai-v23.11-daily-reading-contract-v18";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -83,7 +83,7 @@ function coreInstruction(periodKind:unknown,compact=false){const kind=String(per
 - key_windows 1개, decisions 1개, priorities 1~2개. decision은 key_window와 하나 이상의 실제 evidence_ref를 공유해. year_phases, cross_checks, domain_answers는 빈 배열로 둬. relationship_reading/contact_flow/investment_reading은 이번 범위가 아니므로 생략해.
 - systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.
 - 종합에서 특정 역할을 나열하지 마. 애정은 만남·호감의 상호성·관계 속도를 다루고 연락 조언으로만 채우지 마. 현실 사건·증상·학습 효과를 관측한 것처럼 단정하지 마.
-- change_condition은 판단이 달라지는 현실 관찰이다. 새로운 명령문으로 채우지 마. 구체 조건을 도출할 수 없으면 그 한계를 솔직하게 써.
+- change_condition은 판단이 달라지는 현실 관찰이다. 새로운 명령문으로 채우지 마. 구체 조건을 도출할 수 없으면 change_condition을 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
 - 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘 대신 선택 운세일이라고 써.
 `;return `
 [OUTPUT]
@@ -176,7 +176,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
     return {ok:false,error:"Thai 출력 안전검증 실패",model,usage:u,guard_violations:guard.violations,editorial_trace,...resultMeta};
   }
   traceStages.push(captureEditorialStage("post_thai_guard",data));
-  const quality=applyDailyEditorialGate(inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false}),dailyEditorial);
+  const quality=applyDailyEditorialGate(inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false,allowEmptyDailyChangeCondition:true}),dailyEditorial);
   traceStages.push(captureEditorialStage("post_quality_validation",data));
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini",quality_ok:Boolean(quality?.ok)});
   if(!quality.ok){
@@ -206,26 +206,28 @@ async function rewriteDailyCandidate(first:any,payload:any,model:string,key:stri
     const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
     const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day");
     if(!structure.passed)return {ok:false,error:"일일 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:structure};
-    return finalizeCandidate(patched,payload,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
+    const edited=finalizeCandidate(patched,payload,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
+    return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"일일 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
 
 async function calculate(payload:any,preferred:string,key:string,shouldContinue:()=>Promise<boolean>){
   const budget:Budget={used:0,deadline:Date.now()+MAX_JOB_MS,calls:[]};
   const first:any=await generate(payload,preferred,key,budget,"initial",false,"");
-  if(first.ok)return {...first,attempt_count:budget.used,call_trace:budget.calls};
+  if(first.ok&&payload?.period_kind!=="day")return {...first,attempt_count:budget.used,call_trace:budget.calls};
   if(first?.http_status===429||first?.cost_guard_blocked)return {...first,attempt_count:budget.used,call_trace:budget.calls};
   if(!(await shouldContinue()))return {ok:false,error:"AI 해설 생성이 취소됐어.",model:preferred,canceled:true,usage:first.usage,attempt_count:budget.used,call_trace:budget.calls};
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
   let second:any;
-  const dailyPatch=first?.quality_guard_failed?buildDailyRewriteRequest(first.candidate_data,first.quality_report,payload):null;
-  if(dailyPatch)second=await rewriteDailyCandidate(first,payload,secondModel,key,budget,dailyPatch);
+  const dailyDraft=first.ok?first.data:first.quality_guard_failed?first.candidate_data:null;
+  const dailyPatch=dailyDraft?buildDailyClarityRequest(dailyDraft,payload,first.quality_report):null;
+  if(dailyPatch)second=await rewriteDailyCandidate({...first,candidate_data:dailyDraft},payload,"gemini-3.7-flash",key,budget,dailyPatch);
   else if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
   else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report)+(first.quality_report.daily_editorial?.passed===false?dailyEditorialRetryInstruction(first.quality_report.daily_editorial,first.candidate_data):""));
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답"))second=await generate(payload,secondModel,key,budget,"fallback",true,"");
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
-  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,first_structure_report:first?.structure_report??null,...(preferred===secondModel?{}:{fallback_from:preferred})};
+  if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,first_structure_report:first?.structure_report??null,...(preferred===second.model?{}:{fallback_from:preferred})};
   return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,origin:"deterministic_safe",safe_summary_required:true,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
 }
 

@@ -1,30 +1,54 @@
 export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v1-evidence-and-language'
 
-export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY_EDITORIAL]
-- 이번 요청은 종합과 기본 여섯 분야의 첫 화면 원고다. 추가 하위관계·이직·시험·투자 원고는 이번 생성 범위가 아니다. 빈칸을 채우려고 범위를 넓히지 마.
-- 독자에게 말하듯 자연스러운 반말을 써. 보고서식 "작용한다/형성된다/요구된다/적합하다/동시 작용" 대신 실제 대상과 동사를 써. headline은 25~60자, overall.summary는 80~180자를 목표로 하되 조건을 자르지 마.
-- headline에서 결론 하나를 먼저 말하고 summary에서는 왜 그렇게 읽었는지 풀어줘. 핵심이 두 문장에 흩어지거나 "변화와 점검이 동시에 작용" 같은 추상 대비만 남으면 다시 써. dominant_pattern도 별도 설명이 없으면 빈 문자열로 두고 요약을 반복하지 마.
-- clusters.real_scene은 먼저 조건부 생활 장면을 독자가 이해할 말로 설명해. 행성명·삼분위·육십분위·역행을 문단 첫머리에 나열하지 마. 전문 계산 이름은 systems 또는 계산 근거에 모아.
-- 계산된 배치를 실제 사건의 관측처럼 쓰지 마. 호감 표현이 존재한다, 상급자의 요구가 강해진다, 늦은 시간 체력이 저하된다는 사실은 입력에 없다. 상황 예시를 쓸 때에는 "약속을 앞두고 있다면"처럼 조건을 밝혀.
-- 구체적으로 보이게 하려고 물의 온도·신체 부위·증상·학습 효과·임의의 개수나 횟수를 만들지 마. 계산값은 그런 정보를 주지 않는다. 행동은 핵심 판단과 바로 연결되는 확인 하나로 써.
-- 애정은 실제 만남·호감의 상호성·관계 속도를 다뤄. 메시지를 주고받으라는 행동만 쓰면 연락과 구분되지 않는다. 상대가 실제로 무엇을 했다고 가정하지 마.
-- change_condition은 다른 일을 시키는 칸이 아니다. 어떤 현실 관찰이 앞의 판단을 약하게 하거나 적용하지 않게 하는지 써. 설명할 근거가 없으면 "이 자료만으로는 판단을 바꿀 구체 조건까지 정할 수 없어"처럼 한계를 밝혀. 과거 이야기를 하면 감정을 설명하라는 등 새 시나리오를 만들지 마.
-- 독자가 묻는 것은 "이 날 무엇을 먼저 살피고, 왜 그렇게 읽는가"다. headline은 핵심 판단, overall.summary는 판단의 이유와 적용 범위, decisions는 행동을 맡는다. 같은 뜻을 세 번 풀어쓰지 마.
-- 일일 종합 첫 문단에서 이직·시험·학업·투자 등 사용자에게 확인되지 않은 역할과 일정을 전제하지 마. 해당 분야에서만 상황을 조건부로 다뤄.
-- "이야기를 열어두다", "대화의 접점을 열다", "변화 욕구를 현실적 규격에 안착시키다"처럼 대상과 행동이 불분명한 표현은 쓰지 마. 누가 무엇을 말하거나 확인하는지 일상적인 한국어로 써.
-- 추상어를 쉬운 말로 바꾸더라도 근거와의 연결을 없애지 마. 근거의 어떤 특징을 어떤 생활상의 질문으로 읽는지 설명해. "오늘도 일정과 휴식을 챙겨" 같은 상시 조언만 남으면 실패다.
-- daily_editorial_brief는 질문별로 전달된 사실과 그 사용 범위를 표시한다. 근거가 있다는 것과 사건을 예측할 수 있다는 것은 다르다. 상대 마음, 선연락 주체, 신체 증상, 결과를 사실로 만들어내지 마.
-- 시간창은 하루 안의 상대 비교이며 실제 약속·업무·수면 시간표가 아니다. 새벽 최고값을 새벽 연락·이직 검토 권유로 바꾸지 마. 사용자의 활동 시간이 없으면 새벽에는 행동을 권하지 말고 시각은 근거 상세에만 남겨.
-- 01:00~02:30 근거를 "오전 업무 전"으로 바꾸거나, 학업 시간창을 업무·컨디션 조언의 시간으로 옮기지 마. 쓸 만한 시간 근거가 없으면 시각 없는 행동으로 쓰고 시간은 만들지 마.
-- 행성 위치만 있는 Thai 자료를 순조로운 일정·안정·관계 유지의 근거로 승격하지 마. 설명 가능한 위치 사실과 설명 불가능한 생활 판단의 경계를 밝혀. 다른 두 체계와 억지로 같은 결론을 만들지 마.
-- 명확한 지원·주의 방향이 없으면 대립을 꾸미지 마. 확인된 맥락과 해석의 한계를 설명해. 원고가 부족하면 일반론으로 채우지 마.
-- 한 분야의 domain_answers를 direct/partial로 답했다면 그 분야 기본 요약을 빈 insufficient로 남기지 마. 같은 자료로 무엇까지 말할 수 있는지 기본 요약에도 설명해.`
+export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY EDITOR: 선택한 운세일 안에서 읽는 해설]
+이번 요청은 종합과 기본 여섯 분야의 첫 화면 원고야. 계산은 끝났어. 계산된 배치를 생활에서 어떻게 읽을지 설명하되, 실제 사건이나 사용자 상태를 관측한 것으로 취급하지 마.
+
+[작성 순서]
+1. daily_editorial_brief.questions의 질문에 맞춰 clusters 여섯 분야를 먼저 작성해. 근거 ID를 고르고 해당 분야에 적용할 판단을 써. 다른 분야나 종합 요약으로 대체되는 결과는 실패야.
+2. editorial_focus에 전체 첫 화면에서 답할 질문 하나, 판단 하나, 적용 상황, 그 판단의 해석상 이유, 근거 ID를 정리해. 여섯 분야 중 사용자가 먼저 읽을 가치가 있는 판단을 선택해. 모든 분야를 묶은 거창한 하루의 성격을 만들 필요는 없어. 반대 근거는 같은 판단에 직접 영향을 줄 때만 함께 고려해.
+3. 그 내용을 읽고 headline을 마지막에 써. 독자가 한 번 읽고 무엇에 대한 어떤 판단인지 말할 수 있어야 해. 제목은 무엇이 수월하거나 까다로운지 읽어주는 짧은 한 문장(25~60자), overall.summary는 적용 상황과 이유를 설명하는 짧은 두 문장(80~180자 목표)이야. 문장 수를 맞추려고 조건을 삭제하지 마. 제목에 이유·행동·제한까지 전부 압축하지 마. 본문을 줄여 붙인 제목도 안 돼.
+
+[필드 역할]
+- conclusion: 그 분야에서 무엇이 수월하거나 까다로운지 설명하는 판단 하나. 확인해·미뤄·줄여 같은 행동 지시가 아니야. 애정은 만남·호감의 상호성·관계 속도, 대인은 협력·요청·의견 차이, 직업은 맡은 일·조건·진행, 학업은 이해·정리·집중, 금전은 지출·예산, 컨디션은 활동·휴식의 범위에서 구분해.
+- real_scene: 이 판단이 어떤 상황에 해당하며 왜 그렇게 읽는지 두 문장으로 설명해. 사용자에게 그 일이 이미 일어났다고 쓰지 말고 필요하면 조건을 밝혀.
+- action: 앞의 판단과 연결된 확인 또는 선택 하나. 무엇을 확인하는지 대상을 밝혀. 결론을 동의어로 반복하지 마.
+- change_condition: 앞의 판단을 적용하지 않아도 되는 현실 관찰. 새 명령문이나 엉뚱한 시나리오를 넣지 마. 도출할 수 없으면 빈 문자열로 둬. 예산 안이면 문제없다거나 급하면 미루라는 허가·명령으로 채우지 마.
+- headline은 판단, overall.summary는 적용 상황과 이유, decisions는 행동이야. dominant_pattern은 새 설명이 없으면 빈 문자열로 둬.
+
+[문장 기준]
+해설과 조언을 구분해. headline과 conclusion은 근거를 읽은 결과이고 action은 그에 따른 선택이야. 모든 분야를 확인·절제·유보 조언으로 끝내지 마. 지원 근거가 있으면 무엇이 수월하다고 읽는지도 설명하고, 주의 근거가 있을 때만 조심할 이유를 써. 반대 방향이 없으면 균형을 맞추려고 만들지 마.
+자연스러운 반말로 써. 실제 생활에서 체감할 수 있는 구체적인 장면을 설명하되 사례를 예언으로 바꾸지 마. 사람·대화·약속·가격·일정처럼 뜻을 바로 알 수 있는 대상을 쓰고 무엇이 어떤지를 말해. 명사를 이어 붙여 '의욕과 교류의 접점', '대화와 생각의 확장', '내실과 긴장'처럼 하루를 포장하지 마.
+'기준을 지켜', '중심을 잡아', '현실을 확인해'로 끝내지 말고 어떤 기준인지 써. 같은 결론을 제목·요약·조언에서 세 번 말하지 마. 다만 근거가 실제로 같으면 억지로 다른 해설을 만들지도 마.
+주어와 서술어, 목적어와 동사의 뜻이 맞는지 확인해. '사람과 나눌 이야기는 열어두고'처럼 뜻을 다시 해석해야 하는 문장은 다시 써. 전문용어와 계산 이름은 systems에 두고 첫 문단을 행성명으로 시작하지 마.
+
+[해석 범위]
+- 직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마. 직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마. 해당 분야에서만 조건부로 다뤄. 종합은 누구나 적용할 수 있는 구체적 상황 하나로 써.
+- 점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마. supportive/caution/context는 구분하고 두 분야를 채우려고 없는 대비를 만들지 마.
+- 근거는 해석의 자료야. 상대 마음·호감의 존재·선연락·실제 제안·수익·결과·측정된 체력·증상·학습 효과를 사실로 만들지 마. 조건부 사례에도 근거와 무관한 신체 부위·물의 온도·횟수를 붙이지 마.
+- 연애와 연락은 같은 분야가 아니야. 연애 해설을 답장과 연락 여부만으로 채우지 마.
+- 시각과 시간대는 이번 원고 범위가 아니야. 시간창을 새벽 연락이나 임의의 오전 일정으로 바꾸지 마. 다른 분야의 시간 근거를 옮기지 마.
+- Western·사주·Thai 근거는 독립적으로 설명해. Thai 행성 위치만으로 일정·관계가 순조롭다고 예측하지 마. 다른 체계와 합산해 확신을 키우지 마.
+- 분야마다 같은 좋지만/어렵지만 틀을 반복하지 마. 근거가 한쪽이면 한쪽만 설명해. 각 분야에 전달된 근거를 함께 읽어. context는 긍정이나 부정의 판정이 아니야. 실제 observation과 설명을 읽어 해석하고, 제외된 분야를 임의로 인용하지 마.
+- 근거가 없으면 insufficient와 빈 원고로 남겨. 고정 조언으로 메우지 마. 모든 문장에서 날짜 표현은 time_context를 따라. limits에는 해석의 한계를 짧게 담아.`
 
 const TOPIC_BY_SECTION: Record<string,string[]> = {
   'relationship.love_general':['연애'], 'relationship.summary':['대인관계'],
   'work_study.study':['학업'], 'work_study.work':['직장'], 'money_news.money':['금전'], 'condition.condition':['컨디션'],
 }
+const READER_QUESTIONS:Record<string,string>={
+  'relationship.love_general':'만남이나 관계의 속도에서 무엇을 먼저 살필까?',
+  'relationship.summary':'사람들과 의견이나 요청을 주고받을 때 무엇이 중요할까?',
+  'work_study.study':'배우고 정리할 때 어디에 주의를 둘까?',
+  'work_study.work':'맡은 일을 진행하거나 조건을 정할 때 무엇을 살필까?',
+  'money_news.money':'돈을 쓰거나 예산을 정할 때 무엇을 살필까?',
+  'condition.condition':'활동과 휴식을 정할 때 무엇을 살필까?',
+}
 const str=(v:unknown)=>typeof v==='string'?v.trim():''
+function belongsTo(row:any,topics:string[]) {
+  if(topics.includes(str(row.topic)))return true
+  const source=Array.isArray(row.source_topics)?row.source_topics:[]
+  return source.some((t:string)=>topics.includes(t))
+}
 function clocksIn(value:string) {
   return [...value.matchAll(/(오전|오후)?\s*\b([01]?\d|2[0-3])(?::([0-5]\d)|시(?:\s*([0-5]?\d)분)?)/g)].map(m=>{
     let hour=Number(m[2]);if(m[1]==='오후'&&hour<12)hour+=12;if(m[1]==='오전'&&hour===12)hour=0
@@ -37,9 +61,9 @@ export function dailyEditorialBrief(payload:any) {
     version:DAILY_EDITORIAL_VERSION,
     life_role:'not_provided', activity_hours:'not_provided',
     questions:Object.entries(TOPIC_BY_SECTION).map(([section,topics])=>{
-      const facts=rows.filter((r:any)=>topics.includes(r.topic) && /intraday_evidence|daily_actual/.test(str(r.scope)))
+      const facts=rows.filter((r:any)=>belongsTo(r,topics) && /intraday_evidence|daily_actual/.test(str(r.scope)))
       const windows=rows.filter((r:any)=>topics.includes(r.topic) && r.scope==='intraday_window')
-      return {section,topics,fact_refs:facts.map((r:any)=>r.id),window_refs:windows.map((r:any)=>r.id),scope:facts.length?'context_interpretation_only':'no_direct_facts_in_packet'}
+      return {section,topics,reader_question:READER_QUESTIONS[section],fact_refs:facts.map((r:any)=>r.id),window_refs:windows.map((r:any)=>r.id),scope:facts.length?'context_interpretation_only':'no_direct_facts_in_packet'}
     }),
     window_policy:'relative_comparison_not_schedule', thai_position_policy:'geometry_not_life_prediction',
   }
@@ -51,7 +75,9 @@ export function dailyReaderPacket(packet:any) {
   const source=Array.isArray(packet?.evidence_ledger)?packet.evidence_ledger:[]
   const chosen=new Map<string,any>()
   for(const topics of Object.values(TOPIC_BY_SECTION)){
-    for(const row of source.filter((r:any)=>topics.includes(r.topic)&&/intraday_evidence|daily_actual/.test(str(r.scope))).slice(0,5))chosen.set(row.id,row)
+    // The upstream packet is already bounded. Preserve all supplied facts for
+    // these six fields; a second first-N trim discards contrary observations.
+    for(const row of source.filter((r:any)=>belongsTo(r,topics)&&/intraday_evidence|daily_actual/.test(str(r.scope))))chosen.set(row.id,row)
   }
   for(const system of ['saju','thai']){
     for(const row of source.filter((r:any)=>r.system===system&&/daily/.test(str(r.scope))).slice(0,2))chosen.set(row.id,row)
@@ -90,6 +116,7 @@ export function inspectDailyEditorial(data:any,payload:any) {
     if(payload?.time_context?.today_word_allowed===false&&/오늘/.test(r.text))add('today_word_without_current_date',r.path)
     if(opaque.test(r.text))add('opaque_korean_expression',r.path)
     if(r.kind==='overview'&&/삼분위|육십분위|사분위|천왕성|해왕성|명왕성|일진|육합|정인\s*기운/.test(r.text))add('technical_detail_in_summary',r.path)
+    if(r.path.endsWith('.change_condition')&&/문제\s*없|그대로\s*진행해도|미뤄|보장(?:돼|해|할 수 있어)/.test(r.text))add('unsupported_permission_in_condition',r.path)
     if(r.path.endsWith('.change_condition')&&/판단이\s*안\s*바뀌/.test(r.text))add('opaque_change_condition',r.path)
     if(r.path!=='limits'&&/다[.!]?$/.test(r.text))add('report_style_in_reader_copy',r.path)
     if(r.path.endsWith('.real_scene')&&/^(?:달|태양|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성)(?:과|와|의|이|가)/.test(r.text))add('technical_opening_in_reader_explanation',r.path)

@@ -20,3 +20,10 @@ test('repeated field conclusions, overall fallback and unbounded hero fail',()=>
   d.overall.summary='가'.repeat(361)
   assert.ok(inspectDailyProviderDocument(d,'day').issues.includes('daily_summary_invalid'))
 })
+
+test('a grounded daily reading does not have to invent an exception',()=>{
+ const d=core();d.clusters[0].change_condition=''
+ assert.ok(inspectDailyProviderDocument(d,'day').passed)
+ d.clusters[0].action=''
+ assert.ok(!inspectDailyProviderDocument(d,'day').passed)
+})

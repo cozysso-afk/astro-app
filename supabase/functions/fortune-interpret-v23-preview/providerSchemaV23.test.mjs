@@ -94,3 +94,12 @@ test('provider normalization turns a missing cluster array into isolated insuffi
   assert.equal(normalized.clusters.condition.condition.applicability,'insufficient')
   assert.equal(Object.keys(normalized.clusters.relationship).length,15)
 })
+
+test('daily writer finishes field evidence before composing its first-screen answer',()=>{
+  const schema=buildProviderCoreSchema(SCHEMA,'day')
+  assert.deepEqual(schema.propertyOrdering.slice(0,4),['clusters','editorial_focus','overall','headline'])
+  assert.ok(schema.required.includes('editorial_focus'))
+  assert.ok(schema.properties.editorial_focus.required.includes('evidence_refs'))
+  assert.equal(buildProviderCoreSchema(SCHEMA,'week').properties.editorial_focus,undefined)
+  assert.equal(SCHEMA.properties.editorial_focus,undefined)
+})

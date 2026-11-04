@@ -106,54 +106,25 @@ test('V23 prompt explicitly blocks score narration from becoming the explanation
   assert.match(out.text, /고정 조언문을 분야명만 바꿔 반복하지 마/)
 })
 
-test('human-language contract requires concrete scenes and semantic non-repetition', () => {
-  const day = buildV23CorePrompt(payload('day')).text
-  const week = buildV23CorePrompt(payload('week')).text
-  assert.match(day, /실제 생활에서 체감할 수 있는 구체적인 장면/)
-  assert.match(day, /다른 날짜나 다른 사람에게 그대로 붙여도 말이 되는 범용 조언이면 실패/)
-  assert.match(day, /"서두르지 마\/신중해\/천천히 봐"는 같은 의미/)
-  assert.match(day, /선택한 운세일만의 촉발·시간대·현실 장면/)
-  assert.match(day, /분야 점수 요약만 쓰지 마/)
-  assert.match(week, /7일의 이동이나 전환/)
-  assert.match(week, /초반→중반→후반/)
+test('daily prompt has one scope and does not reference missing narrative plans', () => {
+  const out=buildV23CorePrompt(payload('day')).text
+  assert.match(out,/editorial_focus/)
+  assert.match(out,/clusters 여섯 분야를 먼저 작성/)
+  assert.match(out,/짧은 두 문장/)
+  assert.match(out,/직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마/)
+  assert.match(out,/점수가 낮거나 band가 약하다는 이유만으로/)
+  assert.doesNotMatch(out,/HUMAN_LANGUAGE_CONTRACT|V23 CORE CONTRACT|반드시 따를 서사 순서|narrative_plan|domain_answer_contracts/)
+  assert.match(out,/연애 해설을 답장과 연락 여부만으로 채우지 마/)
+  const packet=JSON.parse(out.split('PROMPT_DATA=')[1])
+  assert.ok(packet.daily_editorial_brief.questions.every(q=>q.reader_question.endsWith('?')))
 })
 
-test('integrated daily overview stays role-neutral and rejects weak-band promotion', () => {
-  const text = buildV23CorePrompt(payload('day')).text
-  assert.match(text,/직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마/)
-  assert.match(text,/직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마/)
-  assert.match(text,/세부 분야명과 조건부 해설은 topic_analysis와 clusters에서만/)
-  assert.match(text,/점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마/)
-})
-
-test('editorial usability gate requires an actionable reading instead of safe generic prose', () => {
-  const text = buildV23CorePrompt(payload('day')).text
-  assert.match(text, /두 분야를 채우려고 없는 대비를 만들지 마/)
-  assert.match(text, /결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건/)
-  assert.match(text, /무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지/)
-  assert.match(text, /사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패/)
-  assert.match(text, /topic 이름만 바꿔도 그대로 통하는 문장을 반복하지 마/)
-})
-
-test('interpersonal and reunion editorial contracts preserve domain-specific limits', () => {
-  const text = buildV23CorePrompt(payload('day')).text
-  assert.match(text, /대인관계 세부항목은 친구·지인, 직장동료, 가족·가까운 사람, 새 인맥, 갈등·경계를 서로 다른 독립 계산 결과처럼 꾸미지 마/)
-  assert.match(text, /공통 대인관계 근거를 각 현실 상황에 어떻게 적용해 읽는지 조건부로 번역/)
-  assert.match(text, /재회 관심 해설은 생각남→연락→실제 만남→관계 재구축을 서로 다른 단계로 유지/)
-  assert.match(text, /다시 낮춰 읽을 현실 조건/)
-})
-
-test('Korean editorial contract enforces grammar and separates love from contact', () => {
-  const text = buildV23CorePrompt(payload('day')).text
-  assert.match(text, /주어와 서술어가 무엇을 가리키는지 분명하게 맞춰/)
-  assert.match(text, /목적어와 서술어의 의미 호응을 확인/)
-  assert.match(text, /병렬 항목은 같은 문법 단위로 맞춰/)
-  assert.match(text, /추상명사를 연속해서 쌓지 마/)
-  assert.match(text, /headline·overall·topic verdict·action은 각자 다른 역할/)
-  assert.match(text, /연애와 연락은 같은 분야가 아니야/)
-  assert.match(text, /연애 해설을 답장과 연락 여부만으로 채우지 마/)
-  assert.match(text, /한 바이트 쉬다/)
-  assert.match(text, /문맥에 맞지 않는 단어 결합/)
+test('non-daily prompt retains relationship and Korean editorial contracts', () => {
+  const text=buildV23CorePrompt(payload('week')).text
+  assert.match(text,/재회 관심 해설은 생각남→연락→실제 만남→관계 재구축/)
+  assert.match(text,/다시 낮춰 읽을 현실 조건/)
+  assert.match(text,/목적어와 서술어의 의미 호응을 확인/)
+  assert.match(text,/초반→중반→후반/)
 })
 
 test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {
@@ -173,6 +144,14 @@ test('day prioritizes a one-day trigger while week prioritizes a multi-day patte
   const week = buildPeriodNarrativeContext({period_kind:'week', evidence_ledger:evidence})
   assert.match(day.phenomena[0].label, /Mars square Saturn/)
   assert.match(week.phenomena[0].label, /Jupiter trine Sun/)
-  assert.match(buildV23CorePrompt(payload('day')).text, /해당 운세일만의 촉발/)
+  assert.match(buildV23CorePrompt(payload('day')).text, /선택한 운세일 안에서/)
   assert.match(buildV23CorePrompt(payload('week')).text, /초반→중반→후반/)
+})
+
+test('daily writer receives the actual date-wording contract from the source payload',()=>{
+  const input=payload('day');input.time_context={today_word_allowed:false,requested_start:'2026-11-05'}
+  const out=buildV23CorePrompt(input)
+  assert.deepEqual(out.packet.time_context,input.time_context)
+  assert.match(out.text,/DATE WORDING · HARD GATE/)
+  assert.equal(JSON.parse(out.text.split('PROMPT_DATA=')[1]).time_context.today_word_allowed,false)
 })
