@@ -13,3 +13,12 @@ export const FORTUNE_FIELDS = [
 ] satisfies Array<{id:string;label:string;desc:string;topics:string[];lens:LifeTopic}>
 export type FortuneField = typeof FORTUNE_FIELDS[number]
 export function fortuneField(id:string|undefined) {return FORTUNE_FIELDS.find(f=>f.id===id)}
+
+// UI labels are never data identifiers. Entry pages may narrow these groups.
+export function fortuneGroup(lens: LifeTopic): FortuneField | undefined {
+  const ids: Partial<Record<LifeTopic, string>> = {애정:'love',대인:'social',학업:'study',직업:'work',금전:'money',컨디션:'condition'}
+  const base = fortuneField(ids[lens])
+  if (!base) return undefined
+  const topics: Partial<Record<LifeTopic, string[]>> = {애정:['연애','연락','재회'],대인:['대인관계','소식'],학업:['학업','시험'],직업:['직장','이직'],금전:['금전','투자심리','수익실현','신규진입','투자주의']}
+  return {...base, label: lens === '애정' ? '애정운' : base.label, topics: topics[lens] ?? base.topics}
+}

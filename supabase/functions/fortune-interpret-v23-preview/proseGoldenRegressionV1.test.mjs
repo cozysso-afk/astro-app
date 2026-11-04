@@ -166,7 +166,7 @@ test('golden 11: frontend focus card accepts concise authored prose instead of r
 // Golden 12 — pipeline ordering keeps authored prose first and the UI fails closed to verified Gemini only.
 test('golden 12: backend validates authored prose without deterministic co-writing',()=>{
   const projectionPos=indexSource.indexOf('buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)')
-  const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload)')
+  const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false})')
   assert.ok(projectionPos>=0&&validatePos>projectionPos)
   assert.doesNotMatch(indexSource,/stabilizeCoreForQuality\(withTopics,payload\)/)
   assert.doesNotMatch(indexSource,/polishV23EditorialDepth\(data,payload\)/)

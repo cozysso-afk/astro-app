@@ -469,6 +469,7 @@ export type AiInterpretationResponse = {
     cross_checks?: AiCrossCheck[]
     decisions?: AiDecision[]
     clusters: AiEditorialClusters
+    editorial_delivery?: Record<string, 'authored' | 'omitted' | 'invalid'>
     domain_answers?: AiDomainAnswer[]
     relationship_reading?: { context: string; flow: string; focus_timing: string; watch: string; avoid: string; evidence_refs?: string[] }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }

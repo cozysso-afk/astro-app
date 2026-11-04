@@ -1,7 +1,7 @@
 import { westernRankCopy } from './lib/westernRankCopy'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
-import type { FortuneField } from './lib/fortuneFields'
+import { fortuneGroup, type FortuneField } from './lib/fortuneFields'
 import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
 import type { IntegratedApiResponse, FortuneStat } from './appTypes'
@@ -153,8 +153,9 @@ function BoundedCopy({packet}:{packet:Record<string,unknown>}) {
   }
   return <div className="system-copy"><button type="button" onClick={copy}><Copy size={16}/>선택 체계 심층 프롬프트 복사</button><small>현재 체계의 계산 근거만 · 최대 7,500자</small><p role="status">{notice}</p></div>
 }
-export function SystemReadingViews({calculation:c,children,field,loveStatus,initialSystem='integrated'}:{calculation:IntegratedApiResponse;children:ReactNode;field?:FortuneField;loveStatus?:LoveStatus;initialSystem?:SystemId}) {
+export function SystemReadingViews({calculation:c,children,field,loveStatus,initialSystem='integrated',onSystemChange}:{calculation:IntegratedApiResponse;children:ReactNode;field?:FortuneField;loveStatus?:LoveStatus;initialSystem?:SystemId;onSystemChange?:(system:SystemId)=>void}) {
   const [system,setSystem] = useState<SystemId>(initialSystem)
+  useEffect(()=>{onSystemChange?.(system)},[system,onSystemChange])
   const [topic,setTopic] = useState<LifeTopic>(field?.lens ?? '전체')
   const [wheelIndex,setWheelIndex] = useState(0)
   useEffect(()=>{setSystem(initialSystem);setTopic(field?.lens ?? '전체')},[initialSystem,field?.lens])
@@ -179,7 +180,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const sajuOverviewSummary = topic==='전체'
     ? sajuOverviewText(view.lenses, view.sajuSummary)
     : sajuOverviewText(selectedLenses, '이번 기간의 사주 흐름은 계산됐지만, 이 분야까지 바로 연결할 근거는 부족해. 사주 탭에서 적용된 운 구간을 확인해줘.')
-  const focusedField = field ?? (topic==='전체' ? undefined : {id:topic,label:topic+'운',desc:'선택 분야',topics:WESTERN[topic],lens:topic})
+  const focusedField = field ?? fortuneGroup(topic)
   const overview = <section className="system-overview"><h3>세 체계 한눈에</h3><div className="system-overview-grid">
         <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{westernOverviewSummary}</p><small>점수는 사건 확률이 아니라 같은 기간 안에서의 상대적 강약이야.</small></article>
         {view.saju&&view.contexts.length ? <article className="system-saju"><strong><Columns3 size={16}/>사주</strong><p>{sajuOverviewSummary}</p><small>간지·십성은 사주 탭의 계산 근거에서 따로 확인할 수 있어.</small></article>:<p className="system-unavailable">사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어.</p>}

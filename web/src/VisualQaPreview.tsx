@@ -1,4 +1,5 @@
 import { ReunionHierarchyPanel } from './ReunionHierarchyPanel'
+import { DailyReadingQaPreview } from './DailyReadingQaPreview'
 import { hierarchyView } from './lib/reunionHierarchy'
 import { ReadingTimeline } from './ReadingSignals'
 import { westernRankCopy } from './lib/westernRankCopy'
@@ -77,6 +78,7 @@ export function VisualQaPreview() {
         <BirthTimeReliabilityFields value={birthProfile} onChange={patch=>setBirthProfile(current=>({...current,...patch}))}/>
       </div>
     </section>
+    <DailyReadingQaPreview/>
 
     <section className="system-reading system-integrated" data-qa-block="systems" style={{marginBottom:28}}>
       <section className="system-overview">

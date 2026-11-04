@@ -39,11 +39,20 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.10-integrated-daily-overview')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.11-daily-reading-contract')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
   assert.match(out.text, /Mercury trine Jupiter/)
+})
+
+test('daily copy contract keeps the headline and summary short and forbids overall fallback', () => {
+  const out = buildV23CorePrompt(payload('day')).text
+  assert.match(out, /문장 수를 맞추려고 조건을 삭제/)
+  assert.match(out, /80~180자/)
+  assert.match(out, /종합 요약으로 대체되는 결과는 실패/)
+  assert.doesNotMatch(out,/relationship은 summary, friends, coworkers/)
+  assert.match(out,/이번 요청은 종합과 기본 여섯 분야/)
 })
 
 test('non-today packets hard-ban today wording across every user-facing field', () => {
@@ -119,7 +128,7 @@ test('integrated daily overview stays role-neutral and rejects weak-band promoti
 
 test('editorial usability gate requires an actionable reading instead of safe generic prose', () => {
   const text = buildV23CorePrompt(payload('day')).text
-  assert.match(text, /최소 두 개의 서로 다른 생활 분야를 실제로 연결/)
+  assert.match(text, /두 분야를 채우려고 없는 대비를 만들지 마/)
   assert.match(text, /결론 ② 현실에서 나타나는 장면 또는 판단 기준 ③ 사용자가 취할 행동 또는 이 판단이 달라지는 조건/)
   assert.match(text, /무엇이 실제로 나타나면 지금 판단을 올리거나 낮출 수 있는지/)
   assert.match(text, /사용자가 읽고 나서 다음 행동이나 관찰 기준을 하나도 얻지 못하면 실패/)

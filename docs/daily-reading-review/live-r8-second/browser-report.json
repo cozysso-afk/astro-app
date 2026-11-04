@@ -1,0 +1,85 @@
+{
+  "source": "Actual Gemini output for synthetic QA profile; not handwritten copy",
+  "job_id": "6bf2455e-12c9-4e8e-bd64-83b9b414e4a6",
+  "model": "gemini-3.6-flash",
+  "date": "2026-11-05",
+  "widths": [
+    {
+      "width": 320,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 350,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 393,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 430,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    }
+  ],
+  "scopes": [
+    {
+      "label": "전체",
+      "state": "ready",
+      "heading": "대화와 생각은 무성하게 확장되지만 내실을 다지는 실천과의 사이에서 긴장이 생기는 날이야.",
+      "blockCount": 7,
+      "exportTextParity": true
+    },
+    {
+      "label": "애정",
+      "state": "ready",
+      "heading": "감정적 끌림과 마음의 표현 욕구는 크지만, 속도감의 차이로 인해 엇박자가 날 수 있어.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "대인",
+      "state": "ready",
+      "heading": "대화의 양은 풍성해지지만 민감한 주제에서는 오해나 시각차가 커질 수 있어.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "학업",
+      "state": "ready",
+      "heading": "다양한 호기심으로 공부 범위를 넓히고 싶어지지만 끈기 있게 하나를 끝내는 집중력이 요구돼.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "직업",
+      "state": "ready",
+      "heading": "목표와 방향성에 대한 아이디어는 넘치지만 실무적 검증과 세부 조율이 병행되어야 해.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "금전",
+      "state": "ready",
+      "heading": "지출 욕구나 투자 구상은 커질 수 있으나 실제 실속을 챙기려면 지출 항목을 점검해야 해.",
+      "blockCount": 4,
+      "exportTextParity": true
+    },
+    {
+      "label": "컨디션",
+      "state": "ready",
+      "heading": "정신적인 활동량에 비해 감정적 피로도나 신체 저항력이 흔들리기 쉬운 날이야.",
+      "blockCount": 4,
+      "exportTextParity": true
+    }
+  ],
+  "exportedImages": 8,
+  "errors": []
+}

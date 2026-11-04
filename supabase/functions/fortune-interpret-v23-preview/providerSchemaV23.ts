@@ -187,5 +187,6 @@ export function normalizeProviderCore(core:any){
     const group=key.slice(0,dot),section=key.slice(dot+1);
     if(!seen.has(key)||invalid.has(key))groups[group][section]=insufficientProviderSection();
   }
-  return {...core,clusters:groups,domain_answers:normalizedDomainAnswers(core?.domain_answers)};
+  const editorial_delivery=Object.fromEntries(EDITORIAL_SECTION_KEYS.map(key=>[key,invalid.has(key)?'invalid':!seen.has(key)?'omitted':'authored']));
+  return {...core,clusters:groups,editorial_delivery,domain_answers:normalizedDomainAnswers(core?.domain_answers)};
 }

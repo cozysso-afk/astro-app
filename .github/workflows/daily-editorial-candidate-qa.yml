@@ -1,7 +1,11 @@
 name: Daily editorial candidate QA
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      confirm_paid_calls:
+        description: 'Type YES after deploying and reviewing the isolated QA candidate'
+        required: true
+        default: 'NO'
 permissions:
   contents: read
 concurrency:
@@ -9,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   connection:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'qa/daily-editorial-v23-11'
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qa/daily-editorial-v23-11' && inputs.confirm_paid_calls == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
@@ -70,3 +74,4 @@ jobs:
           path: candidate-artifacts/
           retention-days: 7
           if-no-files-found: warn
+

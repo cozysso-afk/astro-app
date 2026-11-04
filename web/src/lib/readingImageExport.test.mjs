@@ -51,7 +51,7 @@ test('short flow and timing cards use compact geometry instead of wasting vertic
   assert.match(exporter,/function cardMetrics/)
   assert.match(exporter,/titleSize:\s*compact\s*\?\s*27\s*:\s*30/)
   assert.match(exporter,/bodySize:\s*compact\s*\?\s*29\s*:\s*BODY_SIZE/)
-  assert.match(exporter,/maxBodyLines:\s*compact\s*\?\s*3/)
+  assert.match(exporter,/maxBodyLines:\s*card\.complete\s*\?\s*Infinity\s*:\s*compact\s*\?\s*3/)
 })
 
 test('export filters empty cards and includes both primary and reference period sectors',()=>{
@@ -62,6 +62,17 @@ test('export filters empty cards and includes both primary and reference period 
   assert.match(exporter,/\.period-ai-user-reference \.period-ai-topic/)
   assert.match(exporter,/if \(!body\) continue/)
   assert.match(exporter,/dedupeCards\(dates\)/)
+})
+
+test('daily export reads the active system hero and fills the image with that system cards',()=>{
+  assert.match(exporter,/\.reading-hero-subtitle:not\(\.reading-export-subtitle-v7\)/)
+  assert.match(exporter,/classList\.contains\('system-integrated'\)/)
+  assert.match(exporter,/\.system-hero h3/)
+  assert.match(exporter,/\.system-hero > p/)
+  assert.match(exporter,/function systemDetailCards/)
+  assert.match(exporter,/\.western-score-grid > details/)
+  assert.match(exporter,/\.saju-reader-topics \.system-lens/)
+  assert.match(exporter,/\.thai-life-map \.bhumi-grid > details/)
 })
 
 test('current reunion layout exports the full reading instead of falling through to a sparse generic image',()=>{

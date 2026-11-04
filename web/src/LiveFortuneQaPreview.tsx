@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ImageDown, LoaderCircle } from 'lucide-react'
 import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
+import { SystemReadingViews } from './SystemReadingViews'
 import { exportReadingImages } from './lib/readingImageExport'
 import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes'
 
@@ -40,6 +41,17 @@ export function LiveFortuneQaPreview() {
 
   if (!payload) {
     return <main className="app-shell" data-qa-live-ready="false"><p>실제 Gemini QA 입력이 없습니다.</p></main>
+  }
+
+  if (payload.interpretation.interpreter_version?.startsWith('supabase-ai-v23.11')) {
+    return <main className="app-shell live-fortune-qa-preview" data-qa-live-ready="true" style={{maxWidth:760,margin:'0 auto',padding:'18px 16px 100px'}}>
+      <header className="result-card" data-qa-live-meta><span>실제 Gemini 생성 결과 검수 · 가상 프로필</span><p>{payload.model} · {payload.periodStart}</p></header>
+      <section data-qa-live-root className="fortune-experience period-today">
+        <SystemReadingViews calculation={payload.calculation}>
+          <PeriodFortuneNarrativeV2 period="today" calculation={payload.calculation} result={payload.interpretation}/>
+        </SystemReadingViews>
+      </section>
+    </main>
   }
 
   const refs = [...evidenceRefs(payload.interpretation.data)].sort()

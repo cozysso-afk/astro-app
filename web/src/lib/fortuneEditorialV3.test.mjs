@@ -71,6 +71,20 @@ test('Gemini structured cluster prose remains available for user-facing topic co
   assert.match(result.topicEditorial['소식'],/공식 안내/)
 })
 
+test('specialist hero never copies the integrated overall paragraph',()=>{
+  const payload=data({
+    overall:{summary:'종합 화면에만 있어야 하는 문장이야.',dominant_pattern:'',best_phase:'',caution_phase:'',evidence_refs:[]},
+    topic_analysis:{
+      ...data().topic_analysis,
+      직장:{verdict:'직장 결론이야.',reason:'직장 이유를 확인해.',timing:'오전에 봐.',action:'업무 순서를 정해.',avoid:'새 일을 벌이지 마.',importance:'핵심',confidence:'보통',confidence_reason:'',evidence_refs:[]},
+    },
+  })
+  const result=buildFortuneEditorialV3(payload,calc(),base(),{id:'work',label:'직업',topics:['직장']})
+  assert.match(result.heroSummary,/직장 이유/)
+  assert.match(result.heroSummary,/업무 순서/)
+  assert.doesNotMatch(result.heroSummary,/종합 화면에만/)
+})
+
 test('topic editorial preserves strong core prose when only change condition is weak',()=>{
   const clusters=emptyClusters()
   clusters.work_study.work={
@@ -249,7 +263,8 @@ test('weak investment caution boilerplate is hidden from the reference list',()=
 test('hero subtitle removes the sentence already promoted into the headline',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
   assert.match(panel,/export function dedupeHeroSubtitle/)
-  assert.match(panel,/const heroSubtitle = dedupeHeroSubtitle\(\[heroLead\.detail, heroSummary\]\.filter\(Boolean\)\.join\(' '\), heroLead\.title\)/)
+  assert.match(panel,/export function compactDailyHeroSummary/)
+  assert.match(panel,/period === 'today'[\s\S]*?compactDailyHeroSummary\(\[heroLead\.detail, heroSummary\]/)
   assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
   assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
 })

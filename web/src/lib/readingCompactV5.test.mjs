@@ -40,11 +40,10 @@ test('saved image spends its three-sentence budget on conclusion plus real evide
   assert.match(exporter, /const body = \[detail, \.\.\.paragraphs\]/)
 })
 
-test('saved hero keeps the headline but drops repeated subtitle copy so evidence cards can pack evenly', () => {
-  assert.match(runtime, /ensureExportHeroCompact/)
-  assert.match(runtime, /reading-export-subtitle-v7/)
-  assert.match(runtime, /bridge\.textContent = ''/)
-  assert.match(runtime, /ensureExportHeroCompact\(reading\)/)
+test('saved hero reads the visible subtitle instead of inserting a blank export bridge', () => {
+  assert.doesNotMatch(runtime, /ensureExportHeroCompact/)
+  assert.doesNotMatch(runtime, /reading-export-subtitle-v7/)
+  assert.match(exporter, /\.reading-hero-subtitle:not\(\.reading-export-subtitle-v7\)/)
 })
 
 test('saved image adds one hidden three-system synthesis card without extending phone scroll', () => {

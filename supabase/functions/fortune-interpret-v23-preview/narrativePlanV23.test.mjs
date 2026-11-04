@@ -41,5 +41,14 @@ test('weak band alone stays out of the daily caution plan',()=>{
   const plan=buildNarrativePlan(packet)
   assert.deepEqual(plan.supporting_topics,[])
   assert.deepEqual(plan.caution_topics,[])
-  assert.match(plan.period_operation,/약한 분야는 결론을 미룬다/)
+  assert.equal(plan.mode,'context_only')
+  assert.equal(plan.core_tension,null)
+  assert.match(plan.period_operation,/우선순위를 만들지 않는다/)
+})
+
+test('high activation without directional evidence is not supportive',()=>{
+  const plan=buildNarrativePlan({period_kind:'day',ranking:{strongest:[{topic:'직장',band:'강함'}],weakest:[]},period_narrative:{kind:'day',phenomena:[]}})
+  assert.deepEqual(plan.supporting_topics,[])
+  assert.equal(plan.mode,'context_only')
+  assert.equal(plan.core_tension,null)
 })

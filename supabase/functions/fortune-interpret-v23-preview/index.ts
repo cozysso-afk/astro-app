@@ -8,13 +8,16 @@ import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget,
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
+import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
+import { buildDailyRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
+import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.10-gemini-single-author-v16";
+const VERSION="supabase-ai-v23.11-daily-reading-contract-v17";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -72,12 +75,25 @@ const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이
 - 한 문단에는 새로운 판단 하나만 넣고, 근거의 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결한다.
 - 한국어 반말. JSON만 반환한다.`;
 
-function coreInstruction(periodKind:unknown,compact=false){const clusterLimit=compact?6:10;const kind=String(periodKind??"annual");const periodMinimum=kind==="annual"?"key_windows 5개 이상, year_phases 4개 이상, cross_checks 3개 이상, decisions 3개 이상, priorities 3개 이상":kind==="month"?"key_windows 3개 이상, decisions 2개 이상, priorities 2개 이상":kind==="week"?"key_windows 2개 이상, decisions 2개 이상, priorities 2개 이상":"key_windows 1개 이상, decisions 1개 이상, priorities 1개 이상";return `
+function coreInstruction(periodKind:unknown,compact=false){const kind=String(periodKind??"annual");const clusterLimit=kind==="day"?6:compact?6:10;const periodMinimum=kind==="annual"?"key_windows 5개 이상, year_phases 4개 이상, cross_checks 3개 이상, decisions 3개 이상, priorities 3개 이상":kind==="month"?"key_windows 3개 이상, decisions 2개 이상, priorities 2개 이상":kind==="week"?"key_windows 2개 이상, decisions 2개 이상, priorities 2개 이상":"key_windows 1개 이상, decisions 1개 이상, priorities 1개 이상";if(kind==="day")return `
+[DAILY OUTPUT]
+- clusters는 sparse 배열이고 key는 ${DAILY_PRIMARY_KEYS.join(', ')} 여섯 개만 작성해. 각 항목은 conclusion/real_scene/action/change_condition/evidence_refs/applicability를 포함해.
+- headline 한 문장, overall.summary 80~180자, 기본 각 분야는 판단 한 문장과 설명·행동·판단 조건을 구분해. 친근한 반말로 ~해/~야로 끝내. 보고서식 ~한다/~이다는 쓰지 마.
+- time_of_day=not_in_this_reading_scope이다. 시각·아침·오전·오후·저녁·밤·새벽을 새로 붙이지 마. 모든 key_windows의 start/end는 근거의 날짜로 쓰되 시간대 행동을 만들지 마.
+- key_windows 1개, decisions 1개, priorities 1~2개. decision은 key_window와 하나 이상의 실제 evidence_ref를 공유해. year_phases, cross_checks, domain_answers는 빈 배열로 둬. relationship_reading/contact_flow/investment_reading은 이번 범위가 아니므로 생략해.
+- systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.
+- 종합에서 특정 역할을 나열하지 마. 애정은 만남·호감의 상호성·관계 속도를 다루고 연락 조언으로만 채우지 마. 현실 사건·증상·학습 효과를 관측한 것처럼 단정하지 마.
+- change_condition은 판단이 달라지는 현실 관찰이다. 새로운 명령문으로 채우지 마. 구체 조건을 도출할 수 없으면 그 한계를 솔직하게 써.
+- 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘 대신 선택 운세일이라고 써.
+`;return `
 [OUTPUT]
 - topic_analysis는 출력하지 마. 서버가 계산근거와 함께 별도로 붙인다.
 - clusters는 중첩 객체가 아니라 실제 근거로 직접 해설할 수 있는 key만 sparse 배열로 최대 ${clusterLimit}개 출력해. 모든 key를 채우지 마. 서버가 생략 key를 빈 insufficient 상태로 채운다.
 - clusters 각 항목은 key/conclusion/real_scene/action/change_condition/evidence_refs/applicability를 모두 포함하고 key는 한 번씩만 써. 선택할 때 narrative_plan의 지원·경계 분야와 실제 사용자 화면에 필요한 구체 분야를 우선해.
-- domain_answers는 PROMPT_DATA.domain_answer_contracts 중 실제 evidence_refs로 답할 수 있는 질문만 sparse하게 출력해. 각 행은 topic/question_key/answer/status/evidence_refs를 포함한다. status=direct는 해당 질문을 직접 뒷받침하는 근거가 있을 때, partial은 같은 분야 근거로 일부만 답할 수 있을 때만 쓴다. 근거가 없는 질문은 행 자체를 생략해. 서버가 누락 질문을 not_calculated로 채운다.
+- day에서는 ${DAILY_PRIMARY_KEYS.join(', ')} 여섯 기본 분야를 반드시 포함해. 근거로 해석할 수 없으면 그 항목을 applicability=insufficient, 빈 원고와 빈 evidence_refs로 명시하고 생략하지 마. 다른 분야의 결론이나 전체 요약을 복사해 채우지 마. 기본 여섯 분야 외 세부항목만 남은 한도에서 추가해.
+- day의 각 conclusion은 25~60자 내외의 판단, real_scene은 그 근거가 생활에서 어떻게 드러나는지 80~180자 내외의 설명, action과 change_condition은 각각 구체적 행동과 관찰 조건으로 분리해. 글자 수보다 조건 보존을 우선하고 같은 조언을 네 필드에서 되풀이하지 마.
+- day에서는 domain_answers를 빈 배열로 둬. 이번에는 첫 화면의 여섯 기본 원고만 작성하고, 상세 질문 답변은 별도 요청 범위다.
+- day 외 기간의 domain_answers는 PROMPT_DATA.domain_answer_contracts 중 실제 evidence_refs로 답할 수 있는 질문만 sparse하게 출력해. 각 행은 topic/question_key/answer/status/evidence_refs를 포함한다. status=direct는 해당 질문을 직접 뒷받침하는 근거가 있을 때, partial은 같은 분야 근거로 일부만 답할 수 있을 때만 쓴다. 근거가 없는 질문은 행 자체를 생략해. 서버가 누락 질문을 not_calculated로 채운다.
 - domain_answers에서 일반 상담문으로 빈칸을 메우지 마. 예: 금전 점수만 있는데 계약·회수 근거가 없으면 contract_recovery 행을 출력하지 않는다. 시험 점수만 있는데 실수 유형 근거가 없으면 performance_error를 합격/실패 예측으로 만들지 않는다.
 - 허용 clusters key 목록=${EDITORIAL_SECTION_KEYS.join(", ")}.
 - 전체 결론, key_windows, annual이면 year_phases 4개, cross_checks, decisions, 관계가 중요할 경우 relationship_reading/contact_flow, 투자 중요 시 investment_reading, systems, priorities, limits를 작성해.
@@ -87,16 +103,17 @@ function coreInstruction(periodKind:unknown,compact=false){const clusterLimit=co
 - relationship_reading.focus_timing은 relationship_reading.evidence_refs를 먼저 고른 뒤, 그 근거 행의 date와 정확히 같은 날짜만 써. start/end 구간이나 다른 분야 근거 날짜는 관계 주목 날짜로 쓰지 마. date가 있는 직접 관계 근거가 없으면 모든 정확한 날짜를 빼고 날짜 없는 현실 확인 조건으로 작성해.
 - ${kind} 필수 개수: ${periodMinimum}. responseSchema의 minItems보다 적게 반환하지 마.
 - 모든 decision은 최소 하나의 evidence_ref를 실제 key_window와 공유해.
-- day에서 W:window가 있으면 실제 HH:MM~HH:MM과 같은 분야 W:detail을 함께 연결해.
-- annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.`;}
+- day에서 실제 시각을 쓸 때만 같은 분야의 W:window와 W:detail을 함께 연결해. 시간창이 있어도 행동에 시각을 붙일 의무는 없다. 새벽 상대 최고값을 새벽 행동 권유나 임의의 오전 일정으로 바꾸지 마.
+- annual cross_checks는 Western과 비Western이 실제 함께 존재할 때만 복수체계로 써.
+${kind==="day"?"- 최종 확인: headline과 overall.summary에서는 학업·시험·이직·출퇴근·투자 등 특정 생활 역할을 나열하지 마. 분야별 해설에서만 해당 상황을 조건부로 다뤄. 실제 기준일을 모르면 모든 문장에서 오늘 대신 선택 운세일이라고 써. 자연스러운 반말로 써. 같은 결론을 다른 명사로 바꾸어 반복하지 마. 행성 이름을 real_scene 첫머리에 쓰지 말고 조건부 생활 장면을 먼저 설명해. 관측하지 않은 호감·상급자 요구·증상을 사실로 만들지 마.":""}`;}
 
 type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;max_output_tokens:number;finish_reason?:string;error?:string};
 type Budget={used:number;deadline:number;calls:CallTrace[]};
 function budgetLeft(b:Budget){return b.used<MAX_GEMINI_CALLS&&Date.now()<b.deadline;}
-async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback",compact=false,qualityRetry=""){
+async function generateCore(fullPayload:any,promptPayload:any,model:string,key:string,budget:Budget,kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback",compact=false,qualityRetry="",override?:{prompt:string;schema:any}){
   if(!budgetLeft(budget))return {ok:false,error:"AI 호출 상한에 도달해 추가 생성을 중단했어.",model,cost_guard_blocked:true};
-  const authoredPrompt=buildV23CorePromptFromPacket(promptPayload);
-  const prompt=`${authoredPrompt.text}\n\n${coreInstruction(fullPayload?.period_kind,compact)}${qualityRetry}`;
+  const authoredPrompt=override?{text:""}:buildV23CorePromptFromPacket(promptPayload);
+  const prompt=override?.prompt??`${authoredPrompt.text}\n\n${coreInstruction(fullPayload?.period_kind,compact)}${qualityRetry}`;
   const promptBytes=enc.encode(prompt).byteLength;
   const callNo=++budget.used;
   const started=Date.now();
@@ -108,7 +125,7 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   try{
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
       method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:buildProviderCoreSchema(SCHEMA,fullPayload?.period_kind),maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:v23ThinkingLevel()}}}),
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:override?.schema??buildProviderCoreSchema(SCHEMA,fullPayload?.period_kind),maxOutputTokens,temperature:.28,thinkingConfig:{thinkingLevel:v23ThinkingLevel()}}}),
     });
     const rawText=await r.text();
     let raw:any=null;try{raw=JSON.parse(rawText);}catch{}
@@ -151,14 +168,15 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
     return structureFailure({model,usage:u,data:withTopics,origin:"gemini",editorial_trace,...resultMeta},withTopics);
   }
-  const data=attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload);
+  const dailyEditorial=inspectDailyEditorial(validated,payload);
+  const data={...attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload),editorial_delivery:core.editorial_delivery};
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
   if(!guard.safe){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini"});
     return {ok:false,error:"Thai 출력 안전검증 실패",model,usage:u,guard_violations:guard.violations,editorial_trace,...resultMeta};
   }
   traceStages.push(captureEditorialStage("post_thai_guard",data));
-  const quality=inspectInterpretationQuality(data,payload);
+  const quality=applyDailyEditorialGate(inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false}),dailyEditorial);
   traceStages.push(captureEditorialStage("post_quality_validation",data));
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini",quality_ok:Boolean(quality?.ok)});
   if(!quality.ok){
@@ -173,9 +191,23 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
+  const dailyReport=inspectDailyProviderDocument(core.partial,payload?.period_kind);
+  if(!dailyReport.passed)return {...core,ok:false,error:"일일 해설 기본 분야 검증 실패",structure_guard_failed:true,structure_report:dailyReport};
   const normalizedCore=normalizeProviderCore(core.partial);
   const normalizedTrace=captureEditorialStage("provider_normalized",normalizedCore);
   return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+}
+
+async function rewriteDailyCandidate(first:any,payload:any,model:string,key:string,budget:Budget,request:any){
+  const result=await generateCore(payload,{},model,key,budget,"semantic_rewrite",true,"",request);
+  if(!result.ok)return result;
+  try{
+    const patched=applyDailyRewrite(first.candidate_data,request,result.partial);
+    const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
+    const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day");
+    if(!structure.passed)return {ok:false,error:"일일 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:structure};
+    return finalizeCandidate(patched,payload,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
+  }catch{return {ok:false,error:"일일 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
 
 async function calculate(payload:any,preferred:string,key:string,shouldContinue:()=>Promise<boolean>){
@@ -186,8 +218,10 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   if(!(await shouldContinue()))return {ok:false,error:"AI 해설 생성이 취소됐어.",model:preferred,canceled:true,usage:first.usage,attempt_count:budget.used,call_trace:budget.calls};
   const secondModel=preferred===FALLBACK_MODEL?preferred:FALLBACK_MODEL;
   let second:any;
-  if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
-  else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report));
+  const dailyPatch=first?.quality_guard_failed?buildDailyRewriteRequest(first.candidate_data,first.quality_report,payload):null;
+  if(dailyPatch)second=await rewriteDailyCandidate(first,payload,secondModel,key,budget,dailyPatch);
+  else if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
+  else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report)+(first.quality_report.daily_editorial?.passed===false?dailyEditorialRetryInstruction(first.quality_report.daily_editorial,first.candidate_data):""));
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답"))second=await generate(payload,secondModel,key,budget,"fallback",true,"");
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);

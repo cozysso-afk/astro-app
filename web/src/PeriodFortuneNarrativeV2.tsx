@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { DailyReadingPanel } from './DailyReadingPanel'
 import type { AiInterpretationResponse, IntegratedApiResponse, PeriodKey } from './appTypes'
 import type { FortuneField } from './lib/fortuneFields'
 import type { LoveStatus } from './lib/loveReadingContext'
@@ -139,6 +140,16 @@ function splitDailyHero(value: string) {
   return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: clean, detail: '' }
 }
 
+export function compactDailyHeroSummary(value: string, limit = 2) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  return (text.match(/[^.!?]+[.!?]?/g) ?? [text])
+    .map(sentence => sentence.trim())
+    .filter(Boolean)
+    .slice(0, limit)
+    .join(' ')
+}
+
 function importantWindowStatus(kind?: 'favorable' | 'caution' | 'mixed') {
   if (kind === 'favorable') return '진행 후보'
   if (kind === 'caution') return '확인 필요'
@@ -179,6 +190,7 @@ export function PeriodFortuneNarrativeV2({
   calculation,
   result,
   technicalDetails,
+  onRetry,
 }: {
   loveStatus?: LoveStatus
   systemOverview?: ReactNode
@@ -189,6 +201,7 @@ export function PeriodFortuneNarrativeV2({
   calculation: IntegratedApiResponse
   result: AiInterpretationResponse
   technicalDetails?: ReactNode
+  onRetry?: () => void
 }) {
   if (!result.ok || !result.data) return null
   if (westernOnly) return null
@@ -203,6 +216,8 @@ export function PeriodFortuneNarrativeV2({
     && fortuneNarrativeOrigin(result.model, result.origin) === 'gemini'
     && !result.usage?.local_quality_fallback
     && interpretationHeroEligible(result.usage?.quality_validation, result.usage)
+
+  if (period === 'today' && !westernOnly) return <DailyReadingPanel data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
   const scopedData = field
     ? {
         ...data,
@@ -242,7 +257,12 @@ export function PeriodFortuneNarrativeV2({
   const displayWhen = period === 'today'
     ? readingDateSemantics(calculation.period.start).dayLabel
     : summary.when
-  const heroSubtitle = dedupeHeroSubtitle([heroLead.detail, heroSummary].filter(Boolean).join(' '), heroLead.title)
+  const heroSubtitle = dedupeHeroSubtitle(
+    period === 'today'
+      ? compactDailyHeroSummary([heroLead.detail, heroSummary].filter(Boolean).join(' '), 2)
+      : [heroLead.detail, heroSummary].filter(Boolean).join(' '),
+    heroLead.title,
+  )
   // The integrated daily overview must stay a whole-day synthesis. A single
   // specialist domain (study, work, investment, reunion, etc.) can still lead
   // its dedicated field page, but must not take over the integrated hero.

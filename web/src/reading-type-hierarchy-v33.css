@@ -17,7 +17,7 @@
   html body .app-shell .fortune-experience .period-ai-section-title > span,
   html body .app-shell .relationship-experience .reading-section > h3,
   html body .app-shell .system-reading > h3,
-  html body .app-shell .system-reading section > h3,
+  html body .app-shell .system-reading section > h3:not(.daily-reading-headline),
   html body .app-shell .thai-life-map > h3 {
     font-size: 17px !important;
     font-weight: 800 !important;

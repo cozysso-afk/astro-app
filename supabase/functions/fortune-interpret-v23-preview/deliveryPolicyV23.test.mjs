@@ -7,7 +7,7 @@ const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
 test('V23 validates Gemini prose without deterministic rewriting or local long-form fallback', () => {
   assert.doesNotMatch(source, /repairInterpretationQuality\(data,payload\)/)
   assert.doesNotMatch(source, /post_quality_repair/)
-  assert.match(source, /const quality=inspectInterpretationQuality\(data,payload\)/)
+  assert.match(source, /const quality=applyDailyEditorialGate\(inspectInterpretationQuality\(data,payload,\{requireDailyTimedDecision:false\}\),dailyEditorial\)/)
   assert.match(source, /post_quality_validation/)
   assert.doesNotMatch(source, /buildLocalQualityFallbackCore\(payload\)/)
   assert.doesNotMatch(source, /allow_degraded_quality/)
@@ -22,7 +22,7 @@ test('V23 starts with the model that leaves a second call for semantic quality r
 })
 
 test('V23 completion recovery makes the response sparse instead of lowering its token ceiling', () => {
-  assert.match(source, /const clusterLimit=compact\?6:10/)
+  assert.match(source, /const clusterLimit=kind==="day"\?6:compact\?6:10/)
   assert.match(source, /실제 근거로 직접 해설할 수 있는 key만 sparse 배열/)
   assert.match(source, /서버가 생략 key를 빈 insufficient 상태로 채운다/)
   assert.match(source, /coreInstruction\(fullPayload\?\.period_kind,compact\)/)

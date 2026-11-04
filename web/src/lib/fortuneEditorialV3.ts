@@ -326,9 +326,15 @@ function fieldHero(data: InterpretationData, calculation: IntegratedApiResponse,
   const firstTopic = field.topics[0]
   const row = topic(data, firstTopic)
   const aiTopic = clean(editorialTopics[firstTopic])
+  const topicFallback = [row?.reason, row?.action, row?.timing, row?.avoid]
+    .map(clean)
+    .filter(part => readerFacing(part))
+    .join(' ')
   return {
     headline: aiTopic ? firstSentence(aiTopic) : clean(row?.verdict),
-    summary: aiTopic || clean(row?.reason) || clean(data.overall?.summary),
+    // A specialist field must never fall back to the integrated overall copy.
+    // Doing so made love, work, money and study look like duplicated screens.
+    summary: aiTopic || topicFallback,
   }
 }
 

@@ -98,7 +98,7 @@ function hasDeterministicClaim(prose:string){
   return re.test(prose);
 }
 
-export function inspectInterpretationQuality(data:any,payload:any){
+export function inspectInterpretationQuality(data:any,payload:any,options:{requireDailyTimedDecision?:boolean}={}){
   const map=ledgerMap(payload),kind=String(payload?.period_kind??"day"),stages:any[]=[];
 
   const s1:string[]=[];
@@ -245,7 +245,7 @@ export function inspectInterpretationQuality(data:any,payload:any){
     const hasIntradayWindow=detailDays.some((day:any)=>Object.values(day?.topics??{}).some((topic:any)=>Boolean(topic?.best_window||topic?.caution_window)));
     if(hasIntradayWindow){
       const timedDecisions=(data?.decisions??[]).filter((d:any)=>Boolean(clockWindow(d?.timing)));
-      if(!timedDecisions.length)s5.push("선택 운세일 시간대 행동 가이드 누락");
+      if(options.requireDailyTimedDecision!==false&&!timedDecisions.length)s5.push("선택 운세일 시간대 행동 가이드 누락");
       const windowEvidence=[...map.entries()].filter(([ref,row]:any)=>String(ref).startsWith("W:window:")||row?.scope==="intraday_window");
       if(!windowEvidence.length)s5.push("선택 운세일 시간창 전용 W:window:* 계산근거 누락");
       if(windowEvidence.length&&timedDecisions.length){
