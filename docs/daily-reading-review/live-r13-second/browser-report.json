@@ -1,0 +1,86 @@
+{
+  "source": "Actual Gemini output for synthetic QA profile; not handwritten copy",
+  "replay_policy": "r13 actual Gemini response replayed through final daily exception-omission policy; all retained prose and evidence are unchanged",
+  "job_id": "96cfd9dd-b638-4309-97ef-007cbb1ae181",
+  "model": "gemini-3.7-flash",
+  "date": "2026-11-05",
+  "widths": [
+    {
+      "width": 320,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 350,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 393,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    },
+    {
+      "width": 430,
+      "overflow": 0,
+      "clipped": false,
+      "bodyFont": "\"Nanum Myeongjo\", \"Noto Serif KR\", AppleMyungjo, Batang, serif"
+    }
+  ],
+  "scopes": [
+    {
+      "label": "전체",
+      "state": "ready",
+      "heading": "대화에서 합의점을 찾기는 까다롭지만 맡은 일의 기준을 정리하기는 수월해.",
+      "blockCount": 6,
+      "exportTextParity": true
+    },
+    {
+      "label": "애정",
+      "state": "ready",
+      "heading": "만남이나 호감 표현에서 마음의 속도가 엇갈리기 쉬워 감정 정리가 다소 까다로워.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "대인",
+      "state": "ready",
+      "heading": "사람들과 의견을 조율하거나 요청을 주고받을 때 말의 뉘앙스로 인한 마찰이 생기기 쉬워.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "학업",
+      "state": "ready",
+      "heading": "새로운 내용을 무리하게 파고들기보다 기존에 배운 내용을 정리하는 편이 수월해.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "직업",
+      "state": "ready",
+      "heading": "맡은 일의 최종 목표와 진행 조건을 체계적으로 매듭짓는 작업이 수월해.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "금전",
+      "state": "ready",
+      "heading": "기분에 휩쓸려 계획에 없던 지출을 결정하기 쉬워 예산 통제가 까다로워.",
+      "blockCount": 3,
+      "exportTextParity": true
+    },
+    {
+      "label": "컨디션",
+      "state": "ready",
+      "heading": "무리한 활동으로 인한 피로감이 누적되기 쉬워 휴식의 비중을 챙기는 조율이 까다로워.",
+      "blockCount": 3,
+      "exportTextParity": true
+    }
+  ],
+  "exportedImages": 8,
+  "errors": []
+}

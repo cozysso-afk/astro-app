@@ -63,7 +63,7 @@ try{
   }
   assert.equal(new Set(scopes.filter(r=>r.state==='ready').map(r=>r.heading)).size,scopes.filter(r=>r.state==='ready').length)
   assert.deepEqual(errors,[])
-  const report={source:'Actual Gemini output for synthetic QA profile; not handwritten copy',job_id:status.job_id,model:status.model,date:calculation.period.start,widths,scopes,exportedImages:downloads.length,errors}
+  const report={source:'Actual Gemini output for synthetic QA profile; not handwritten copy',replay_policy:input.replay_policy??null,job_id:status.job_id,model:status.model,date:calculation.period.start,widths,scopes,exportedImages:downloads.length,errors}
   await writeFile(path.join(out,'browser-report.json'),JSON.stringify(report,null,2))
   console.log(JSON.stringify(report))
 }finally{await browser.close();await server.close()}

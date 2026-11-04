@@ -16,9 +16,9 @@ test('V23 validates Gemini prose without deterministic rewriting or local long-f
 })
 
 
-test('V23 starts with the model that leaves a second call for semantic quality rewrite', () => {
+test('daily starts with the reviewed model while longer periods retain their existing default', () => {
   assert.match(source, /const V23_DEFAULT_MODEL="gemini-3\.6-flash"/)
-  assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:V23_DEFAULT_MODEL/)
+  assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:compacted\.period_kind==="day"\?"gemini-3\.7-flash":V23_DEFAULT_MODEL/)
 })
 
 test('V23 completion recovery makes the response sparse instead of lowering its token ceiling', () => {

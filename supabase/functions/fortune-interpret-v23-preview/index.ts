@@ -10,7 +10,7 @@ import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
 import { buildDailyClarityRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
-import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
+import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, omitUnsupportedDailyConditions } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
@@ -83,7 +83,7 @@ function coreInstruction(periodKind:unknown,compact=false){const kind=String(per
 - key_windows 1개, decisions 1개, priorities 1~2개. decision은 key_window와 하나 이상의 실제 evidence_ref를 공유해. year_phases, cross_checks, domain_answers는 빈 배열로 둬. relationship_reading/contact_flow/investment_reading은 이번 범위가 아니므로 생략해.
 - systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.
 - 종합에서 특정 역할을 나열하지 마. 애정은 만남·호감의 상호성·관계 속도를 다루고 연락 조언으로만 채우지 마. 현실 사건·증상·학습 효과를 관측한 것처럼 단정하지 마.
-- change_condition은 판단이 달라지는 현실 관찰이다. 새로운 명령문으로 채우지 마. 구체 조건을 도출할 수 없으면 change_condition을 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
+- change_condition은 이번 일일 계약에서는 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
 - 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘 대신 선택 운세일이라고 써.
 `;return `
 [OUTPUT]
@@ -161,6 +161,8 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   const {editorial_trace_seed:traceSeed=[],editorial_trace_origin:traceOrigin,...resultMeta}=meta??{};
   const traceStages=Array.isArray(traceSeed)?[...traceSeed]:[];
   if(!traceStages.length)traceStages.push(captureEditorialStage("finalize_input",core));
+  core=omitUnsupportedDailyConditions(core,payload?.period_kind);
+  if(payload?.period_kind==="day")traceStages.push(captureEditorialStage("omit_unsupported_daily_exceptions",core));
   const withTopics={...core,topic_analysis:buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)};
   traceStages.push(captureEditorialStage("post_authored_projection",withTopics));
   const validated=validateOutput(withTopics);
@@ -290,8 +292,8 @@ Deno.serve(async(req)=>{
     if(error)return res(publicFortuneError("JOB_CANCEL_FAILED",error),500);return res({ok:true,job_id:id,canceled:Boolean(data?.id)});
   }
   if(!b?.calculation)return res(publicFortuneError("CALCULATION_REQUIRED"),400);
-  const preferred=MODELS[b.model]?b.model:V23_DEFAULT_MODEL;
   const compacted=compactCalculation(b.calculation);
+  const preferred=MODELS[b.model]?b.model:compacted.period_kind==="day"?"gemini-3.7-flash":V23_DEFAULT_MODEL;
   const precisionGate=precisionGateFromPayload(b.calculation);
   const payload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,b.calculation):compacted;
   const pb=buildV23PromptBudget(payload);
