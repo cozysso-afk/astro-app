@@ -1,5 +1,7 @@
 name: Daily editorial candidate QA
 on:
+  pull_request:
+    types: [synchronize]
   workflow_dispatch:
     inputs:
       confirm_paid_calls:
@@ -13,7 +15,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   connection:
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qa/daily-editorial-v23-11' && inputs.confirm_paid_calls == 'YES'
+    if: github.head_ref == 'qa/daily-editorial-v23-11'
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [first, second]
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
@@ -22,6 +28,7 @@ jobs:
           node-version: '22'
       - name: Generate one synthetic daily candidate with at most two provider calls
         env:
+          QA_PROFILE: ${{ matrix.profile }}
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
@@ -45,11 +52,12 @@ jobs:
           console.log(JSON.stringify({stage:'generation_service',available:meta.ok,configured:info?.configured===true,version:info?.interpreter_version,paid_calls:0}));
           if(!meta.ok||info?.configured!==true)process.exit(1);
 
-          if(info.interpreter_version!=='supabase-ai-v23.11-daily-editorial-qa-r8'||info.max_gemini_calls_per_job!==2)throw new Error('Unexpected candidate contract');
+          if(info.interpreter_version!=='supabase-ai-v23.11-daily-editorial-qa-r9'||info.max_gemini_calls_per_job!==2)throw new Error('Unexpected candidate contract');
           const post=async(url,body,headers)=>{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body),signal:AbortSignal.timeout(180000)});const d=await r.json().catch(()=>null);if(!r.ok||!d)throw new Error('QA HTTP '+r.status);return d};
           const headers={apikey:process.env.QA_SUPABASE_ANON_KEY,Authorization:'Bearer '+result.access_token};
-          const date='2026-11-05';
-          const calculation=await post(process.env.QA_CALC_API_URL,{profile:{name:'synthetic-qa-only',birth_date:'1991-02-20',birth_time:'13:15:00',time_known:true,time_source:'official_record',time_confidence:'exact',latitude:35.1796,longitude:129.0756,utc_offset_hours:9,gender:'male'},start_date:date,end_date:date},{Authorization:headers.Authorization});
+          const first=process.env.QA_PROFILE==='first';
+          const date=first?'2026-11-04':'2026-11-05';
+          const calculation=await post(process.env.QA_CALC_API_URL,{profile:{name:'synthetic-qa-only',birth_date:first?'1987-06-15':'1991-02-20',birth_time:first?'08:30:00':'13:15:00',time_known:true,time_source:'official_record',time_confidence:'exact',latitude:first?37.5665:35.1796,longitude:first?126.9780:129.0756,utc_offset_hours:9,gender:first?'female':'male'},start_date:date,end_date:date},{Authorization:headers.Authorization});
           if(!calculation.ok||calculation.period?.start!==date||calculation.period?.end!==date)throw new Error('Calculation period mismatch');
           const endpoint=base+'/functions/v1/fortune-daily-editorial-qa';
           const budget=await post(endpoint,{action:'inspect',calculation},headers);
@@ -62,7 +70,7 @@ jobs:
           for(let attempt=0;attempt<90;attempt++){status=await post(endpoint,{action:'status',job_id:started.job_id},headers);if(['done','failed'].includes(status.status))break;await new Promise(r=>setTimeout(r,2000))}
           const fs=await import('node:fs/promises');
           await fs.mkdir('candidate-artifacts',{recursive:true});
-          await fs.writeFile('candidate-artifacts/candidate.json',JSON.stringify({synthetic_profile:true,calculation,status,budget,candidate_revision:'r8-second-profile'},null,2));
+          await fs.writeFile('candidate-artifacts/candidate.json',JSON.stringify({synthetic_profile:true,calculation,status,budget,candidate_revision:'r9'},null,2));
           console.log(JSON.stringify({stage:'completed',job_id:started.job_id,status:status.status,verified:status.provenance_verified===true,model:status.model}));
           if(status.status!=='done'||status.provenance_verified!==true)process.exitCode=1;
           JS
@@ -70,7 +78,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-editorial-candidate
+          name: daily-editorial-candidate-${{ matrix.profile }}
           path: candidate-artifacts/
           retention-days: 7
           if-no-files-found: warn
