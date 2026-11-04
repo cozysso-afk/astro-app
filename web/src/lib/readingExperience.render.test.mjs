@@ -54,6 +54,18 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
   else assert.match(visible,/2026-09-14/)
 })
 
+test('integrated daily hero does not promote one specialist topic score',()=>{
+  const f=fortuneFixture('today')
+  f.calculation.western.overall.학업={...f.calculation.western.overall.학업,average:37,band:'약함'}
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['학업'],transit:'Moon',target:'Sun',aspect:'square',contribution:4,polarity:-.8})
+  const common={period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}
+  const integrated=renderToStaticMarkup(createElement(Fortune,common)).split('<details class="period-ai-details"')[0]
+  const field=renderToStaticMarkup(createElement(Fortune,{...common,field:{id:'study',label:'학업운',desc:'집중·이해·복습',topics:['학업'],lens:'학업'}})).split('<details class="period-ai-details"')[0]
+  assert.doesNotMatch(integrated,/daily-reading-signal/)
+  assert.match(field,/daily-reading-signal/)
+  assert.match(field,/학업/)
+})
+
 for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']) test(`actual ${mode} without verified Gemini provenance never exposes calculated prose`,()=>{
   const html=renderToStaticMarkup(createElement(Relationship,{aspects,partnerExact:false,analysisMode:mode,timing,ai:null,aiLoading:false,aiError:'',onAi:noAction,timeSensitivePoints:new Set(['Moon','ASC']),formatAspect:a=>`${a.a} ${a.aspect} ${a.b}`}))
   const visible=html.split('<details class="relationship-technical"')[0]

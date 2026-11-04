@@ -2,7 +2,7 @@ import { V23_PROMPT_VERSION } from './promptV23.ts'
 import { PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
 export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
-export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-authored-prose-v4'
+export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-integrated-overview-v5'
 export const WEEKLY_OUTPUT_CACHE_VERSION = 'weekly-output-headroom-v2'
 export const PROVIDER_NORMALIZATION_CACHE_VERSION = 'provider-single-author-provenance-v2'
 export const FALLBACK_EDITORIAL_CACHE_VERSION = 'evidence-episode-action-v2'

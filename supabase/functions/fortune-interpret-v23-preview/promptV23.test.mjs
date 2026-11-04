@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.9-relationship-row-date')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.10-integrated-daily-overview')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -107,6 +107,14 @@ test('human-language contract requires concrete scenes and semantic non-repetiti
   assert.match(day, /분야 점수 요약만 쓰지 마/)
   assert.match(week, /7일의 이동이나 전환/)
   assert.match(week, /초반→중반→후반/)
+})
+
+test('integrated daily overview stays role-neutral and rejects weak-band promotion', () => {
+  const text = buildV23CorePrompt(payload('day')).text
+  assert.match(text,/직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마/)
+  assert.match(text,/직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마/)
+  assert.match(text,/세부 분야명과 조건부 해설은 topic_analysis와 clusters에서만/)
+  assert.match(text,/점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마/)
 })
 
 test('editorial usability gate requires an actionable reading instead of safe generic prose', () => {
