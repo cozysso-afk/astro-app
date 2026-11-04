@@ -44,21 +44,21 @@ jobs:
           if(info.interpreter_version!=='supabase-ai-v23.11-daily-editorial-qa-r8'||info.max_gemini_calls_per_job!==2)throw new Error('Unexpected candidate contract');
           const post=async(url,body,headers)=>{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body),signal:AbortSignal.timeout(180000)});const d=await r.json().catch(()=>null);if(!r.ok||!d)throw new Error('QA HTTP '+r.status);return d};
           const headers={apikey:process.env.QA_SUPABASE_ANON_KEY,Authorization:'Bearer '+result.access_token};
-          const date='2026-11-04';
-          const calculation=await post(process.env.QA_CALC_API_URL,{profile:{name:'synthetic-qa-only',birth_date:'1987-06-15',birth_time:'08:30:00',time_known:true,time_source:'official_record',time_confidence:'exact',latitude:37.5665,longitude:126.978,utc_offset_hours:9,gender:'female'},start_date:date,end_date:date},{Authorization:headers.Authorization});
+          const date='2026-11-05';
+          const calculation=await post(process.env.QA_CALC_API_URL,{profile:{name:'synthetic-qa-only',birth_date:'1991-02-20',birth_time:'13:15:00',time_known:true,time_source:'official_record',time_confidence:'exact',latitude:35.1796,longitude:129.0756,utc_offset_hours:9,gender:'male'},start_date:date,end_date:date},{Authorization:headers.Authorization});
           if(!calculation.ok||calculation.period?.start!==date||calculation.period?.end!==date)throw new Error('Calculation period mismatch');
           const endpoint=base+'/functions/v1/fortune-daily-editorial-qa';
           const budget=await post(endpoint,{action:'inspect',calculation},headers);
           if(!budget.ok||!budget.prompt_budget_ok||budget.estimated_max_job_krw>300)throw new Error('Candidate budget blocked');
           console.log(JSON.stringify({stage:'budget',estimated_max_job_krw:budget.estimated_max_job_krw}));
-          const started=await post(endpoint,{action:'start',calculation,model:'gemini-3.7-flash'},headers);
+          const started=await post(endpoint,{action:'start',calculation,model:'gemini-3.6-flash'},headers);
           if(!started.ok||!started.job_id)throw new Error('Candidate start failed');
           console.log(JSON.stringify({stage:'started',job_id:started.job_id,reused:started.reused}));
           let status;
           for(let attempt=0;attempt<90;attempt++){status=await post(endpoint,{action:'status',job_id:started.job_id},headers);if(['done','failed'].includes(status.status))break;await new Promise(r=>setTimeout(r,2000))}
           const fs=await import('node:fs/promises');
           await fs.mkdir('candidate-artifacts',{recursive:true});
-          await fs.writeFile('candidate-artifacts/candidate.json',JSON.stringify({synthetic_profile:true,calculation,status,budget,candidate_revision:'r8'},null,2));
+          await fs.writeFile('candidate-artifacts/candidate.json',JSON.stringify({synthetic_profile:true,calculation,status,budget,candidate_revision:'r8-second-profile'},null,2));
           console.log(JSON.stringify({stage:'completed',job_id:started.job_id,status:status.status,verified:status.provenance_verified===true,model:status.model}));
           if(status.status!=='done'||status.provenance_verified!==true)process.exitCode=1;
           JS
