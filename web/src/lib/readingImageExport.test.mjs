@@ -108,12 +108,14 @@ test('canvas wrapping keeps common closing punctuation attached to the previous 
   assert.match(exporter,/out\.push\(line\.trimEnd\(\)\)/)
 })
 
-test('relationship result still exposes image save and excludes its toolbar from exported content',()=>{
-  assert.match(panel,/exportReadingImages/)
-  assert.match(panel,/data-reading-export-root="relationship"/)
-  assert.match(panel,/data-reading-export-ignore="true"/)
-  assert.match(panel,/결과 이미지 저장/)
-  assert.match(panel,/이미지 만드는 중/)
+test('relationship exports only the same authored document used on screen',()=>{
+  assert.match(panel,/buildRelationshipReadingDocument/)
+  assert.match(panel,/<AuthoredReadingPanel doc={document}/)
+  assert.doesNotMatch(panel,/exportReadingImages/)
+  const authored=readFileSync(new URL('../AuthoredReadingPanel.tsx',import.meta.url),'utf8')
+  assert.match(authored,/exportAuthoredReadingImages\(doc,controller.signal\)/)
+  assert.match(authored,/doc.exportBlockIds.length/)
+  assert.match(exporter,/authoredReadingExportModel/)
 })
 
 test('screen cards and reunion cards use translucent jelly glass materials',()=>{

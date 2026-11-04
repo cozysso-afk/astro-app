@@ -32,7 +32,7 @@ export function publicUsage(value: unknown) {
     if(typeof row.http_status==='number'&&Number.isInteger(row.http_status)&&row.http_status>=0&&row.http_status<=599)projected.http_status=row.http_status;
     if(typeof row.finish_reason==='string'&&row.finish_reason.length<=80)projected.finish_reason=row.finish_reason;
     if(typeof row.outcome==='string'&&['success','failed','timeout','invalid_json','validation_failed'].includes(row.outcome))projected.outcome=row.outcome;
-    if(typeof row.validation_stage==='string'&&['single_author_shape','reunion_grounding','grounded','parse_or_validation_exception'].includes(row.validation_stage))projected.validation_stage=row.validation_stage;
+    if(typeof row.validation_stage==='string'&&['single_author_shape','relationship_editorial','reunion_grounding','grounded','parse_or_validation_exception'].includes(row.validation_stage))projected.validation_stage=row.validation_stage;
     if(typeof row.validation_reason==='string'&&/^[a-z0-9_]{1,80}$/.test(row.validation_reason))projected.validation_reason=row.validation_reason;
     return projected;
   });
@@ -74,6 +74,16 @@ function texts(value:unknown,limits:Record<string,number>) {
 }
 export function publicInterpretation(value:unknown) {
   const r=record(value),out:Record<string,any>|null=texts(value,TEXT_LIMITS);if(!r||!out)return null;
+  // Old stored readings have no summary roles. Never fabricate one from overview.
+  const coreKeys=['core_summary','core_reason','core_action','core_conditions'];
+  if(coreKeys.some(key=>r[key]!==undefined)){
+    for(const [key,max] of [['core_summary',180],['core_reason',360],['core_action',240]] as const){
+      if(typeof r[key]!=='string'||!r[key].trim()||r[key].length>max)return null;
+      out[key]=r[key];
+    }
+    if(!Array.isArray(r.core_conditions)||r.core_conditions.length>4||r.core_conditions.some((v:unknown)=>typeof v!=='string'||!v.trim()||v.length>240))return null;
+    out.core_conditions=r.core_conditions.slice();
+  }
   for(const [k,max] of [['felt_scenarios',1300],['practical_advice',1200]] as const){
     if(!Array.isArray(r[k])||r[k].length>4||r[k].some((x:unknown)=>typeof x!=='string'||x.length>max*4))return null;
     out[k]=r[k].slice();
@@ -92,6 +102,7 @@ export function publicRelationshipResult(value:unknown,usageValue?:unknown) {
   const r=record(value),safeUsage=publicUsage(usageValue===undefined?r?.usage:usageValue);if(!r||r.ok!==true||!model(r.model)||!version(r.interpreter_version)||r.origin!=='gemini'||r.provenance_verified!==true)return null;
   if(safeUsage.generation_version!==r.interpreter_version||!Array.isArray(safeUsage.call_trace)||!safeUsage.call_trace.some((row:any)=>row.outcome==='success'&&row.http_status>=200&&row.http_status<300))return null;
   const data=publicInterpretation(r.data);if(!data)return null;
+  if(/question-reading-contract$/.test(r.interpreter_version)&&typeof data.core_summary!=='string')return null;
   return {ok:true,data,...metadata(r),usage:safeUsage};
 }
 export function publicCachedResult(value:unknown,usageValue?:unknown) {

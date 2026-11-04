@@ -139,16 +139,21 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
     const kind=normalizePeriodKind(periodKind);
     const minimums={
       day:{key_windows:1,decisions:1,priorities:1},
-      week:{key_windows:2,decisions:2,priorities:2},
-      month:{key_windows:3,decisions:2,priorities:2},
-      annual:{key_windows:5,decisions:3,priorities:3},
+      week:{key_windows:0,decisions:0,priorities:0},
+      month:{key_windows:0,decisions:0,priorities:0},
+      annual:{key_windows:0,decisions:0,priorities:0},
     }[kind];
     for(const [field,minItems] of Object.entries(minimums)){
       if(core.properties?.[field]?.type==="ARRAY")core.properties[field].minItems=minItems;
     }
     if(kind==="annual"){
-      core.properties.year_phases.minItems=4;
-      core.properties.cross_checks.minItems=3;
+      core.properties.year_phases.minItems=0;
+      core.properties.cross_checks.minItems=0;
+    }
+    if(kind!=="day"){
+      const {clusters,headline,overall,...rest}=core.properties;
+      core.properties={clusters,overall,headline,...rest};
+      core.propertyOrdering=Object.keys(core.properties);
     }
     if(kind==="day"){
       // Write field interpretations before the first-screen answer. This plan

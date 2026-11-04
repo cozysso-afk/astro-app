@@ -157,22 +157,24 @@ test('golden 10: frontend topic selection does not discard a whole block for one
 })
 
 // Golden 11 — concise 2–3 sentence authored copy remains renderable.
-test('golden 11: frontend focus card accepts concise authored prose instead of requiring four sentences',()=>{
-  assert.match(narrativeSource,/if \(sentences\.length < 2\) return null/)
-  assert.doesNotMatch(narrativeSource,/if \(sentences\.length < 4\) return null/)
-  assert.match(narrativeSource,/sceneAction: sentences\.length >= 3/)
+test('golden 11: concise authored blocks keep their role and complete text',async()=>{
+  const {buildPeriodReadingDocument}=await import('../../../web/src/lib/authoredReadingDocument.ts')
+  const section={conclusion:'짧은 결론.',real_scene:'짧은 장면.',action:'짧은 행동.',change_condition:'짧은 조건.',evidence_refs:['W:1'],applicability:'direct'}
+  const doc=buildPeriodReadingDocument({clusters:{work_study:{work:section}}},'week','a','b',{id:'work',label:'직업운',topics:['직장']},true)
+  assert.equal(doc.state,'ready');assert.equal(doc.headline,section.conclusion)
+  assert.deepEqual(doc.core.map(b=>b.text),[section.real_scene,section.action,section.change_condition])
 })
 
 // Golden 12 — pipeline ordering keeps authored prose first and the UI fails closed to verified Gemini only.
 test('golden 12: backend validates authored prose without deterministic co-writing',()=>{
   const projectionPos=indexSource.indexOf('buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)')
-  const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false,allowEmptyDailyChangeCondition:true})')
+  const validatePos=indexSource.indexOf('inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false,allowEmptyDailyChangeCondition:true,periodReadingContract:true})')
   assert.ok(projectionPos>=0&&validatePos>projectionPos)
   assert.doesNotMatch(indexSource,/stabilizeCoreForQuality\(withTopics,payload\)/)
   assert.doesNotMatch(indexSource,/polishV23EditorialDepth\(data,payload\)/)
   assert.doesNotMatch(indexSource,/buildLocalQualityFallbackCore\(payload\)/)
   assert.match(panelSource,/return <PeriodFortuneNarrativeV2/)
   assert.match(narrativeSource,/result\.provenance_verified === true/)
-  assert.match(narrativeSource,/if \(!verifiedNarrative\)/)
-  assert.match(narrativeSource,/const summary = authoredSummaryOnly\(base, data\)/)
+  assert.match(narrativeSource,/buildPeriodReadingDocument\(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative/)
+  assert.doesNotMatch(narrativeSource,/authoredSummaryOnly|compactDailyHeroSummary/)
 })

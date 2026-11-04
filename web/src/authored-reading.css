@@ -1,0 +1,15 @@
+/* A single typography owner for authored period and relationship prose. */
+.authored-reading{--reading-serif:'Nanum Myeongjo','Noto Serif KR',serif;--reading-ui:'Noto Sans KR',system-ui,sans-serif;min-width:0;margin:18px 0;padding:24px 20px;border:1px solid #fff;border-radius:24px;background:linear-gradient(135deg,#fffffff2,#f4eefbb8,#e9f6f4b0);color:#343447}
+.authored-reading>header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;font:700 13px/1.7 var(--reading-ui);color:#70637d}
+.authored-reading .authored-reading-headline{font:700 22px/1.7 var(--reading-serif);letter-spacing:-.035em;margin:18px 0 24px;word-break:keep-all;overflow-wrap:anywhere}
+.authored-reading .authored-reading-block{padding:18px 0;margin:0;border-top:1px solid #74628922}
+.authored-reading .authored-reading-block h4{margin:0 0 8px;font:700 13px/1.7 var(--reading-ui);color:#6d557f}
+.authored-reading .authored-reading-block p{margin:0;font:400 16px/1.95 var(--reading-serif);letter-spacing:-.02em;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere;color:#3f4153;max-height:none;overflow:visible;-webkit-line-clamp:unset}
+.authored-reading .authored-reading-section{margin:18px 0;padding:16px 0;border-top:1px solid #74628922}
+.authored-reading .authored-reading-section>h3{font:700 17px/1.7 var(--reading-ui);margin:0 0 12px}
+.authored-reading .authored-reading-details,.authored-reading .authored-reading-technical{margin-top:20px;border-top:1px solid #74628922;padding-top:16px}
+.authored-reading summary{font:700 14px/1.7 var(--reading-ui);cursor:pointer;padding:8px 0}
+.authored-reading .authored-reading-save{width:100%;min-height:44px;border:1px solid #b7a9c7;border-radius:12px;background:#ffffffba;color:#5d4774;font:700 14px/1.6 var(--reading-ui);padding:12px;margin-top:12px}
+.authored-reading .authored-reading-save:disabled{opacity:.6}
+.authored-reading .authored-reading-state,.authored-reading .authored-reading-notice{font:400 14px/1.8 var(--reading-ui);color:#625c6d;overflow-wrap:anywhere}
+@media(max-width:350px){.authored-reading{padding:20px 16px}.authored-reading .authored-reading-headline{font-size:20px}.authored-reading .authored-reading-block p{font-size:15px}}

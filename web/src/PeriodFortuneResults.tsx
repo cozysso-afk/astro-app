@@ -149,7 +149,7 @@ export function PeriodFortuneResults({
   )
   return <div ref={exportRootRef} data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
     <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
-    {!(period === 'today' && selectedSystem === 'integrated') && <div className="reading-export-toolbar" data-reading-export-ignore="true">
+    {selectedSystem !== 'integrated' && <div className="reading-export-toolbar" data-reading-export-ignore="true">
       <button type="button" onClick={saveImages} disabled={exporting}>{exporting ? <LoaderCircle className="reading-export-spinner" size={17}/> : <ImageDown size={17}/>} {exporting ? '이미지 만드는 중' : '결과 이미지 저장'}</button>
       {exportNotice && <small>{exportNotice}</small>}
     </div>}

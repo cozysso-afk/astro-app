@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { buildV23CorePrompt } from './promptV23.ts'
+import { inspectInterpretationQuality } from '../fortune-interpret-v6-preview/qualityV2.ts'
 
 import { SCHEMA } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import {
@@ -77,15 +79,15 @@ test('C4 malformed authored answer is isolated to its question instead of poison
   assert.match(good.answer,/월말/)
 })
 
-test('C5 V23 prompt contract forbids generic padding for unsupported subquestions',()=>{
-  assert.match(promptSource,/domain_answer_contracts/)
-  assert.match(promptSource,/not_calculated/)
-  assert.match(promptSource,/일반론으로 채우지 마/)
-  assert.match(indexSource,/domain_answers는 PROMPT_DATA\.domain_answer_contracts/)
-  assert.match(indexSource,/근거가 없는 질문은 행 자체를 생략해/)
-  assert.match(indexSource,/서버가 누락 질문을 not_calculated로 채운다/)
-  assert.match(indexSource,/금전 점수만 있는데 계약·회수 근거가 없으면 contract_recovery 행을 출력하지 않는다/)
-  assert.match(indexSource,/시험 점수만 있는데 실수 유형 근거가 없으면 performance_error/)
+test('C5 unsupported subquestions remain not calculated and cannot publish an authored answer',()=>{
+  const p={period_kind:'month',period:{start:'2026-11-01',end:'2026-11-30'},evidence_ledger:[]}
+  const actual=buildV23CorePrompt(p)
+  assert.match(actual.text,/domain_answer_contracts/)
+  assert.match(actual.text,/일반론으로 채우지 마/)
+  const normalized=normalizeProviderCore({clusters:[],domain_answers:[]})
+  assert.equal(normalized.domain_answers.find(r=>r.question_key==='contract_recovery').status,'not_calculated')
+  const data={domain_answers:[{topic:'금전',question_key:'contract_recovery',status:'not_calculated',answer:'회수할 수 있어.',evidence_refs:[]}]}
+  assert.ok(inspectInterpretationQuality(data,p).stages[0].issues.some(i=>i.includes('미계산 질문에 답변 생성')))
 })
 
 test('C6 quality gate rejects invented answers and requires grounding for direct or partial rows',()=>{
@@ -94,14 +96,14 @@ test('C6 quality gate rejects invented answers and requires grounding for direct
   assert.match(qualitySource,/domain_answers 중복/)
 })
 
-test('C7 frontend gives domain answers priority over generic topic editorial for field pages',()=>{
-  assert.match(editorialSource,/domainAnswers: domainAnswers\(data\)/)
-  assert.match(editorialSource,/row\.status!=='direct' && row\.status!=='partial'/)
-  assert.match(narrativeSource,/const domainAnswerRows = verifiedNarrative/)
-  assert.match(narrativeSource,/domainAnsweredTopics\.has\(item\.topic\)/)
-  assert.match(narrativeSource,/field\?\.topics \?\? summary\.focusTopics/)
-  assert.match(editorialSource,/row\.evidence_refs\?\.some/)
-  assert.match(narrativeSource,/질문별 해설/)
-  assert.match(narrativeSource,/없는 세부값은 만들지 않아/)
-  assert.match(narrativeSource,/부분 근거 · 이 질문 전체를 확정하는 계산은 아님/)
+test('C7 frontend preserves scoped domain answers before detailed context without invented missing answers',async()=>{
+  const {buildPeriodReadingDocument}=await import('../../../web/src/lib/authoredReadingDocument.ts')
+  const field={id:'contact',label:'연락운',topics:['연락','소식']}
+  const section={conclusion:'연락의 핵심',real_scene:'대화가 오가는 장면',action:'실제 답변을 확인해.',change_condition:'답변이 없으면 판단을 보류해.',evidence_refs:['W:contact'],applicability:'direct'}
+  const data={clusters:{relationship:{contact_activation:section,contact_continuity:section}},domain_answers:[{topic:'연락',question_key:'reply',label:'답변',answer:'답변 조건 원문',status:'partial',evidence_refs:['W:contact']},{topic:'연락',question_key:'missing',label:'미작성',answer:'',status:'not_calculated',evidence_refs:[]},{topic:'직장',question_key:'work',label:'업무',answer:'다른 분야 원고',status:'direct',evidence_refs:['W:work']}]}
+  const doc=buildPeriodReadingDocument(data,'week','2026-11-01','2026-11-07',field,true)
+  assert.equal(doc.sections[0].id,'question:연락:reply')
+  assert.equal(doc.sections[0].blocks[0].text,'답변 조건 원문')
+  assert.equal(doc.sections.find(s=>s.id==='question:연락:missing').state,'missing')
+  assert.ok(!doc.sections.some(s=>s.id.includes('직장')))
 })

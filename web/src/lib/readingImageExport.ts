@@ -1,6 +1,7 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
 import type { DailyReadingDocument } from './dailyReadingDocument'
+import type { AuthoredReadingDocument } from './authoredReadingDocument'
 type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean; complete?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
 type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[]; fitContentHeight?: boolean }
@@ -779,6 +780,26 @@ export async function exportDailyReadingImages(doc: DailyReadingDocument, signal
   if (fonts.some(f=>!f.length) || !labelFonts.length) throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
   signal.throwIfAborted()
   return exportModelImages(model, `${doc.title} ${doc.date}`, signal)
+}
+
+export function authoredReadingExportModel(doc:AuthoredReadingDocument):ExportModel {
+  if(doc.state!=='ready'||!doc.headline||!doc.exportBlockIds.length)throw new Error('완성된 핵심 해설이 있어야 저장할 수 있어.')
+  const byId=new Map(doc.core.map(block=>[block.id,block]))
+  const blocks=doc.exportBlockIds.map(id=>{const block=byId.get(id);if(!block)throw new Error('저장할 원고 항목이 빠졌어. 화면을 다시 확인해줘.');return block})
+  return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[
+    {title:'핵심 답',body:doc.headline,tone:'love',editorial:true,complete:true},
+    ...blocks.map(block=>({title:block.label,body:block.text,tone:'plain' as const,editorial:true,complete:true})),
+  ]}]}
+}
+
+export async function exportAuthoredReadingImages(doc:AuthoredReadingDocument,signal:AbortSignal):Promise<ExportResult> {
+  const model=authoredReadingExportModel(doc)
+  const copy=[doc.headline,...doc.core.filter(b=>doc.exportBlockIds.includes(b.id)).map(b=>b.text)].join(' ')
+  const fonts=await Promise.all([400,700].map(weight=>document.fonts.load(`${weight} 32px "Nanum Myeongjo"`,copy)))
+  const labels=await document.fonts.load('700 32px "Noto Sans KR"',`${doc.title} 핵심 답 ${doc.core.map(b=>b.label).join(' ')}`)
+  if(fonts.some(f=>!f.length)||!labels.length)throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
+  signal.throwIfAborted()
+  return exportModelImages(model,`${doc.title} ${doc.date}`,signal)
 }
 
 async function exportModelImages(model: ExportModel, label: string, signal?: AbortSignal): Promise<ExportResult> {

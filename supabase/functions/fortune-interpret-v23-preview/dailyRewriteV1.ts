@@ -31,7 +31,7 @@ unprovided/unobserved/unmeasured: 입력 없는 사건·실제 체력·신체 �
 mixed_life_roles: 업무와 공부를 독자의 실제 일정처럼 함께 가정하지 마. 해당 주장의 공통 확인 대상을 역할 중립적으로 설명해.
 unprovided_role_in_overview: 특정 직업·학업·이직 일정을 전제하지 말고 공통 생활 상황으로 종합해.
 opaque: 명사만 바꿔 같은 모호한 말을 반복하지 말고 무슨 상황에서 무엇을 확인할지 직접 써.
-오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. change_condition은 새 명령이 아니라 앞의 판단이 달라질 관찰 조건이야. 근거 있는 예외를 도출할 수 없으면 해당 필드만 빈 문자열로 반환해.
+오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. 일일 change_condition은 빈 문자열로 반환해. 빠진 연락·재회·시험·이직·투자·소식 항목을 이 문장 편집 단계에서 새로 작성하지 마. 항목 누락은 전체 구조 검증에서 처리하며 이미 작성된 다른 세부 원고를 지우거나 종합으로 바꾸지 마.
 time_context=${JSON.stringify(payload.time_context??{})}
 TARGETS=${JSON.stringify(targets)}`}
 }
@@ -45,7 +45,7 @@ export function buildDailyClarityRequest(candidate:any,payload:any,quality?:any)
   const request=buildDailyRewriteRequest(candidate,{stages:quality?.stages??[],daily_editorial:{issues}},payload)
   if(!request)return null
   request.prompt+=`\n[FINAL READER EDIT]\n자동검사 통과와 문장 품질은 달라. 아래 기준으로 각 target을 편집해. 제목·요약과 실제 오류가 있는 필드만 고쳐. 이미 기준에 맞는 문장은 그대로 반환해. 원문보다 확신을 높이거나 새로운 손해·효과·예외를 추가하지 마.\n- 원고의 의미와 조건, 근거 방향을 보존해. 사건·증상·상대 행동을 새로 만들지 마.\n- headline/conclusion은 행동 명령이 아니라 무엇이 수월하거나 까다로운지 해석한 결과야. 독자가 묻는 운세에 먼저 답하고 행동은 action에 남겨. 모든 결론을 확인·미루기·조심하기로 바꾸지 마.
-- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단이 해당하는 상황과 이유를 짧은 두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나, change_condition은 판단을 달리 적용할 현실 관찰이야. 분야 이름만 바꾸어 통하는 조언은 다시 써.\n${DAILY_EDITORIAL_INSTRUCTION}`
+- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단이 해당하는 상황과 이유를 짧은 두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나야. 일일 change_condition은 빈 문자열로 유지해. 분야 이름만 바꾸어 통하는 조언은 다시 써. 연락의 활성·지속과 연애, 재회와 관계 재결합을 서로 바꾸지 마.\n${DAILY_EDITORIAL_INSTRUCTION}`
   return request
 }
 

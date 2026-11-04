@@ -179,6 +179,10 @@ export type RelationshipAiResponse = {
   data?: {
     headline: string
     overview: string
+    core_summary?: string
+    core_reason?: string
+    core_action?: string
+    core_conditions?: string[]
     chemistry: string
     emotional_dynamic?: string
     communication: string

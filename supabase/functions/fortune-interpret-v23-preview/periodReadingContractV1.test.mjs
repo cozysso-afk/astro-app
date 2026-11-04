@@ -1,0 +1,98 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {attachPeriodReadingContext,inspectPeriodProviderDocument,inspectPeriodReading,applyPeriodReadingGate,PERIOD_PRIMARY_KEYS} from './periodReadingContractV1.ts'
+import {inspectInterpretationQuality} from '../fortune-interpret-v6-preview/qualityV2.ts'
+import {buildPeriodNarrativeContext} from './periodNarrativeV23.ts'
+const blank=key=>({key,conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'})
+const provider=()=>({headline:'맡은 역할의 범위를 비교할 때 차이가 보여.',overall:{summary:'기간의 일부 표본만 전달됐어. 관측된 날짜의 차이부터 읽어.'},clusters:PERIOD_PRIMARY_KEYS.map(blank)})
+const packet=(rows=[],kind='annual')=>({period_kind:kind,period:{start:'2026-01-01',end:'2026-12-31'},evidence_ledger:rows})
+const normalized=()=>({...provider(),clusters:Object.fromEntries(['relationship','work_study','money_news','condition'].map(g=>[g,Object.fromEntries(PERIOD_PRIMARY_KEYS.filter(k=>k.startsWith(g+'.')).map(k=>[k.split('.')[1],blank(k)]))]))})
+const fact=(id,date,topic='직장')=>({id,date,topic,system:'western',scope:'daily_actual',direction:'context',text:'계산 관측'})
+
+test('a required field omission cannot be normalized into evidence insufficiency',()=>{
+ const core=provider()
+ assert.equal(inspectPeriodProviderDocument(core,'week').passed,true)
+ core.clusters.pop()
+ assert.ok(inspectPeriodProviderDocument(core,'week').issues.some(i=>i.code==='primary_missing_or_duplicate'))
+ assert.equal(inspectPeriodProviderDocument(core,'day').passed,true)
+})
+test('computed contact and exam cannot disappear from a period response',()=>{
+ const p=packet([fact('c','2026-01-02','연락'),fact('x','2026-01-03','시험')])
+ const result=inspectPeriodProviderDocument(provider(),'annual',p)
+ for(const key of ['relationship.contact_activation','relationship.contact_continuity','work_study.exam'])assert.ok(result.issues.some(i=>i.path==='clusters.'+key))
+ const core=provider();core.clusters.push(...['relationship.contact_activation','relationship.contact_continuity','work_study.exam'].map(blank))
+ assert.equal(inspectPeriodProviderDocument(core,'annual',p).passed,true)
+})
+test('insufficient is an explicit state, never a container for invented prose',()=>{
+ const core=provider();core.clusters[0].conclusion='누군가에게 연락이 올 거야.'
+ assert.ok(inspectPeriodProviderDocument(core,'month').issues.some(i=>i.code==='insufficient_with_authored_claim'))
+})
+test('reader packet restores omitted topic evidence and retains source_topics and omission metadata',()=>{
+ const kept=fact('kept','2026-02-01','학업'),contact={...fact('contact','2026-03-01'),topic:undefined,source_topics:['연락']},extra=fact('extra','2026-07-01','학업')
+ const p=packet([kept]),full=packet([kept,contact,extra])
+ const result=attachPeriodReadingContext(p,full)
+ assert.deepEqual(result.evidence_ledger.find(r=>r.id==='contact'),contact)
+ assert.deepEqual(result.period_reading.omitted_ids,['extra'])
+ assert.ok(result.period_reading.required_section_keys.includes('relationship.contact_activation'))
+ assert.equal(result.period_reading.questions.find(q=>q.key==='work_study.study').coverage,'sampled')
+ assert.deepEqual(p.evidence_ledger,[kept])
+ assert.equal(attachPeriodReadingContext({...p,period_kind:'day'},full).period_reading,undefined)
+})
+test('single-date and two endpoint samples cannot substantiate a quarterly phase',()=>{
+ const p=packet([fact('start','2026-10-01'),fact('end','2026-12-31')]),data=normalized()
+ data.year_phases=[{start:'2026-10-01',end:'2026-12-31',evidence_refs:['start','end']}]
+ assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='unsupported_period_span'))
+ data.year_phases=[];data.key_windows=[{start:'2026-10-01',end:'2026-10-01',evidence_refs:['start']}]
+ assert.equal(inspectPeriodReading(data,p).passed,true)
+ p.evidence_ledger.push({id:'range',start:'2026-10-01',end:'2027-01-01',system:'saju',scope:'annual_segment'})
+ data.year_phases=[{start:'2026-10-01',end:'2026-12-31',evidence_refs:['range']}]
+ assert.equal(inspectPeriodReading(data,p).passed,true)
+})
+test('work cannot borrow only study evidence, but real source_topics are supported',()=>{
+ const data=normalized();data.clusters.work_study.work={...blank('work_study.work'),applicability:'conditional',evidence_refs:['study']}
+ const p=packet([fact('study','2026-10-01','학업')])
+ assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='primary_without_same_topic_period_evidence'))
+ p.evidence_ledger[0].source_topics=['직장']
+ assert.equal(inspectPeriodReading(data,p).passed,true)
+})
+test('six-stage status cannot overwrite a failed period scope gate',()=>{
+ const quality={ok:true,score:100,stages:Array.from({length:6},(_,i)=>({stage:i+1,passed:true,issues:[]}))}
+ const data=normalized();data.key_windows=[{start:'2026-01-01',end:'2027-01-01',evidence_refs:[]}]
+ const result=applyPeriodReadingGate(quality,inspectPeriodReading(data,packet()))
+ assert.equal(result.ok,false);assert.equal(result.score,83);assert.equal(result.stages.length,6)
+ assert.equal(quality.ok,true)
+})
+test('period contract removes forced phases and empty-condition failure without weakening legacy or daily defaults',()=>{
+ const data=normalized();data.clusters.work_study.work={conclusion:'맡은 역할을 비교하는 기준이 중요해.',real_scene:'일의 범위가 다르다면 같은 조건인지 비교할 필요가 있어.',action:'약속한 책임의 범위를 먼저 비교해.',change_condition:'',evidence_refs:['work'],applicability:'conditional'}
+ const p=packet([fact('work','2026-01-02')])
+ const legacy=inspectInterpretationQuality(data,p),current=inspectInterpretationQuality(data,p,{periodReadingContract:true})
+ assert.ok(legacy.stages[4].issues.some(i=>i.includes('4개 phase')))
+ assert.ok(legacy.stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+ assert.equal(current.stages[4].issues.some(i=>/핵심 시기 부족|4개 phase|교차검증 3개/.test(i)),false)
+ assert.equal(current.stages[5].issues.some(i=>i.includes('판단변경조건 누락')),false)
+ const daily=inspectInterpretationQuality(data,{...p,period_kind:'day'},{periodReadingContract:true})
+ assert.ok(daily.stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+})
+test('period phenomena retain topics of actual multi-topic ledger rows and do not require fabricated quarters',()=>{
+ const p=packet([{...fact('shared','2026-02-01'),topic:undefined,source_topics:['학업','시험']}])
+ const context=buildPeriodNarrativeContext(p)
+ assert.deepEqual(new Set(context.phenomena[0].topics),new Set(['학업','시험']))
+ assert.equal(context.required_sequence.some(s=>/^[1-4]분기$/.test(s)),false)
+})
+
+test('an annual work claim about the second half cannot cite only February or a study date',()=>{
+ const data=normalized(),p=packet([fact('work','2026-02-01'),fact('study','2026-11-21','학업')])
+ data.clusters.work_study.work={...blank('work_study.work'),applicability:'conditional',conclusion:'하반기에는 역할이 안정적으로 정리돼.',evidence_refs:['work','study']}
+ assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='claim_period_without_local_evidence'))
+ data.clusters.work_study.work.conclusion='하반기를 판단할 근거는 부족해.'
+ assert.equal(inspectPeriodReading(data,p).passed,true)
+ data.clusters.work_study.work.conclusion='2026-11-21에 역할이 정리돼.'
+ assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='claim_date_without_local_evidence'))
+})
+test('saju exclusive segment end does not substantiate the next day',()=>{
+ const p=packet([{id:'S',system:'saju',scope:'monthly_segment',start:'2026-07-01',end:'2026-08-01'}]),data=normalized()
+ data.year_phases=[{start:'2026-07-01',end:'2026-08-01',evidence_refs:['S']}]
+ assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='unsupported_period_span'))
+ data.year_phases[0].end='2026-07-31'
+ assert.equal(inspectPeriodReading(data,p).passed,true)
+})
