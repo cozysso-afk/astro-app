@@ -1,4 +1,5 @@
 name: Daily production smoke
+# Revision 2: inspect the direct authenticated V23 cost contract.
 on:
   push:
     branches: [qa/daily-editorial-v23-11]

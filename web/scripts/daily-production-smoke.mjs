@@ -19,9 +19,15 @@ const report = {source:'Authenticated production homepage, synthetic QA profile'
 let browser, page, session, calculation, finalStatus, jobId = existingJobId
 const pending = new Set()
 const downloads = []
+const fileWrites = new Map()
 let exportScope = 'overall'
 await mkdir(out,{recursive:true})
-const save = (name,data) => writeFile(path.join(out,name),JSON.stringify(data,null,2))
+const save = (name,data) => {
+  const json=JSON.stringify(data,null,2)
+  const writing=(fileWrites.get(name)||Promise.resolve()).catch(()=>{}).then(()=>writeFile(path.join(out,name),json))
+  fileWrites.set(name,writing)
+  return writing
+}
 const required = name => {assert.ok(process.env[name],`Missing ${name}`);return process.env[name].trim()}
 const safeError = error => {
   let message=String(error?.message || error)
@@ -40,6 +46,23 @@ function track(promise) {
   pending.add(promise)
   promise.catch(error=>report.errors.push(safeError(error))).finally(()=>pending.delete(promise))
 }
+function assertHealthy() {
+  assert.ok(!report.generationFailed,'Production generation failed; no retry attempted')
+  assert.ok(!report.calculationFailed,'Production calculation failed; no generation attempted')
+  assert.equal(report.errors.length,0,report.errors[0]||'Browser verification failed')
+}
+async function withHealth(promise) {
+  let timer
+  try {
+    return await Promise.race([promise,new Promise((_,reject)=>{
+      timer=setInterval(()=>{try{assertHealthy()}catch(error){reject(error)}},250)
+    })])
+  } finally {clearInterval(timer)}
+}
+const heartbeat=setInterval(()=>{
+  console.log(JSON.stringify({event:'qa-heartbeat',stage:report.stage,paidStarts:report.paidStarts,blockedStarts:report.blockedStarts,jobObserved:!!jobId,calculationObserved:!!calculation,generationStatus:report.generationStatus||null,errorCount:report.errors.length}))
+},15000)
+heartbeat.unref()
 try {
   const supabase=required('QA_SUPABASE_URL').replace(/\/$/,'')
   const anon=required('QA_SUPABASE_ANON_KEY')
@@ -99,12 +122,18 @@ try {
       assert.equal(body.model,model,'Non-3.7 model blocked before paid start')
       assert.equal(body.calculation?.period?.start,date,'Unexpected generation start date')
       assert.equal(body.calculation?.period?.end,date,'Unexpected generation end date')
+      // Playwright response-body decoding can finish after the app has decoded its copy.
+      // Join those reads before allowing React's immediately following generation request.
+      await Promise.all([...pending])
+      assertHealthy()
       assert.ok(calculation,'Synthetic calculation was not observed')
       if(existingJobId) {
         return route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({ok:true,job_id:existingJobId,status:'queued',reused:true,interpreter_version:version})})
       }
       report.stage='prepaid-inspection'
-      const inspection=await request({action:'inspect',calculation:body.calculation,model:body.model})
+      // The public V22 gateway intentionally omits cost estimates. Read the
+      // authenticated V23 inspector directly; the real UI start still uses V22.
+      const inspection=await post(`${supabase}/functions/v1/fortune-interpret-v23-preview`,{action:'inspect',calculation:body.calculation,model:body.model},headers)
       assert.equal(inspection.interpreter_version,version,'Unexpected live engine; no paid start')
       assert.equal(inspection.prompt_budget_ok,true,'Prompt budget rejected; no paid start')
       assert.ok(Number.isFinite(inspection.estimated_max_job_krw)&&inspection.estimated_max_job_krw<=300,'Cost estimate exceeds 300 KRW; no paid start')
@@ -120,25 +149,33 @@ try {
   })
   // Validate the actual calculator input before allowing it onto the network.
   await context.route('**/v1/fortune/integrated/start',async route=>{
+    if(route.request().method()!=='POST')return route.continue()
     try {
       const body=route.request().postDataJSON()
       assert.equal(body.profile?.birth_date,profile.birthDate,'Non-synthetic birth date blocked')
       assert.ok(String(body.profile?.birth_time).startsWith(profile.birthTime),'Non-synthetic birth time blocked')
       assert.equal(body.start_date,date);assert.equal(body.end_date,date)
       report.syntheticCalculationVerified=true
+      report.precisionInput={time_known:body.profile.time_known,time_source:body.profile.time_source,time_confidence:body.profile.time_confidence}
+      report.stage='calculation-started'
       await route.continue()
     } catch(error) {report.errors.push(safeError(error));await route.abort('blockedbyclient')}
   })
   page.on('response',response=>{
     const url=new URL(response.url())
+    if(url.pathname==='/v1/fortune/integrated/start')report.calculationStartHttp=response.status()
     if(url.pathname.includes('/v1/fortune/integrated/jobs/'))track((async()=>{
       const data=await response.json().catch(()=>null)
-      if(data?.status==='done'&&data.result&&report.syntheticCalculationVerified){calculation=data.result;await persistCandidate()}
+      report.calculationStatus=data?.status||`HTTP ${response.status()}`
+      if(data?.status==='failed'){report.calculationFailed=true;report.errors.push(safeError(data.error||'Calculation failed'))}
+      if(data?.status==='done'&&data.result&&report.syntheticCalculationVerified){calculation=data.result;report.stage='calculation-complete';report.precisionResult={contract:calculation.precision?.contract_version,status:calculation.precision?.status};await persistCandidate()}
     })())
     if(url.pathname.endsWith(`/functions/v1/${endpoint}`)&&response.request().method()==='POST')track((async()=>{
       const body=response.request().postDataJSON()
       const data=await response.json().catch(()=>null)
+      if(body?.action==='start'){report.generationStartHttp=response.status();if(!data?.ok||!data?.job_id){report.generationFailed=true;report.errors.push(safeError(data?.error||`Generation start HTTP ${response.status()}`))}}
       if(body?.action==='start'&&data?.job_id){jobId=data.job_id;report.job_id=jobId;await save('job.json',{synthetic_profile:true,job_id:jobId,date,replay:!!existingJobId});await persistCandidate()}
+      if(body?.action==='status')report.generationStatus=data?.status||`HTTP ${response.status()}`
       if(body?.action==='status'&&data?.status==='done'){finalStatus=data;await persistCandidate()}
       if(body?.action==='status'&&data?.status==='failed'){report.generationFailed=true;await save('job-failure.json',{job_id:jobId,status:'failed',error:safeError(data.error||'Generation failed')})}
     })())
@@ -146,11 +183,12 @@ try {
   await page.goto(`${origin}/?date=${date}`,{waitUntil:'domcontentloaded',timeout:60000})
   const root=page.locator('[data-reading-export-root="period-fortune"]')
   const calculate=page.locator('.period-fortune-report').getByRole('button',{name:'오늘운세 + AI 해설 생성',exact:true})
-  await calculate.waitFor({timeout:90000})
-  await page.waitForFunction(()=>[...document.querySelectorAll('.period-fortune-report button')].some(b=>b.textContent==='오늘운세 + AI 해설 생성'&&!b.disabled),{},{timeout:90000})
+  report.stage='waiting-for-calculation-button'
+  await withHealth(calculate.waitFor({timeout:90000}))
+  await withHealth(page.waitForFunction(()=>[...document.querySelectorAll('.period-fortune-report button')].some(b=>b.textContent==='오늘운세 + AI 해설 생성'&&!b.disabled),{},{timeout:90000}))
   report.stage='calculate-click'
   await calculate.click()
-  await root.locator('.daily-reading[data-daily-state="ready"]').waitFor({timeout:420000})
+  await withHealth(root.locator('.daily-reading[data-daily-state="ready"]').waitFor({timeout:420000}))
   await Promise.all([...pending])
   assert.ok(finalStatus,'Completed production status was not captured')
   assert.equal(finalStatus.interpreter_version,version)
@@ -200,12 +238,16 @@ try {
 } catch(error) {
   report.failure=safeError(error)
   if(page) {
+    const notices=await page.locator('.period-fortune-report .status-banner.error,.period-fortune-report [role="alert"],.private-auth-error').allTextContents().catch(()=>[])
+    report.visibleErrors=notices.slice(0,5).map(safeError)
+    report.loginVisible=await page.locator('.private-auth-shell').count().catch(()=>0)
     report.visibleState=await page.locator('.daily-reading').evaluateAll(nodes=>nodes.map(n=>({state:n.getAttribute('data-daily-state'),scope:n.getAttribute('data-daily-scope')}))).catch(()=>[])
     // Only the synthetic reading panel may be captured, never login/account UI.
     if(calculation)await page.locator('.daily-reading').first().screenshot({path:path.join(out,'failure-reading.png'),timeout:5000}).catch(()=>{})
   }
   process.exitCode=1
 } finally {
+  clearInterval(heartbeat)
   await Promise.allSettled([...pending,...downloads])
   report.exportedImages=downloads.length
   await persistCandidate()
