@@ -67,3 +67,15 @@ test('an optional empty exception keeps the grounded daily reading and export re
  assert.ok(!doc.blocks.some(b=>b.id.endsWith(':condition')))
  assert.deepEqual(dailyReadingExportModel(doc).sections.flatMap(s=>s.cards).map(c=>c.body),[doc.headline,...doc.blocks.map(b=>b.text)])
 })
+
+test('overall financial caveats do not leak to field readings and date-only timing is not repeated',()=>{
+ const d=data();d.limits='실제 재정 잔고나 시장 가격 변동을 예측하지 않아.';d.decisions[0].timing='2026-11-04'
+ const overall=buildDailyReadingDocument(d,'2026-11-04',undefined,true)
+ assert.ok(overall.blocks.some(b=>b.text===d.limits))
+ assert.ok(!overall.blocks.some(b=>b.id==='overall:timing'))
+ for(const label of ['애정','대인','학업','직업','금전','컨디션']){
+   const doc=buildDailyReadingDocument(d,'2026-11-04',fortuneGroup(label),true)
+   assert.ok(!doc.blocks.some(b=>b.text===d.limits))
+   assert.ok(dailyReadingExportModel(doc).fitContentHeight)
+ }
+})

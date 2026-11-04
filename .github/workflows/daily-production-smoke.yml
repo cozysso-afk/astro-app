@@ -1,10 +1,13 @@
 name: Daily production smoke
-# Revision 2: inspect the direct authenticated V23 cost contract.
 on:
-  push:
-    branches: [qa/daily-editorial-v23-11]
-    paths: [.github/workflows/daily-production-smoke.yml]
+  pull_request:
+    types: [closed]
   workflow_dispatch:
+    inputs:
+      existing_job_id:
+        description: 'QA-owned completed job to reuse with zero paid generation'
+        required: true
+        default: 'cd1abe43-8046-4083-a82a-c223df3a9a85'
 permissions:
   contents: read
 concurrency:
@@ -12,7 +15,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   production:
-    if: github.ref_name == 'qa/daily-editorial-v23-11'
+    # One post-merge replay only; no paid generation is enabled by this workflow.
+    if: inputs.existing_job_id != '' || (github.event.pull_request.number == 333 && github.event.pull_request.merged == true)
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     defaults:
@@ -37,6 +41,7 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id || 'cd1abe43-8046-4083-a82a-c223df3a9a85' }}
         run: node scripts/daily-production-smoke.mjs
       - name: Save synthetic-only verification evidence
         if: always()

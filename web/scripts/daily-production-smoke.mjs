@@ -40,7 +40,7 @@ async function post(url,body,headers={}) {
   return response.json()
 }
 async function persistCandidate() {
-  await save('candidate.json',{synthetic_profile:true,replay_policy:report.replayPolicy,job_id:jobId,calculation:calculation ?? null,status:finalStatus ? {ok:finalStatus.ok,status:finalStatus.status,job_id:jobId,model:finalStatus.model,interpreter_version:finalStatus.interpreter_version,provenance_verified:finalStatus.provenance_verified,period_start:finalStatus.period_start,period_end:finalStatus.period_end,data:finalStatus.data} : null})
+  await save('candidate.json',{synthetic_profile:true,replay_policy:report.replayPolicy,job_id:jobId,calculation:calculation ?? null,status:finalStatus ? {ok:finalStatus.ok,status:finalStatus.status,job_id:jobId,model:finalStatus.model,origin:finalStatus.origin,usage:finalStatus.usage,interpreter_version:finalStatus.interpreter_version,provenance_verified:finalStatus.provenance_verified,period_start:finalStatus.period_start,period_end:finalStatus.period_end,data:finalStatus.data} : null})
 }
 function track(promise) {
   pending.add(promise)

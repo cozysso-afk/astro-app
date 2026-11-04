@@ -3,7 +3,7 @@ type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
 import type { DailyReadingDocument } from './dailyReadingDocument'
 type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean; complete?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
-type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[] }
+type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[]; fitContentHeight?: boolean }
 type LayoutItem = { section?: string; card: ExportCard }
 
 const PAGE_WIDTH = 1206
@@ -363,22 +363,22 @@ export function buildReadingExportModel(root: HTMLElement, label: string): Expor
   return genericModel(root, label)
 }
 
-function createCanvas() {
+function createCanvas(height = PAGE_HEIGHT) {
   const canvas = document.createElement('canvas')
   canvas.width = PAGE_WIDTH
-  canvas.height = PAGE_HEIGHT
+  canvas.height = height
   const ctx = canvas.getContext('2d')!
   drawAuroraBackground(ctx)
   return { canvas, ctx }
 }
 
 function drawAuroraBackground(ctx: CanvasRenderingContext2D) {
-  const base = ctx.createLinearGradient(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
+  const base = ctx.createLinearGradient(0, 0, PAGE_WIDTH, ctx.canvas.height)
   base.addColorStop(0, '#f8fcff')
   base.addColorStop(.44, '#fbf9ff')
   base.addColorStop(1, '#f7fffb')
   ctx.fillStyle = base
-  ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
+  ctx.fillRect(0, 0, PAGE_WIDTH, ctx.canvas.height)
   const glow = (x: number, y: number, r: number, inner: string) => {
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, r)
     gradient.addColorStop(0, inner)
@@ -602,7 +602,7 @@ function drawHeader(ctx: CanvasRenderingContext2D, model: ExportModel, page: num
 }
 
 function drawFooter(ctx: CanvasRenderingContext2D) {
-  const y = PAGE_HEIGHT - FOOTER_HEIGHT
+  const y = ctx.canvas.height - FOOTER_HEIGHT
   ctx.strokeStyle = 'rgba(123,140,180,.11)'
   ctx.beginPath()
   ctx.moveTo(PAGE_PADDING, y)
@@ -725,9 +725,12 @@ function renderPages(model: ExportModel) {
   const canvases: HTMLCanvasElement[] = []
 
   layouts.forEach((items, index) => {
-    const { canvas, ctx } = createCanvas()
+    const spacing = pageVisualSpacing(probe.ctx, items)
+    const usedHeight = HEADER_HEIGHT + spacing.topOffset + pageUsedHeight(probe.ctx, items)
+      + Math.max(0, items.length - 1) * spacing.extraGap + FOOTER_HEIGHT + 48
+    const height = model.fitContentHeight ? Math.min(PAGE_HEIGHT, Math.max(620, Math.ceil(usedHeight))) : PAGE_HEIGHT
+    const { canvas, ctx } = createCanvas(height)
     drawHeader(ctx, model, index + 1, layouts.length)
-    const spacing = pageVisualSpacing(ctx, items)
     let y = HEADER_HEIGHT + spacing.topOffset
     items.forEach((item, itemIndex) => {
       if (item.section) y = drawSectionTitle(ctx, item.section, y)
@@ -760,7 +763,7 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
 
 export function dailyReadingExportModel(doc: DailyReadingDocument): ExportModel {
   if (doc.state !== 'ready' || !doc.headline || !doc.blocks.length) throw new Error('완성된 해설이 있어야 저장할 수 있어.')
-  return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[
+  return {title:doc.title,date:doc.date,hero:'',fitContentHeight:true,sections:[{cards:[
     {title:'이 날의 핵심',body:doc.headline,tone:'love',editorial:true,complete:true},
     ...doc.blocks.map(b=>({title:b.label,body:b.text,tone:'plain' as const,editorial:true,complete:true})),
   ]}]}

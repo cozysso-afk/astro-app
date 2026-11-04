@@ -67,7 +67,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     const decision = data.decisions?.find(d=>clean(d.action) && d.evidence_refs?.length)
     if (decision) {
       doc.blocks.push({id:'overall:action',label:'지금 할 일',text:decision.action})
-      if (clean(decision.timing)) doc.blocks.push({id:'overall:timing',label:'이 행동을 적용할 때',text:decision.timing})
+      if (clean(decision.timing) && clean(decision.timing) !== date) doc.blocks.push({id:'overall:timing',label:'이 행동을 적용할 때',text:decision.timing})
       for (const [key,label] of [['watch','다시 판단할 조건'],['avoid','피할 것']] as const) {
         if (clean(decision[key])) doc.blocks.push({id:`overall:${key}`,label,text:decision[key]})
       }
@@ -83,8 +83,9 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       if(clean(data.systems?.[key]))doc.details.push({id:`system:${key}`,label,text:data.systems[key]})
     }
   }
-  // Limits remain attached to the exact same screen/export document.
-  if (clean(data.limits)) doc.blocks.push({id:'limits',label:'함께 알아둘 점',text:clean(data.limits)})
+  // The overall limit has no field scope: a money-specific caveat must not
+  // become love, study or condition copy merely because it is globally present.
+  if (!field && clean(data.limits)) doc.blocks.push({id:'limits',label:'함께 알아둘 점',text:clean(data.limits)})
   doc.state = 'ready'
   return doc
 }
