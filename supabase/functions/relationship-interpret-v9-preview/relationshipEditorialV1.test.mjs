@@ -76,3 +76,15 @@ test('a long paragraph cannot become the relationship headline',()=>{
   assert.equal(validateRelationshipEditorial(data,'compatibility').reason,'invalid_headline')
   assert.equal(data.headline.length,181)
 })
+
+
+test('stored-style unsupported claims, exact cooldowns and aspect label mismatches are rejected',()=>{
+ const attraction=core();attraction.headline='서로에게 끌리는 마음은 확실하지만 대화 차이를 맞춰야 해.'
+ assert.equal(validateRelationshipEditorial(attraction,'compatibility').reason,'unobserved_mind_claim')
+ const exact=core();exact.practical_advice=['갈등이 생기면 10분간 생각할 시간을 가져.']
+ assert.equal(validateRelationshipEditorial(exact,'compatibility').reason,'invented_exact_behavior_duration')
+ const intent=marriage('marriage_unmarried');intent.marriage_reading.emotional_home='서로를 삶의 안전지대로 인식하는 흐름이 있어.'
+ assert.equal(validateRelationshipEditorial(intent,'marriage_unmarried').reason,'unobserved_mind_claim')
+ const mismatch=marriage('marriage_unmarried');mismatch.marriage_reading.daily_life='수성과 상승점의 대립각(Mercury square ASC)이 대화를 어렵게 해.'
+ assert.equal(validateRelationshipEditorial(mismatch,'marriage_unmarried').reason,'aspect_translation_mismatch')
+})
