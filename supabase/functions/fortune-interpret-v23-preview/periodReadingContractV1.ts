@@ -1,7 +1,7 @@
 // Period reading is a bounded first-screen bundle. It is not a capability
 // certification: available rows describe the evidence, not permission to
 // predict events or to infer unobserved changes between sampled dates.
-export const PERIOD_READING_VERSION = 'period-reading-v1-explicit-slots-and-sampled-time'
+export const PERIOD_READING_VERSION = 'period-reading-v1.1-readable-local-dates'
 export const PERIOD_PRIMARY_TOPICS:Record<string,string[]> = {
   'relationship.love_general':['연애'], 'relationship.summary':['대인관계'],
   'work_study.study':['학업'], 'work_study.work':['직장'],
@@ -95,6 +95,8 @@ export function buildPeriodReadingInstruction(kind:unknown){
 - 초·중·후반이나 네 분기를 의무적으로 채우지 마. 표본 날짜가 여러 개라는 이유만으로 중간이 계속 좋았거나 달라졌다고 말하지 마. 관측이 같은 경우 유지되는 맥락을 설명할 수 있지만, 날짜 사이의 미계산 변화를 확정하지 마.
 - period_reading.questions는 전달된 분야별 근거와 표본 범위야. all_supplied_rows도 전체 기간의 모든 날이 계산됐다는 뜻은 아니야. omitted_ids의 근거는 인용하지 마. 일부 날짜 근거만 있으면 그 날짜의 관측과 기간 전체의 제한을 분리해.
 - key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 real_scene과 action에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
+- 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
+- headline·overall·best_phase·caution_phase·각 분야 conclusion/action/real_scene 첫 문장은 행성명·각 이름·영문 전문어·사주 용어·'기류/에너지/작용' 없이 생활 언어로 써. 전문 근거는 real_scene의 두 번째 문장 뒤로 미뤄.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
 - domain_answers와 relationship_reading/contact_flow/investment_reading은 기존 기능이야. 해당 질문에 답할 근거가 있으면 유지해. 근거가 없으면 생략하고, 관계 전체의 점수만으로 선연락·재회 결과·상대 마음을 채우지 마. 질문 계약별 지원 범위를 따라.
 - 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마.
@@ -112,6 +114,13 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const issues:Issue[]=[]
   if(!isExtendedPeriod(kind))return {version:PERIOD_READING_VERSION,passed:true,issues}
   const rows=Array.isArray(core?.clusters)?core.clusters:[]
+  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
+  const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
+  if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
+  for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
+    const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
+    if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
+  }
   for(const key of payload?requiredKeys(payload):PERIOD_PRIMARY_KEYS){
     const found=rows.filter((r:any)=>r?.key===key)
     if(found.length!==1){issues.push({code:'primary_missing_or_duplicate',path:`clusters.${key}`});continue}

@@ -95,3 +95,12 @@ test('saju exclusive segment end does not substantiate the next day',()=>{
  data.year_phases[0].end='2026-07-31'
  assert.equal(inspectPeriodReading(data,p).passed,true)
 })
+
+
+test('period first screen rejects technical leads and abstract hero copy',()=>{
+ const technical=provider();technical.headline='천왕성의 기류가 작용하는 한 달'
+ const report=inspectPeriodProviderDocument(technical,'month')
+ assert.ok(report.issues.some(i=>i.code==='period_hero_not_plain_language'))
+ const section=provider();section.clusters[0]={key:PERIOD_PRIMARY_KEYS[0],conclusion:'금성 삼각각으로 관계가 좋아져.',real_scene:'먼저 생활 장면을 확인해.',action:'반응을 확인해.',change_condition:'',evidence_refs:['x'],applicability:'conditional'}
+ assert.ok(inspectPeriodProviderDocument(section,'week').issues.some(i=>i.code==='period_section_not_plain_language'))
+})

@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { MODELS, FALLBACK_MODEL, TOPICS, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
-import { addGeminiUsage, inspectThaiOutputSafety, thaiOutputGuardRequired, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
+import { addGeminiUsage, inspectThaiOutputSafety, thaiOutputGuardRequired, strictThaiRetryInstruction, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-preview/costGuardV21.ts";
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
@@ -18,7 +18,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.14-hard-readable-complete-reading-v21";
+const VERSION="supabase-ai-v23.15-readable-local-date-v22";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -208,6 +208,7 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   if(dailyPatch)second=await rewriteDailyCandidate({...first,candidate_data:dailyDraft},payload,"gemini-3.7-flash",key,budget,dailyPatch);
   else if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
   else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report)+(first.quality_report.daily_editorial?.passed===false?dailyEditorialRetryInstruction(first.quality_report.daily_editorial,first.candidate_data):""));
+  else if(Array.isArray(first?.guard_violations)&&first.guard_violations.length)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictThaiRetryInstruction(first.guard_violations));
   else if(first?.timeout||[500,502,503,504].includes(Number(first?.http_status??0))||String(first?.error??"").includes("구조화 응답"))second=await generate(payload,secondModel,key,budget,"fallback",true,"");
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
