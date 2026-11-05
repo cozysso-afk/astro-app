@@ -134,3 +134,15 @@ test('image export control is mobile-safe and reduced-motion aware',()=>{
   assert.match(css,/width:\s*100%/)
   assert.match(css,/prefers-reduced-motion:\s*reduce/)
 })
+
+
+test('independent system export preserves all authored cards and refuses font drift',()=>{
+  assert.doesNotMatch(exporter,/\.western-score-grid > details'\)\)\.slice\(0, 3\)/)
+  assert.doesNotMatch(exporter,/\.saju-reader-topics \\.system-lens'\)\)\.slice\(0, 3\)/)
+  assert.doesNotMatch(exporter,/\.thai-life-map \\.bhumi-grid > details'\)\)\.slice\(0, 3\)/)
+  assert.match(exporter,/western-score-guidance'\),\n\s*tone:[\s\S]{0,180}complete:\s*true/)
+  assert.match(exporter,/heroSource[\s\S]*integrated \? firstSentences\(heroSource, 1\) : heroSource/)
+  assert.match(exporter,/전체를 통틀어 보면[\s\S]{0,220}complete:\s*true/)
+  assert.match(exporter,/Noto Sans KR/)
+  assert.match(exporter,/저장할 글꼴을 불러오지 못했어/)
+})
