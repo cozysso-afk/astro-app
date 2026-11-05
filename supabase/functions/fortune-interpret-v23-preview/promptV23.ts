@@ -4,7 +4,7 @@ import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NA
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.13-readable-local-date-contract'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.14-readable-retry-contract'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
