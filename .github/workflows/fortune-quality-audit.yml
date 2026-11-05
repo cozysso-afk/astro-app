@@ -98,7 +98,7 @@ jobs:
 
   live-gemini-audit:
     name: Manually approved synthetic Gemini V23 audit
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES' && inputs.existing_job_id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -114,9 +114,8 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
-          QA_FORTUNE_FUNCTION_SLUG: fortune-completeness-v19-qa
-          QA_MAX_JOBS: '3'
-          QA_PERIOD_KINDS: week,month,annual
+          QA_MAX_JOBS: ${{ inputs.max_jobs }}
+          QA_PERIOD_KINDS: ${{ inputs.period_kinds }}
         run: |
           node --experimental-strip-types web/scripts/fortune-live-qa.mjs \
             --max-jobs "$QA_MAX_JOBS" \
