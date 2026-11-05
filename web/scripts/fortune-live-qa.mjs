@@ -75,7 +75,7 @@ export async function buildQaConfig(env = process.env) {
   })
   return {
     calcApi,
-    fortuneUrl: supabase + '/functions/v1/fortune-interpret-v22-preview',
+    fortuneUrl: supabase + '/functions/v1/' + String(env.QA_FORTUNE_FUNCTION_SLUG ?? 'fortune-interpret-v22-preview').trim(),
     headers: { apikey: anon, Authorization: 'Bearer ' + token },
     calcHeaders: { Authorization: 'Bearer ' + token },
   }

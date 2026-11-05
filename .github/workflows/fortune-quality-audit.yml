@@ -114,6 +114,7 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_FORTUNE_FUNCTION_SLUG: fortune-completeness-v19-qa
           QA_MAX_JOBS: ${{ inputs.max_jobs }}
           QA_PERIOD_KINDS: ${{ inputs.period_kinds }}
         run: |
