@@ -99,7 +99,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
 - headline·overall·best_phase·caution_phase·각 분야 conclusion/action/real_scene 첫 문장은 행성명·각 이름·영문 전문어·사주 용어·'기류/에너지/작용' 없이 생활 언어로 써. 전문 근거는 real_scene의 두 번째 문장 뒤로 미뤄.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
 - domain_answers와 relationship_reading/contact_flow/investment_reading은 기존 기능이야. 해당 질문에 답할 근거가 있으면 유지해. 근거가 없으면 생략하고, 관계 전체의 점수만으로 선연락·재회 결과·상대 마음을 채우지 마. 질문 계약별 지원 범위를 따라.
-- 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마.
+- 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마. 퇴근·출근·수면 부족·체력 저하·상대의 답신 같은 현실 사건은 입력 기록 없이 있었다거나 생긴다고 쓰지 마.
 - Western·사주·Thai는 독립 근거야. 같은 기간이라고 합산해 확신을 키우지 마. 원시 Thai 위치를 기간의 길흉·사건·상대 마음으로 바꾸지 마. 점수는 확률이 아니고 높은 활성도는 유리하다는 뜻도 아니야.
 - 서사는 점수보다 실제 현상 묶음부터 시작해. 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명하고 각 분야의 질문에 맞춰 적용 범위를 구분해.
 - 점수·평균·변동폭을 설명 자체로 착각하지 마. 고정 조언문을 분야명만 바꿔 반복하지 마. 목적어와 서술어의 의미 호응을 확인하고 쉬운 생활 언어로 써. 제출 전 오탈자와 잘못 붙은 단어를 한 번 더 읽어 고쳐.
@@ -117,7 +117,10 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
   if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
-  if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(JSON.stringify(core)))issues.push({code:'period_korean_copy_error',path:'root'})
+  if(/(?:업무|직장|학업|시험|공부|이직|출근|퇴근)/.test(hero))issues.push({code:'period_hero_role_assumption',path:'headline'})
+  const providerText=JSON.stringify(core)
+  if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(providerText))issues.push({code:'period_korean_copy_error',path:'root'})
+  if(/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|체력이\s*떨어질\s*수|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/.test(providerText))issues.push({code:'period_unobserved_event_or_span',path:'root'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
