@@ -104,3 +104,9 @@ test('period first screen rejects technical leads and abstract hero copy',()=>{
  const section=provider();section.clusters[0]={key:PERIOD_PRIMARY_KEYS[0],conclusion:'금성 삼각각으로 관계가 좋아져.',real_scene:'먼저 생활 장면을 확인해.',action:'반응을 확인해.',change_condition:'',evidence_refs:['x'],applicability:'conditional'}
  assert.ok(inspectPeriodProviderDocument(section,'week').issues.some(i=>i.code==='period_section_not_plain_language'))
 })
+
+
+test('period first screen rejects malformed Korean copy',()=>{
+ const data=provider();data.clusters[0]={key:PERIOD_PRIMARY_KEYS[0],conclusion:'컨디션 관리가 필요해.',real_scene:'무선 규칙적인 수면과 휴식을 확보해.',action:'일정을 줄여.',change_condition:'',evidence_refs:['x'],applicability:'conditional'}
+ assert.ok(inspectPeriodProviderDocument(data,'annual').issues.some(i=>i.code==='period_korean_copy_error'))
+})
