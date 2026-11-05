@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {attachPeriodReadingContext,inspectPeriodProviderDocument,inspectPeriodReading,applyPeriodReadingGate,PERIOD_PRIMARY_KEYS} from './periodReadingContractV1.ts'
+import {attachPeriodReadingContext,inspectPeriodProviderDocument,inspectPeriodReading,applyPeriodReadingGate,reusePlainHeadlineFromSummary,PERIOD_PRIMARY_KEYS} from './periodReadingContractV1.ts'
 import {inspectInterpretationQuality} from '../fortune-interpret-v6-preview/qualityV2.ts'
 import {buildPeriodNarrativeContext} from './periodNarrativeV23.ts'
 const blank=key=>({key,conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'})
@@ -121,4 +121,14 @@ test('period first screen rejects role assumptions and invented events or spans'
  assert.ok(inspectPeriodProviderDocument(body,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'))
  const investment=provider();investment.investment_reading={realization:'차익 실현을 고려할 시기야.'}
  assert.ok(inspectPeriodProviderDocument(investment,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'))
+})
+
+
+test('an isolated abstract headline reuses one complete authored summary sentence',()=>{
+ const data=provider();data.headline='천왕성의 기류가 작용하는 한 달';data.overall.summary='약속을 정하기 전에 조건을 다시 확인하는 편이 좋아. 나머지는 날짜별 근거를 봐.'
+ const out=reusePlainHeadlineFromSummary(data,'month')
+ assert.equal(out.headline,'약속을 정하기 전에 조건을 다시 확인하는 편이 좋아')
+ assert.equal(out.overall.summary,data.overall.summary)
+ const many=provider();many.headline='천왕성의 기류가 작용하는 한 달';many.overall.summary='이번 달에는 업무와 공부를 함께 점검해.'
+ assert.equal(reusePlainHeadlineFromSummary(many,'month'),many)
 })
