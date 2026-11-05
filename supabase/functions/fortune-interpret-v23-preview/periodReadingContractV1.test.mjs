@@ -132,3 +132,12 @@ test('an isolated abstract headline reuses one complete authored summary sentenc
  const many=provider();many.headline='천왕성의 기류가 작용하는 한 달';many.overall.summary='이번 달에는 업무와 공부를 함께 점검해.'
  assert.equal(reusePlainHeadlineFromSummary(many,'month'),many)
 })
+
+
+test('calendar month wording is not mistaken for the Moon',()=>{
+ const data=provider();data.headline='이번 달은 약속 조건을 다시 확인하는 편이 좋아.';data.overall.summary='이번 달은 대화와 지출 조건을 서두르지 말고 확인하는 편이 좋아.'
+ data.clusters=data.clusters.map(row=>row.key===PERIOD_PRIMARY_KEYS[0]?{...row,conclusion:'이번 달은 말을 서두르지 않는 편이 좋아.',real_scene:'이번 달에는 약속 조건을 다시 확인해.',action:'이번 달은 답하기 전에 내용을 읽어봐.',evidence_refs:['x'],applicability:'conditional'}:row)
+ assert.equal(inspectPeriodProviderDocument(data,'month').issues.some(i=>i.code==='period_section_not_plain_language'),false)
+ const moon=provider();moon.headline='달과 금성이 대화를 움직이는 한 달'
+ assert.ok(inspectPeriodProviderDocument(moon,'month').issues.some(i=>i.code==='period_hero_not_plain_language'))
+})
