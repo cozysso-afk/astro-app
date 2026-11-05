@@ -62,7 +62,7 @@ jobs:
 
   live-gemini-audit:
     name: Manually approved relationship four-mode Gemini audit
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -78,8 +78,7 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
-          QA_RELATIONSHIP_FUNCTION_SLUG: relationship-question-contract-qa
-        run: node web/scripts/relationship-live-qa.mjs --max-jobs "3" --purposes "compatibility,reunion,marriage_unmarried" --out web/relationship-live-qa-artifacts
+        run: node web/scripts/relationship-live-qa.mjs --max-jobs "${{ inputs.max_jobs }}" --purposes "${{ inputs.purposes }}" --out web/relationship-live-qa-artifacts
       - name: Upload report without prose, profiles, or credentials
         if: always()
         uses: actions/upload-artifact@v4
