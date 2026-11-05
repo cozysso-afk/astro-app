@@ -4,7 +4,7 @@ import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NA
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.11-daily-reading-contract'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.12-hard-readable-contract'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
@@ -106,6 +106,18 @@ export function buildV23PromptPacket(payload:any) {
     domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
   packet.narrative_plan=buildNarrativePlan(packet)
+  if(packet.period_kind==='annual'){
+    // Annual inputs are the largest. The instruction already carries these
+    // policies, so omit duplicated contract prose rather than dropping facts.
+    delete packet.domain_answer_contracts
+    if(packet.period_narrative){
+      delete packet.period_narrative.required_sequence
+      delete packet.period_narrative.evidence_priority
+      delete packet.period_narrative.forbidden_patterns
+      delete packet.period_narrative.distinctive_requirements
+      delete packet.period_narrative.interpretation_policy
+    }
+  }
   if(packet.period_kind==='day')packet.daily_editorial_brief=dailyEditorialBrief(packet)
   return packet
 }

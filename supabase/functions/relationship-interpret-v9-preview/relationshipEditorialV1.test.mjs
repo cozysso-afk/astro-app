@@ -25,6 +25,10 @@ test('core answer rejects technical shorthand, report style, copy errors and uno
  assert.equal(validateRelationshipEditorial(typo,'compatibility').reason,'korean_copy_error')
  const mind=core();mind.overview='두 사람 모두 관계를 지키려는 의지가 강해.'
  assert.equal(validateRelationshipEditorial(mind,'compatibility').reason,'unobserved_mind_claim')
+ const marriedMind=core();marriedMind.core_summary='서로에 대한 강한 애정과 가정을 지키려는 책임감이 단단해.'
+ assert.equal(validateRelationshipEditorial(marriedMind,'compatibility').reason,'unobserved_mind_claim')
+ const technicalLead=core();technicalLead.core_reason='화성과 금성의 삼각각이 관계를 받쳐줘. 쉽게 말하면 대화가 잘 맞기 쉬워.'
+ assert.equal(validateRelationshipEditorial(technicalLead,'compatibility').reason,'technical_terms_lead_core_reason')
 })
 
 test('copying the summary into reason, action or meaningful limits is rejected',()=>{

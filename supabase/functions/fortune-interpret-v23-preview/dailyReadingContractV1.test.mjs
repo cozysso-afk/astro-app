@@ -29,6 +29,13 @@ test('daily overview stays role-neutral and repeated abstract copy is rejected',
  assert.ok(inspectDailyProviderDocument(abstract,'day').issues.includes('daily_detail_abstract_repetition'))
 })
 
+test('unsupported incoming initiator and Korean copy errors are rejected',()=>{
+ const incoming=core();incoming.contact_flow={incoming:'상대방이 먼저 메시지를 건네올 수 있어.'}
+ assert.ok(inspectDailyProviderDocument(incoming,'day').issues.includes('daily_incoming_initiator_prediction'))
+ const typo=core();typo.clusters[0].real_scene='상답의 여유를 확인해.'
+ assert.ok(inspectDailyProviderDocument(typo,'day').issues.includes('daily_korean_copy_error'))
+})
+
 test('a grounded daily reading does not have to invent an exception',()=>{
  const d=core();d.clusters[0].change_condition=''
  assert.ok(inspectDailyProviderDocument(d,'day').passed)

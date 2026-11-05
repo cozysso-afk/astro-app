@@ -11,7 +11,7 @@ export const EDITORIAL_INSTRUCTION = `
 headline은 핵심 판단 한 문장(25~60자 목표, 180자 이내)이야. 긴 본문을 제목에 붙이지 마.
 headline·core_summary·overview는 천체명·각 이름·영문 전문어 없이 사람말로 먼저 답해. 전문 근거는 core_reason과 top_aspects 뒤쪽에만 두고, core_reason도 쉬운 뜻부터 쓴 뒤 근거를 최대 두 묶음만 덧붙여.
 모든 사용자 문장은 일관되게 자연스러운 ~해/~야체로 써. ~한다/~이다 보고서체를 섞지 마. '기류·에너지·조율·구조' 같은 추상어만으로 문장을 완성하지 마.
-사용자가 입력하지 않은 현재 감정·의지·실제 행동은 단정하지 마. 계산상의 끌림·긴장 가능성과 실제로 사랑한다·관계를 지키려 한다는 관측은 구분해.
+사용자가 입력하지 않은 현재 감정·의지·실제 행동은 단정하지 마. 계산상의 끌림·긴장 가능성은 '그렇게 느끼기 쉬운 조건'으로 표현하고, 실제로 사랑한다·가정을 지키려 한다·이미 강하게 결속됐다는 관측으로 바꾸지 마.
 core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), core_reason은 그 판단을 만든 실제 근거와 쉬운 뜻(360자 이내), core_action은 그 근거와 연결된 현실 확인 또는 행동 하나(240자 이내), core_conditions는 판단을 바꿀 실제 제약·조건 0~4개(각 240자 이내)다. 결론에 이미 사용된 필수 조건은 반드시 보존하고, 그런 조건이 없으면 빈 배열로 둔다. 빈칸을 채우려고 새로운 예외나 일반 주의문을 만들지 않는다. 조건을 요약에서 빠뜨리면 결론이 바뀌는 경우 요약에도 조건을 붙인다. 제한문구만으로 요약을 채우지 않는다.
 이 네 필드는 서로 다른 역할이다. 같은 문장 복사·단순 바꿔쓰기나 타 모드 내용을 채우지 않는다. 글자 수를 채우려고 새 사실을 만들지 않는다. overview는 상세 안내 2~4문장이고 핵심 요약과 별개다. 이유는 실제 근거, 생활 장면은 조건부 예시, 관측 사실은 사용자가 입력한 기록으로 구분한다. 구체적인 냉각 시간·연락 횟수·상대 심리·결혼 날짜를 근거 없이 만들지 않는다.
 궁합은 chemistry=끌림, emotional_dynamic=정서 리듬, communication=대화, conflict_pattern=갈등 수습, power_boundaries=결정권·경계, long_term=지속 조건으로 질문을 분리한다. 상시 관계 특성과 선택 기간의 변화(timing)를 섞지 않는다. felt_scenarios는 근거가 허용하는 생활 장면 1~3개이며 실제 사건처럼 쓰지 않는다. reunion_context는 궁합·결혼 모드에서 빈 문자열로 둔다.
@@ -33,13 +33,16 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   }
   const conditions = data?.core_conditions
   if (!Array.isArray(conditions) || conditions.length > 4 || conditions.some(v => !text(v).trim() || text(v).length > 240)) return fail('invalid_core_conditions')
-  if(conditions.some(v=>!/(?:경우|때|없으면|있으면|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(text(v))))return fail('core_condition_is_advice')
+  if(conditions.some(v=>!/(?:경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(text(v))))return fail('core_condition_is_advice')
+  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const plainCore=text(data.headline)+' '+text(data.core_summary)
-  if (/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위)/i.test(plainCore)) return fail('technical_terms_in_core_answer')
+  if (technical.test(plainCore)) return fail('technical_terms_in_core_answer')
+  const reasonLead=text(data.core_reason).split(/[.!?。]/)[0]
+  if(technical.test(reasonLead))return fail('technical_terms_lead_core_reason')
   const styleFields=[data.headline,data.core_summary,data.core_reason,data.core_action,data.overview,...conditions]
   if(styleFields.some(value=>/(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./.test(text(value)))) return fail('inconsistent_report_style')
   if(styleFields.some(value=>/(?:생활 가관|북수조점|예작)/.test(text(value)))) return fail('korean_copy_error')
-  const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑)/
+  const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어))/
   if(styleFields.some(value=>unobservedMind.test(text(value)))) return fail('unobserved_mind_claim')
   const allProse=JSON.stringify(data)
   if(/\b\d+\s*(?:분|시간|일)\b/.test(allProse))return fail('invented_exact_behavior_duration')
