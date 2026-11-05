@@ -137,8 +137,8 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.6-observed-fact-question-reading-contract'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.9-observed-stage-question-reading-contract'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.7-grounded-question-reading-contract'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.10-grounded-stage-question-reading-contract'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
