@@ -19,8 +19,8 @@ const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.16-readable-retry-v23'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'
 const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v6-daily-reading-contract-v9'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
-const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12.5-readable-retry-question-reading-contract'
-const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14.8-observed-stage-question-reading-contract'
+const RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12.6-observed-fact-question-reading-contract'
+const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14.9-observed-stage-question-reading-contract'
 
 function normalizedFortunePeriodKind(request: Record<string, unknown>, calculation: Record<string, unknown>, period: Record<string, unknown>): string {
   const raw = String(calculation.period_kind ?? request.period_kind ?? period.kind ?? '').trim().toLowerCase()

@@ -7,8 +7,8 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { validateReunionGroundingV2 } from "./reunionGroundingV2.ts";
 import { CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
-const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.5-readable-retry-question-reading-contract";
-const REUNION_VERSION="relationship-v14.8-observed-stage-question-reading-contract";
+const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.6-observed-fact-question-reading-contract";
+const REUNION_VERSION="relationship-v14.9-observed-stage-question-reading-contract";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -324,7 +324,8 @@ function reunionOutputContract(payload:any){
 }
 function promptText(payload:any,purpose:Purpose,compactMode=false,repairHint=""){
  const retry=compactMode?"재시도다. 완전한 JSON을 만들되 근거·오브·사주 허용필드·시기는 유지하고 중복만 줄여라.\n":"";
- const editorialRepair=compactMode?"core_reason 첫 문장은 행성명·각 이름·사주 용어 없이 쉬운 생활 언어로 판단 이유를 말하고, 전문 근거는 두 번째 문장 뒤로 미뤄. core_conditions는 조언 목록이 아니다. 각 문장을 반드시 '~하면', '~할 때', '~인 경우' 형태의 판단 변경 조건문으로 쓰고, 조건이 없으면 빈 배열을 써.\n":"";
+ const reunionRepair=compactMode&&purpose==="reunion"&&payload?.reunion_evidence_v2?.initiative_gate?.available!==true?"다음 선연락 주체는 계산할 수 없어. initiative와 consultation_answer.initiative에는 이 제한을 그대로 쓰고, 상대가 먼저/내가 먼저/먼저 다가온다는 문장을 한 번도 쓰지 마. consultation_answer.current_stage에는 사용자 입력 기록과 기준 시점을 반드시 밝혀.\n":"";
+ const editorialRepair=compactMode?"core_reason 첫 문장은 행성명·각 이름·사주 용어 없이 쉬운 생활 언어로 판단 이유를 말하고, 전문 근거는 두 번째 문장 뒤로 미뤄. core_conditions는 조언 목록이 아니다. 각 문장을 반드시 '~하면', '~할 때', '~인 경우' 형태의 판단 변경 조건문으로 쓰고, 조건이 없으면 빈 배열을 써. 계산상 책임감·결속 가능성은 '~하기 쉬운 조건'으로 쓰고 실제 책임감·의지·감정이 이미 있다고 단정하지 마.\n"+reunionRepair:"";
  const repair=compactMode&&repairHint?`앞선 응답 검증 실패=${repairHint}. 새 JSON에서 이 실패 원인을 반드시 바로잡아라.\n${editorialRepair}`:"";
  const reunion=purpose==="reunion"?`${reunionOutputContract(payload)}\n사용자 문장은 쉬운 한국어로 쓰고 내부 용어(관문, TOP, 후보 수, 통과 점수)를 그대로 노출하지 마라. 후보가 없다는 것은 불가능 또는 확률 0이 아니다. 현재 연락 중이면 연락 재개 예측을 반복하지 말고 다음 미확인 단계를 설명하라. 각 결론은 1~2문장, 해석은 2~3문장으로 작성하고 근거 ID는 유지하라. 같은 조언을 여러 필드에서 반복하지 마라.\n`:"";
  return `PURPOSE=${purpose}\n${modeInstruction(purpose)}\n${EDITORIAL_INSTRUCTION}\n${retry}${repair}${reunion}CALCULATED_DATA=${JSON.stringify(payload)}`;
