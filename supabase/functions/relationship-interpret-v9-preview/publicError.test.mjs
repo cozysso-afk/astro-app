@@ -66,7 +66,7 @@ test('invalid reunion prose is retried with Gemini and never composed locally',a
   assert.match(h.requests[1].contents[0].parts[0].text,/앞선 응답 검증 실패=reunion_grounding:invalid_question_evidence_refs/);
   assert.match(h.requests[1].contents[0].parts[0].text,/why_reconnect\.evidence_refs는 다음 ID만 사용/);
   const reunionSchema=h.requests[0].generationConfig.responseSchema.properties.reunion_synthesis_v2.properties;
-  assert.equal(reunionSchema.timing.properties.windows.maxItems,4);
+  assert.equal(reunionSchema.timing.properties.windows.maxItems,0);
   assert.equal(reunionSchema.consultation_answer.properties.evidence_refs.minItems,3);
 });
 test('generation exceptions produce fixed HTTP response and safe failed storage',async()=>{
