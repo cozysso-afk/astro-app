@@ -6,7 +6,7 @@ import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-previe
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
-import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate } from "./periodReadingContractV1.ts";
+import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, reusePlainHeadlineFromSummary } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
@@ -175,11 +175,17 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(core.partial,payload?.period_kind,pb.packet):inspectDailyProviderDocument(core.partial,payload?.period_kind,pb.packet);
+  let providerCore=core.partial;
+  let headlineReused=false;
+  let dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
+  if(!dailyReport.passed&&isExtendedPeriod(payload?.period_kind)){
+    const reused=reusePlainHeadlineFromSummary(providerCore,payload?.period_kind);
+    if(reused!==providerCore){providerCore=reused;headlineReused=true;dailyReport=inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet);}
+  }
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
-  const normalizedCore=normalizeProviderCore(core.partial);
+  const normalizedCore=normalizeProviderCore(providerCore);
   const normalizedTrace=captureEditorialStage("provider_normalized",normalizedCore);
-  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,headline_reused_from_summary:headlineReused,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
 }
 
 async function rewriteDailyCandidate(first:any,payload:any,model:string,key:string,budget:Budget,request:any){
