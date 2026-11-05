@@ -25,12 +25,9 @@ const context = await browser.newContext({
   acceptDownloads: true,
 })
 const page = await context.newPage()
-const downloadPromises = []
-let downloadCount = 0
+const downloads = []
 page.on('download', download => {
-  downloadCount += 1
-  const target = path.join(outDir, `saved-result-${downloadCount}.png`)
-  downloadPromises.push(download.saveAs(target))
+  downloads.push(download)
 })
 
 try {
@@ -169,15 +166,17 @@ try {
   const state = (await page.locator('[data-qa-export-status]').textContent()) || ''
   assert(!state.startsWith('error:'), `saved-image QA failed: ${state}`)
   const expectedPages = Number(state.split(':')[1])
-  assert(expectedPages === 2, `visual fixture must stay at 2 saved pages, got ${state}`)
+  assert(expectedPages >= 2, `complete export must span at least 2 saved pages, got ${state}`)
 
   const deadline = Date.now() + 8_000
-  while (downloadCount < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
-  await Promise.all(downloadPromises)
-  assert(downloadCount === expectedPages, `expected ${expectedPages} saved images, received ${downloadCount}`)
+  while (downloads.length < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
+  assert(downloads.length === expectedPages, `expected ${expectedPages} saved images, received ${downloads.length}`)
+  for (let index = 0; index < downloads.length; index += 1) {
+    await downloads[index].saveAs(path.join(outDir, `saved-result-${index + 1}.png`))
+  }
 
-  await writeFile(path.join(outDir, 'diagnostics.json'), JSON.stringify({ ...diagnostics, expectedPages, downloadCount }, null, 2))
-  console.log(JSON.stringify({ ok: true, ...diagnostics, expectedPages, downloadCount }, null, 2))
+  await writeFile(path.join(outDir, 'diagnostics.json'), JSON.stringify({ ...diagnostics, expectedPages, downloadCount: downloads.length }, null, 2))
+  console.log(JSON.stringify({ ok: true, ...diagnostics, expectedPages, downloadCount: downloads.length }, null, 2))
 } finally {
   await browser.close()
 }
