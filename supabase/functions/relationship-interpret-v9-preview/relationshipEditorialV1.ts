@@ -33,13 +33,16 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   }
   const conditions = data?.core_conditions
   if (!Array.isArray(conditions) || conditions.length > 4 || conditions.some(v => !text(v).trim() || text(v).length > 240)) return fail('invalid_core_conditions')
+  if(conditions.some(v=>!/(?:경우|때|없으면|있으면|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(text(v))))return fail('core_condition_is_advice')
   const plainCore=text(data.headline)+' '+text(data.core_summary)
   if (/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위)/i.test(plainCore)) return fail('technical_terms_in_core_answer')
   const styleFields=[data.headline,data.core_summary,data.core_reason,data.core_action,data.overview,...conditions]
   if(styleFields.some(value=>/(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./.test(text(value)))) return fail('inconsistent_report_style')
   if(styleFields.some(value=>/(?:생활 가관|북수조점|예작)/.test(text(value)))) return fail('korean_copy_error')
-  const unobservedMind=/(?:깊은 애정이? (?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑)/
+  const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑)/
   if(styleFields.some(value=>unobservedMind.test(text(value)))) return fail('unobserved_mind_claim')
+  const allProse=JSON.stringify(data)
+  if(/\b\d+\s*(?:분|시간|일)\b/.test(allProse))return fail('invented_exact_behavior_duration')
   const fields = [data.core_summary, data.core_reason, data.core_action, ...conditions].map(canonical)
   if (new Set(fields).size !== fields.length) return fail('duplicated_core_roles')
   if (purpose.startsWith('marriage_') && data?.marriage_reading?.mode !== purpose) return fail('marriage_mode_mismatch')

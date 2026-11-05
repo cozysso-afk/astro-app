@@ -45,6 +45,8 @@ export function inspectDailyProviderDocument(core:any, kind:unknown, payload?:an
   const hero=text(core?.headline)+' '+text(core?.overall?.summary)+' '+text(core?.overall?.best_phase)+' '+text(core?.overall?.caution_phase)
   if (/(?:학업|공부|시험|직장|업무|실무|이직|투자|매수|매도|연애|연락|재회|금전|컨디션)/.test(hero)) issues.push('daily_overview_role_specific')
   if (/(?:기류|에너지|예작|가관)/.test(hero)) issues.push('daily_overview_abstract_or_typo')
+  const contactIncoming=text(core?.contact_flow?.incoming)
+  if(/(?:상대(?:로부터|가)|누군가가)\s*먼저[^.]{0,30}(?:연락|메시지|대화|문의)/.test(contactIncoming))issues.push('daily_incoming_initiator_prediction')
   const authoredRows=rows.filter((row:any)=>row?.applicability!=='insufficient')
   const abstractCount=authoredRows.reduce((count:number,row:any)=>count+((text(row?.conclusion)+' '+text(row?.real_scene)+' '+text(row?.action)).match(/(?:기류|에너지|작용)/g)?.length??0),0)
   if(abstractCount>2)issues.push('daily_detail_abstract_repetition')
