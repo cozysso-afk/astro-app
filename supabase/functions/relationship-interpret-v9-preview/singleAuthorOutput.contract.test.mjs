@@ -10,5 +10,5 @@ test('served relationship output is never rewritten with local glossary copy', (
 })
 
 test('reunion output cache and provenance use the question reading contract', () => {
-  assert.match(source, /REUNION_VERSION="relationship-v14\.9-observed-stage-question-reading-contract"/)
+  assert.match(source, /REUNION_VERSION="relationship-v14\.10-grounded-stage-question-reading-contract"/)
 })
