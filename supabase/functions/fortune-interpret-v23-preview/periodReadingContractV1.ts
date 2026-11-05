@@ -102,7 +102,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
 - 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마.
 - Western·사주·Thai는 독립 근거야. 같은 기간이라고 합산해 확신을 키우지 마. 원시 Thai 위치를 기간의 길흉·사건·상대 마음으로 바꾸지 마. 점수는 확률이 아니고 높은 활성도는 유리하다는 뜻도 아니야.
 - 서사는 점수보다 실제 현상 묶음부터 시작해. 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명하고 각 분야의 질문에 맞춰 적용 범위를 구분해.
-- 점수·평균·변동폭을 설명 자체로 착각하지 마. 고정 조언문을 분야명만 바꿔 반복하지 마. 목적어와 서술어의 의미 호응을 확인하고 쉬운 생활 언어로 써.
+- 점수·평균·변동폭을 설명 자체로 착각하지 마. 고정 조언문을 분야명만 바꿔 반복하지 마. 목적어와 서술어의 의미 호응을 확인하고 쉬운 생활 언어로 써. 제출 전 오탈자와 잘못 붙은 단어를 한 번 더 읽어 고쳐.
 - domain_answer_contracts의 각 질문에서 실제 evidence_refs로 직접 또는 부분 답변할 수 있는 항목만 domain_answers에 써. status=direct/partial을 구분하고 근거가 없는 질문은 생략해. 서버가 not_calculated로 처리한다. 일반론으로 채우지 마.
 - relationship_reading.focus_timing의 정확한 날짜는 같은 관계 분야의 직접 date 근거를 연결한 경우만 써. start/end 구간이나 다른 분야의 날짜를 관계 주목 날짜로 가져오지 마. 직접 날짜 근거가 없으면 정확한 날짜를 쓰지 마.
 - 재회 관심 해설은 생각남→연락→실제 만남→관계 재구축 단계를 구분해. 이전 단계가 다음 단계를 보장하지 않아. 다시 낮춰 읽을 현실 조건은 근거가 허용할 때만 쓰고, 실제 관찰 정보가 없으면 있다고 가정하지 마.
@@ -117,6 +117,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
   if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
+  if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(JSON.stringify(core)))issues.push({code:'period_korean_copy_error',path:'root'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
