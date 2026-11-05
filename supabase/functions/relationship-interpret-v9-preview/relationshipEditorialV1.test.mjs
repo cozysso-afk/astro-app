@@ -27,6 +27,8 @@ test('core answer rejects technical shorthand, report style, copy errors and uno
  assert.equal(validateRelationshipEditorial(mind,'compatibility').reason,'unobserved_mind_claim')
  const marriedMind=core();marriedMind.core_summary='서로에 대한 강한 애정과 가정을 지키려는 책임감이 단단해.'
  assert.equal(validateRelationshipEditorial(marriedMind,'compatibility').reason,'unobserved_mind_claim')
+ const observedIntent=core();observedIntent.overview='너희 부부는 가정을 지키는 책임감과 협력 체계가 단단하게 갖춰져 있어.'
+ assert.equal(validateRelationshipEditorial(observedIntent,'marriage_married').reason,'unobserved_mind_claim')
  const technicalLead=core();technicalLead.core_reason='화성과 금성의 삼각각이 관계를 받쳐줘. 쉽게 말하면 대화가 잘 맞기 쉬워.'
  assert.equal(validateRelationshipEditorial(technicalLead,'compatibility').reason,'technical_terms_lead_core_reason')
 })
