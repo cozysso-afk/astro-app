@@ -25,13 +25,13 @@ test('daily starts with the reviewed model while longer periods retain their exi
   assert.match(source, /const preferred=MODELS\[b\.model\]\?b\.model:compacted\.period_kind==="day"\?"gemini-3\.7-flash":V23_DEFAULT_MODEL/)
 })
 
-test('period retries do not invent windows or drop required contact slots to fit a fixed cluster count', () => {
+test('period retries do not invent windows or force every optional contact detail', () => {
   const schema=buildProviderCoreSchema(SCHEMA,'annual')
   assert.equal(schema.properties.year_phases.minItems,0)
   assert.equal(schema.properties.key_windows.minItems,0)
   const p={period_kind:'annual',period:{start:'2026-01-01',end:'2026-12-31'},evidence_ledger:[{id:'contact',topic:'연락',date:'2026-02-01'}]}
   const core={clusters:PERIOD_PRIMARY_KEYS.map(key=>({key,applicability:'insufficient',conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[]}))}
-  assert.ok(inspectPeriodProviderDocument(core,'annual',p).issues.some(i=>i.path==='clusters.relationship.contact_activation'))
+  assert.equal(inspectPeriodProviderDocument(core,'annual',p).issues.some(i=>i.path==='clusters.relationship.contact_activation'),false)
 })
 
 test('relationship focus dates require direct relationship timing evidence', () => {
