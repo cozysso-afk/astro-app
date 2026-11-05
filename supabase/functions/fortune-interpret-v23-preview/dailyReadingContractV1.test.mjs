@@ -22,6 +22,13 @@ test('repeated field conclusions, overall fallback and unbounded hero fail',()=>
   assert.ok(inspectDailyProviderDocument(d,'day').issues.includes('daily_summary_invalid'))
 })
 
+test('daily overview stays role-neutral and repeated abstract copy is rejected',()=>{
+ const d=core();d.headline='학업과 실무를 밀어붙이기 좋아.'
+ assert.ok(inspectDailyProviderDocument(d,'day').issues.includes('daily_overview_role_specific'))
+ const abstract=core();for(const row of abstract.clusters){row.real_scene='좋은 기류와 에너지가 작용해.'}
+ assert.ok(inspectDailyProviderDocument(abstract,'day').issues.includes('daily_detail_abstract_repetition'))
+})
+
 test('a grounded daily reading does not have to invent an exception',()=>{
  const d=core();d.clusters[0].change_condition=''
  assert.ok(inspectDailyProviderDocument(d,'day').passed)

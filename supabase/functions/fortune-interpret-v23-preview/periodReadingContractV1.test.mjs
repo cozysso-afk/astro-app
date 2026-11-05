@@ -16,10 +16,9 @@ test('a required field omission cannot be normalized into evidence insufficiency
  assert.ok(inspectPeriodProviderDocument(core,'week').issues.some(i=>i.code==='primary_missing_or_duplicate'))
  assert.equal(inspectPeriodProviderDocument(core,'day').passed,true)
 })
-test('computed contact and exam cannot disappear from a period response',()=>{
+test('extended periods keep detail readings optional instead of forcing every sampled topic',()=>{
  const p=packet([fact('c','2026-01-02','연락'),fact('x','2026-01-03','시험')])
- const result=inspectPeriodProviderDocument(provider(),'annual',p)
- for(const key of ['relationship.contact_activation','relationship.contact_continuity','work_study.exam'])assert.ok(result.issues.some(i=>i.path==='clusters.'+key))
+ assert.equal(inspectPeriodProviderDocument(provider(),'annual',p).passed,true)
  const core=provider();core.clusters.push(...['relationship.contact_activation','relationship.contact_continuity','work_study.exam'].map(blank))
  assert.equal(inspectPeriodProviderDocument(core,'annual',p).passed,true)
 })
@@ -33,7 +32,7 @@ test('reader packet restores omitted topic evidence and retains source_topics an
  const result=attachPeriodReadingContext(p,full)
  assert.deepEqual(result.evidence_ledger.find(r=>r.id==='contact'),contact)
  assert.deepEqual(result.period_reading.omitted_ids,['extra'])
- assert.ok(result.period_reading.required_section_keys.includes('relationship.contact_activation'))
+ assert.deepEqual(result.period_reading.required_section_keys,PERIOD_PRIMARY_KEYS)
  assert.equal(result.period_reading.questions.find(q=>q.key==='work_study.study').coverage,'sampled')
  assert.deepEqual(p.evidence_ledger,[kept])
  assert.equal(attachPeriodReadingContext({...p,period_kind:'day'},full).period_reading,undefined)

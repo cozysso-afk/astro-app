@@ -17,9 +17,11 @@ export const PERIOD_DETAIL_TOPICS:Record<string,string[]> = {
   'investment.realization':['수익실현'], 'investment.entry':['신규진입'],
 }
 const QUESTION_TOPICS={...PERIOD_PRIMARY_TOPICS,...PERIOD_DETAIL_TOPICS}
-function requiredKeys(payload:any){
-  const rows=payload?.evidence_ledger??[]
-  return [...PERIOD_PRIMARY_KEYS,...Object.entries(PERIOD_DETAIL_TOPICS).filter(([,topics])=>rows.some((row:any)=>intersects(row,payload.period)&&topicsOf(row).some(t=>topics.includes(t)))).map(([key])=>key)]
+function requiredKeys(_payload:any){
+  // Extended periods keep the six first-screen questions mandatory. Detail
+  // readings remain available when directly answerable, but are not all forced
+  // merely because a sampled topic row exists.
+  return PERIOD_PRIMARY_KEYS
 }
 const text=(v:unknown)=>typeof v==='string'?v.trim():''
 const date=(v:unknown)=>{
@@ -85,7 +87,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
   const word=kind==='week'?'한 주':kind==='month'?'한 달':'한 해'
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.
-- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 period_reading.required_section_keys에 있으면 반드시 작성해. 근거로 그 질문에 답할 수 없으면 해당 항목을 명시적으로 insufficient로 둬. 상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.
+- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. 상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.
 - 각 항목은 conclusion/real_scene/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나, real_scene은 적용 상황과 실제 기간근거의 이유, action은 그 판단에서 도출한 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.

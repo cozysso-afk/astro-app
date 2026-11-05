@@ -16,6 +16,17 @@ test('core roles remain exact model text; missing or overlong role is rejected',
   assert.equal(data.core_summary.length,181)
 })
 
+test('core answer rejects technical shorthand, report style, copy errors and unobserved feelings',()=>{
+ const technical=core();technical.core_summary='태양과 금성의 삼각각이 관계를 받쳐줘.'
+ assert.equal(validateRelationshipEditorial(technical,'compatibility').reason,'technical_terms_in_core_answer')
+ const report=core();report.overview='생활 규칙을 맞추는 것이 필요하다.'
+ assert.equal(validateRelationshipEditorial(report,'compatibility').reason,'inconsistent_report_style')
+ const typo=core();typo.core_reason='생활 가관을 확인해.'
+ assert.equal(validateRelationshipEditorial(typo,'compatibility').reason,'korean_copy_error')
+ const mind=core();mind.overview='두 사람 모두 관계를 지키려는 의지가 강해.'
+ assert.equal(validateRelationshipEditorial(mind,'compatibility').reason,'unobserved_mind_claim')
+})
+
 test('copying the summary into reason, action or meaningful limits is rejected',()=>{
   for(const key of ['core_reason','core_action']){const data=core();data[key]=data.core_summary;assert.equal(validateRelationshipEditorial(data,'compatibility').reason,'duplicated_core_roles')}
   const data=core();data.core_conditions=[data.core_summary];assert.equal(validateRelationshipEditorial(data,'compatibility').reason,'duplicated_core_roles')
