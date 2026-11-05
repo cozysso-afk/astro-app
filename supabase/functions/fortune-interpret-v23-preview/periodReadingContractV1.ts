@@ -139,6 +139,18 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   return {version:PERIOD_READING_VERSION,passed:!issues.length,issues}
 }
 
+/** Reuse one complete Gemini-authored summary sentence when only the headline
+ * is still abstract. No local words are written or shortened. */
+export function reusePlainHeadlineFromSummary(core:any,kind:unknown){
+  if(!isExtendedPeriod(kind))return core
+  const before=inspectPeriodProviderDocument(core,kind)
+  if(before.issues.length!==1||before.issues[0]?.code!=='period_hero_not_plain_language'||before.issues[0]?.path!=='headline')return core
+  const sentence=text(core?.overall?.summary).split(/[.!?。]/).map(value=>value.trim()).find(Boolean)??''
+  if(sentence.length<12||sentence.length>80)return core
+  const patched={...core,headline:sentence}
+  return inspectPeriodProviderDocument(patched,kind).passed?patched:core
+}
+
 // Validate claims against their own references. Two endpoint samples do not
 // cover the interval between them; a phase requires a real interval row.
 function rowCoversSpan(row:any,start:string,end:string){
