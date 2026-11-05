@@ -114,7 +114,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const issues:Issue[]=[]
   if(!isExtendedPeriod(kind))return {version:PERIOD_READING_VERSION,passed:true,issues}
   const rows=Array.isArray(core?.clusters)?core.clusters:[]
-  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
+  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
   if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){

@@ -34,7 +34,7 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   const conditions = data?.core_conditions
   if (!Array.isArray(conditions) || conditions.length > 4 || conditions.some(v => !text(v).trim() || text(v).length > 240)) return fail('invalid_core_conditions')
   if(conditions.some(v=>!/(?:경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(text(v))))return fail('core_condition_is_advice')
-  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
+  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const plainCore=text(data.headline)+' '+text(data.core_summary)
   if (technical.test(plainCore)) return fail('technical_terms_in_core_answer')
   const reasonLead=text(data.core_reason).split(/[.!?。]/)[0]
