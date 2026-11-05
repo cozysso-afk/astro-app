@@ -140,7 +140,7 @@ test('independent system export preserves all authored cards and refuses font dr
   assert.doesNotMatch(exporter,/\.western-score-grid > details'\)\)\.slice\(0, 3\)/)
   assert.doesNotMatch(exporter,/\.saju-reader-topics \\.system-lens'\)\)\.slice\(0, 3\)/)
   assert.doesNotMatch(exporter,/\.thai-life-map \\.bhumi-grid > details'\)\)\.slice\(0, 3\)/)
-  assert.match(exporter,/western-score-guidance'\),\n\s*tone:[\s\S]{0,180}complete:\s*true/)
+  assert.match(exporter,/const western =[\s\S]*?western-score-guidance[\s\S]*?complete:\s*true[\s\S]*?const saju =/)
   assert.match(exporter,/heroSource[\s\S]*integrated \? firstSentences\(heroSource, 1\) : heroSource/)
   assert.match(exporter,/전체를 통틀어 보면[\s\S]{0,220}complete:\s*true/)
   assert.match(exporter,/Noto Sans KR/)
