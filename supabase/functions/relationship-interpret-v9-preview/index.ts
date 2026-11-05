@@ -7,8 +7,8 @@ import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { validateReunionGroundingV2 } from "./reunionGroundingV2.ts";
 import { CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
-const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.6-observed-fact-question-reading-contract";
-const REUNION_VERSION="relationship-v14.9-observed-stage-question-reading-contract";
+const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.7-grounded-question-reading-contract";
+const REUNION_VERSION="relationship-v14.10-grounded-stage-question-reading-contract";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
