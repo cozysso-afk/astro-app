@@ -117,11 +117,11 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|(?<!이번\s)(?<!한\s)달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
   if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
-  if(/(?:업무|직장|학업|시험|공부|이직|출근|퇴근)/.test(hero))issues.push({code:'period_hero_role_assumption',path:'headline'})
+  if(/(?:업무|실무|직장|학업|시험|공부|이직|출근|퇴근)/.test(hero))issues.push({code:'period_hero_role_assumption',path:'headline'})
   const providerText=JSON.stringify(core)
   if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(providerText))issues.push({code:'period_korean_copy_error',path:'root'})
-  if(/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|체력이\s*떨어질\s*수|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/.test(providerText))issues.push({code:'period_unobserved_event_or_span',path:'root'})
-  for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
+  if(/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/.test(providerText))issues.push({code:'period_unobserved_event_or_span',path:'root'})
+  const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')\n  const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']\n  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[]).length>5))issues.push({code:'period_generic_repetition',path:'root'})\n  for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
   }
