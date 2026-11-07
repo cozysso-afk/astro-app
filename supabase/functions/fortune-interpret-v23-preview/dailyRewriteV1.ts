@@ -109,7 +109,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\d{1,2}월\s*\d{1,2}일|상반기|하반기|[1-4]분기)/
   for(let index=0;index<rows.length;index++)if(typeof rows[index]?.real_scene==='string'&&dated.test(rows[index].real_scene))paths.add(`clusters.${index}.real_scene`)
   const selected=[...paths]
-  if(!selected.length||selected.length>48)return null
+  if(!selected.length||selected.length>64)return null
   const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.')}))
   return {paths:selected,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[PERIOD BOUNDED PROSE EDIT]
