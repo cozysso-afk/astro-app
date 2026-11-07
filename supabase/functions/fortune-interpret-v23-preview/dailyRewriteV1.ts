@@ -96,6 +96,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language','period_unobserved_event_or_span','period_generic_repetition'])
   if(!issues.length||issues.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=new Set<string>()
+  for(const issue of issues.filter((issue:any)=>issue.code==='period_unobserved_event_or_span'&&issue.path!=='root'))if(typeof get(candidate,issue.path)==='string'&&get(candidate,issue.path).trim())paths.add(issue.path)
   if(issues.some((issue:any)=>issue.path==='headline')){
     for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
   }
@@ -117,7 +118,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   for(let index=0;index<rows.length;index++)if(typeof rows[index]?.real_scene==='string'&&dated.test(rows[index].real_scene))paths.add(`clusters.${index}.real_scene`)
   const selected=[...paths]
   if(!selected.length||selected.length>64)return null
-  const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.')}))
+  const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.'),failures:issues.filter((issue:any)=>issue.path===path||issue.path==='root').map((issue:any)=>issue.code)}))
   return {paths:selected,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[PERIOD BOUNDED PROSE EDIT]
 전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
