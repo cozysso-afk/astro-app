@@ -166,3 +166,13 @@ test('root copy findings edit all authored period prose without touching evidenc
   assert.ok(request.paths.includes('relationship_reading.watch'))
   assert.ok(request.prompt.includes('피로'))
 })
+
+
+test('field-specific period copy findings repair the exact non-cluster prose',()=>{
+  const candidate={headline:'요청 범위를 맞추는 달이야.',overall:{summary:'서로 이해한 조건을 비교해.'},clusters:[],relationship_reading:{watch:'답신이 늦어지니 상대가 먼저 연락할 때까지 기다려.'}}
+  const request=buildPeriodStructureRewriteRequest(candidate,{period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'}},{issues:[
+    {path:'relationship_reading.watch',code:'period_unobserved_event_or_span'},
+  ]})
+  assert.ok(request.paths.includes('relationship_reading.watch'))
+  assert.deepEqual(request.targets.find(target=>target.path==='relationship_reading.watch').failures,['period_unobserved_event_or_span'])
+})
