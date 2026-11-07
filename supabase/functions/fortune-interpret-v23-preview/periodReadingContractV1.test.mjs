@@ -167,3 +167,16 @@ test('period provider locates invented health claims and unsupported detail pros
   assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_health_claim'&&issue.path==='clusters.5.real_scene'))
   assert.ok(report.issues.some(issue=>issue.code==='period_unsupported_detail_prose'&&issue.path==='investment_reading.risk'))
 })
+
+
+test('authored period scenes stay conditional and relationship prose cannot invent contact',()=>{
+  const data=provider()
+  data.clusters=data.clusters.map((row,index)=>index===0?{...row,conclusion:'속도를 정하기보다 반응을 살펴봐.',real_scene:'상대의 짧은 연락이 이어져.',action:'답장 간격을 이틀로 늘려.',evidence_refs:['x'],applicability:'direct'}:row)
+  const report=inspectPeriodProviderDocument(data,'month')
+  assert.ok(report.issues.some(issue=>issue.code==='period_real_scene_not_conditional'&&issue.path==='clusters.0.real_scene'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_relationship_contact_leak'&&issue.path==='clusters.0.real_scene'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_specific_life_detail'&&issue.path==='clusters.0.action'))
+  data.clusters[0].real_scene='실제로 대화를 나누는 상황이라면 확인된 반응보다 앞서 관계를 정하지 마.'
+  data.clusters[0].action='말의 강도보다 약속 이행 여부를 살펴봐.'
+  assert.equal(inspectPeriodProviderDocument(data,'month').issues.some(issue=>['period_real_scene_not_conditional','period_relationship_contact_leak','period_specific_life_detail'].includes(issue.code)),false)
+})
