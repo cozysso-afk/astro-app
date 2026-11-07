@@ -54,6 +54,7 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
   const issues=Array.isArray(report?.issues)?report.issues:[]
   const parsed=issues.map((issue:any)=>{
     if(typeof issue==='string'){
+      if(!issue.includes(':'))return {path:'headline',code:issue.trim()}
       const [path,...rest]=issue.split(':')
       return {path:path.trim(),code:rest.join(':').trim()}
     }
