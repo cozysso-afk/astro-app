@@ -98,8 +98,9 @@ function hasDeterministicClaim(prose:string){
   return re.test(prose);
 }
 
-export function inspectInterpretationQuality(data:any,payload:any,options:{requireDailyTimedDecision?:boolean;allowEmptyDailyChangeCondition?:boolean}={}){
+export function inspectInterpretationQuality(data:any,payload:any,options:{requireDailyTimedDecision?:boolean;allowEmptyDailyChangeCondition?:boolean;periodReadingContract?:boolean}={}){
   const map=ledgerMap(payload),kind=String(payload?.period_kind??"day"),stages:any[]=[];
+  const periodReading=options.periodReadingContract===true&&["week","month","annual"].includes(kind);
 
   const s1:string[]=[];
   if(!data?.headline||!data?.overall?.summary)s1.push("headline/overall 누락");
@@ -196,7 +197,7 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
   }
   const relationshipSalient=["연애","연락","재회"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));
   const investmentSalient=["투자심리","수익실현","신규진입","투자주의"].some(topic=>["핵심","주목"].includes(String(data?.topic_analysis?.[topic]?.importance??"")));
-  if(relationshipSalient){
+  if(relationshipSalient&&(!periodReading||Object.values(data?.relationship_reading??{}).some((v:any)=>typeof v==="string"&&v.trim()))){
     const rr=data?.relationship_reading??{};
     const rows=(rr?.evidence_refs??[]).map((r:string)=>map.get(r)).filter(Boolean) as any[];
     const directional=new Set(["수신신호","발신적합","과거인연접점"]);
@@ -211,28 +212,28 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
     if(x?.mode!=="Western단독"&&(!systems.has("western")||systems.size<2))s4.push(`복수체계/상반맥락인데 독립 체계 2개 미만: ${x?.label||""}`);
   }
   const windowRefs=new Set((data?.key_windows??[]).flatMap((x:any)=>x?.evidence_refs??[]));
-  for(const d of data?.decisions??[])if(!(d?.evidence_refs??[]).some((r:string)=>windowRefs.has(r)))s4.push(`핵심 시기와 연결되지 않은 결정 조언: ${txt(d?.action,60)}`);
+  for(const d of data?.decisions??[])if(!(periodReading&&!windows.length&&(d?.evidence_refs??[]).some((r:string)=>map.has(r)))&&!(d?.evidence_refs??[]).some((r:string)=>windowRefs.has(r)))s4.push(`핵심 시기와 연결되지 않은 결정 조언: ${txt(d?.action,60)}`);
   stages.push(qualityStage(4,"내부 일관성",uniq(s4).slice(0,30)));
 
   const s5:string[]=[];
-  const minWindows=kind==="annual"?5:kind==="month"?3:kind==="week"?2:1;
-  const minDecisions=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
-  const minPriorities=kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
+  const minWindows=periodReading?0:kind==="annual"?5:kind==="month"?3:kind==="week"?2:1;
+  const minDecisions=periodReading?0:kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
+  const minPriorities=periodReading?0:kind==="annual"?3:kind==="month"?2:kind==="week"?2:1;
   if((data?.key_windows?.length??0)<minWindows)s5.push(`핵심 시기 부족: ${data?.key_windows?.length??0}/${minWindows}`);
   if((data?.decisions?.length??0)<minDecisions)s5.push(`결정/행동 가이드 부족: ${data?.decisions?.length??0}/${minDecisions}`);
   if((data?.priorities?.length??0)<minPriorities)s5.push(`우선순위 부족: ${data?.priorities?.length??0}/${minPriorities}`);
-  if(kind==="annual"&&(data?.year_phases?.length??0)<4)s5.push("연간 4개 phase 미완성");
-  if(kind==="annual"&&(data?.cross_checks?.length??0)<3)s5.push("연간 교차검증 3개 미만");
-  if(kind==="annual"&&Array.from(map.values() as any).some((r:any)=>r?.system&&r.system!=="western")){
+  if(!periodReading&&kind==="annual"&&(data?.year_phases?.length??0)<4)s5.push("연간 4개 phase 미완성");
+  if(!periodReading&&kind==="annual"&&(data?.cross_checks?.length??0)<3)s5.push("연간 교차검증 3개 미만");
+  if(!periodReading&&kind==="annual"&&Array.from(map.values() as any).some((r:any)=>r?.system&&r.system!=="western")){
     const multi=(data?.cross_checks??[]).filter((x:any)=>{const systems=new Set((x?.evidence_refs??[]).map((r:string)=>map.get(r)?.system).filter(Boolean));return systems.has("western")&&systems.size>=2;}).length;
     if(multi<2)s5.push(`복수체계 교차검증 부족: ${multi}/2`);
   }
-  if(kind==="annual"&&(data?.overall?.evidence_refs?.length??0)<3)s5.push("연간 총평 근거 3개 미만");
-  if(kind==="annual"&&Number(payload?.western?.daily_evidence_coverage?.days_with_evidence??0)>0){
+  if(!periodReading&&kind==="annual"&&(data?.overall?.evidence_refs?.length??0)<3)s5.push("연간 총평 근거 3개 미만");
+  if(!periodReading&&kind==="annual"&&Number(payload?.western?.daily_evidence_coverage?.days_with_evidence??0)>0){
     const dailyBacked=(data?.key_windows??[]).filter((w:any)=>(w?.evidence_refs??[]).some((ref:string)=>ref.startsWith("W:daily:"))).length;
     if(dailyBacked<Math.min(3,data?.key_windows?.length??0))s5.push(`실제 일별 애스펙트/하우스 근거가 연결된 핵심 시기 부족: ${dailyBacked}/3`);
   }
-  if(kind==="week"||kind==="month"){
+  if(!periodReading&&(kind==="week"||kind==="month")){
     const dailyRefsAvailable=Array.from(map.keys()).filter((ref:any)=>String(ref).startsWith("W:daily:"));
     if(dailyRefsAvailable.length){
       const required=kind==="month"?Math.min(2,data?.key_windows?.length??0):Math.min(1,data?.key_windows?.length??0);
@@ -286,10 +287,10 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
     if(!String(w?.summary??"").trim())s5.push(`핵심 시기 설명 누락: ${w?.label}`);
     if(String(w?.summary??"").length>750)s5.push(`핵심 시기 설명이 지나치게 김: ${w?.label}`);
     if(!String(w?.action??"").trim())s5.push(`핵심 시기 행동 누락: ${w?.label}`);
-    if((w?.evidence_refs?.length??0)<(kind==="annual"?2:1))s5.push(`핵심 시기 근거 수 부족: ${w?.label}`);
+    if((w?.evidence_refs?.length??0)<(kind==="annual"&&!periodReading?2:1))s5.push(`핵심 시기 근거 수 부족: ${w?.label}`);
   }
   if(kind==="annual")for(const p of data?.year_phases??[])if(!(p?.evidence_refs?.length))s5.push(`연간 phase 근거 없음: ${p?.label}`);
-  if(relationshipSalient){
+  if(relationshipSalient&&(!periodReading||Object.values(data?.relationship_reading??{}).some((v:any)=>typeof v==="string"&&v.trim()))){
     const rr=data?.relationship_reading??{},cf=data?.contact_flow??{};
     if(!String(rr?.context??"").trim())s5.push("관계·재회 관계 맥락 누락");
     if(!String(rr?.flow??"").trim())s5.push("관계·재회 이어지는 흐름 누락");
@@ -361,7 +362,7 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
     if(String(section?.conclusion??"").length<10)s6.push(`${id} 현재 결론 누락`);
     if(String(section?.real_scene??"").length<12)s6.push(`${id} 현실 장면/판단기준 누락`);
     if(String(section?.action??"").length<8)s6.push(`${id} 사용자 행동 누락`);
-    if(!(payload?.period_kind==="day"&&options.allowEmptyDailyChangeCondition===true&&!String(section?.change_condition??"").trim())&&String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
+    if(!((periodReading||payload?.period_kind==="day"&&options.allowEmptyDailyChangeCondition===true)&&!String(section?.change_condition??"").trim())&&String(section?.change_condition??"").length<12)s6.push(`${id} 판단변경조건 누락`);
     if(mode==="direct"&&!(section?.evidence_refs?.length))s6.push(`${id} direct인데 근거 ID 없음`);
     const combined=sectionText(section);
     if(/^(?:확인해|지켜봐|신중해|서두르지 마|천천히 봐)[.!\s]*$/.test(combined))s6.push(`${id} 안전하지만 무용한 원고`);

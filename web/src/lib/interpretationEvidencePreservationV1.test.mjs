@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { buildSync } from 'esbuild'
 import { compactReunionHierarchyForExternal, compactReunionTimingForExternal } from './reunionCompactEvidence.ts'
 
 const edge = readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts', import.meta.url), 'utf8')
@@ -94,7 +96,24 @@ test('technical causal prose is never restored just to fill reader-language slot
   assert.doesNotMatch(body,/selected\.push\(row\)/)
 })
 
-test('reunion authored cache is invalidated for the temporal evidence contract', () => {
-  assert.match(edge,/REUNION_VERSION="relationship-v14\.3-gemini-single-author"/)
-  assert.match(cache,/relationship-v14\.3-gemini-single-author/)
+test('reunion authored cache rotates with the backend contract and cannot reuse the prior generation key', async () => {
+  const backendVersion=edge.match(/const REUNION_VERSION="([^"]+)"/)?.[1]
+  const clientVersion=cache.match(/const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = '([^']+)'/)?.[1]
+  const oldVersion='relationship-v14.3-gemini-single-author'
+  assert.ok(backendVersion)
+  assert.equal(clientVersion,backendVersion)
+  assert.notEqual(clientVersion,oldVersion)
+  // Bundle the actual production function twice. Only the old version token is
+  // substituted; hashing and input serialization remain production code.
+  const load=async source=>{
+    const built=buildSync({stdin:{contents:source,loader:'ts',resolveDir:fileURLToPath(new URL('.',import.meta.url))},bundle:true,platform:'node',format:'esm',write:false})
+    return import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)
+  }
+  const current=await load(cache),legacy=await load(cache.replace(clientVersion,oldVersion))
+  const calculation={engine:'synthetic',period:{start:'2026-11-04',end:'2026-11-10'}},context={observed_state:'unknown'}
+  const key=current.relationshipAiCacheId(calculation,'reunion','test-model',context)
+  assert.notEqual(key,legacy.relationshipAiCacheId(calculation,'reunion','test-model',context))
+  assert.equal(current.relationshipAiCacheId(calculation,'compatibility','test-model',context),legacy.relationshipAiCacheId(calculation,'compatibility','test-model',context))
+  assert.notEqual(key,current.relationshipAiCacheId(calculation,'reunion','test-model',{observed_state:'contact_observed'}))
+  assert.equal(key,current.relationshipAiCacheId(structuredClone(calculation),'reunion','test-model',structuredClone(context)))
 })

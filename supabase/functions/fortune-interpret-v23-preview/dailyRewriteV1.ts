@@ -2,6 +2,12 @@ import { DAILY_EDITORIAL_INSTRUCTION } from './dailyEditorialV1.ts'
 type Issue={path:string;code:string}
 const parts=(path:string)=>path.replace(/\[(\d+)\]/g,'.$1').split('.')
 const get=(data:any,path:string)=>parts(path).reduce((v,key)=>v?.[key],data)
+const PERIOD_UNOBSERVED=/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/
+function matchingStringPaths(value:any,pattern:RegExp,path=''):string[]{
+  if(typeof value==='string')return path&&pattern.test(value)?[path]:[]
+  if(!value||typeof value!=='object')return []
+  return Object.entries(value).flatMap(([key,child])=>matchingStringPaths(child,pattern,path?path+'.'+key:key))
+}
 
 export function buildDailyRewriteRequest(candidate:any,quality:any,payload:any) {
   const issues:Issue[]=quality?.daily_editorial?.issues??[]
@@ -31,7 +37,7 @@ unprovided/unobserved/unmeasured: 입력 없는 사건·실제 체력·신체 �
 mixed_life_roles: 업무와 공부를 독자의 실제 일정처럼 함께 가정하지 마. 해당 주장의 공통 확인 대상을 역할 중립적으로 설명해.
 unprovided_role_in_overview: 특정 직업·학업·이직 일정을 전제하지 말고 공통 생활 상황으로 종합해.
 opaque: 명사만 바꿔 같은 모호한 말을 반복하지 말고 무슨 상황에서 무엇을 확인할지 직접 써.
-오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. change_condition은 새 명령이 아니라 앞의 판단이 달라질 관찰 조건이야. 근거 있는 예외를 도출할 수 없으면 해당 필드만 빈 문자열로 반환해.
+오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. 일일 change_condition은 빈 문자열로 반환해. 빠진 연락·재회·시험·이직·투자·소식 항목을 이 문장 편집 단계에서 새로 작성하지 마. 항목 누락은 전체 구조 검증에서 처리하며 이미 작성된 다른 세부 원고를 지우거나 종합으로 바꾸지 마.
 time_context=${JSON.stringify(payload.time_context??{})}
 TARGETS=${JSON.stringify(targets)}`}
 }
@@ -45,17 +51,122 @@ export function buildDailyClarityRequest(candidate:any,payload:any,quality?:any)
   const request=buildDailyRewriteRequest(candidate,{stages:quality?.stages??[],daily_editorial:{issues}},payload)
   if(!request)return null
   request.prompt+=`\n[FINAL READER EDIT]\n자동검사 통과와 문장 품질은 달라. 아래 기준으로 각 target을 편집해. 제목·요약과 실제 오류가 있는 필드만 고쳐. 이미 기준에 맞는 문장은 그대로 반환해. 원문보다 확신을 높이거나 새로운 손해·효과·예외를 추가하지 마.\n- 원고의 의미와 조건, 근거 방향을 보존해. 사건·증상·상대 행동을 새로 만들지 마.\n- headline/conclusion은 행동 명령이 아니라 무엇이 수월하거나 까다로운지 해석한 결과야. 독자가 묻는 운세에 먼저 답하고 행동은 action에 남겨. 모든 결론을 확인·미루기·조심하기로 바꾸지 마.
-- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단이 해당하는 상황과 이유를 짧은 두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나, change_condition은 판단을 달리 적용할 현실 관찰이야. 분야 이름만 바꾸어 통하는 조언은 다시 써.\n${DAILY_EDITORIAL_INSTRUCTION}`
+- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단이 해당하는 상황과 이유를 짧은 두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나야. 일일 change_condition은 빈 문자열로 유지해. 분야 이름만 바꾸어 통하는 조언은 다시 써. 연락의 활성·지속과 연애, 재회와 관계 재결합을 서로 바꾸지 마.\n${DAILY_EDITORIAL_INSTRUCTION}`
   return request
 }
 
-export function applyDailyRewrite(candidate:any,request:{paths:string[]},response:any) {
+
+
+export function buildPeriodQualityRewriteRequest(candidate:any,payload:any,quality:any) {
+  if(!['week','month','annual'].includes(String(payload?.period_kind??'')))return null
+  const issues=Array.isArray(quality?.period_reading?.issues)?quality.period_reading.issues:[]
+  const allowed=new Set(['claim_date_without_local_evidence','claim_period_without_local_evidence','relationship_date_without_direct_relationship_evidence'])
+  if(!issues.length||issues.some((issue:any)=>!allowed.has(String(issue?.code??''))))return null
+  const failedStages=(quality?.stages??[]).filter((stage:any)=>!stage?.passed)
+  if(failedStages.some((stage:any)=>stage?.stage!==6))return null
+  const paths=[...new Set(issues.map((issue:any)=>String(issue?.path??'')).filter(Boolean))]
+  if(!paths.length||paths.some(path=>typeof get(candidate,path)!=='string'))return null
+  const targets=paths.map(path=>{
+    const parentPath=parts(path).slice(0,-1).join('.')
+    const parent=parentPath?get(candidate,parentPath):candidate
+    const refs=Array.isArray(parent?.evidence_refs)?parent.evidence_refs:[]
+    return {path,previous_text:get(candidate,path),failures:issues.filter((issue:any)=>issue.path===path).map((issue:any)=>issue.code),
+      evidence:(payload?.evidence_ledger??[]).filter((row:any)=>refs.includes(row?.id))}
+  })
+  return {paths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+    prompt:`[PERIOD DATE-GROUNDING EDIT]
+전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+각 target은 이미 날짜 근거 검증에 실패했다. 편집 결과에는 2026-10-05 같은 숫자 날짜와 10월 5일 같은 한글 날짜, 주차·월·분기·상반기·하반기 표현을 하나도 남기지 마. 다른 날짜로 바꾸거나 날짜 사이의 지속을 새로 추정하지 마.
+기존 판단의 방향과 제한, 생활 장면은 유지해. 날짜를 뺀 뒤에도 문장이 자연스럽도록 고치되 사건·성과·상대 행동을 새로 만들지 마.
+행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용으로 시작하지 말고 자연스러운 한국어 반말로 써.
+PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
+TARGETS=${JSON.stringify(targets)}`}
+}
+
+
+export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,report:any) {
+  if(!['week','month','annual'].includes(String(payload?.period_kind??'')))return null
+  const issues=(Array.isArray(report?.issues)?report.issues:[]).map((issue:any)=>{
+    if(typeof issue==='string'){
+      const [path,...rest]=issue.split(':')
+      return {path:path.trim(),code:rest.join(':').trim()}
+    }
+    return {path:String(issue?.path??''),code:String(issue?.code??'')}
+  })
+  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language','period_unobserved_event_or_span','period_unobserved_health_claim','period_unsupported_detail_prose','period_real_scene_not_conditional','period_specific_life_detail','period_relationship_contact_leak','period_generic_repetition'])
+  if(!issues.length||issues.some((issue:any)=>!allowed.has(issue.code)))return null
+  const paths=new Set<string>()
+  for(const issue of issues.filter((issue:any)=>['period_unobserved_event_or_span','period_unobserved_health_claim','period_unsupported_detail_prose','period_real_scene_not_conditional','period_specific_life_detail','period_relationship_contact_leak'].includes(issue.code)&&issue.path!=='root'))if(typeof get(candidate,issue.path)==='string'&&get(candidate,issue.path).trim())paths.add(issue.path)
+  if(issues.some((issue:any)=>issue.path==='headline')){
+    for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
+  }
+  const rows=Array.isArray(candidate?.clusters)?candidate.clusters:[]
+  for(const issue of issues.filter((issue:any)=>issue.code==='period_section_not_plain_language')){
+    const key=issue.path.replace(/^clusters\./,'')
+    const index=rows.findIndex((row:any)=>String(row?.key??'')===key)
+    if(index<0)return null
+    for(const field of ['conclusion','applies_when','evidence_meaning','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
+  }
+  if(issues.some((issue:any)=>issue.path==='root')){
+    for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
+    if(issues.some((issue:any)=>issue.code==='period_unobserved_event_or_span'))for(const path of matchingStringPaths(candidate,PERIOD_UNOBSERVED))paths.add(path)
+    for(let index=0;index<rows.length;index++)if(rows[index]?.applicability!=='insufficient'){
+      for(const field of ['conclusion','applies_when','evidence_meaning','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
+    }
+  }
+  const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\d{1,2}월\s*\d{1,2}일|상반기|하반기|[1-4]분기)/
+  for(let index=0;index<rows.length;index++)for(const field of ['applies_when','evidence_meaning','real_scene'])if(typeof rows[index]?.[field]==='string'&&dated.test(rows[index][field]))paths.add(`clusters.${index}.${field}`)
+  const selected=[...paths]
+  if(!selected.length||selected.length>64)return null
+  const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.'),failures:issues.filter((issue:any)=>issue.path===path||issue.path==='root').map((issue:any)=>issue.code)}))
+  const allowEmptyPaths=issues.filter((issue:any)=>issue.code==='period_unsupported_detail_prose').map((issue:any)=>issue.path)
+  return {paths:selected,allowEmptyPaths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+    prompt:`[PERIOD BOUNDED PROSE EDIT]
+전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+모든 target은 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
+hero=true인 제목·요약에서는 사용자의 직장·업무·학업·시험·이직 상태를 가정하거나 분야명을 나열하지 마. 공통으로 드러나는 약속·요청·지출·휴식·대화·선택 기준 중 실제 원고에 있는 대상 하나로 종합해.
+날짜가 든 target은 이미 근거 범위 검증 대상이야. 편집 결과에서 2026-10-05 같은 숫자 날짜, 10월 5일 같은 날짜, 주차·분기·상반기·하반기를 모두 제거해. 다른 날짜나 지속 구간을 만들지 마.
+기존 판단의 방향과 제한은 유지하되, applies_when은 사용자의 현재 사실을 말하지 말고 반드시 '만약 …라면/…할 때/…경우' 중 하나를 쓴 조건형 적용 상황으로 바꿔. evidence_meaning에는 계산 근거가 허용하는 판단 이유만 생활어로 쓰고 특정 직장·학습도구·결제수단·시간대를 지어내지 마. 사건·성과·상대 행동을 새로 만들지 마. 연락 직접 근거가 없는 관계 문장에서는 연락·답장·선연락을 쓰지 마. 컨디션과 총평에서는 피로·체력·기력·수면·열감·개운함·과로·과부하·생활 리듬·집중력·감정 급변 같은 증상이나 상태를 예측하지 마. 몸 상태를 관측한 것처럼 쓰지 말고 일정 밀도·활동량·휴식 간격을 보수적으로 정하는 선택만 설명해. period_unsupported_detail_prose 실패 target은 근거 없는 세부 해설이므로 text를 빈 문자열로 반환해. 그 외 target은 비우지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
+PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
+TARGETS=${JSON.stringify(targets)}`}
+}
+
+export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,report:any) {
+  const issues=Array.isArray(report?.issues)?report.issues:[]
+  const parsed=issues.map((issue:any)=>{
+    if(typeof issue==='string'){
+      if(!issue.includes(':'))return {path:'headline',code:issue.trim()}
+      const [path,...rest]=issue.split(':')
+      return {path:path.trim(),code:rest.join(':').trim()}
+    }
+    return {path:String(issue?.path??''),code:String(issue?.code??'')}
+  })
+  const allowed=new Set(['daily_overview_role_specific','daily_overview_abstract_or_typo','period_hero_not_plain_language','period_hero_role_assumption'])
+  if(!['day','week','month','annual'].includes(String(payload?.period_kind??''))||!parsed.length||parsed.some((issue:any)=>!allowed.has(issue.code)))return null
+  const paths=['headline','overall.summary','overall.best_phase','overall.caution_phase'].filter(path=>typeof get(candidate,path)==='string'&&get(candidate,path).trim())
+  if(!paths.includes('headline')||!paths.includes('overall.summary'))return null
+  const rows=(Array.isArray(candidate?.clusters)?candidate.clusters:[]).filter((row:any)=>row?.applicability!=='insufficient').slice(0,8).map((row:any)=>({key:row?.key,conclusion:row?.conclusion,real_scene:row?.real_scene,evidence_refs:row?.evidence_refs}))
+  return {paths,targets:paths.map(path=>({path,previous_text:get(candidate,path)})),schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+    prompt:`[ROLE-NEUTRAL HERO EDIT]
+전체 해설을 다시 쓰지 말고 첫 화면 문장만 편집해. patches에 TARGETS의 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+이 원고에는 사용자의 직업·학업·시험·이직·투자·연애 상태 정보가 없다. headline, overall.summary, overall.best_phase, overall.caution_phase에서 직장·업무·실무·출근·퇴근·학업·공부·시험·이직·투자·매수·매도·연애·연락·재회·금전·컨디션을 사용자의 실제 일정처럼 쓰거나 분야 목록으로 나열하지 마.
+기류·에너지·작용·조율·정돈·신중하게·균형이 중요 같은 추상어만으로 결론을 만들지 마. 행성명·각 이름·영문 전문어·사주 용어도 쓰지 마.
+대신 기존 원고와 분야 결론이 공통으로 말하는 실제 대상을 하나 골라, 약속·요청·지출·휴식·대화·선택 기준처럼 역할과 무관한 생활 장면으로 바꿔. 근거에 없는 사건·성과·상대 행동은 새로 만들지 마.
+headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.summary는 제목을 반복하지 말고 적용 상황과 이유를 두 문장, 80~180자 정도로 설명해. best_phase와 caution_phase도 분야명이 아니라 무엇을 할 때 판단이 달라지는지 짧게 써.
+기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
+PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
+PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}
+FIELD_CONCLUSIONS=${JSON.stringify(rows)}
+TARGETS=${JSON.stringify(paths.map(path=>({path,previous_text:get(candidate,path)})))}`}
+}
+
+export function applyDailyRewrite(candidate:any,request:{paths:string[],allowEmptyPaths?:string[]},response:any) {
   const patches=response?.patches
   if(!Array.isArray(patches)||patches.length!==request.paths.length)throw new Error('daily_patch_count')
-  const expected=new Set(request.paths),seen=new Set<string>()
+  const expected=new Set(request.paths),seen=new Set<string>(),allowEmpty=new Set(request.allowEmptyPaths??[])
   const result=structuredClone(candidate)
   for(const patch of patches){
-    if(!expected.has(patch.path)||seen.has(patch.path)||typeof patch.text!=='string'||(!patch.text.trim()&&!patch.path.endsWith('.change_condition'))||patch.text.length>700)throw new Error('daily_patch_scope')
+    if(!expected.has(patch.path)||seen.has(patch.path)||typeof patch.text!=='string'||(!patch.text.trim()&&!patch.path.endsWith('.change_condition')&&!allowEmpty.has(patch.path))||patch.text.length>700)throw new Error('daily_patch_scope')
     seen.add(patch.path)
     const keys=parts(patch.path),key=keys.pop()!
     const parent=keys.reduce((v,k)=>v[k],result)

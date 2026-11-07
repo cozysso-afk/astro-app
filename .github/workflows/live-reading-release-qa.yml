@@ -1,0 +1,95 @@
+name: One-shot live reading release QA
+
+on:
+  push:
+    branches:
+      - fix/reading-completeness-v19
+    paths:
+      - ".github/workflows/live-reading-release-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: one-shot-live-reading-release-qa
+  cancel-in-progress: false
+
+jobs:
+  fortune:
+    name: Gemini 3.7 bounded month prose verification r7
+    if: contains(github.event.head_commit.message, '[live-reading-qa]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Generate and audit four fresh fortune readings
+        env:
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_FORTUNE_FUNCTION_SLUG: fortune-completeness-v19-qa
+          QA_LIVE_APPROVED: "YES"
+          QA_FORTUNE_MODEL: gemini-3.7-flash
+        run: >-
+          node --experimental-strip-types scripts/fortune-live-qa.mjs
+          --max-jobs 1
+          --period-kinds month
+          --out live-release-artifacts/fortune
+      - name: Upload fortune report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-release-fortune-${{ github.sha }}
+          path: web/live-release-artifacts/fortune/
+          if-no-files-found: warn
+          retention-days: 7
+
+  relationship:
+    name: Fresh Gemini compatibility-reunion-marriage
+    needs: fortune
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Generate and audit four fresh relationship readings
+        env:
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_RELATIONSHIP_FUNCTION_SLUG: relationship-question-contract-qa
+          QA_RELATIONSHIP_LIVE_APPROVED: "YES"
+        run: >-
+          node scripts/relationship-live-qa.mjs
+          --max-jobs 4
+          --purposes compatibility,reunion,marriage_unmarried,marriage_married
+          --out live-release-artifacts/relationship
+      - name: Upload relationship report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-release-relationship-${{ github.sha }}
+          path: web/live-release-artifacts/relationship/
+          if-no-files-found: warn
+          retention-days: 7

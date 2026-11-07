@@ -54,6 +54,11 @@ jobs:
       - name: Install web dependencies for SDK transport regression
         working-directory: web
         run: npm ci
+      - name: Reading completeness and authored-document regressions
+        run: |
+          node --experimental-strip-types --test supabase/functions/fortune-interpret-v23-preview/dailyReadingContractV1.test.mjs supabase/functions/fortune-interpret-v23-preview/dailyEditorialV1.test.mjs supabase/functions/fortune-interpret-v23-preview/dailyRewriteV1.test.mjs supabase/functions/fortune-interpret-v23-preview/periodReadingContractV1.test.mjs
+          node --experimental-strip-types --test supabase/functions/relationship-interpret-v9-preview/relationshipEditorialV1.test.mjs
+          node --experimental-strip-types --test web/src/lib/dailyReadingDocument.test.mjs web/src/lib/authoredReadingDocument.test.mjs
       - name: Evidence-ledger and interpretation regression tests
         run: |
           node --experimental-strip-types --test supabase/functions/fortune-interpret-v6-preview/periodInstruction.test.mjs

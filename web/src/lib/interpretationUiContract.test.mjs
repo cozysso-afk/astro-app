@@ -3,6 +3,8 @@ import './compactDeepPrompt.test.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import {buildPeriodReadingDocument} from './authoredReadingDocument.ts'
+import {fortuneField} from './fortuneFields.ts'
 import { buildFortuneUserSummary } from './fortuneUserSummary.ts'
 import { interpretationHeroEligible, normalizeTopicEntries } from './interpretationTopics.ts'
 
@@ -135,56 +137,35 @@ test('annual reading separates TOP 3, action cards, and date detail', () => {
 })
 
 test('period default view uses only provenance-verified Gemini prose', () => {
-  const renderStart = period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2')
-  const technicalStart = period.indexOf('<summary>계산 근거 자세히 보기</summary>', renderStart)
-  assert.ok(renderStart >= 0 && technicalStart > renderStart)
-  const defaultMarkup = period.slice(renderStart, technicalStart)
-  assert.match(period.slice(0, renderStart), /result\.provenance_verified === true/)
-  assert.match(period.slice(0, renderStart), /const summary = authoredSummaryOnly\(base, data\)/)
-  assert.match(period.slice(0, renderStart), /if \(!verifiedNarrative\)/)
-  assert.match(defaultMarkup, /summary\.favorableCards/)
-  assert.match(defaultMarkup, /summary\.cautionCards/)
-  assert.match(defaultMarkup, /summary\.focusTopics/)
-  assert.match(defaultMarkup, /summary\.importantWindows/)
-  assert.match(defaultMarkup, /ReadingExplanation kind="reason"/)
+  const {data}=fixture()
+  const denied=buildPeriodReadingDocument(data,'week','2026-11-02','2026-11-08',undefined,false)
+  assert.equal(denied.state,'unverified')
+  assert.equal(denied.headline,'')
+  assert.deepEqual(denied.core,[])
+  assert.deepEqual(denied.sections,[])
+  const allowed=buildPeriodReadingDocument(data,'week','2026-11-02','2026-11-08',undefined,true)
+  assert.equal(allowed.headline,data.headline)
+  assert.equal(allowed.core[0].text,data.overall.summary)
 })
 
 test('relationship focus uses plain labels and only renders useful structured directions', () => {
-  const annualKey = annual.indexOf('className="ai-key-window-section"')
-  const annualRel = annual.indexOf('className="ai-relationship-section"')
-  assert.ok(annualKey >= 0 && annualRel > annualKey, 'annual relationship focus should follow date detail')
-  assert.equal((annual.match(/className="ai-relationship-section"/g) || []).length, 1)
-  assert.equal((annual.match(/className="ai-direction-grid ai-relationship-direction"/g) || []).length, 1)
-
-  assert.match(period, />연락 흐름</)
-  assert.match(period, /kind: 'incoming',\s*label: '외부 연락 반응'/)
-  assert.match(period, /kind: 'outgoing',\s*label: '내 연락 실행 적합도'/)
-  assert.match(period, /kind: 'reconnection' as const,\s*label: '과거 인연 재접점'/)
-  assert.match(period, /summary\.relationship\.(?:incoming|outgoing|reconnection)/)
-  assert.doesNotMatch(period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2'), period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')), /세 방향을 따로 보면|상대 → 나|나 → 상대/)
+  const {data}=fixture()
+  const doc=buildPeriodReadingDocument(data,'week','2026-11-02','2026-11-08',fortuneField('contact'),true)
+  for(const key of ['incoming','outgoing'])assert.equal(doc.sections.find(s=>s.id===`contact:${key}`).blocks[0].text,data.contact_flow[key])
+  assert.equal(doc.sections.some(s=>s.id==='contact:reconnection'),false)
+  data.contact_flow.incoming=''
+  const missing=buildPeriodReadingDocument(data,'week','2026-11-02','2026-11-08',fortuneField('contact'),true)
+  assert.equal(missing.sections.some(s=>s.id==='contact:incoming'),false)
 })
 
 test('primary topics stay concise and reference topics are one-line collapsed items', () => {
-  const focusStart = period.indexOf('period-ai-window-section period-ai-user-focus')
-  const referenceStart = period.indexOf('className="period-ai-topic-disclosure period-ai-topic-reference-disclosure period-ai-user-reference"')
-  const technicalStart = period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>')
-  assert.ok(focusStart >= 0 && referenceStart > focusStart && technicalStart > referenceStart)
-
-  const focus = period.slice(focusStart, referenceStart)
-  assert.match(focus, /summary\.focusTopics\.filter[\s\S]*\.map/)
-  assert.match(focus, /item\.conclusion/)
-  assert.match(focus, /item\.observe/)
-  assert.match(focus, /item\.caution/)
-  assert.match(focus, /item\.reason/)
-  assert.match(focus, /item\.timing/)
-  assert.match(focus, /item\.action/)
-  assert.doesNotMatch(focus, /item\.(?:verdict|avoid|confidence)/)
-
-  const reference = period.slice(referenceStart, technicalStart)
-  assert.match(reference, /<summary>다른 분야 보기<\/summary>/)
-  assert.match(reference, /visibleReferenceTopics\.map/)
-  assert.match(reference, /item\.summary/)
-  assert.doesNotMatch(reference, /item\.(?:reason|timing|action|avoid|confidence)/)
+  const {data}=fixture()
+  const doc=buildPeriodReadingDocument(data,'week','2026-11-02','2026-11-08',fortuneField('study'),true)
+  assert.equal(doc.headline,'')
+  assert.deepEqual(doc.core,[])
+  assert.ok(doc.sections.some(s=>s.id==='work_study.study'&&s.state==='missing'))
+  assert.equal(JSON.stringify(doc).includes(data.overall.summary),false)
+  assert.equal(doc.sections.some(s=>s.id.startsWith('contact:')),false)
 })
 
 test('period topic normalization supports legacy arrays without exposing numeric indexes', () => {
@@ -295,12 +276,11 @@ test('every topic gets its own conclusion instead of a swapped-name template', (
 })
 
 test('period result labels natural presentation without claiming deterministic text came from Gemini', () => {
-  assert.match(period, /result\.provenance_verified === true/)
-  assert.match(period, /fortuneNarrativeOrigin\(result\.model, result\.origin\) === 'gemini'/)
-  assert.match(period, /검증된 Gemini 해설이 아니어서 표시하지 않았어/)
-  assert.match(period, /맞춤 운세 해설/)
-  const defaultMarkup = period.slice(period.indexOf('return <section className="period-ai-card period-ai-v18 period-ai-v2'),period.lastIndexOf('<summary>계산 근거 자세히 보기</summary>'))
-  assert.doesNotMatch(defaultMarkup,/계산근거 기반 자동 해설|AI\(인공지능\) 기간 해설/)
+  assert.match(period,/result\.provenance_verified === true/)
+  assert.match(period,/fortuneNarrativeOrigin\(result\.model, result\.origin\) === 'gemini'/)
+  assert.match(period,/buildPeriodReadingDocument/)
+  assert.match(period,/<AuthoredReadingPanel/)
+  assert.doesNotMatch(period,/buildFortuneUserSummary\(/)
 })
 
 test('daily scene headline changes its language by domain even when the same planet repeats', () => {

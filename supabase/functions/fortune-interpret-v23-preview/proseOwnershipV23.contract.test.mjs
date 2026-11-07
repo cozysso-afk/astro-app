@@ -94,15 +94,18 @@ test('frontend preserves concise authored blocks instead of discarding them whol
   const readerFacing=frontend.slice(frontend.indexOf('function readerFacing'),frontend.indexOf('function relationshipPartUsable'))
   assert.doesNotMatch(readerFacing,/TECHNICAL_RE\.test/)
   assert.match(readerFacing,/계산\\s\*/)
-  assert.match(narrative,/if \(sentences\.length < 2\) return null/)
-  assert.doesNotMatch(narrative,/if \(sentences\.length < 4\) return null/)
+  assert.match(narrative,/buildPeriodReadingDocument/)
+  assert.doesNotMatch(narrative,/sentences\.length|sentences\.slice/)
 })
 
-test('verified V23 UI projects Gemini prose only and never authors replacement copy',()=>{
-  assert.match(narrative,/if \(!verifiedNarrative\)/)
-  assert.match(narrative,/const summary = authoredSummaryOnly\(base, data\)/)
+test('verified V23 UI projects Gemini prose only and never authors replacement copy',async()=>{
+  const {buildPeriodReadingDocument}=await import('../../../web/src/lib/authoredReadingDocument.ts')
+  const source={headline:'작성된 제목',overall:{summary:'작성된 첫 문장. 중간의 중요한 부정 조건. 마지막 문장.',dominant_pattern:'작성된 이유',evidence_refs:['W:1']},clusters:{}}
+  const hidden=buildPeriodReadingDocument(source,'week','2026-11-01','2026-11-07',undefined,false)
+  assert.equal(hidden.state,'unverified');assert.equal(hidden.headline,'');assert.deepEqual(hidden.core,[])
+  const visible=buildPeriodReadingDocument(source,'week','2026-11-01','2026-11-07',undefined,true)
+  assert.equal(visible.headline,source.headline)
+  assert.equal(visible.core.find(b=>b.id==='overall:summary').text,source.overall.summary)
   assert.match(narrative,/result\.provenance_verified === true/)
-  assert.doesNotMatch(frontend,/fallbackLoveText|INTERPERSONAL_FALLBACK_COPY|integratedFallback/)
-  const cleanup=narrativePolish.slice(narrativePolish.indexOf('export function polishKoreanSentence'),narrativePolish.indexOf('export function narrativeClaimFamily'))
-  assert.doesNotMatch(cleanup,/\.replace\(/)
+  assert.doesNotMatch(narrative,/firstSentences|compactEditorialCopy|authoredSummaryOnly/)
 })

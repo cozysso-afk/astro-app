@@ -179,6 +179,10 @@ export type RelationshipAiResponse = {
   data?: {
     headline: string
     overview: string
+    core_summary?: string
+    core_reason?: string
+    core_action?: string
+    core_conditions?: string[]
     chemistry: string
     emotional_dynamic?: string
     communication: string
@@ -419,7 +423,7 @@ export type AiQualityValidation = {
 }
 
 export type EditorialApplicability = 'direct' | 'conditional' | 'insufficient'
-export type AiEditorialSection = { conclusion:string; real_scene:string; action:string; change_condition:string; evidence_refs:string[]; applicability:EditorialApplicability }
+export type AiEditorialSection = { conclusion:string; applies_when?:string; evidence_meaning?:string; real_scene?:string; action:string; change_condition:string; evidence_refs:string[]; applicability:EditorialApplicability }
 export type AiDomainAnswerStatus = 'direct' | 'partial' | 'not_calculated'
 export type AiDomainAnswer = { topic:string; question_key:string; label:string; answer:string; status:AiDomainAnswerStatus; evidence_refs:string[] }
 export type AiEditorialClusters = {

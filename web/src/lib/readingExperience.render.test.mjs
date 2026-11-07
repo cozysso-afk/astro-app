@@ -59,14 +59,12 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
     assert.ok(html.indexOf('data-daily-block="overall:summary"')<html.indexOf('daily-reading-details'))
     return
   }
-  assert.equal((visible.match(/class="flow-tile"/g)||[]).length,3)
-  assert.match(visible,/대인관계/)
-  assert.match(visible,/왜 이렇게 보냐면/)
-  assert.match(visible,/수성과 목성/)
+  assert.match(html,/data-authored-scope="overall"/)
+  assert.ok(html.includes(verifiedResult(fixture.data,period).data.overall.summary))
+  assert.ok(html.indexOf('authored-reading-core')<html.indexOf('authored-reading-details'))
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|W:fixture|기술 원문|private-auth-logout/)
-  assert.match(html,/<details class="period-ai-details"[^>]*><summary>계산 근거 자세히 보기/)
-  if(period==='today') assert.doesNotMatch(visible,/2026-09-14|2026-09-17/)
-  else assert.match(visible,/2026-09-14/)
+  assert.match(html,/2026-09-14/)
+
 })
 
 test('integrated daily hero does not promote one specialist topic score',()=>{
@@ -101,7 +99,7 @@ for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_marr
   const visible=html.split('<details class="relationship-technical"')[0]
   assert.match(html,/<details class="relationship-technical"><summary>기술 근거 자세히 보기/)
   assert.doesNotMatch(visible.replace(/<[^>]*>/g,''),/orb|Neptune|Uranus|W:|S:|T:/)
-  assert.match(visible,/Gemini 자연어 해설/)
+  assert.match(visible,/관계 해설이 아직 작성되지 않았어/)
   assert.doesNotMatch(visible,/감정 · 친밀감|관계의 힘의 균형|상대 차트 쪽 활성|내 차트 쪽 활성|과거 인연 재접점|다시 붙었을 때 유지력|반복될 가능성이 높은 문제|주요 시기/)
   const reasons=[...visible.matchAll(/<article class="relationship-pattern">.*?<p>(.*?)<\/p>/g)].map(m=>m[1])
   assert.equal(new Set(reasons).size,reasons.length)
@@ -169,9 +167,10 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} pr
     assert.ok(html.includes(verifiedResult(f.data).data.decisions[0].reason))
     return
   }
-  assert.match(visible, /signal-incoming[\s\S]*?외부 연락 반응[\s\S]*?약함/)
-  assert.match(visible, /signal-outgoing[\s\S]*?내 연락 실행 적합도[\s\S]*?강함/)
-  assert.ok(visible.indexOf('외부 연락 반응')<visible.indexOf('period-ai-user-focus'))
+  assert.match(html,/authored-reading-headline/)
+  assert.ok(html.indexOf('authored-reading-headline')<html.indexOf('authored-reading-details'))
+  assert.ok(html.includes(verifiedResult(f.data,period).data.overall.summary))
+
 })
 test('personal spouse route uses existing hints without manufacturing a meeting or a person',()=>{
   const f=personalMarriageFixture();f.result.spouse_archetype.meeting_route='반복해서 참여하는 모임에서 천천히 알아가는 방식';f.result.spouse_archetype.identity_clues=['생활 리듬을 맞추는 관계']
@@ -184,9 +183,11 @@ test('same date groups authored utilization and caution without losing either me
   const f=fortuneFixture('week');f.data.key_windows=[{start:'2026-09-14',end:'2026-09-14',topics:['대인관계'],signal:'활용',summary:'대화의 핵심을 먼저 정리해.'},{start:'2026-09-14',end:'2026-09-14',topics:['컨디션'],signal:'주의',summary:'무리한 일정은 줄여.'}]
   const html=renderToStaticMarkup(createElement(Fortune,{period:'week',calculation:f.calculation,result:verifiedResult(f.data,'week'),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
   const visible=html.split('<details class="period-ai-details"')[0]
-  assert.equal((visible.match(/<time>(?:지난 · )?2026-09-14<\/time>/g)||[]).length,1)
-  assert.match(visible,/reading-event signal-favorable/)
-  assert.match(visible,/reading-event signal-caution/)
+  assert.ok(visible.includes('대화의 핵심을 먼저 정리해.'))
+  assert.ok(visible.includes('무리한 일정은 줄여.'))
+  assert.match(visible,/data-reading-section="window:0"/)
+  assert.match(visible,/data-reading-section="window:1"/)
+
 })
 
 for(const [period,title] of [['today','오늘 한눈에'],['week','이번 주 전체 흐름'],['month','이번 달 큰 흐름'],['year','올해 큰 흐름']]) test(`external integrated and precision ${period} instructions preserve raw calculation`,()=>{

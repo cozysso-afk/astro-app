@@ -108,12 +108,14 @@ test('canvas wrapping keeps common closing punctuation attached to the previous 
   assert.match(exporter,/out\.push\(line\.trimEnd\(\)\)/)
 })
 
-test('relationship result still exposes image save and excludes its toolbar from exported content',()=>{
-  assert.match(panel,/exportReadingImages/)
-  assert.match(panel,/data-reading-export-root="relationship"/)
-  assert.match(panel,/data-reading-export-ignore="true"/)
-  assert.match(panel,/결과 이미지 저장/)
-  assert.match(panel,/이미지 만드는 중/)
+test('relationship exports only the same authored document used on screen',()=>{
+  assert.match(panel,/buildRelationshipReadingDocument/)
+  assert.match(panel,/<AuthoredReadingPanel doc={document}/)
+  assert.doesNotMatch(panel,/exportReadingImages/)
+  const authored=readFileSync(new URL('../AuthoredReadingPanel.tsx',import.meta.url),'utf8')
+  assert.match(authored,/exportAuthoredReadingImages\(doc,controller.signal\)/)
+  assert.match(authored,/doc.exportBlockIds.length/)
+  assert.match(exporter,/authoredReadingExportModel/)
 })
 
 test('screen cards and reunion cards use translucent jelly glass materials',()=>{
@@ -131,4 +133,16 @@ test('image export control is mobile-safe and reduced-motion aware',()=>{
   assert.match(css,/@media \(max-width: 640px\)/)
   assert.match(css,/width:\s*100%/)
   assert.match(css,/prefers-reduced-motion:\s*reduce/)
+})
+
+
+test('independent system export preserves all authored cards and refuses font drift',()=>{
+  assert.doesNotMatch(exporter,/\.western-score-grid > details'\)\)\.slice\(0, 3\)/)
+  assert.doesNotMatch(exporter,/\.saju-reader-topics \\.system-lens'\)\)\.slice\(0, 3\)/)
+  assert.doesNotMatch(exporter,/\.thai-life-map \\.bhumi-grid > details'\)\)\.slice\(0, 3\)/)
+  assert.match(exporter,/const western =[\s\S]*?western-score-guidance[\s\S]*?complete:\s*true[\s\S]*?const saju =/)
+  assert.match(exporter,/heroSource[\s\S]*integrated \? firstSentences\(heroSource, 1\) : heroSource/)
+  assert.match(exporter,/전체를 통틀어 보면[\s\S]{0,220}complete:\s*true/)
+  assert.match(exporter,/Noto Sans KR/)
+  assert.match(exporter,/저장할 글꼴을 불러오지 못했어/)
 })

@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { buildPeriodReadingDocument } from './authoredReadingDocument.ts'
+import { fortuneField } from './fortuneFields.ts'
 
 const read = (url) => readFileSync(new URL(url, import.meta.url), 'utf8')
 
@@ -90,11 +92,19 @@ test('A9 preserved: relationship direction values exist but side activation alon
   assert.match(relationshipWestern, /side activation alone is not an action-direction indicator/)
 })
 
-test('A10 preserved: fortune presentation has an explicit incoming/outgoing comparison path', () => {
-  assert.doesNotMatch(fortuneEditorial, /function directionSummary/)
-  assert.match(fortuneNarrative, /label: '외부 연락 반응'/)
-  assert.match(fortuneNarrative, /label: '내 연락 실행 적합도'/)
-  assert.match(fortuneNarrative, /data\.contact_flow/)
+test('A10 preserved: authored incoming and outgoing answers remain distinct in the contact document', () => {
+  const section={conclusion:'연락 흐름 원문',real_scene:'응답과 후속 대화를 구분한 설명 원문',action:'대화가 이어지는지 확인해.',change_condition:'',applicability:'conditional',evidence_refs:['W:contact']}
+  const data={headline:'전체 제목',overall:{summary:'전체 요약',evidence_refs:['W:contact']},clusters:{relationship:{contact_activation:section,contact_continuity:section}},contact_flow:{incoming:'외부 연락 반응의 원문은 상대가 연락한다는 확률이 아니야.',outgoing:'내가 연락할 때의 조건 원문은 상대 답변을 보장하지 않아.',reconnection:'과거 인연의 별도 원문'}}
+  const original=structuredClone(data)
+  for(const field of [undefined,fortuneField('contact')]){
+    const doc=buildPeriodReadingDocument(data,'week','2026-11-04','2026-11-10',field,true)
+    assert.equal(doc.sections.find(s=>s.id==='contact:incoming').blocks[0].text,data.contact_flow.incoming)
+    assert.equal(doc.sections.find(s=>s.id==='contact:outgoing').blocks[0].text,data.contact_flow.outgoing)
+    assert.notEqual(doc.sections.find(s=>s.id==='contact:incoming').label,doc.sections.find(s=>s.id==='contact:outgoing').label)
+  }
+  const work=buildPeriodReadingDocument(data,'week','2026-11-04','2026-11-10',fortuneField('work'),true)
+  assert.equal(work.sections.some(s=>s.id.startsWith('contact:')),false)
+  assert.deepEqual(data,original)
 })
 
 test('A11 baseline compression boundary: compact fortune packet caps evidence and date depth', () => {
