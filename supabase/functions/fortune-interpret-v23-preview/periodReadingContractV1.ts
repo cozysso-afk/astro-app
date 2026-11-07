@@ -95,15 +95,15 @@ export function buildPeriodReadingInstruction(kind:unknown){
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.
 - clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. 상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.
-- 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 반드시 '만약 …라면/…할 때/…경우' 형태의 조건형 적용 상황으로 써. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
+- 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 해당 조건을 독립된 문장으로 마쳐. 예를 들어 '두 약속 중 하나를 골라야 할 때 해당돼.'처럼 상황만 설명해. '경우라면'에서 끊지 마. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.
-- headline은 한 문장(25~60자 목표), overall.summary는 적용 상황과 이유를 설명하는 80~180자 목표야. 중요한 제한을 글자 수 때문에 삭제하지 마. 180자 넘는 제목이나 360자 넘는 요약은 실패야. 상세 설명은 real_scene 및 근거 상세에 둬.
+- headline은 한 문장(25~60자 목표), overall.summary는 적용 상황과 이유를 설명하는 80~180자 목표야. 중요한 제한을 글자 수 때문에 삭제하지 마. 180자 넘는 제목이나 360자 넘는 요약은 실패야. 상세 설명은 evidence_meaning에 둬.
 - 초·중·후반이나 네 분기를 의무적으로 채우지 마. 표본 날짜가 여러 개라는 이유만으로 중간이 계속 좋았거나 달라졌다고 말하지 마. 관측이 같은 경우 유지되는 맥락을 설명할 수 있지만, 날짜 사이의 미계산 변화를 확정하지 마.
 - period_reading.questions는 전달된 분야별 근거와 표본 범위야. all_supplied_rows도 전체 기간의 모든 날이 계산됐다는 뜻은 아니야. omitted_ids의 근거는 인용하지 마. 일부 날짜 근거만 있으면 그 날짜의 관측과 기간 전체의 제한을 분리해.
-- key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 real_scene과 action에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
+- key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 evidence_meaning과 action에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
 - 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
-- headline·overall·best_phase·caution_phase·각 분야 conclusion/action/real_scene 첫 문장은 행성명·각 이름·영문 전문어·사주 용어·'기류/에너지/작용' 없이 생활 언어로 써. 전문 근거는 real_scene의 두 번째 문장 뒤로 미뤄.
+- headline·overall·best_phase·caution_phase·각 분야 conclusion/action/applies_when/evidence_meaning은 행성명·각 이름·영문 전문어·사주 용어·'기류/에너지/작용' 없이 생활 언어로 써. 행성명이나 배치는 systems에만 써. evidence_meaning에는 왜 그 선택이 적절한지 일상적인 말로 설명해.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
 - domain_answers와 relationship_reading/contact_flow/investment_reading은 기존 기능이야. 해당 질문에 답할 근거가 있으면 유지해. 근거가 없으면 생략하고, 관계 전체의 점수만으로 선연락·재회 결과·상대 마음을 채우지 마. 질문 계약별 지원 범위를 따라.
 - 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마. 퇴근·출근·수면 부족·체력 저하·상대의 답신 같은 현실 사건은 입력 기록 없이 있었다거나 생긴다고 쓰지 마.
@@ -137,6 +137,17 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   for(const [index,row] of (core?.decisions??[]).entries())for(const field of ['reason','watch','action','avoid'])addHealth(row?.[field],`decisions.${index}.${field}`)
   const conditionalScene=/(?:만약|실제로|라면|한다면|경우|할 때|해야 할 때|정할 때|고를 때|결정할 때)/
   for(const [index,row] of rows.entries())if(row?.applicability!=='insufficient'){const applies=text(row?.applies_when)||text(row?.real_scene).split(/[.!?。]/)[0];if(applies&&!conditionalScene.test(applies))issues.push({code:'period_real_scene_not_conditional',path:`clusters.${index}.${typeof row?.applies_when==='string'?'applies_when':'real_scene'}`})}
+  for (const [index, row] of rows.entries()) {
+    if (row?.applicability === 'insufficient' || typeof row?.applies_when !== 'string') continue
+    const applies = text(row.applies_when)
+    const meaning = text(row.evidence_meaning)
+    if (!applies || /(?:라면|다면|경우|할 때|일 때)[.!?。…\s]*$/.test(applies)) {
+      issues.push({code:'period_real_scene_not_conditional', path:`clusters.${index}.applies_when`})
+    }
+    if (!meaning || technical.test(meaning) || /행성\s*(?:구조|배치)|상대지수|배경\s*배치|표본일/.test(meaning)) {
+      issues.push({code:'period_evidence_not_plain_language', path:`clusters.${index}.evidence_meaning`})
+    }
+  }
   const specificLifeDetail=/(?:퇴근|출근|상급자|협업자|기획안|첨부\s*파일|문제집|오답\s*노트|요약\s*노트|장바구니|공과금|카드\s*대금|잔고|모임\s*회비|생활비\s*계좌|집으로|내일|지난주|이틀\s*뒤|오전|오후|저녁|새벽|답장\s*간격|짧은\s*연락|대면\s*약속)/
   for(const entry of stringEntries(core))if(specificLifeDetail.test(entry.value))issues.push({code:'period_specific_life_detail',path:entry.path})
   const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
