@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildDailyRewriteRequest,buildDailyClarityRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
+import {buildDailyRewriteRequest,buildDailyClarityRequest,buildRoleNeutralHeroRewriteRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
 const data={headline:'제목은 그대로야.',overall:{summary:'요약은 그대로야.'},clusters:{condition:{condition:{conclusion:'이 결론도 유지해.',change_condition:'밤 시간에 피로하면 쉬어.',evidence_refs:['W:test']}}}}
 const quality={stages:[{stage:6,passed:false}],daily_editorial:{issues:[{path:'clusters.condition.condition.change_condition',code:'daypart_without_local_window_evidence'}]}}
 const payload={period_kind:'day',time_context:{today_word_allowed:false},evidence_ledger:[{id:'W:test',direction:'context',text:'실제 계산 근거'}]}
@@ -54,4 +54,38 @@ test('an unsupported exception may be removed, but core prose may not be emptied
   const edited=applyDailyRewrite(data,request,{patches:[{path:request.paths[0],text:''}]})
   assert.equal(edited.clusters.condition.condition.change_condition,'')
   assert.throws(()=>applyDailyRewrite(data,{paths:['headline']},{patches:[{path:'headline',text:''}]}))
+})
+
+
+test('role-specific hero failure uses a bounded hero-only edit',()=>{
+  const candidate={
+    headline:'직장 업무와 학업 계획을 신중하게 조율해.',
+    overall:{summary:'업무와 공부를 함께 정돈하는 날이야.',best_phase:'업무 검토',caution_phase:'학업 집중'},
+    clusters:[{key:'relationship.summary',conclusion:'약속의 범위를 먼저 맞추는 편이 좋아.',real_scene:'요청을 받을 때 완료 기준이 서로 다를 수 있어.',evidence_refs:['W:test'],applicability:'direct'}],
+  }
+  const request=buildRoleNeutralHeroRewriteRequest(candidate,payload,{issues:['daily_overview_role_specific']})
+  assert.deepEqual(request.paths,['headline','overall.summary','overall.best_phase','overall.caution_phase'])
+  assert.ok(request.prompt.includes('전체 해설을 다시 쓰지 말고'))
+  assert.ok(!request.paths.some(path=>path.startsWith('clusters.')))
+  const patched=applyDailyRewrite(candidate,request,{patches:[
+    {path:'headline',text:'약속의 범위와 완료 기준을 먼저 맞추기 좋은 날이야.'},
+    {path:'overall.summary',text:'요청을 바로 받아들이기보다 서로 생각한 결과가 같은지 먼저 물어봐. 기준이 맞으면 다음 선택도 한결 단순해져.'},
+    {path:'overall.best_phase',text:'요청의 범위와 완료 기준을 함께 정할 때'},
+    {path:'overall.caution_phase',text:'상대가 원하는 결과를 짐작만 하고 넘어갈 때'},
+  ]})
+  assert.deepEqual(patched.clusters,candidate.clusters)
+})
+
+test('hero editor refuses unrelated structural failures',()=>{
+  assert.equal(buildRoleNeutralHeroRewriteRequest(data,payload,{issues:['daily_primary_missing_or_duplicate:relationship.summary']}),null)
+  assert.equal(buildRoleNeutralHeroRewriteRequest(data,{...payload,period_kind:'compatibility'},{issues:['daily_overview_role_specific']}),null)
+})
+
+test('extended period role and plain-language failures share the same bounded editor',()=>{
+  const candidate={headline:'직장 업무의 에너지를 조율해.',overall:{summary:'업무와 학업을 정돈해.'},clusters:[]}
+  const request=buildRoleNeutralHeroRewriteRequest(candidate,{...payload,period_kind:'month'},{issues:[
+    'headline: period_hero_not_plain_language',
+    'headline: period_hero_role_assumption',
+  ]})
+  assert.deepEqual(request.paths,['headline','overall.summary'])
 })
