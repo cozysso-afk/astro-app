@@ -38,6 +38,8 @@ function insufficientProviderSection(){
     // Missing or malformed provider sections are represented as data state only.
     // TypeScript must never fill a Gemini-owned reader-facing field with prose.
     conclusion:"",
+    applies_when:"",
+    evidence_meaning:"",
     real_scene:"",
     action:"",
     change_condition:"",
@@ -91,8 +93,10 @@ function validProviderSection(row:any){
   return APPLICABILITY.has(String(row?.applicability??""));
 }
 function normalizedProviderSection(row:any){
-  const real_scene=typeof row?.real_scene==="string"?row.real_scene:[row?.applies_when,row?.evidence_meaning].map((value:any)=>String(value??"").trim()).filter(Boolean).join(" ");
-  return {conclusion:row?.conclusion,real_scene,action:row?.action,change_condition:row?.change_condition,evidence_refs:row?.evidence_refs,applicability:row?.applicability};
+  const applies_when=typeof row?.applies_when==="string"?row.applies_when:"";
+  const evidence_meaning=typeof row?.evidence_meaning==="string"?row.evidence_meaning:"";
+  const real_scene=typeof row?.real_scene==="string"?row.real_scene:[applies_when,evidence_meaning].map((value:any)=>String(value??"").trim()).filter(Boolean).join(" ");
+  return {conclusion:row?.conclusion,applies_when,evidence_meaning,real_scene,action:row?.action,change_condition:row?.change_condition,evidence_refs:row?.evidence_refs,applicability:row?.applicability};
 }
 
 function normalizePeriodKind(value:unknown){
