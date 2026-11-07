@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildDailyRewriteRequest,buildDailyClarityRequest,buildRoleNeutralHeroRewriteRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
+import {buildDailyRewriteRequest,buildDailyClarityRequest,buildPeriodQualityRewriteRequest,buildRoleNeutralHeroRewriteRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
 const data={headline:'제목은 그대로야.',overall:{summary:'요약은 그대로야.'},clusters:{condition:{condition:{conclusion:'이 결론도 유지해.',change_condition:'밤 시간에 피로하면 쉬어.',evidence_refs:['W:test']}}}}
 const quality={stages:[{stage:6,passed:false}],daily_editorial:{issues:[{path:'clusters.condition.condition.change_condition',code:'daypart_without_local_window_evidence'}]}}
 const payload={period_kind:'day',time_context:{today_word_allowed:false},evidence_ledger:[{id:'W:test',direction:'context',text:'실제 계산 근거'}]}
@@ -88,4 +88,35 @@ test('extended period role and plain-language failures share the same bounded ed
     'headline: period_hero_role_assumption',
   ]})
   assert.deepEqual(request.paths,['headline','overall.summary'])
+})
+
+
+test('extended period date failures repair only the located prose fields',()=>{
+  const candidate={headline:'제목 유지',overall:{summary:'요약 유지'},clusters:{relationship:{love_general:{
+    real_scene:'10월 5일부터 10월 20일까지 대화가 이어져.',
+    conclusion:'대화 기준을 맞추는 과정이 중요해.',action:'서로 원하는 결과를 먼저 말해.',
+    evidence_refs:['W:oct-05'],applicability:'direct',
+  }}}}
+  const q={stages:[{stage:6,passed:false}],period_reading:{issues:[
+    {path:'clusters.relationship.love_general.real_scene',code:'claim_date_without_local_evidence'},
+    {path:'clusters.relationship.love_general.real_scene',code:'claim_date_without_local_evidence'},
+  ]}}
+  const periodPayload={period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'},evidence_ledger:[
+    {id:'W:oct-05',date:'2026-10-05',topic:'연애',text:'선택일의 관계 대화 근거'},
+  ]}
+  const request=buildPeriodQualityRewriteRequest(candidate,periodPayload,q)
+  assert.deepEqual(request.paths,['clusters.relationship.love_general.real_scene'])
+  const patched=applyDailyRewrite(candidate,request,{patches:[{
+    path:request.paths[0],text:'대화가 시작되면 서로 원하는 결과와 지킬 기준을 먼저 맞춰봐.',
+  }]})
+  assert.equal(patched.headline,candidate.headline)
+  assert.equal(patched.clusters.relationship.love_general.conclusion,candidate.clusters.relationship.love_general.conclusion)
+  assert.deepEqual(patched.clusters.relationship.love_general.evidence_refs,['W:oct-05'])
+})
+
+test('period date repair refuses non-prose or non-stage-six failures',()=>{
+  const candidate={headline:'제목',overall:{summary:'요약'}}
+  const payload2={period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'},evidence_ledger:[]}
+  assert.equal(buildPeriodQualityRewriteRequest(candidate,payload2,{stages:[{stage:5,passed:false}],period_reading:{issues:[{path:'headline',code:'claim_date_without_local_evidence'}]}}),null)
+  assert.equal(buildPeriodQualityRewriteRequest(candidate,payload2,{stages:[{stage:6,passed:false}],period_reading:{issues:[{path:'headline',code:'primary_missing'}]}}),null)
 })
