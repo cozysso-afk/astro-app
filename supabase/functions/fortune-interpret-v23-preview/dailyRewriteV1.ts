@@ -87,7 +87,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
     }
     return {path:String(issue?.path??''),code:String(issue?.code??'')}
   })
-  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language'])
+  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language','period_unobserved_event_or_span','period_generic_repetition'])
   if(!issues.length||issues.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=new Set<string>()
   if(issues.some((issue:any)=>issue.path==='headline')){
@@ -100,6 +100,12 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
     if(index<0)return null
     for(const field of ['conclusion','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
   }
+  if(issues.some((issue:any)=>issue.path==='root')){
+    for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
+    for(let index=0;index<rows.length;index++)if(rows[index]?.applicability!=='insufficient'){
+      for(const field of ['conclusion','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
+    }
+  }
   const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\d{1,2}월\s*\d{1,2}일|상반기|하반기|[1-4]분기)/
   for(let index=0;index<rows.length;index++)if(typeof rows[index]?.real_scene==='string'&&dated.test(rows[index].real_scene))paths.add(`clusters.${index}.real_scene`)
   const selected=[...paths]
@@ -111,7 +117,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
 모든 target은 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
 hero=true인 제목·요약에서는 사용자의 직장·업무·학업·시험·이직 상태를 가정하거나 분야명을 나열하지 마. 공통으로 드러나는 약속·요청·지출·휴식·대화·선택 기준 중 실제 원고에 있는 대상 하나로 종합해.
 날짜가 든 target은 이미 근거 범위 검증 대상이야. 편집 결과에서 2026-10-05 같은 숫자 날짜, 10월 5일 같은 날짜, 주차·분기·상반기·하반기를 모두 제거해. 다른 날짜나 지속 구간을 만들지 마.
-기존 판단의 방향·제한·생활 장면은 유지하고 사건·성과·상대 행동을 새로 만들지 마. 자연스러운 한국어 반말로 써.
+기존 판단의 방향·제한·생활 장면은 유지하고 사건·성과·상대 행동을 새로 만들지 마. 실제로 측정하지 않은 피로·체력 저하·수면 방해·집중력 저하를 발생 사실처럼 쓰지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 TARGETS=${JSON.stringify(targets)}`}
 }
