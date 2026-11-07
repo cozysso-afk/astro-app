@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   fortune:
-    name: Gemini 3.7 bounded month date repair verification
+    name: Gemini 3.7 date-free month field verification
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
