@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   fortune:
-    name: Gemini 3.7 bounded month prose verification r2
+    name: Gemini 3.7 bounded month prose verification r3
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
