@@ -114,7 +114,7 @@ async function runCase(row, config) {
     }
     // Use the production V23 default explicitly so a model-default regression is
     // visible in the audit instead of depending on a stale caller preference.
-    const started = await request({ action: 'start', calculation, model: 'gemini-3.6-flash' })
+    const started = await request({ action: 'start', calculation, model: String(process.env.QA_FORTUNE_MODEL || 'gemini-3.6-flash') })
     if (!started.ok || !started.job_id) throw new Error('V23 start failed')
     for (let attempt = 0; attempt < 90; attempt++) {
       status = await request({ action: 'status', job_id: started.job_id }, config.headers)
