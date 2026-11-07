@@ -163,8 +163,8 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
     if(kind!=="day"){
       const item=core.properties.clusters.items;
       const scene=structuredClone(item.properties.real_scene);
-      item.properties.applies_when={...structuredClone(scene),description:"사용자에게 실제로 생긴 일을 단정하지 않는 조건형 적용 상황. 첫 문장에 만약/라면/할 때/경우 중 하나를 사용."};
-      item.properties.evidence_meaning={...structuredClone(scene),description:"계산 근거가 conclusion을 허용하는 이유의 생활어 번역. 사용자 사건·증상·상대 행동을 만들지 않음."};
+      item.properties.applies_when={...structuredClone(scene),description:"사용자에게 실제로 생긴 일을 단정하지 않는 조건형 적용 상황. 어떤 경우에 해당하는지 독립된 한 문장으로 마쳐. 조건절에서 끊지 마."};
+      item.properties.evidence_meaning={...structuredClone(scene),description:"계산 근거가 conclusion을 허용하는 이유의 생활어 번역. 행성명·배치 용어는 systems로 보내고 사용자 사건·증상·상대 행동을 만들지 않음."};
       delete item.properties.real_scene;
       item.required=["key","conclusion","applies_when","evidence_meaning","action","change_condition","evidence_refs","applicability"];
       const {clusters,headline,overall,...rest}=core.properties;
