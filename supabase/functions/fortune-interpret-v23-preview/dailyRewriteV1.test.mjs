@@ -176,3 +176,15 @@ test('field-specific period copy findings repair the exact non-cluster prose',()
   assert.ok(request.paths.includes('relationship_reading.watch'))
   assert.deepEqual(request.targets.find(target=>target.path==='relationship_reading.watch').failures,['period_unobserved_event_or_span'])
 })
+
+
+test('unsupported period detail fields may be removed without allowing other prose to vanish',()=>{
+  const candidate={headline:'조건을 확인하는 달이야.',overall:{summary:'약속 범위를 비교해.'},clusters:[],investment_reading:{risk:'변동성이 커질 수 있어.'}}
+  const request=buildPeriodStructureRewriteRequest(candidate,{period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'}},{issues:[
+    {path:'investment_reading.risk',code:'period_unsupported_detail_prose'},
+  ]})
+  assert.deepEqual(request.allowEmptyPaths,['investment_reading.risk'])
+  const patched=applyDailyRewrite(candidate,request,{patches:[{path:'investment_reading.risk',text:''}]})
+  assert.equal(patched.investment_reading.risk,'')
+  assert.throws(()=>applyDailyRewrite(candidate,{paths:['headline'],allowEmptyPaths:[]},{patches:[{path:'headline',text:''}]}))
+})
