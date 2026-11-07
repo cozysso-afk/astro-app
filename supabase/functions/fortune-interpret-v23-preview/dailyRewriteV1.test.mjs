@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildDailyRewriteRequest,buildDailyClarityRequest,buildPeriodQualityRewriteRequest,buildRoleNeutralHeroRewriteRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
+import {buildDailyRewriteRequest,buildDailyClarityRequest,buildPeriodQualityRewriteRequest,buildPeriodStructureRewriteRequest,buildRoleNeutralHeroRewriteRequest,applyDailyRewrite} from './dailyRewriteV1.ts'
 const data={headline:'제목은 그대로야.',overall:{summary:'요약은 그대로야.'},clusters:{condition:{condition:{conclusion:'이 결론도 유지해.',change_condition:'밤 시간에 피로하면 쉬어.',evidence_refs:['W:test']}}}}
 const quality={stages:[{stage:6,passed:false}],daily_editorial:{issues:[{path:'clusters.condition.condition.change_condition',code:'daypart_without_local_window_evidence'}]}}
 const payload={period_kind:'day',time_context:{today_word_allowed:false},evidence_ledger:[{id:'W:test',direction:'context',text:'실제 계산 근거'}]}
@@ -119,4 +119,32 @@ test('period date repair refuses non-prose or non-stage-six failures',()=>{
   const payload2={period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'},evidence_ledger:[]}
   assert.equal(buildPeriodQualityRewriteRequest(candidate,payload2,{stages:[{stage:5,passed:false}],period_reading:{issues:[{path:'headline',code:'claim_date_without_local_evidence'}]}}),null)
   assert.equal(buildPeriodQualityRewriteRequest(candidate,payload2,{stages:[{stage:6,passed:false}],period_reading:{issues:[{path:'headline',code:'primary_missing'}]}}),null)
+})
+
+
+test('period structure repair targets technical leads and every date-bearing scene',()=>{
+  const candidate={
+    headline:'수성의 작용으로 업무를 조율해.',
+    overall:{summary:'직장과 학업의 에너지를 정돈해.',best_phase:'업무 검토',caution_phase:'학업 집중'},
+    clusters:[
+      {key:'relationship.summary',conclusion:'금성의 각이 관계를 자극해.',real_scene:'2026-10-05에 대화 기준을 맞춰.',action:'상대의 의도를 확인해.',evidence_refs:['W:1'],applicability:'direct'},
+      {key:'money_news.money',conclusion:'지출 기준이 중요해.',real_scene:'10월 8일에 쓸 돈을 나눠.',action:'필수 지출을 먼저 적어.',evidence_refs:['W:2'],applicability:'direct'},
+    ],
+  }
+  const request=buildPeriodStructureRewriteRequest(candidate,{period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'}},{issues:[
+    'headline: period_hero_not_plain_language',
+    'headline: period_hero_role_assumption',
+    'clusters.relationship.summary: period_section_not_plain_language',
+  ]})
+  assert.ok(request.paths.includes('headline'))
+  assert.ok(request.paths.includes('clusters.0.conclusion'))
+  assert.ok(request.paths.includes('clusters.0.real_scene'))
+  assert.ok(request.paths.includes('clusters.0.action'))
+  assert.ok(request.paths.includes('clusters.1.real_scene'))
+  assert.ok(!request.paths.includes('clusters.1.conclusion'))
+  assert.ok(request.prompt.includes('전체 해설을 다시 쓰지 말고'))
+})
+
+test('period structure repair refuses structural omissions',()=>{
+  assert.equal(buildPeriodStructureRewriteRequest({clusters:[]},{period_kind:'month'},{issues:['clusters.relationship.summary: primary_missing_or_duplicate']}),null)
 })
