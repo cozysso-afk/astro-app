@@ -18,7 +18,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.24-period-conditional-application-v1";
+const VERSION="supabase-ai-v23.25-period-split-evidence-v1";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -55,7 +55,7 @@ function structureReport(value:any){
   return {version:STRUCTURE_VERSION,passed:false,issues,topic_count:topicKeys.length,cluster_section_count:clusterSections.length};
 }
 function structureFailure(result:any,value:any){const report=structureReport(value);if(!report.issues.length)report.issues.push("validator_rejected_normalized_core");return {...result,ok:false,error:"provider 구조화 응답 검증 실패",structure_guard_failed:true,structure_report:report,candidate_data:result?.data,validation:undefined};}
-function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- period_section_not_plain_language 또는 period_hero_not_plain_language가 있으면 headline·overall·각 conclusion/action/real_scene 첫 문장에서 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용을 모두 빼고 생활 장면부터 써.\n- 각 fields에 정확한 날짜나 기간을 쓰려면 그 fields의 evidence_refs가 그 날짜 또는 구간을 직접 포함해야 해. 아니면 날짜를 삭제하고 장면만 설명해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
+function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- period_section_not_plain_language 또는 period_hero_not_plain_language가 있으면 headline·overall·각 conclusion/action/applies_when/evidence_meaning/real_scene 첫 문장에서 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용을 모두 빼고 생활 장면부터 써.\n- 각 fields에 정확한 날짜나 기간을 쓰려면 그 fields의 evidence_refs가 그 날짜 또는 구간을 직접 포함해야 해. 아니면 날짜를 삭제하고 장면만 설명해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
 
 const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
 절대규칙:
