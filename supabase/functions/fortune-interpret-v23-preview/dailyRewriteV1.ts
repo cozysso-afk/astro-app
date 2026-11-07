@@ -100,7 +100,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
     if(index<0)return null
     for(const field of ['conclusion','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
   }
-  const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}월\s*\d{1,2}일\b|상반기|하반기|[1-4]분기)/
+  const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\d{1,2}월\s*\d{1,2}일|상반기|하반기|[1-4]분기)/
   for(let index=0;index<rows.length;index++)if(typeof rows[index]?.real_scene==='string'&&dated.test(rows[index].real_scene))paths.add(`clusters.${index}.real_scene`)
   const selected=[...paths]
   if(!selected.length||selected.length>48)return null
