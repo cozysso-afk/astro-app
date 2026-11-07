@@ -188,3 +188,15 @@ test('unsupported period detail fields may be removed without allowing other pro
   assert.equal(patched.investment_reading.risk,'')
   assert.throws(()=>applyDailyRewrite(candidate,{paths:['headline'],allowEmptyPaths:[]},{patches:[{path:'headline',text:''}]}))
 })
+
+
+test('period application failures target the exact scene and preserve the conditional instruction',()=>{
+  const candidate={headline:'약속 범위를 확인하는 달이야.',overall:{summary:'조건을 비교해.'},clusters:[{key:'relationship.summary',conclusion:'범위를 먼저 말해.',real_scene:'주변에서 역할을 넘기려는 상황이 생겨.',action:'내일 오전에 답해.',evidence_refs:['W:1'],applicability:'direct'}]}
+  const request=buildPeriodStructureRewriteRequest(candidate,{period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'}},{issues:[
+    {path:'clusters.0.real_scene',code:'period_real_scene_not_conditional'},
+    {path:'clusters.0.action',code:'period_specific_life_detail'},
+  ]})
+  assert.ok(request.paths.includes('clusters.0.real_scene'))
+  assert.ok(request.paths.includes('clusters.0.action'))
+  assert.ok(request.prompt.includes("반드시 '만약"))
+})
