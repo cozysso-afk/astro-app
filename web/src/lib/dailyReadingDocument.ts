@@ -55,7 +55,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     }
     const fingerprint=(s:string)=>s.replace(/[\s.,!?·]/g,'')
     const primary=sections[0].section.conclusion
-    if (sections[0].section.real_scene.length>500 || sections[0].section.action.length>300 || sections[0].section.change_condition.length>300) {doc.state='needs_refresh';return doc}
+    if (clean(sections[0].section.real_scene).length>500 || sections[0].section.action.length>300 || sections[0].section.change_condition.length>300) {doc.state='needs_refresh';return doc}
     const peers=Object.values(data.clusters??{}).flatMap(group=>Object.values(group??{})).filter(s=>s && s!==sections[0].section && s.applicability!=='insufficient')
     if(primary.length>180 || fingerprint(primary)===fingerprint(data.overall?.summary??'') || peers.some(s=>fingerprint(clean(s.conclusion))===fingerprint(primary))) {doc.state='needs_refresh';return doc}
     doc.headline = clean(sections[0].section.conclusion)
