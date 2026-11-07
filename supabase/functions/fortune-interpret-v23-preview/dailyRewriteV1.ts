@@ -50,6 +50,33 @@ export function buildDailyClarityRequest(candidate:any,payload:any,quality?:any)
 }
 
 
+
+export function buildPeriodQualityRewriteRequest(candidate:any,payload:any,quality:any) {
+  if(!['week','month','annual'].includes(String(payload?.period_kind??'')))return null
+  const issues=Array.isArray(quality?.period_reading?.issues)?quality.period_reading.issues:[]
+  const allowed=new Set(['claim_date_without_local_evidence','claim_period_without_local_evidence','relationship_date_without_direct_relationship_evidence'])
+  if(!issues.length||issues.some((issue:any)=>!allowed.has(String(issue?.code??''))))return null
+  const failedStages=(quality?.stages??[]).filter((stage:any)=>!stage?.passed)
+  if(failedStages.some((stage:any)=>stage?.stage!==6))return null
+  const paths=[...new Set(issues.map((issue:any)=>String(issue?.path??'')).filter(Boolean))]
+  if(!paths.length||paths.some(path=>typeof get(candidate,path)!=='string'))return null
+  const targets=paths.map(path=>{
+    const parentPath=parts(path).slice(0,-1).join('.')
+    const parent=parentPath?get(candidate,parentPath):candidate
+    const refs=Array.isArray(parent?.evidence_refs)?parent.evidence_refs:[]
+    return {path,previous_text:get(candidate,path),failures:issues.filter((issue:any)=>issue.path===path).map((issue:any)=>issue.code),
+      evidence:(payload?.evidence_ledger??[]).filter((row:any)=>refs.includes(row?.id))}
+  })
+  return {paths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+    prompt:`[PERIOD DATE-GROUNDING EDIT]
+전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+각 문장은 자기 evidence에 직접 포함되지 않은 날짜·주차·월·분기·상반기·하반기 표현을 삭제해야 해. 다른 날짜로 바꾸거나 날짜 사이의 지속을 새로 추정하지 마.
+기존 판단의 방향과 제한, 생활 장면은 유지해. 날짜를 뺀 뒤에도 문장이 자연스럽도록 고치되 사건·성과·상대 행동을 새로 만들지 마.
+행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용으로 시작하지 말고 자연스러운 한국어 반말로 써.
+PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
+TARGETS=${JSON.stringify(targets)}`}
+}
+
 export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,report:any) {
   const issues=Array.isArray(report?.issues)?report.issues:[]
   const parsed=issues.map((issue:any)=>{
