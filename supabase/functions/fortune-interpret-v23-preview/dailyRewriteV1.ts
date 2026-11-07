@@ -77,6 +77,45 @@ PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 TARGETS=${JSON.stringify(targets)}`}
 }
 
+
+export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,report:any) {
+  if(!['week','month','annual'].includes(String(payload?.period_kind??'')))return null
+  const issues=(Array.isArray(report?.issues)?report.issues:[]).map((issue:any)=>{
+    if(typeof issue==='string'){
+      const [path,...rest]=issue.split(':')
+      return {path:path.trim(),code:rest.join(':').trim()}
+    }
+    return {path:String(issue?.path??''),code:String(issue?.code??'')}
+  })
+  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language'])
+  if(!issues.length||issues.some((issue:any)=>!allowed.has(issue.code)))return null
+  const paths=new Set<string>()
+  if(issues.some((issue:any)=>issue.path==='headline')){
+    for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
+  }
+  const rows=Array.isArray(candidate?.clusters)?candidate.clusters:[]
+  for(const issue of issues.filter((issue:any)=>issue.code==='period_section_not_plain_language')){
+    const key=issue.path.replace(/^clusters\./,'')
+    const index=rows.findIndex((row:any)=>String(row?.key??'')===key)
+    if(index<0)return null
+    for(const field of ['conclusion','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
+  }
+  const dated=/(?:\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}월\s*\d{1,2}일\b|상반기|하반기|[1-4]분기)/
+  for(let index=0;index<rows.length;index++)if(typeof rows[index]?.real_scene==='string'&&dated.test(rows[index].real_scene))paths.add(`clusters.${index}.real_scene`)
+  const selected=[...paths]
+  if(!selected.length||selected.length>48)return null
+  const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.')}))
+  return {paths:selected,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+    prompt:`[PERIOD BOUNDED PROSE EDIT]
+전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+모든 target은 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
+hero=true인 제목·요약에서는 사용자의 직장·업무·학업·시험·이직 상태를 가정하거나 분야명을 나열하지 마. 공통으로 드러나는 약속·요청·지출·휴식·대화·선택 기준 중 실제 원고에 있는 대상 하나로 종합해.
+날짜가 든 target은 이미 근거 범위 검증 대상이야. 편집 결과에서 2026-10-05 같은 숫자 날짜, 10월 5일 같은 날짜, 주차·분기·상반기·하반기를 모두 제거해. 다른 날짜나 지속 구간을 만들지 마.
+기존 판단의 방향·제한·생활 장면은 유지하고 사건·성과·상대 행동을 새로 만들지 마. 자연스러운 한국어 반말로 써.
+PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
+TARGETS=${JSON.stringify(targets)}`}
+}
+
 export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,report:any) {
   const issues=Array.isArray(report?.issues)?report.issues:[]
   const parsed=issues.map((issue:any)=>{
