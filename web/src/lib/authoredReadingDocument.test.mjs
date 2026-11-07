@@ -70,6 +70,29 @@ test('authored insufficient is distinct from omitted model output in daily and p
   assert.ok(day.details.some(b=>b.id==='relationship.contact_continuity:conclusion'))
   assert.ok(day.details.some(b=>b.id==='relationship.love_reunion_interest:conclusion'))
 })
+test('period split explanation renders two named blocks and wins over the legacy alias without duplication',()=>{
+  const data=fixture()
+  const target=data.clusters.work_study.work
+  target.applies_when='만약 업무 조건이 실제로 확인될 때 적용해.'
+  target.evidence_meaning='계산 근거는 우선순위를 좁혀 보라는 뜻이야.'
+  target.real_scene='호환용 문장은 화면에 중복 노출되면 안 돼.'
+  const doc=documents.buildPeriodReadingDocument(data,'month','a','b',fields.fortuneField('work'),true)
+  assert.equal(doc.state,'ready')
+  assert.equal(doc.core.find(b=>b.id.endsWith(':applies-when')).text,target.applies_when)
+  assert.equal(doc.core.find(b=>b.id.endsWith(':evidence-meaning')).text,target.evidence_meaning)
+  assert.ok(!doc.core.some(b=>b.text===target.real_scene))
+  const html=renderToStaticMarkup(createElement(Panel,{doc}))
+  assert.ok(html.includes('이럴 때 적용'))
+  assert.ok(html.includes('근거가 뜻하는 것'))
+  assert.ok(!html.includes(target.real_scene))
+})
+
+test('legacy period cache still renders its original scene block',()=>{
+  const data=fixture()
+  const doc=documents.buildPeriodReadingDocument(data,'week','a','b',fields.fortuneField('work'),true)
+  assert.equal(doc.core.find(b=>b.id.endsWith(':scene')).text,data.clusters.work_study.work.real_scene)
+})
+
 test('long and repeated authored text is preserved rather than silently shortened',()=>{
   const data=fixture();const original='첫 문장. 둘째 문장의 중요한 부정 조건은 절대로 지우지 마. 셋째 문장. 넷째 문장. '.repeat(12)
   data.clusters.work_study.work.real_scene=original
