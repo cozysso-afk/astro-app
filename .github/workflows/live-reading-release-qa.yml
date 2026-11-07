@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   fortune:
-    name: Gemini 3.7 bounded hero repair verification
+    name: Gemini 3.7 bounded month date repair verification
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
@@ -43,8 +43,8 @@ jobs:
           QA_FORTUNE_MODEL: gemini-3.7-flash
         run: >-
           node --experimental-strip-types scripts/fortune-live-qa.mjs
-          --max-jobs 2
-          --period-kinds day,month
+          --max-jobs 1
+          --period-kinds month
           --out live-release-artifacts/fortune
       - name: Upload fortune report
         if: always()
