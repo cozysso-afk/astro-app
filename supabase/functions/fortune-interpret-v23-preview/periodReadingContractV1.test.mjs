@@ -180,3 +180,16 @@ test('authored period scenes stay conditional and relationship prose cannot inve
   data.clusters[0].action='말의 강도보다 약속 이행 여부를 살펴봐.'
   assert.equal(inspectPeriodProviderDocument(data,'month').issues.some(issue=>['period_real_scene_not_conditional','period_relationship_contact_leak','period_specific_life_detail'].includes(issue.code)),false)
 })
+
+test('period cards reject the dangling condition and technical reason seen in the monthly live reading', () => {
+  const data = provider()
+  const row = data.clusters[0]
+  Object.assign(row, {applicability:'conditional', evidence_refs:['x'], conclusion:'약속 사이에 시간을 둬.', action:'약속 사이의 간격을 확인해.',
+    applies_when:'만약 약속을 정해야 하는 경우라면', evidence_meaning:'토성과 금성의 긴장 배치가 나타나기 때문이야.'})
+  const issues = () => inspectPeriodProviderDocument(data, 'month').issues
+  assert.ok(issues().some(i=>i.path==='clusters.0.applies_when'))
+  assert.ok(issues().some(i=>i.path==='clusters.0.evidence_meaning'))
+  row.applies_when='두 약속 중 하나를 골라야 할 때 해당돼.'
+  row.evidence_meaning='일정을 바로 정할 여유가 있는 날과 조금 더 기다릴 날이 나뉘어.'
+  assert.ok(!issues().some(i=>i.path==='clusters.0.applies_when'||i.path==='clusters.0.evidence_meaning'))
+})
