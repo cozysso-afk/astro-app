@@ -31,7 +31,7 @@ const date=(v:unknown)=>{
   return Number.isFinite(stamp)&&new Date(stamp).toISOString().slice(0,10)===value?value:''
 }
 const unique=<T>(values:T[])=>[...new Set(values)]
-const PERIOD_UNOBSERVED=/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/
+const PERIOD_UNOBSERVED=/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반|월\s*(?:초|중순|말)|월중\s*(?:전반|후반)|저녁\s*시간)/
 function stringEntries(value:any,path=''):Array<{path:string,value:string}>{
   if(typeof value==='string')return path?[{path,value}]:[]
   if(!value||typeof value!=='object')return []
@@ -127,9 +127,20 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const providerText=JSON.stringify(core)
   if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(providerText))issues.push({code:'period_korean_copy_error',path:'root'})
   for(const entry of stringEntries(core))if(PERIOD_UNOBSERVED.test(entry.value))issues.push({code:'period_unobserved_event_or_span',path:entry.path})
+  const healthClaim=/(?:피로|체력|기력|수면|열감|개운|과로|과부하|반응\s*속도|생활\s*리듬|집중력|쉬는\s*시간|휴식\s*(?:부족|이\s*모자라)|몸(?:에|이|의)\s*(?:부담|열|무리))/
+  const addHealth=(value:any,path:string)=>{if(healthClaim.test(text(value))&&!issues.some(issue=>issue.code==='period_unobserved_health_claim'&&issue.path===path))issues.push({code:'period_unobserved_health_claim',path})}
+  for(const [index,row] of rows.entries())if(row?.key==='condition.condition'&&row?.applicability!=='insufficient')for(const field of ['conclusion','real_scene','action','change_condition'])addHealth(row?.[field],`clusters.${index}.${field}`)
+  for(const field of ['summary','best_phase','caution_phase','dominant_pattern'])addHealth(core?.overall?.[field],`overall.${field}`)
+  for(const [index,row] of (core?.domain_answers??[]).entries())if(row?.topic==='컨디션')addHealth(row?.answer,`domain_answers.${index}.answer`)
+  for(const field of ['verdict','reason','action','avoid','timing'])addHealth(core?.topic_analysis?.['컨디션']?.[field],`topic_analysis.컨디션.${field}`)
+  for(const [index,row] of (core?.decisions??[]).entries())for(const field of ['reason','watch','action','avoid'])addHealth(row?.[field],`decisions.${index}.${field}`)
+  const investmentSupported=rows.some((row:any)=>String(row?.key??'').startsWith('investment.')&&row?.applicability!=='insufficient')
+  if(!investmentSupported)for(const [field,value] of Object.entries(core?.investment_reading??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`investment_reading.${field}`})
+  const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
+  if(!contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
   const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
-  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[]).length>5))issues.push({code:'period_generic_repetition',path:'root'})
+  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>3))issues.push({code:'period_generic_repetition',path:'root'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
