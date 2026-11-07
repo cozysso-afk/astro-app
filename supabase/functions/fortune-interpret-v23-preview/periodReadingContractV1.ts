@@ -134,9 +134,18 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   for(const [index,row] of (core?.domain_answers??[]).entries())if(row?.topic==='컨디션')addHealth(row?.answer,`domain_answers.${index}.answer`)
   for(const field of ['verdict','reason','action','avoid','timing'])addHealth(core?.topic_analysis?.['컨디션']?.[field],`topic_analysis.컨디션.${field}`)
   for(const [index,row] of (core?.decisions??[]).entries())for(const field of ['reason','watch','action','avoid'])addHealth(row?.[field],`decisions.${index}.${field}`)
+  const conditionalScene=/(?:만약|실제로|라면|한다면|경우|할 때|해야 할 때|정할 때|고를 때|결정할 때)/
+  for(const [index,row] of rows.entries())if(row?.applicability!=='insufficient'&&text(row?.real_scene)&&!conditionalScene.test(text(row.real_scene).split(/[.!?。]/)[0]))issues.push({code:'period_real_scene_not_conditional',path:`clusters.${index}.real_scene`})
+  const specificLifeDetail=/(?:퇴근|출근|상급자|협업자|기획안|첨부\s*파일|문제집|오답\s*노트|요약\s*노트|장바구니|공과금|카드\s*대금|잔고|모임\s*회비|생활비\s*계좌|집으로|내일|지난주|이틀\s*뒤|오전|오후|저녁|새벽|답장\s*간격|짧은\s*연락|대면\s*약속)/
+  for(const entry of stringEntries(core))if(specificLifeDetail.test(entry.value))issues.push({code:'period_specific_life_detail',path:entry.path})
+  const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
+  if(!contactSupported){
+    const contactLeak=/(?:연락|답장|선연락|안부)/
+    for(const entry of stringEntries(core?.relationship_reading??{},'relationship_reading'))if(contactLeak.test(entry.value))issues.push({code:'period_relationship_contact_leak',path:entry.path})
+    for(const [index,row] of rows.entries())if(['relationship.love_general','relationship.summary'].includes(String(row?.key??'')))for(const field of ['conclusion','real_scene','action','change_condition'])if(contactLeak.test(text(row?.[field])))issues.push({code:'period_relationship_contact_leak',path:`clusters.${index}.${field}`})
+  }
   const investmentSupported=rows.some((row:any)=>String(row?.key??'').startsWith('investment.')&&row?.applicability!=='insufficient')
   if(!investmentSupported)for(const [field,value] of Object.entries(core?.investment_reading??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`investment_reading.${field}`})
-  const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
   if(!contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
   const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
