@@ -10,7 +10,7 @@ import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, 
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
-import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
+import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildPeriodStructureRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
 import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, omitUnsupportedDailyConditions } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
@@ -18,7 +18,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.20-date-free-period-repair-v1";
+const VERSION="supabase-ai-v23.21-bounded-period-prose-v1";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -243,9 +243,11 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   const dailyDraft=first.ok?first.data:first.quality_guard_failed?first.candidate_data:null;
   const dailyPatch=dailyDraft?buildDailyClarityRequest(dailyDraft,payload,first.quality_report):null;
   const periodPatch=first?.quality_guard_failed&&first?.candidate_data?buildPeriodQualityRewriteRequest(first.candidate_data,payload,first.quality_report):null;
+  const periodStructurePatch=first?.structure_guard_failed&&first?.partial?buildPeriodStructureRewriteRequest(first.partial,payload,first.structure_report):null;
   const heroPatch=first?.structure_guard_failed&&first?.partial?buildRoleNeutralHeroRewriteRequest(first.partial,payload,first.structure_report):null;
   if(dailyPatch)second=await rewriteDailyCandidate({...first,candidate_data:dailyDraft},payload,preferred,key,budget,dailyPatch);
   else if(periodPatch)second=await rewritePeriodCandidate(first,payload,preferred,key,budget,periodPatch);
+  else if(periodStructurePatch)second=await rewriteRoleNeutralHeroCandidate(first,payload,preferred,key,budget,periodStructurePatch);
   else if(heroPatch)second=await rewriteRoleNeutralHeroCandidate(first,payload,preferred,key,budget,heroPatch);
   else if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
   else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report)+(first.quality_report.daily_editorial?.passed===false?dailyEditorialRetryInstruction(first.quality_report.daily_editorial,first.candidate_data):""));
