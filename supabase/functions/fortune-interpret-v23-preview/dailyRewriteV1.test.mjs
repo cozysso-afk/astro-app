@@ -148,3 +148,20 @@ test('period structure repair targets technical leads and every date-bearing sce
 test('period structure repair refuses structural omissions',()=>{
   assert.equal(buildPeriodStructureRewriteRequest({clusters:[]},{period_kind:'month'},{issues:['clusters.relationship.summary: primary_missing_or_duplicate']}),null)
 })
+
+
+test('root copy findings edit all authored period prose without touching evidence',()=>{
+  const candidate={headline:'실무적 변화를 조율해.',overall:{summary:'조율의 흐름이 이어져.'},clusters:[
+    {key:'relationship.summary',conclusion:'조율이 필요해.',real_scene:'피로 누적이 수면을 방해해.',action:'신중하게 정돈해.',evidence_refs:['W:1'],applicability:'direct'},
+    {key:'money_news.money',conclusion:'지출 기준을 나눠.',real_scene:'2026-10-05에 결제를 검토해.',action:'필수 지출부터 적어.',evidence_refs:['W:2'],applicability:'direct'},
+  ]}
+  const request=buildPeriodStructureRewriteRequest(candidate,{period_kind:'month',period:{start:'2026-10-01',end:'2026-10-31'}},{issues:[
+    'root: period_unobserved_event_or_span','root: period_generic_repetition',
+  ]})
+  assert.ok(request.paths.includes('headline'))
+  assert.ok(request.paths.includes('clusters.0.conclusion'))
+  assert.ok(request.paths.includes('clusters.0.real_scene'))
+  assert.ok(request.paths.includes('clusters.0.action'))
+  assert.ok(request.paths.includes('clusters.1.real_scene'))
+  assert.ok(request.prompt.includes('피로'))
+})
