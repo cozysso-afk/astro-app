@@ -157,3 +157,13 @@ test('period provider rejects role-specific hero, invented symptoms, and generic
   assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_event_or_span'&&issue.path==='clusters.0.real_scene'))
   assert.ok(report.issues.some(issue=>issue.code==='period_generic_repetition'))
 })
+
+
+test('period provider locates invented health claims and unsupported detail prose',()=>{
+  const data=provider()
+  data.clusters=data.clusters.map(row=>row.key==='condition.condition'?{...row,conclusion:'기력 소모와 생활 리듬 변화를 살펴야 해.',real_scene:'몸에 열감이 오르고 쉬어도 개운하지 않을 수 있어.',action:'저녁 시간에는 쉬어.',evidence_refs:['x'],applicability:'direct'}:row)
+  data.investment_reading={risk:'변동성이 커질 수 있어.',entry:'새 종목은 관망해.'}
+  const report=inspectPeriodProviderDocument(data,'month')
+  assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_health_claim'&&issue.path==='clusters.5.real_scene'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_unsupported_detail_prose'&&issue.path==='investment_reading.risk'))
+})
