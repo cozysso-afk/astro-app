@@ -2,6 +2,12 @@ import { DAILY_EDITORIAL_INSTRUCTION } from './dailyEditorialV1.ts'
 type Issue={path:string;code:string}
 const parts=(path:string)=>path.replace(/\[(\d+)\]/g,'.$1').split('.')
 const get=(data:any,path:string)=>parts(path).reduce((v,key)=>v?.[key],data)
+const PERIOD_UNOBSERVED=/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/
+function matchingStringPaths(value:any,pattern:RegExp,path=''):string[]{
+  if(typeof value==='string')return path&&pattern.test(value)?[path]:[]
+  if(!value||typeof value!=='object')return []
+  return Object.entries(value).flatMap(([key,child])=>matchingStringPaths(child,pattern,path?path+'.'+key:key))
+}
 
 export function buildDailyRewriteRequest(candidate:any,quality:any,payload:any) {
   const issues:Issue[]=quality?.daily_editorial?.issues??[]
@@ -102,6 +108,7 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   }
   if(issues.some((issue:any)=>issue.path==='root')){
     for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
+    if(issues.some((issue:any)=>issue.code==='period_unobserved_event_or_span'))for(const path of matchingStringPaths(candidate,PERIOD_UNOBSERVED))paths.add(path)
     for(let index=0;index<rows.length;index++)if(rows[index]?.applicability!=='insufficient'){
       for(const field of ['conclusion','real_scene','action'])if(typeof rows[index]?.[field]==='string'&&rows[index][field].trim())paths.add(`clusters.${index}.${field}`)
     }
