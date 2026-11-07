@@ -84,9 +84,15 @@ function normalizedDomainAnswers(value:any){
 
 function validProviderSection(row:any){
   if(!row||typeof row!=="object"||Array.isArray(row))return false;
-  if(!["conclusion","real_scene","action","change_condition"].every(field=>typeof row?.[field]==="string"))return false;
+  const legacy=typeof row?.real_scene==="string";
+  const split=typeof row?.applies_when==="string"&&typeof row?.evidence_meaning==="string";
+  if(typeof row?.conclusion!=="string"||typeof row?.action!=="string"||typeof row?.change_condition!=="string"||(!legacy&&!split))return false;
   if(!Array.isArray(row?.evidence_refs))return false;
   return APPLICABILITY.has(String(row?.applicability??""));
+}
+function normalizedProviderSection(row:any){
+  const real_scene=typeof row?.real_scene==="string"?row.real_scene:[row?.applies_when,row?.evidence_meaning].map((value:any)=>String(value??"").trim()).filter(Boolean).join(" ");
+  return {conclusion:row?.conclusion,real_scene,action:row?.action,change_condition:row?.change_condition,evidence_refs:row?.evidence_refs,applicability:row?.applicability};
 }
 
 function normalizePeriodKind(value:unknown){
@@ -151,6 +157,12 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       core.properties.cross_checks.minItems=0;
     }
     if(kind!=="day"){
+      const item=core.properties.clusters.items;
+      const scene=structuredClone(item.properties.real_scene);
+      item.properties.applies_when={...structuredClone(scene),description:"사용자에게 실제로 생긴 일을 단정하지 않는 조건형 적용 상황. 첫 문장에 만약/라면/할 때/경우 중 하나를 사용."};
+      item.properties.evidence_meaning={...structuredClone(scene),description:"계산 근거가 conclusion을 허용하는 이유의 생활어 번역. 사용자 사건·증상·상대 행동을 만들지 않음."};
+      delete item.properties.real_scene;
+      item.required=["key","conclusion","applies_when","evidence_meaning","action","change_condition","evidence_refs","applicability"];
       const {clusters,headline,overall,...rest}=core.properties;
       core.properties={clusters,overall,headline,...rest};
       core.propertyOrdering=Object.keys(core.properties);
@@ -199,7 +211,7 @@ export function normalizeProviderCore(core:any){
       invalid.add(key);
       continue;
     }
-    groups[group][section]=Object.fromEntries(EDITORIAL_FIELDS.map(field=>[field,row?.[field]]));
+    groups[group][section]=normalizedProviderSection(row);
   }
 
   for(const key of EDITORIAL_SECTION_KEYS){
