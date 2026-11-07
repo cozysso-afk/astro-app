@@ -121,7 +121,10 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const providerText=JSON.stringify(core)
   if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(providerText))issues.push({code:'period_korean_copy_error',path:'root'})
   if(/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반)/.test(providerText))issues.push({code:'period_unobserved_event_or_span',path:'root'})
-  const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')\n  const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']\n  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[]).length>5))issues.push({code:'period_generic_repetition',path:'root'})\n  for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
+  const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')
+  const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
+  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[]).length>5))issues.push({code:'period_generic_repetition',path:'root'})
+  for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
   }
