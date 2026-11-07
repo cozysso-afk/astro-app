@@ -31,6 +31,7 @@ const date=(v:unknown)=>{
   return Number.isFinite(stamp)&&new Date(stamp).toISOString().slice(0,10)===value?value:''
 }
 const unique=<T>(values:T[])=>[...new Set(values)]
+const sceneText=(row:any)=>text(row?.real_scene)||[text(row?.applies_when),text(row?.evidence_meaning)].filter(Boolean).join(' ')
 const PERIOD_UNOBSERVED=/(?:퇴근\s*후|출근\s*(?:전|후)|연락이\s*올\s*가능성|답신이\s*늦|상대가\s*먼저|수면\s*시간이\s*부족(?!하다면|한\s*경우)|수면[^.]{0,20}방해|체력이\s*떨어질\s*수|체력\s*소모|피로\s*누적|집중력\s*저하|신체적\s*피로|감정적\s*조급함|상호\s*호감을\s*확인|차익\s*실현|매수\s*적기|매도\s*적기|상반기|하반기|중반\s*이후|주\s*초반|주\s*후반|월\s*(?:초|중순|말)|월중\s*(?:전반|후반)|저녁\s*시간)/
 function stringEntries(value:any,path=''):Array<{path:string,value:string}>{
   if(typeof value==='string')return path?[{path,value}]:[]
@@ -94,7 +95,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.
 - clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. 상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.
-- 각 항목은 conclusion/real_scene/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. real_scene 첫 문장은 사용자에게 실제로 일어난 일을 예측하지 말고 반드시 '만약 …라면/…할 때/…경우' 형태의 조건형 적용 상황으로 써. 다음 문장에서만 실제 기간근거가 왜 그 판단을 허용하는지 생활어로 설명해. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
+- 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 반드시 '만약 …라면/…할 때/…경우' 형태의 조건형 적용 상황으로 써. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.
 - headline은 한 문장(25~60자 목표), overall.summary는 적용 상황과 이유를 설명하는 80~180자 목표야. 중요한 제한을 글자 수 때문에 삭제하지 마. 180자 넘는 제목이나 360자 넘는 요약은 실패야. 상세 설명은 real_scene 및 근거 상세에 둬.
@@ -129,29 +130,29 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   for(const entry of stringEntries(core))if(PERIOD_UNOBSERVED.test(entry.value))issues.push({code:'period_unobserved_event_or_span',path:entry.path})
   const healthClaim=/(?:피로|체력|기력|수면|열감|개운|과로|과부하|반응\s*속도|생활\s*리듬|집중력|쉬는\s*시간|휴식\s*(?:부족|이\s*모자라)|몸(?:에|이|의)\s*(?:부담|열|무리))/
   const addHealth=(value:any,path:string)=>{if(healthClaim.test(text(value))&&!issues.some(issue=>issue.code==='period_unobserved_health_claim'&&issue.path===path))issues.push({code:'period_unobserved_health_claim',path})}
-  for(const [index,row] of rows.entries())if(row?.key==='condition.condition'&&row?.applicability!=='insufficient')for(const field of ['conclusion','real_scene','action','change_condition'])addHealth(row?.[field],`clusters.${index}.${field}`)
+  for(const [index,row] of rows.entries())if(row?.key==='condition.condition'&&row?.applicability!=='insufficient')for(const field of ['conclusion','real_scene','applies_when','evidence_meaning','action','change_condition'])addHealth(row?.[field],`clusters.${index}.${field}`)
   for(const field of ['summary','best_phase','caution_phase','dominant_pattern'])addHealth(core?.overall?.[field],`overall.${field}`)
   for(const [index,row] of (core?.domain_answers??[]).entries())if(row?.topic==='컨디션')addHealth(row?.answer,`domain_answers.${index}.answer`)
   for(const field of ['verdict','reason','action','avoid','timing'])addHealth(core?.topic_analysis?.['컨디션']?.[field],`topic_analysis.컨디션.${field}`)
   for(const [index,row] of (core?.decisions??[]).entries())for(const field of ['reason','watch','action','avoid'])addHealth(row?.[field],`decisions.${index}.${field}`)
   const conditionalScene=/(?:만약|실제로|라면|한다면|경우|할 때|해야 할 때|정할 때|고를 때|결정할 때)/
-  for(const [index,row] of rows.entries())if(row?.applicability!=='insufficient'&&text(row?.real_scene)&&!conditionalScene.test(text(row.real_scene).split(/[.!?。]/)[0]))issues.push({code:'period_real_scene_not_conditional',path:`clusters.${index}.real_scene`})
+  for(const [index,row] of rows.entries())if(row?.applicability!=='insufficient'){const applies=text(row?.applies_when)||text(row?.real_scene).split(/[.!?。]/)[0];if(applies&&!conditionalScene.test(applies))issues.push({code:'period_real_scene_not_conditional',path:`clusters.${index}.${typeof row?.applies_when==='string'?'applies_when':'real_scene'}`})}
   const specificLifeDetail=/(?:퇴근|출근|상급자|협업자|기획안|첨부\s*파일|문제집|오답\s*노트|요약\s*노트|장바구니|공과금|카드\s*대금|잔고|모임\s*회비|생활비\s*계좌|집으로|내일|지난주|이틀\s*뒤|오전|오후|저녁|새벽|답장\s*간격|짧은\s*연락|대면\s*약속)/
   for(const entry of stringEntries(core))if(specificLifeDetail.test(entry.value))issues.push({code:'period_specific_life_detail',path:entry.path})
   const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
   if(!contactSupported){
     const contactLeak=/(?:연락|답장|선연락|안부)/
     for(const entry of stringEntries(core?.relationship_reading??{},'relationship_reading'))if(contactLeak.test(entry.value))issues.push({code:'period_relationship_contact_leak',path:entry.path})
-    for(const [index,row] of rows.entries())if(['relationship.love_general','relationship.summary'].includes(String(row?.key??'')))for(const field of ['conclusion','real_scene','action','change_condition'])if(contactLeak.test(text(row?.[field])))issues.push({code:'period_relationship_contact_leak',path:`clusters.${index}.${field}`})
+    for(const [index,row] of rows.entries())if(['relationship.love_general','relationship.summary'].includes(String(row?.key??'')))for(const field of ['conclusion','real_scene','applies_when','evidence_meaning','action','change_condition'])if(contactLeak.test(text(row?.[field])))issues.push({code:'period_relationship_contact_leak',path:`clusters.${index}.${field}`})
   }
   const investmentSupported=rows.some((row:any)=>String(row?.key??'').startsWith('investment.')&&row?.applicability!=='insufficient')
   if(!investmentSupported)for(const [field,value] of Object.entries(core?.investment_reading??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`investment_reading.${field}`})
   if(!contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
-  const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.real_scene,row?.action])].map(text).join(' ')
+  const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.applies_when,row?.evidence_meaning,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
   if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>3))issues.push({code:'period_generic_repetition',path:'root'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
-    const readerLead=[row?.conclusion,row?.action,text(row?.real_scene).split(/[.!?。]/)[0]].map(text).join(' ')
+    const readerLead=[row?.conclusion,row?.action,text(row?.applies_when)||sceneText(row).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
   }
   for(const key of payload?requiredKeys(payload):PERIOD_PRIMARY_KEYS){
@@ -160,8 +161,8 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     const row=found[0]
     if(!['direct','conditional','insufficient'].includes(row.applicability))issues.push({code:'invalid_applicability',path:`clusters.${key}`})
     if(row.applicability==='insufficient'){
-      if(['conclusion','real_scene','action','change_condition'].some(k=>text(row[k]))||(row.evidence_refs?.length??0)>0)issues.push({code:'insufficient_with_authored_claim',path:`clusters.${key}`})
-    }else if(!['conclusion','real_scene','action'].every(k=>text(row[k]))||typeof row.change_condition!=='string'||!Array.isArray(row.evidence_refs)||!row.evidence_refs.length){
+      if(['conclusion','real_scene','applies_when','evidence_meaning','action','change_condition'].some(k=>text(row[k]))||(row.evidence_refs?.length??0)>0)issues.push({code:'insufficient_with_authored_claim',path:`clusters.${key}`})
+    }else if(!text(row.conclusion)||!sceneText(row)||!text(row.action)||typeof row.change_condition!=='string'||!Array.isArray(row.evidence_refs)||!row.evidence_refs.length){
       issues.push({code:'primary_incomplete',path:`clusters.${key}`})
     }
   }
