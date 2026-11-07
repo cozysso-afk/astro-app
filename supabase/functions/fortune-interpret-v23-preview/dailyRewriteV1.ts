@@ -70,7 +70,7 @@ export function buildPeriodQualityRewriteRequest(candidate:any,payload:any,quali
   return {paths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[PERIOD DATE-GROUNDING EDIT]
 전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
-각 문장은 자기 evidence에 직접 포함되지 않은 날짜·주차·월·분기·상반기·하반기 표현을 삭제해야 해. 다른 날짜로 바꾸거나 날짜 사이의 지속을 새로 추정하지 마.
+각 target은 이미 날짜 근거 검증에 실패했다. 편집 결과에는 2026-10-05 같은 숫자 날짜와 10월 5일 같은 한글 날짜, 주차·월·분기·상반기·하반기 표현을 하나도 남기지 마. 다른 날짜로 바꾸거나 날짜 사이의 지속을 새로 추정하지 마.
 기존 판단의 방향과 제한, 생활 장면은 유지해. 날짜를 뺀 뒤에도 문장이 자연스럽도록 고치되 사건·성과·상대 행동을 새로 만들지 마.
 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용으로 시작하지 말고 자연스러운 한국어 반말로 써.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
