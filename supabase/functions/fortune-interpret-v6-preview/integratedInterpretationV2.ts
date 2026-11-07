@@ -393,7 +393,10 @@ function cleanDomainAnswers(v:any){
 function cleanEditorialSection(v:any){
   if(!v||typeof v!=="object"||Array.isArray(v))return null;
   const mode=txt(v?.applicability,24);
-  return {conclusion:txt(v?.conclusion,900),real_scene:txt(v?.real_scene,1200),action:txt(v?.action,900),change_condition:txt(v?.change_condition,1000),evidence_refs:cleanRefs(v?.evidence_refs),applicability:["direct","conditional","insufficient"].includes(mode)?mode:"insufficient"};
+  const split = typeof v?.applies_when === "string" && typeof v?.evidence_meaning === "string" && (v.applies_when || v.evidence_meaning)
+    ? {applies_when:txt(v.applies_when,1200),evidence_meaning:txt(v.evidence_meaning,1200)}
+    : {};
+  return {...split,conclusion:txt(v?.conclusion,900),real_scene:txt(v?.real_scene,1200),action:txt(v?.action,900),change_condition:txt(v?.change_condition,1000),evidence_refs:cleanRefs(v?.evidence_refs),applicability:["direct","conditional","insufficient"].includes(mode)?mode:"insufficient"};
 }
 function cleanEditorialGroup(v:any,keys:string[]){
   if(!v||typeof v!=="object"||Array.isArray(v))return null;
