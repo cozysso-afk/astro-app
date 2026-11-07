@@ -1,7 +1,7 @@
 // Period reading is a bounded first-screen bundle. It is not a capability
 // certification: available rows describe the evidence, not permission to
 // predict events or to infer unobserved changes between sampled dates.
-export const PERIOD_READING_VERSION = 'period-reading-v1.1-readable-local-dates'
+export const PERIOD_READING_VERSION = 'period-reading-v1.2-split-evidence'
 export const PERIOD_PRIMARY_TOPICS:Record<string,string[]> = {
   'relationship.love_general':['연애'], 'relationship.summary':['대인관계'],
   'work_study.study':['학업'], 'work_study.work':['직장'],
