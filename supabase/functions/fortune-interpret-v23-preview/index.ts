@@ -10,7 +10,7 @@ import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, 
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
-import { buildDailyClarityRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
+import { buildDailyClarityRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
 import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, omitUnsupportedDailyConditions } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
@@ -18,7 +18,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.17-grounded-reader-v24";
+const VERSION="supabase-ai-v23.18-role-neutral-hero-v1";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -201,6 +201,22 @@ async function rewriteDailyCandidate(first:any,payload:any,model:string,key:stri
   }catch{return {ok:false,error:"일일 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
 
+
+async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:string,key:string,budget:Budget,request:any){
+  const result=await generateCore(payload,{},model,key,budget,"semantic_rewrite",true,"",request);
+  if(!result.ok)return result;
+  try{
+    const patched=applyDailyRewrite(first.partial,request,result.partial);
+    const packet=buildV23PromptBudget(payload).packet;
+    const kind=payload?.period_kind;
+    const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
+    if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
+    const normalized=normalizeProviderCore(patched);
+    const edited=finalizeCandidate(normalized,payload,model,result.usage,{targeted_role_neutral_hero:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.partial),captureEditorialStage("provider_hero_patch_applied",patched)]});
+    return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
+  }catch{return {ok:false,error:"첫 화면 수정 원고 범위 검증 실패",model,usage:result.usage};}
+}
+
 async function calculate(payload:any,preferred:string,key:string,shouldContinue:()=>Promise<boolean>){
   const budget:Budget={used:0,deadline:Date.now()+MAX_JOB_MS,calls:[]};
   const first:any=await generate(payload,preferred,key,budget,"initial",false,"");
@@ -211,7 +227,9 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   let second:any;
   const dailyDraft=first.ok?first.data:first.quality_guard_failed?first.candidate_data:null;
   const dailyPatch=dailyDraft?buildDailyClarityRequest(dailyDraft,payload,first.quality_report):null;
-  if(dailyPatch)second=await rewriteDailyCandidate({...first,candidate_data:dailyDraft},payload,"gemini-3.7-flash",key,budget,dailyPatch);
+  const heroPatch=first?.structure_guard_failed&&first?.partial?buildRoleNeutralHeroRewriteRequest(first.partial,payload,first.structure_report):null;
+  if(dailyPatch)second=await rewriteDailyCandidate({...first,candidate_data:dailyDraft},payload,preferred,key,budget,dailyPatch);
+  else if(heroPatch)second=await rewriteRoleNeutralHeroCandidate(first,payload,preferred,key,budget,heroPatch);
   else if(first?.structure_guard_failed===true&&first?.structure_report)second=await generate(payload,secondModel,key,budget,"structure_rewrite",true,strictStructureRetryInstruction(first.structure_report));
   else if(first?.quality_guard_failed===true&&first?.quality_report)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictQualityRetryInstruction(first.quality_report)+(first.quality_report.daily_editorial?.passed===false?dailyEditorialRetryInstruction(first.quality_report.daily_editorial,first.candidate_data):""));
   else if(Array.isArray(first?.guard_violations)&&first.guard_violations.length)second=await generate(payload,secondModel,key,budget,"semantic_rewrite",true,strictThaiRetryInstruction(first.guard_violations));
