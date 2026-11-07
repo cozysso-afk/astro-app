@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { SCHEMA } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
+import { SCHEMA, TOPICS, validateOutput } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from './providerSchemaV23.ts'
 
 const section=(key,index)=>({
@@ -86,6 +86,9 @@ test('period split fields survive normalization while the legacy scene alias rem
   assert.equal(first.applies_when,'만약 조건 0에 해당할 때')
   assert.equal(first.evidence_meaning,'근거 의미 0')
   assert.equal(first.real_scene,'만약 조건 0에 해당할 때 근거 의미 0')
+  const final=validateOutput({...normalized,overall:{},systems:{},topic_analysis:Object.fromEntries(TOPICS.map(topic=>[topic,{}]))})
+  assert.equal(final.clusters.relationship.summary.applies_when,first.applies_when)
+  assert.equal(final.clusters.relationship.summary.evidence_meaning,first.evidence_meaning)
 })
 
 test('provider normalization isolates a missing key without discarding valid authored sections',()=>{
