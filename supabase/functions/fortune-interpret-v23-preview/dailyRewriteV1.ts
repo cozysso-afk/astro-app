@@ -93,10 +93,10 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
     }
     return {path:String(issue?.path??''),code:String(issue?.code??'')}
   })
-  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language','period_unobserved_event_or_span','period_generic_repetition'])
+  const allowed=new Set(['period_hero_not_plain_language','period_hero_role_assumption','period_section_not_plain_language','period_unobserved_event_or_span','period_unobserved_health_claim','period_unsupported_detail_prose','period_generic_repetition'])
   if(!issues.length||issues.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=new Set<string>()
-  for(const issue of issues.filter((issue:any)=>issue.code==='period_unobserved_event_or_span'&&issue.path!=='root'))if(typeof get(candidate,issue.path)==='string'&&get(candidate,issue.path).trim())paths.add(issue.path)
+  for(const issue of issues.filter((issue:any)=>['period_unobserved_event_or_span','period_unobserved_health_claim','period_unsupported_detail_prose'].includes(issue.code)&&issue.path!=='root'))if(typeof get(candidate,issue.path)==='string'&&get(candidate,issue.path).trim())paths.add(issue.path)
   if(issues.some((issue:any)=>issue.path==='headline')){
     for(const path of ['headline','overall.summary','overall.best_phase','overall.caution_phase'])if(typeof get(candidate,path)==='string'&&get(candidate,path).trim())paths.add(path)
   }
@@ -119,13 +119,14 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   const selected=[...paths]
   if(!selected.length||selected.length>64)return null
   const targets=selected.map(path=>({path,previous_text:get(candidate,path),hero:path==='headline'||path.startsWith('overall.'),failures:issues.filter((issue:any)=>issue.path===path||issue.path==='root').map((issue:any)=>issue.code)}))
-  return {paths:selected,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
+  const allowEmptyPaths=issues.filter((issue:any)=>issue.code==='period_unsupported_detail_prose').map((issue:any)=>issue.path)
+  return {paths:selected,allowEmptyPaths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[PERIOD BOUNDED PROSE EDIT]
 전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
 모든 target은 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
 hero=true인 제목·요약에서는 사용자의 직장·업무·학업·시험·이직 상태를 가정하거나 분야명을 나열하지 마. 공통으로 드러나는 약속·요청·지출·휴식·대화·선택 기준 중 실제 원고에 있는 대상 하나로 종합해.
 날짜가 든 target은 이미 근거 범위 검증 대상이야. 편집 결과에서 2026-10-05 같은 숫자 날짜, 10월 5일 같은 날짜, 주차·분기·상반기·하반기를 모두 제거해. 다른 날짜나 지속 구간을 만들지 마.
-기존 판단의 방향·제한·생활 장면은 유지하고 사건·성과·상대 행동을 새로 만들지 마. 실제로 측정하지 않은 피로·체력 저하·수면 방해·집중력 저하를 발생 사실처럼 쓰지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
+기존 판단의 방향·제한·생활 장면은 유지하고 사건·성과·상대 행동을 새로 만들지 마. 컨디션과 총평에서는 피로·체력·기력·수면·열감·개운함·과로·과부하·생활 리듬·집중력·감정 급변 같은 증상이나 상태를 예측하지 마. 몸 상태를 관측한 것처럼 쓰지 말고 일정 밀도·활동량·휴식 간격을 보수적으로 정하는 선택만 설명해. period_unsupported_detail_prose 실패 target은 근거 없는 세부 해설이므로 text를 빈 문자열로 반환해. 그 외 target은 비우지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 TARGETS=${JSON.stringify(targets)}`}
 }
@@ -159,13 +160,13 @@ FIELD_CONCLUSIONS=${JSON.stringify(rows)}
 TARGETS=${JSON.stringify(paths.map(path=>({path,previous_text:get(candidate,path)})))}`}
 }
 
-export function applyDailyRewrite(candidate:any,request:{paths:string[]},response:any) {
+export function applyDailyRewrite(candidate:any,request:{paths:string[],allowEmptyPaths?:string[]},response:any) {
   const patches=response?.patches
   if(!Array.isArray(patches)||patches.length!==request.paths.length)throw new Error('daily_patch_count')
-  const expected=new Set(request.paths),seen=new Set<string>()
+  const expected=new Set(request.paths),seen=new Set<string>(),allowEmpty=new Set(request.allowEmptyPaths??[])
   const result=structuredClone(candidate)
   for(const patch of patches){
-    if(!expected.has(patch.path)||seen.has(patch.path)||typeof patch.text!=='string'||(!patch.text.trim()&&!patch.path.endsWith('.change_condition'))||patch.text.length>700)throw new Error('daily_patch_scope')
+    if(!expected.has(patch.path)||seen.has(patch.path)||typeof patch.text!=='string'||(!patch.text.trim()&&!patch.path.endsWith('.change_condition')&&!allowEmpty.has(patch.path))||patch.text.length>700)throw new Error('daily_patch_scope')
     seen.add(patch.path)
     const keys=parts(patch.path),key=keys.pop()!
     const parent=keys.reduce((v,k)=>v[k],result)
