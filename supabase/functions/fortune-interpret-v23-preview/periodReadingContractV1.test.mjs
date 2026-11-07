@@ -141,3 +141,19 @@ test('calendar month wording is not mistaken for the Moon',()=>{
  const moon=provider();moon.headline='달과 금성이 대화를 움직이는 한 달'
  assert.ok(inspectPeriodProviderDocument(moon,'month').issues.some(i=>i.code==='period_hero_not_plain_language'))
 })
+
+
+test('period provider rejects role-specific hero, invented symptoms, and generic repetition',()=>{
+  const base={
+    headline:'실무적 변화를 조율하는 달',
+    overall:{summary:'현실적 압박과 조율의 흐름을 살펴봐.',best_phase:'조율이 쉬운 때',caution_phase:'압박이 커지는 때'},
+    clusters:PERIOD_PRIMARY_KEYS.map((key,index)=>({
+      key,conclusion:'현실적 조율이 필요해.',real_scene:index===0?'피로 누적이 수면을 방해할 수 있어.':'압박 속에서 조율의 흐름이 이어져.',
+      action:'신중하게 정돈해.',change_condition:'',evidence_refs:['W:test'],applicability:'direct',
+    })),
+  }
+  const report=inspectPeriodProviderDocument(base,'month',{})
+  assert.ok(report.issues.some(issue=>issue.code==='period_hero_role_assumption'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_event_or_span'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_generic_repetition'))
+})
