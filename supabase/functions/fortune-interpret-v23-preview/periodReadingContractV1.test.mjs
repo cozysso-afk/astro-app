@@ -116,11 +116,11 @@ test('period first screen rejects role assumptions and invented events or spans'
  const hero=provider();hero.overall.summary='이번 주에는 업무와 공부를 함께 점검해.'
  assert.ok(inspectPeriodProviderDocument(hero,'week').issues.some(i=>i.code==='period_hero_role_assumption'))
  const contact=provider();contact.contact_flow={incoming:'주 초반에는 연락이 올 가능성이 있어.'}
- assert.ok(inspectPeriodProviderDocument(contact,'week').issues.some(i=>i.code==='period_unobserved_event_or_span'))
+ assert.ok(inspectPeriodProviderDocument(contact,'week').issues.some(i=>i.code==='period_unobserved_event_or_span'&&i.path==='contact_flow.incoming'))
  const body=provider();body.clusters[0]={key:PERIOD_PRIMARY_KEYS[0],conclusion:'컨디션을 점검해.',real_scene:'퇴근 후에는 체력이 떨어질 수 있어.',action:'일정을 줄여.',change_condition:'',evidence_refs:['x'],applicability:'conditional'}
- assert.ok(inspectPeriodProviderDocument(body,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'))
+ assert.ok(inspectPeriodProviderDocument(body,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'&&i.path==='clusters.0.real_scene'))
  const investment=provider();investment.investment_reading={realization:'차익 실현을 고려할 시기야.'}
- assert.ok(inspectPeriodProviderDocument(investment,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'))
+ assert.ok(inspectPeriodProviderDocument(investment,'annual').issues.some(i=>i.code==='period_unobserved_event_or_span'&&i.path==='investment_reading.realization'))
 })
 
 
@@ -154,6 +154,6 @@ test('period provider rejects role-specific hero, invented symptoms, and generic
   }
   const report=inspectPeriodProviderDocument(base,'month',{})
   assert.ok(report.issues.some(issue=>issue.code==='period_hero_role_assumption'))
-  assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_event_or_span'))
+  assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_event_or_span'&&issue.path==='clusters.0.real_scene'))
   assert.ok(report.issues.some(issue=>issue.code==='period_generic_repetition'))
 })
