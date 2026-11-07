@@ -130,3 +130,18 @@ test('missing questions keep all labels in one collapsed list after available au
   assert.ok(html.indexOf('data-reading-section="relationship.contact_continuity"')<html.indexOf('authored-reading-coverage'))
   assert.doesNotMatch(html,/이 질문의 해설은 아직 작성되지 않았어/)
 })
+
+test('daily love exposes contact and reunion without opening generic details', async () => {
+  const {DailyReadingPanel} = await server.ssrLoadModule('/src/DailyReadingPanel.tsx')
+  const data = fixture()
+  delete data.clusters.relationship.contact_continuity
+  data.clusters.relationship.love_reunion_interest.applicability = 'insufficient'
+  data.editorial_delivery = {'relationship.love_reunion_interest': 'authored'}
+  const html = renderToStaticMarkup(createElement(DailyReadingPanel, {
+    data, date:'2026-11-04', field:fields.fortuneGroup('애정'), verified:true,
+  }))
+  assert.match(html, /data-daily-slot="relationship.contact_activation" data-slot-state="ready"><summary>연락운<\/summary>/)
+  assert.match(html, /data-daily-slot="relationship.contact_continuity" data-slot-state="missing"/)
+  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><strong>재회운<\/strong>/)
+  assert.equal(html.split('data-daily-detail="relationship.contact_activation:conclusion"').length, 2)
+})
