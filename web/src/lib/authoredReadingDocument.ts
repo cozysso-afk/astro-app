@@ -31,10 +31,15 @@ const sectionMap: Record<string,Array<[string,string,string,string]>> = {
 }
 function editorialSection(id:string,label:string,section:AiEditorialSection|undefined,delivered?:string):AuthoredSection {
   const authored=section?.evidence_refs?.length && section.applicability!=='insufficient'
-  const state=section?.applicability==='insufficient'&&delivered==='authored'?'insufficient':authored&&text(section.conclusion)&&text(section.real_scene)&&text(section.action)?'ready':'missing'
+  const hasSplit=text(section?.applies_when)&&text(section?.evidence_meaning)
+  const hasLegacy=text(section?.real_scene)
+  const state=section?.applicability==='insufficient'&&delivered==='authored'?'insufficient':authored&&text(section.conclusion)&&(hasSplit||hasLegacy)&&text(section.action)?'ready':'missing'
   return {id,label,state,blocks:state==='ready'?[
     ...block(`${id}:conclusion`,'핵심 답',section?.conclusion),
-    ...block(`${id}:scene`,'생활에서 보면',section?.real_scene),
+    ...(hasSplit?[
+      ...block(`${id}:applies-when`,'이럴 때 적용',section?.applies_when),
+      ...block(`${id}:evidence-meaning`,'근거가 뜻하는 것',section?.evidence_meaning),
+    ]:block(`${id}:scene`,'생활에서 보면',section?.real_scene)),
     ...block(`${id}:action`,'할 일 · 확인할 점',section?.action),
     ...block(`${id}:condition`,'판단이 달라지는 조건',section?.change_condition),
   ]:[]}
