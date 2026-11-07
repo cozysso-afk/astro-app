@@ -125,7 +125,7 @@ test('missing questions keep all labels in one collapsed list after available au
   const doc=documents.buildPeriodReadingDocument(data,'month','a','b',fields.fortuneField('contact'),true)
   const html=renderToStaticMarkup(createElement(Panel,{doc}))
   assert.match(html,/<details class="authored-reading-coverage"><summary>아직 작성되지 않은 항목 1개/)
-  assert.match(html,/<details class="authored-reading-coverage"><summary>계산 근거가 부족한 항목 2개/)
+  assert.match(html,/<details class="authored-reading-coverage"><summary>근거가 부족한 항목 2개/)
   assert.ok(html.includes('소식 · 시기'));assert.ok(html.includes('연락 · 시기'));assert.ok(html.includes('연락 흐름'))
   assert.ok(html.indexOf('data-reading-section="relationship.contact_continuity"')<html.indexOf('authored-reading-coverage'))
   assert.doesNotMatch(html,/이 질문의 해설은 아직 작성되지 않았어/)
