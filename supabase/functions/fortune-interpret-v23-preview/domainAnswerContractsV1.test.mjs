@@ -104,6 +104,6 @@ test('C7 frontend preserves scoped domain answers before detailed context withou
   const doc=buildPeriodReadingDocument(data,'week','2026-11-01','2026-11-07',field,true)
   assert.equal(doc.sections[0].id,'question:연락:reply')
   assert.equal(doc.sections[0].blocks[0].text,'답변 조건 원문')
-  assert.equal(doc.sections.find(s=>s.id==='question:연락:missing').state,'missing')
+  assert.equal(doc.sections.find(s=>s.id==='question:연락:missing').state,'insufficient')
   assert.ok(!doc.sections.some(s=>s.id.includes('직장')))
 })
