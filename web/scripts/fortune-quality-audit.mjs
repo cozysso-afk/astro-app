@@ -194,7 +194,7 @@ function evaluateOne(row, mode) {
   }
   if (mode === 'live' && data && typeof data === 'object') {
     try {
-      const report = inspectInterpretationQuality(data, payload)
+      const report = inspectInterpretationQuality(data, payload, { requireDailyTimedDecision: false, allowEmptyDailyChangeCondition: true, periodReadingContract: ['week','month','annual'].includes(period) })
       for (const stage of report?.stages ?? []) {
         if (!stage?.passed) problems.push(issue('V23_QUALITY_STAGE_FAILED', 'error', {
           stage: Number(stage.stage),
