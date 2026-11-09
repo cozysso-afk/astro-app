@@ -11,6 +11,8 @@ const out = path.resolve('daily-production-artifacts')
 const origin = 'https://astro-app-web-ten.vercel.app'
 const date = process.env.QA_REPLAY_DATE || '2026-11-04'
 const version = process.env.QA_REPLAY_VERSION || 'supabase-ai-v23.11-daily-reading-contract-v18'
+const monthly = process.env.QA_VERIFY_MONTH === 'yes'
+const endDate = monthly ? new Date(Date.UTC(Number(date.slice(0,4)), Number(date.slice(5,7)), 0)).toISOString().slice(0,10) : date
 const model = 'gemini-3.7-flash'
 const endpoint = 'fortune-interpret-v22-preview'
 const existingJobId = process.env.QA_EXISTING_JOB_ID || ''
@@ -75,7 +77,7 @@ try {
   if(existingJobId) {
     const stored=await request({action:'status',job_id:existingJobId})
     assert.equal(stored.period_start,date,'Existing job date mismatch')
-    assert.equal(stored.period_end,date,'Existing job end date mismatch')
+    assert.equal(stored.period_end,endDate,'Existing job end date mismatch')
     assert.equal(stored.model,model,'Existing job model mismatch')
     assert.equal(stored.interpreter_version,version,'Existing job engine mismatch')
     assert.notEqual(stored.status,'failed','A failed job cannot be replayed')
@@ -124,7 +126,7 @@ try {
       assert.equal(body.narrative_engine,'v23','Unexpected engine blocked')
       assert.equal(body.model,model,'Non-3.7 model blocked before paid start')
       assert.equal(body.calculation?.period?.start,date,'Unexpected generation start date')
-      assert.equal(body.calculation?.period?.end,date,'Unexpected generation end date')
+      assert.equal(body.calculation?.period?.end,endDate,'Unexpected generation end date')
       // Playwright response-body decoding can finish after the app has decoded its copy.
       // Join those reads before allowing React's immediately following generation request.
       await Promise.all([...pending])
@@ -157,7 +159,7 @@ try {
       const body=route.request().postDataJSON()
       assert.equal(body.profile?.birth_date,profile.birthDate,'Non-synthetic birth date blocked')
       assert.ok(String(body.profile?.birth_time).startsWith(profile.birthTime),'Non-synthetic birth time blocked')
-      assert.equal(body.start_date,date);assert.equal(body.end_date,date)
+      assert.equal(body.start_date,date);assert.equal(body.end_date,endDate)
       report.syntheticCalculationVerified=true
       report.precisionInput={time_known:body.profile.time_known,time_source:body.profile.time_source,time_confidence:body.profile.time_confidence}
       report.stage='calculation-started'
@@ -183,15 +185,15 @@ try {
       if(body?.action==='status'&&data?.status==='failed'){report.generationFailed=true;await save('job-failure.json',{job_id:jobId,status:'failed',error:safeError(data.error||'Generation failed')})}
     })())
   })
-  await page.goto(`${origin}/?date=${date}`,{waitUntil:'domcontentloaded',timeout:60000})
+  await page.goto(`${origin}/?date=${date}${monthly?'&kind=monthly':''}`,{waitUntil:'domcontentloaded',timeout:60000})
   const root=page.locator('[data-reading-export-root="period-fortune"]')
-  const calculate=page.locator('.period-fortune-report').getByRole('button',{name:'오늘운세 + AI 해설 생성',exact:true})
+  const calculate=page.locator('.period-fortune-report').getByRole('button',{name:monthly?'월간운세 + AI 해설 생성':'오늘운세 + AI 해설 생성',exact:true})
   report.stage='waiting-for-calculation-button'
   await withHealth(calculate.waitFor({timeout:90000}))
-  await withHealth(page.waitForFunction(()=>[...document.querySelectorAll('.period-fortune-report button')].some(b=>b.textContent==='오늘운세 + AI 해설 생성'&&!b.disabled),{},{timeout:90000}))
+  await withHealth(page.waitForFunction(()=>[...document.querySelectorAll('.period-fortune-report button')].some(b=>/^(오늘|월간)운세 \+ AI 해설 생성$/.test(b.textContent)&&!b.disabled),{},{timeout:90000}))
   report.stage='calculate-click'
   await calculate.click()
-  await withHealth(root.locator('.daily-reading[data-daily-state="ready"]').waitFor({timeout:420000}))
+  await withHealth(root.locator(monthly?'.authored-reading[data-authored-state="ready"]':'.daily-reading[data-daily-state="ready"]').waitFor({timeout:420000}))
   await Promise.all([...pending])
   assert.ok(finalStatus,'Completed production status was not captured')
   assert.equal(finalStatus.interpreter_version,version)
@@ -203,6 +205,22 @@ try {
   for(const [index,label] of ['전체','애정','대인','학업','직업','금전','컨디션'].entries()) {
     exportScope=String(index)
     await root.getByRole('button',{name:label,exact:true}).click()
+    if (monthly) {
+      const panel=root.locator('.authored-reading')
+      assert.equal(await panel.getAttribute('data-authored-state'),'ready',label+' monthly missing')
+      const heading=await panel.locator('h3.authored-reading-headline').innerText()
+      assert.ok(heading.trim(),label+' monthly headline empty')
+      const body=await panel.locator('.authored-reading-core').innerText()
+      assert.ok(body.trim(),label+' monthly explanation empty')
+      if(label==='애정') {
+        const recorded=root.getByRole('region',{name:'연락운과 실제 기록'})
+        await recorded.getByText(/서로 주고받음 1일/).waitFor()
+        report.contactRecordShown=true
+      }
+      await panel.screenshot({path:path.join(out,'month-'+index+'.png')})
+      report.scopes.push({label,state:'ready',heading})
+      continue
+    }
     const panel=root.locator('.daily-reading')
     if (label==='애정' && process.env.QA_REPLAY_DATE) {
       const observed=root.getByRole('region',{name:'연락운과 실제 기록'})

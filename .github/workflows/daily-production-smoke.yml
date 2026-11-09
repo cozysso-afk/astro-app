@@ -19,7 +19,7 @@ concurrency:
 jobs:
   production:
     # One post-merge replay only; no paid generation is enabled by this workflow.
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[contact-replay]')) || inputs.existing_job_id != '' || (github.event.pull_request.number == 333 && github.event.pull_request.merged == true)
+    if: (github.event_name == 'push' && (contains(github.event.head_commit.message, '[contact-replay]') || contains(github.event.head_commit.message, '[monthly-production]'))) || inputs.existing_job_id != '' || (github.event.pull_request.number == 333 && github.event.pull_request.merged == true)
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     defaults:
@@ -44,9 +44,10 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
-          QA_REPLAY_DATE: ${{ github.event_name == 'push' && '2026-10-26' || '' }}
+          QA_VERIFY_MONTH: ${{ contains(github.event.head_commit.message, '[monthly-production]') && 'yes' || 'no' }}
+          QA_REPLAY_DATE: ${{ contains(github.event.head_commit.message, '[monthly-production]') && '2026-11-01' || (github.event_name == 'push' && '2026-10-26') || '' }}
           QA_REPLAY_VERSION: ${{ github.event_name == 'push' && 'supabase-ai-v23.25-period-split-evidence-v1' || '' }}
-          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id || (github.event_name == 'push' && '0d11e830-3871-4eff-ac76-6c8e13cff050') || 'cd1abe43-8046-4083-a82a-c223df3a9a85' }}
+          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id || (contains(github.event.head_commit.message, '[contact-replay]') && '0d11e830-3871-4eff-ac76-6c8e13cff050') || (github.event_name != 'push' && 'cd1abe43-8046-4083-a82a-c223df3a9a85') || '' }}
         run: node scripts/daily-production-smoke.mjs
       - name: Save synthetic-only verification evidence
         if: always()
