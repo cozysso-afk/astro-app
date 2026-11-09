@@ -9,8 +9,8 @@ const require = createRequire(import.meta.url)
 const {chromium} = require('playwright')
 const out = path.resolve('daily-production-artifacts')
 const origin = 'https://astro-app-web-ten.vercel.app'
-const date = '2026-11-04'
-const version = 'supabase-ai-v23.11-daily-reading-contract-v18'
+const date = process.env.QA_REPLAY_DATE || '2026-11-04'
+const version = process.env.QA_REPLAY_VERSION || 'supabase-ai-v23.11-daily-reading-contract-v18'
 const model = 'gemini-3.7-flash'
 const endpoint = 'fortune-interpret-v22-preview'
 const existingJobId = process.env.QA_EXISTING_JOB_ID || ''
@@ -87,17 +87,20 @@ try {
   const context=await browser.newContext({viewport:{width:393,height:852},acceptDownloads:true,timezoneId:'Asia/Seoul',serviceWorkers:'block'})
   page=await context.newPage()
   page.setDefaultTimeout(30000)
-  await context.addInitScript(({session,key,profile})=>{
+  await context.addInitScript(({session,key,profile,contactDate})=>{
     if(location.origin!=='https://astro-app-web-ten.vercel.app')return
     // New browser context: never reads or changes a real user's existing profile.
     localStorage.setItem(key,JSON.stringify(session))
     localStorage.setItem('starlight-destiny.birth-profile.v1',JSON.stringify(profile))
     localStorage.setItem('starlight-destiny.ui-settings.v1',JSON.stringify({glow:true,motion:false}))
+    if (contactDate) localStorage.setItem('starlight-destiny.relationship-outcomes.v2',JSON.stringify([
+      {date:contactDate,event:'both',note:'QA 연락 기록 확인',scores:{수신신호:52},past_connection:true,saved_at:contactDate+'T19:00:00Z'},
+    ]))
     // Leave model unset to exercise the deployed 3.7 default; validate before start.
     window.__dailyQaDrawn=[]
     const fill=CanvasRenderingContext2D.prototype.fillText
     CanvasRenderingContext2D.prototype.fillText=function(text,x,y,...args){window.__dailyQaDrawn.push({text,y,height:this.canvas.height});return fill.call(this,text,x,y,...args)}
-  },{session,key:`sb-${new URL(supabase).hostname.split('.')[0]}-auth-token`,profile})
+  },{session,key:`sb-${new URL(supabase).hostname.split('.')[0]}-auth-token`,profile,contactDate:process.env.QA_REPLAY_DATE})
   page.on('pageerror',error=>report.errors.push(safeError(error)))
   page.on('download',download=>{
     const filename=`${exportScope}-export-${downloads.length+1}.png`
@@ -201,6 +204,14 @@ try {
     exportScope=String(index)
     await root.getByRole('button',{name:label,exact:true}).click()
     const panel=root.locator('.daily-reading')
+    if (label==='애정' && process.env.QA_REPLAY_DATE) {
+      const observed=root.getByRole('region',{name:'연락운과 실제 기록'})
+      await observed.getByText(/QA 연락 기록 확인/).waitFor()
+      assert.match(await observed.innerText(),/서로 연락을 주고받았어요/)
+      assert.ok(await panel.locator('[data-daily-slot="relationship.contact_activation"]').count())
+      assert.ok(await panel.locator('[data-daily-slot="relationship.love_reunion_interest"]').count())
+      report.contactRecordShown=true
+    }
     const state=await panel.getAttribute('data-daily-state')
     assert.ok(['ready','insufficient'].includes(state),`${label}: unexpected state ${state}`)
     for(const width of [320,350,393,430]) {
