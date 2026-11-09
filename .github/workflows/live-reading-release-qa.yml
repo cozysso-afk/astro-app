@@ -17,7 +17,7 @@ concurrency:
 jobs:
   fortune:
     name: Verify daily reading repair
-    if: contains(github.event.head_commit.message, '[live-reading-qa]')
+    if: contains(github.event.head_commit.message, '[live-fortune-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
     defaults:
