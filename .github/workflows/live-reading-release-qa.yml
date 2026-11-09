@@ -3,7 +3,7 @@ name: One-shot live reading release QA
 on:
   push:
     branches:
-      - fix/reading-completeness-v19
+      - fix/reunion-contact-language
     paths:
       - ".github/workflows/live-reading-release-qa.yml"
 
@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
   relationship:
-    name: Verify reunion conditions in the stored Gemini result
+    name: Verify repaired references and attributed action wording
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
@@ -80,6 +80,7 @@ jobs:
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
           QA_RELATIONSHIP_FUNCTION_SLUG: relationship-question-contract-qa
           QA_RELATIONSHIP_LIVE_APPROVED: "YES"
+          QA_RELATIONSHIP_MODEL: gemini-3.7-flash
         run: >-
           node scripts/relationship-live-qa.mjs
           --max-jobs 1
