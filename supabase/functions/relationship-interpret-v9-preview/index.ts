@@ -363,12 +363,17 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
    const editorial=validateRelationshipEditorial(data,purpose);
    if(!editorial.ok){
     const failure=validationFailure(model,u,"relationship_editorial",String(editorial.reason));
-    if (!compactMode) return {...failure,copyRepair:planRelationshipCopyRepair(authored,payload,purpose)};
+    if (!compactMode) {
+      const grounding = purpose === "reunion" ? validateReunionGroundingV2(data,payload) : null;
+      if (!grounding || grounding.ok || ["insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
+        return {...failure,copyRepair:planRelationshipCopyRepair(authored,payload,purpose)};
+      }
+    }
     return failure;
    }
    if(purpose==="reunion"){
     const validation=validateReunionGroundingV2(data,payload);
-    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:compactMode ? null : planRelationshipCopyRepair(authored,payload,purpose)};}
+    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
    }
    if(!grounded(data,payload,purpose,compactMode)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"grounded",purpose,model,compactMode}));return {...validationFailure(model,u,"grounded","insufficient_grounded_content"),copyRepair:compactMode ? null : planRelationshipCopyRepair(authored,payload,purpose)};}
    return {ok:true,data,model,interpreter_version:versionForPurpose(purpose),usage:u};
