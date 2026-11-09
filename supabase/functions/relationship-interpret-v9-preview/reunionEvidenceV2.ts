@@ -394,7 +394,18 @@ export function buildReunionEvidenceV2(packet: any) {
 
   addReturnContext(items, packet)
 
-  const evidence = compact(items)
+  const ranked = compact(items)
+  // Reserve the rows the five questions are allowed to cite before applying
+  // the shared packet limit. All references are then derived from this packet.
+  const selected = new Set<Evidence>()
+  for (const question of QUESTION_KEYS) {
+    for (const row of ranked.filter(item=>item.question===question).slice(0,8)) selected.add(row)
+  }
+  for (const row of ranked) {
+    if (selected.size === 64) break
+    selected.add(row)
+  }
+  const evidence = ranked.filter(row=>selected.has(row))
   const questions = Object.fromEntries(QUESTION_KEYS.map(q => {
     const rows = evidence.filter(e => e.question === q).slice(0,8)
     return [q,{evidence_refs:rows.map(e=>e.id),support_refs:rows.filter(e=>e.role==='support').map(e=>e.id),counter_refs:rows.filter(e=>e.role==='counter').map(e=>e.id),families:[...new Set(rows.map(e=>e.independence_group))]}]
@@ -437,5 +448,5 @@ export function buildReunionEvidenceV2(packet: any) {
     if (packet.reunion_dimensions) packet.reunion_dimensions = compactDimensionsForPrompt(packet.reunion_dimensions)
     if (packet.reunion_secondary_support) packet.reunion_secondary_support = compactSecondarySupportForPrompt(packet.reunion_secondary_support)
   }
-  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Normalized reunion progression evidence preserves direction, monthly phase, house context, relationship domains, and stage hints without treating directional activation as observed private feeling or action.  Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence:evidence.slice(0,64),convergence,initiative_gate}
+  return {version:REUNION_EVIDENCE_VERSION,policy:'Question-first evidence matrix. Normalized reunion progression evidence preserves direction, monthly phase, house context, relationship domains, and stage hints without treating directional activation as observed private feeling or action.  Convergence requires at least two independent families aligned as support or counter evidence; context and derived duplicates are not additive probabilities. Emotion, contact, meeting, and reunion are separate stages. Progression is period context; exact dates require fast triggers. Solar Return is annual background and Lunar Return is monthly/emotional background. Return context may cross-check or break ties among dates that already passed the fast-trigger gate, but never creates an exact date and never adds an independent convergence vote against the same underlying transit phenomenon. Return activation is non-directional and cannot identify who contacts first. In user-facing prose, do not re-explain the same aspect across multiple questions, prefer Korean planet/aspect names, and display angular precision to 0.01° with values below 0.01° shown as <0.01°.',coverage,questions,evidence,convergence,initiative_gate}
 }

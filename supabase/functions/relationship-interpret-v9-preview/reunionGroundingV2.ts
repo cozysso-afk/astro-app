@@ -12,7 +12,7 @@ function splitSentences(value: unknown) {
 }
 
 export function hasUnsupportedInitiativeDirection(value: unknown, observation?: any) {
-  const blocked = /(?:누가\s*먼저|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합|시작\s*압력|(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?[^.!?]{0,32}(?:먼저|앞서|우세)|(?:먼저|앞서|우세)[^.!?]{0,32}(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?)/
+  const blocked = /(?:누가\s*먼저|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합|시작\s*압력|(?:내(?:가|\s*쪽|\s*방향|\s*측)|나(?:는|의)|상대(?:방)?(?:가|는|\s*쪽|\s*방향|\s*측))[^.!?]{0,32}(?:먼저|앞서|우세)|(?:먼저|앞서|우세)[^.!?]{0,32}(?:내가|나(?:는|의)|상대(?:방)?(?:가|는|\s*쪽|\s*측)))/
   const uncertainty = /(?:정하기|판단하기|확정하기|예측하기)\s*(?:어려|힘들)|(?:알|확정할|예측할|판단할|단정할|특정할|정할|가릴|구분할|확인할|계산할)\s*수\s*없|(?:판단|확정|예측|단정|특정|계산|확인)(?:은|이|하기가|하기는|하기)?\s*(?:불가|어려)|(?:선연락|먼저\s*연락|행동.{0,6}(?:주체|순서)).{0,20}(?:아니|의미하지|보여\s*주지|판정할 수 없)/
   const clauses = splitSentences(value).flatMap(line=>line.split(/(?:지만|다만|그러나|그렇지만|반면)[, ]*/))
   return clauses.some(sentence => {
@@ -21,6 +21,7 @@ export function hasUnsupportedInitiativeDirection(value: unknown, observation?: 
     const signalOnly = /활성|수신\s*신호|발신\s*적합/.test(sentence) &&
       !/먼저|선연락|앞서|다가오|다가가|연락(?:해|하|할|이 오|을 보)|메시지를/.test(sentence)
     if (signalOnly) return false
+    if (/기대(?:하며)?\s*기다리기보다|예단하지|기대하지/.test(sentence) && !/가능성이 (?:높|커)|연락할 거야/.test(sentence)) return false
     // A recorded past initiator does not establish who acts next.
     const counterpart = /상대(?:가|측|\s*쪽)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
     const user = /(?:내가|내\s*쪽|나(?:는|의))[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)

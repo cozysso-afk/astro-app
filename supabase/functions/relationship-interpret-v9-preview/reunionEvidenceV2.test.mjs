@@ -153,3 +153,20 @@ test('convergence requires independent evidence aligned to the same role',()=>{
   assert.equal(out.convergence.some(x=>x.question==='why_reconnect'),false)
   assert.equal(out.convergence.some(x=>x.question==='repeat_risks'),false)
 })
+
+test('a densely populated packet includes every advertised citation within its 64 rows',()=>{
+ const packet=exactPacket()
+ const samples=packet.reunion_evidence_contract.evidence
+ packet.reunion_evidence_contract.evidence=Array.from({length:48},(_,i)=>({
+   ...samples[i%samples.length],orb:.01+i*.01,calendar_month:'2027-'+String(i%12+1).padStart(2,'0'),
+ }))
+ const out=buildReunionEvidenceV2(packet)
+ const sent=new Set(out.evidence.map(row=>row.id))
+ assert.equal(sent.size,64)
+ for(const [q,v] of Object.entries(out.questions)){
+   assert.ok(v.evidence_refs.length,q)
+   assert.ok(v.evidence_refs.every(ref=>sent.has(ref)),q)
+ }
+ for(const v of out.convergence)assert.ok(v.evidence_refs.every(ref=>sent.has(ref)))
+ for(const v of [out.initiative_gate.incoming,out.initiative_gate.outgoing]) assert.ok(v.evidence_refs.every(ref=>sent.has(ref)))
+})
