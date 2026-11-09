@@ -24,6 +24,18 @@ export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Nep
 
 export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
 
+export function hasInventedDuration(value: string) {
+  // Month/day labels and angular measurements can legitimately appear in timing evidence.
+  const prose = value.replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}일/g,'').replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
+  return /\d+\s*(?:분|시간|일)(?:간|\s*정도)?/.test(prose)
+}
+
+function proseFields(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (!value || typeof value !== 'object') return []
+  return Object.entries(value).filter(([key])=>key !== 'evidence_refs').flatMap(([,item])=>proseFields(item))
+}
+
 const text = (v: unknown) => typeof v === 'string' ? v : ''
 const canonical = (v: string) => v.replace(/[\s.!?。]+/g, '')
 
@@ -45,9 +57,10 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   const styleFields=[data.headline,data.core_summary,data.core_reason,data.core_action,data.overview,...conditions,...marriageFields]
   if(styleFields.some(value=>/(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./.test(text(value)))) return fail('inconsistent_report_style')
   if(styleFields.some(value=>/(?:생활 가관|북수조점|예작|무필요)/.test(text(value)))) return fail('korean_copy_error')
-  const allProse=JSON.stringify(data)
-  if(unobservedMind.test(allProse)) return fail('unobserved_mind_claim')
-  if(/\d+\s*(?:분|시간|일)(?:간|\s*정도)?/.test(allProse))return fail('invented_exact_behavior_duration')
+  const fieldsOfProse=proseFields(data)
+  const allProse=fieldsOfProse.join('. ')
+  if(fieldsOfProse.some(value=>unobservedMind.test(value))) return fail('unobserved_mind_claim')
+  if(fieldsOfProse.some(hasInventedDuration))return fail('invented_exact_behavior_duration')
   if(/(?:대립각\([^)]*\bsquare\b|사각각\([^)]*\bopposition\b|삼각각\([^)]*\bsextile\b|육십분위\([^)]*\btrine\b)/i.test(allProse))return fail('aspect_translation_mismatch')
   const fields = [data.core_summary, data.core_reason, data.core_action, ...conditions].map(canonical)
   if (new Set(fields).size !== fields.length) return fail('duplicated_core_roles')

@@ -88,3 +88,10 @@ test('stored-style unsupported claims, exact cooldowns and aspect label mismatch
  const mismatch=marriage('marriage_unmarried');mismatch.marriage_reading.daily_life='수성과 상승점의 대립각(Mercury square ASC)이 대화를 어렵게 해.'
  assert.equal(validateRelationshipEditorial(mismatch,'marriage_unmarried').reason,'aspect_translation_mismatch')
 })
+
+test('calendar timing and measured arcminutes are distinct from prescribed behavior durations',()=>{
+ const data=core(); data.timing='11월 10일 전후를 살펴봐.'; data.top_aspects=[{meaning:'오브 1도 20분'}]
+ assert.equal(validateRelationshipEditorial(data,'compatibility').ok,true)
+ data.core_action='연락하기 전에 3일 기다려.'
+ assert.equal(validateRelationshipEditorial(data,'compatibility').reason,'invented_exact_behavior_duration')
+})
