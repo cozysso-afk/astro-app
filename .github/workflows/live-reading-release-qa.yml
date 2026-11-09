@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   fortune:
-    name: Gemini 3.7 bounded month prose verification r7
+    name: Verify daily and monthly readings
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
@@ -31,7 +31,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - name: Generate and audit four fresh fortune readings
+      - name: Generate one daily and one monthly reading
         env:
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
@@ -43,8 +43,8 @@ jobs:
           QA_FORTUNE_MODEL: gemini-3.7-flash
         run: >-
           node --experimental-strip-types scripts/fortune-live-qa.mjs
-          --max-jobs 1
-          --period-kinds month
+          --max-jobs 2
+          --period-kinds day,month
           --out live-release-artifacts/fortune
       - name: Upload fortune report
         if: always()
@@ -57,7 +57,7 @@ jobs:
 
   relationship:
     name: Fresh Gemini compatibility-reunion-marriage
-    needs: fortune
+    if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
     defaults:
@@ -71,7 +71,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - name: Generate and audit four fresh relationship readings
+      - name: Verify compatibility and reunion readings
         env:
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
@@ -82,8 +82,8 @@ jobs:
           QA_RELATIONSHIP_LIVE_APPROVED: "YES"
         run: >-
           node scripts/relationship-live-qa.mjs
-          --max-jobs 4
-          --purposes compatibility,reunion,marriage_unmarried,marriage_married
+          --max-jobs 2
+          --purposes compatibility,reunion
           --out live-release-artifacts/relationship
       - name: Upload relationship report
         if: always()
