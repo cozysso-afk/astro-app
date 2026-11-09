@@ -9,6 +9,6 @@ test('served relationship output is never rewritten with local glossary copy', (
   assert.match(source, /return out;}/)
 })
 
-test('reunion output cache and provenance use V14.3', () => {
-  assert.match(source, /REUNION_VERSION="relationship-v14\.3-gemini-single-author"/)
+test('reunion output cache and provenance use the question reading contract', () => {
+  assert.match(source, /REUNION_VERSION="relationship-v14\.10-grounded-stage-question-reading-contract"/)
 })

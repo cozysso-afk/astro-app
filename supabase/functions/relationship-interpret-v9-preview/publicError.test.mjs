@@ -8,14 +8,31 @@ const ts=require('typescript');
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 const helper={};vm.runInNewContext(compile(fs.readFileSync(new URL('./publicError.ts',import.meta.url),'utf8')),{exports:helper});
 const grounding={};vm.runInNewContext(compile(fs.readFileSync(new URL('./reunionGroundingV2.ts',import.meta.url),'utf8')),{exports:grounding});
+const editorial={};vm.runInNewContext(compile(fs.readFileSync(new URL('./relationshipEditorialV1.ts',import.meta.url),'utf8')),{exports:editorial});
+const copyRepair={};
+vm.runInNewContext(compile(fs.readFileSync(new URL('./relationshipCopyRepair.ts',import.meta.url),'utf8')),{
+  exports:copyRepair, structuredClone, require:id=>{
+    if(id==='./relationshipEditorialV1.ts') return editorial;
+    if(id==='./reunionGroundingV2.ts') return grounding;
+    throw Error('Unexpected repair dependency '+id);
+  },
+});
 const source=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
 const canary='authorization: Bearer TEST_CANARY';
 const prose='합성 관계 근거와 설명입니다. '.repeat(40).trim();
 const reunionProse=tag=>`${tag}에서 계산 근거가 뜻하는 바와 현실에서 확인할 장면을 구분해서 설명한다. ${tag} 단계가 다음 단계와 어떻게 다른지도 함께 설명해 과장 없이 읽을 수 있게 한다. `.repeat(3).trim();
 const reunionEvidenceIds=['R2:test:1','R2:test:2','R2:test:3','R2:test:4','R2:test:5','R2:test:6'];
 const reunionEvidence={buildReunionEvidenceV2:()=>({version:'reunion-evidence-v2.0',policy:'test',coverage:{},questions:{why_reconnect:{evidence_refs:reunionEvidenceIds.slice(0,2),support_refs:reunionEvidenceIds.slice(0,2),counter_refs:[],families:['a','b']},initiative:{evidence_refs:reunionEvidenceIds.slice(1,3),support_refs:reunionEvidenceIds.slice(1,3),counter_refs:[],families:['a','b']},timing:{evidence_refs:reunionEvidenceIds.slice(2,4),support_refs:reunionEvidenceIds.slice(2,4),counter_refs:[],families:['a','b']},rebuild:{evidence_refs:reunionEvidenceIds.slice(3,5),support_refs:reunionEvidenceIds.slice(3,5),counter_refs:[],families:['a','b']},repeat_risks:{evidence_refs:reunionEvidenceIds.slice(4,6),support_refs:[],counter_refs:reunionEvidenceIds.slice(4,6),families:['a','b']}},evidence:reunionEvidenceIds.map(id=>({id})),convergence:[]})};
-const fixture={headline:'합성 해설',overview:prose,chemistry:prose,emotional_dynamic:prose,communication:prose,conflict_pattern:prose,power_boundaries:prose,long_term:prose,timing:prose,reunion_context:prose,felt_scenarios:[prose,prose,prose],practical_advice:[prose],top_aspects:[{label:'근거',meaning:prose}],limits:prose,reunion_reading:{bottom_line:prose,incoming_contact:prose},reunion_synthesis_v2:{summary:reunionProse('재회 전체 요약'),consultation_answer:{current_stage:reunionProse('현재 단계'),contact_type_if_any:reunionProse('연락 형태'),initiative:'행동의 시작 주체를 정할 근거가 충분하지 않다.',continuity:reunionProse('대화 지속'),meeting_gate:reunionProse('실제 만남 조건'),rebuild_gate:reunionProse('관계 재구축 조건'),behavior_change_evidence:reunionProse('행동 변화 근거'),next_stage_up_conditions:[reunionProse('다음 단계 조건')],down_conditions:[reunionProse('현재 단계 유지 조건')],repeat_risks:[reunionProse('반복 위험')],contextual_application:{complete_cutoff:'',no_contact:'',occasional_contact:'',meeting_again:'',ambiguous_relationship:''},evidence_refs:reunionEvidenceIds.slice(0,4)},why_reconnect:{conclusion:reunionProse('다시 신경 쓰이는 이유 결론'),interpretation:reunionProse('다시 신경 쓰이는 이유 해설'),evidence_refs:reunionEvidenceIds.slice(0,2)},initiative:{conclusion:'행동의 시작 주체를 정할 근거가 충분하지 않다.',interpretation:'관계 활성도는 두 사람의 관심이 움직이는 정도일 뿐 실제 행동의 순서를 보여 주지 않는다.',evidence_refs:reunionEvidenceIds.slice(1,3)},timing:{conclusion:reunionProse('현재 단계와 다음 단계'),windows:[{period:'2027-01',meaning:reunionProse('후보 시기 의미'),evidence_refs:reunionEvidenceIds.slice(2,4)}],evidence_refs:reunionEvidenceIds.slice(2,4)},rebuild:{conclusion:reunionProse('관계 재구축 조건'),conditions:[reunionProse('재구축 확인 장면')],evidence_refs:reunionEvidenceIds.slice(3,5)},repeat_risks:{conclusion:reunionProse('반복 위험 결론'),patterns:[reunionProse('반복 위험 장면')],evidence_refs:reunionEvidenceIds.slice(4,6)},convergence:[],precision_note:reunionProse('정밀도 안내')},marriage_reading:Object.fromEntries(['bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(k=>[k,prose]))};
-const provider=(data=fixture)=>new Response(JSON.stringify({usageMetadata:{promptTokenCount:10,candidatesTokenCount:20,thoughtsTokenCount:3,totalTokenCount:33},candidates:[{content:{parts:[{text:JSON.stringify(data)}]}}]}));
+const fixture={core_summary:'관계의 중심 답을 짧게 구분해 읽어야 해.',core_reason:'이유는 계산된 접점이 뜻하는 상호작용 범위에서만 설명해.',core_action:'갈등이 생길 때 서로 확인하는 질문이 달라지는지 살펴봐.',core_conditions:['출생시간이 확인되지 않으면 시간민감 근거는 잠정이야.'],headline:'합성 해설',overview:prose,chemistry:prose,emotional_dynamic:prose,communication:prose,conflict_pattern:prose,power_boundaries:prose,long_term:prose,timing:prose,reunion_context:'',felt_scenarios:[prose,prose,prose],practical_advice:[prose],top_aspects:[{label:'근거',meaning:prose}],limits:prose,reunion_reading:{bottom_line:prose,incoming_contact:prose},reunion_synthesis_v2:{summary:reunionProse('재회 전체 요약'),consultation_answer:{current_stage:'현실 관계 단계는 입력 기록이 없어 미확인이야. 계산 후보와 실제 사건은 구분해야 해.',contact_type_if_any:reunionProse('연락 형태'),initiative:'행동의 시작 주체를 정할 근거가 충분하지 않다.',continuity:reunionProse('대화 지속'),meeting_gate:reunionProse('실제 만남 조건'),rebuild_gate:reunionProse('관계 재구축 조건'),behavior_change_evidence:reunionProse('행동 변화 근거'),next_stage_up_conditions:[reunionProse('다음 단계 조건')],down_conditions:[reunionProse('현재 단계 유지 조건')],repeat_risks:[reunionProse('반복 위험')],contextual_application:{complete_cutoff:'',no_contact:'',occasional_contact:'',meeting_again:'',ambiguous_relationship:''},evidence_refs:reunionEvidenceIds.slice(0,4)},why_reconnect:{conclusion:reunionProse('다시 신경 쓰이는 이유 결론'),interpretation:reunionProse('다시 신경 쓰이는 이유 해설'),evidence_refs:reunionEvidenceIds.slice(0,2)},initiative:{conclusion:'행동의 시작 주체를 정할 근거가 충분하지 않다.',interpretation:'관계 활성도는 두 사람의 관심이 움직이는 정도일 뿐 실제 행동의 순서를 보여 주지 않는다.',evidence_refs:reunionEvidenceIds.slice(1,3)},timing:{conclusion:reunionProse('현재 단계와 다음 단계'),windows:[{period:'2027-01',meaning:reunionProse('후보 시기 의미'),evidence_refs:reunionEvidenceIds.slice(2,4)}],evidence_refs:reunionEvidenceIds.slice(2,4)},rebuild:{conclusion:reunionProse('관계 재구축 조건'),conditions:[reunionProse('재구축 확인 장면')],evidence_refs:reunionEvidenceIds.slice(3,5)},repeat_risks:{conclusion:reunionProse('반복 위험 결론'),patterns:[reunionProse('반복 위험 장면')],evidence_refs:reunionEvidenceIds.slice(4,6)},convergence:[],precision_note:reunionProse('정밀도 안내')},marriage_reading:Object.fromEntries(['bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(k=>[k,prose]))};
+const provider=(data=fixture,purpose='compatibility')=>{
+  const authored=structuredClone(data);
+  if(purpose.startsWith('marriage_')){
+    authored.marriage_reading={...authored.marriage_reading,mode:purpose};
+    for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term','timing'])authored[key]='';
+    authored.felt_scenarios=[];
+  }
+  return new Response(JSON.stringify({usageMetadata:{promptTokenCount:10,candidatesTokenCount:20,thoughtsTokenCount:3,totalTokenCount:33},candidates:[{content:{parts:[{text:JSON.stringify(authored)}]}}]}));
+};
 const calculationFor=purpose=>purpose==='reunion'?{result:{reunion_hierarchy:{version:'test-hierarchy',as_of_date:'2026-09-19',validation:{status:'PASS'},weights:{},thresholds:{},stages:{},top_periods:[],nearest_window:null,initiative:{available:false,verdict:'판정 불가'},coverage:{western:true,saju:false,ziwei:false},limitations:[],score_meaning:'test',stability_structure:{}}}}:{result:{}};
 function harness(options={}) {
   let handler;const rows=options.rows??[],writes=[],requests=[];let inserts=0;
@@ -32,7 +49,7 @@ function harness(options={}) {
       Object.assign(rows[0],patch);return {data:{id:'synthetic-job'},error:null};
     }return q;
   }};
-  vm.runInNewContext(compile(source),{exports:{},console,require:id=>id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id==='./reunionGroundingV2.ts'?grounding:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider()},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
+  vm.runInNewContext(compile(source),{exports:{},console,require:id=>id==='./relationshipCopyRepair.ts'?copyRepair:id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id==='./reunionGroundingV2.ts'?grounding:id==='./relationshipEditorialV1.ts'?editorial:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider(fixture,requests.at(-1).contents[0].parts[0].text.match(/PURPOSE=([^\n]+)/)[1])},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
   return {rows,writes,requests,get inserts(){return inserts},async run(purpose='compatibility'){const response=await handler(new Request('https://example.test/relationship',{method:'POST',headers:{authorization:'Bearer synthetic-session'},body:JSON.stringify({calculation:calculationFor(purpose),purpose})}));return {status:response.status,body:await response.json()}}};
 }
 function safe(value){assert(!JSON.stringify(value).includes('TEST_CANARY'));}
@@ -57,7 +74,7 @@ test('invalid reunion prose is retried with Gemini and never composed locally',a
   assert.match(h.requests[1].contents[0].parts[0].text,/앞선 응답 검증 실패=reunion_grounding:invalid_question_evidence_refs/);
   assert.match(h.requests[1].contents[0].parts[0].text,/why_reconnect\.evidence_refs는 다음 ID만 사용/);
   const reunionSchema=h.requests[0].generationConfig.responseSchema.properties.reunion_synthesis_v2.properties;
-  assert.equal(reunionSchema.timing.properties.windows.maxItems,4);
+  assert.equal(reunionSchema.timing.properties.windows.maxItems,0);
   assert.equal(reunionSchema.consultation_answer.properties.evidence_refs.minItems,3);
 });
 test('generation exceptions produce fixed HTTP response and safe failed storage',async()=>{
@@ -110,4 +127,26 @@ test('fresh/recently updated queued/running are protected; both stale states rec
 test('public helper ignores hostile extras, inherited codes and malformed usage',()=>{
   for(const code of ['constructor','toString','proto'])safe(helper.publicRelationshipError(code,{error:canary,stage:canary,usage:{total_tokens:Infinity,debug:canary},model:canary}));
   assert.equal(Object.keys(helper.publicUsage([canary])).length,0);
+});
+
+test('overlong model core is rejected through both attempts, never cut into a valid answer',async()=>{
+  const data={...fixture,core_summary:'가'.repeat(181)};
+  const h=harness({fetch:()=>provider(data)}),r=await h.run();
+  assert.equal(r.body.ok,false);assert.equal(r.body.error_code,'REL_RESULT_INVALID');assert.equal(r.body.data,undefined);
+  assert.equal(h.requests.length,2);assert.equal(h.writes[0].status,'failed');
+  assert.equal(h.writes[0].usage_json.call_trace[0].validation_stage,'relationship_editorial');
+  assert.equal(h.writes[0].usage_json.call_trace[0].validation_reason,'invalid_core_summary');
+  assert.equal(data.core_summary.length,181);
+});
+
+test('new cached readings require complete core roles; old readings are preserved without invented summary',async()=>{
+  const h=harness(),first=await h.run();
+  assert.deepEqual(first.body.data.core_conditions,fixture.core_conditions);
+  assert.equal(first.body.data.core_summary,fixture.core_summary);
+  for(const key of ['core_summary','core_reason','core_action','core_conditions'])delete h.rows[0].result_json.data[key];
+  const invalid=await h.run();assert.equal(invalid.body.error_code,'REL_CACHED_RESULT_INVALID');assert.equal(h.requests.length,1);
+  h.rows[0].result_json.interpreter_version='relationship-v12.0-gemini-single-author';
+  h.rows[0].usage_json.generation_version='relationship-v12.0-gemini-single-author';
+  const legacy=await h.run();assert.equal(legacy.body.ok,true);assert.equal(legacy.body.data.core_summary,undefined);
+  assert.equal(legacy.body.data.overview,fixture.overview);assert.equal(h.requests.length,1);
 });

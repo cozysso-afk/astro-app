@@ -1,9 +1,10 @@
+import { attachPeriodReadingContext, buildPeriodReadingInstruction } from './periodReadingContractV1.ts'
 import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.11-daily-reading-contract'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.15-grounded-reader-contract'
 const enc = new TextEncoder()
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
@@ -94,7 +95,7 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 행동 조언은 해석을 다시 말하는 문장이 아니라, 사용자가 현실에서 확인하거나 조정할 수 있는 구체 행동 하나로 써.`
 
 export function buildV23PromptPacket(payload:any) {
-  const base = buildPromptPacket(payload)
+  const base = attachPeriodReadingContext(buildPromptPacket(payload),payload)
   const narrative = buildPeriodNarrativeContext(base)
   const packet:any = {
     ...base,
@@ -105,6 +106,18 @@ export function buildV23PromptPacket(payload:any) {
     domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
   packet.narrative_plan=buildNarrativePlan(packet)
+  if(packet.period_kind==='annual'){
+    // Annual inputs are the largest. The instruction already carries these
+    // policies, so omit duplicated contract prose rather than dropping facts.
+    delete packet.domain_answer_contracts
+    if(packet.period_narrative){
+      delete packet.period_narrative.required_sequence
+      delete packet.period_narrative.evidence_priority
+      delete packet.period_narrative.forbidden_patterns
+      delete packet.period_narrative.distinctive_requirements
+      delete packet.period_narrative.interpretation_policy
+    }
+  }
   if(packet.period_kind==='day')packet.daily_editorial_brief=dailyEditorialBrief(packet)
   return packet
 }
@@ -156,17 +169,8 @@ export function buildV23CorePromptFromPacket(packet:any) {
     version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,
     text:`${DAILY_EDITORIAL_INSTRUCTION}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
   }
-  // The legacy contract asks for all 25 nested sections; daily delivery now
-  // requests six sparse primary sections. Never send both instructions.
-  const narrativeInstruction = buildPeriodNarrativeInstruction(writerPacket, packet?.period_kind!=='day')
-  const temporalInstruction = buildTemporalWordingInstruction(packet)
-  const text = `${narrativeInstruction}\n\n${temporalInstruction ? `${temporalInstruction}\n\n` : ''}${HUMAN_LANGUAGE_CONTRACT}\n\n${packet?.period_kind==='day'?DAILY_EDITORIAL_INSTRUCTION:''}\n\n[V23 CORE CONTRACT]\n- 계산과 점수는 서버가 끝냈다. 다시 계산하지 마.\n- narrative_plan은 근거에서 확인한 방향 구분이다. mode=context_only이면 지원·주의 대비나 우선순위를 만들지 마. 한쪽만 있으면 반대쪽을 꾸미지 말고, mixed일 때만 양쪽 근거를 연결해. strongest 한 분야만 길게 바꿔 써서 overall.summary를 만들지 마.\n- 서사는 topic 점수부터 시작하지 말고 period_narrative.phenomena의 현상 묶음부터 시작해.\n- 같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명한 뒤 분야별 발현 차이만 덧붙여.\n- 각 핵심 문단은 반드시 근거가 의미하는 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결해.\n- 점수·평균·변동폭을 설명 자체로 착각하지 마. 숫자는 강약을 보조할 때만 사용해.\n- day/week/month/annual의 시간해상도를 섞지 마.\n- 고정 조언문을 분야명만 바꿔 반복하지 마. 행동은 해당 현상 묶음과 시기의 조건에서 도출해.\n- supportive와 caution이 함께 있는 현상은 긴장 또는 혼합으로 설명하고 하나의 긍정/부정 결론으로 압축하지 마.\n- Western·사주·Thai는 독립 근거로 유지하고, 같은 시기라는 이유로 합산·시너지·확정 표현을 만들지 마.\n- 상대 속마음, 사건 확률, 가격방향, 매매 적기를 만들지 마.\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
-  return {
-    version: V23_PROMPT_VERSION,
-    narrative_version: PERIOD_NARRATIVE_VERSION,
-    packet,
-    text,
-  }
+  const text = `${buildPeriodNarrativeInstruction(writerPacket,false)}\n\n${buildPeriodReadingInstruction(packet.period_kind)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
+  return {version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,text}
 }
 
 export function buildV23CorePrompt(payload:any) {

@@ -201,72 +201,11 @@ test('contact overall reading keeps useful scene and action separate from direct
   assert.equal(result.contact.outgoing,'')
 })
 
-test('contact UI always shows both honestly named calculation axes',()=>{
+test('current period UI delegates source prose and selection to a document without sentence slicing',()=>{
   const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/const showContactDirectionDetails = Boolean\(editorial\.contact\)/)
-  assert.match(panel,/showContactDirectionDetails && <ReadingDirections/)
-  assert.match(panel,/label: '외부 연락 반응'/)
-  assert.match(panel,/label: '내 연락 실행 적합도'/)
-  assert.match(panel,/이 비교만으로 먼저 연락할 사람은 판정하지 않아요/)
-  assert.match(panel,/<strong>연락이 오가는 흐름<\/strong>/)
-  assert.doesNotMatch(panel,/전체 연락 활성도/)
-})
-
-test('verified non-relationship fields surface structured editorial in main focus cards with deterministic fallback',()=>{
-  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/const structuredFieldTopics = verifiedNarrative && field/)
-  assert.match(panel,/editorial\.topicEditorial\[topic\] \?\? ''/)
-  assert.match(panel,/연애','대인관계','연락','재회','투자주의/)
-  assert.match(panel,/editorialCopyUsable\(item\.text\)/)
-  assert.match(panel,/export function focusEditorialParts/)
-  assert.match(panel,/verifiedNarrative && !field \? focusEditorialParts\(editorial\.topicEditorial\[item\.topic\]/)
-  assert.match(panel,/deepEditorial\?\.conclusion \|\| item\.conclusion/)
-  assert.match(panel,/period-ai-topic-editorial-v4/)
-  assert.match(panel,/deepEditorial\.sceneAction/)
-  assert.match(panel,/판단 바뀌는 조건/)
-  assert.match(panel,/deepEditorial\.change/)
-  assert.match(panel,/<ReadingExplanation kind="practice">\{item\.action\}<\/ReadingExplanation>/)
-  assert.match(panel,/<em>확인할 것<\/em> \{item\.observe\}/)
-})
-
-test('overall hero uses authored Gemini hero only after provenance verification',()=>{
-  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/META_EDITORIAL_RE/)
-  assert.doesNotMatch(panel,/overallFallback|polishFortuneSummary/)
-  assert.match(panel,/const integratedHeroHeadline = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroHeadline\)/)
-  assert.match(panel,/const integratedHeroSummary = verifiedNarrative && !field && editorialCopyUsable\(editorial\.heroSummary\)/)
-  assert.match(panel,/const heroHeadline = fieldHeroHeadline \|\| integratedHeroHeadline/)
-  assert.match(panel,/const heroSummary = fieldHeroSummary \|\| integratedHeroSummary/)
-  assert.match(panel,/!!summary\.favorableCards\.length && <FortuneFlowCards/)
-  assert.match(panel,/const heroLead = period === 'today'[\s\S]*?splitDailyHero\(heroHeadline\)/)
-  assert.doesNotMatch(panel,/relationshipDailyLead/)
-  assert.match(panel,/<h3 className="period-ai-hero-title-v4">\{heroLead\.title\}<\/h3>/)
-  assert.match(panel,/daily-reading-signal/)
-})
-
-test('main relationship and reference summaries cannot be overwritten by generic Gemini prose',()=>{
-  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/<p>\{summary\.relationship\.summary\}<\/p>/)
-  assert.doesNotMatch(panel,/compactEditorialCopy\(editorial\.topicEditorial\['연락'\]\) \|\| summary\.relationship\.summary/)
-  assert.match(panel,/<p>\{item\.detail\?\.conclusion \|\| item\.summary\}<\/p>/)
-  assert.doesNotMatch(panel,/compactEditorialCopy\(editorial\.topicEditorial\[item\.topic\]\) \|\| item\.detail/)
-})
-
-test('weak investment caution boilerplate is hidden from the reference list',()=>{
-  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/visibleReferenceTopics/)
-  assert.match(panel,/item\.topic === '투자주의'/)
-  assert.match(panel,/\/약\/\.test\(item\.band\)/)
-  assert.match(panel,/visibleReferenceTopics\.map/)
-})
-
-test('hero subtitle removes the sentence already promoted into the headline',()=>{
-  const panel=readFileSync(new URL('../PeriodFortuneNarrativeV2.tsx',import.meta.url),'utf8')
-  assert.match(panel,/export function dedupeHeroSubtitle/)
-  assert.match(panel,/export function compactDailyHeroSummary/)
-  assert.match(panel,/period === 'today'[\s\S]*?compactDailyHeroSummary\(\[heroLead\.detail, heroSummary\]/)
-  assert.match(panel,/\{heroSubtitle && <p className="reading-hero-subtitle">\{heroSubtitle\}<\/p>\}/)
-  assert.doesNotMatch(panel,/\{editorial\.heroSummary && <p className="reading-hero-subtitle">/)
+  assert.match(panel,/buildPeriodReadingDocument\(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative/)
+  assert.match(panel,/<AuthoredReadingPanel doc={document}/)
+  assert.doesNotMatch(panel,/compactEditorialCopy|compactDailyHeroSummary|dedupeHeroSubtitle|buildFortuneUserSummary/)
 })
 
 test('legacy saved string clusters remain visible in editorial group copy',()=>{

@@ -1,0 +1,50 @@
+/* The counterpart form shares field components with the profile. Keep its mobile
+   layout independent of the profile grid and its fixed-height notices. */
+.tool-panel .field-grid.counterpart-birth-form {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px;
+  align-items: start;
+}
+.tool-panel .counterpart-birth-form > * {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+.tool-panel .counterpart-birth-form > .field-wide {
+  grid-column: 1 / -1 !important;
+}
+.tool-panel .counterpart-birth-form :is(.check-field, .location-data-status, .privacy-note, .advanced-panel summary, .stable-choice-trigger) {
+  height: auto !important;
+  max-height: none !important;
+}
+.tool-panel .counterpart-birth-form .stable-choice-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tool-panel .counterpart-time-note {
+  margin: 0;
+  color: #635b6c;
+  font-size: .85rem;
+  line-height: 1.5;
+}
+@media (max-width: 600px) {
+  .tool-panel .field-grid.counterpart-birth-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: auto !important;
+  }
+  .tool-panel .counterpart-birth-form > * {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+  .tool-panel .counterpart-birth-form .birthplace-two-step {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+.tool-panel .counterpart-time-fields {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  gap: 12px;
+  padding: 12px;
+}

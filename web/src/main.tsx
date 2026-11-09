@@ -55,6 +55,7 @@ import './horary-prashna.css'
 import './reunion-readable.css'
 import './reunion-quality-v74.css'
 import './daily-reading-quality-v75.css'
+import './relationship-form.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
 

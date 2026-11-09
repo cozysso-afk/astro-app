@@ -6,17 +6,18 @@ export type DailyReadingDocument = {
   version: 'daily-document-v1'; date: string; scope: string; title: string
   state: 'ready' | 'missing' | 'unverified' | 'insufficient' | 'needs_refresh'; headline: string
   blocks: DailyBlock[]; details: DailyBlock[]
+  slots?: Array<{id:string;label:string;state:'ready'|'missing'|'insufficient'}>
 }
 type Data = NonNullable<AiInterpretationResponse['data']>
 const clean = (s: unknown): string => typeof s === 'string' ? s.trim() : ''
 const sectionKeys: Record<string, [string, string, string][]> = {
-  love: [['relationship','love_general','애정'],...(['single','crush','flirting','ambiguous','couple','reunion_interest'].map((key,i)=>['relationship',`love_${key}`,['솔로 · 새 인연','짝사랑','썸','애매한 관계','연애 중','재회를 생각하는 경우'][i]] as [string,string,string]))],
-  social: [['relationship','summary','대인관계'],...(['friends','coworkers','family','new_people','boundaries'].map((key,i)=>['relationship',key,['친구 · 지인','직장동료','가족 · 가까운 사람','새 만남','관계의 경계'][i]] as [string,string,string]))],
+  love: [['relationship','love_general','애정'],['relationship','contact_activation','연락 흐름'],['relationship','contact_continuity','대화의 지속'],...(['single','crush','flirting','ambiguous','couple','reunion_interest'].map((key,i)=>['relationship',`love_${key}`,['솔로 · 새 인연','짝사랑','썸','애매한 관계','연애 중','재회를 생각하는 경우'][i]] as [string,string,string]))],
+  social: [['relationship','summary','대인관계'],['relationship','contact_activation','연락 흐름'],['relationship','contact_continuity','대화의 지속'],['money_news','news','공식 소식'],...(['friends','coworkers','family','new_people','boundaries'].map((key,i)=>['relationship',key,['친구 · 지인','직장동료','가족 · 가까운 사람','새 만남','관계의 경계'][i]] as [string,string,string]))],
   study: [['work_study','study','학업'],['work_study','exam','시험']],
   exam: [['work_study','exam','시험']],
   work: [['work_study','work','직장'],['work_study','career_change','이직']],
   'job-change': [['work_study','career_change','이직']],
-  money: [['money_news','money','금전']],
+  money: [['money_news','money','금전'],['investment','psychology','투자 판단'],['investment','realization','수익 실현'],['investment','entry','신규 진입']],
   investment: [['investment','psychology','투자 판단'],['investment','realization','수익 실현'],['investment','entry','신규 진입']],
   contact: [['relationship','contact_activation','연락'],['relationship','contact_continuity','대화의 지속'],['money_news','news','공식 소식']],
   condition: [['condition','condition','컨디션']],
@@ -39,8 +40,21 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
   const doc: DailyReadingDocument = {version:'daily-document-v1',date,scope:field?.id ?? 'overall',title:field?.label ?? '일일 종합운세',state:verified?'missing':'unverified',headline:'',blocks:[],details:[]}
   if (!verified) return doc
   if (field) {
-    const topicForKey: Record<string,string> = {work:'직장',career_change:'이직',study:'학업',exam:'시험',news:'소식'}
+    const topicForKey: Record<string,string> = {work:'직장',career_change:'이직',study:'학업',exam:'시험',news:'소식',psychology:'투자심리',realization:'수익실현',entry:'신규진입'}
     const sections = (sectionKeys[field.id] ?? []).filter(([,k])=>!topicForKey[k] || field.topics.includes(topicForKey[k])).map(([g,k,label])=>({key:`${g}.${k}`,label,section:(data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>)?.[g]?.[k]}))
+    doc.slots=sections.map(s=>({id:s.key,label:s.label,state:ready(s.section)?'ready':s.section?.applicability==='insufficient'&&data.editorial_delivery?.[s.key]==='authored'?'insufficient':'missing'}))
+    doc.details=sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
+      {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
+    ])
+    if (field.topics.includes('연락')) {
+      for (const [key,label] of [['incoming','연락을 받을 흐름'],['outgoing','내가 먼저 연락할 조건'],['reconnection','과거 인연과 다시 연락할 흐름']] as const) {
+        if (key === 'reconnection' && !field.topics.includes('재회')) continue
+        const value = clean(data.contact_flow?.[key])
+        if (value) doc.details.push({id:`direction:${key}`,label,text:value})
+      }
+    }
+    const answers = (data.domain_answers ?? []).filter(a=>field.topics.includes(a.topic) && a.status !== 'not_calculated' && a.evidence_refs?.length && clean(a.answer))
+    doc.details.push(...answers.map(a=>({id:`question:${a.topic}:${a.question_key}`,label:a.label,text:a.answer})))
     // The primary question must be answered; never promote a secondary subject.
     if (!ready(sections[0]?.section)) {
       if (sections[0]?.section?.applicability === 'insufficient' && data.editorial_delivery?.[sections[0].key] === 'authored') doc.state='insufficient'
@@ -48,16 +62,11 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     }
     const fingerprint=(s:string)=>s.replace(/[\s.,!?·]/g,'')
     const primary=sections[0].section.conclusion
-    if (sections[0].section.real_scene.length>500 || sections[0].section.action.length>300 || sections[0].section.change_condition.length>300) {doc.state='needs_refresh';return doc}
+    if (clean(sections[0].section.real_scene).length>500 || sections[0].section.action.length>300 || sections[0].section.change_condition.length>300) {doc.state='needs_refresh';return doc}
     const peers=Object.values(data.clusters??{}).flatMap(group=>Object.values(group??{})).filter(s=>s && s!==sections[0].section && s.applicability!=='insufficient')
     if(primary.length>180 || fingerprint(primary)===fingerprint(data.overall?.summary??'') || peers.some(s=>fingerprint(clean(s.conclusion))===fingerprint(primary))) {doc.state='needs_refresh';return doc}
     doc.headline = clean(sections[0].section.conclusion)
     doc.blocks = blocksFor(sections[0].section,sections[0].key)
-    doc.details = sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
-      {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
-    ])
-    const answers = (data.domain_answers ?? []).filter(a=>field.topics.includes(a.topic) && a.status !== 'not_calculated' && a.evidence_refs?.length && clean(a.answer))
-    doc.details.push(...answers.map(a=>({id:`question:${a.topic}:${a.question_key}`,label:a.label,text:a.answer})))
   } else {
     if (!clean(data.headline) || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
     if(data.headline.length>180 || data.overall.summary.length>360 || data.headline.trim()===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}

@@ -39,7 +39,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.11-daily-reading-contract')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.15-grounded-reader-contract')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -124,7 +124,7 @@ test('non-daily prompt retains relationship and Korean editorial contracts', () 
   assert.match(text,/재회 관심 해설은 생각남→연락→실제 만남→관계 재구축/)
   assert.match(text,/다시 낮춰 읽을 현실 조건/)
   assert.match(text,/목적어와 서술어의 의미 호응을 확인/)
-  assert.match(text,/초반→중반→후반/)
+  assert.match(text,/초반·중반·후반의 변화를 의무적으로 만들지 않/)
 })
 
 test('day prioritizes a one-day trigger while week prioritizes a multi-day pattern', () => {
@@ -145,7 +145,7 @@ test('day prioritizes a one-day trigger while week prioritizes a multi-day patte
   assert.match(day.phenomena[0].label, /Mars square Saturn/)
   assert.match(week.phenomena[0].label, /Jupiter trine Sun/)
   assert.match(buildV23CorePrompt(payload('day')).text, /선택한 운세일 안에서/)
-  assert.match(buildV23CorePrompt(payload('week')).text, /초반→중반→후반/)
+  assert.match(buildV23CorePrompt(payload('week')).text, /표본이 같으면 유지되는 점/)
 })
 
 test('daily writer receives the actual date-wording contract from the source payload',()=>{

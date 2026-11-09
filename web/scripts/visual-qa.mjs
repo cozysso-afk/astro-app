@@ -25,12 +25,9 @@ const context = await browser.newContext({
   acceptDownloads: true,
 })
 const page = await context.newPage()
-const downloadPromises = []
-let downloadCount = 0
+const downloads = []
 page.on('download', download => {
-  downloadCount += 1
-  const target = path.join(outDir, `saved-result-${downloadCount}.png`)
-  downloadPromises.push(download.saveAs(target))
+  downloads.push(download)
 })
 
 try {
@@ -169,15 +166,56 @@ try {
   const state = (await page.locator('[data-qa-export-status]').textContent()) || ''
   assert(!state.startsWith('error:'), `saved-image QA failed: ${state}`)
   const expectedPages = Number(state.split(':')[1])
-  assert(expectedPages === 2, `visual fixture must stay at 2 saved pages, got ${state}`)
+  assert(expectedPages >= 2, `complete export must span at least 2 saved pages, got ${state}`)
 
   const deadline = Date.now() + 8_000
-  while (downloadCount < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
-  await Promise.all(downloadPromises)
-  assert(downloadCount === expectedPages, `expected ${expectedPages} saved images, received ${downloadCount}`)
+  while (downloads.length < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
+  assert(downloads.length === expectedPages, `expected ${expectedPages} saved images, received ${downloads.length}`)
+  for (let index = 0; index < downloads.length; index += 1) {
+    await downloads[index].saveAs(path.join(outDir, `saved-result-${index + 1}.png`))
+  }
 
-  await writeFile(path.join(outDir, 'diagnostics.json'), JSON.stringify({ ...diagnostics, expectedPages, downloadCount }, null, 2))
-  console.log(JSON.stringify({ ok: true, ...diagnostics, expectedPages, downloadCount }, null, 2))
+  const formPage = await context.newPage()
+  await formPage.route('**/*', route => {
+    const url = new URL(route.request().url())
+    return url.protocol.startsWith('http') && url.origin !== new URL(baseUrl).origin
+      ? route.abort() : route.continue()
+  })
+  const formUrl = new URL(baseUrl)
+  formUrl.searchParams.set('screen','partner-form')
+  await formPage.goto(formUrl.href)
+  await formPage.getByRole('button',{name:/궁합운/}).first().click()
+  const form = formPage.locator('.counterpart-birth-form')
+  for (const width of [320,375,402,430]) {
+    await formPage.setViewportSize({width,height:874})
+    await form.waitFor()
+    const issues = await form.evaluate(root=>{
+      const bounds = root.getBoundingClientRect()
+      return [...root.children].flatMap(el=>{
+        const rect = el.getBoundingClientRect()
+        if (!rect.width) return []
+        return Math.abs(rect.width - bounds.width) > 3 || rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+          ? [el.textContent.trim().slice(0,24)] : []
+      })
+    })
+    assert(!issues.length,'partner form clipped or only partly fills row at '+width+'px: '+issues.join(', '))
+    const settings = form.locator('.counterpart-time-settings')
+    await settings.locator('summary').click()
+    assert(await form.locator('.counterpart-time-note:visible').count()===1,'duplicate birth time hint')
+    await settings.locator('summary').click()
+    await form.screenshot({path:path.join(outDir,'partner-form-'+width+'.png')})
+  }
+  const unknown = form.getByRole('checkbox')
+  await unknown.check()
+  assert(!await form.getByRole('button',{name:'출생시간 신뢰도'}).count(),'inactive time precision is still visible')
+  await unknown.uncheck()
+  await form.getByRole('button',{name:'출생 시·도'}).click()
+  await formPage.getByRole('listbox',{name:'출생 시·도'}).getByRole('option').nth(1).click()
+  assert(await form.getByRole('button',{name:'출생 시·군·구'}).isEnabled(),'district control did not activate')
+  await formPage.close()
+
+  await writeFile(path.join(outDir, 'diagnostics.json'), JSON.stringify({ ...diagnostics, expectedPages, downloadCount: downloads.length }, null, 2))
+  console.log(JSON.stringify({ ok: true, ...diagnostics, expectedPages, downloadCount: downloads.length }, null, 2))
 } finally {
   await browser.close()
 }

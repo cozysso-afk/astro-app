@@ -33,6 +33,17 @@ export function DailyReadingPanel({data,date,field,verified,technicalDetails,onR
       if (exportJob.current === job) {exportJob.current=null;setSaving(false)}
     }
   }
+  const relationshipLabels: Record<string, string> = {
+    'relationship.contact_activation': '연락운',
+    'relationship.contact_continuity': '대화가 이어질 조건',
+    'relationship.love_reunion_interest': '재회운',
+  }
+  const featured = doc.scope === 'love'
+    ? (doc.slots ?? []).filter(slot => relationshipLabels[slot.id])
+    : []
+  const featuredIds = new Set(featured.map(slot => slot.id))
+  const directions = doc.details.filter(block=>block.id.startsWith('direction:'))
+  const otherDetails = doc.details.filter(block => !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
   return <section className="daily-reading" data-daily-scope={doc.scope} data-daily-state={doc.state}>
     <header className="daily-reading-heading"><span>{doc.title}</span><time dateTime={date}>{date}</time></header>
     {doc.state === 'ready' ? <>
@@ -40,8 +51,28 @@ export function DailyReadingPanel({data,date,field,verified,technicalDetails,onR
       <div className="daily-reading-blocks">{doc.blocks.map(b=><section className="daily-reading-block" key={b.id} data-daily-block={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</div>
       <button className="daily-reading-save" type="button" disabled={saving} onClick={save}>{saving?'이미지 만드는 중…':'핵심 해설 이미지 저장'}</button>
       {notice&&<p className="daily-reading-notice" role="status">{notice}</p>}
-      {!!doc.details.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{doc.details.map(b=><section className="daily-reading-block" key={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
     </> : <p className="daily-reading-state">{{unverified:'확인된 해설을 아직 불러오지 못했어.',missing:'이 분야의 해설이 아직 완성되지 않았어.',insufficient:'이번 해설에서는 이 분야에 답할 근거를 충분히 연결하지 못했어.',needs_refresh:'기존 해설의 길이나 내용 중복을 다시 확인해야 해. 해설을 새로 불러와줘.'}[doc.state]}</p>}
+    {directions.map(block=><section className="daily-reading-block" key={block.id} data-daily-detail={block.id}>
+      <h4>{block.label}</h4><p>{block.text}</p>
+    </section>)}
+    {featured.map(slot => {
+      const label = relationshipLabels[slot.id]
+      if (slot.state !== 'ready') {
+        return <p className="daily-reading-state" key={slot.id} data-daily-slot={slot.id} data-slot-state={slot.state}>
+          <strong>{label}</strong> · {slot.state === 'insufficient' ? '판단할 근거가 부족해.' : '이 항목의 해설이 없어.'}
+        </p>
+      }
+      return <details className="daily-reading-details" key={slot.id} data-daily-slot={slot.id} data-slot-state="ready">
+        <summary>{label}</summary>
+        {doc.details.filter(block => block.id.startsWith(slot.id + ':')).map(block =>
+          <section className="daily-reading-block" key={block.id} data-daily-detail={block.id}>
+            <h4>{block.label}</h4><p>{block.text}</p>
+          </section>
+        )}
+      </details>
+    })}
+    {!!otherDetails.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{otherDetails.map(b=><section className="daily-reading-block" key={b.id} data-daily-detail={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
+    {(['missing','insufficient'] as const).map(state=>{const slots=doc.slots?.filter(slot=>slot.state===state && !featuredIds.has(slot.id))??[];return slots.length?<details className="daily-reading-coverage" key={state}><summary>{state==='missing'?'아직 작성되지 않은 항목':'근거가 부족한 항목'} {slots.length}개</summary><ul>{slots.map(slot=><li key={slot.id} data-daily-slot={slot.id} data-slot-state={state}>{slot.label}</li>)}</ul></details>:null})}
     {onRetry && (doc.state==='missing' || doc.state==='needs_refresh') && <button type="button" className="daily-reading-save" onClick={onRetry}>해설 다시 불러오기</button>}
     {technicalDetails&&<details className="daily-reading-details"><summary>계산 근거 보기</summary>{technicalDetails}</details>}
   </section>

@@ -1,6 +1,7 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
 import type { DailyReadingDocument } from './dailyReadingDocument'
+import type { AuthoredReadingDocument } from './authoredReadingDocument'
 type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean; complete?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
 type ExportModel = { title: string; date: string; hero: string; subtitle?: string; sections: ExportSection[]; fitContentHeight?: boolean }
@@ -95,7 +96,7 @@ function periodTopicCards(root: HTMLElement) {
     const detail = textOf(article, ':scope > b')
     const paragraphs = directParagraphs(article)
     const body = [detail, ...paragraphs].filter(Boolean).join(' ')
-    return { title, body: firstSentences(body, 3), tone: toneOf(article), editorial: true } satisfies ExportCard
+    return { title, body, tone: toneOf(article), editorial: true, complete: true } satisfies ExportCard
   })
   return dedupeCards(cards)
 }
@@ -110,28 +111,31 @@ function systemDetailCards(root: HTMLElement, integrated: boolean) {
       editorial: true,
     })))
   }
-  const western = Array.from(root.querySelectorAll<HTMLElement>('.western-score-grid > details')).slice(0, 3).map(card => ({
+  const western = Array.from(root.querySelectorAll<HTMLElement>('.western-score-grid > details')).map(card => ({
     eyebrow: textOf(card, '.western-score-band'),
     title: textOf(card, '.western-score-topline strong'),
-    body: firstSentences(textOf(card, '.western-score-guidance'), 1),
+    body: textOf(card, '.western-score-guidance'),
     meta: textOf(card, '.western-score-topline b') ? `상대 활성도 ${textOf(card, '.western-score-topline b')}점` : '',
     tone: 'plain' as const,
     compact: true,
     editorial: true,
+    complete: true,
   }))
-  const saju = Array.from(root.querySelectorAll<HTMLElement>('.saju-reader-topics .system-lens')).slice(0, 3).map(card => ({
+  const saju = Array.from(root.querySelectorAll<HTMLElement>('.saju-reader-topics .system-lens')).map(card => ({
     title: textOf(card, ':scope > h4'),
-    body: firstSentences(`${textOf(card, ':scope > p')} ${textOf(card, '.reading-explanation.is-practice p')}`, 2),
+    body: normalizeText(`${textOf(card, ':scope > p')} ${textOf(card, '.reading-explanation.is-practice p')}`),
     tone: 'plain' as const,
     compact: true,
     editorial: true,
+    complete: true,
   }))
-  const thai = Array.from(root.querySelectorAll<HTMLElement>('.thai-life-map .bhumi-grid > details')).slice(0, 3).map(card => ({
+  const thai = Array.from(root.querySelectorAll<HTMLElement>('.thai-life-map .bhumi-grid > details')).map(card => ({
     title: textOf(card, ':scope > summary strong'),
-    body: firstSentences(`${textOf(card, '.thai-lens-reading > p')} ${textOf(card, '.reading-explanation.is-practice p')}`, 2),
+    body: normalizeText(`${textOf(card, '.thai-lens-reading > p')} ${textOf(card, '.reading-explanation.is-practice p')}`),
     tone: 'system' as const,
     compact: true,
     editorial: true,
+    complete: true,
   }))
   return dedupeCards([...western, ...saju, ...thai])
 }
@@ -140,13 +144,10 @@ function periodModel(root: HTMLElement, label: string): ExportModel {
   const date = textOf(root, '.reading-period-date') || textOf(root, '.result-headline span')
   const systemRoot = root.querySelector<HTMLElement>('.system-reading')
   const integrated = !systemRoot || systemRoot.classList.contains('system-integrated')
-  const hero = firstSentences(textOf(root, integrated ? '.period-ai-head h3' : '.system-hero h3'), 1)
-  const subtitle = firstSentences(textOf(
-    root,
-    integrated
-      ? '.reading-hero-subtitle:not(.reading-export-subtitle-v7)'
-      : '.system-hero > p',
-  ), 2)
+  const heroSource=textOf(root, integrated ? '.period-ai-head h3' : '.system-hero h3')
+  const hero = integrated ? firstSentences(heroSource, 1) : heroSource
+  const subtitleSource=textOf(root, integrated ? '.reading-hero-subtitle:not(.reading-export-subtitle-v7)' : '.system-hero > p')
+  const subtitle = integrated ? firstSentences(subtitleSource, 2) : subtitleSource
   const sections: ExportSection[] = []
 
   const systemCards = systemDetailCards(root, integrated)
@@ -433,16 +434,16 @@ function readingFont(ctx: CanvasRenderingContext2D, size: number, weight = 500) 
 }
 
 async function ensureExportFonts() {
-  if (typeof document === 'undefined' || !document.fonts) return
-  try {
-    await Promise.all([
-      document.fonts.load('500 32px "Nanum Myeongjo"'),
-      document.fonts.load('700 32px "Nanum Myeongjo"'),
-      document.fonts.load('500 32px "Noto Serif KR"'),
-      document.fonts.load('700 32px "Noto Serif KR"'),
-    ])
-  } catch {
-    // AppleMyungjo/Batang remain deterministic local serif fallbacks on supported clients.
+  if (typeof document === 'undefined' || !document.fonts) throw new Error('저장할 글꼴을 확인하지 못했어.')
+  const [myeongjo500,myeongjo700,serif500,serif700,sans700] = await Promise.all([
+    document.fonts.load('500 32px "Nanum Myeongjo"'),
+    document.fonts.load('700 32px "Nanum Myeongjo"'),
+    document.fonts.load('500 32px "Noto Serif KR"'),
+    document.fonts.load('700 32px "Noto Serif KR"'),
+    document.fonts.load('700 32px "Noto Sans KR"'),
+  ])
+  if((!myeongjo500.length&&!serif500.length)||(!myeongjo700.length&&!serif700.length)||!sans700.length){
+    throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
   }
 }
 
@@ -638,7 +639,7 @@ function pageFits(ctx: CanvasRenderingContext2D, items: LayoutItem[]) {
 
 function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
   const groups: LayoutItem[] = []
-  if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true } })
+  if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true, complete: true } })
   for (const section of model.sections) {
     const clean = section.cards.some(c=>c.complete) ? section.cards : dedupeCards(section.cards)
     clean.forEach((card, index) => {
@@ -779,6 +780,26 @@ export async function exportDailyReadingImages(doc: DailyReadingDocument, signal
   if (fonts.some(f=>!f.length) || !labelFonts.length) throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
   signal.throwIfAborted()
   return exportModelImages(model, `${doc.title} ${doc.date}`, signal)
+}
+
+export function authoredReadingExportModel(doc:AuthoredReadingDocument):ExportModel {
+  if(doc.state!=='ready'||!doc.headline||!doc.exportBlockIds.length)throw new Error('완성된 핵심 해설이 있어야 저장할 수 있어.')
+  const byId=new Map(doc.core.map(block=>[block.id,block]))
+  const blocks=doc.exportBlockIds.map(id=>{const block=byId.get(id);if(!block)throw new Error('저장할 원고 항목이 빠졌어. 화면을 다시 확인해줘.');return block})
+  return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[
+    {title:'핵심 답',body:doc.headline,tone:'love',editorial:true,complete:true},
+    ...blocks.map(block=>({title:block.label,body:block.text,tone:'plain' as const,editorial:true,complete:true})),
+  ]}]}
+}
+
+export async function exportAuthoredReadingImages(doc:AuthoredReadingDocument,signal:AbortSignal):Promise<ExportResult> {
+  const model=authoredReadingExportModel(doc)
+  const copy=[doc.headline,...doc.core.filter(b=>doc.exportBlockIds.includes(b.id)).map(b=>b.text)].join(' ')
+  const fonts=await Promise.all([400,700].map(weight=>document.fonts.load(`${weight} 32px "Nanum Myeongjo"`,copy)))
+  const labels=await document.fonts.load('700 32px "Noto Sans KR"',`${doc.title} 핵심 답 ${doc.core.map(b=>b.label).join(' ')}`)
+  if(fonts.some(f=>!f.length)||!labels.length)throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
+  signal.throwIfAborted()
+  return exportModelImages(model,`${doc.title} ${doc.date}`,signal)
 }
 
 async function exportModelImages(model: ExportModel, label: string, signal?: AbortSignal): Promise<ExportResult> {

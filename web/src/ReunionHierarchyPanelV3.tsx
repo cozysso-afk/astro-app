@@ -44,7 +44,7 @@ function evidenceLabel(row: Aspect) {
   return [a,aspect,b,orb].filter(Boolean).join(' · ')
 }
 
-export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, historyCalculated=false, observation={state:'',initiator:'',events:[]}, evidence, reunionV2, directionRows, sustainabilityText }: {
+export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, historyCalculated=false, observation={state:'',initiator:'',events:[]}, evidence, reunionV2, directionRows, sustainabilityText, authoredReadingSeparate=false }: {
   hierarchyData: ReunionHierarchy
   historyHierarchyData?: ReunionHierarchy | null
   historyCalculated?: boolean
@@ -53,6 +53,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   reunionV2: ReunionSynthesis | null
   directionRows: DirectionRow[]
   sustainabilityText: string
+  authoredReadingSeparate?: boolean
 }) {
   const valid = hierarchyData.validation?.status === 'PASS'
   const readingV4 = buildReunionReadingV4({
@@ -95,7 +96,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
     ?? readingV4.axes.find(row => row.state === 'current_signal')?.key
   return <section className="reading-section reunion-hierarchy reunion-ui-v5">
     {!valid ? <p role="alert">계산 확인이 필요해요. 다시 계산한 뒤 결과를 확인해 주세요.</p> : <>
-      <section className="reunion-v5-answer">
+      {!authoredReadingSeparate && <section className="reunion-v5-answer">
         <div className="reunion-v4-answer-meta"><span>현재 판정</span><time>기준일 {hierarchyData.as_of_date}</time></div>
         {!hasObservedState ? <>
           <h3>현재 관계 상태를 먼저 입력해 주세요</h3>
@@ -109,7 +110,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
           <h3>자연어 해설을 불러오지 못했어요</h3>
           <p className="reunion-v4-answer-copy">계산 단계는 아래에서 확인할 수 있어요. 해설은 다시 생성해 주세요.</p>
         </>}
-      </section>
+      </section>}
       <section className="reunion-v5-section reunion-v4-stage-section">
         <h4>관계가 어디까지 왔는지</h4>
         <ol className="reunion-v4-stage-rail" aria-label="재회 6단계 진행표">

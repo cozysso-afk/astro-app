@@ -194,7 +194,7 @@ function summarizeDailyOutcomes(records: DailyOutcomeRecord[]) {
   const contact = usable.filter((row)=>row.event === 'received' || row.event === 'both')
   const none = usable.filter((row)=>row.event === 'none')
   const mean = (rows: DailyOutcomeRecord[], key: string) => {
-    const values = rows.map((row)=>row.scores[key]).filter((value): value is number=>typeof value === 'number' && Number.isFinite(value))
+    const values = rows.map((row)=>row.scores?.[key]).filter((value): value is number=>typeof value === 'number' && Number.isFinite(value))
     return values.length ? values.reduce((sum,value)=>sum+value,0)/values.length : null
   }
   return {
@@ -1599,10 +1599,12 @@ export default function AppNext() {
   }
 
 
-  const outcomeCalibration = useMemo(() => {
+  const outcomeRecords = useMemo(() => {
     void outcomeNonce
-    return summarizeDailyOutcomes(readDailyOutcomes())
+    return readDailyOutcomes()
   }, [outcomeNonce])
+
+  const outcomeCalibration = useMemo(() => summarizeDailyOutcomes(outcomeRecords), [outcomeRecords])
 
   async function saveDailyOutcome() {
     if (!integratedResult || period !== 'today' || !outcomeDraft.event) {
@@ -1620,7 +1622,7 @@ export default function AppNext() {
       scores: {
         '수신신호': signals['수신신호']?.average ?? null,
         '발신적합': signals['발신적합']?.average ?? null,
-        '재접점': signals['과거인연재접점']?.average ?? null,
+        '재접점': (signals['과거인연접점'] ?? signals['과거인연재접점'])?.average ?? null,
         '연락': overall['연락']?.average ?? null,
         '재회': overall['재회']?.average ?? null,
         '연애': overall['연애']?.average ?? null,
@@ -1638,7 +1640,7 @@ export default function AppNext() {
     }
     setOutcomeDraft(record)
     setOutcomeSaved(true)
-    if (localOutcomeSaved) setOutcomeNonce((value)=>value+1)
+    setOutcomeNonce((value)=>value+1)
     if (!localOutcomeSaved && archived.cloudSynced) setActionNotice('실제 결과는 클라우드에 저장했어. 이 브라우저 로컬 저장소는 사용할 수 없어.')
     else if (!archived.cloudSynced) setActionNotice('실제 결과를 이 기기에 저장했어. 클라우드 동기화는 대기 중이야.')
     else setActionNotice('실제 결과 저장 완료')
@@ -1814,13 +1816,16 @@ export default function AppNext() {
               <details><summary>실제 사건 날짜 기록 · 선택</summary><div className="reunion-observation-dates"><label><span>재접촉</span><input type="date" value={reunionRecontactDate} onChange={e=>{setReunionRecontactDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>실제 만남</span><input type="date" value={reunionMeetingDate} onChange={e=>{setReunionMeetingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>관계 합의</span><input type="date" value={reunionRebuildingDate} onChange={e=>{setReunionRebuildingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label></div></details>
             </section>}
             {needsCounterpart&&<>
-            <div className="subsection-title">상대 출생정보</div>
-            <div className="field-grid">
+            <div className="subsection-title" id="counterpart-birth-title">상대 출생정보</div>
+            <div className="field-grid counterpart-birth-form" role="group" aria-labelledby="counterpart-birth-title">
               <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
               <label className="field birth-time-field"><span>출생시간</span><input type="time" value={counterpart.birthTime} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,birthTime:e.target.value})}/></label>
-              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime,timeSource:e.target.checked?'unknown':counterpart.timeSource,timeConfidence:e.target.checked?'unknown':counterpart.timeConfidence,rectifiedWindowStart:'',rectifiedWindowEnd:''})}/><span>상대 출생시간 모름 — 출생지역은 그대로 기록 가능 · Moon(달)·각도·하우스·다빈슨/마크스 등 시간민감 레이어만 자동 제외</span></label>
-              <BirthTimeReliabilityFields value={counterpart} disabled={!counterpart.timeKnown} onChange={(patch)=>setCounterpart({...counterpart,...patch})}/>
+              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime,timeSource:e.target.checked?'unknown':counterpart.timeSource,timeConfidence:e.target.checked?'unknown':counterpart.timeConfidence,rectifiedWindowStart:'',rectifiedWindowEnd:''})}/><span>상대 출생시간을 몰라요</span></label>
+              {counterpart.timeKnown ? <details className="advanced-panel field-wide counterpart-time-settings">
+                <summary>출생시간 출처와 가능한 시간 범위</summary>
+                <div className="counterpart-time-fields"><BirthTimeReliabilityFields value={counterpart} concise onChange={(patch)=>setCounterpart({...counterpart,...patch})}/></div>
+              </details> : <p className="field-wide counterpart-time-note">출생지는 선택할 수 있어요. 출생시간에 따라 달라지는 항목은 궁합에서 제외해요.</p>}
               <KoreaBirthplaceSelector value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
               <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
                 <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>
@@ -1828,7 +1833,7 @@ export default function AppNext() {
                 <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={counterpart.utcOffset} onChange={(e)=>setCounterpart({...counterpart,utcOffset:e.target.value})}/></label>
               </div></details>
             </div>
-            <div className="coordinate-note"><MapPin size={16}/><span>국내는 시·도 → 시·군·구만 고르면 현재 행정경계 대표좌표와 UTC +9를 자동 적용해. 직접 좌표 입력은 고급 설정이야.</span></div>
+            
             </>}
             <div className="calculation-range"><CalendarDays size={17}/><span>{isPersonalMarriage?'개인 결혼운':'관계'} 분석기간 {relationshipStartDate} ~ {relationshipEndDate} · {relationshipDayCount}일</span></div>
             {(isPersonalMarriage?personalMarriageError:relationshipError) && <div className="status-banner error"><AlertTriangle size={17}/><span>{isPersonalMarriage?personalMarriageError:relationshipError}</span></div>}
@@ -1851,7 +1856,7 @@ export default function AppNext() {
               </div>
               {actionNotice && <div className="status-banner subtle"><CheckCircle2 size={16}/><span>{actionNotice}</span></div>}
               {archiveStatus && <div className="status-banner subtle"><Cloud size={16}/><span>{archiveStatus}</span></div>}
-              <RelationshipInterpretationPanel aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} angleTimeAvailable={Boolean(relationshipResult.result.natal_synastry?.user_time_available && relationshipResult.result.natal_synastry?.partner_time_available)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
+              <RelationshipInterpretationPanel readingPeriod={relationshipResult.period} aspects={natalAspects} partnerExact={Boolean(relationshipResult.result.natal_synastry?.partner_time_exact)} angleTimeAvailable={Boolean(relationshipResult.result.natal_synastry?.user_time_available && relationshipResult.result.natal_synastry?.partner_time_available)} ai={relationshipAi} aiLoading={relationshipAiLoading} aiError={relationshipAiError} onAi={runRelationshipAi} analysisMode={selectedTool==='marriage'?`marriage_${marriageMode}`:relationshipPurpose} timeSensitivePoints={relationshipTimeSensitivePoints} formatAspect={aspectText}
                 sajuContext={relationshipResult.result.saju_relationship}
                 timing={relationshipResult.result.reunion_transits?.directional_context ?? reunionTiming}
                 returnSupport={relationshipResult.result.reunion_return_support ?? null}
@@ -1930,6 +1935,7 @@ export default function AppNext() {
               bestDays={bestIntegratedDays}
               cautionDays={cautionIntegratedDays}
               activeDayun={activeDayun}
+              outcomeRecords={outcomeRecords}
               outcomeDraft={outcomeDraft}
               outcomeSaved={outcomeSaved}
               outcomeCalibration={outcomeCalibration}

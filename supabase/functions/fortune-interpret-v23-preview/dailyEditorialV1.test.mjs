@@ -18,7 +18,7 @@ test('production regression: night window cannot become a morning career appoint
 test('window references are local and Korean clock notation is checked too',()=>{
   const errors=codes({overall:{summary:'오후 13시 30분 이후에 일을 정리해.',evidence_refs:[]},decisions:[{timing:'13:30~15:00',evidence_refs:['W:study']}]})
   assert.ok(errors.includes('clock_without_local_window_evidence'))
-  assert.deepEqual(codes({clusters:{condition:{condition:{action:'13:30~15:00에 쉬어.',evidence_refs:['W:study']}}}}),['window_from_other_field'])
+  assert.deepEqual(codes({clusters:{condition:{condition:{action:'13:30~15:00에 쉬어.',evidence_refs:['W:study']}}}}),['evidence_from_other_field','window_from_other_field'])
 })
 test('showing a cited relative time as evidence is allowed without telling readers to wake up',()=>{
   assert.deepEqual(codes({key_windows:[{summary:'상대 비교값은 01:00~02:30에 높아. 실제 활동 시간표를 뜻하지 않아.',evidence_refs:['W:career']}]}),[])
@@ -130,4 +130,41 @@ test('unsupported permission in an exception is rejected; empty daily conditions
  assert.ok(inspectInterpretationQuality(d,payload()).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
  assert.ok(!inspectInterpretationQuality(d,payload(),{allowEmptyDailyChangeCondition:true}).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
  assert.ok(inspectInterpretationQuality(d,{...payload(),period_kind:'week'},{allowEmptyDailyChangeCondition:true}).stages[5].issues.some(i=>i.includes('판단변경조건 누락')))
+})
+
+test('daily packet restores every supported detailed topic without replacing contact with love',()=>{
+ const topics=['연락','재회','시험','이직','투자심리','수익실현','신규진입','소식']
+ const evidence_ledger=topics.map((topic,i)=>({id:`W:detail:${i}`,topic,scope:'intraday_evidence',direction:'context',text:`${topic} 계산근거`}))
+ const packet=dailyReaderPacket({period_kind:'day',evidence_ledger})
+ assert.deepEqual([...packet.evidence_ledger].sort((a,b)=>a.id.localeCompare(b.id)),evidence_ledger)
+ const questions=packet.daily_editorial_brief.questions
+ assert.equal(questions.length,25)
+ assert.equal(questions.filter(q=>q.generation_policy==='required_primary').length,6)
+ assert.equal(questions.filter(q=>q.generation_policy==='required_detail').length,9)
+ const activation=questions.find(q=>q.section==='relationship.contact_activation')
+ const continuity=questions.find(q=>q.section==='relationship.contact_continuity')
+ assert.deepEqual(activation.fact_refs,['W:detail:0'])
+ assert.deepEqual(continuity.fact_refs,['W:detail:0'])
+ assert.notEqual(activation.reader_question,continuity.reader_question)
+ assert.deepEqual(questions.find(q=>q.section==='relationship.love_general').fact_refs,[])
+ assert.equal(questions.find(q=>q.section==='relationship.love_single').generation_policy,'conditional_optional')
+})
+
+test('restored contact reading cannot cite unrelated love-only evidence',()=>{
+ const data={clusters:{relationship:{contact_activation:{conclusion:'대화가 오가는 흐름을 살펴봐.',applicability:'conditional',evidence_refs:['W:love']}}}}
+ assert.ok(codes(data).includes('evidence_from_other_field'))
+ const p=payload();p.evidence_ledger[2].source_topics=['연애','연락']
+ assert.ok(!codes(data,p).includes('evidence_from_other_field'))
+})
+
+test('another date cannot activate a required daily contact section or enter its packet',()=>{
+ const p={period:{start:'2026-11-04',end:'2026-11-04'},evidence_ledger:[
+  {id:'W:old',topic:'연락',scope:'intraday_evidence',date:'2026-11-03'},
+  {id:'W:current',topic:'연애',scope:'intraday_evidence',date:'2026-11-04'},
+ ]}
+ const packet=dailyReaderPacket(p)
+ assert.deepEqual(packet.evidence_ledger.map(r=>r.id),['W:current'])
+ const q=dailyEditorialBrief(p).questions.find(q=>q.section==='relationship.contact_activation')
+ assert.deepEqual(q.fact_refs,[])
+ assert.notEqual(q.generation_policy,'required_detail')
 })

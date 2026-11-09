@@ -6,6 +6,7 @@ type EvidenceRow = {
   id?: string
   system?: string
   topic?: string
+  source_topics?: string[]
   scope?: string
   date?: string
   start?: string
@@ -65,19 +66,19 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
   },
   week: {
     objective: '7일 안에서 흐름이 어떻게 이동하는지 읽는다. 하루 운세 7개를 붙이지 말고 전환과 누적을 설명한다.',
-    sequence: ['이번 주 핵심 흐름', '초반', '중반', '후반', '전환점', '이번 주에 이어지는 행동'],
+    sequence: ['이번 주 핵심과 해석 범위', '근거가 있는 날짜 사이의 차이 또는 유지', '계산하지 않은 구간의 제한', '이번 주에 이어지는 행동'],
     evidence_priority: ['daily trajectory', 'dated direct evidence', 'repeated short pattern', 'period context'],
     forbidden: ['날짜별 독립 운세 나열', '월간·연간 구조적 결론', '같은 행동문구 반복'],
     distinctive_requirements: [
       '헤드라인은 특정 하루의 촉발보다 7일간의 이동·누적·전환을 요약한다.',
-      '가능하면 서로 다른 날짜 2개 이상을 연결해 초반→중반→후반의 변화를 설명한다.',
+      '서로 다른 날짜의 근거가 있을 때만 비교한다. 초반·중반·후반의 변화를 의무적으로 만들지 않으며 표본이 같으면 유지되는 점과 비교의 한계를 설명한다.',
       '오늘 운세처럼 즉시 행동 한 줄로 끝내지 말고 이번 주에 유지하거나 조정할 패턴을 제시한다.',
     ],
     granularity: 'early-mid-late-week',
   },
   month: {
     objective: '한 달 안에서 반복되는 패턴과 방향 전환을 읽는다. 단일 고점보다 지속성과 재발 여부를 우선한다.',
-    sequence: ['이번 달 큰 흐름', '월초', '중순', '월말', '반복되는 패턴', '일시적인 변화와 지속되는 변화', '현실적 우선순위'],
+    sequence: ['이번 달 핵심과 자료 범위', '실제 관측된 반복 또는 경계', '표본과 기간 전체의 구분', '현실적 우선순위'],
     evidence_priority: ['weekly or multi-day recurrence', 'month segments', 'dated direct evidence', 'period context'],
     forbidden: ['일일 시간창을 중심축으로 사용', '한 날짜만으로 월 전체를 대표', '주간 문구를 기간만 늘려 재사용'],
     distinctive_requirements: [
@@ -88,11 +89,11 @@ const PERIOD_CONTRACT: Record<PeriodKind, {
   },
   annual: {
     objective: '연중 구조적 배경과 큰 전환을 읽는다. 장기 배경과 일시적 촉발을 분리하고 분기·월 단위의 변화를 설명한다.',
-    sequence: ['올해의 구조적 테마', '1분기', '2분기', '3분기', '4분기', '장기 배경', '일시적 촉발', '올해의 우선순위'],
+    sequence: ['올해의 구조적 테마와 제한', '실제 구간 근거가 있는 장기 배경', '날짜 표본의 일시적 촉발', '확인된 변화 또는 유지', '올해의 우선순위'],
     evidence_priority: ['long-running transit context', 'monthly trajectory', 'quarter changes', 'dated peaks as supporting detail'],
     forbidden: ['좋은 날짜 TOP 목록을 본문 중심으로 사용', '일일 행동문구를 연간 조언으로 확대', '짧은 접촉을 연중 지속으로 추정'],
     distinctive_requirements: [
-      '장기 배경과 분기별 전환을 먼저 설명하고 특정 하루는 보조 근거로만 쓴다.',
+      '장기 배경은 실제 구간 근거가 있을 때만 설명한다. 네 분기나 전환을 의무적으로 채우지 않고, 특정 하루의 근거만 있으면 그 날의 표본이라는 한계를 밝힌다.',
       '연간 조언은 한 해 동안 반복해서 확인할 기준으로 작성한다.',
     ],
     granularity: 'quarters-and-months',
@@ -105,6 +106,10 @@ function dateOnly(value: unknown): string { return text(value).match(/\b\d{4}-\d
 
 export function normalizePeriodKind(value: unknown): PeriodKind {
   return KIND_ALIASES[text(value)] ?? 'annual'
+}
+
+function evidenceTopics(row: EvidenceRow): string[] {
+  return uniq([text(row.topic), ...(row.source_topics ?? []).map(text)].filter(Boolean))
 }
 
 function evidenceDate(row: EvidenceRow): string {
@@ -145,7 +150,7 @@ function roleFor(rows: EvidenceRow[]): PhenomenonCluster['role'] {
 function salienceFor(rows: EvidenceRow[], role: PhenomenonCluster['role']): number {
   const refs = uniq(rows.map(row => text(row.id)).filter(Boolean)).length
   const dates = uniq(rows.map(evidenceDate).filter(Boolean)).length
-  const topics = uniq(rows.map(row => text(row.topic)).filter(Boolean)).length
+  const topics = uniq(rows.flatMap(evidenceTopics)).length
   const explicitObservation = rows.some(row => Boolean(row.observation?.transit && row.observation?.target && row.observation?.aspect))
   return refs * 3 + dates * 4 + topics * 2 + (explicitObservation ? 6 : 0) + (role === 'tension' ? 5 : 0)
 }
@@ -170,7 +175,7 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
       role,
       systems: uniq(rows.map(row => text(row.system)).filter(Boolean)),
       dates,
-      topics: uniq(rows.map(row => text(row.topic)).filter(Boolean)),
+      topics: uniq(rows.flatMap(evidenceTopics)),
       directions: uniq(rows.map(row => text(row.direction)).filter(Boolean)),
       evidence_refs: refs,
       evidence_count: refs.length,
@@ -230,6 +235,7 @@ export function buildPeriodNarrativeContext(payload: any) {
       '먼저 현상 묶음을 읽고 그 다음 어떤 분야에 나타나는지 설명한다.',
       'topic 점수는 중요도와 강약의 보조정보이지 서사의 출발점이 아니다.',
       '같은 천체 구성이 여러 날짜에 반복되면 여러 개의 독립 근거처럼 부풀리지 않는다.',
+      '여러 날짜의 표본 사이가 연속적으로 같은 상태였다는 뜻은 아니다. background는 묶음 분류일 뿐 지속기간 증명이 아니다.',
       'Western·사주·Thai는 독립 체계로 유지하며 같은 시기라고 합산하거나 시너지로 단정하지 않는다.',
       '각 핵심 문단은 왜 그런지 → 어떻게 체감되는지 → 언제 두드러지는지 → 현실에서 무엇을 확인할지 순서로 쓴다.',
     ],
@@ -284,7 +290,7 @@ export function buildPeriodNarrativeInstruction(payload: any, includeLegacyEdito
 목표=${ctx.objective}
 시간해상도=${ctx.granularity}
 
-[반드시 따를 서사 순서]
+[기간별 설명 순서 · 근거 없는 단계는 생략]
 ${ctx.required_sequence.map((x, i) => `${i + 1}. ${x}`).join('\n')}
 
 [근거 우선순위]

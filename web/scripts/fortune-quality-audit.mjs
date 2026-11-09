@@ -194,7 +194,7 @@ function evaluateOne(row, mode) {
   }
   if (mode === 'live' && data && typeof data === 'object') {
     try {
-      const report = inspectInterpretationQuality(data, payload)
+      const report = inspectInterpretationQuality(data, payload, { requireDailyTimedDecision: false, allowEmptyDailyChangeCondition: true, periodReadingContract: ['week','month','annual'].includes(period) })
       for (const stage of report?.stages ?? []) {
         if (!stage?.passed) problems.push(issue('V23_QUALITY_STAGE_FAILED', 'error', {
           stage: Number(stage.stage),
@@ -242,7 +242,9 @@ function checkVisual(diagnostics) {
   if (diagnostics.systemCards?.length !== 3) issues.push(issue('VISUAL_SYSTEM_CARDS_MISSING'))
   if (Number(diagnostics.reunionOverflow) > 1) issues.push(issue('VISUAL_REUNION_OVERFLOW'))
   if (Number(diagnostics.birthRangeOverflow) > 1) issues.push(issue('VISUAL_BIRTH_RANGE_OVERFLOW'))
-  if (Number(diagnostics.downloadCount) !== 2) issues.push(issue('VISUAL_EXPORT_COUNT_MISMATCH'))
+  const expectedPages = Number(diagnostics.expectedPages)
+  const downloadCount = Number(diagnostics.downloadCount)
+  if (!Number.isInteger(expectedPages) || expectedPages < 2 || downloadCount !== expectedPages) issues.push(issue('VISUAL_EXPORT_COUNT_MISMATCH'))
   for (const width of diagnostics.mobileWidths ?? []) {
     if (Number(width.overflow) > 1 || width.stageOverlap) {
       issues.push(issue('VISUAL_MOBILE_LAYOUT', 'error', { width: Number(width.width) }))
@@ -252,7 +254,8 @@ function checkVisual(diagnostics) {
     status: issues.length ? 'failed' : 'passed',
     issues,
     screenshots: ['mobile-full.png', 'systems-mobile.png', 'interpretation-v2-mobile.png',
-      'reunion-mobile.png', 'export-source-mobile.png', 'saved-result-1.png', 'saved-result-2.png'],
+      'reunion-mobile.png', 'export-source-mobile.png',
+      ...Array.from({ length: Number.isInteger(expectedPages) && expectedPages > 0 ? expectedPages : 0 }, (_, index) => `saved-result-${index + 1}.png`)],
   }
 }
 export function evaluateCases(input, { mode = 'live', visual = null } = {}) {

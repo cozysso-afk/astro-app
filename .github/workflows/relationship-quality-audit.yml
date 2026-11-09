@@ -21,17 +21,17 @@ on:
   workflow_dispatch:
     inputs:
       confirm_paid_calls:
-        description: 'Type YES to permit up to 2 synthetic relationship Gemini jobs'
+        description: 'Type YES to permit up to 4 synthetic relationship Gemini jobs'
         required: true
         default: 'NO'
       max_jobs:
-        description: 'Maximum jobs (1-2)'
+        description: 'Maximum jobs (1-4)'
         required: true
-        default: '2'
+        default: '4'
       purposes:
-        description: 'Unique comma-separated subset of compatibility,reunion'
+        description: 'Unique comma-separated subset of compatibility,reunion,marriage_unmarried,marriage_married'
         required: true
-        default: 'compatibility,reunion'
+        default: 'compatibility,reunion,marriage_unmarried,marriage_married'
 
 permissions:
   contents: read
@@ -61,7 +61,7 @@ jobs:
         working-directory: web
 
   live-gemini-audit:
-    name: Manually approved compatibility and reunion Gemini audit
+    name: Manually approved relationship four-mode Gemini audit
     if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_calls == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 25
