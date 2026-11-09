@@ -71,8 +71,9 @@ test('invalid reunion prose is retried with Gemini and never composed locally',a
   assert.equal(h.writes[0].usage_json.call_trace[0].outcome,'validation_failed');
   assert.equal(h.writes[0].usage_json.call_trace[0].validation_stage,'reunion_grounding');
   assert.equal(h.writes[0].usage_json.call_trace[0].validation_reason,'invalid_question_evidence_refs');
-  assert.match(h.requests[1].contents[0].parts[0].text,/앞선 응답 검증 실패=reunion_grounding:invalid_question_evidence_refs/);
-  assert.match(h.requests[1].contents[0].parts[0].text,/why_reconnect\.evidence_refs는 다음 ID만 사용/);
+  assert.match(h.requests[1].contents[0].parts[0].text,/why_reconnect/);
+  const refFields=Object.values(h.requests[1].generationConfig.responseSchema.properties).filter(field=>field.type==='ARRAY');
+  assert.ok(refFields.length>0&&refFields.every(field=>field.items.enum?.length&&!field.items.enum.includes('NOT_REAL')));
   const reunionSchema=h.requests[0].generationConfig.responseSchema.properties.reunion_synthesis_v2.properties;
   assert.equal(reunionSchema.timing.properties.windows.maxItems,0);
   assert.equal(reunionSchema.consultation_answer.properties.evidence_refs.minItems,3);

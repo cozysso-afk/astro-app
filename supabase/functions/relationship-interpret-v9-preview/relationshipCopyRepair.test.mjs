@@ -16,3 +16,14 @@ test('a style-only rejection can be corrected without regenerating unrelated fie
  const plan=planRelationshipCopyRepair(draft,{},'reunion')
  assert.deepEqual(plan.targets.map(row=>row.path),[['core_reason']])
 })
+
+test('the author can repair a question citation using only its supplied evidence',()=>{
+ const draft={reunion_synthesis_v2:{why_reconnect:{conclusion:'이전에 나눈 대화를 떠올릴 수 있어.',evidence_refs:['invented']}}}
+ const matrix={questions:{why_reconnect:{evidence_refs:['E1']}},evidence:[{id:'E1',facts:['calculated']}]}
+ const plan=planRelationshipCopyRepair(draft,{reunion_evidence_v2:matrix},'reunion')
+ const reference=plan.targets.find(t=>t.evidence)
+ const reply=Object.fromEntries(plan.targets.map(t=>[t.id,t.evidence?['E1']:t.previous]))
+ assert.deepEqual(applyRelationshipCopyRepair(plan,reply).reunion_synthesis_v2.why_reconnect.evidence_refs,['E1'])
+ assert.throws(()=>applyRelationshipCopyRepair(plan,{...reply,[reference.id]:['invented']}))
+ assert.deepEqual(draft.reunion_synthesis_v2.why_reconnect.evidence_refs,['invented'])
+})

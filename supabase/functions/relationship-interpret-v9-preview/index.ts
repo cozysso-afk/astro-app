@@ -328,7 +328,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),115000),kind=compactMode?"semantic_rewrite":"initial";
  try{
   const prompt=copyRepair
-    ? `이 해설의 지정된 문장만 고쳐. 각 필드의 기존 근거와 조건을 보존하고 군더더기 없이 한국어로 답해. 먼저 일상적인 말로 판단 이유를 설명하고 전문 용어는 top_aspects에 남겨. 서로 원한다거나 마음을 안다고 쓰지 마. 과거 행동은 입력 기록이 있는 경우에만 과거로 표현해. 다음 연락 주체는 확인할 수 없고 연락·만남·재결합은 다른 단계야. 날짜와 근거 ID는 새로 만들지 마. TARGETS=${JSON.stringify(copyRepair.targets)}. 핵심 판단=${JSON.stringify(copyRepair.draft.core_summary)}. 확인 자료=${JSON.stringify({observation:payload.reunion_observation, stages:payload.reunion_hierarchy?.stages, questions:copyRepair.draft.reunion_synthesis_v2?.consultation_answer, aspects:copyRepair.draft.top_aspects})}`
+    ? `이 해설의 지정된 문장만 고쳐. 각 필드의 기존 근거와 조건을 보존하고 군더더기 없이 한국어로 답해. 먼저 일상적인 말로 판단 이유를 설명하고 전문 용어는 top_aspects에 남겨. 서로 원한다거나 마음을 안다고 쓰지 마. 과거 행동은 입력 기록이 있는 경우에만 과거로 표현해. 다음 연락 주체는 확인할 수 없고 연락·만남·재결합은 다른 단계야. 날짜와 근거 ID는 새로 만들지 마. evidence가 있는 항목은 주어진 근거 중 해당 질문의 판단을 직접 지지하는 ID만 배열로 반환해. TARGETS=${JSON.stringify(copyRepair.targets)}. 핵심 판단=${JSON.stringify(copyRepair.draft.core_summary)}. 확인 자료=${JSON.stringify({observation:payload.reunion_observation, stages:payload.reunion_hierarchy?.stages, questions:copyRepair.draft.reunion_synthesis_v2?.consultation_answer, aspects:copyRepair.draft.top_aspects})}`
     : promptText(payload,purpose,compactMode,repairHint);
   const responseSchema=copyRepair ? copyRepair.schema : schemaFor(purpose,payload);
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema,maxOutputTokens:relationshipOutputTokens(purpose,compactMode),temperature:.32,thinkingConfig:{thinkingLevel:purpose==="reunion"?"low":"medium"}}})});
@@ -347,7 +347,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
     const failure=validationFailure(model,u,"relationship_editorial",String(editorial.reason));
     if (!compactMode) {
       const grounding = purpose === "reunion" ? validateReunionGroundingV2(data,payload) : null;
-      if (!grounding || grounding.ok || ["insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
+      if (!grounding || grounding.ok || ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
         return {...failure,copyRepair:planRelationshipCopyRepair(authored,payload,purpose)};
       }
     }
@@ -355,7 +355,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
    }
    if(purpose==="reunion"){
     const validation=validateReunionGroundingV2(data,payload);
-    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
+    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
    }
    if(!grounded(data,payload,purpose,compactMode)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"grounded",purpose,model,compactMode}));return {...validationFailure(model,u,"grounded","insufficient_grounded_content"),copyRepair:compactMode ? null : planRelationshipCopyRepair(authored,payload,purpose)};}
    return {ok:true,data,model,interpreter_version:versionForPurpose(purpose),usage:u};
