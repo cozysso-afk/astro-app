@@ -42,3 +42,9 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+.tool-panel .counterpart-time-fields {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  gap: 12px;
+  padding: 12px;
+}

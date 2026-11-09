@@ -199,7 +199,10 @@ try {
       })
     })
     assert(!issues.length,'partner form clipped or only partly fills row at '+width+'px: '+issues.join(', '))
-    assert(await form.locator('.counterpart-time-note').count()===1,'duplicate birth time hint')
+    const settings = form.locator('.counterpart-time-settings')
+    await settings.locator('summary').click()
+    assert(await form.locator('.counterpart-time-note:visible').count()===1,'duplicate birth time hint')
+    await settings.locator('summary').click()
     await form.screenshot({path:path.join(outDir,'partner-form-'+width+'.png')})
   }
   const unknown = form.getByRole('checkbox')

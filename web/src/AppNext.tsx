@@ -1822,7 +1822,10 @@ export default function AppNext() {
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
               <label className="field birth-time-field"><span>출생시간</span><input type="time" value={counterpart.birthTime} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,birthTime:e.target.value})}/></label>
               <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime,timeSource:e.target.checked?'unknown':counterpart.timeSource,timeConfidence:e.target.checked?'unknown':counterpart.timeConfidence,rectifiedWindowStart:'',rectifiedWindowEnd:''})}/><span>상대 출생시간을 몰라요</span></label>
-              <BirthTimeReliabilityFields value={counterpart} disabled={!counterpart.timeKnown} concise onChange={(patch)=>setCounterpart({...counterpart,...patch})}/>
+              {counterpart.timeKnown ? <details className="advanced-panel field-wide counterpart-time-settings">
+                <summary>출생시간 출처와 가능한 시간 범위</summary>
+                <div className="counterpart-time-fields"><BirthTimeReliabilityFields value={counterpart} concise onChange={(patch)=>setCounterpart({...counterpart,...patch})}/></div>
+              </details> : <p className="field-wide counterpart-time-note">출생지는 선택할 수 있어요. 출생시간에 따라 달라지는 항목은 궁합에서 제외해요.</p>}
               <KoreaBirthplaceSelector value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
               <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
                 <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>

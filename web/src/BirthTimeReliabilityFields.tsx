@@ -285,7 +285,6 @@ export function BirthTimeReliabilityFields({ value, onChange, disabled = false, 
     onChange(patch)
   }
 
-  if (concise && disabled) return <p className="field-wide counterpart-time-note">출생지는 선택할 수 있어요. 출생시간에 따라 달라지는 항목은 궁합에서 제외해요.</p>
   return <>
     <div ref={firstFieldRef} className={`field ${compact ? '' : 'field-wide'}`}>
       <span>출생시간 출처</span>
