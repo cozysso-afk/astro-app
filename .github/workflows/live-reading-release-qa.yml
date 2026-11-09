@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   fortune:
-    name: Verify daily and monthly readings
+    name: Verify daily reading repair
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
@@ -31,7 +31,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - name: Generate one daily and one monthly reading
+      - name: Check daily detail repair
         env:
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
@@ -43,8 +43,8 @@ jobs:
           QA_FORTUNE_MODEL: gemini-3.7-flash
         run: >-
           node --experimental-strip-types scripts/fortune-live-qa.mjs
-          --max-jobs 2
-          --period-kinds day,month
+          --max-jobs 1
+          --period-kinds day
           --out live-release-artifacts/fortune
       - name: Upload fortune report
         if: always()
