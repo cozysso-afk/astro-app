@@ -246,13 +246,6 @@ function schemaFor(purpose:Purpose,payload:any=null){
    const timing=REUNION_V2_SCHEMA.properties.timing,windows=timing.properties.windows,item=windows.items;
    const constrainedTiming={...timing,properties:{...timing.properties,windows:{...windows,maxItems:exactDates.length?4:0,items:{...item,properties:{...item.properties,period:exactDates.length?{type:"STRING",enum:exactDates}:S}}}}};
    const properties={...REUNION_V2_SCHEMA.properties,timing:constrainedTiming};
-   for (const question of ["why_reconnect","initiative","timing","rebuild","repeat_risks"]) {
-     const allowed=payload?.reunion_evidence_v2?.questions?.[question]?.evidence_refs;
-     if (Array.isArray(allowed) && allowed.length) {
-       const section=properties[question];
-       properties[question]={...section,properties:{...section.properties,evidence_refs:{...REF_ARRAY,items:{type:"STRING",enum:[...new Set(allowed)]}}}};
-     }
-   }
    properties.summary={...S,description:"120자 이상. 입력한 현재 상태와 연락·만남·관계 회복 중 다음에 확인할 단계를 두세 문장으로 설명."};
    if (payload?.reunion_evidence_v2?.initiative_gate?.available !== true) {
      const direction={...S,description:"다음 선연락 주체를 판단할 수 없다는 근거 범위를 설명한다. 실제로 누가 먼저 행동할지 예측하지 않는다."};
