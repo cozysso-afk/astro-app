@@ -11,7 +11,7 @@ function splitSentences(value: unknown) {
   return source ? source.replace(/([.!?])\s+/g, '$1\n').split('\n').map(item => item.trim()).filter(Boolean) : []
 }
 
-function hasUnsupportedInitiativeDirection(value: unknown, observation?: any) {
+export function hasUnsupportedInitiativeDirection(value: unknown, observation?: any) {
   const blocked = /(?:누가\s*먼저|선연락|상대가\s*(?:먼저\s*)?(?:연락|메시지)|내가\s*(?:먼저\s*)?(?:연락|메시지)|상대측\s*활성|내측\s*활성|수신\s*신호|발신\s*적합|시작\s*압력|(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?[^.!?]{0,32}(?:먼저|앞서|우세)|(?:먼저|앞서|우세)[^.!?]{0,32}(?:내|나|상대)(?:\s*쪽|\s*방향|\s*측)?)/
   const uncertainty = /(?:정하기|판단하기|확정하기|예측하기)\s*(?:어려|힘들)|(?:알|확정할|예측할)\s*수\s*없|(?:선연락|먼저\s*연락|행동.{0,6}(?:주체|순서)).{0,20}(?:아니|의미하지|보여\s*주지|판정할 수 없)/
   return splitSentences(value).some(sentence => {

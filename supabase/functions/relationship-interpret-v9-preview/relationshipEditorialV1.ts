@@ -20,6 +20,10 @@ core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), 
 재회 core_summary/current_stage는 사용자 관측과 계산상 다음 후보를 구분한다. 관측 state가 없으면 현실 단계는 미확인이라고 명시한다. 있으면 입력 기록임을 밝히고 그 기록의 시점(as_of)이 없으면 현재까지 유지된다고 단정하지 않는다. 후보 없음은 실제 사건이 없었다는 뜻이 아니다. observed initiator는 기록된 과거 행동일 뿐 다음 선연락 주체 근거가 아니다.
 `
 
+export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
+
+export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
+
 const text = (v: unknown) => typeof v === 'string' ? v : ''
 const canonical = (v: string) => v.replace(/[\s.!?。]+/g, '')
 
@@ -33,7 +37,6 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   }
   const conditions = data?.core_conditions
   if (!Array.isArray(conditions) || conditions.length > 4 || conditions.some(v => !text(v).trim() || text(v).length > 240)) return fail('invalid_core_conditions')
-  const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const plainCore=text(data.headline)+' '+text(data.core_summary)
   if (technical.test(plainCore)) return fail('technical_terms_in_core_answer')
   const reasonLead=text(data.core_reason).split(/[.!?。]/)[0]
@@ -43,7 +46,6 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   if(styleFields.some(value=>/(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./.test(text(value)))) return fail('inconsistent_report_style')
   if(styleFields.some(value=>/(?:생활 가관|북수조점|예작|무필요)/.test(text(value)))) return fail('korean_copy_error')
   const allProse=JSON.stringify(data)
-  const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
   if(unobservedMind.test(allProse)) return fail('unobserved_mind_claim')
   if(/\d+\s*(?:분|시간|일)(?:간|\s*정도)?/.test(allProse))return fail('invented_exact_behavior_duration')
   if(/(?:대립각\([^)]*\bsquare\b|사각각\([^)]*\bopposition\b|삼각각\([^)]*\bsextile\b|육십분위\([^)]*\btrine\b)/i.test(allProse))return fail('aspect_translation_mismatch')

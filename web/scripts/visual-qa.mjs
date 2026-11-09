@@ -207,7 +207,7 @@ try {
   assert(!await form.getByRole('button',{name:'출생시간 신뢰도'}).count(),'inactive time precision is still visible')
   await unknown.uncheck()
   await form.getByRole('button',{name:'출생 시·도'}).click()
-  await formPage.getByRole('option').nth(1).click()
+  await formPage.getByRole('listbox',{name:'출생 시·도'}).getByRole('option').nth(1).click()
   assert(await form.getByRole('button',{name:'출생 시·군·구'}).isEnabled(),'district control did not activate')
   await formPage.close()
 
