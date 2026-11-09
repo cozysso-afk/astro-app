@@ -90,3 +90,11 @@ test('recorded direction may not be swapped and summary may not promote the obse
   data.core_summary='이미 재결합했으니 이제 생활을 맞추면 돼.'
   assert.equal(validateReunionGroundingV2(data,observed).reason,'promoted_observed_stage')
 })
+
+test('a chart comparison and an explicit inability to identify the next initiator are valid',()=>{
+ const data=reading()
+ data.reunion_synthesis_v2.initiative.conclusion='상대측 활성은 내측 활성보다 높아. 누가 먼저 연락할지는 판단할 수 없어.'
+ assert.equal(validateReunionGroundingV2(data,payload).ok,true)
+ data.reunion_synthesis_v2.initiative.conclusion='누가 먼저 연락할지는 판단할 수 없지만 상대가 먼저 연락할 가능성이 높아.'
+ assert.equal(validateReunionGroundingV2(data,payload).reason,'unsupported_initiative_direction')
+})

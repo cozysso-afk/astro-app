@@ -245,7 +245,22 @@ function schemaFor(purpose:Purpose,payload:any=null){
    const exactDates=[...new Set((Array.isArray(payload?.reunion_timing_windows?.windows)?payload.reunion_timing_windows.windows:[]).flatMap((x:any)=>[x?.date,x?.start,x?.end]).map((x:any)=>String(x??"")).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&(!asOf||x>=asOf)))];
    const timing=REUNION_V2_SCHEMA.properties.timing,windows=timing.properties.windows,item=windows.items;
    const constrainedTiming={...timing,properties:{...timing.properties,windows:{...windows,maxItems:exactDates.length?4:0,items:{...item,properties:{...item.properties,period:exactDates.length?{type:"STRING",enum:exactDates}:S}}}}};
-   const reunionSchema={...REUNION_V2_SCHEMA,properties:{...REUNION_V2_SCHEMA.properties,timing:constrainedTiming}};
+   const properties={...REUNION_V2_SCHEMA.properties,timing:constrainedTiming};
+   for (const question of ["why_reconnect","initiative","timing","rebuild","repeat_risks"]) {
+     const allowed=payload?.reunion_evidence_v2?.questions?.[question]?.evidence_refs;
+     if (Array.isArray(allowed) && allowed.length) {
+       const section=properties[question];
+       properties[question]={...section,properties:{...section.properties,evidence_refs:{...REF_ARRAY,items:{type:"STRING",enum:[...new Set(allowed)]}}}};
+     }
+   }
+   properties.summary={...S,description:"120자 이상. 입력한 현재 상태와 연락·만남·관계 회복 중 다음에 확인할 단계를 두세 문장으로 설명."};
+   if (payload?.reunion_evidence_v2?.initiative_gate?.available !== true) {
+     const direction={...S,description:"다음 선연락 주체를 판단할 수 없다는 근거 범위를 설명한다. 실제로 누가 먼저 행동할지 예측하지 않는다."};
+     properties.initiative={...properties.initiative,properties:{...properties.initiative.properties,conclusion:direction}};
+     const consultation=properties.consultation_answer;
+     properties.consultation_answer={...consultation,properties:{...consultation.properties,initiative:direction}};
+   }
+   const reunionSchema={...REUNION_V2_SCHEMA,properties};
    return {type:"OBJECT",properties:{...CORE_SCHEMA,headline:S,overview:S,timing:S,reunion_context:S,practical_advice:{type:"ARRAY",items:S,maxItems:4},top_aspects:{type:"ARRAY",items:{type:"OBJECT",properties:{label:S,meaning:S},required:["label","meaning"]},maxItems:10},limits:S,reunion_synthesis_v2:reunionSchema},required:[...CORE_KEYS,"headline","overview","timing","reunion_context","practical_advice","top_aspects","limits","reunion_synthesis_v2"]};
  }
  const properties:any={...COMMON_SCHEMA,...CORE_SCHEMA};const required=[...CORE_KEYS,"headline","overview","chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term","timing","reunion_context","felt_scenarios","practical_advice","top_aspects","limits"];
