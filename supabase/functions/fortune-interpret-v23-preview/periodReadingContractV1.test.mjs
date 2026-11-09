@@ -203,7 +203,7 @@ test('a rejected edit keeps the original action only when all period checks pass
  const recovered=retainValidPeriodFields(original,edited,'month',undefined)
  assert.equal(recovered.clusters[0].action,original.clusters[0].action)
  assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
- edited.headline=''
+ edited.clusters.pop()
  assert.equal(retainValidPeriodFields(original,edited,'month',undefined),edited)
 })
 test('checking a budget balance is a voluntary action, predicting a new bill still fails',()=>{
