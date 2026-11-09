@@ -341,11 +341,14 @@ function validationFailure(model:string,usageValue:any,stage:string,reason:strin
 async function sha(value:string){const digest=await crypto.subtle.digest("SHA-256",enc.encode(value));return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return `[${v.map(stable).join(",")}]`;return `{${Object.keys(v).sort().map(k=>`${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`;}
 
-async function generate(payload:any,purpose:Purpose,model:string,key:string,compactMode=false,repairHint=""){
+async function generate(payload:any,purpose:Purpose,model:string,key:string,compactMode=false,repairHint="",reasonDraft:any=null){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),115000),kind=compactMode?"semantic_rewrite":"initial";
  try{
-  const prompt=promptText(payload,purpose,compactMode,repairHint);
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schemaFor(purpose,payload),maxOutputTokens:relationshipOutputTokens(purpose,compactMode),temperature:.32,thinkingConfig:{thinkingLevel:purpose==="reunion"?"low":"medium"}}})});
+  const prompt=reasonDraft
+    ? `앞서 작성한 궁합·재회 해설에서 core_reason만 다시 써. 첫 문장은 일상적인 말로 이미 제시한 판단의 이유를 설명해. 행성명·각 이름은 top_aspects에 이미 있으므로 생략해. 속마음이나 실제 선연락 주체는 추가하지 마. 새 근거나 상황을 만들지 마. 기존 판단: ${JSON.stringify({summary:reasonDraft.core_summary,reason:reasonDraft.core_reason,aspects:reasonDraft.top_aspects})}`
+    : promptText(payload,purpose,compactMode,repairHint);
+  const responseSchema=reasonDraft ? {type:"OBJECT",properties:{core_reason:CORE_SCHEMA.core_reason},required:["core_reason"]} : schemaFor(purpose,payload);
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema,maxOutputTokens:relationshipOutputTokens(purpose,compactMode),temperature:.32,thinkingConfig:{thinkingLevel:purpose==="reunion"?"low":"medium"}}})});
   const rawText=await r.text();
   if(!r.ok)return publicRelationshipError("REL_GENERATION_FAILED",{model,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,call_trace:[{call:1,model,kind,http_status:r.status,finish_reason:"",outcome:"failed"}]}});
   let raw:any;
@@ -354,10 +357,20 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
   let txt=parts.filter((x:any)=>!x?.thought).map((x:any)=>x?.text??"").join("").trim()||parts.map((x:any)=>x?.text??"").join("").trim();
   txt=txt.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"");
   try{
-   const authored=JSON.parse(txt);const data=validate(authored,purpose);
+   const reply=JSON.parse(txt);const authored=reasonDraft ? {...reasonDraft,core_reason:reply.core_reason} : reply;const data=validate(authored,purpose);
    if(!data||!preservesAuthoredOutput(authored,data)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"single_author_shape",purpose,model,compactMode}));return validationFailure(model,u,"single_author_shape","authored_shape_changed");}
    const editorial=validateRelationshipEditorial(data,purpose);
-   if(!editorial.ok)return validationFailure(model,u,"relationship_editorial",String(editorial.reason));
+   if(!editorial.ok){
+    const failure=validationFailure(model,u,"relationship_editorial",String(editorial.reason));
+    if(!compactMode && editorial.reason==="technical_terms_lead_core_reason"){
+      // Inspect the unaffected fields before reserving the second call for a single field.
+      const otherFields={...data,core_reason:"두 사람의 대화 방식이 다를 때 확인할 점이 있어."};
+      if(validateRelationshipEditorial(otherFields,purpose).ok &&
+        (purpose!=="reunion" || validateReunionGroundingV2(otherFields,payload).ok) &&
+        grounded(data,payload,purpose,false)) return {...failure,reasonDraft:authored};
+    }
+    return failure;
+   }
    if(purpose==="reunion"){
     const validation=validateReunionGroundingV2(data,payload);
     if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return validationFailure(model,u,"reunion_grounding",reason);}
@@ -368,7 +381,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
  }catch(e){const outcome=e instanceof DOMException&&e.name==="AbortError"?"timeout":"failed";return publicRelationshipError(outcome==="timeout"?"REL_GENERATION_TIMEOUT":"REL_GENERATION_FAILED",{model,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,call_trace:[{call:1,model,kind,http_status:0,finish_reason:"",outcome}]}});}
  finally{clearTimeout(timer);}
 }
-async function calculate(payload:any,purpose:Purpose,preferred:string,key:string){let calls=0;const version=versionForPurpose(purpose);const first:any=await generate(payload,purpose,preferred,key,false);calls+=1;const firstUsage=first.usage??{};if(first.ok)return {...first,origin:"gemini",provenance_verified:true,usage:{...firstUsage,attempt_count:calls,generation_version:version}};if(calls>=MAX_GEMINI_CALLS)return {...first,usage:{...firstUsage,attempt_count:calls,generation_version:version}};const retryModel=preferred===DEFAULT_MODEL?FALLBACK_MODEL:preferred;const second:any=await generate(payload,purpose,retryModel,key,true,String(first.validation_hint??""));calls+=1;const total=addUsage(firstUsage,second.usage??{});if(second.ok)return {...second,origin:"gemini",provenance_verified:true,usage:{...total,attempt_count:calls,generation_version:version},...(retryModel!==preferred?{fallback_from:preferred}:{})};return publicRelationshipError(second.error_code??"REL_GENERATION_FAILED",{model:preferred,interpreter_version:version,usage:{...total,attempt_count:calls,generation_version:version}});}
+async function calculate(payload:any,purpose:Purpose,preferred:string,key:string){let calls=0;const version=versionForPurpose(purpose);const first:any=await generate(payload,purpose,preferred,key,false);calls+=1;const firstUsage=first.usage??{};if(first.ok)return {...first,origin:"gemini",provenance_verified:true,usage:{...firstUsage,attempt_count:calls,generation_version:version}};if(calls>=MAX_GEMINI_CALLS)return {...first,usage:{...firstUsage,attempt_count:calls,generation_version:version}};const retryModel=preferred===DEFAULT_MODEL?FALLBACK_MODEL:preferred;const second:any=await generate(payload,purpose,retryModel,key,true,String(first.validation_hint??""),first.reasonDraft??null);calls+=1;const total=addUsage(firstUsage,second.usage??{});if(second.ok)return {...second,origin:"gemini",provenance_verified:true,usage:{...total,attempt_count:calls,generation_version:version},...(retryModel!==preferred?{fallback_from:preferred}:{})};return publicRelationshipError(second.error_code??"REL_GENERATION_FAILED",{model:preferred,interpreter_version:version,usage:{...total,attempt_count:calls,generation_version:version}});}
 
 async function countJobs(admin:any,userId:string|null,since:string){let q=admin.from("ai_interpret_jobs").select("id",{count:"exact",head:true}).like("kind","supabase-relationship-v11%").gte("created_at",since);if(userId)q=q.eq("user_id",userId);const {count,error}=await q;if(error)throw error;return Number(count??0);}
 async function rollingGuard(admin:any,userId:string){const now=Date.now();const u10=await countJobs(admin,userId,new Date(now-10*60*1000).toISOString()),u24=await countJobs(admin,userId,new Date(now-24*60*60*1000).toISOString()),g10=await countJobs(admin,null,new Date(now-10*60*1000).toISOString()),g24=await countJobs(admin,null,new Date(now-24*60*60*1000).toISOString());if(u10>=MAX_USER_NEW_JOBS_10M)return `내 계정에서 10분 동안 새 관계 해설 ${MAX_USER_NEW_JOBS_10M}건 한도에 도달했어.`;if(u24>=MAX_USER_NEW_JOBS_24H)return `내 계정에서 24시간 새 관계 해설 ${MAX_USER_NEW_JOBS_24H}건 한도에 도달했어.`;if(g10>=MAX_GLOBAL_NEW_JOBS_10M)return `전체 10분 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_10M}건 안전 한도에 도달했어.`;if(g24>=MAX_GLOBAL_NEW_JOBS_24H)return `전체 24시간 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_24H}건 안전 한도에 도달했어.`;return "";}

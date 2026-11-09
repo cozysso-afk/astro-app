@@ -536,3 +536,14 @@ export async function deleteArchive(item: ArchiveItem) {
   const localDelete = persistLocal(loadLocal().filter((row) => row.id !== item.id))
   if (!localDelete.ok) throw new Error(localDelete.error)
 }
+
+export async function readCloudContactOutcomes(start: string, end: string): Promise<unknown[]> {
+  const auth = await ensureArchiveUser()
+  if (!auth.userId) throw new Error('클라우드 로그인이 필요해요.')
+  const query = supabase.from('readings').select('calculation_json')
+    .eq('user_id', auth.userId).eq('reading_type','outcome')
+    .gte('period_start',start).lte('period_start',end)
+  const response = await withArchiveTimeout(query, ARCHIVE_QUERY_TIMEOUT_MS, '연락 기록 조회가 지연되고 있어요.')
+  if (response.error) throw response.error
+  return (response.data ?? []).map(row => row.calculation_json?.result)
+}

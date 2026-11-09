@@ -2,7 +2,7 @@ export type RelationshipPurpose = 'compatibility' | 'reunion' | 'marriage_unmarr
 
 export const CORE_KEYS = ['core_summary', 'core_reason', 'core_action', 'core_conditions'] as const
 export const CORE_SCHEMA = {
-  core_summary: {type: 'STRING'}, core_reason: {type: 'STRING'}, core_action: {type: 'STRING'},
+  core_summary: {type: 'STRING'}, core_reason: {type: 'STRING', description: '첫 문장은 생활 속 상황과 쉬운 이유만 설명한다. 천체명과 각 이름은 top_aspects에 쓴다. 두 사람이 실제로 서로 무엇을 느끼는지 단정하지 않는다.'}, core_action: {type: 'STRING'},
   core_conditions: {type: 'ARRAY', items: {type: 'STRING'}, maxItems: 4},
 }
 

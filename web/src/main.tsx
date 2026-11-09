@@ -57,6 +57,7 @@ import './reunion-quality-v74.css'
 import './daily-reading-quality-v75.css'
 import './viewport-background-v60.css'
 import './reading-font-fix-v54.css'
+import './relationship-form.css'
 
 const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
 const host = typeof window !== 'undefined' ? window.location.hostname : ''

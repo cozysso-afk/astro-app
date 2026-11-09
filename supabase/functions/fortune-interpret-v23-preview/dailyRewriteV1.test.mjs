@@ -200,3 +200,12 @@ test('period application failures target the exact scene and preserve the condit
   assert.ok(request.paths.includes('clusters.0.action'))
   assert.ok(request.prompt.includes("반드시 '만약"))
 })
+
+test('mixed daily failures repair only the affected copy and retain evidence',()=>{
+ const candidate={headline:'직장 업무',overall:{summary:'계획을 조율해.'},clusters:[
+   {key:'relationship.contact_activation',conclusion:'대화에 좋은 에너지가 작용해.',real_scene:'시간을 정하면 이야기를 이어가기 좋아.',evidence_refs:['W:contact']},
+ ]}
+ const req=buildRoleNeutralHeroRewriteRequest(candidate,payload,{issues:['daily_overview_role_specific','daily_detail_abstract_repetition']})
+ assert.deepEqual(req.paths,['headline','overall.summary','clusters.0.conclusion'])
+ assert.deepEqual(applyDailyRewrite(candidate,req,{patches:req.paths.map(path=>({path,text:'편집한 문장'}))}).clusters[0].evidence_refs,['W:contact'])
+})

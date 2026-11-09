@@ -142,18 +142,29 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
     return {path:String(issue?.path??''),code:String(issue?.code??'')}
   })
   const allowed=new Set(['daily_overview_role_specific','daily_overview_abstract_or_typo','period_hero_not_plain_language','period_hero_role_assumption'])
+  const abstractDetails = payload?.period_kind === 'day' && parsed.some((issue:any)=>issue.code === 'daily_detail_abstract_repetition')
+  if (abstractDetails) allowed.add('daily_detail_abstract_repetition')
   if(!['day','week','month','annual'].includes(String(payload?.period_kind??''))||!parsed.length||parsed.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=['headline','overall.summary','overall.best_phase','overall.caution_phase'].filter(path=>typeof get(candidate,path)==='string'&&get(candidate,path).trim())
   if(!paths.includes('headline')||!paths.includes('overall.summary'))return null
+  if (abstractDetails) {
+    for (const [i,row] of (candidate.clusters ?? []).entries()) {
+      if (row.applicability === 'insufficient') continue
+      for (const field of ['conclusion','real_scene','action']) {
+        if (/기류|에너지|작용/.test(row[field] || '')) paths.push(`clusters.${i}.${field}`)
+      }
+    }
+    if (paths.length > 32) return null
+  }
   const rows=(Array.isArray(candidate?.clusters)?candidate.clusters:[]).filter((row:any)=>row?.applicability!=='insufficient').slice(0,8).map((row:any)=>({key:row?.key,conclusion:row?.conclusion,real_scene:row?.real_scene,evidence_refs:row?.evidence_refs}))
   return {paths,targets:paths.map(path=>({path,previous_text:get(candidate,path)})),schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[ROLE-NEUTRAL HERO EDIT]
-전체 해설을 다시 쓰지 말고 첫 화면 문장만 편집해. patches에 TARGETS의 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
+전체 해설을 다시 쓰지 말고 지정한 첫 화면 문장과 TARGETS에 포함된 상세 문장만 편집해. 상세 문장의 기류·에너지·작용은 그 분야의 기존 근거가 뜻하는 구체적인 상황으로 풀어 써. patches에 TARGETS의 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
 이 원고에는 사용자의 직업·학업·시험·이직·투자·연애 상태 정보가 없다. headline, overall.summary, overall.best_phase, overall.caution_phase에서 직장·업무·실무·출근·퇴근·학업·공부·시험·이직·투자·매수·매도·연애·연락·재회·금전·컨디션을 사용자의 실제 일정처럼 쓰거나 분야 목록으로 나열하지 마.
 기류·에너지·작용·조율·정돈·신중하게·균형이 중요 같은 추상어만으로 결론을 만들지 마. 행성명·각 이름·영문 전문어·사주 용어도 쓰지 마.
 대신 기존 원고와 분야 결론이 공통으로 말하는 실제 대상을 하나 골라, 약속·요청·지출·휴식·대화·선택 기준처럼 역할과 무관한 생활 장면으로 바꿔. 근거에 없는 사건·성과·상대 행동은 새로 만들지 마.
 headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.summary는 제목을 반복하지 말고 적용 상황과 이유를 두 문장, 80~180자 정도로 설명해. best_phase와 caution_phase도 분야명이 아니라 무엇을 할 때 판단이 달라지는지 짧게 써.
-기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
+첫 화면 네 문장에는 직장·업무·실무·학업·공부·시험·이직·투자·매수·매도·연애·재회·금전·컨디션이라는 분야명을 넣지 마. 기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}
 FIELD_CONCLUSIONS=${JSON.stringify(rows)}

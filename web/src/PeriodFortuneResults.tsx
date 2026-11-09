@@ -6,6 +6,7 @@ import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { CheckCircle2, ImageDown, LoaderCircle } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
+import { ContactOutcomeReading } from './ContactOutcomeReading'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
@@ -38,6 +39,7 @@ type PeriodFortuneResultsProps = {
   bestDays: HighlightPoint[]
   cautionDays: HighlightPoint[]
   activeDayun: ActiveDayun | null
+  outcomeRecords?: DailyOutcomeRecord[]
   outcomeDraft: DailyOutcomeRecord
   outcomeSaved: boolean
   outcomeCalibration: OutcomeCalibration
@@ -76,6 +78,7 @@ export function PeriodFortuneResults({
   bestDays,
   cautionDays,
   activeDayun,
+  outcomeRecords,
   outcomeDraft,
   outcomeSaved,
   outcomeCalibration,
@@ -157,15 +160,16 @@ export function PeriodFortuneResults({
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>외부 연락 반응 신호와 내 연락 실행 적합도는 서로 다른 계산축이야. 특정 상대가 먼저 연락할 사람을 판정하지는 않아.</p></aside>}
     <SystemReadingViews initialSystem={initialSystem} onSystemChange={setSelectedSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails} onRetry={aiLoading?undefined:onRetryAi}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>}
+      {outcomeRecords && <ContactOutcomeReading calculation={result} localRecords={outcomeRecords}/>}
     </></SystemReadingViews>
     {field?.id==='love'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}
     <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
-    {period==='today' && <details className="reading-outcome"><summary>오늘의 체감 기록하기</summary><DailyOutcomeCard
+    {period==='today' && <div className="reading-outcome"><DailyOutcomeCard
       draft={outcomeDraft}
       saved={outcomeSaved}
       calibration={outcomeCalibration}
       onChange={onOutcomeChange}
       onSave={onSaveOutcome}
-    /></details>}
+    /></div>}
   </div>
 }

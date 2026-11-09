@@ -21,7 +21,8 @@ function providerStage(result) {
   const success = trace.some(row => row?.outcome === 'success' && Number(row?.http_status) >= 200 && Number(row?.http_status) < 300 && row?.finish_reason === 'STOP')
   const issues = []
   if (result?.origin !== 'gemini' || result?.provenance_verified !== true) issues.push('GEMINI_PROVENANCE_UNVERIFIED')
-  if (!/^relationship-v(?:12\.0|14\.[0-3])-gemini-single-author$/.test(text(result?.interpreter_version))) issues.push('GENERATION_VERSION_INVALID')
+  const currentVersions = ['relationship-v12.7-grounded-question-reading-contract', 'relationship-v14.10-grounded-stage-question-reading-contract']
+  if (!currentVersions.includes(text(result?.interpreter_version)) && !/^relationship-v(?:12\.0|14\.[0-3])-gemini-single-author$/.test(text(result?.interpreter_version))) issues.push('GENERATION_VERSION_INVALID')
   if (usage.generation_version !== result?.interpreter_version) issues.push('STORED_VERSION_MISMATCH')
   if (!success) issues.push('SUCCESSFUL_CALL_TRACE_MISSING')
   return stage(1, issues)

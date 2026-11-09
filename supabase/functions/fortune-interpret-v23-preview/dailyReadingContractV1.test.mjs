@@ -90,3 +90,8 @@ test('optional authored detail must be complete and insufficient cannot hide aut
  d.clusters.at(-1).applicability='insufficient'
  assert.ok(inspectDailyProviderDocument(d,'day').issues.includes('daily_insufficient_with_prose:investment.entry'))
 })
+
+test('ordinary contact does not assign the reader a relationship or profession',()=>{
+ const d=core(); d.headline='약속 시간을 바꾸려면 먼저 연락해 두는 게 좋아.'
+ assert.equal(inspectDailyProviderDocument(d,'day').passed,true)
+})
