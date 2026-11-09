@@ -105,3 +105,11 @@ test('the words 나 and 내 inside other words do not predict an initiator',()=>
  data.practical_advice=['정리되지 않은 장문의 메시지를 먼저 보내지 마.']
  assert.equal(validateReunionGroundingV2(data,payload).ok,true)
 })
+
+test('discussing whether to send a message is not a prediction about who will initiate',()=>{
+ const d=reading()
+ d.core_action='내가 먼저 연락할지 고민한다면, 실제로 대화를 나눌 상황인지 확인해.'
+ assert.equal(validateReunionGroundingV2(d,payload).ok,true)
+ d.core_action='상대방이 먼저 연락을 취할 가능성이 높아.'
+ assert.equal(validateReunionGroundingV2(d,payload).reason,'unsupported_initiative_direction')
+})

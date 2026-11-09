@@ -58,7 +58,7 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
     }
   }
   if (!targets.length || targets.length>24) return null
-  const schema = {type:'OBJECT',properties:Object.fromEntries(targets.map(t=>[t.id,t.evidence ? {type:'ARRAY',items:{type:'STRING',enum:t.evidence.map(e=>e.id)},minItems:1,maxItems:Math.min(4,t.evidence.length)} : {type:'STRING'}])),required:targets.map(t=>t.id)}
+  const schema = {type:'OBJECT',properties:Object.fromEntries(targets.map(t=>[t.id,t.evidence ? {type:'ARRAY',items:{type:'STRING',enum:t.evidence.map(e=>e.id)},minItems:1,maxItems:Math.min(4,t.evidence.length)} : {type:'STRING',description:t.issues.join('. ')}])),required:targets.map(t=>t.id)}
   return {draft,targets,schema}
 }
 
