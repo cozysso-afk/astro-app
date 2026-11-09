@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
   relationship:
-    name: Fresh Gemini compatibility-reunion-marriage
+    name: Check partner and reunion interpretation with dated evidence
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
