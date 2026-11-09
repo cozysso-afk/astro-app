@@ -10,3 +10,9 @@ test('one edit can fix the reason and disputed intent without rewriting the rest
  assert.deepEqual(patched.nested,draft.nested)
  assert.throws(()=>applyRelationshipCopyRepair(plan,{field_0:'한 문장'}))
 })
+
+test('a style-only rejection can be corrected without regenerating unrelated fields',()=>{
+ const draft={core_reason:'대화 속도가 다를 수 있다. 일정을 맞추는 데 확인이 필요하다.',core_summary:'조건이 달라질 수 있어.'}
+ const plan=planRelationshipCopyRepair(draft,{},'reunion')
+ assert.deepEqual(plan.targets.map(row=>row.path),[['core_reason']])
+})

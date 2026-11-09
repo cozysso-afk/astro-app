@@ -1,4 +1,4 @@
-import { hasCondition, hasInventedDuration, technical, unobservedMind } from './relationshipEditorialV1.ts'
+import { copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, unobservedMind } from './relationshipEditorialV1.ts'
 import { hasUnsupportedInitiativeDirection } from './reunionGroundingV2.ts'
 
 type Target = { id: string; path: string[]; previous: string; issues: string[] }
@@ -16,6 +16,8 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
       if (key === 'reunion_synthesis_v2.summary' && value.trim().length < 120) issues.push('120자 이상으로 입력된 관계 상태와 연락·만남·재구축 중 확인할 다음 단계를 구체적으로 설명')
       if (path[0] === 'core_conditions' && !hasCondition(value)) issues.push('행동 지시 대신, 기존 근거에서 판단이 달라지는 조건을 ~하면 또는 ~할 때로 설명')
       if (hasInventedDuration(value)) issues.push('근거 없는 대기 시간·행동 기간을 삭제')
+      if (reportStyle.test(value)) issues.push('내용은 유지하고 보고서체 종결을 자연스러운 반말로 바꿔')
+      if (copyTypo.test(value)) issues.push('잘못된 한국어 표현을 바로잡아')
       if (unobservedMind.test(value)) issues.push('현재 속마음이나 의지를 단정하지 말고 확인 가능한 조건을 설명')
       if (purpose === 'reunion' && !payload?.reunion_evidence_v2?.initiative_gate?.available &&
           hasUnsupportedInitiativeDirection(value,payload?.reunion_observation)) issues.push('미래 선연락 주체는 알 수 없다고 설명')
