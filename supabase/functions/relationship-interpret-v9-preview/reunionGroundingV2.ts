@@ -121,11 +121,11 @@ export function validateReunionGroundingV2(data: any, payload: any): ReunionGrou
     ['why_reconnect', source?.why_reconnect?.evidence_refs], ['initiative', source?.initiative?.evidence_refs],
     ['timing', source?.timing?.evidence_refs], ['rebuild', source?.rebuild?.evidence_refs], ['repeat_risks', source?.repeat_risks?.evidence_refs],
   ]
-  if (questionSections.some(([question, value]) => !validateQuestionRefs(value, payload, question))) return {ok: false, data, reason: 'invalid_question_evidence_refs'}
+  if (questionSections.some(([question, value]) => !validateQuestionRefs(value, payload, question) || !validateRefs(value, valid))) return {ok: false, data, reason: 'invalid_question_evidence_refs'}
   if (!validateRefs(consultation?.evidence_refs, valid, 3)) return {ok: false, data, reason: 'invalid_consultation_evidence_refs'}
   const timingGate = allowedTimingDateGate(payload)
   for (const window of arr(source?.timing?.windows)) {
-    if (!validateQuestionRefs(window?.evidence_refs, payload, 'timing')) return {ok: false, data, reason: 'invalid_timing_evidence_refs'}
+    if (!validateQuestionRefs(window?.evidence_refs, payload, 'timing') || !validateRefs(window?.evidence_refs, valid)) return {ok: false, data, reason: 'invalid_timing_evidence_refs'}
     if (!timingWindowAllowed(window, timingGate)) return {ok: false, data, reason: 'unsupported_timing_window'}
   }
   for (const convergence of arr(source?.convergence)) if (!validateRefs(convergence?.evidence_refs, valid, 2)) return {ok: false, data, reason: 'invalid_convergence_evidence_refs'}

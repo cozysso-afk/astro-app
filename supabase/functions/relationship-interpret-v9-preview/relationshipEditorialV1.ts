@@ -27,6 +27,12 @@ export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두
 export const reportStyle = /(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./
 export const copyTypo = /(?:생활 가관|북수조점|예작|무필요)/
 
+const sajuTerms = ["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"]
+export function unsupportedSajuTerm(value: string, source: string) {
+  return sajuTerms.find(term => !source.includes(term) && value.split(/[.!?。\n]/).some(sentence =>
+    sentence.includes(term) && !/(?:계산|판단|확인|제공)(?:할 수 없|하지 않|되지 않|되지 않았|하지 않았)/.test(sentence)))
+}
+
 export function hasCondition(value: string) {
   return /(?:[가-힣]면(?:[ ,.]|$)|경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(value)
 }

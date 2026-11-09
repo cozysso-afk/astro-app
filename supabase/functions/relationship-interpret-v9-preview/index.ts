@@ -6,7 +6,7 @@ import type { RelationshipErrorCode } from "./publicError.ts";
 import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { validateReunionGroundingV2 } from "./reunionGroundingV2.ts";
 import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relationshipCopyRepair.ts";
-import { CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
+import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
 const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.7-grounded-question-reading-contract";
 const REUNION_VERSION="relationship-v14.10-grounded-stage-question-reading-contract";
@@ -271,19 +271,9 @@ function cleanReunionV2(v:any){return {summary:cut(v?.summary,3200),consultation
 function validate(o:any,p:Purpose){if(!o||typeof o!=="object")return null;const rr=o.reunion_reading??{},rv2=o.reunion_synthesis_v2??{},mr=o.marriage_reading??{};const out:any={core_summary:o.core_summary,core_reason:o.core_reason,core_action:o.core_action,core_conditions:o.core_conditions,headline:cut(o.headline,450),overview:cut(o.overview,6500),chemistry:cut(o.chemistry,4200),emotional_dynamic:cut(o.emotional_dynamic,4200),communication:cut(o.communication,4200),conflict_pattern:cut(o.conflict_pattern,4200),power_boundaries:cut(o.power_boundaries,3800),long_term:cut(o.long_term,4500),timing:cut(o.timing,3500),reunion_context:cut(o.reunion_context,3500),felt_scenarios:Array.isArray(o.felt_scenarios)?o.felt_scenarios.slice(0,4).map((x:any)=>cut(x,1300)):[],reunion_reading:{bottom_line:cut(rr.bottom_line,4500),contact_recontact:cut(rr.contact_recontact,4000),emotional_reactivation:cut(rr.emotional_reactivation,4000),relationship_rebuilding:cut(rr.relationship_rebuilding,4500),incoming_contact:cut(rr.incoming_contact,4000),outgoing_contact:cut(rr.outgoing_contact,3500),reconnection_windows:cut(rr.reconnection_windows,6000),low_windows:cut(rr.low_windows,3500),relationship_filter:cut(rr.relationship_filter,4500),precision_note:cut(rr.precision_note,1800)},reunion_synthesis_v2:cleanReunionV2(rv2),marriage_reading:{mode:cut(mr.mode,80),bottom_line:cut(mr.bottom_line,4800),bond:cut(mr.bond,4200),emotional_home:cut(mr.emotional_home,4200),daily_life:cut(mr.daily_life,4800),intimacy_resources:cut(mr.intimacy_resources,4600),conflict_repair:cut(mr.conflict_repair,4200),commitment_or_current_cycle:cut(mr.commitment_or_current_cycle,4200),timing:cut(mr.timing,3800),caution:cut(mr.caution,3800),precision_note:cut(mr.precision_note,1800)},practical_advice:Array.isArray(o.practical_advice)?o.practical_advice.slice(0,4).map((x:any)=>cut(x,1200)):[],top_aspects:Array.isArray(o.top_aspects)?o.top_aspects.slice(0,10).map((x:any)=>({label:cut(x?.label,500),meaning:cut(x?.meaning,1800)})):[],limits:cut(o.limits,2200)};if(p!=="reunion"){out.reunion_reading={bottom_line:"",contact_recontact:"",emotional_reactivation:"",relationship_rebuilding:"",incoming_contact:"",outgoing_contact:"",reconnection_windows:"",low_windows:"",relationship_filter:"",precision_note:""};out.reunion_synthesis_v2=cleanReunionV2({});}if(!p.startsWith("marriage_"))out.marriage_reading={mode:"",bottom_line:"",bond:"",emotional_home:"",daily_life:"",intimacy_resources:"",conflict_repair:"",commitment_or_current_cycle:"",timing:"",caution:"",precision_note:""};return out;}
 
 function grounded(data:any,payload:any,p:Purpose,relaxed=false){
- const all=JSON.stringify(data),src=JSON.stringify(payload);
- const forbidden=["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"];
- for(const word of forbidden)if(all.includes(word)&&!src.includes(word))return false;
- const unknownTime=payload?.precision?.partner_time_exact===false;
- const scale=relaxed?.60:(unknownTime?.72:1);
- const need=(n:number)=>Math.max(40,Math.floor(n*scale));
- if(p==="reunion"){
-   const v2=data?.reunion_synthesis_v2??{};
-   const validEvidenceRefs=new Set((payload?.reunion_evidence_v2?.evidence??[]).map((x:any)=>String(x?.id??"")).filter(Boolean));
-   const refs=[...(v2?.consultation_answer?.evidence_refs??[]),...(v2?.why_reconnect?.evidence_refs??[]),...(v2?.initiative?.evidence_refs??[]),...(v2?.timing?.evidence_refs??[]),...(v2?.rebuild?.evidence_refs??[]),...(v2?.repeat_risks?.evidence_refs??[]),...(v2?.timing?.windows??[]).flatMap((x:any)=>x?.evidence_refs??[]),...(v2?.convergence??[]).flatMap((x:any)=>x?.evidence_refs??[])];
-   const distinctValidRefs=new Set(refs.map((x:any)=>String(x)).filter((x:string)=>validEvidenceRefs.has(x)));
-   if(String(v2?.summary??"").length<need(180)||refs.some((x:any)=>!validEvidenceRefs.has(String(x)))||distinctValidRefs.size<3)return false;
- }
+ // Reunion already passed the section, date, evidence and direction checks
+ // in validateReunionGroundingV2. Use the same 120-character summary contract.
+ if(unsupportedSajuTerm(JSON.stringify(data),JSON.stringify(payload)))return false;
  if(p==="compatibility"){
    if(!String(data.overview??"").trim())return false;
    for(const k of ["chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term"])
@@ -296,22 +286,6 @@ function grounded(data:any,payload:any,p:Purpose,relaxed=false){
    if(!String(m.bottom_line??"").trim())return false;
    for(const k of ["bond","emotional_home","daily_life","intimacy_resources","conflict_repair","commitment_or_current_cycle","timing","caution"])
      if(!String(m[k]??"").trim())return false;
- }
- if(p==="reunion"){
-   const r=data.reunion_synthesis_v2??{};
-   const whyConclusion=String(r?.why_reconnect?.conclusion??"").trim();
-   const whyInterpretation=String(r?.why_reconnect?.interpretation??"").trim();
-   // Grounding is a safety/traceability gate, not a prose-length score. The repair
-   // layer already guarantees these core sections and valid evidence refs. Do not
-   // discard a grounded Gemini answer merely because it is shorter than the style target.
-   if(String(r?.summary??"").trim().length<120)return false;
-   const consultation=r?.consultation_answer??{};
-   if(["current_stage","contact_type_if_any","initiative","continuity","meeting_gate","rebuild_gate","behavior_change_evidence"].some(key=>String(consultation?.[key]??"").trim().length<12))return false;
-   if(!(consultation?.next_stage_up_conditions?.length)||!(consultation?.down_conditions?.length)||!(consultation?.repeat_risks?.length))return false;
-   if(whyConclusion.length<12||whyInterpretation.length<24)return false;
-   if(String(r?.timing?.conclusion??"").trim().length<12)return false;
-   if(String(r?.rebuild?.conclusion??"").trim().length<12)return false;
-   if(String(r?.repeat_risks?.conclusion??"").trim().length<12)return false;
  }
  return true;
 }

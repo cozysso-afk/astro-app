@@ -1,4 +1,4 @@
-import { copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, unobservedMind } from './relationshipEditorialV1.ts'
+import { unsupportedSajuTerm, copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, unobservedMind } from './relationshipEditorialV1.ts'
 import { hasUnsupportedInitiativeDirection } from './reunionGroundingV2.ts'
 
 type Target = { id: string; path: string[]; previous: string; issues: string[] }
@@ -7,6 +7,7 @@ type Target = { id: string; path: string[]; previous: string; issues: string[] }
 // replace those prose fields, never IDs, scores, timing windows or observations.
 export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string) {
   const targets: Target[] = []
+  const source=JSON.stringify(payload)
   function visit(value:any,path:string[]) {
     if (typeof value === 'string') {
       const key = path.join('.')
@@ -15,6 +16,8 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
       if (key === 'core_reason' && technical.test(value.split(/[.!?。]/)[0])) issues.push('첫 문장은 전문 용어 없이 판단 이유만 설명')
       if (key === 'reunion_synthesis_v2.summary' && value.trim().length < 120) issues.push('120자 이상으로 입력된 관계 상태와 연락·만남·재구축 중 확인할 다음 단계를 구체적으로 설명')
       if (path[0] === 'core_conditions' && !hasCondition(value)) issues.push('행동 지시 대신, 기존 근거에서 판단이 달라지는 조건을 ~하면 또는 ~할 때로 설명')
+      const term = unsupportedSajuTerm(value,source)
+      if (term) issues.push(`계산에서 제공하지 않은 사주 근거 ${term}을 제거하고 확인된 근거만 설명`)
       if (hasInventedDuration(value)) issues.push('근거 없는 대기 시간·행동 기간을 삭제')
       if (reportStyle.test(value)) issues.push('내용은 유지하고 보고서체 종결을 자연스러운 반말로 바꿔')
       if (copyTypo.test(value)) issues.push('잘못된 한국어 표현을 바로잡아')
