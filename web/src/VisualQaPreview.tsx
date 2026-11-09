@@ -6,6 +6,7 @@ import { westernRankCopy } from './lib/westernRankCopy'
 import { useEffect, useRef, useState } from 'react'
 import { exportReadingImages } from './lib/readingImageExport'
 import { installReadingPresentationV5 } from './lib/readingPresentationV5'
+import App from './AppNext'
 import { BirthTimeReliabilityFields } from './BirthTimeReliabilityFields'
 import type { BirthProfile } from './appTypes'
 
@@ -41,6 +42,10 @@ function TopicCard({
 }
 
 export function VisualQaPreview() {
+  if (new URLSearchParams(location.search).get('screen') === 'partner-form') return <App/>
+  return <ReadingFixtures/>
+}
+function ReadingFixtures() {
   const exportRoot = useRef<HTMLElement | null>(null)
   const [ready, setReady] = useState(false)
   const [exportState, setExportState] = useState('idle')

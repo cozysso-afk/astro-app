@@ -42,7 +42,8 @@ export function DailyReadingPanel({data,date,field,verified,technicalDetails,onR
     ? (doc.slots ?? []).filter(slot => relationshipLabels[slot.id])
     : []
   const featuredIds = new Set(featured.map(slot => slot.id))
-  const otherDetails = doc.details.filter(block => !featuredIds.has(block.id.split(':')[0]))
+  const directions = doc.details.filter(block=>block.id.startsWith('direction:'))
+  const otherDetails = doc.details.filter(block => !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
   return <section className="daily-reading" data-daily-scope={doc.scope} data-daily-state={doc.state}>
     <header className="daily-reading-heading"><span>{doc.title}</span><time dateTime={date}>{date}</time></header>
     {doc.state === 'ready' ? <>
@@ -51,6 +52,9 @@ export function DailyReadingPanel({data,date,field,verified,technicalDetails,onR
       <button className="daily-reading-save" type="button" disabled={saving} onClick={save}>{saving?'이미지 만드는 중…':'핵심 해설 이미지 저장'}</button>
       {notice&&<p className="daily-reading-notice" role="status">{notice}</p>}
     </> : <p className="daily-reading-state">{{unverified:'확인된 해설을 아직 불러오지 못했어.',missing:'이 분야의 해설이 아직 완성되지 않았어.',insufficient:'이번 해설에서는 이 분야에 답할 근거를 충분히 연결하지 못했어.',needs_refresh:'기존 해설의 길이나 내용 중복을 다시 확인해야 해. 해설을 새로 불러와줘.'}[doc.state]}</p>}
+    {directions.map(block=><section className="daily-reading-block" key={block.id} data-daily-detail={block.id}>
+      <h4>{block.label}</h4><p>{block.text}</p>
+    </section>)}
     {featured.map(slot => {
       const label = relationshipLabels[slot.id]
       if (slot.state !== 'ready') {

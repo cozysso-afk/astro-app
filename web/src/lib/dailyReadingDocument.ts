@@ -46,6 +46,13 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     doc.details=sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
       {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
     ])
+    if (field.topics.includes('연락')) {
+      for (const [key,label] of [['incoming','연락을 받을 흐름'],['outgoing','내가 먼저 연락할 조건'],['reconnection','과거 인연과 다시 연락할 흐름']] as const) {
+        if (key === 'reconnection' && !field.topics.includes('재회')) continue
+        const value = clean(data.contact_flow?.[key])
+        if (value) doc.details.push({id:`direction:${key}`,label,text:value})
+      }
+    }
     const answers = (data.domain_answers ?? []).filter(a=>field.topics.includes(a.topic) && a.status !== 'not_calculated' && a.evidence_refs?.length && clean(a.answer))
     doc.details.push(...answers.map(a=>({id:`question:${a.topic}:${a.question_key}`,label:a.label,text:a.answer})))
     // The primary question must be answered; never promote a secondary subject.
