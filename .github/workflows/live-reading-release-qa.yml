@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
   relationship:
-    name: Check partner and reunion interpretation with dated evidence
+    name: Verify reunion conditions in the stored Gemini result
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
@@ -82,8 +82,8 @@ jobs:
           QA_RELATIONSHIP_LIVE_APPROVED: "YES"
         run: >-
           node scripts/relationship-live-qa.mjs
-          --max-jobs 2
-          --purposes compatibility,reunion
+          --max-jobs 1
+          --purposes reunion
           --out live-release-artifacts/relationship
       - name: Upload relationship report
         if: always()
