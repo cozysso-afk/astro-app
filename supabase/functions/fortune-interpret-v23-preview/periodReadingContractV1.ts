@@ -149,7 +149,17 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     }
   }
   const specificLifeDetail=/(?:퇴근|출근|상급자|협업자|기획안|첨부\s*파일|문제집|오답\s*노트|요약\s*노트|장바구니|공과금|카드\s*대금|잔고|모임\s*회비|생활비\s*계좌|집으로|내일|지난주|이틀\s*뒤|오전|오후|저녁|새벽|답장\s*간격|짧은\s*연락|대면\s*약속)/
-  for(const entry of stringEntries(core))if(specificLifeDetail.test(entry.value))issues.push({code:'period_specific_life_detail',path:entry.path})
+  for (const entry of stringEntries(core)) {
+    if (!specificLifeDetail.test(entry.value)) continue
+    // An optional budget check is an action the reader can take. A predicted
+    // bill, a job role or an exact time still needs supporting evidence.
+    const field = /^clusters\.(\d+)\.action$/.exec(entry.path)
+    const moneyAction = field && rows[Number(field[1])]?.key === 'money_news.money' &&
+      !specificLifeDetail.test(entry.value.replace(/잔고|장바구니|공과금|카드\s*대금/g,'')) &&
+      /(?:확인해|비교해|살펴봐|합산해|점검해|따져봐)[.!?。]?$/u.test(entry.value.trim()) &&
+      !/예상|발생|늘어|줄어|부족해져|청구될|나갈 거|결제될/.test(entry.value)
+    if (!moneyAction) issues.push({code:'period_specific_life_detail',path:entry.path})
+  }
   const contactSupported=rows.some((row:any)=>['relationship.contact_activation','relationship.contact_continuity'].includes(String(row?.key??''))&&row?.applicability!=='insufficient')
   if(!contactSupported){
     const contactLeak=/(?:연락|답장|선연락|안부)/
@@ -178,6 +188,37 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     }
   }
   return {version:PERIOD_READING_VERSION,passed:!issues.length,issues}
+}
+
+/** If an edit introduces a new defect, try the complete original model-authored
+ * field. Publish it only when the assembled document passes every period check. */
+export function retainValidPeriodFields(original:any, edited:any, kind:string, packet:any) {
+  const report = inspectPeriodProviderDocument(edited,kind,packet)
+  if (!isExtendedPeriod(kind) || report.passed || report.issues.length > 4) return edited
+  const restored = structuredClone(edited)
+  const optionalPriorities = new Set<number>()
+  for (const issue of report.issues) {
+    const priority = /^priorities\.(\d+)$/.exec(issue.path)
+    if (priority && Array.isArray(restored.priorities)) {
+      const i = Number(priority[1])
+      if (i >= restored.priorities.length) return edited
+      optionalPriorities.add(i)
+      if (text(original.priorities?.[i])) restored.priorities[i]=original.priorities[i]
+      continue
+    }
+    const path = /^clusters\.(\d+)\.(action|conclusion|applies_when|evidence_meaning|real_scene)$/.exec(issue.path)
+    if (!path) return edited
+    const row = original.clusters?.[Number(path[1])]
+    const target = restored.clusters?.[Number(path[1])]
+    if (!target || target.key !== row?.key || !text(row[path[2]])) return edited
+    target[path[2]] = row[path[2]]
+  }
+  if (inspectPeriodProviderDocument(restored,kind,packet).passed) return restored
+  // Extra period priorities are optional. Preserve the complete authored core
+  // and every unaffected priority if one ungrounded list item is all that failed.
+  if (!optionalPriorities.size) return edited
+  restored.priorities=restored.priorities.filter((_:unknown,index:number)=>!optionalPriorities.has(index))
+  return inspectPeriodProviderDocument(restored,kind,packet).passed ? restored : edited
 }
 
 /** Reuse one complete Gemini-authored summary sentence when only the headline

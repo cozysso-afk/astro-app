@@ -24,14 +24,30 @@ export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Nep
 
 export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
 
+export const reportStyle = /(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./
+export const copyTypo = /(?:생활 가관|북수조점|예작|무필요)/
+
+const sajuTerms = ["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"]
+export function unsupportedSajuTerm(value: string, source: string) {
+  return sajuTerms.find(term => !source.includes(term) && value.split(/[.!?。\n]/).some(sentence =>
+    sentence.includes(term) && !/(?:계산|판단|확인|제공)(?:할 수 없|하지 않|되지 않|되지 않았|하지 않았)/.test(sentence)))
+}
+
 export function hasCondition(value: string) {
   return /(?:[가-힣]면(?:[ ,.]|$)|경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(value)
 }
 
 export function hasInventedDuration(value: string) {
-  // Month/day labels and angular measurements can legitimately appear in timing evidence.
-  const prose = value.replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}일/g,'').replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
-  return /\d+\s*(?:분|시간|일)(?:간|\s*정도)?/.test(prose)
+  // Dates (including ranges and ISO dates with Korean particles) are evidence.
+  // The rejected claim is prescribing an exact duration for someone's behavior.
+  const prose = value
+    .replace(/\d{4}[-./]\d{1,2}[-./]\d{1,2}(?:일)?/g,'')
+    .replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}(?:일)?(?:\s*[~–-]\s*(?:\d{1,2}월\s*)?\d{1,2})?일?/g,'')
+    .replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
+  return prose.split(/[.!?。\n]/).some(sentence =>
+    /\d+\s*(?:분|시간|일)(?:간|씩|\s*(?:정도|동안|후에|뒤에))?/.test(sentence) &&
+    /기다[려리]|기다린|생각할 시간|시간을 (?:가져|두)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고)|미뤄|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/.test(sentence))
+
 }
 
 function proseFields(value: unknown): string[] {
@@ -59,8 +75,8 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   if(technical.test(reasonLead))return fail('technical_terms_lead_core_reason')
   const marriageFields=Object.values(data?.marriage_reading??{})
   const styleFields=[data.headline,data.core_summary,data.core_reason,data.core_action,data.overview,...conditions,...marriageFields]
-  if(styleFields.some(value=>/(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./.test(text(value)))) return fail('inconsistent_report_style')
-  if(styleFields.some(value=>/(?:생활 가관|북수조점|예작|무필요)/.test(text(value)))) return fail('korean_copy_error')
+  if(styleFields.some(value=>reportStyle.test(text(value)))) return fail('inconsistent_report_style')
+  if(styleFields.some(value=>copyTypo.test(text(value)))) return fail('korean_copy_error')
   const fieldsOfProse=proseFields(data)
   const allProse=fieldsOfProse.join('. ')
   if(fieldsOfProse.some(value=>unobservedMind.test(value))) return fail('unobserved_mind_claim')

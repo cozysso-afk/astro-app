@@ -90,3 +90,26 @@ test('recorded direction may not be swapped and summary may not promote the obse
   data.core_summary='이미 재결합했으니 이제 생활을 맞추면 돼.'
   assert.equal(validateReunionGroundingV2(data,observed).reason,'promoted_observed_stage')
 })
+
+test('a chart comparison and an explicit inability to identify the next initiator are valid',()=>{
+ const data=reading()
+ data.reunion_synthesis_v2.initiative.conclusion='상대측 활성은 내측 활성보다 높아. 누가 먼저 연락할지는 판단할 수 없어.'
+ assert.equal(validateReunionGroundingV2(data,payload).ok,true)
+ data.reunion_synthesis_v2.initiative.conclusion='누가 먼저 연락할지는 판단할 수 없지만 상대가 먼저 연락할 가능성이 높아.'
+ assert.equal(validateReunionGroundingV2(data,payload).reason,'unsupported_initiative_direction')
+})
+
+test('the words 나 and 내 inside other words do not predict an initiator',()=>{
+ const data=reading()
+ data.core_summary='만남 신호는 있으나 먼저 확인할 부분은 실제 대화 가능 여부야.'
+ data.practical_advice=['정리되지 않은 장문의 메시지를 먼저 보내지 마.']
+ assert.equal(validateReunionGroundingV2(data,payload).ok,true)
+})
+
+test('discussing whether to send a message is not a prediction about who will initiate',()=>{
+ const d=reading()
+ d.core_action='내가 먼저 연락할지 고민한다면, 실제로 대화를 나눌 상황인지 확인해.'
+ assert.equal(validateReunionGroundingV2(d,payload).ok,true)
+ d.core_action='상대방이 먼저 연락을 취할 가능성이 높아.'
+ assert.equal(validateReunionGroundingV2(d,payload).reason,'unsupported_initiative_direction')
+})

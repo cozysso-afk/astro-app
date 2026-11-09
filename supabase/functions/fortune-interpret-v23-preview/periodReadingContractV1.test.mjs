@@ -1,3 +1,4 @@
+import {retainValidPeriodFields} from './periodReadingContractV1.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {attachPeriodReadingContext,inspectPeriodProviderDocument,inspectPeriodReading,applyPeriodReadingGate,reusePlainHeadlineFromSummary,PERIOD_PRIMARY_KEYS} from './periodReadingContractV1.ts'
@@ -192,4 +193,34 @@ test('period cards reject the dangling condition and technical reason seen in th
   row.applies_when='두 약속 중 하나를 골라야 할 때 해당돼.'
   row.evidence_meaning='일정을 바로 정할 여유가 있는 날과 조금 더 기다릴 날이 나뉘어.'
   assert.ok(!issues().some(i=>i.path==='clusters.0.applies_when'||i.path==='clusters.0.evidence_meaning'))
+})
+
+test('a rejected edit keeps the original action only when all period checks pass',()=>{
+ const original=provider()
+ Object.assign(original.clusters[0],{applicability:'direct',conclusion:'상대와 표현의 속도를 살펴봐.',real_scene:'실제로 대화를 나누는 상황이라면 확인된 반응보다 앞서 관계를 정하지 마.',action:'상대의 말과 행동이 일치하는지 살펴봐.',evidence_refs:['x']})
+ const edited=structuredClone(original)
+ edited.clusters[0].action='답장 간격을 이틀로 늘려.'
+ const recovered=retainValidPeriodFields(original,edited,'month',undefined)
+ assert.equal(recovered.clusters[0].action,original.clusters[0].action)
+ assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
+ edited.clusters.pop()
+ assert.equal(retainValidPeriodFields(original,edited,'month',undefined),edited)
+})
+test('checking a budget balance is a voluntary action, predicting a new bill still fails',()=>{
+ const data=provider(), row=data.clusters.find(row=>row.key==='money_news.money')
+ Object.assign(row,{applicability:'direct',conclusion:'지출 기준을 먼저 정해.',real_scene:'비용을 비교할 때 합계를 살펴봐.',action:'구매 전에 잔고를 확인해.',evidence_refs:['x']})
+ const index=data.clusters.indexOf(row)
+ assert.ok(!inspectPeriodProviderDocument(data,'month').issues.some(i=>i.path===`clusters.${index}.action`&&i.code==='period_specific_life_detail'))
+ row.action='공과금이 늘어날 테니 잔고를 확인해.'
+ assert.ok(inspectPeriodProviderDocument(data,'month').issues.some(i=>i.path===`clusters.${index}.action`&&i.code==='period_specific_life_detail'))
+})
+
+test('a bad optional priority cannot hide six independently valid period sections',()=>{
+ const original=provider();original.priorities=['비용을 비교해.','내일 저녁에 대면 약속을 잡아.']
+ const edited=structuredClone(original)
+ edited.priorities[1]='이틀 뒤 대면 약속을 잡아.'
+ const recovered=retainValidPeriodFields(original,edited,'month',undefined)
+ assert.deepEqual(recovered.priorities,['비용을 비교해.'])
+ assert.deepEqual(recovered.clusters,original.clusters)
+ assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
 })

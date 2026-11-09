@@ -6,7 +6,7 @@ import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-previe
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
-import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, reusePlainHeadlineFromSummary } from "./periodReadingContractV1.ts";
+import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, reusePlainHeadlineFromSummary, retainValidPeriodFields } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
@@ -206,9 +206,10 @@ async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:strin
   const result=await generateCore(payload,{},model,key,budget,"semantic_rewrite",true,"",request);
   if(!result.ok)return result;
   try{
-    const patched=applyDailyRewrite(first.partial,request,result.partial);
+    const editedFields=applyDailyRewrite(first.partial,request,result.partial);
     const packet=buildV23PromptBudget(payload).packet;
     const kind=payload?.period_kind;
+    const patched=isExtendedPeriod(kind)?retainValidPeriodFields(first.partial,editedFields,kind,packet):editedFields;
     const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
     if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
     const normalized=normalizeProviderCore(patched);

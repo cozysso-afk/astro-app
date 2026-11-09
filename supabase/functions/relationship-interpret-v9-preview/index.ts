@@ -6,12 +6,12 @@ import type { RelationshipErrorCode } from "./publicError.ts";
 import { buildReunionEvidenceV2 } from "./reunionEvidenceV2.ts";
 import { validateReunionGroundingV2 } from "./reunionGroundingV2.ts";
 import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relationshipCopyRepair.ts";
-import { CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
+import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
 const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.7-grounded-question-reading-contract";
 const REUNION_VERSION="relationship-v14.10-grounded-stage-question-reading-contract";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
-const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL]);
+const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL,"gemini-3.7-flash"]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
@@ -202,7 +202,7 @@ CALCULATED_DATA.reunion_evidence_v2를 재회 해설의 1차 근거 계약으로
 - reunion_observation.state가 messaging이면 연락 발생은 이미 끝난 질문이다. summary와 current_stage는 반드시 "연락은 이미 재개됐다"에서 출발하고, 연락 가능성·재접촉 가능성을 다시 예측하지 않는다. timing과 meeting_gate는 실제 만남, rebuild_gate는 관계 정의·지속 행동만 답한다.
 - 같은 결론을 summary, current_stage, contact_type_if_any, continuity에 말만 바꿔 반복하지 않는다. 각 필드는 각각 현재 판정, 연락의 형태, 대화 지속 조건이라는 새 정보를 하나씩 추가한다.
 - why_reconnect는 "다시 떠오른다", "정서적 배경이 있다"로 끝내지 않는다. 실제 근거가 허용하는 관계 패턴 1~2개를 쉬운 말로 번역하고, 이번 현실 연락에서 어떤 장면으로 드러날 수 있는지 연결한다. 개인화할 근거가 부족하면 심리 문구를 만들지 말고 부족하다고 쓴다.
-- 재회 해설은 독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라. 순서는 반드시 [현재 살아 있는 흐름] → [왜 다시 신경 쓰이는가] → [지금 어느 단계인가] → [누가/어떻게 움직일 여지] → [연락 창] → [만남 창] → [재구축 조건] → [반복 위험] 순서다.
+- 재회 해설은 독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라. 순서는 반드시 [현재 살아 있는 흐름] → [왜 다시 신경 쓰이는가] → [지금 어느 단계인가] → [확인된 연락 사실과 아직 모르는 점] → [연락 창] → [만남 창] → [재구축 조건] → [반복 위험] 순서다.
 - summary는 확인된 현실 상태와 가장 가까운 다음 후보의 차이만 먼저 답한다. 네 단계별 자세한 근거는 각 질문 필드에서 설명한다.
 - "마음이 다시 움직이는 시기"와 "실제 관계가 움직이는 시기"를 반드시 분리해 설명해라. 감정 활성만으로 연락·만남·재구축을 승격하지 마라.
 - 같은 안전문구를 섹션마다 반복하지 마라. 각 섹션은 앞 섹션에 없던 새 정보를 추가해야 한다.
@@ -245,7 +245,15 @@ function schemaFor(purpose:Purpose,payload:any=null){
    const exactDates=[...new Set((Array.isArray(payload?.reunion_timing_windows?.windows)?payload.reunion_timing_windows.windows:[]).flatMap((x:any)=>[x?.date,x?.start,x?.end]).map((x:any)=>String(x??"")).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&(!asOf||x>=asOf)))];
    const timing=REUNION_V2_SCHEMA.properties.timing,windows=timing.properties.windows,item=windows.items;
    const constrainedTiming={...timing,properties:{...timing.properties,windows:{...windows,maxItems:exactDates.length?4:0,items:{...item,properties:{...item.properties,period:exactDates.length?{type:"STRING",enum:exactDates}:S}}}}};
-   const reunionSchema={...REUNION_V2_SCHEMA,properties:{...REUNION_V2_SCHEMA.properties,timing:constrainedTiming}};
+   const properties={...REUNION_V2_SCHEMA.properties,timing:constrainedTiming};
+   properties.summary={...S,description:"120자 이상. 입력한 현재 상태와 연락·만남·관계 회복 중 다음에 확인할 단계를 두세 문장으로 설명."};
+   if (payload?.reunion_evidence_v2?.initiative_gate?.available !== true) {
+     const direction={...S,description:"다음 선연락 주체를 판단할 수 없다는 근거 범위를 설명한다. 실제로 누가 먼저 행동할지 예측하지 않는다."};
+     properties.initiative={...properties.initiative,properties:{...properties.initiative.properties,conclusion:direction}};
+     const consultation=properties.consultation_answer;
+     properties.consultation_answer={...consultation,properties:{...consultation.properties,initiative:direction}};
+   }
+   const reunionSchema={...REUNION_V2_SCHEMA,properties};
    return {type:"OBJECT",properties:{...CORE_SCHEMA,headline:S,overview:S,timing:S,reunion_context:S,practical_advice:{type:"ARRAY",items:S,maxItems:4},top_aspects:{type:"ARRAY",items:{type:"OBJECT",properties:{label:S,meaning:S},required:["label","meaning"]},maxItems:10},limits:S,reunion_synthesis_v2:reunionSchema},required:[...CORE_KEYS,"headline","overview","timing","reunion_context","practical_advice","top_aspects","limits","reunion_synthesis_v2"]};
  }
  const properties:any={...COMMON_SCHEMA,...CORE_SCHEMA};const required=[...CORE_KEYS,"headline","overview","chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term","timing","reunion_context","felt_scenarios","practical_advice","top_aspects","limits"];
@@ -263,19 +271,9 @@ function cleanReunionV2(v:any){return {summary:cut(v?.summary,3200),consultation
 function validate(o:any,p:Purpose){if(!o||typeof o!=="object")return null;const rr=o.reunion_reading??{},rv2=o.reunion_synthesis_v2??{},mr=o.marriage_reading??{};const out:any={core_summary:o.core_summary,core_reason:o.core_reason,core_action:o.core_action,core_conditions:o.core_conditions,headline:cut(o.headline,450),overview:cut(o.overview,6500),chemistry:cut(o.chemistry,4200),emotional_dynamic:cut(o.emotional_dynamic,4200),communication:cut(o.communication,4200),conflict_pattern:cut(o.conflict_pattern,4200),power_boundaries:cut(o.power_boundaries,3800),long_term:cut(o.long_term,4500),timing:cut(o.timing,3500),reunion_context:cut(o.reunion_context,3500),felt_scenarios:Array.isArray(o.felt_scenarios)?o.felt_scenarios.slice(0,4).map((x:any)=>cut(x,1300)):[],reunion_reading:{bottom_line:cut(rr.bottom_line,4500),contact_recontact:cut(rr.contact_recontact,4000),emotional_reactivation:cut(rr.emotional_reactivation,4000),relationship_rebuilding:cut(rr.relationship_rebuilding,4500),incoming_contact:cut(rr.incoming_contact,4000),outgoing_contact:cut(rr.outgoing_contact,3500),reconnection_windows:cut(rr.reconnection_windows,6000),low_windows:cut(rr.low_windows,3500),relationship_filter:cut(rr.relationship_filter,4500),precision_note:cut(rr.precision_note,1800)},reunion_synthesis_v2:cleanReunionV2(rv2),marriage_reading:{mode:cut(mr.mode,80),bottom_line:cut(mr.bottom_line,4800),bond:cut(mr.bond,4200),emotional_home:cut(mr.emotional_home,4200),daily_life:cut(mr.daily_life,4800),intimacy_resources:cut(mr.intimacy_resources,4600),conflict_repair:cut(mr.conflict_repair,4200),commitment_or_current_cycle:cut(mr.commitment_or_current_cycle,4200),timing:cut(mr.timing,3800),caution:cut(mr.caution,3800),precision_note:cut(mr.precision_note,1800)},practical_advice:Array.isArray(o.practical_advice)?o.practical_advice.slice(0,4).map((x:any)=>cut(x,1200)):[],top_aspects:Array.isArray(o.top_aspects)?o.top_aspects.slice(0,10).map((x:any)=>({label:cut(x?.label,500),meaning:cut(x?.meaning,1800)})):[],limits:cut(o.limits,2200)};if(p!=="reunion"){out.reunion_reading={bottom_line:"",contact_recontact:"",emotional_reactivation:"",relationship_rebuilding:"",incoming_contact:"",outgoing_contact:"",reconnection_windows:"",low_windows:"",relationship_filter:"",precision_note:""};out.reunion_synthesis_v2=cleanReunionV2({});}if(!p.startsWith("marriage_"))out.marriage_reading={mode:"",bottom_line:"",bond:"",emotional_home:"",daily_life:"",intimacy_resources:"",conflict_repair:"",commitment_or_current_cycle:"",timing:"",caution:"",precision_note:""};return out;}
 
 function grounded(data:any,payload:any,p:Purpose,relaxed=false){
- const all=JSON.stringify(data),src=JSON.stringify(payload);
- const forbidden=["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"];
- for(const word of forbidden)if(all.includes(word)&&!src.includes(word))return false;
- const unknownTime=payload?.precision?.partner_time_exact===false;
- const scale=relaxed?.60:(unknownTime?.72:1);
- const need=(n:number)=>Math.max(40,Math.floor(n*scale));
- if(p==="reunion"){
-   const v2=data?.reunion_synthesis_v2??{};
-   const validEvidenceRefs=new Set((payload?.reunion_evidence_v2?.evidence??[]).map((x:any)=>String(x?.id??"")).filter(Boolean));
-   const refs=[...(v2?.consultation_answer?.evidence_refs??[]),...(v2?.why_reconnect?.evidence_refs??[]),...(v2?.initiative?.evidence_refs??[]),...(v2?.timing?.evidence_refs??[]),...(v2?.rebuild?.evidence_refs??[]),...(v2?.repeat_risks?.evidence_refs??[]),...(v2?.timing?.windows??[]).flatMap((x:any)=>x?.evidence_refs??[]),...(v2?.convergence??[]).flatMap((x:any)=>x?.evidence_refs??[])];
-   const distinctValidRefs=new Set(refs.map((x:any)=>String(x)).filter((x:string)=>validEvidenceRefs.has(x)));
-   if(String(v2?.summary??"").length<need(180)||refs.some((x:any)=>!validEvidenceRefs.has(String(x)))||distinctValidRefs.size<3)return false;
- }
+ // Reunion already passed the section, date, evidence and direction checks
+ // in validateReunionGroundingV2. Use the same 120-character summary contract.
+ if(unsupportedSajuTerm(JSON.stringify(data),JSON.stringify(payload)))return false;
  if(p==="compatibility"){
    if(!String(data.overview??"").trim())return false;
    for(const k of ["chemistry","emotional_dynamic","communication","conflict_pattern","power_boundaries","long_term"])
@@ -288,22 +286,6 @@ function grounded(data:any,payload:any,p:Purpose,relaxed=false){
    if(!String(m.bottom_line??"").trim())return false;
    for(const k of ["bond","emotional_home","daily_life","intimacy_resources","conflict_repair","commitment_or_current_cycle","timing","caution"])
      if(!String(m[k]??"").trim())return false;
- }
- if(p==="reunion"){
-   const r=data.reunion_synthesis_v2??{};
-   const whyConclusion=String(r?.why_reconnect?.conclusion??"").trim();
-   const whyInterpretation=String(r?.why_reconnect?.interpretation??"").trim();
-   // Grounding is a safety/traceability gate, not a prose-length score. The repair
-   // layer already guarantees these core sections and valid evidence refs. Do not
-   // discard a grounded Gemini answer merely because it is shorter than the style target.
-   if(String(r?.summary??"").trim().length<120)return false;
-   const consultation=r?.consultation_answer??{};
-   if(["current_stage","contact_type_if_any","initiative","continuity","meeting_gate","rebuild_gate","behavior_change_evidence"].some(key=>String(consultation?.[key]??"").trim().length<12))return false;
-   if(!(consultation?.next_stage_up_conditions?.length)||!(consultation?.down_conditions?.length)||!(consultation?.repeat_risks?.length))return false;
-   if(whyConclusion.length<12||whyInterpretation.length<24)return false;
-   if(String(r?.timing?.conclusion??"").trim().length<12)return false;
-   if(String(r?.rebuild?.conclusion??"").trim().length<12)return false;
-   if(String(r?.repeat_risks?.conclusion??"").trim().length<12)return false;
  }
  return true;
 }
@@ -320,7 +302,7 @@ function reunionOutputContract(payload:any){
  const state=String(observation?.state??"");
  const labels:any={disconnected:"연락이 끊긴 상태",recontacted:"다시 연락이 닿은 상태",messaging:"메시지를 주고받는 상태",met:"실제로 만난 상태",intimate_undefined:"친밀하지만 관계 정의가 불분명한 상태",reunited:"다시 관계를 시작한 상태"};
  const observedStage=state?`consultation_answer.current_stage는 반드시 "사용자 입력 기록상 ${labels[state]??state}"라고 시작하고, 기준 시점은 ${String(observation?.as_of??"입력되지 않음")}이라고 밝혀. 기준 시점이 없으면 현재도 같다고 단정하지 마.`:"consultation_answer.current_stage는 현실 단계가 입력되지 않아 미확인이라고 밝혀.";
- const initiativeRule=payload?.reunion_evidence_v2?.initiative_gate?.available===true?"initiative_gate의 허용 범위 안에서만 다음 연락 주체를 설명해.":"다음 선연락 주체는 계산할 수 없어. initiative와 consultation_answer.initiative에 상대가 먼저/내가 먼저라고 쓰지 마.";
+ const initiativeRule=payload?.reunion_evidence_v2?.initiative_gate?.available===true?"initiative_gate의 허용 범위 안에서만 다음 연락 주체를 설명해.":"다음 선연락 주체를 판단할 수 없어. initiative와 consultation_answer.initiative에는 이 한계와 그 이유를 써. 다른 항목에서 수신·발신의 우열을 예측하지 마. 과거 선연락 주체가 기록된 경우에만 과거 사실로 언급해.";
  return `[REUNION_OUTPUT_CONTRACT]\n${questionLines.join("\n")}\n${observedStage}\n${initiativeRule}\ntiming.windows[].evidence_refs도 timing 허용 ID만 사용한다.\nconsultation_answer.evidence_refs는 전체 허용 ID 중 서로 다른 ID를 최소 3개 사용: ${JSON.stringify(globalIds)}\nconvergence[].evidence_refs는 전체 허용 ID 중 최소 2개를 사용한다.\ntiming.windows[].period에 정확한 날짜를 쓸 때는 다음 날짜 문자열만 그대로 사용: ${JSON.stringify(exactDates)}\n허용 목록 밖 ID나 날짜를 새로 만들지 않는다.`;
 }
 function promptText(payload:any,purpose:Purpose,compactMode=false,repairHint=""){
@@ -346,10 +328,10 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),115000),kind=compactMode?"semantic_rewrite":"initial";
  try{
   const prompt=copyRepair
-    ? `이 해설의 지정된 문장만 고쳐. 각 필드의 기존 근거와 조건을 보존하고 군더더기 없이 한국어로 답해. 먼저 일상적인 말로 판단 이유를 설명하고 전문 용어는 top_aspects에 남겨. 서로 원한다거나 마음을 안다고 쓰지 마. 과거 행동은 입력 기록이 있는 경우에만 과거로 표현해. 다음 연락 주체는 확인할 수 없고 연락·만남·재결합은 다른 단계야. 날짜와 근거 ID는 새로 만들지 마. TARGETS=${JSON.stringify(copyRepair.targets)}. 핵심 판단=${JSON.stringify(copyRepair.draft.core_summary)}. 확인 자료=${JSON.stringify({observation:payload.reunion_observation, stages:payload.reunion_hierarchy?.stages, questions:copyRepair.draft.reunion_synthesis_v2?.consultation_answer, aspects:copyRepair.draft.top_aspects})}`
+    ? `이 해설의 지정된 문장만 고쳐. 각 필드의 기존 근거와 조건을 보존하고 군더더기 없이 한국어로 답해. 먼저 일상적인 말로 판단 이유를 설명하고 전문 용어는 top_aspects에 남겨. 서로 원한다거나 마음을 안다고 쓰지 마. 과거 행동은 입력 기록이 있는 경우에만 과거로 표현해. 다음 연락 주체는 확인할 수 없고 연락·만남·재결합은 다른 단계야. 날짜와 근거 ID는 새로 만들지 마. evidence가 있는 항목은 주어진 근거 중 해당 질문의 판단을 직접 지지하는 ID만 배열로 반환해. TARGETS=${JSON.stringify(copyRepair.targets)}. 핵심 판단=${JSON.stringify(copyRepair.draft.core_summary)}. 확인 자료=${JSON.stringify({observation:payload.reunion_observation, stages:payload.reunion_hierarchy?.stages, questions:copyRepair.draft.reunion_synthesis_v2?.consultation_answer, aspects:copyRepair.draft.top_aspects})}`
     : promptText(payload,purpose,compactMode,repairHint);
   const responseSchema=copyRepair ? copyRepair.schema : schemaFor(purpose,payload);
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema,maxOutputTokens:relationshipOutputTokens(purpose,compactMode),temperature:.32,thinkingConfig:{thinkingLevel:purpose==="reunion"?"low":"medium"}}})});
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:copyRepair ? "별빛의 운명 한국어 원고 편집. 지정된 필드만 고쳐. 질문별로 주어진 근거와 실제 기록만 사용해. 다음 선연락 주체를 정할 수 없는 상황에서는 어느 쪽의 행동도 예측하지 마. 실제 기록의 시점과 계산상 시기 후보를 구분해. 날짜·속마음·현재 상황은 새로 만들지 마." : SYSTEM}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema,maxOutputTokens:relationshipOutputTokens(purpose,compactMode),temperature:.32,thinkingConfig:{thinkingLevel:purpose==="reunion"?"low":"medium"}}})});
   const rawText=await r.text();
   if(!r.ok)return publicRelationshipError("REL_GENERATION_FAILED",{model,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,call_trace:[{call:1,model,kind,http_status:r.status,finish_reason:"",outcome:"failed"}]}});
   let raw:any;
@@ -365,7 +347,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
     const failure=validationFailure(model,u,"relationship_editorial",String(editorial.reason));
     if (!compactMode) {
       const grounding = purpose === "reunion" ? validateReunionGroundingV2(data,payload) : null;
-      if (!grounding || grounding.ok || ["insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
+      if (!grounding || grounding.ok || ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
         return {...failure,copyRepair:planRelationshipCopyRepair(authored,payload,purpose)};
       }
     }
@@ -373,7 +355,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
    }
    if(purpose==="reunion"){
     const validation=validateReunionGroundingV2(data,payload);
-    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
+    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
    }
    if(!grounded(data,payload,purpose,compactMode)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"grounded",purpose,model,compactMode}));return {...validationFailure(model,u,"grounded","insufficient_grounded_content"),copyRepair:compactMode ? null : planRelationshipCopyRepair(authored,payload,purpose)};}
    return {ok:true,data,model,interpreter_version:versionForPurpose(purpose),usage:u};

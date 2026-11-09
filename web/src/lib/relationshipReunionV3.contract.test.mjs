@@ -13,10 +13,12 @@ before(async()=>{
 })
 after(async()=>server?.close())
 const serverSource=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
+const groundingSource=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const wrapper=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 test('calculation and AI grounding contracts remain intact',()=>{
- for(const marker of ['relationship-v14.10-grounded-stage-question-reading-contract','buildReunionEvidenceV2','validateReunionGroundingV2','validEvidenceRefs','reunion_synthesis_v2:reunionSchema']) assert.ok(serverSource.includes(marker),marker)
+ for(const marker of ['relationship-v14.10-grounded-stage-question-reading-contract','buildReunionEvidenceV2','validateReunionGroundingV2','reunion_synthesis_v2:reunionSchema']) assert.ok(serverSource.includes(marker),marker)
+ assert.match(groundingSource,/validateRefs\(value, valid\)/)
 })
 test('reunion keeps authored synthesis separate from calculated hierarchy without losing either',()=>{
  assert.match(wrapper,/ReunionHierarchyPanelV3/)
