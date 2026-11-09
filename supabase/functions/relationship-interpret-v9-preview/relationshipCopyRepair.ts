@@ -13,6 +13,7 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
       const issues = []
       if (['headline','core_summary'].includes(key) && technical.test(value)) issues.push('전문 용어를 생활 언어로 풀이')
       if (key === 'core_reason' && technical.test(value.split(/[.!?。]/)[0])) issues.push('첫 문장은 전문 용어 없이 판단 이유만 설명')
+      if (key === 'reunion_synthesis_v2.summary' && value.trim().length < 120) issues.push('120자 이상으로 입력된 관계 상태와 연락·만남·재구축 중 확인할 다음 단계를 구체적으로 설명')
       if (hasInventedDuration(value)) issues.push('근거 없는 대기 시간·행동 기간을 삭제')
       if (unobservedMind.test(value)) issues.push('현재 속마음이나 의지를 단정하지 말고 확인 가능한 조건을 설명')
       if (purpose === 'reunion' && !payload?.reunion_evidence_v2?.initiative_gate?.available &&
