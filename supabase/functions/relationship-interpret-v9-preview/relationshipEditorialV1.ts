@@ -29,9 +29,16 @@ export function hasCondition(value: string) {
 }
 
 export function hasInventedDuration(value: string) {
-  // Month/day labels and angular measurements can legitimately appear in timing evidence.
-  const prose = value.replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}일/g,'').replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
-  return /\d+\s*(?:분|시간|일)(?:간|\s*정도)?/.test(prose)
+  // Dates (including ranges and ISO dates with Korean particles) are evidence.
+  // The rejected claim is prescribing an exact duration for someone's behavior.
+  const prose = value
+    .replace(/\d{4}[-./]\d{1,2}[-./]\d{1,2}(?:일)?/g,'')
+    .replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}(?:일)?(?:\s*[~–-]\s*(?:\d{1,2}월\s*)?\d{1,2})?일?/g,'')
+    .replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
+  return prose.split(/[.!?。\n]/).some(sentence =>
+    /\d+\s*(?:분|시간|일)(?:간|씩|\s*(?:정도|동안|후에|뒤에))?/.test(sentence) &&
+    /기다[려리]|기다린|생각할 시간|시간을 (?:가져|두)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고)|미뤄|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/.test(sentence))
+
 }
 
 function proseFields(value: unknown): string[] {

@@ -102,3 +102,10 @@ test('the requested Korean conditional ending is accepted and unqualified advice
  d.core_conditions=['서로 대화를 나눠 봐.']
  assert.equal(validateRelationshipEditorial(d,'reunion').reason,'core_condition_is_advice')
 })
+
+test('reunion timing ranges with dates do not prescribe a contact duration',()=>{
+ const data=core(); data.timing='2026-11-03일부터 11월 5~10일 사이에 대화를 이어갈 조건을 살펴봐.'
+ assert.equal(validateRelationshipEditorial(data,'reunion').ok,true)
+ data.core_action='답장을 30분 뒤에 해.'
+ assert.equal(validateRelationshipEditorial(data,'reunion').reason,'invented_exact_behavior_duration')
+})
