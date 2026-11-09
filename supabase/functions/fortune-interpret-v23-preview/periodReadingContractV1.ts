@@ -196,7 +196,16 @@ export function retainValidPeriodFields(original:any, edited:any, kind:string, p
   const report = inspectPeriodProviderDocument(edited,kind,packet)
   if (!isExtendedPeriod(kind) || report.passed || report.issues.length > 4) return edited
   const restored = structuredClone(edited)
+  const optionalPriorities = new Set<number>()
   for (const issue of report.issues) {
+    const priority = /^priorities\.(\d+)$/.exec(issue.path)
+    if (priority && Array.isArray(restored.priorities)) {
+      const i = Number(priority[1])
+      if (i >= restored.priorities.length) return edited
+      optionalPriorities.add(i)
+      if (text(original.priorities?.[i])) restored.priorities[i]=original.priorities[i]
+      continue
+    }
     const path = /^clusters\.(\d+)\.(action|conclusion|applies_when|evidence_meaning|real_scene)$/.exec(issue.path)
     if (!path) return edited
     const row = original.clusters?.[Number(path[1])]
@@ -204,6 +213,11 @@ export function retainValidPeriodFields(original:any, edited:any, kind:string, p
     if (!target || target.key !== row?.key || !text(row[path[2]])) return edited
     target[path[2]] = row[path[2]]
   }
+  if (inspectPeriodProviderDocument(restored,kind,packet).passed) return restored
+  // Extra period priorities are optional. Preserve the complete authored core
+  // and every unaffected priority if one ungrounded list item is all that failed.
+  if (!optionalPriorities.size) return edited
+  restored.priorities=restored.priorities.filter((_:unknown,index:number)=>!optionalPriorities.has(index))
   return inspectPeriodProviderDocument(restored,kind,packet).passed ? restored : edited
 }
 

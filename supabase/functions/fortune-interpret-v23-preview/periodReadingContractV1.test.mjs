@@ -214,3 +214,13 @@ test('checking a budget balance is a voluntary action, predicting a new bill sti
  row.action='공과금이 늘어날 테니 잔고를 확인해.'
  assert.ok(inspectPeriodProviderDocument(data,'month').issues.some(i=>i.path===`clusters.${index}.action`&&i.code==='period_specific_life_detail'))
 })
+
+test('a bad optional priority cannot hide six independently valid period sections',()=>{
+ const original=provider();original.priorities=['비용을 비교해.','내일 저녁에 대면 약속을 잡아.']
+ const edited=structuredClone(original)
+ edited.priorities[1]='이틀 뒤 대면 약속을 잡아.'
+ const recovered=retainValidPeriodFields(original,edited,'month',undefined)
+ assert.deepEqual(recovered.priorities,['비용을 비교해.'])
+ assert.deepEqual(recovered.clusters,original.clusters)
+ assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
+})
