@@ -3,7 +3,7 @@ name: One-shot live reading release QA
 on:
   push:
     branches:
-      - fix/reading-completeness-v19
+      - fix/reunion-contact-language
     paths:
       - ".github/workflows/live-reading-release-qa.yml"
 
@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
   relationship:
-    name: Verify reunion conditions in the stored Gemini result
+    name: Verify the final reunion text repair
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
