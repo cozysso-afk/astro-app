@@ -95,3 +95,10 @@ test('calendar timing and measured arcminutes are distinct from prescribed behav
  data.core_action='연락하기 전에 3일 기다려.'
  assert.equal(validateRelationshipEditorial(data,'compatibility').reason,'invented_exact_behavior_duration')
 })
+
+test('the requested Korean conditional ending is accepted and unqualified advice rejected',()=>{
+ const d=core();d.core_conditions=['두 사람이 만남에 합의하면 시기 판단이 달라져.']
+ assert.equal(validateRelationshipEditorial(d,'reunion').ok,true)
+ d.core_conditions=['서로 대화를 나눠 봐.']
+ assert.equal(validateRelationshipEditorial(d,'reunion').reason,'core_condition_is_advice')
+})

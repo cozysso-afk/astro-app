@@ -3,7 +3,7 @@ export type RelationshipPurpose = 'compatibility' | 'reunion' | 'marriage_unmarr
 export const CORE_KEYS = ['core_summary', 'core_reason', 'core_action', 'core_conditions'] as const
 export const CORE_SCHEMA = {
   core_summary: {type: 'STRING'}, core_reason: {type: 'STRING', description: '첫 문장은 생활 속 상황과 쉬운 이유만 설명한다. 천체명과 각 이름은 top_aspects에 쓴다. 두 사람이 실제로 서로 무엇을 느끼는지 단정하지 않는다.'}, core_action: {type: 'STRING'},
-  core_conditions: {type: 'ARRAY', items: {type: 'STRING'}, maxItems: 4},
+  core_conditions: {type: 'ARRAY', description:'판단이 달라지는 실제 조건만 만약 ~하면 또는 ~할 때 형식으로 쓴다. 조건이 없으면 빈 배열.', items: {type: 'STRING'}, maxItems: 4},
 }
 
 export const EDITORIAL_INSTRUCTION = `
@@ -23,6 +23,10 @@ core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), 
 export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
 
 export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
+
+export function hasCondition(value: string) {
+  return /(?:[가-힣]면(?:[ ,.]|$)|경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(value)
+}
 
 export function hasInventedDuration(value: string) {
   // Month/day labels and angular measurements can legitimately appear in timing evidence.
@@ -64,7 +68,7 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   if(/(?:대립각\([^)]*\bsquare\b|사각각\([^)]*\bopposition\b|삼각각\([^)]*\bsextile\b|육십분위\([^)]*\btrine\b)/i.test(allProse))return fail('aspect_translation_mismatch')
   const fields = [data.core_summary, data.core_reason, data.core_action, ...conditions].map(canonical)
   if (new Set(fields).size !== fields.length) return fail('duplicated_core_roles')
-  if(conditions.some(v=>!/(?:경우|때|없어|있어|않아|못해|전까지|확인되지|미검증|달라지|지속되|바뀌)/.test(text(v))))return fail('core_condition_is_advice')
+  if(conditions.some(v=>!hasCondition(text(v))))return fail('core_condition_is_advice')
   if (purpose.startsWith('marriage_') && data?.marriage_reading?.mode !== purpose) return fail('marriage_mode_mismatch')
   if (purpose !== 'reunion' && text(data?.reunion_context).trim()) return fail('unrequested_reunion_content')
   if (purpose.startsWith('marriage_')) {
