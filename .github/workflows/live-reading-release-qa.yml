@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
   relationship:
-    name: Verify compact reunion schema with dated evidence
+    name: Verify reunion duration and contact directions
     if: contains(github.event.head_commit.message, '[live-reading-qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 24
