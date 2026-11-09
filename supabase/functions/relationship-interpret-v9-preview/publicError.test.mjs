@@ -9,6 +9,14 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const helper={};vm.runInNewContext(compile(fs.readFileSync(new URL('./publicError.ts',import.meta.url),'utf8')),{exports:helper});
 const grounding={};vm.runInNewContext(compile(fs.readFileSync(new URL('./reunionGroundingV2.ts',import.meta.url),'utf8')),{exports:grounding});
 const editorial={};vm.runInNewContext(compile(fs.readFileSync(new URL('./relationshipEditorialV1.ts',import.meta.url),'utf8')),{exports:editorial});
+const copyRepair={};
+vm.runInNewContext(compile(fs.readFileSync(new URL('./relationshipCopyRepair.ts',import.meta.url),'utf8')),{
+  exports:copyRepair, structuredClone, require:id=>{
+    if(id==='./relationshipEditorialV1.ts') return editorial;
+    if(id==='./reunionGroundingV2.ts') return grounding;
+    throw Error('Unexpected repair dependency '+id);
+  },
+});
 const source=fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8');
 const canary='authorization: Bearer TEST_CANARY';
 const prose='합성 관계 근거와 설명입니다. '.repeat(40).trim();
@@ -41,7 +49,7 @@ function harness(options={}) {
       Object.assign(rows[0],patch);return {data:{id:'synthetic-job'},error:null};
     }return q;
   }};
-  vm.runInNewContext(compile(source),{exports:{},console,require:id=>id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id==='./reunionGroundingV2.ts'?grounding:id==='./relationshipEditorialV1.ts'?editorial:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider(fixture,requests.at(-1).contents[0].parts[0].text.match(/PURPOSE=([^\n]+)/)[1])},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
+  vm.runInNewContext(compile(source),{exports:{},console,require:id=>id==='./relationshipCopyRepair.ts'?copyRepair:id==='./publicError.ts'?helper:id==='./reunionEvidenceV2.ts'?reunionEvidence:id==='./reunionGroundingV2.ts'?grounding:id==='./relationshipEditorialV1.ts'?editorial:id.startsWith('jsr:')?{}:id.startsWith('npm:')?{createClient:(_url,key)=>{assert.equal(key,'synthetic-service');return admin}}:(()=>{throw Error('Unexpected import')})(),Response,Request,Headers,TextEncoder,crypto,AbortController,DOMException,Error,setTimeout,clearTimeout,fetch:async(_url,init)=>{requests.push(JSON.parse(init.body));return options.fetch?options.fetch(requests.length):provider(fixture,requests.at(-1).contents[0].parts[0].text.match(/PURPOSE=([^\n]+)/)[1])},Deno:{env:{get:k=>({SUPABASE_URL:'https://example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',GEMINI_API_KEY:'synthetic-key'}[k])},serve:h=>handler=h}});
   return {rows,writes,requests,get inserts(){return inserts},async run(purpose='compatibility'){const response=await handler(new Request('https://example.test/relationship',{method:'POST',headers:{authorization:'Bearer synthetic-session'},body:JSON.stringify({calculation:calculationFor(purpose),purpose})}));return {status:response.status,body:await response.json()}}};
 }
 function safe(value){assert(!JSON.stringify(value).includes('TEST_CANARY'));}
