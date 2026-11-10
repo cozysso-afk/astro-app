@@ -13,7 +13,7 @@ import { evaluateCases, renderHtml } from './fortune-quality-audit.mjs'
 const cases = [
   { id: 'synthetic-live-01', birth_date: '1987-06-15', birth_time: '08:30:00',
     latitude: 37.5665, longitude: 126.978, utc_offset_hours: 9, gender: 'female',
-    kind: 'day', start: '2026-10-26', end: '2026-10-26' },
+    kind: 'day', start: '2026-11-11', end: '2026-11-11' },
   { id: 'synthetic-live-02', birth_date: '1991-02-20', birth_time: '13:15:00',
     latitude: 35.1796, longitude: 129.0756, utc_offset_hours: 9, gender: 'male',
     kind: 'week', start: '2026-10-26', end: '2026-11-01' },
@@ -187,6 +187,7 @@ async function main() {
       })
     }
   }
+  for(const row of results)if(row.period_kind==='day'||row.id.includes('day')){const group=row.result?.data?.clusters?.relationship;console.log('scenario states',JSON.stringify(Object.fromEntries(['single','crush','flirting','ambiguous','couple'].map(k=>[k,group?.['love_'+k]?.applicability||'missing']))))}
   const report = evaluateCases(results, { mode: 'live' })
   await mkdir(out, { recursive: true })
   await writeFile(path.join(out, 'report.json'), JSON.stringify(report, null, 2))

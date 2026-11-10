@@ -3,7 +3,7 @@ name: One-shot live reading release QA
 on:
   push:
     branches:
-      - fix/reading-completeness-v19
+      - fix/reading-scope-nov11
     paths:
       - ".github/workflows/live-reading-release-qa.yml"
 
