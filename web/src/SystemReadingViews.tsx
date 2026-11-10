@@ -174,8 +174,9 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
   const westernPeriod = westernWhen(c.period.day_count, c.period.start)
   const loveScores = selectedWestern.filter(([name])=>['연애','연락','재회'].includes(name))
   const westernReaderHeadline = topic==='애정' && loveScores.length
-    ? loveScores.map(([name,stat])=>`${name} ${stat.average}점(${stat.band})`).join(' · ')
+    ? loveScores.map(([name,stat])=>`${({연애:'만났을 때의 관계 분위기',연락:'연락이 오갈 조건',재회:'다시 이어질 조건'} as Record<string,string>)[name]} · ${stat.band}(${stat.average}점)`).join(' / ')
     : westernHeadline(selectedWestern,westernPeriod,c)
+  const lowestWestern = [...selectedWestern].filter(([name])=>name!=='투자주의').sort((a,b)=>a[1].average-b[1].average)[0]
   const westernOverviewSummary = westernOverviewText(selectedWestern,westernPeriod,c)
   const westernDisplayRows = field || topic!=='전체' ? selectedWestern : representativeWesternRows(selectedWestern)
   const sajuPeriod = westernWhen(c.period.day_count, c.period.start)
@@ -199,7 +200,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     {system==='integrated' ? <>
       {injectReadingContext(children,{field:focusedField,systemOverview:overview})}
     </> : system==='western' ? <>
-      <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>{topic==='애정' ? '연애는 만났을 때의 관계 분위기, 연락은 대화가 오갈 조건, 재회는 과거 인연과 다시 이어질 조건을 봐. 세 점수는 따로 읽어.' : '점수는 선택한 기간에 각 주제가 얼마나 두드러지는지를 나타내.'}</p></header>
+      <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>{topic==='애정' ? '연애는 만났을 때의 관계 분위기, 연락은 대화가 오갈 조건, 재회는 과거 인연과 다시 이어질 조건을 봐. 세 점수는 따로 읽어.' : topic==='전체' && lowestWestern ? `상대적으로 낮은 항목은 ${lowestWestern[0]}(${lowestWestern[1].average}점)이야. ${westernGuidance(lowestWestern[0],lowestWestern[1],c)}` : '점수는 선택한 기간에 각 주제가 얼마나 두드러지는지를 나타내.'}</p></header>
       {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}
       <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s,c)}</small><span className="western-score-more">{c.period.start===c.period.end?'계산일 보기':'날짜 보기'}</span></summary>{c.period.start!==c.period.end&&<p>선택 기간 변동폭 {s.spread} · 날짜별 점수 차이는 아래처럼 참고해.</p>}{c.period.start===c.period.end?<p>계산일 · {c.period.start}</p>:<><p>점수가 높은 날: {(s.best_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 계획한 일을 진행할 후보일로만 보고 실제 일정·조건을 함께 확인해.</p><p>점수가 낮은 날: {(s.caution_days??[]).slice(0,1).map(d=>d.date).join(', ')||'자료 없음'} · 활성도가 덜 두드러지는 비교일이며, 불리한 사건이나 피해야 할 날이라는 뜻은 아니야.</p></>}</details>)}</div>
       {injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}

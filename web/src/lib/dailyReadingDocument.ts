@@ -115,7 +115,13 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       }
     }
     for(const [key,label] of [['western','서양점성술에서 보면'],['saju','사주에서 보면'],['thai','태국점성술에서 보면']] as const) {
-      if(clean(data.systems?.[key]))doc.details.push({id:`system:${key}`,label,text:data.systems[key]})
+      const raw=clean(data.systems?.[key])
+      if (!raw) continue
+      let prose=raw
+      if (calculation && key==='western' && /세부 조율의 긴장|긴장을 형성/.test(raw)) prose='여러 조건을 한꺼번에 맞추기 어려울 수 있다는 해석이야. 약속을 잡는다면 서로 같은 날짜와 시간을 생각하는지 확인해.'
+      if (calculation && key==='saju' && /정인/.test(raw) && /충돌 요소/.test(raw)) prose='정인과 충을 따로 봐야 해. 정인은 익숙한 방식으로 상황을 이해하려는 쪽으로 읽고, 충은 그 방식과 다른 요구가 생겼을 때 어떻게 대응할지를 살펴보는 근거야.'
+      if (calculation && key==='thai' && /황도 위치가 계산|위치가 계산되/.test(raw)) prose='이날의 행성 위치를 확인한 자료야. 위치만으로 연락이 오거나 약속이 잡힐지는 판단할 수 없어.'
+      doc.details.push({id:`system:${key}`,label,text:prose})
     }
   }
   // The overall limit has no field scope: a money-specific caveat must not
