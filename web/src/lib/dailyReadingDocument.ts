@@ -56,10 +56,11 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
         ['couple','연애 중','한쪽이 바쁜 날이라면 답장 속도로 마음을 짐작하기보다 함께 시간을 낼 수 있는 날을 정해 봐.'],
       ]
       for (const [key,label,application] of scenarios) {
-        const slot=doc.slots.find(item=>item.id==='relationship.love_'+key)
+        const slotId='relationship.love_'+key
+        const slot=doc.slots.find(item=>item.id===slotId)
         if (slot?.state!=='missing') continue
         doc.details.push({id:'application:'+key,label:label+' · 계산값 적용 예시',text:application})
-        doc.slots=doc.slots.filter(item=>item!==slot)
+        doc.slots=doc.slots.filter(item=>item.id!==slotId)
       }
       if (doc.details.some(item=>item.id.startsWith('application:'))) {
         doc.details.unshift({id:'application:basis',label:'상황별로 읽는 기준',text:`이날 연애 지표는 ${loveStat.average}점(${loveStat.band})이야. 아래 예시는 같은 계산을 각 관계에 적용할 때 살펴볼 점이야.`})
