@@ -39,7 +39,7 @@ export function PeriodFortuneNarrativeV2({
     && !result.usage?.local_quality_fallback
     && interpretationHeroEligible(result.usage?.quality_validation, result.usage)
 
-  if (period === 'today' && !westernOnly) return <DailyReadingPanel data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
+  if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
   const document=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
   return <AuthoredReadingPanel doc={document} technicalDetails={technicalDetails}/>
 }

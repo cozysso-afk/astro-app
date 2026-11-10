@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AiInterpretationResponse } from './appTypes'
+import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes'
 import type { FortuneField } from './lib/fortuneFields'
 import { buildDailyReadingDocument } from './lib/dailyReadingDocument'
 import { exportDailyReadingImages } from './lib/readingImageExport'
@@ -11,8 +11,8 @@ import '@fontsource/nanum-myeongjo/latin-700.css'
 import '@fontsource/noto-sans-kr/korean-400.css'
 import '@fontsource/noto-sans-kr/korean-700.css'
 
-export function DailyReadingPanel({data,date,field,verified,technicalDetails,onRetry}:{data:NonNullable<AiInterpretationResponse['data']>;date:string;field?:FortuneField;verified:boolean;technicalDetails?:ReactNode;onRetry?:()=>void}) {
-  const doc = useMemo(()=>buildDailyReadingDocument(data,date,field,verified),[data,date,field,verified])
+export function DailyReadingPanel({data,date,field,verified,technicalDetails,onRetry,calculation}:{calculation?:IntegratedApiResponse;data:NonNullable<AiInterpretationResponse['data']>;date:string;field?:FortuneField;verified:boolean;technicalDetails?:ReactNode;onRetry?:()=>void}) {
+  const doc = useMemo(()=>buildDailyReadingDocument(data,date,field,verified,calculation),[data,date,field,verified,calculation])
   const exportJob = useRef<AbortController | null>(null)
   const [saving,setSaving] = useState(false)
   const [notice,setNotice] = useState('')
