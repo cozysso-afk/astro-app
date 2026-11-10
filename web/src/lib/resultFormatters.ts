@@ -1,3 +1,4 @@
+import { relationshipLimitKo } from './relationshipLimitKo'
 import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
 import { buildExternalCompactPrompt, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
 import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
@@ -447,7 +448,7 @@ export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marr
     lines.push(`- 정밀 ${month.signal_summary.exact_contacts} · 조화 ${month.signal_summary.supportive_contacts} · 긴장 ${month.signal_summary.challenging_contacts}`)
     month.signal_summary.tightest.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb(오브) ${aspect.orb.toFixed(2)}°`))
   }
-  if (result.limitations?.length) lines.push('', `제한사항: ${result.limitations.join(' ')}`)
+  if (result.limitations?.length) lines.push('', `제한사항: ${result.limitations.map(relationshipLimitKo).join(' ')}`)
   const raw = kind === 'reunion' ? { relationship: response, reunion_directional_context: reunionContext ?? null } : response
   lines.push('', '[원본 계산 JSON]', JSON.stringify(raw, null, 2))
   return lines.join('\n')
