@@ -73,9 +73,9 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
         const stat=signals?.[{incoming:'수신신호',outgoing:'발신적합',reconnection:'과거인연접점'}[key]]
         const weak=stat?.band && /약|낮/.test(stat.band)
         const value = weak ? ({
-          incoming:`수신 지표는 ${stat.band}이야. 먼저 연락이 올 것으로 기대할 만한 신호는 약해.`,
-          outgoing:`발신 지표는 ${stat.band}이야. 먼저 말을 건다고 대화가 수월하게 이어질 것으로 보기는 어려워.`,
-          reconnection:`재접점 지표는 ${stat.band}이야. 과거 인연과 다시 대화가 시작될 뚜렷한 신호는 없어.`,
+          incoming:`이날 수신 지표는 ‘${stat.band}’으로 나왔어. 먼저 연락이 올 거라고 기대할 근거는 약해.`,
+          outgoing:`발신 지표도 ‘${stat.band}’으로 나왔어. 먼저 말을 건다고 대화가 수월하게 이어질 것으로 보기는 어려워.`,
+          reconnection:`재접점 지표는 ‘${stat.band}’으로 나왔어. 과거 인연과 다시 대화가 시작될 뚜렷한 신호는 없어.`,
         }[key]) : clean(data.contact_flow?.[key])
         if (value) doc.details.push({id:`direction:${key}`,label,text:value})
       }
@@ -124,7 +124,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       const raw=clean(data.systems?.[key])
       if (!raw) continue
       let prose=raw
-      if (calculation && key==='western' && /세부 조율의 긴장|긴장을 형성/.test(raw)) prose='여러 조건을 한꺼번에 맞추기 어려울 수 있다는 해석이야. 약속을 잡는다면 서로 같은 날짜와 시간을 생각하는지 확인해.'
+      if (calculation && key==='western' && /세부 조율의 긴장|긴장을 형성/.test(raw)) prose='약속이나 요청을 주고받을 때 같은 말을 서로 다르게 이해할 수 있다는 해석이야. 시간이나 조건을 한 번 더 짚어 보는 게 좋아.'
       if (calculation && key==='saju' && /정인/.test(raw) && /충돌 요소/.test(raw)) prose='정인과 충을 따로 봐야 해. 정인은 익숙한 방식으로 상황을 이해하려는 쪽으로 읽고, 충은 그 방식과 다른 요구가 생겼을 때 어떻게 대응할지를 살펴보는 근거야.'
       if (calculation && key==='thai' && /황도 위치가 계산|위치가 계산되/.test(raw)) prose='이날의 행성 위치를 확인한 자료야. 위치만으로 연락이 오거나 약속이 잡힐지는 판단할 수 없어.'
       doc.details.push({id:`system:${key}`,label,text:prose})
