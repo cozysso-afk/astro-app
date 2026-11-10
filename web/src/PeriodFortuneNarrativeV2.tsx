@@ -4,6 +4,8 @@ import type {FortuneField} from './lib/fortuneFields'
 import type {LoveStatus} from './lib/loveReadingContext'
 import {DailyReadingPanel} from './DailyReadingPanel'
 import {AuthoredReadingPanel} from './AuthoredReadingPanel'
+import {weeklyPeriodSupplements} from './lib/weeklyPeriodSupplement'
+import {weeklyReadingCore} from './lib/weeklyReadingCore'
 import {monthlyPeriodSupplements} from './lib/monthlyLoveSupplement'
 import {buildPeriodReadingDocument} from './lib/authoredReadingDocument'
 import {fortuneNarrativeOrigin} from './lib/fortuneNarrativeOrigin'
@@ -41,10 +43,12 @@ export function PeriodFortuneNarrativeV2({
     && interpretationHeroEligible(result.usage?.quality_validation, result.usage)
 
   if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
-  const document=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
+  const saved=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
+  const weekly = period==='week' && verifiedNarrative
+  const document = weekly ? weeklyReadingCore(saved,data,calculation,field) : saved
   const monthlyLove = period==='month' && field?.id==='love' && verifiedNarrative
-  const supplements = period==='month' && verifiedNarrative ? monthlyPeriodSupplements(document,calculation) : []
-  const retry = monthlyLove && onRetry && document.sections.some(section=>section.state==='missing')
+  const supplements = weekly ? weeklyPeriodSupplements(document,calculation) : period==='month' && verifiedNarrative ? monthlyPeriodSupplements(document,calculation) : []
+  const retry = onRetry && (weekly || (monthlyLove && document.sections.some(section=>section.state==='missing')))
     ? () => onRetry(true) : undefined
-  return <AuthoredReadingPanel doc={document} technicalDetails={technicalDetails} supplements={supplements} onRefresh={retry}/>
+  return <AuthoredReadingPanel doc={document} technicalDetails={technicalDetails} supplements={supplements} period={period} onRefresh={retry}/>
 }

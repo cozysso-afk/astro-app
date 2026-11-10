@@ -143,6 +143,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
   const signature = {
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
     ...(periodKind === 'day' ? {daily_relationship_revision: 3} : {}),
+    ...(periodKind === 'week' ? {weekly_reading_revision: 1} : {}),
     ...(periodKind === 'month' ? {monthly_relationship_revision: 1} : {}),
     narrative_contract: narrativeContract,
     precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,

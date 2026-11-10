@@ -31,6 +31,21 @@ function monthlyLoveEvidence(payload:any) {
     row?.id && row.system !== 'thai' && intersects(row,payload.period) && topicsOf(row).includes('연애'))
 }
 function requiredKeys(payload:any) {
+  if (payload?.period_kind === 'week') {
+    // Reserve space for a useful answer in each evidenced family while keeping
+    // the number of full provider sections within the existing response budget.
+    const rows=(payload.evidence_ledger ?? []).filter((row:any)=>row?.id && row.system!=='thai' && intersects(row,payload.period))
+    const families=[
+      ['relationship.contact_activation','relationship.love_reunion_interest'],
+      ['work_study.exam','work_study.career_change'],
+      ['money_news.news','investment.psychology','investment.realization','investment.entry'],
+    ]
+    const supported=families.flatMap(keys=>{
+      const key=keys.find(k=>rows.some((row:any)=>topicsOf(row).some(topic=>PERIOD_DETAIL_TOPICS[k].includes(topic))))
+      return key ? [key] : []
+    })
+    return [...PERIOD_PRIMARY_KEYS,...supported]
+  }
   return payload?.period_kind === 'month' && monthlyLoveEvidence(payload).length
     ? [...PERIOD_PRIMARY_KEYS,...monthLoveKeys] : PERIOD_PRIMARY_KEYS
 }
@@ -105,8 +120,13 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
 
 export function buildPeriodReadingInstruction(kind:unknown){
   const word=kind==='week'?'한 주':kind==='month'?'한 달':'한 해'
+  const weekly = kind==='week' ? `
+- 주간 본문의 첫 문단은 이번 주 선택에서 무엇이 달라지는지, 실제 근거가 왜 그런 판단을 허용하는지, 그 판단이 적용되는 생활 장면을 서로 다른 문장으로 설명해. 똑같은 조언을 제목·요약·이유에 반복하지 마.
+- overall.dominant_pattern은 독자가 “왜?”라고 물었을 때의 답이야. ‘추진력과 대화상 점검 압박의 공존’처럼 이름만 붙이지 말고, 어느 조건에서 결정을 밀고 나가기 수월한지, 어디에서 다시 확인해야 하는지를 해당 주 근거에 따라 완결된 말로 풀어. 서로 반대되는 근거가 없으면 대비를 만들지 마.
+- 같은 분야에 주 안의 날짜별 차이가 실제로 있으면 그중 의미 있는 관측 둘을 YYYY-MM-DD와 함께 비교해. 한 날짜만 있으면 그날에 한정해. 날짜를 쓴 항목은 자기 evidence_refs로 날짜를 뒷받침해야 해. 단일 표본은 주 전체로 늘리지 마.
+- period_reading.required_section_keys의 추가 질문도 각각 한 번 작성해. 직접 판단할 근거가 부족하면 조건부로 어디까지 말할 수 있는지 밝히고, 전혀 연결되지 않으면 insufficient로 둬. 연락 수신·발신·재회는 각각의 근거로 구분해. 분야별 상세에는 실제 적용 장면과 그 이유를 설명하고, 더 많은 글을 채우려고 근거 없는 사건을 만들지 마.` : ''
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
-- 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.
+- 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.${weekly}
 - clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. ${kind==='month'?'period_reading.required_section_keys에 포함된 애정 상황은 각각 한 번씩 작성해. love_situations.questions의 서로 다른 질문에 공통 연애 근거를 조건부로 적용해. applicability는 conditional로 두고, 적용 상황·그 상황에서 근거의 의미·실제로 확인할 행동을 구분해. 상대의 마음, 사용자 관계 상태, 특정 날짜의 만남을 만들어내지 마. 한 날짜만 근거가 있으면 그날의 사례로 한정해.':'상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.'}
 - 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 해당 조건을 독립된 문장으로 마쳐. 예를 들어 '두 약속 중 하나를 골라야 할 때 해당돼.'처럼 상황만 설명해. '경우라면'에서 끊지 마. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
@@ -114,7 +134,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
 - headline은 한 문장(25~60자 목표), overall.summary는 적용 상황과 이유를 설명하는 80~180자 목표야. 중요한 제한을 글자 수 때문에 삭제하지 마. 180자 넘는 제목이나 360자 넘는 요약은 실패야. 상세 설명은 evidence_meaning에 둬.
 - 초·중·후반이나 네 분기를 의무적으로 채우지 마. 표본 날짜가 여러 개라는 이유만으로 중간이 계속 좋았거나 달라졌다고 말하지 마. 관측이 같은 경우 유지되는 맥락을 설명할 수 있지만, 날짜 사이의 미계산 변화를 확정하지 마.
 - period_reading.questions는 전달된 분야별 근거와 표본 범위야. all_supplied_rows도 전체 기간의 모든 날이 계산됐다는 뜻은 아니야. omitted_ids의 근거는 인용하지 마. 일부 날짜 근거만 있으면 그 날짜의 관측과 기간 전체의 제한을 분리해.
-- key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 evidence_meaning과 action에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
+- key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 evidence_meaning과 action${kind==='week'?' 또는 overall이 직접 인용한 관측을 설명하는 문장':''}에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
 - 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
 - headline·overall·best_phase·caution_phase·각 분야 conclusion/action/applies_when/evidence_meaning은 행성명·각 이름·영문 전문어·사주 용어·'기류/에너지/작용' 없이 생활 언어로 써. 행성명이나 배치는 systems에만 써. evidence_meaning에는 왜 그 선택이 적절한지 일상적인 말로 설명해.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
@@ -138,6 +158,25 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
   if(technical.test(hero)||/(?:기류|에너지|작용)/.test(hero))issues.push({code:'period_hero_not_plain_language',path:'headline'})
   if(/(?:업무|실무|직장|학업|시험|공부|이직|출근|퇴근)/.test(hero))issues.push({code:'period_hero_role_assumption',path:'headline'})
+  if (kind==='week' && payload?.evidence_ledger?.some((row:any)=>row?.id && intersects(row,payload.period))) {
+    const summary=text(core?.overall?.summary)
+    const reason=text(core?.overall?.dominant_pattern)
+    const sentences=summary.split(/[.!?。]+(?:\s|$)|\n/).map(part=>part.trim()).filter(Boolean)
+    if (new Set(sentences).size<2) issues.push({code:'weekly_summary_needs_explanation',path:'overall.summary'})
+    if (!reason || /(?:공존|병존|형성|강화|상충|활성화|압박|긴장|혼재)[.!?。\s]*$/u.test(reason) ||
+        sentences.some(sentence=>sentence===reason.replace(/[.!?。]+$/u,''))) {
+      issues.push({code:'weekly_reason_needs_interpretation',path:'overall.dominant_pattern'})
+    }
+    const refs=new Set(core?.overall?.evidence_refs ?? [])
+    const linked=payload.evidence_ledger.filter((row:any)=>refs.has(row.id) && intersects(row,payload.period))
+    for (const field of ['summary','dominant_pattern','best_phase','caution_phase']) {
+      for (const match of text(core?.overall?.[field]).matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)) {
+        if (match[1]<payload.period.start || match[1]>payload.period.end || !linked.some((row:any)=>rowCoversSpan(row,match[1],match[1]))) {
+          issues.push({code:'weekly_date_without_cited_observation',path:'overall.'+field})
+        }
+      }
+    }
+  }
   const providerText=JSON.stringify(core)
   if(/(?:무선\s+규칙적인|상답|예작|생활\s+가관)/.test(providerText))issues.push({code:'period_korean_copy_error',path:'root'})
   for(const entry of stringEntries(core))if(PERIOD_UNOBSERVED.test(entry.value))issues.push({code:'period_unobserved_event_or_span',path:entry.path})
@@ -289,10 +328,10 @@ export function inspectPeriodReading(data:any,payload:any){
     const [group,name]=key.split('.'),section=data?.clusters?.[group]?.[name]
     if(!section||section.applicability==='insufficient')continue
     const linked=(section.evidence_refs??[]).map((id:string)=>ledger.get(id)).filter((r:any)=>r&&topicsOf(r).some(t=>topics.includes(t)))
-    for(const field of ['conclusion','real_scene','action','change_condition']){
+    for(const field of ['conclusion','real_scene','applies_when','evidence_meaning','action','change_condition']){
       const prose=text(section[field])
       for(const match of prose.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)){
-        if(!linked.some((r:any)=>rowCoversSpan(r,match[1],match[1])))add('claim_date_without_local_evidence',`clusters.${key}.${field}`)
+        if(match[1]<payload.period.start || match[1]>payload.period.end || !linked.some((r:any)=>rowCoversSpan(r,match[1],match[1])))add('claim_date_without_local_evidence',`clusters.${key}.${field}`)
       }
       // These explicit half-year/quarter markers caused a real stored annual
       // failure. This is a narrow guard, not a general Korean claim parser.
