@@ -45,7 +45,7 @@ type PeriodFortuneResultsProps = {
   outcomeCalibration: OutcomeCalibration
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
-  onRetryAi: () => void
+  onRetryAi: (refreshMonthlyGaps?:boolean) => void
   onCopyAiPrompt: (mode?: ExternalCopyMode) => void
   onCancelAi: () => void
   aiCanCancel: boolean

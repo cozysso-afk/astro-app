@@ -629,6 +629,8 @@ export default function AppNext() {
   const periodSelectionStart = periodStart(queryDate, period)
   const integratedStartDate = selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : periodSelectionStart
   const integratedSelectionEnd = selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)
+  const selectedReadingPeriod = useRef({start:integratedStartDate,end:integratedSelectionEnd})
+  selectedReadingPeriod.current = {start:integratedStartDate,end:integratedSelectionEnd}
   const clampedRelationshipDays = Math.max(7, Math.min(365, Number(relationshipDays) || 365))
   const relationshipStartDate = relationshipCalendarYear ? `${relationshipCalendarYear}-01-01` : queryDate
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
@@ -733,6 +735,7 @@ export default function AppNext() {
         const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
           body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'status', job_id: jobId },
         })
+        if (aiPollRef.current !== jobId) return
         if (error) throw error
         if (data?.status === 'done') {
           const payload: AiInterpretationResponse = {
@@ -748,8 +751,7 @@ export default function AppNext() {
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
           const annotated = annotatePayload(payload)
           if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', annotated, ttlDays)
-          const currentStart = integratedStartDate
-          const currentEnd = integratedSelectionEnd
+          const {start:currentStart,end:currentEnd} = selectedReadingPeriod.current
           if (!periodStart || (currentStart === periodStart && currentEnd === periodEndValue)) {
             setAiInterpretation(annotated)
             setAiCacheSource(data?.reused ? 'server' : 'fresh')
@@ -781,8 +783,10 @@ export default function AppNext() {
       if (document.visibilityState === 'hidden') return
       setAiError(await fortuneAiStatusErrorMessage(error))
     } finally {
-      aiPollRef.current = null
-      setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
+      if (aiPollRef.current === jobId) {
+        aiPollRef.current = null
+        setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
+      }
     }
   }
 
@@ -801,7 +805,7 @@ export default function AppNext() {
     void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
-  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, refreshMonthlyGaps = false) => {
     if (!calculation) return
     const generatedAt = new Date()
     const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
@@ -821,12 +825,18 @@ export default function AppNext() {
     }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
     const ttlDays = fortuneCacheTtlDays(period, selectedTool)
-    if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
+    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshMonthlyGaps && aiInterpretation?.ok))) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
     let startPayload: unknown = null
     try {
-      const cached = await readReadingCache<AiInterpretationResponse>(cacheId)
+      const cached = refreshMonthlyGaps ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
+      if (aiRequestRef.current !== cacheId) return
+      if (selectedReadingPeriod.current.start !== calculation.period.start || selectedReadingPeriod.current.end !== calculation.period.end) {
+        aiRequestRef.current = ''
+        setAiLoading(false)
+        return
+      }
       if (cached?.ok && cached.data) {
         const annotated = annotatePayload(cached)
         setAiInterpretation(annotated)
@@ -1958,7 +1968,7 @@ export default function AppNext() {
               outcomeCalibration={outcomeCalibration}
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
-              onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
+              onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps === true)}
               onCopyAiPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}
