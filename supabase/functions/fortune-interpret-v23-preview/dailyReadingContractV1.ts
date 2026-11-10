@@ -2,7 +2,7 @@ import { EDITORIAL_SECTION_KEYS } from './providerSchemaV23.ts'
 
 // Primary controls presentation order, not the set of supported daily readings.
 export const DAILY_PRIMARY_KEYS = ['relationship.love_general','relationship.summary','work_study.study','work_study.work','money_news.money','condition.condition'] as const
-export const DAILY_DETAIL_KEYS = ['relationship.contact_activation','relationship.contact_continuity','relationship.love_reunion_interest','work_study.exam','work_study.career_change','investment.psychology','investment.realization','investment.entry','money_news.news'] as const
+export const DAILY_DETAIL_KEYS = ['relationship.love_single','relationship.love_crush','relationship.love_flirting','relationship.love_ambiguous','relationship.love_couple','relationship.contact_activation','relationship.contact_continuity','relationship.love_reunion_interest','work_study.exam','work_study.career_change','investment.psychology','investment.realization','investment.entry','money_news.news'] as const
 export const DAILY_SECTION_TOPICS:Record<string,string[]> = {
   'relationship.summary':['대인관계'], 'relationship.friends':['대인관계'], 'relationship.coworkers':['대인관계'],
   'relationship.family':['대인관계'], 'relationship.new_people':['대인관계'], 'relationship.boundaries':['대인관계'],

@@ -207,3 +207,17 @@ test('period home and independent field navigation are separate',async()=>{
  assert.match(field,/FIELD_ONLY/);assert.match(field,/전체 기간운세로 돌아가기/)
  assert.doesNotMatch(field,/독립 운세 선택/)
 })
+
+test('relationship heroes use the selected Saju lens and retain all three Western scores',()=>{
+ const f=fixture('today'), field=fields.find(item=>item.id==='love')
+ for(const [name,average,band] of [['연애',53,'보통'],['연락',29,'매우 약함'],['재회',46,'다소 약함']]){
+   f.calculation.western.overall[name]={average,band,spread:0,best_days:[],caution_days:[]}
+ }
+ const render=initialSystem=>renderToStaticMarkup(h(Views,{calculation:f.calculation,field,initialSystem}))
+ const hero=markup=>markup.match(/<header class="system-hero [^"]*">([\s\S]*?)<\/header>/)?.[1]??''
+ const saju=hero(render('saju')), western=hero(render('western'))
+ assert.match(saju,/관계|상대|약속|만남|호감|들은 말/)
+ assert.doesNotMatch(saju,/새 자료|이미 배운|마감일/)
+ for(const value of ['53점','29점','46점'])assert.ok(western.includes(value),value)
+ assert.doesNotMatch(western,/투자|수익/)
+})

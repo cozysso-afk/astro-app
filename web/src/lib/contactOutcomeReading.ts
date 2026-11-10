@@ -25,9 +25,9 @@ export function contactRecordReading(rows: DailyOutcomeRecord[], day?: string) {
     const when = row.date === day ? '이날' : `최근 기록인 ${row.date}에`
     const eventText = {
       none: '연락을 주고받지 않았어요.',
-      received: '연락을 받았어요. 누가 대화를 시작했는지는 이 기록만으로 알 수 없어요.',
+      received: '연락을 받았어요.',
       sent: '내가 먼저 연락했어요. 답장이 왔는지는 별도 기록이 필요해요.',
-      both: '서로 연락을 주고받았어요. 먼저 연락한 사람은 기록되지 않았어요.',
+      both: row.note?.trim() ? '서로 연락을 주고받았어요.' : '서로 연락을 주고받았어요. 먼저 연락한 사람은 기록되지 않았어요.',
     } as const
     return `${when} ${row.event ? eventText[row.event] : ''}${row.past_connection && row.event !== 'none' ? ' 과거 인연과의 연락으로 표시한 날이에요.' : ''}`
   }

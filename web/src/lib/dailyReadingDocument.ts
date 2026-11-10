@@ -1,4 +1,4 @@
-import type { AiEditorialSection, AiInterpretationResponse } from '../appTypes'
+import type { AiEditorialSection, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 
 export type DailyBlock = { id: string; label: string; text: string }
@@ -36,7 +36,7 @@ function ready(section: AiEditorialSection | undefined): boolean {
 
 // Migration adapter: preserve provider-owned prose verbatim. In particular,
 // deterministic topic_analysis and another scope's overall summary are not fallbacks.
-export function buildDailyReadingDocument(data: Data, date: string, field?: FortuneField, verified = false): DailyReadingDocument {
+export function buildDailyReadingDocument(data: Data, date: string, field?: FortuneField, verified = false, calculation?: IntegratedApiResponse): DailyReadingDocument {
   const doc: DailyReadingDocument = {version:'daily-document-v1',date,scope:field?.id ?? 'overall',title:field?.label ?? '일일 종합운세',state:verified?'missing':'unverified',headline:'',blocks:[],details:[]}
   if (!verified) return doc
   if (field) {
@@ -46,10 +46,37 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     doc.details=sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
       {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
     ])
+    const loveStat = calculation?.western.overall?.['연애']
+    if (field.id==='love' && loveStat?.band) {
+      const scenarios = [
+        ['single','새 인연','소개나 모임이 있다면 첫 대화가 편한지, 한 번 더 만날 의사가 양쪽에 있는지 살펴봐.'],
+        ['crush','짝사랑','내가 관심을 표현한 뒤 상대도 질문을 건네거나 먼저 시간을 내는지가 확인할 점이야.'],
+        ['flirting','썸','대화가 잘 통했던 날 이후에 실제로 다음 약속을 잡는지 봐.'],
+        ['ambiguous','애매한 관계','만남이 이어져도 원하는 관계가 같은지는 별개야. 둘이 어느 정도의 연락과 만남을 원하는지 이야기해 봐.'],
+        ['couple','연애 중','한쪽이 바쁜 날이라면 답장 속도로 마음을 짐작하기보다 함께 시간을 낼 수 있는 날을 정해 봐.'],
+      ]
+      for (const [key,label,application] of scenarios) {
+        const slotId='relationship.love_'+key
+        const slot=doc.slots.find(item=>item.id===slotId)
+        if (slot?.state!=='missing') continue
+        doc.details.push({id:'application:'+key,label:label+' · 계산값 적용 예시',text:application})
+        doc.slots=doc.slots.filter(item=>item.id!==slotId)
+      }
+      if (doc.details.some(item=>item.id.startsWith('application:'))) {
+        doc.details.unshift({id:'application:basis',label:'상황별로 읽는 기준',text:`이날 연애 지표는 ${loveStat.average}점(${loveStat.band})이야. 아래 예시는 같은 계산을 각 관계에 적용할 때 살펴볼 점이야.`})
+      }
+    }
     if (field.topics.includes('연락')) {
       for (const [key,label] of [['incoming','연락을 받을 흐름'],['outgoing','내가 먼저 연락할 조건'],['reconnection','과거 인연과 다시 연락할 흐름']] as const) {
         if (key === 'reconnection' && !field.topics.includes('재회')) continue
-        const value = clean(data.contact_flow?.[key])
+        const signals=calculation?.western.relationship_signals
+        const stat=signals?.[{incoming:'수신신호',outgoing:'발신적합',reconnection:'과거인연접점'}[key]]
+        const weak=stat?.band && /약|낮/.test(stat.band)
+        const value = weak ? ({
+          incoming:`이날 수신 지표는 ‘${stat.band}’으로 나왔어. 먼저 연락이 올 거라고 기대할 근거는 약해.`,
+          outgoing:`발신 지표도 ‘${stat.band}’으로 나왔어. 먼저 말을 건다고 대화가 수월하게 이어질 것으로 보기는 어려워.`,
+          reconnection:`재접점 지표는 ‘${stat.band}’으로 나왔어. 과거 인연과 다시 대화가 시작될 뚜렷한 신호는 없어.`,
+        }[key]) : clean(data.contact_flow?.[key])
         if (value) doc.details.push({id:`direction:${key}`,label,text:value})
       }
     }
@@ -67,6 +94,11 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     if(primary.length>180 || fingerprint(primary)===fingerprint(data.overall?.summary??'') || peers.some(s=>fingerprint(clean(s.conclusion))===fingerprint(primary))) {doc.state='needs_refresh';return doc}
     doc.headline = clean(sections[0].section.conclusion)
     doc.blocks = blocksFor(sections[0].section,sections[0].key)
+    if (field.id==='love' && calculation) {
+      const values=calculation.western.overall
+      const scores=['연애','연락','재회'].flatMap(name=>{const stat=values?.[name];return stat && Number.isFinite(stat.average)?[`${name} ${stat.average}점(${stat.band})`]:[]})
+      if (scores.length) doc.blocks.unshift({id:'love:calculated',label:'이날의 관계 지표',text:scores.join(' · ')})
+    }
   } else {
     if (!clean(data.headline) || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
     if(data.headline.length>180 || data.overall.summary.length>360 || data.headline.trim()===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}
@@ -89,7 +121,13 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       }
     }
     for(const [key,label] of [['western','서양점성술에서 보면'],['saju','사주에서 보면'],['thai','태국점성술에서 보면']] as const) {
-      if(clean(data.systems?.[key]))doc.details.push({id:`system:${key}`,label,text:data.systems[key]})
+      const raw=clean(data.systems?.[key])
+      if (!raw) continue
+      let prose=raw
+      if (calculation && key==='western' && /세부 조율의 긴장|긴장을 형성/.test(raw)) prose='약속이나 요청을 주고받을 때 같은 말을 서로 다르게 이해할 수 있다는 해석이야. 시간이나 조건을 한 번 더 짚어 보는 게 좋아.'
+      if (calculation && key==='saju' && /정인/.test(raw) && /충돌 요소/.test(raw)) prose='정인과 충을 따로 봐야 해. 정인은 익숙한 방식으로 상황을 이해하려는 쪽으로 읽고, 충은 그 방식과 다른 요구가 생겼을 때 어떻게 대응할지를 살펴보는 근거야.'
+      if (calculation && key==='thai' && /황도 위치가 계산|위치가 계산되/.test(raw)) prose='이날의 행성 위치를 확인한 자료야. 위치만으로 연락이 오거나 약속이 잡힐지는 판단할 수 없어.'
+      doc.details.push({id:`system:${key}`,label,text:prose})
     }
   }
   // The overall limit has no field scope: a money-specific caveat must not
