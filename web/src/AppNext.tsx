@@ -57,6 +57,7 @@ import { RelationshipInterpretationPanel } from './RelationshipInterpretationPan
 import { PersonalMarriagePanel, type PersonalMarriageResponse } from './PersonalMarriagePanel'
 import { ReunionTimingPanel, ReunionTransitPanel } from './ReunionPanels'
 import { RelationshipEvidenceDetails } from './RelationshipEvidenceDetails'
+import { relationshipLimitKo } from './lib/relationshipLimitKo'
 import { RelationshipPrecisionDetails } from './RelationshipPrecisionDetails'
 import { LocationResults } from './LocationResults'
 import { HoraryPrashnaPanel } from './HoraryPrashnaPanel'
@@ -208,11 +209,6 @@ function summarizeDailyOutcomes(records: DailyOutcomeRecord[]) {
   }
 }
 
-function relationshipLimitKo(text: string) {
-  if (text.includes('Partner exact birth time/place missing')) return '상대의 정확한 출생시간·장소가 없어 데이비슨·마크스·마크스 3차 진행은 추정하지 않고 제외했어.'
-  if (text.includes('Exact partner birth time')) return '상대의 정확한 출생시간이 없어 해당 정밀 진행 레이어는 계산하지 않았어.'
-  return text
-}
 function initialPeriodFromUrl(): PeriodKey {
   if (typeof window === 'undefined') return 'today'
   const kind = new URLSearchParams(window.location.search).get('kind')
