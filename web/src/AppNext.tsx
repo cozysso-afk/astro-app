@@ -376,6 +376,23 @@ function archiveSaveMessage(result: ArchiveSaveResult, label: string) {
   return `${label} 저장 실패 · 이 기기와 클라우드 모두 저장하지 못했어${details ? ` (${details})` : ''}`
 }
 
+function RelationshipDayInput({ days, onCommit }: { days: number; onCommit: (days: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return <div className="relationship-custom-days"><span>직접 지정</span><label>
+    <input type="number" inputMode="numeric" min={7} max={365} step={1}
+      aria-label="분석 기간 직접 지정 (7~365일)" value={draft ?? days}
+      onChange={event => setDraft(event.target.value)}
+      onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}
+      onBlur={() => {
+        if (draft !== null && draft.trim() && Number.isFinite(Number(draft))) {
+          onCommit(Math.max(7, Math.min(365, Math.round(Number(draft)))))
+        }
+        setDraft(null)
+      }}/>
+    <em>일</em>
+  </label></div>
+}
+
 export default function AppNext() {
   const [period, setPeriod] = useState<PeriodKey>(() => initialPeriodFromUrl())
   const [integratedCalendarYear, setIntegratedCalendarYear] = useState<number | null>(null)
@@ -427,6 +444,7 @@ export default function AppNext() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const aiPollRef = useRef<string | null>(null)
+  const restoredPeriodRef = useRef<string | null>(null)
   const [aiActiveJobId, setAiActiveJobId] = useState<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
@@ -612,6 +630,8 @@ export default function AppNext() {
   const periodSelectionStart = periodStart(queryDate, period)
   const integratedStartDate = selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : periodSelectionStart
   const integratedSelectionEnd = selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)
+  const selectedReadingPeriod = useRef({start:integratedStartDate,end:integratedSelectionEnd})
+  selectedReadingPeriod.current = {start:integratedStartDate,end:integratedSelectionEnd}
   const clampedRelationshipDays = Math.max(7, Math.min(365, Number(relationshipDays) || 365))
   const relationshipStartDate = relationshipCalendarYear ? `${relationshipCalendarYear}-01-01` : queryDate
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
@@ -716,6 +736,7 @@ export default function AppNext() {
         const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
           body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'status', job_id: jobId },
         })
+        if (aiPollRef.current !== jobId) return
         if (error) throw error
         if (data?.status === 'done') {
           const payload: AiInterpretationResponse = {
@@ -731,8 +752,7 @@ export default function AppNext() {
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
           const annotated = annotatePayload(payload)
           if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', annotated, ttlDays)
-          const currentStart = integratedStartDate
-          const currentEnd = integratedSelectionEnd
+          const {start:currentStart,end:currentEnd} = selectedReadingPeriod.current
           if (!periodStart || (currentStart === periodStart && currentEnd === periodEndValue)) {
             setAiInterpretation(annotated)
             setAiCacheSource(data?.reused ? 'server' : 'fresh')
@@ -754,7 +774,7 @@ export default function AppNext() {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
           const failedPayload: AiInterpretationResponse = { ok:false, origin:data.origin, provenance_verified:data.provenance_verified === true, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
-          setAiInterpretation(failedPayload)
+          if (!requestForArchive?.reading_revision_job) setAiInterpretation(failedPayload)
           throw new Error(failedPayload.error)
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
@@ -764,8 +784,10 @@ export default function AppNext() {
       if (document.visibilityState === 'hidden') return
       setAiError(await fortuneAiStatusErrorMessage(error))
     } finally {
-      aiPollRef.current = null
-      setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
+      if (aiPollRef.current === jobId) {
+        aiPollRef.current = null
+        setAiLoading(Boolean(readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)))
+      }
     }
   }
 
@@ -784,7 +806,7 @@ export default function AppNext() {
     void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
-  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot) => {
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, refreshMonthlyGaps = false) => {
     if (!calculation) return
     const generatedAt = new Date()
     const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
@@ -804,12 +826,18 @@ export default function AppNext() {
     }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
     const ttlDays = fortuneCacheTtlDays(period, selectedTool)
-    if (aiRequestRef.current === cacheId && (aiLoading || aiInterpretation?.ok)) return
+    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshMonthlyGaps && aiInterpretation?.ok))) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
     let startPayload: unknown = null
     try {
-      const cached = await readReadingCache<AiInterpretationResponse>(cacheId)
+      const cached = refreshMonthlyGaps ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
+      if (aiRequestRef.current !== cacheId) return
+      if (selectedReadingPeriod.current.start !== calculation.period.start || selectedReadingPeriod.current.end !== calculation.period.end) {
+        aiRequestRef.current = ''
+        setAiLoading(false)
+        return
+      }
       if (cached?.ok && cached.data) {
         const annotated = annotatePayload(cached)
         setAiInterpretation(annotated)
@@ -822,8 +850,10 @@ export default function AppNext() {
         }
         return
       }
-      setAiInterpretation(null)
-      setAiCacheSource('')
+      if (!refreshMonthlyGaps) {
+        setAiInterpretation(null)
+        setAiCacheSource('')
+      }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
         body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', calculation: calculationForInterpretation, model: aiModel },
@@ -834,7 +864,8 @@ export default function AppNext() {
         if (data?.missing_key) setAiConfigured(false)
         throw new Error(fortuneAiPublicErrorMessage(data, 'AI 해설 서버 작업을 시작하지 못했어.'))
       }
-      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
+      const archiveRequest = refreshMonthlyGaps ? {...requestForCache, reading_revision_job: String(data.job_id)} : requestForCache
+      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: archiveRequest }
       setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
@@ -855,6 +886,11 @@ export default function AppNext() {
 
   useEffect(() => {
     if (mainView !== 'home' || integratedLoading || !birthProfile.birthDate || !birthProfile.birthTime) return
+    if (restoredPeriodRef.current !== null) {
+      const restored = restoredPeriodRef.current
+      restoredPeriodRef.current = null
+      if (restored === integratedStartDate + '/' + integratedSelectionEnd) return
+    }
     if (!(selectedTool === null || selectedTool === 'integrated' || selectedTool === 'precision')) return
     const latitude = parseOptionalNumber(birthProfile.latitude)
     const longitude = parseOptionalNumber(birthProfile.longitude)
@@ -1459,6 +1495,7 @@ export default function AppNext() {
       return
     }
     if (currentPeriodArchive) {
+      restoredPeriodRef.current = item.periodStart + '/' + item.periodEnd
       setLegacyArchiveOpen(null)
       setQueryDate(item.periodStart)
       setPeriod(item.periodKey)
@@ -1798,7 +1835,7 @@ export default function AppNext() {
               <div className="relationship-range-block">
                 <div><strong>{relationshipPurpose==='reunion'?'재회운 분석기간':'궁합 시기 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div>
                 <div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div>
-                <div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div>
+                <RelationshipDayInput days={clampedRelationshipDays} onCommit={days=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}/>
                 <div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="관계운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setReunionTiming(null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div>
                 <small className="relationship-range-note">{relationshipPurpose==='reunion'?'재회는 기본 365일. 수신·발신·재접점과 두 사람 차트를 건드리는 실제 트랜짓 날짜를 이 범위 안에서 비교해.':'기본 궁합 구조는 고정이고, 여기 지정한 7~365일은 관계 시기 흐름에만 적용돼.'}</small>
               </div>
@@ -1806,7 +1843,7 @@ export default function AppNext() {
             {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>미혼</strong><span>상대 유무에 따라 개인 결혼운 또는 특정 상대 결혼궁합</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setMarriageScope('partner');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>기혼</strong><span>배우자와 현재 결속·생활·갈등·회복 주기</span></button></div>}
             {selectedTool==='marriage'&&marriageMode==='unmarried'&&<div className="relationship-purpose-row marriage-scope-row"><button type="button" className={marriageScope==='personal'?'is-active':''} onClick={()=>{setMarriageScope('personal');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setRelationshipError('')}}><strong>상대 없음 · 개인 결혼운</strong><span>결혼 가능성 · 시기 · 미래 배우자상</span></button><button type="button" className={marriageScope==='partner'?'is-active':''} onClick={()=>{setMarriageScope('partner');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setPersonalMarriageError('')}}><strong>특정 상대 있음 · 결혼궁합</strong><span>이 사람과의 생활궁합 · 결속 · 갈등 · 친밀감</span></button></div>}
             {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='married'?'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·공유자원·갈등과 회복 흐름을 봐.':marriageScope==='personal'?'상대가 없어도 내 차트로 결혼 가능성 지수·강한 시기·배우자 외모/성향/직업군·만남 경로를 적극적으로 봐. 0~100은 점성 엔터테인먼트 지수이고 실제 이름·주소·회사처럼 특정 신원만 만들어내지 않아.':'이 특정 상대와 결혼생활로 들어갈 때의 결속·생활·친밀감·돈/공유자원·갈등·지속성과 결혼 흐름을 깊게 봐.'}</span></div>}
-            {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><div className="relationship-custom-days"><span>직접 지정</span><label><input type="number" min="7" max="365" step="1" value={clampedRelationshipDays} onChange={(e)=>{setRelationshipDays(Math.max(7,Math.min(365,Number(e.target.value)||7)));setRelationshipCalendarYear(null)}}/><em>일</em></label></div><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
+            {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><RelationshipDayInput days={clampedRelationshipDays} onCommit={days=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}/><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 수신(상대→나) · 발신(나→상대) · 재접점은 서로 섞지 않아.</span></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&reunionContractStatus!=='ready'&&<div className="status-banner error"><AlertTriangle size={16}/><span>{reunionContractStatus==='stale'?'재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 최신 서버 확인 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.':'재회 계산 서버 버전을 확인 중이야. 확인이 끝나기 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.'}</span></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<section className="reunion-observation-form" aria-labelledby="reunion-observation-title">
@@ -1941,7 +1978,7 @@ export default function AppNext() {
               outcomeCalibration={outcomeCalibration}
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
-              onRetryAi={()=>void runAiInterpretation(integratedResult, integratedRequestSnapshot)}
+              onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps === true)}
               onCopyAiPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}

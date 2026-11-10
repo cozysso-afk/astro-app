@@ -17,11 +17,22 @@ export const PERIOD_DETAIL_TOPICS:Record<string,string[]> = {
   'investment.realization':['수익실현'], 'investment.entry':['신규진입'],
 }
 const QUESTION_TOPICS={...PERIOD_PRIMARY_TOPICS,...PERIOD_DETAIL_TOPICS}
-function requiredKeys(_payload:any){
-  // Extended periods keep the six first-screen questions mandatory. Detail
-  // readings remain available when directly answerable, but are not all forced
-  // merely because a sampled topic row exists.
-  return PERIOD_PRIMARY_KEYS
+const monthLoveQuestions: Record<string,string> = {
+  'relationship.love_single':'소개나 첫 만남에서 다시 보고 싶은 계기는 무엇일까?',
+  'relationship.love_crush':'내가 표현한 관심에 상대도 관심을 보이는지 무엇으로 확인할까?',
+  'relationship.love_flirting':'서로 알아가는 중이라면 다음 만남을 어떻게 구체화할까?',
+  'relationship.love_ambiguous':'관계가 불분명하다면 서로의 기대와 행동을 어떻게 맞춰 볼까?',
+  'relationship.love_couple':'교제 중이라면 함께 쓸 시간이나 다툰 뒤 대화를 어떻게 돌볼까?',
+}
+const monthLoveKeys = Object.keys(monthLoveQuestions)
+const monthLoveTopics = Object.fromEntries(monthLoveKeys.map(key => [key,['연애']]))
+function monthlyLoveEvidence(payload:any) {
+  return (payload?.evidence_ledger ?? []).filter((row:any) =>
+    row?.id && row.system !== 'thai' && intersects(row,payload.period) && topicsOf(row).includes('연애'))
+}
+function requiredKeys(payload:any) {
+  return payload?.period_kind === 'month' && monthlyLoveEvidence(payload).length
+    ? [...PERIOD_PRIMARY_KEYS,...monthLoveKeys] : PERIOD_PRIMARY_KEYS
 }
 const text=(v:unknown)=>typeof v==='string'?v.trim():''
 const date=(v:unknown)=>{
@@ -76,6 +87,8 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
     requested_period:packet.period,
     temporal_policy:'dated_samples_do_not_establish_continuous_change',
     required_primary_keys:PERIOD_PRIMARY_KEYS,required_section_keys:requiredKeys({...packet,evidence_ledger}),
+    ...(packet.period_kind==='month' && monthlyLoveEvidence({...packet,evidence_ledger}).length
+      ? {love_situations:{questions:monthLoveQuestions, shared_evidence_question:'relationship.love_general'}} : {}),
     included_ids:[...selectedIds],omitted_ids:omitted.map((r:any)=>r.id),
     omission_reason:omitted.length?'bounded_prompt_selection':null,
     questions:Object.entries(QUESTION_TOPICS).map(([key,topics])=>{
@@ -94,7 +107,7 @@ export function buildPeriodReadingInstruction(kind:unknown){
   const word=kind==='week'?'한 주':kind==='month'?'한 달':'한 해'
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.
-- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. 상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.
+- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. ${kind==='month'?'period_reading.required_section_keys에 포함된 애정 상황은 각각 한 번씩 작성해. love_situations.questions의 서로 다른 질문에 공통 연애 근거를 조건부로 적용해. applicability는 conditional로 두고, 적용 상황·그 상황에서 근거의 의미·실제로 확인할 행동을 구분해. 상대의 마음, 사용자 관계 상태, 특정 날짜의 만남을 만들어내지 마. 한 날짜만 근거가 있으면 그날의 사례로 한정해.':'상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.'}
 - 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 해당 조건을 독립된 문장으로 마쳐. 예를 들어 '두 약속 중 하나를 골라야 할 때 해당돼.'처럼 상황만 설명해. '경우라면'에서 끊지 마. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.
@@ -176,10 +189,24 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     const readerLead=[row?.conclusion,row?.action,text(row?.applies_when)||sceneText(row).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
   }
-  for(const key of payload?requiredKeys(payload):PERIOD_PRIMARY_KEYS){
+  const required = payload ? requiredKeys(payload) : PERIOD_PRIMARY_KEYS
+  const loveEvidenceIds = new Set(monthlyLoveEvidence(payload).map((row:any)=>row.id))
+  const conclusions = new Set<string>()
+  const actions = new Set<string>()
+  for(const key of required){
     const found=rows.filter((r:any)=>r?.key===key)
     if(found.length!==1){issues.push({code:'primary_missing_or_duplicate',path:`clusters.${key}`});continue}
     const row=found[0]
+    if (monthLoveKeys.includes(key)) {
+      if (row.applicability!=='conditional' || !row.evidence_refs?.some((ref:string)=>loveEvidenceIds.has(ref))) {
+        issues.push({code:'monthly_love_requires_conditional_topic_evidence',path:`clusters.${key}`})
+      }
+      for (const [field,seen] of [['conclusion',conclusions],['action',actions]] as const) {
+        const normalized=text(row[field]).replace(/[\s.!?,]/g,'')
+        if (normalized && seen.has(normalized)) issues.push({code:'monthly_love_repeated_answer',path:`clusters.${key}.${field}`})
+        if (normalized) seen.add(normalized)
+      }
+    }
     if(!['direct','conditional','insufficient'].includes(row.applicability))issues.push({code:'invalid_applicability',path:`clusters.${key}`})
     if(row.applicability==='insufficient'){
       if(['conclusion','real_scene','applies_when','evidence_meaning','action','change_condition'].some(k=>text(row[k]))||(row.evidence_refs?.length??0)>0)issues.push({code:'insufficient_with_authored_claim',path:`clusters.${key}`})
@@ -250,14 +277,15 @@ export function inspectPeriodReading(data:any,payload:any){
     const value=path==='headline'?data?.headline:data?.overall?.summary
     if(!text(value)||text(value).length>max)add('missing_or_overlong_hero',path)
   }
-  for(const [key,topics] of Object.entries(QUESTION_TOPICS)){
+  const scopedTopics = payload.period_kind==='month' ? {...QUESTION_TOPICS,...monthLoveTopics} : QUESTION_TOPICS
+  for(const [key,topics] of Object.entries(scopedTopics)){
     const [group,name]=key.split('.'),row=data?.clusters?.[group]?.[name]
     if(!row){if(PERIOD_PRIMARY_KEYS.includes(key))add('primary_missing',`clusters.${key}`);continue}
     if(row.applicability==='insufficient')continue
     const linked=(row.evidence_refs??[]).map((id:string)=>ledger.get(id)).filter(Boolean)
     if(!linked.some((r:any)=>intersects(r,payload.period)&&topicsOf(r).some(t=>topics.includes(t))))add('primary_without_same_topic_period_evidence',`clusters.${key}`)
   }
-  for(const [key,topics] of Object.entries(QUESTION_TOPICS)){
+  for(const [key,topics] of Object.entries(scopedTopics)){
     const [group,name]=key.split('.'),section=data?.clusters?.[group]?.[name]
     if(!section||section.applicability==='insufficient')continue
     const linked=(section.evidence_refs??[]).map((id:string)=>ledger.get(id)).filter((r:any)=>r&&topicsOf(r).some(t=>topics.includes(t)))

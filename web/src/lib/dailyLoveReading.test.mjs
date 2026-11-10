@@ -1,0 +1,37 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {buildDailyReadingDocument} from './dailyReadingDocument.ts'
+
+const field = {id:'love',label:'애정',topics:['연애','연락','재회']}
+const archived = {clusters:{relationship:{}},contact_flow:{incoming:'안부가 도착할 흐름이 열려 있어.'}}
+function read(band, signals = {}, data = archived) {
+  const calculation = {western:{overall:{연애:{average:53,band}},relationship_signals:signals}}
+  return buildDailyReadingDocument(data,'2026-11-11',field,true,calculation)
+}
+test('all five legacy applications respond to the daily relationship band', () => {
+  const readings = ['약함','보통','보통 이상'].map(band => read(band))
+  for (const key of ['single','crush','flirting','ambiguous','couple']) {
+    const texts = readings.map(doc => doc.details.find(row => row.id === 'application:'+key)?.text)
+    assert.ok(texts.every(Boolean))
+    assert.equal(new Set(texts).size,3)
+  }
+})
+test('directions follow independent scores, including legacy reconnection signal name', () => {
+  const doc = read('보통', {
+    수신신호:{average:29,band:'매우 약함'}, 발신적합:{average:64,band:'보통 이상'},
+    과거인연재접점:{average:46,band:'다소 약함'},
+  })
+  const direction = key => doc.details.find(row => row.id === 'direction:'+key)?.text
+  assert.match(direction('incoming'),/29점.*근거는 약해/)
+  assert.match(direction('outgoing'),/64점.*먼저 대화를 꺼내기/)
+  assert.match(direction('reconnection'),/46점.*접촉이 다시 시작될 근거는 약해/)
+})
+test('preserve authored and explicitly insufficient scenario readings', () => {
+  const section = {conclusion:'서로 궁금해하는 주제가 있어.',real_scene:'이어지는 질문을 봐.',action:'한 가지 더 물어봐.',evidence_refs:['daily-love']}
+  const data = {clusters:{relationship:{love_crush:section,love_couple:{applicability:'insufficient'}}},
+    editorial_delivery:{'relationship.love_couple':'authored'}}
+  const doc = read('보통',{},data)
+  assert.equal(doc.details.find(row=>row.id==='relationship.love_crush:conclusion')?.text,section.conclusion)
+  assert.equal(doc.details.some(row=>['application:crush','application:couple'].includes(row.id)),false)
+  assert.equal(doc.slots.find(slot=>slot.id==='relationship.love_couple')?.state,'insufficient')
+})

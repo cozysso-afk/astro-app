@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react'
 import type {AuthoredReadingDocument,AuthoredBlock} from './lib/authoredReadingDocument'
+import type {MonthSupplement} from './lib/monthlyLoveSupplement'
 import {exportAuthoredReadingImages} from './lib/readingImageExport'
 import './authored-reading.css'
 import '@fontsource/nanum-myeongjo/korean-400.css'
@@ -12,12 +13,13 @@ import '@fontsource/noto-sans-kr/korean-700.css'
 function Blocks({blocks}:{blocks:AuthoredBlock[]}) {
   return <>{blocks.map(b=><section className="authored-reading-block" data-reading-block={b.id} key={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</>
 }
-export function AuthoredReadingPanel({doc,technicalDetails}:{doc:AuthoredReadingDocument;technicalDetails?:ReactNode}) {
+export function AuthoredReadingPanel({doc,technicalDetails,supplements=[],onRefresh}:{doc:AuthoredReadingDocument;technicalDetails?:ReactNode;supplements?:MonthSupplement[];onRefresh?:()=>void}) {
   const job=useRef<AbortController|null>(null)
   const [saving,setSaving]=useState(false)
   const [notice,setNotice]=useState('')
   const authored=doc.sections.filter(section=>section.state==='ready'&&section.blocks.length)
-  const missing=doc.sections.filter(section=>section.state==='missing')
+  const supplemented=new Set(supplements.map(row=>row.id))
+  const missing=doc.sections.filter(section=>section.state==='missing' && !supplemented.has(section.id))
   const insufficient=doc.sections.filter(section=>section.state==='insufficient')
   useEffect(()=>{setSaving(false);setNotice('');return()=>{job.current?.abort();job.current=null}},[doc.revision])
   async function save(){
@@ -37,6 +39,11 @@ export function AuthoredReadingPanel({doc,technicalDetails}:{doc:AuthoredReading
       {doc.state==='ready'&&!doc.exportBlockIds.length&&<p className="authored-reading-state">이 원고에는 행동·확인점이 따로 작성되지 않았어. 기간 해설은 그대로 읽을 수 있어.</p>}
       {notice&&<p className="authored-reading-notice" role="status">{notice}</p>}
       {!!authored.length&&<details className="authored-reading-details" open={doc.state!=='ready'}><summary>질문별 상세 해설</summary>{authored.map(section=><section className="authored-reading-section" key={section.id} data-reading-section={section.id}><h3>{section.label}</h3><Blocks blocks={section.blocks}/></section>)}</details>}
+      {!!supplements.length&&<section className="authored-reading-section"><h3>{doc.scope==='love'?'월간 계산값으로 본 애정운':'월간 계산값으로 본 분야별 해설'}</h3>
+        <p>기존 원고에 빠진 질문을 이달의 서양점성술 계산값으로 풀었어.</p>
+        {supplements.map(row=><details className="authored-reading-details" key={row.id} data-calculated-section={row.id}><summary>{row.label}</summary><p>{row.text}</p><small>{row.evidence}</small></details>)}
+      </section>}
+      {onRefresh&&<button className="authored-reading-save" type="button" onClick={onRefresh}>월간 AI 해설 다시 작성</button>}
       {!!missing.length&&<details className="authored-reading-coverage"><summary>아직 작성되지 않은 항목 {missing.length}개</summary><ul>{missing.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="missing">{section.label}</li>)}</ul></details>}
       {!!insufficient.length&&<details className="authored-reading-coverage"><summary>근거가 부족한 항목 {insufficient.length}개</summary><ul>{insufficient.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="insufficient">{section.label}</li>)}</ul></details>}
     </>}
