@@ -94,6 +94,11 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     if(primary.length>180 || fingerprint(primary)===fingerprint(data.overall?.summary??'') || peers.some(s=>fingerprint(clean(s.conclusion))===fingerprint(primary))) {doc.state='needs_refresh';return doc}
     doc.headline = clean(sections[0].section.conclusion)
     doc.blocks = blocksFor(sections[0].section,sections[0].key)
+    if (field.id==='love' && calculation) {
+      const values=calculation.western.overall
+      const scores=['연애','연락','재회'].flatMap(name=>{const stat=values?.[name];return stat && Number.isFinite(stat.average)?[`${name} ${stat.average}점(${stat.band})`]:[]})
+      if (scores.length) doc.blocks.unshift({id:'love:calculated',label:'이날의 관계 지표',text:scores.join(' · ')})
+    }
   } else {
     if (!clean(data.headline) || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
     if(data.headline.length>180 || data.overall.summary.length>360 || data.headline.trim()===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}
