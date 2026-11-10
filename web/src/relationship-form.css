@@ -48,3 +48,31 @@
   gap: 12px;
   padding: 12px;
 }
+
+@media (max-width: 600px) {
+  .tool-panel .counterpart-birth-form .advanced-grid,
+  .tool-panel .reunion-observation-dates,
+  .tool-panel .reunion-history-range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .tool-panel :is(.reunion-observation-dates, .reunion-history-range) label {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+  }
+  .tool-panel :is(.reunion-observation-dates, .reunion-history-range) input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .tool-panel .relationship-custom-days input,
+  .tool-panel .relationship-calendar-year select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .tool-panel .relationship-range-buttons button {
+    min-height: 44px;
+  }
+}

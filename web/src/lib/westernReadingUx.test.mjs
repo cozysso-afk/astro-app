@@ -37,12 +37,8 @@ test('western score cards expose plain guidance before date detail', () => {
   assert.doesNotMatch(view, /특히 연락·재회·투자 관련 값은/)
 })
 
-test('western date detail uses relative score labels and tells users how to act', () => {
-  assert.doesNotMatch(view, /좋은 날:|주의할 날:/)
-  assert.match(view, /점수가 높은 날:/)
-  assert.match(view, /점수가 낮은 날:/)
-  assert.match(view, /실제 일정·조건을 함께 확인해/)
-  assert.match(view, /불리한 사건이나 피해야 할 날이라는 뜻은 아니야/)
+test('western date detail passes the selected range and original statistic', () => {
+  assert.match(view, /westernPeriodFact\(s,c\.period\.start,c\.period\.end\)/)
 })
 
 function periodFixture(){
@@ -93,14 +89,11 @@ test('period priorities and each independent cross-check explanation survive wit
   assert.equal(field.sections.some(s=>s.id.startsWith('priority:')||s.id.startsWith('cross:')),false)
 })
 
-test('thai overview leads with concrete actions and keeps placement jargon secondary', () => {
-  assert.match(view, /오늘은 부탁을 받을 때 내가 맡을 범위부터 정하고/)
-  assert.match(view, /수면·회복 시간을 일정에 먼저 넣어/)
-  assert.match(view, /부탁과 책임이 한쪽에 몰리는지/)
-  assert.match(view, /쉬는 시간·내가 결정할 범위·돈과 시간을 장기 계획으로 나눠 관리해/)
-  assert.match(view, /thaiLifeSummary\(w\.wheel\.map\(r=>r\.bhumi_key\)\)/)
-  assert.match(view, /부탁·휴식·결정 범위·돈과 시간처럼 지금 손댈 수 있는 부분부터 확인해/)
-  assert.doesNotMatch(view, /부탁·책임의 패턴|생활 영역을 읽는 기준표|좋고 나쁨을 한 줄로 단정하기보다/)
+test('thai summary connects the active area to an actual placement and follows the selected topic', () => {
+  assert.match(view, /thaiPlacementComparison\(firstPlacement,view\.natalWheel,isNatalWheel\)/)
+  assert.match(view, /topic==='애정' \? thaiLoveSummary : thaiLifeSummary/)
+  assert.match(view, /thaiGuide\(w\.wheel\.filter\(r=>THAI_LIFE_KEYS\[topic\]\.includes\(r\.bhumi_key\)\)/)
+  assert.match(view, /<p>\{thaiEvidence\}<\/p>/)
 })
 
 test('calculation details translate engine contracts into reader-facing Korean', () => {

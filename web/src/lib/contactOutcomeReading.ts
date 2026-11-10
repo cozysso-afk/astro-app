@@ -18,6 +18,16 @@ export function observedContactRows(values: unknown[], start: string, end: strin
   return [...latest.values()].sort((a,b) => b.date.localeCompare(a.date))
 }
 
+export function recordedSignalReading(row: DailyOutcomeRecord) {
+  const signal = row.event === 'sent' ? '발신적합' : '수신신호'
+  const score = row.scores?.[signal]
+  if (typeof score !== 'number' || !Number.isFinite(score)) return ''
+  const label = signal === '발신적합' ? '먼저 연락할 조건' : '연락을 받을 흐름'
+  const outcome = { received: '실제로 연락을 받았어요.', both: '실제로 연락을 주고받았어요.',
+    sent: '그날 먼저 연락했어요.', none: '그날 주고받은 연락은 없었어요.', '': '' }
+  return `${row.date}에 저장한 ‘${label}’은 ${score.toFixed(1)}점이었고, ${outcome[row.event]}`
+}
+
 export function contactRecordReading(rows: DailyOutcomeRecord[], day?: string) {
   if (!rows.length) return ''
   if (day) {
@@ -26,10 +36,17 @@ export function contactRecordReading(rows: DailyOutcomeRecord[], day?: string) {
     const eventText = {
       none: '연락을 주고받지 않았어요.',
       received: '연락을 받았어요.',
-      sent: '내가 먼저 연락했어요. 답장이 왔는지는 별도 기록이 필요해요.',
+      sent: '내가 먼저 연락했어요.',
       both: row.note?.trim() ? '서로 연락을 주고받았어요.' : '서로 연락을 주고받았어요. 먼저 연락한 사람은 기록되지 않았어요.',
     } as const
-    return `${when} ${row.event ? eventText[row.event] : ''}${row.past_connection && row.event !== 'none' ? ' 과거 인연과의 연락으로 표시한 날이에요.' : ''}`
+    const note = row.note?.trim()
+    const time = { dawn: '새벽', morning: '오전', afternoon: '오후', evening: '저녁', night: '밤', '': '' }[row.event_time_bucket]
+    const channel = { message: '문자·메신저', dm: 'DM·SNS', call: '전화', in_person: '직접 만남', other: '', '': '' }[row.channel]
+    const context = row.event === 'none' ? '' : [time, channel, row.past_connection && '과거 인연'].filter(Boolean).join(' · ')
+    return [`${when} ${row.event ? eventText[row.event] : ''}`,
+      context && `기록한 상황은 ‘${context}’예요.`,
+      note && `당시 상황은 “${note}”라고 남겼어요.`].filter(Boolean).join(' ')
+
   }
   const counts = Object.entries(events).map(([event,label]) =>
     [label, rows.filter(row => row.event === event).length] as const)
