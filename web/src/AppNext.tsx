@@ -444,6 +444,7 @@ export default function AppNext() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const aiPollRef = useRef<string | null>(null)
+  const restoredPeriodRef = useRef<string | null>(null)
   const [aiActiveJobId, setAiActiveJobId] = useState<string | null>(null)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [aiModel, setAiModel] = useState(loadAiModel)
@@ -773,7 +774,7 @@ export default function AppNext() {
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
           const failedPayload: AiInterpretationResponse = { ok:false, origin:data.origin, provenance_verified:data.provenance_verified === true, model:data.model, fallback_from:data.fallback_from, interpreter_version:data.interpreter_version || 'unknown', usage:data.usage ?? undefined, error:fortuneAiFailedJobMessage(data) }
-          setAiInterpretation(failedPayload)
+          if (!requestForArchive?.reading_revision_job) setAiInterpretation(failedPayload)
           throw new Error(failedPayload.error)
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2500))
@@ -849,8 +850,10 @@ export default function AppNext() {
         }
         return
       }
-      setAiInterpretation(null)
-      setAiCacheSource('')
+      if (!refreshMonthlyGaps) {
+        setAiInterpretation(null)
+        setAiCacheSource('')
+      }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
         body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', calculation: calculationForInterpretation, model: aiModel },
@@ -861,7 +864,8 @@ export default function AppNext() {
         if (data?.missing_key) setAiConfigured(false)
         throw new Error(fortuneAiPublicErrorMessage(data, 'AI 해설 서버 작업을 시작하지 못했어.'))
       }
-      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: requestForCache }
+      const archiveRequest = refreshMonthlyGaps ? {...requestForCache, reading_revision_job: String(data.job_id)} : requestForCache
+      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: archiveRequest }
       setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
@@ -882,6 +886,11 @@ export default function AppNext() {
 
   useEffect(() => {
     if (mainView !== 'home' || integratedLoading || !birthProfile.birthDate || !birthProfile.birthTime) return
+    if (restoredPeriodRef.current !== null) {
+      const restored = restoredPeriodRef.current
+      restoredPeriodRef.current = null
+      if (restored === integratedStartDate + '/' + integratedSelectionEnd) return
+    }
     if (!(selectedTool === null || selectedTool === 'integrated' || selectedTool === 'precision')) return
     const latitude = parseOptionalNumber(birthProfile.latitude)
     const longitude = parseOptionalNumber(birthProfile.longitude)
@@ -1486,6 +1495,7 @@ export default function AppNext() {
       return
     }
     if (currentPeriodArchive) {
+      restoredPeriodRef.current = item.periodStart + '/' + item.periodEnd
       setLegacyArchiveOpen(null)
       setQueryDate(item.periodStart)
       setPeriod(item.periodKey)

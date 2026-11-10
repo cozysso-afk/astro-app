@@ -19,12 +19,18 @@ function evidence(topic:string, stat:FortuneStat, start:string, end:string) {
   const samples = [...new Map(days.filter(point=>point!==undefined).map(point=>[point.date,point])).values()]
   return [`월간 ${topic} 평균 ${stat.average}점 · ${stat.band}`,...samples.map(point=>`${point.date} ${point.score}점`)].join(' / ')
 }
-export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse):MonthSupplement[] {
+function monthTopics(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse) {
   const {start,end} = calculation.period
-  if (doc.scope!=='love' || doc.state==='unverified' || !isoDate(start) || !isoDate(end) ||
-      end<start || start.slice(0,7)!==end.slice(0,7) || doc.date!==`${start} → ${end}`) return []
+  if (doc.state==='unverified' || !isoDate(start) || !isoDate(end) || start===end ||
+      end<start || start.slice(0,7)!==end.slice(0,7) || doc.date!==`${start} → ${end}`) return
   const month=calculation.western.months?.find(row=>row.start===start && row.end===end)
-  const topics=month?.topics ?? calculation.western.overall
+  return month?.topics ?? calculation.western.overall
+}
+export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse):MonthSupplement[] {
+  if (!['love','overall','contact'].includes(doc.scope)) return []
+  const topics=monthTopics(doc,calculation)
+  if (!topics) return []
+  const {start,end}=calculation.period
   return doc.sections.flatMap(section=>{
     const question=questions[section.id]
     if (section.state!=='missing'||!question) return []
@@ -34,4 +40,46 @@ export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:
     const text=/약|낮|이하/.test(stat.band)?weak:/강|높|이상/.test(stat.band)?strong:neutral
     return [{id:section.id,label:section.label,text,evidence:evidence(topic,stat,start,end)}]
   })
+}
+
+
+// These questions share their parent topic's statistic. The action is specific
+// to the situation; it is not a separately calculated forecast for that person.
+const monthlyActions: Record<string,[string,string]> = {
+  'relationship.love_general':['연애','관심을 주고받았던 만남을 떠올려 봐. 다음 만남도 두 사람이 함께 정하는지가 관계의 속도를 읽는 기준이야.'],
+  'relationship.summary':['대인관계','사람들과 의견을 맞춰야 할 일정이 있다면 누구와 무엇을 정할지 먼저 적어 봐. 실제 합의가 된 일부터 진행해.'],
+  'relationship.friends':['대인관계','친구와 멀어진 것 같다면 마지막 대화에서 미뤄 둔 약속부터 떠올려 봐. 다시 만나고 싶을 때는 가능한 날 하나를 건네 봐.'],
+  'relationship.coworkers':['대인관계','동료와 부탁을 주고받을 때는 누가 어디까지 맡는지 한 문장으로 확인해. 같은 말을 서로 다르게 이해한 부분을 일찍 찾을 수 있어.'],
+  'relationship.family':['대인관계','가까운 사람의 부탁을 들었을 때는 조언을 원하는지, 그냥 들어주길 원하는지 먼저 물어봐. 익숙한 사이에서도 필요한 도움이 다를 수 있어.'],
+  'relationship.new_people':['대인관계','새 모임에서는 기억에 남은 공통 관심사를 다음 대화의 시작점으로 써 봐. 한 번 인사가 오간 것과 관계가 이어지는 건 따로 봐.'],
+  'relationship.boundaries':['대인관계','반복되는 부탁이 부담스럽다면 가능한 시간과 맡을 수 있는 범위를 구체적으로 알려 줘. 그 뒤에도 같은 요구가 반복되는지 봐.'],
+  'money_news.news':['소식','발표나 안내를 기다린다면 공식 게시 일정과 수신 경로를 확인해. 점수가 달라지는 날이 실제 발표일을 정해 주지는 않아.'],
+  'work_study.study':['학업','공부한 내용을 책을 덮고 설명해 봐. 설명이 멈추는 지점을 다음 공부 시간에 다시 다루면 복습할 범위를 좁힐 수 있어.'],
+  'work_study.exam':['시험','실전 시간에 맞춰 문제 한 세트를 풀고, 개념을 몰라서 틀린 문제와 시간을 놓친 문제를 나눠 봐. 실제 시험일과 합격 여부는 이 지표로 정할 수 없어.'],
+  'work_study.work':['직장','여러 요청이 겹칠 때는 먼저 끝내야 하는 일의 담당자와 기한을 맞춰 봐. 주고받은 합의를 기록하면 다시 작업하는 시간을 줄일 수 있어.'],
+  'work_study.career_change':['이직','관심 있는 공고의 실제 마감일, 맡게 될 일, 지원 조건을 확인해. 면접 연락이나 합격 여부는 채용처가 알려 준 내용으로 판단해.'],
+  'money_news.money':['금전','이번 달 확정된 수입과 빠져나갈 고정비를 먼저 적어 봐. 결제일 전에 남는 금액을 확인하면 미뤄도 되는 지출을 고르기 쉬워.'],
+  'investment.psychology':['투자심리','가격이 움직인 날에는 처음 적어 둔 판단 근거가 달라졌는지 살펴봐. 기대나 불안만 달라졌다면 그 변화를 따로 기록해.'],
+  'investment.realization':['수익실현','보유한 자산의 정리 조건을 미리 정했다면 현재 가격·비용·비중을 그 조건과 비교해. 이 점수는 매도 시점이나 예상 수익률을 제시하지 않아.'],
+  'investment.entry':['신규진입','새로 관심을 둔 자산은 진입을 고려한 이유와 그 이유가 틀렸다고 판단할 조건을 함께 적어 봐. 점수가 높은 날도 매수 신호로 읽을 수 없어.'],
+  'condition.condition':['컨디션','피로가 쌓인 날 전후에 수면과 일정이 어떻게 달랐는지 살펴봐. 회복 시간을 어디에 넣을 수 있는지 정하는 데 참고해.'],
+}
+
+export function monthlyPeriodSupplements(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse):MonthSupplement[] {
+  const topics=monthTopics(doc,calculation)
+  if (!topics) return []
+  const love=monthlyLoveSupplements(doc,calculation)
+  const {start,end}=calculation.period
+  const other=doc.sections.flatMap(section=>{
+    const action=monthlyActions[section.id]
+    if (!action || section.state!=='missing') return []
+    const [topic,advice]=action
+    const stat=topics[topic]
+    if (!stat?.band || !Number.isFinite(stat.average)) return []
+    const intro=topic==='대인관계' && section.id!=='relationship.summary'
+      ? `이달 대인관계 전체 활성도는 ‘${stat.band}’이야. `
+      : `이달 ${topic} 활성도는 ‘${stat.band}’이야. `
+    return [{id:section.id,label:section.label,text:intro+advice,evidence:evidence(topic,stat,start,end)}]
+  })
+  return [...love,...other]
 }

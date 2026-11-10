@@ -39,7 +39,7 @@ export function AuthoredReadingPanel({doc,technicalDetails,supplements=[],onRefr
       {doc.state==='ready'&&!doc.exportBlockIds.length&&<p className="authored-reading-state">이 원고에는 행동·확인점이 따로 작성되지 않았어. 기간 해설은 그대로 읽을 수 있어.</p>}
       {notice&&<p className="authored-reading-notice" role="status">{notice}</p>}
       {!!authored.length&&<details className="authored-reading-details" open={doc.state!=='ready'}><summary>질문별 상세 해설</summary>{authored.map(section=><section className="authored-reading-section" key={section.id} data-reading-section={section.id}><h3>{section.label}</h3><Blocks blocks={section.blocks}/></section>)}</details>}
-      {!!supplements.length&&<section className="authored-reading-section"><h3>월간 계산값으로 본 애정운</h3>
+      {!!supplements.length&&<section className="authored-reading-section"><h3>{doc.scope==='love'?'월간 계산값으로 본 애정운':'월간 계산값으로 본 분야별 해설'}</h3>
         <p>기존 원고에 빠진 질문을 이달의 서양점성술 계산값으로 풀었어.</p>
         {supplements.map(row=><details className="authored-reading-details" key={row.id} data-calculated-section={row.id}><summary>{row.label}</summary><p>{row.text}</p><small>{row.evidence}</small></details>)}
       </section>}

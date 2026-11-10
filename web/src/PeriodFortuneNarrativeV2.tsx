@@ -4,7 +4,7 @@ import type {FortuneField} from './lib/fortuneFields'
 import type {LoveStatus} from './lib/loveReadingContext'
 import {DailyReadingPanel} from './DailyReadingPanel'
 import {AuthoredReadingPanel} from './AuthoredReadingPanel'
-import {monthlyLoveSupplements} from './lib/monthlyLoveSupplement'
+import {monthlyPeriodSupplements} from './lib/monthlyLoveSupplement'
 import {buildPeriodReadingDocument} from './lib/authoredReadingDocument'
 import {fortuneNarrativeOrigin} from './lib/fortuneNarrativeOrigin'
 import {interpretationHeroEligible} from './lib/interpretationTopics'
@@ -43,7 +43,7 @@ export function PeriodFortuneNarrativeV2({
   if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
   const document=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
   const monthlyLove = period==='month' && field?.id==='love' && verifiedNarrative
-  const supplements = monthlyLove ? monthlyLoveSupplements(document,calculation) : []
+  const supplements = period==='month' && verifiedNarrative ? monthlyPeriodSupplements(document,calculation) : []
   const retry = monthlyLove && onRetry && document.sections.some(section=>section.state==='missing')
     ? () => onRetry(true) : undefined
   return <AuthoredReadingPanel doc={document} technicalDetails={technicalDetails} supplements={supplements} onRefresh={retry}/>

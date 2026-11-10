@@ -41,6 +41,34 @@ function readingStrength(band: string): ReadingStrength {
   return 'neutral'
 }
 
+const socialApplications: Record<string,Record<ReadingStrength,string>> = {
+  friends: {
+    weak:'친구들과 약속을 맞추기 어렵다면 꼭 만나고 싶은 날 하나만 제안해 봐. 답이 늦어도 사이가 멀어졌다고 해석할 필요는 없어.',
+    neutral:'친구와 만날 계획이 있다면 서로 하고 싶은 일을 하나씩 골라 봐. 둘 다 시간을 낼 수 있는 약속부터 잡기 편해.',
+    strong:'친구들과 함께할 일을 제안하기 좋은 쪽이야. 다 같이 좋아했던 활동을 꺼내고 참여할 사람의 의견을 들어 봐.',
+  },
+  coworkers: {
+    weak:'동료에게 부탁할 일이 있다면 맡아 달라는 범위와 필요한 시점을 함께 알려 줘. 서로 다르게 이해한 부분을 일찍 찾을 수 있어.',
+    neutral:'같이 맡은 일이 있다면 누가 무엇을 끝내면 다음 사람이 이어받는지 맞춰 봐. 역할을 확인하기 무난한 날이야.',
+    strong:'함께 일할 사람과 의견을 모아 볼 만해. 합의가 됐다면 각자가 맡을 일까지 그 자리에서 정해 봐.',
+  },
+  family: {
+    weak:'가까운 사람에게 부탁할 때는 이미 알고 있을 거라 여기기 쉬워. 무엇을 도와주면 좋겠는지 한 가지를 짚어 말해 봐.',
+    neutral:'가족과 일정을 맞출 일이 있다면 서로 비워 둔 시간을 먼저 확인해. 원하는 일을 한쪽이 미리 정하지 않아도 돼.',
+    strong:'가까운 사람과 함께 보내고 싶은 시간을 제안해 봐. 상대가 요즘 편하게 느끼는 방식도 물어보면 좋아.',
+  },
+  new_people: {
+    weak:'낯선 자리라면 여러 사람과 깊게 친해지려 애쓰지 않아도 돼. 소개받은 사람 한 명에게 공통 관심사를 물어봐.',
+    neutral:'처음 만난 사람과는 함께 있는 자리의 이야기부터 시작해 봐. 상대도 질문을 건네면 대화를 조금 더 이어갈 수 있어.',
+    strong:'새로운 사람과 말을 나눌 여지가 있는 날이야. 공통으로 즐긴 주제가 있다면 다음에 함께할 일을 가볍게 제안해 봐.',
+  },
+  boundaries: {
+    weak:'다른 사람의 부탁을 받았을 때 부담이 크다면 지금 가능한 범위를 먼저 알려 줘. 바로 답하기 어려우면 확인할 시간을 정해.',
+    neutral:'새 약속이나 부탁을 받으면 이미 잡힌 일정부터 살펴봐. 어디까지 시간을 쓸 수 있는지 말해 두면 기대를 맞추기 쉬워.',
+    strong:'의견을 나누기 좋은 날에도 모든 부탁을 받아야 하는 건 아니야. 함께 하고 싶은 일과 네가 맡을 수 있는 범위를 같이 알려 줘.',
+  },
+}
+
 const scenarioReadings: Record<string, Record<ReadingStrength, string>> = {
   single: {
     weak: '새 사람을 만나는 데 탄력이 작은 날이야. 소개를 받는다면 첫 자리에서 결론을 내리기보다 함께 이야기하기 편한 주제가 있었는지 돌아봐.',
@@ -98,6 +126,22 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     doc.details=sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
       {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
     ])
+    if (field.id==='social' && calculation?.period?.start===date && calculation.period.end===date) {
+      const stat=calculation.western.overall?.['대인관계']
+      if (stat?.band && Number.isFinite(stat.average)) {
+        const strength=readingStrength(stat.band)
+        for (const [key,reading] of Object.entries(socialApplications)) {
+          const slotId='relationship.'+key
+          const slot=doc.slots.find(item=>item.id===slotId)
+          if (slot?.state!=='missing') continue
+          doc.details.push({id:'social-application:'+key,label:slot.label+' · 계산값 적용',text:reading[strength]})
+          doc.slots=doc.slots.filter(item=>item.id!==slotId)
+        }
+        if (doc.details.some(item=>item.id.startsWith('social-application:'))) {
+          doc.details.unshift({id:'social-calculation',label:'상황별 해설의 근거',text:`${date}의 서양점성술 대인관계 지표는 ${stat.average}점(${stat.band})이야. 기존 원고에 빠진 질문은 이 공통 지표를 상황별로 적용해 풀었어.`})
+        }
+      }
+    }
     const loveStat = calculation?.western.overall?.['연애']
     if (field.id==='love' && loveStat?.band) {
       const strength = readingStrength(loveStat.band)
