@@ -1,6 +1,6 @@
 import { westernRankCopy } from './lib/westernRankCopy'
 import type { LoveStatus } from './lib/loveReadingContext'
-import { fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
+import { fortuneEvidenceSnapshot, fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
 import { fortuneGroup, type FortuneField } from './lib/fortuneFields'
 import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Orbit, Columns3, Sparkles, Layers3, Copy } from 'lucide-react'
@@ -90,7 +90,21 @@ const WESTERN_NEUTRAL_COPY: Record<string,string> = {
 function westernGuidance(name:string, stat:FortuneStat, calculation:IntegratedApiResponse) {
   const pair = WESTERN_FLOW_COPY[name] ?? ['결정 전에 확인할 조건을 적고, 비어 있는 항목부터 채워.','확인되지 않은 조건이 있으면 결정을 미루고 사실부터 확인해.']
   const tone = fortunePresentationTone(calculation,name,stat.average,String(stat.band ?? ''))
+  if (name === '연락' && /약|낮/.test(stat.band || '')) {
+    if (tone === 'good') return '연락 흐름은 약하지만 대화에 도움이 되는 근거도 있어. 이미 오간 말이 있다면 그 화제를 이어가 봐.'
+    if (tone === 'caution') return '연락 흐름이 약하고 말을 주고받을 때 걸리는 조건도 있어. 급한 용건이라면 한 가지를 짧게 물어봐.'
+    return '연락 흐름은 약해. 이 점수만으로는 누가 먼저 연락할지 알기 어려워.'
+  }
   return tone === 'good' ? pair[0] : tone === 'caution' ? pair[1] : WESTERN_NEUTRAL_COPY[name] ?? `${name}은 평소 흐름에 가까워.`
+}
+function WesternScoreEvidence({calculation, topic}:{calculation:IntegratedApiResponse;topic:string}) {
+  const {support, challenge, neutral} = fortuneEvidenceSnapshot(calculation,topic)
+  if (!support && !challenge && !neutral) return null
+  return <div className="western-score-evidence">
+    {support && <p>도움이 되는 배치 · {support}</p>}
+    {challenge && <p>부담이 되는 배치 · {challenge}</p>}
+    {neutral && <p>함께 작용하는 배치 · {neutral}</p>}
+  </div>
 }
 function periodReadingFrame(when:string) {
   return when === '오늘' ? koreanParticle(when,'은는') : `${when} 기준으로`
@@ -197,7 +211,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>{topic==='애정' ? '연애는 만났을 때의 관계 분위기, 연락은 대화가 오갈 조건, 재회는 과거 인연과 다시 이어질 조건을 봐. 세 점수는 따로 읽어.' : topic==='전체' && lowestWestern ? `상대적으로 낮은 항목은 ${lowestWestern[0]}(${lowestWestern[1].average}점)이야. ${westernGuidance(lowestWestern[0],lowestWestern[1],c)}` : '점수는 선택한 기간에 각 주제가 얼마나 두드러지는지를 나타내.'}</p></header>
       {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}
-      <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s,c)}</small><span className="western-score-more">{c.period.start===c.period.end?'계산일 보기':'날짜 보기'}</span></summary><p>{westernPeriodFact(s,c.period.start,c.period.end)}</p></details>)}</div>
+      <div className="system-score-grid western-score-grid">{westernDisplayRows.map(([name,s])=><details className="western-score-card" key={name}><summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span><small className="western-score-guidance">{westernGuidance(name,s,c)}</small><span className="western-score-more">{c.period.start===c.period.end?'계산일 보기':'날짜 보기'}</span></summary><p>{westernPeriodFact(s,c.period.start,c.period.end)}</p><WesternScoreEvidence calculation={c} topic={name}/></details>)}</div>
       {injectReadingContext(children,{field:focusedField,westernOnly:true,technicalDetails:undefined})}
     </> : !view.allowed ? <p className="system-unavailable">현재 입력된 출생시간 정보로는 {system==='saju'?'사주':'태국점성술'}를 신뢰도 있게 계산할 수 없어. 화면을 바꿔도 이 제한은 그대로야.</p> : system==='saju' ? <>
       <header className="system-hero saju-reader-hero"><span>사주 · {sajuPeriod}</span><h3>{sajuReaderHeadline}</h3>{relevantContexts.length>0 && <p>{relevantContexts.slice(0,3).map(r=>`${r.layer} ${ganzhiWithReading(r.ganzhi)} · ${r.stem_ten_god}${c.period.day_count>1 ? ` (적용 시작 ${r.segment_start})` : ''}`).join(' / ')}</p>}</header>
