@@ -11,23 +11,30 @@ function splitSentences(value: unknown) {
   return source ? source.replace(/([.!?])\s+/g, '$1\n').split('\n').map(item => item.trim()).filter(Boolean) : []
 }
 
+function laterRecordedContact(clause: string) {
+  return /그\s*(?:뒤|후|이후)|그다음|그 다음|이후에는|두 번째 연락|다음번에는/.test(clause)
+    && /(?:연락|전화|메시지|문자).{0,12}(?:했|왔|보냈|걸었)/.test(clause)
+    && !/가능성|다음에도|앞으로|할 거|할 예정|할 전망/.test(clause)
+}
+
 export function hasUnsupportedInitiativeDirection(value: unknown, observation?: any) {
-  const actor = /(?:상대(?:방)?(?:이|가|는| 쪽|측|에게|에게서)|내(?:가| 쪽| 방향| 측)|나(?:는|의)|먼저[^.!?]{0,22}(?:상대(?:방)?|나)(?:야|예요|일))/u
+  const actor = /(?:상대(?:방)?(?:이|가|는| 쪽|측|에게|에게서)|내(?:가| 쪽| 방향| 측)|제가|저는|사용자(?:가|는)|본인(?:이|은)|나(?:는|의)|먼저[^.!?]{0,22}(?:상대(?:방)?|나)(?:야|예요|일))/u
   const action = /먼저|선연락|시작.{0,4}압력|앞서|우세|(?:연락|메시지)[^.!?]{0,25}(?:올 거|보낼 거|취할 거|가능성이 (?:높|커)|할 거)/u
   const uncertainty = /(?:정하기|판단하기|확정하기|예측하기)\s*(?:어려|힘들)|(?:알|확정할|예측할|판단할|단정할|특정할|정할|가릴|구분할|확인할|계산할)\s*수\s*없|(?:판단|확정|예측|단정|특정|계산|확인)(?:은|이|하기가|하기는|하기)?\s*(?:불가|어려)|(?:선연락|먼저\s*연락|행동.{0,6}(?:주체|순서)).{0,20}(?:아니|의미하지|보여\s*주지|판정할 수 없)/
   const clauses = splitSentences(value).flatMap(line=>line.split(/(?:지만|다만|그러나|그렇지만|반면)[, ]*/))
   return clauses.some(sentence => {
     // The gate concerns an attributed action. Mentioning a message, a chart
     // metric, or the question "who first?" alone does not attribute an action.
+    if (laterRecordedContact(sentence)) return false
     if (!actor.test(sentence) || !action.test(sentence) || uncertainty.test(sentence)) return false
     const adviceOrQuestion = /(?:기대(?:하며)?\s*기다리기보다|예단하지|기대하지|보내지 마|연락하지 마|고민(?:할|하는|한다)|여부를 확인|인지 확인|정할 필요|결정할 때)/.test(sentence)
     const prediction = /(?:가능성이 (?:높|커)|먼저 (?:움직이는 흐름|움직일 거|연락할 거)|앞서는 것으로)/.test(sentence)
     if (adviceOrQuestion && !prediction) return false
     const counterpart = /상대(?:방)?(?:이|가|은|는|측|\s*쪽)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
-    const user = /(?:내가|내\s*쪽|나는)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
+    const user = /(?:내가|제가|저는|사용자(?:가|는)|본인(?:이|은)|내\s*쪽|나는)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
     const matchesRecordedInitiator = observation?.initiator === 'counterpart' ? counterpart && !user : observation?.initiator === 'user' ? user && !counterpart : observation?.initiator === 'mutual' && /서로|양쪽|둘 다/.test(sentence)
     const pastRecord = matchesRecordedInitiator && /입력|기록|알려준|관측/.test(sentence) && /했|왔|보냈|이었|걸었/.test(sentence) && !/앞으로|다음|예정|가능성|전망/.test(sentence)
-    const conditionalCheck = /(?:연락|메시지)(?:을|를)?\s*(?:하면|한다면|했을 때|하는지 확인)/.test(sentence)
+    const conditionalCheck = /(?:연락|메시지)(?:을|를)?\s*(?:하면|한다면|했다면|했을 때|하는지 확인)|먼저\s*연락(?:할|하는)\s*경우/.test(sentence)
     return !pastRecord && !conditionalCheck
   })
 }
@@ -39,13 +46,56 @@ function proseLeaves(value: any): string[] {
   return []
 }
 
+function factualClause(clause: string, match: RegExpExecArray) {
+  const after = clause.slice(match.index + match[0].length)
+  return !/(?:다면|더라면|을 경우|는 경우|을 때|는지|는가|을지|다고 해서|다고 가정|는 게 아니|던 게 아니|더라도|어도|었어도|었을 때|인지|는 뜻은 아니|다는 뜻은 아니|다고 단정|다고 볼 수 없|다고 보기는 어려|다고 확정)/.test(after)
+}
+
+export type ReunionFactInput = {
+  state?: string
+  initiator?: string
+  events?: ReadonlyArray<{kind:string;date?:string}>
+}
+export function reunionFactContradiction(value: string, observed: ReunionFactInput | null | undefined):
+  'denied_observed_stage' | 'promoted_observed_stage' | 'contradicted_observed_initiator' | null {
+  const state = observed?.state ?? ''
+  const events = observed?.events ?? []
+  const meetingRecorded = ['met','intimate_undefined'].includes(state) || events.some(event=>event?.kind==='meeting')
+  const contactRecorded = ['recontacted','messaging','met','intimate_undefined','reunited'].includes(state) || events.some(event=>event?.kind==='recontact')
+  const pastAgreement = events.some(event=>event?.kind==='rebuilding')
+  for (const line of splitSentences(value)) {
+    // Check each claim separately: a true historical clause must not excuse a
+    // different assertion in the same sentence. Hypothetical cases describe no event.
+    for (const clause of line.split(/[,;]|지만|는데도|반면|그러나/)) {
+      const pastAction = /(?:연락|전화|메시지|문자)[^.!?]{0,12}(?:했|왔|보냈|걸었|했었)|(?:선연락|첫 연락)[^.!?]{0,12}(?:였|이었)/.exec(clause)
+      if (pastAction && !laterRecordedContact(clause) && /먼저|첫 연락|선연락/.test(clause) && factualClause(clause,pastAction)) {
+        const first = /(?:내가|제가|저는|나는|사용자(?:가|는)|본인(?:이|은))\s*(?:먼저|첫 연락)|먼저\s*(?:연락|전화|문자)(?:한|를? 건)\s*(?:사람|쪽)(?:은|이)\s*(?:나|저|본인|사용자)/.test(clause) ? 'user'
+          : /상대(?:방)?(?:이|가|은|는)\s*(?:먼저|첫 연락)|먼저\s*(?:연락|전화|문자)(?:한|를? 건)\s*(?:사람|쪽)(?:은|이)\s*상대/.test(clause) ? 'counterpart' : ''
+        if (first && first !== observed?.initiator) return 'contradicted_observed_initiator'
+      }
+      const agreement = /(?:(?:이미|실제로)\s*(?:두 사람은?\s*)?다시 사귀고|재결합했|(?:이미|실제로)\s*재회했)|(?:다시\s*(?:교제|사귀)|재결합|교제 재개|관계 재개|재회).{0,14}(?:합의했|합의가 (?:됐|이뤄졌)|약속했|결정했)|(?:교제|연애)를?\s*다시\s*시작했/.exec(clause)
+      const knownPast = /(?:과거|이전|예전|지난|당시|그때|기록된 날짜|\d{4}-\d{2}-\d{2})/.test(clause) && !/(?:지금|현재|여전히|지금까지)/.test(clause)
+      if (agreement && state !== 'reunited' && !(pastAgreement && knownPast) && factualClause(clause,agreement)) return 'promoted_observed_stage'
+      // "지난 만남 뒤로 다시 만나지 않았다" is compatible with an observed meeting.
+      const subsequent = /(?:그 뒤|그 이후|이후|그때부터|그 후|이전에는|전에는|당시에는|요즘|최근에는|다음 만남)/.test(clause)
+      const agreementDenial = /재결합한 적(?:이|은|도)?\s*없|(?:교제|재결합|관계 재개)(?:에|에는|를|하기로)?\s*(?:아직\s*)?합의(?:하지\s*(?:않|못)|한 적(?:이|은|도)?\s*없)/.exec(clause)
+      if (agreementDenial && (state==='reunited' || pastAgreement) && !subsequent && factualClause(clause,agreementDenial)) return 'denied_observed_stage'
+      const denial = meetingRecorded && /만난 적(?:이|은|도)?\s*없|(?:실제(?:로)?\s*)?만남(?:이|은|도)?\s*(?:없었|없어|없다|없습니다)|(?:(?:아직|한 번도)\s*|(?:기록상|기록에는|기록에서는)[^.!?]{0,18})(?:다시\s*)?만나지\s*(?:않|못)/.exec(clause)
+        || contactRecorded && /연락(?:한|을 주고받은|이 닿은) 적(?:이|은|도)?\s*없|(?:한 번도|아직)\s*(?:다시\s*)?연락(?:이|을|은)?\s*(?:닿지 않|한 적 없|하지 않|오가지 않)/.exec(clause)
+      if (denial && !subsequent && factualClause(clause,denial)) return 'denied_observed_stage'
+    }
+  }
+  return null
+}
+
 function observedStageGate(data: any, payload: any) {
-  // Only current-stage answer is the factual state claim; contextual branches are hypothetical.
-  const current = text(data?.reunion_synthesis_v2?.consultation_answer?.current_stage)
   const observed = payload?.reunion_observation
+  for (const value of proseLeaves(data)) {
+    const failure = reunionFactContradiction(value,observed)
+    if (failure) return failure==='contradicted_observed_initiator'?'unsupported_initiative_direction':failure
+  }
+  const current = text(data?.reunion_synthesis_v2?.consultation_answer?.current_stage)
   const state = text(observed?.state)
-  const leadSentences = [data?.core_summary, data?.reunion_synthesis_v2?.summary, current].flatMap(splitSentences)
-  if (state !== 'reunited' && leadSentences.some(sentence => /(?:이미|실제로)\s*(?:두 사람은?\s*)?(?:재회했|재결합했|다시 사귀고)/.test(sentence) && !/다면|경우|인지/.test(sentence))) return 'promoted_observed_stage'
   if (!state) return /(?:현실|실제|현재|관측|입력|관계).{0,24}(?:미확인|확인되지|확인할 수 없|알 수 없|입력되지|기록이 없|정보가 없|판단할 수 없)/.test(current) ? null : 'unobserved_current_stage'
   if (!/입력|기록|알려준|관측/.test(current)) return 'unattributed_observed_stage'
   const markers: Record<string, RegExp> = {

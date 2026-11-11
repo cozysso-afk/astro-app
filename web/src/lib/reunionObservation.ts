@@ -54,9 +54,17 @@ export const eventLabels:Record<ReunionObservedEventKind,string> = {recontact:'�
 export const initiatorLabels = {counterpart:'상대가 먼저',user:'내가 먼저',mutual:'서로 비슷한 시점',unknown:'확인 어려움'} as const
 
 export function recordedReunionEvents(events:ReunionObservationContext['events'], today=browserLocalDateIso()) {
-  return events.filter(event=>Object.hasOwn(eventLabels,event.kind) && /^\d{4}-\d{2}-\d{2}$/.test(event.date)
+  return events.filter(event=>event && typeof event.date==='string' && Object.hasOwn(eventLabels,event.kind) && /^\d{4}-\d{2}-\d{2}$/.test(event.date)
     && event.date<=today && new Date(event.date+'T00:00:00Z').toJSON()?.slice(0,10)===event.date)
     .sort((a,b)=>a.date.localeCompare(b.date))
+}
+
+export function readReunionObservation(value: unknown): ReunionObservationContext {
+  const record = (value && typeof value === 'object' ? value : {}) as Partial<ReunionObservationContext>
+  const state = REUNION_STATE_OPTIONS.find(option=>option.value===record.state)?.value ?? ''
+  const initiator = record.initiator && Object.hasOwn(initiatorLabels,record.initiator) ? record.initiator : ''
+  const events = Array.isArray(record.events) ? recordedReunionEvents(record.events).map(({kind,date})=>({kind,date})) : []
+  return {state,initiator,events}
 }
 
 export function observationReading(context: ReunionObservationContext) {

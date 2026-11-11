@@ -1,3 +1,4 @@
+import {contactDirectionApplication} from './contactDirectionReading.ts'
 import type { FortuneStat, IntegratedApiResponse } from '../appTypes'
 import type { AuthoredReadingDocument, AuthoredSection } from './authoredReadingDocument'
 import type { FortuneField } from './fortuneFields'
@@ -120,7 +121,8 @@ export function weeklyQuestionSections(doc:AuthoredReadingDocument, calc:Integra
       if (incoming && outgoing) {
         const a=signals.수신신호!.average,b=signals.발신적합!.average
         const interpretation = a===b?'두 방향의 주간 점수가 같아.':a>b?'둘을 비교하면 이번 주에는 바깥에서 연락을 받을 조건이 더 두드러져.':'둘을 비교하면 이번 주에는 내가 말을 꺼낼 조건이 더 두드러져.'
-        answer=`외부에서 연락을 받을 조건은 ${incoming}, 내가 먼저 연락할 조건은 ${outgoing}이야. ${interpretation} 실제 첫 연락을 어느 쪽이 했는지는 연락 기록에서 확인할 수 있어.`
+        const application=contactDirectionApplication(signals.수신신호?.band,signals.발신적합?.band)
+        answer=[`외부에서 연락을 받을 조건은 ${incoming}, 내가 먼저 연락할 조건은 ${outgoing}이야.`,interpretation,application,'실제 첫 연락을 어느 쪽이 했는지는 연락 기록에서 확인할 수 있어.'].filter(Boolean).join(' ')
       }
     } else if(topic==='재회' && question==='contact_meeting'){
       const signal=scoreLabel(signals?.과거인연접점??signals?.과거인연재접점)

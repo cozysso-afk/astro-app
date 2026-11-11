@@ -1,4 +1,5 @@
-import type { AiEditorialSection, AiInterpretationResponse, PeriodKey, RelationshipAiResponse, RelationshipAnalysisMode } from '../appTypes'
+import { reunionFactContradiction } from '../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts'
+import type { ReunionObservationContext, AiEditorialSection, AiInterpretationResponse, PeriodKey, RelationshipAiResponse, RelationshipAnalysisMode } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
 
 export type AuthoredBlock = { id: string; label: string; text: string }
@@ -6,7 +7,7 @@ export type AuthoredSection = { id: string; label: string; state: 'ready'|'missi
 export type AuthoredReadingDocument = {
   version: 'authored-reading-v1'; revision: string; scope: string; title: string; date: string
   state: 'ready'|'partial'|'missing'|'unverified'|'calculated'; headline: string
-  core: AuthoredBlock[]; sections: AuthoredSection[]; exportBlockIds: string[]
+  core: AuthoredBlock[]; sections: AuthoredSection[]; exportBlockIds: string[]; omittedObservationConflict?: boolean
 }
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : ''
 const block = (id:string,label:string,value:unknown): AuthoredBlock[] => text(value) ? [{id,label,text:text(value)}] : []
@@ -116,7 +117,7 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
   return completed
 }
 
-export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,mode:RelationshipAnalysisMode,date:string):AuthoredReadingDocument {
+export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,mode:RelationshipAnalysisMode,date:string,observation?:ReunionObservationContext):AuthoredReadingDocument {
   const labels:Record<string,string>={compatibility:'궁합',reunion:'재회',marriage_unmarried:'결혼궁합',marriage_married:'결혼생활'}
   const verified=ai?.ok&&ai.origin==='gemini'&&ai.provenance_verified===true&&ai.data
   const doc:AuthoredReadingDocument={version:'authored-reading-v1',revision:'',scope:mode,title:`${labels[mode]??'궁합'} 해설`,date,state:verified?'missing':'unverified',headline:'',core:[],sections:[],exportBlockIds:[]}
@@ -152,5 +153,20 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
   ;(data.practical_advice??[]).forEach((value,i)=>add(`advice:${i}`,'현실에서 확인할 점',value))
   ;(data.felt_scenarios??[]).forEach((value,i)=>add(`scene:${i}`,'생활 장면',value))
   ;(data.top_aspects??[]).forEach((value,i)=>add(`aspect:${i}`,value.label,value.meaning))
-  return finish(doc,Boolean(doc.headline&&text(core.core_summary)&&text(core.core_reason)&&text(core.core_action)&&Array.isArray(core.core_conditions)&&core.core_conditions.length<=4&&core.core_conditions.every(value=>Boolean(text(value)))),ai.interpreter_version??'legacy')
+  if(mode==='reunion' && observation) {
+    // Apply the same factual checks on reopening old drafts, without modifying the archive.
+    const clean = (value:string) => {
+      if(!reunionFactContradiction(value,observation)) return value
+      doc.omittedObservationConflict=true
+      return value.split(/(?<=[.!?。])\s+|\n+/u).filter(sentence=>!reunionFactContradiction(sentence,observation)).join(' ').trim()
+    }
+    const cleanBlocks=(rows:AuthoredBlock[])=>rows.map(row=>({...row,text:clean(row.text)})).filter(row=>row.text)
+    doc.headline=clean(doc.headline)
+    doc.core=cleanBlocks(doc.core)
+    doc.sections=doc.sections.flatMap(section=>{
+      const blocks=cleanBlocks(section.blocks)
+      return section.blocks.length && !blocks.length ? [] : [{...section,blocks}]
+    })
+  }
+  return finish(doc,Boolean(doc.headline&&['core:summary','core:reason','core:action'].every(id=>doc.core.some(b=>b.id===id))&&Array.isArray(core.core_conditions)&&core.core_conditions.length<=4&&core.core_conditions.every(value=>Boolean(text(value)))),ai.interpreter_version??'legacy')
 }

@@ -7,6 +7,7 @@ import { browserLocalDateIso } from './lib/readingDateSemantics'
 import { observedContactRows, observedRelationshipPassage } from './lib/contactOutcomeReading'
 
 type ObservationContext = {
+  field?: FortuneField
   observations: DailyOutcomeRecord[]
   remote: { failed: boolean } | null
   calculation: IntegratedApiResponse
@@ -17,6 +18,16 @@ export function useContactObservations() { return useContext(Observation) }
 export function useObservedPassage(period:string, scope:string) {
   const shared = useContactObservations()
   return shared ? observedRelationshipPassage(shared.observations,shared.calculation,period,scope) : null
+}
+
+export function useObservedPromptContext() {
+  const shared = useContactObservations()
+  if (!shared) return ''
+  const {day_count}=shared.calculation.period
+  const period = day_count===1 ? 'today' : day_count===7 ? 'week' : day_count<=45 ? 'month' : 'year'
+  const scope = shared.field?.id==='love' ? 'love' : 'contact'
+  const passage = observedRelationshipPassage(shared.observations,shared.calculation,period,scope)
+  return passage ? `[사용자가 기록한 연락] ${passage.fact} 기록한 날짜의 사실을 먼저 반영하라. 수신만으로 선연락 주체를 추정하거나 만남을 교제 합의로 바꾸지 말라. 다른 날짜의 상대가 같은 사람이라고 단정하지 말라.\n` : ''
 }
 
 type ScopeProps = {calculation: IntegratedApiResponse; field?: FortuneField; localRecords?: unknown[]; children: ReactNode}
@@ -50,5 +61,5 @@ function LoadObservations({calculation,field,localRecords,children}: ScopeProps 
   const remote = cloud?.from === from && cloud.end === through ? cloud : null
   const archived = listLocalArchive().filter(row=>row.kind === 'outcome').map(row=>row.result)
   const observations = observedContactRows([...archived,...(remote?.values ?? []),...localRecords],from,through)
-  return <Observation.Provider value={{observations,remote,calculation}}>{children}</Observation.Provider>
+  return <Observation.Provider value={{observations,remote,calculation,field}}>{children}</Observation.Provider>
 }

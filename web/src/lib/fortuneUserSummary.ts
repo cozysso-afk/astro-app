@@ -1,5 +1,6 @@
 import type { AiInterpretationResponse, AiTopicInterpretation, FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import { fortunePresentationTone, fortuneToneAssessment, fortuneEvidenceSnapshot, evidenceDirection, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
+import {contactDirectionApplication} from './contactDirectionReading.ts'
 import { readingDateSemantics } from './readingDateSemantics.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
@@ -514,7 +515,7 @@ function relationshipConsistency(context: FortuneUserSummaryContext): Relationsh
   const reconnectionLevel = finiteLevel(topicStat(context, '재회'))
   const incomingLevel = finiteLevel(signals['수신신호'])
   const outgoingLevel = finiteLevel(signals['발신적합'])
-  const pastLevel = finiteLevel(signals['과거인연접점'])
+  const pastLevel = finiteLevel(signals['과거인연접점']) ?? finiteLevel(signals['과거인연재접점'])
   const directionalWeak = incomingLevel === 'low' && outgoingLevel === 'low'
   const blockReconnectionAction = !contactLevel || contactLevel === 'low' || directionalWeak
 
@@ -529,12 +530,13 @@ function relationshipConsistency(context: FortuneUserSummaryContext): Relationsh
   }
 
   if (blockReconnectionAction && reconnectionLevel && reconnectionLevel !== 'low') {
+    const constraint = !contactLevel ? '연락 전체 지표는 계산 정보가 부족해.' : contactLevel === 'low' ? '계산된 연락 활성도는 약해.' : '받는 연락과 먼저 거는 연락 지표는 모두 약해.'
     return {
       contactLevel, reconnectionLevel, incomingLevel, outgoingLevel, pastLevel, blockReconnectionAction,
-      reconnectionMeaning: '관계 회복 여지는 있으나 실제 연락 흐름은 약함',
-      reconnectionConclusion: '재회 흐름은 보통 이상이지만 계산된 연락 활성도는 약해. 실제 연락을 주고받았는지는 별도로 확인하고, 그 사실과 관계 회복 의향은 구분해서 봐.',
+      reconnectionMeaning: '재접촉을 살필 때야. '+constraint,
+      reconnectionConclusion: `재회 흐름은 보통 이상이야. ${constraint} 실제 연락을 주고받았는지는 별도로 확인하고, 그 사실과 관계 회복 의향은 구분해서 봐.`,
       reconnectionAction: '이미 연락 중이라면 대화의 지속과 다음 만남을 보고, 연락 여부가 미확인이라면 재접촉 기록부터 확인해.',
-      reconnectionCaution: '재회 점수가 연락 신호의 약세를 덮어쓰지는 않아. 이 수치는 실제 연락의 유무를 판단하지 않으므로, 이미 확인된 연락 기록과 구분해서 읽어.',
+      reconnectionCaution: '실제 연락이나 만남을 기록했다면 그날 주고받은 말부터 봐. 기록이 비어 있으면 연락 여부는 아직 알 수 없어. 관계를 다시 시작할지는 두 사람이 나눈 대화와 합의에서 확인해.',
     }
   }
 
@@ -573,7 +575,7 @@ function relationshipSummary(context: FortuneUserSummaryContext, important: Set<
     const point = flowLevel(stat) === 'low' ? stat.caution_days?.[0] : stat.best_days?.[0]
     return point && point.date >= context.calculation.period.start && point.date <= context.calculation.period.end ? point.date : undefined
   }
-  const reconnectionStat = Number.isFinite(stats['과거인연접점']?.average) ? stats['과거인연접점'] : undefined
+  const reconnectionStat = [stats['과거인연접점'],stats['과거인연재접점']].find(stat=>Number.isFinite(stat?.average))
   return {
     summary: '외부 연락 반응 신호와 내가 연락을 시작할 때의 실행 적합도를 나눠 봐. 두 값 모두 특정 상대의 행동이나 답장 확률을 뜻하지 않아.',
     incomingBand: band(incoming), outgoingBand: band(outgoing),
@@ -589,7 +591,7 @@ function relationshipSummary(context: FortuneUserSummaryContext, important: Set<
       : '내가 연락을 시작할 조건은 중간대야. 보낼 필요가 있을 때만 짧고 구체적으로 전해.',
     reconnection: important.has('재회') && reconnectionStat
       ? consistency.blockReconnectionAction
-        ? `과거 인연 접점 신호는 ${band(reconnectionStat)}으로 잡혀 있지만 연락 전체 흐름이 약해. 실제 재접촉으로 단정하지 말고 연락과 행동이 생기는지를 봐.`
+        ? `과거 인연 접점 신호는 ${band(reconnectionStat)}으로 잡혀 있어. ${consistency.reconnectionMeaning} 실제 연락이나 만남은 기록에서 확인해.`
         : `과거 인연 재접촉은 ${band(reconnectionStat)}으로 잡혀 있어. 추억보다 실제 대화가 다시 시작되는지를 봐.`
       : undefined,
   }
@@ -945,7 +947,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
       ? consistency.reconnectionCaution
       : snapshot.challenge
         ? `${clean(narrative?.avoid) ?? copy.caution} 부담 근거는 ${snapshot.challenge}야. 이 근거 하나로 사건을 확정하지 마.`
-        : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : undefined)
+        : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : topic === '연애' ? LIFE.연애[1] : undefined)
     return { topic, conclusion, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level, direction),
       timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,
       caution: cautionText }
@@ -998,7 +1000,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
     periodKind: frame.kind, when, headline, summary: (frame.kind === 'day' ? daySummary(bestFlow, cautionFlow, frame.when) : frame.kind === 'week' ? '주간의 큰 방향부터 잡고, 아래 시기에 맞춰 중요한 일을 나눠 배치해봐.' : frame.kind === 'month' ? '한 달을 같은 속도로 보내기보다, 힘을 쓸 때와 여유를 둘 때를 나눠서 읽어봐.' : '올해 전체의 방향과 개별 시기는 구분해봐. 큰 계획은 유지하되 구간마다 힘을 조절하는 쪽이야.'),
     doTitle: '가장 좋은 흐름', cautionTitle: '가장 조심할 흐름', focusTitle: '중요 분야',
     bestFlow, cautionFlow,
-    favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: displayFlowBand(row.score!, topicStat(context, row.topic)?.band ?? '보통'), meaning: row.topic === '연락' ? '외부 연락 환경과 내 연락 실행 조건을 구분해' : row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].use : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].use : FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),
+    favorableCards: bestCandidates.map(row => ({ topic: row.topic, score: row.score!, band: displayFlowBand(row.score!, topicStat(context, row.topic)?.band ?? '보통'), meaning: row.topic === '연락' ? '받는 연락과 내가 보내는 연락의 조건을 따로 봐' : row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].use : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].use : FLOW_COPY[row.topic]?.[0] ?? '흐름에 맞춰 계획을 진행해' })),
     cautionCards: cautionCandidates.map(row => ({ topic: row.topic, score: row.score!, band: row.topic === '투자주의' ? '주의' : displayFlowBand(row.score!, topicStat(context, row.topic)?.band ?? '약함'), meaning: row.topic === '재회' ? consistency.reconnectionMeaning : frame.kind === 'day' && DAILY_HEADLINE_SCENE[row.topic] ? DAILY_HEADLINE_SCENE[row.topic].caution : frame.kind === 'week' && WEEKLY_HEADLINE_SCENE[row.topic] ? WEEKLY_HEADLINE_SCENE[row.topic].caution : FLOW_COPY[row.topic]?.[1] ?? '속도를 낮추는 편이 좋아' })),
     doItems: best.map(row => row.topic === '재회' ? consistency.reconnectionConclusion : topicCopy(row.topic, row.level, when, row.direction).conclusion),
     cautionItems: caution.map(row => row.topic === '재회' ? consistency.reconnectionConclusion : topicCopy(row.topic, row.level, when, row.direction).conclusion),
@@ -1168,5 +1170,6 @@ export function contactReading(value: FortuneUserRelationship): string {
   const send = !outgoing || outgoing === '정보 부족'
     ? '내 연락 실행 적합도도 계산 정보가 부족해.'
     : `내 연락 실행 적합도는 ${outgoing}이야. 이 값은 내가 말을 꺼낼 때의 상대적 조건이지 상대의 답장 의향은 아니야.`
-  return `${receive} ${send} 두 값의 차이는 계산축 비교일 뿐, 먼저 연락할 사람을 판정하지 않아.`
+  const application=contactDirectionApplication(incoming,outgoing)
+  return [receive,send,application || '실제로 누가 먼저 연락했는지는 주고받은 연락에서 확인할 수 있어.'].join(' ')
 }

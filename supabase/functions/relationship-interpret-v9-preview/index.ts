@@ -9,7 +9,7 @@ import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relat
 import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
 const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.7-grounded-question-reading-contract";
-const REUNION_VERSION="relationship-v14.10-grounded-stage-question-reading-contract";
+const REUNION_VERSION="relationship-v14.11-observed-fact-reading-contract";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL,"gemini-3.7-flash"]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -313,8 +313,11 @@ function reunionOutputContract(payload:any){
  const state=String(observation?.state??"");
  const labels:any={disconnected:"연락이 끊긴 상태",recontacted:"다시 연락이 닿은 상태",messaging:"메시지를 주고받는 상태",met:"실제로 만난 상태",intimate_undefined:"친밀하지만 관계 정의가 불분명한 상태",reunited:"다시 관계를 시작한 상태"};
  const observedStage=state?`consultation_answer.current_stage는 반드시 "사용자 입력 기록상 ${labels[state]??state}"라고 시작하고, 기준 시점은 ${String(observation?.as_of??"입력되지 않음")}이라고 밝혀. 기준 시점이 없으면 현재도 같다고 단정하지 마.`:"consultation_answer.current_stage는 현실 단계가 입력되지 않아 미확인이라고 밝혀.";
+ const initiatorLabels:Record<string,string>={counterpart:"상대가 먼저",user:"본인이 먼저",mutual:"두 사람이 비슷한 시점에"};
+ const observedInitiator=initiatorLabels[String(observation?.initiator??"")];
+ const facts=observedInitiator?`지난 첫 재접촉은 입력 기록상 ${observedInitiator} 연락했다. 이 사실을 과거형으로 명시한다. 차트와 방향이 다르더라도 기록을 바꾸지 않는다.`:"기록에 없는 과거 선연락 주체는 지목하지 않는다.";
  const initiativeRule=payload?.reunion_evidence_v2?.initiative_gate?.available===true?"initiative_gate의 허용 범위 안에서만 다음 연락 주체를 설명해.":"다음 선연락 주체를 판단할 수 없어. initiative와 consultation_answer.initiative에는 이 한계와 그 이유를 써. 다른 항목에서 수신·발신의 우열을 예측하지 마. 과거 선연락 주체가 기록된 경우에만 과거 사실로 언급해.";
- return `[REUNION_OUTPUT_CONTRACT]\n${questionLines.join("\n")}\n${observedStage}\n${initiativeRule}\ntiming.windows[].evidence_refs도 timing 허용 ID만 사용한다.\nconsultation_answer.evidence_refs는 전체 허용 ID 중 서로 다른 ID를 최소 3개 사용: ${JSON.stringify(globalIds)}\nconvergence[].evidence_refs는 전체 허용 ID 중 최소 2개를 사용한다.\ntiming.windows[].period에 정확한 날짜를 쓸 때는 다음 날짜 문자열만 그대로 사용: ${JSON.stringify(exactDates)}\n허용 목록 밖 ID나 날짜를 새로 만들지 않는다.`;
+ return `[REUNION_OUTPUT_CONTRACT]\n${questionLines.join("\n")}\n${observedStage}\n${facts}\n${initiativeRule}\ntiming.windows[].evidence_refs도 timing 허용 ID만 사용한다.\nconsultation_answer.evidence_refs는 전체 허용 ID 중 서로 다른 ID를 최소 3개 사용: ${JSON.stringify(globalIds)}\nconvergence[].evidence_refs는 전체 허용 ID 중 최소 2개를 사용한다.\ntiming.windows[].period에 정확한 날짜를 쓸 때는 다음 날짜 문자열만 그대로 사용: ${JSON.stringify(exactDates)}\n허용 목록 밖 ID나 날짜를 새로 만들지 않는다.`;
 }
 function promptText(payload:any,purpose:Purpose,compactMode=false,repairHint=""){
  const retry=compactMode?"재시도다. 완전한 JSON을 만들되 근거·오브·사주 허용필드·시기는 유지하고 중복만 줄여라.\n":"";

@@ -153,7 +153,7 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
         : status === 'intimate_uncommitted'
           ? '친밀한 상대와의 연락 방향을 보되, 연락을 애정이나 관계 약속의 증거로 바꾸지 않아.'
           : '현재 연인과 주고받는 연락의 두 방향을 구분해. 상대의 속마음을 확정하는 값은 아니야.',
-    ...(single && Number.isFinite(calculation.western.relationship_signals?.['과거인연접점']?.average)
+    ...(single && ['과거인연접점','과거인연재접점'].some(key=>Number.isFinite(calculation.western.relationship_signals?.[key]?.average))
       ? {}
       : { reconnection: undefined, reconnectionBand: undefined, reconnectionTiming: undefined }),
   } : undefined
@@ -174,9 +174,9 @@ export function applyLoveContext(summary: FortuneUserSummary, calculation: Integ
         const contextual = item.topic === '연애' ? love : contact
         return {
           ...item,
-          conclusion: contextual.conclusion,
+          conclusion: item.topic === '연락' ? item.conclusion : contextual.conclusion,
           action: contextual.action,
-          caution: contextual.caution,
+          caution: [...new Set([item.caution,contextual.caution].filter(Boolean))].join(' '),
         }
       }),
     referenceTopics: summary.referenceTopics

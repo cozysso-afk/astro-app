@@ -1,29 +1,34 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { hierarchy,renderReunion } from './fixtures/reunionPanel.mjs'
+import { timing } from './readingExperience.fixtures.mjs'
 
-const panel = readFileSync(new URL('../ReunionHierarchyPanelV3.tsx', import.meta.url), 'utf8')
-
-test('contact activation uses hierarchy stage values, never incoming or outgoing direction scores', () => {
-  const body=panel.slice(panel.indexOf('function contactReading'),panel.indexOf('function directionRow'))
-  assert.match(body,/hierarchy\.stages\?\.contact_recontact/)
-  assert.match(body,/stage\?\.activation/)
-  assert.doesNotMatch(body,/incoming|outgoing|directionRows/)
+test('direction scores remain visible and independent of the contact-stage score',()=>{
+  const html=renderReunion()
+  const section=html.split('<h4>연락 방향 참고값</h4>')[1].split('</section>')[0]
+  assert.match(section,/수신 · 상대 → 나<\/b><strong>약함 · 30점/)
+  assert.match(section,/발신 · 나 → 상대<\/b><strong>강함 · 70점/)
+  assert.match(html,/연락·대화: 42/)
+  assert.doesNotMatch(section,/42점|내가 먼저 연락하게/)
+  assert.match(renderReunion({timing:{...timing,incoming:null}}),/수신 · 상대 → 나<\/b><strong>정보 부족<\/strong>/)
 })
 
-test('direction score difference remains visible without claiming the actual first-contact actor', () => {
-  assert.match(panel,/function initiativeReading\(rows: DirectionRow\[\]\)/)
-  assert.match(panel,/Math\.abs\(diff\) < 5/)
-  assert.match(panel,/근소 우세/)
-  assert.match(panel,/실제 선연락 주체를 확정한다는 뜻은 아니야/)
-  assert.match(panel,/실제로 누가 먼저 연락할지를 예측하지 않아/)
-  assert.match(panel,/계산값과 별도 기록/)
+test('known initiator, mutual, unknown and absent keep their recorded meaning even without a valid hierarchy',()=>{
+  for (const [initiator,label] of Object.entries({counterpart:'상대가 먼저',user:'내가 먼저',mutual:'서로 비슷한 시점',unknown:'확인 어려움','':'미기록'})) {
+    for (const calculation of [hierarchy,null,{...hierarchy,validation:{status:'FAIL'}}]) {
+      const html=renderReunion({hierarchy:calculation,observation:{state:'recontacted',initiator,events:[]}})
+      assert.equal(html.split('<b>실제 첫 연락</b> · '+label).length-1,1)
+    }
+  }
+  const empty=renderReunion({observation:undefined})
+  assert.match(empty,/현재 관계 상태 미입력/)
+  assert.match(empty,/<b>실제 첫 연락<\/b> · 미기록/)
 })
 
-test('reunion UI exposes relative activation and a separate behavior-change outlook', () => {
-  assert.match(panel,/수신·발신 계산값 비교/)
-  assert.match(panel,/상대가 예전과 다르게 움직일 여지가 있나/)
-  assert.match(panel,/function behaviorChangeReading/)
-  assert.match(panel,/실제 만남이나 관계 재구축 단계가 약하므로/)
-  assert.doesNotMatch(panel,/상대는 예전과 달라졌을까/)
+test('a dated meeting does not confirm an initiator or agreement to resume dating',()=>{
+  const html=renderReunion({observation:{state:'met',initiator:'unknown',events:[{kind:'meeting',date:'2025-09-14'}]}})
+  assert.match(html,/두 사람이 실제로 다시 만났어요/)
+  assert.match(html,/실제 첫 연락<\/b> · 확인 어려움/)
+  assert.match(html,/직접 만난 날 · <time dateTime="2025-09-14">/)
+  assert.doesNotMatch(html,/다시 교제하기로 합의<\/span><strong>확인됨/)
 })

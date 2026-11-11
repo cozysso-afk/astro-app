@@ -56,3 +56,13 @@ test('monthly relationship situations respond independently when contact directi
   assert.match(select(a,'couple'),/63점.*함께 바꾸고 싶은/)
   assert.match(select(b,'couple'),/29점.*언제 편하게 얘기/)
 })
+
+for(const period of ['today','week','month']) {
+  test(period+' turns opposite contact bands into different practical readings',()=>{
+    const outgoing=render(period,25,75),incoming=render(period,75,25)
+    assert.match(outgoing,/먼저 전할 용건이 있다면 질문 하나/)
+    assert.doesNotMatch(outgoing,/이미 질문을 보냈다면 답이 늦다는/)
+    assert.match(incoming,/이미 질문을 보냈다면 답이 늦다는/)
+    assert.doesNotMatch(incoming,/먼저 전할 용건이 있다면 질문 하나/)
+  })
+}

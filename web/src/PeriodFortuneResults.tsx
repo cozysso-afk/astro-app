@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { DatingArchetypePanel } from './DatingArchetypePanel'
+import { useObservedPromptContext } from './ContactObservationScope'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
@@ -45,7 +46,7 @@ type PeriodFortuneResultsProps = {
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
   onRetryAi: (refreshMonthlyGaps?:boolean) => void
-  onCopyAiPrompt: (mode?: ExternalCopyMode, field?: FortuneField) => void
+  onCopyAiPrompt: (mode?: ExternalCopyMode, field?: FortuneField, observed?:string) => void
   onCancelAi: () => void
   aiCanCancel: boolean
   onOutcomeChange: (draft: DailyOutcomeRecord) => void
@@ -53,8 +54,9 @@ type PeriodFortuneResultsProps = {
 }
 
 function SavedReadingPromptCopy({onCopy,field,westernOnly}: {onCopy: PeriodFortuneResultsProps['onCopyAiPrompt'];field?: FortuneField;westernOnly?: boolean}) {
+  const observed = useObservedPromptContext()
   if (westernOnly) return null
-  return <div data-reading-export-ignore="true"><ExternalPromptCopy onCopy={mode=>onCopy(mode,field)}/></div>
+  return <div data-reading-export-ignore="true"><ExternalPromptCopy onCopy={mode=>onCopy(mode,field,observed)}/></div>
 }
 
 function periodExportTitle(period: PeriodKey, label: string | undefined, result: IntegratedApiResponse, fieldLabel?: string) {

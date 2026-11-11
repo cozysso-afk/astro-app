@@ -171,3 +171,17 @@ test('mixed old and new love sections are accessible by situation without duplic
   assert.equal(html.split(supplements[0].text).length,2)
   assert.ok(html.includes('주간 계산 근거'))
 })
+
+test('opening an old reunion draft keeps valid sentences while removing a statement that contradicts the saved meeting',()=>{
+  const ai={ok:true,origin:'gemini',provenance_verified:true,interpreter_version:'legacy',data:{
+    headline:'다시 연락을 주고받은 뒤',core_summary:'입력 기록상 두 사람은 만난 적이 없어요. 다음 약속이 잡히는지 보세요.',
+    core_reason:'두 사람이 시간을 내는지 살펴보세요.',core_action:'약속을 함께 정해 보세요.',core_conditions:[],
+    reunion_synthesis_v2:{consultation_answer:{current_stage:'입력 기록상 두 사람은 다시 교제하기로 합의했어요.'}}
+  }}
+  const original=JSON.stringify(ai)
+  const doc=documents.buildRelationshipReadingDocument(ai,'reunion','2026-11-11',{state:'met',initiator:'counterpart',events:[]})
+  assert.equal(doc.omittedObservationConflict,true)
+  assert.equal(doc.core.find(x=>x.id==='core:summary').text,'다음 약속이 잡히는지 보세요.')
+  assert.ok(!doc.sections.some(s=>s.blocks.some(b=>b.text.includes('교제하기로 합의했어요'))))
+  assert.equal(JSON.stringify(ai),original)
+})
