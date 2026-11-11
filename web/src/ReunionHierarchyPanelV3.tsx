@@ -2,7 +2,7 @@ import type { Aspect, RelationshipAiResponse, ReunionObservationContext } from '
 import { ReadingTimeline, type DirectionRow } from './ReadingSignals'
 import type { ReunionHierarchy } from './lib/reunionHierarchy'
 import { polishKoreanSentence } from './lib/fortuneNarrativePolish'
-import { compareObservedEvents } from './lib/reunionObservation'
+import { compareObservedEvents, observationReading } from './lib/reunionObservation'
 import { buildReunionReadingV4 } from './lib/reunionReadingV4'
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
@@ -93,7 +93,6 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const riskNarrative = readerSentences(`${reunionV2?.repeat_risks?.conclusion ?? ''} ${(reunionV2?.repeat_risks?.patterns ?? []).join(' ')}`, 3)
   const sustainabilityNarrative = readerSentences(sustainabilityText, 2)
   const currentAxisKey = [...readingV4.axes].reverse().find(row => row.state === 'observed')?.key
-    ?? readingV4.axes.find(row => row.state === 'current_signal')?.key
   return <section className="reading-section reunion-hierarchy reunion-ui-v5">
     {!valid ? <p role="alert">계산 확인이 필요해요. 다시 계산한 뒤 결과를 확인해 주세요.</p> : <>
       {!authoredReadingSeparate && <section className="reunion-v5-answer">
@@ -107,8 +106,8 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
           {aiCheckpoint ? <p className="reunion-v4-next-checkpoint"><b>다음 확인점</b>{aiCheckpoint}</p> : null}
           {aiReason ? <div className="reunion-v4-verdict-points"><p><b>판정 이유</b>{aiReason}</p></div> : null}
         </> : <>
-          <h3>자연어 해설을 불러오지 못했어요</h3>
-          <p className="reunion-v4-answer-copy">계산 단계는 아래에서 확인할 수 있어요. 해설은 다시 생성해 주세요.</p>
+          <h3>{observationReading(observation).title}</h3>
+          <p className="reunion-v4-answer-copy">{observationReading(observation).text}</p>
         </>}
       </section>}
       <section className="reunion-v5-section reunion-v4-stage-section">
@@ -120,7 +119,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         </ol>
       </section>
       {readingV4.futureWindows.length > 0 ? <section className="reunion-v5-section reunion-v4-future-windows">
-        <h4>앞으로 주목할 시기</h4>
+        <h4>다음 단계의 계산상 참고 시기</h4>
         <ReadingTimeline events={readingV4.futureWindows.map(row=>({date:row.date,kind:row.stage==='relationship_rebuilding'?'rebuilding':row.stage==='contact_recontact'?'incoming':'reconnection',label:row.label,status:'주목'}))} context={{now:new Date(hierarchyData.as_of_date+'T12:00:00+09:00')}}/>
       </section> : null}
       <section className="reunion-v5-section reunion-v4-directions-section">

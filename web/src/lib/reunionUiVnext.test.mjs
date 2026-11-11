@@ -1,27 +1,33 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import test from 'node:test'
-
-const panel = readFileSync(new URL('../ReunionHierarchyPanel.tsx', import.meta.url), 'utf8')
-const host = readFileSync(new URL('../RelationshipInterpretationPanel.tsx', import.meta.url), 'utf8')
-
-test('reunion vNext is present-first, directional, retrospective, future-gated, and rebuild-aware', () => {
-  const headings = ['지금 두 사람은 어디에 있나','서로에게 걸리는 방향','관계 자체의 현재 단계','지난 활성기 · 사후 확인용','앞으로의 후보 시기','연락 ≠ 재회','관계를 다시 이어가려면','계산 근거 보기']
-  let cursor = -1
-  for (const heading of headings) {
-    const next = panel.indexOf(heading)
-    assert.ok(next > cursor, `${heading} order`)
-    cursor = next
-  }
-  assert.match(panel, /실제 속마음이나 실제 선연락 행동을 관측한 값은 아니야/)
-  assert.match(panel, /과거와 맞아 보인다는 사실만으로 엔진 정확도가 증명되는 것은 아니야/)
-  assert.match(panel, /사건 확정일 아님/)
-  assert.match(panel, /진행 컴포짓을 포함한 관계층/)
+import {after,before,test} from 'node:test'
+import {createServer} from 'vite'
+import {fileURLToPath} from 'node:url'
+import {createElement} from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+let server,Panel
+before(async()=>{
+  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+  Panel=(await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')).RelationshipInterpretationPanel
 })
-
-test('hierarchy reading does not require a paid AI call for base inspection', () => {
-  assert.match(host, /추가 자연어 해설 · 선택/)
-  assert.match(host, /위 계산 결과 확인에는 필요 없어/)
-  assert.match(host, /reunion && hierarchyData && ai\?\.ok && ai\.data/)
-  assert.match(host, /<ReunionHierarchyPanel/)
+after(()=>server?.close())
+const hierarchy={version:'fixture',as_of_date:'2025-11-11',validation:{status:'PASS'},stages:{relationship_rebuilding:{activation:64,candidate_count:1}},top_periods:[{start:'2025-11-18',end:'2025-11-18',date:'2025-11-18',stage:'relationship_rebuilding',final:64}],past_windows:[],current_windows:[]}
+function show(more={}) {
+  return renderToStaticMarkup(createElement(Panel,{analysisMode:'reunion',aspects:[],timeSensitivePoints:new Set(),formatAspect:()=>'',observation:{state:'met',initiator:'user',events:[]},hierarchy,ai:null,aiLoading:false,aiError:'',onAi:()=>assert.fail('generated on render'),...more}))
+}
+test('confirmed meeting, next-stage timing and first contact remain distinct in the reading',()=>{
+  const html=show()
+  const headings=['두 사람이 실제로 다시 만났어요','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','지난 시기와 실제 기록 비교']
+  const positions=headings.map(heading=>html.indexOf(heading))
+  assert.ok(positions.every((offset,i)=>offset>=0 && (!i || offset>positions[i-1])))
+  assert.match(html,/실제 첫 연락<\/b> · 내가 먼저/)
+  assert.match(html,/다시 교제하기로 합의<\/span><strong>주목 시기 있음/)
+  assert.match(html,/예측 적중률을 뜻하지 않아요/)
+})
+test('free facts and calculations precede optional generation and survive a generation error',()=>{
+  for(const props of [{},{aiError:'사용 한도가 찼어요.'},{aiLoading:true}]){
+    const html=show(props)
+    assert.ok(html.indexOf('두 사람이 실제로 다시 만났어요')>=0)
+    assert.ok(html.indexOf('계산 근거와 점수 보기')<html.indexOf('ai-preflight-cost'))
+    assert.match(html,/관계 유지<\/span><strong>앞 단계 미확인/)
+  }
 })

@@ -1,9 +1,10 @@
 import type { ReunionObservationContext } from '../appTypes'
+import {initiatorLabels,recordedReunionEvents} from './reunionObservation.ts'
 import type { DirectionRow } from '../ReadingSignals'
 import type { ReunionHierarchy, ReunionPeriod } from './reunionHierarchy'
 
 export type ReunionAxisKey = 'awareness' | 'recontact' | 'continuity' | 'meeting' | 'agreement' | 'sustainability'
-export type ReunionAxisState = 'observed' | 'current_signal' | 'future_candidate' | 'no_candidate' | 'blocked' | 'not_calculated'
+export type ReunionAxisState = 'observed' | 'past_event' | 'current_signal' | 'future_candidate' | 'undated_signal' | 'no_candidate' | 'blocked' | 'not_calculated'
 
 export type ReunionAxisV4 = {
   key: ReunionAxisKey
@@ -39,7 +40,7 @@ const AXIS_LABEL: Record<ReunionAxisKey, string> = {
   recontact: '연락이 닿음',
   continuity: '대화가 이어짐',
   meeting: '실제 만남',
-  agreement: '다시 만나기로 정함',
+  agreement: '다시 교제하기로 합의',
   sustainability: '관계 유지',
 }
 
@@ -48,19 +49,16 @@ const AXIS_ORDER: ReunionAxisKey[] = ['awareness','recontact','continuity','meet
 function stageInfo(hierarchy: ReunionHierarchy, stage: string) {
   const row = hierarchy.stages?.[stage]
   const current = hierarchy.current_windows.some(window => window.stage === stage)
-  const future = hierarchy.top_periods.some(window => window.stage === stage)
+  const future = hierarchy.top_periods.some(window => window.stage === stage && window.end >= hierarchy.as_of_date)
   const count = typeof row?.candidate_count === 'number' && Number.isFinite(row.candidate_count) ? row.candidate_count : null
   return { row, current, future, count, hasSignal: current || future || Boolean(count && count > 0) }
 }
 
 function observedAxes(context: ReunionObservationContext) {
   const states = new Set<ReunionAxisKey>()
-  if (['recontacted','messaging','met','intimate_undefined','reunited'].includes(context.state)) {
-    states.add('awareness')
-    states.add('recontact')
-  }
+  if (context.state === 'recontacted' || context.state === 'messaging') states.add('recontact')
   if (context.state === 'messaging') states.add('continuity')
-  if (['met','intimate_undefined','reunited'].includes(context.state)) states.add('meeting')
+  if (context.state === 'met' || context.state === 'intimate_undefined') states.add('meeting')
   if (context.state === 'reunited') states.add('agreement')
   return states
 }
@@ -73,15 +71,18 @@ function rawAxisState(key: ReunionAxisKey, hierarchy: ReunionHierarchy, observed
   if (!stage) return 'not_calculated'
   const info = stageInfo(hierarchy, stage)
   if (info.current) return 'current_signal'
-  if (info.future || (info.count != null && info.count > 0)) return 'future_candidate'
+  if (info.future) return 'future_candidate'
+  if (info.count != null && info.count > 0) return 'undated_signal'
   if (info.count === 0) return 'no_candidate'
   return 'not_calculated'
 }
 
 function stateStatus(key: ReunionAxisKey, state: ReunionAxisState) {
+  if (state === 'past_event') return '날짜 기록 있음'
   if (state === 'observed') return '확인됨'
   if (state === 'current_signal') return '지금 주목'
   if (state === 'future_candidate') return '주목 시기 있음'
+  if (state === 'undated_signal') return '시기 확인 필요'
   if (state === 'no_candidate') return '뚜렷한 시기 없음'
   if (state === 'blocked') return '앞 단계 미확인'
   if (key === 'continuity') return '대화 기록으로 확인'
@@ -95,18 +96,21 @@ function availableState(state: ReunionAxisState) {
 
 function buildAxes(hierarchy: ReunionHierarchy, context: ReunionObservationContext) {
   const observed = observedAxes(context)
+  const eventAxes:Record<string,ReunionAxisKey>={recontact:'recontact',meeting:'meeting',rebuilding:'agreement'}
+  const dated=new Set(recordedReunionEvents(context.events).map(event=>eventAxes[event.kind]))
   const raw = new Map(AXIS_ORDER.map(key => [key, rawAxisState(key, hierarchy, observed)]))
   return AXIS_ORDER.map<ReunionAxisV4>(key => {
     let state = raw.get(key)!
     if (key === 'meeting' && !observed.has(key) && !availableState(raw.get('recontact')!)) state = 'blocked'
     if (key === 'agreement' && !observed.has(key) && !observed.has('meeting')) state = 'blocked'
     if (key === 'sustainability' && !observed.has('agreement')) state = 'blocked'
+    if (dated.has(key) && !observed.has(key)) state='past_event'
     return {
       key,
       label: AXIS_LABEL[key],
       state,
       status: stateStatus(key, state),
-      source: observed.has(key) ? 'observation' : key === 'continuity' || key === 'sustainability' ? 'interpretation' : 'calculation',
+      source: observed.has(key) || dated.has(key) ? 'observation' : key === 'continuity' || key === 'sustainability' ? 'interpretation' : 'calculation',
     }
   })
 }
@@ -139,18 +143,10 @@ function directions(rows: DirectionRow[]): ReunionDirectionV4[] {
   ]
 }
 
-function observedInitiator(context: ReunionObservationContext) {
-  if (context.initiator === 'counterpart') return '상대가 먼저'
-  if (context.initiator === 'user') return '내가 먼저'
-  if (context.initiator === 'mutual') return '서로 비슷한 시점'
-  if (context.initiator === 'unknown') return '확인 어려움'
-  return undefined
-}
-
 function windowLabel(row: ReunionPeriod) {
-  if (row.stage === 'contact_recontact') return '연락·대화 재개'
-  if (row.stage === 'in_person_meeting') return '실제 만남'
-  if (row.stage === 'relationship_rebuilding') return '관계 합의·재구축'
+  if (row.stage === 'contact_recontact') return '다시 연락할 여건'
+  if (row.stage === 'in_person_meeting') return '만남을 살펴볼 시기'
+  if (row.stage === 'relationship_rebuilding') return '관계를 다시 정할 여건'
   return '다시 의식하는 배경'
 }
 
@@ -170,7 +166,7 @@ export function buildReunionReadingV4({ hierarchy, observation, directionRows, h
         ? 'agreement'
         : observation.state === 'reunited'
           ? undefined
-          : axes.find(row => row.state !== 'observed' && row.state !== 'blocked' && STAGE_FOR_AXIS[row.key])?.key
+          : recordedReunionEvents(observation.events).length ? undefined : 'recontact'
   const futureWindows = hierarchy.top_periods
     .filter(row => row.end >= hierarchy.as_of_date)
     .filter(row => targetAxis && STAGE_FOR_AXIS[targetAxis] === row.stage)
@@ -179,7 +175,7 @@ export function buildReunionReadingV4({ hierarchy, observation, directionRows, h
   return {
     axes,
     directions: directions(directionRows),
-    observedInitiator: observedInitiator(observation),
+    observedInitiator: observation.initiator ? initiatorLabels[observation.initiator] : undefined,
     futureWindows,
   }
 }

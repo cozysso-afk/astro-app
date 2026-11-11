@@ -49,7 +49,7 @@ import type {
   AiInterpretationResponse
 } from './appTypes'
 import type { ReunionObservationContext, ReunionObservedInitiator, ReunionObservedState } from './appTypes'
-import { REUNION_STATE_OPTIONS } from './lib/reunionObservation'
+import { REUNION_STATE_OPTIONS, recordedReunionEvents } from './lib/reunionObservation'
 
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { AnnualDailyScoresPanel } from './AnnualDailyScoresPanel'
@@ -471,6 +471,7 @@ export default function AppNext() {
   const [uiSettings, setUiSettings] = useState(() => loadUiSettings())
   const [actionNotice, setActionNotice] = useState('')
   const relationshipRevisionRef = useRef(0)
+  const relationshipAiRevisionRef = useRef(0)
   const restoringRelationshipRef = useRef(false)
 
   useEffect(() => {
@@ -637,11 +638,11 @@ export default function AppNext() {
   const reunionObservation = useMemo<ReunionObservationContext>(()=>({
     state:reunionObservedState,
     initiator:reunionObservedInitiator,
-    events:[
+    events:recordedReunionEvents([
       {kind:'recontact' as const,date:reunionRecontactDate},
       {kind:'meeting' as const,date:reunionMeetingDate},
       {kind:'rebuilding' as const,date:reunionRebuildingDate},
-    ].filter(row=>Boolean(row.date)),
+    ]),
   }),[reunionObservedState,reunionObservedInitiator,reunionRecontactDate,reunionMeetingDate,reunionRebuildingDate])
   const isPersonalMarriage = selectedTool === 'marriage' && marriageMode === 'unmarried' && marriageScope === 'personal'
   const needsCounterpart = selectedTool === 'compatibility' || (selectedTool === 'marriage' && !isPersonalMarriage)
@@ -1236,9 +1237,19 @@ export default function AppNext() {
   }
 
 
+  function invalidateObservationReading() {
+    relationshipAiRevisionRef.current += 1
+    setRelationshipAi(null)
+    setRelationshipAiCacheSource('')
+    setRelationshipAiError('')
+    setRelationshipAiLoading(false)
+  }
+
   const runRelationshipAi = async () => {
     if (!relationshipResult) return
     const revision = relationshipRevisionRef.current
+    const aiRevision = ++relationshipAiRevisionRef.current
+    const current = () => revision === relationshipRevisionRef.current && aiRevision === relationshipAiRevisionRef.current
     const currentMode: RelationshipAnalysisMode = selectedTool === 'marriage' ? `marriage_${marriageMode}` : relationshipPurpose
     const snapshotMode = String(relationshipRequestSnapshot?.analysis_mode ?? '')
     const analysisMode = (snapshotMode || currentMode) as RelationshipAnalysisMode
@@ -1253,20 +1264,23 @@ export default function AppNext() {
     try {
       const cached = relationshipAiSuccess(await readReadingCache<RelationshipAiResponse>(relationshipCacheId))
       if (cached?.ok && cached.data) {
-        if (revision !== relationshipRevisionRef.current) return
+        if (!current()) return
         setRelationshipAi(annotatePayload(cached))
         setRelationshipAiCacheSource('local')
         return
       }
+      if (!current()) return
       await ensureSupabaseSession()
+      if (!current()) return
       const reunionContextForAi = analysisMode === 'reunion' ? {...reunionTiming,reunion_observation:reunionObservation} : reunionTiming
       const { data, error } = await supabase.functions.invoke('relationship-interpret-v9-preview', { body: { calculation: relationshipResult, reunion_context: reunionContextForAi, purpose: analysisMode, model: aiModel } })
       if (error) throw new RelationshipAiPublicError({error:await relationshipAiInvokeErrorMessage(error)})
       const payload = relationshipAiSuccess(data)
       if (!payload) throw new RelationshipAiPublicError(data)
-      if (revision !== relationshipRevisionRef.current) return
+      if (!current()) return
       const annotated = annotatePayload(payload)
       await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
+      if (!current()) return
       setRelationshipAi(annotated)
       setRelationshipAiCacheSource('fresh')
       if (relationshipRequestSnapshot) {
@@ -1278,9 +1292,9 @@ export default function AppNext() {
         void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)
       }
     } catch (error) {
-      if (revision === relationshipRevisionRef.current) setRelationshipAiError(relationshipAiCatchMessage(error))
+      if (current()) setRelationshipAiError(relationshipAiCatchMessage(error))
     } finally {
-      if (revision === relationshipRevisionRef.current) setRelationshipAiLoading(false)
+      if (current()) setRelationshipAiLoading(false)
     }
   }
 
@@ -1851,9 +1865,9 @@ export default function AppNext() {
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&reunionContractStatus!=='ready'&&<div className="status-banner error"><AlertTriangle size={16}/><span>{reunionContractStatus==='stale'?'재회 계산 서버가 최신 근거 계약으로 아직 배포되지 않았어. 최신 서버 확인 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.':'재회 계산 서버 버전을 확인 중이야. 확인이 끝나기 전에는 재회 계산과 유료 AI 해설을 시작하지 않아.'}</span></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<section className="reunion-observation-form" aria-labelledby="reunion-observation-title">
               <div><strong id="reunion-observation-title">현재 관계 상태 · 선택 입력</strong><span>관측 사실은 계산 점수·날짜·관문을 바꾸지 않고, 이미 확인된 단계를 반복하지 않게 해설 순서에만 반영해.</span></div>
-              <label className="field field-wide"><span>지금 확인된 상태</span><select value={reunionObservedState} onChange={e=>{setReunionObservedState(e.target.value as ReunionObservedState);setRelationshipAi(null);setRelationshipAiError('')}}>{REUNION_STATE_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}</select></label>
-              <label className="field field-wide"><span>실제 첫 재접촉 주체 · 선택</span><select value={reunionObservedInitiator} onChange={e=>{setReunionObservedInitiator(e.target.value as ReunionObservedInitiator);setRelationshipAi(null);setRelationshipAiError('')}}><option value="">기록 안 함</option><option value="counterpart">상대가 먼저</option><option value="user">내가 먼저</option><option value="mutual">서로 비슷한 시점</option><option value="unknown">확인 어려움</option></select><small>이 실제 기록은 상대 차트 쪽·내 차트 쪽 활성도와 별도로 표시돼.</small></label>
-              <details><summary>실제 사건 날짜 기록 · 선택</summary><div className="reunion-observation-dates"><label><span>재접촉</span><input type="date" value={reunionRecontactDate} onChange={e=>{setReunionRecontactDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>실제 만남</span><input type="date" value={reunionMeetingDate} onChange={e=>{setReunionMeetingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label><label><span>관계 합의</span><input type="date" value={reunionRebuildingDate} onChange={e=>{setReunionRebuildingDate(e.target.value);setRelationshipAi(null);setRelationshipAiError('')}}/></label></div></details>
+              <label className="field field-wide"><span>지금 확인된 상태</span><select value={reunionObservedState} onChange={e=>{setReunionObservedState(e.target.value as ReunionObservedState);invalidateObservationReading()}}>{REUNION_STATE_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}</select></label>
+              <label className="field field-wide"><span>실제 첫 재접촉 주체 · 선택</span><select value={reunionObservedInitiator} onChange={e=>{setReunionObservedInitiator(e.target.value as ReunionObservedInitiator);invalidateObservationReading()}}><option value="">기록 안 함</option><option value="counterpart">상대가 먼저</option><option value="user">내가 먼저</option><option value="mutual">서로 비슷한 시점</option><option value="unknown">확인 어려움</option></select><small>이 실제 기록은 상대 차트 쪽·내 차트 쪽 활성도와 별도로 표시돼.</small></label>
+              <details><summary>실제 사건 날짜 기록 · 선택</summary><div className="reunion-observation-dates"><label><span>재접촉</span><input type="date" max={toDateInputValue(new Date())} value={reunionRecontactDate} onChange={e=>{setReunionRecontactDate(e.target.value);invalidateObservationReading()}}/></label><label><span>실제 만남</span><input type="date" max={toDateInputValue(new Date())} value={reunionMeetingDate} onChange={e=>{setReunionMeetingDate(e.target.value);invalidateObservationReading()}}/></label><label><span>관계 합의</span><input type="date" max={toDateInputValue(new Date())} value={reunionRebuildingDate} onChange={e=>{setReunionRebuildingDate(e.target.value);invalidateObservationReading()}}/></label></div></details>
             </section>}
             {needsCounterpart&&<>
             <div className="subsection-title" id="counterpart-birth-title">상대 출생정보</div>
@@ -1890,7 +1904,7 @@ export default function AppNext() {
                 {reunionHistoryError&&<small role="alert">{reunionHistoryError}</small>}
               </section>}
               <div className="result-actions">
-                <ExternalPromptCopy onCopy={mode=>{if(relationshipRequestSnapshot) void copyExternalPrompt(()=>relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose,relationshipRequestSnapshot,relationshipResult,reunionTiming,mode),mode)}}/>
+                <ExternalPromptCopy onCopy={mode=>{if(relationshipRequestSnapshot) void copyExternalPrompt(()=>relationshipPromptText(selectedTool==='marriage'?'marriage':relationshipPurpose,relationshipRequestSnapshot,relationshipResult,reunionTiming,mode,relationshipPurpose==='reunion' && selectedTool==='compatibility'?reunionObservation:undefined),mode)}}/>
                 <button type="button" onClick={()=>handleCopy('결과 전체복사', relationshipResultText(selectedTool==='marriage'?'marriage':relationshipPurpose, relationshipResult, reunionTiming))}><Copy size={15}/><span>결과 전체복사</span></button>
                 <button className="save-action" type="button" onClick={saveRelationshipRecord} disabled={archiveSaving}><Save size={15}/><span>{archiveSaving?'저장 중…':'기록 저장'}</span></button>
               </div>

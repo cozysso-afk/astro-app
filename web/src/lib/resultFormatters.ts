@@ -1,8 +1,9 @@
+import {observationReading,eventLabels,initiatorLabels} from './reunionObservation'
 import { relationshipLimitKo } from './relationshipLimitKo'
 import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
 import { buildExternalCompactPrompt, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
 import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
-import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext } from '../appTypes'
+import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext, ReunionObservationContext } from '../appTypes'
 import { topicOrder } from './fortuneTopics'
 
 export const planetLabels: Record<string, string> = {
@@ -346,7 +347,7 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
   }
 }
 
-export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null, mode: ExternalCopyMode = 'full') {
+export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marriage', request: Record<string, unknown>, calculation?: RelationshipApiResponse | null, reunionContext?: ReunionTimingContext | null, mode: ExternalCopyMode = 'full', observation?: ReunionObservationContext) {
   const user = (request.user ?? {}) as Record<string, unknown>
   const cp = (request.counterpart ?? {}) as Record<string, unknown>
   const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
@@ -360,6 +361,12 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     : kind === 'reunion' ? '[재회 흐름 한눈에] [상대 차트 쪽 활성] [내 차트 쪽 활성] [과거 인연 재접점] [재접촉 vs 관계 회복] [다시 붙었을 때 유지력] [반복 가능성이 높은 문제] [주요 시기] [현실적으로 확인해야 할 행동]'
     : kind === 'marriage' ? '[결혼궁합 한눈에] [함께 살 때 강점] [감정과 친밀감] [대화와 갈등 해결] [책임 / 역할] [생활 리듬] [장기 유지력] [결혼 전에 확인할 현실 조건]'
     : '[궁합 한눈에] 3~5문장 [자연스럽게 잘 맞는 점] [부딪히기 쉬운 점] [대화와 사고방식] [감정과 친밀감] [끌림] [경계 / 힘의 균형] [장기 유지력] [현실적으로 맞춰야 할 것]'
+  const record=kind==='reunion' && observation ? observationReading(observation) : null
+  const facts=record && observation ? [
+    observation.state ? record.title : '',
+    observation.initiator ? '기록한 첫 연락 주체 · '+initiatorLabels[observation.initiator] : '',
+    ...record.events.map(event=>eventLabels[event.kind]+' · '+event.date),
+  ].filter(Boolean).join(' / ') : ''
   const intro = [
     `[별빛의 운명 · ${label} 외부 AI용 초압축 해석 요청]`,
     `관계 상태: ${String(request.relationship_status ?? '')} / 분석 모드: ${String(request.analysis_mode ?? kind)} / 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
@@ -367,11 +374,13 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     `상대: ${String(cp.name ?? '상대')} · ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
     '※ 좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다. 아래 계산값을 다시 천문/사주 계산하지 마라.',
     '',
+    facts ? `[사용자가 확인한 관계 기록] ${facts}
+이 기록에서 출발해 다음으로 확인할 점을 해설하라. 날짜가 있는 과거 사건만으로 현재 교제 여부를 단정하지 마라.` : '',
     '[EXTERNAL_AI_PROMPT_V2 · 관계 심층 상담]',
     '너는 아래 계산값만 근거로 읽는 숙련된 관계 점성술 분석가다. 실제 상담 수준의 연결된 한국어 문단으로 해설하라.',
     '계산 권위는 별빛의 운명 엔진에 있다. 외부 LLM은 해석자이며 두 번째 계산기가 아니다.',
     '[해석 규칙]',
-    '- 아래 COMPACT_CALCULATED_DATA만 단일 근거로 사용한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
+    '- 점성술 해설의 근거는 아래 COMPACT_CALCULATED_DATA로 한정한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
     kind === 'reunion' ? '- 재회운은 reunion_dimensions의 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 분리한다. incoming/outgoing은 상대측/내측 활성이지 행동 방향이 아니다. reunion_secondary_support는 진행계열 기간 배경이며 exact date를 만들지 않는다. reunion_return_support의 Solar Return(태양회귀)은 연간 배경, Lunar Return(달회귀)은 월간·정서 배경이다. Return은 fast trigger를 통과한 날짜를 교차검증하는 보조층일 뿐 날짜를 새로 만들거나 같은 transit을 중복 가산하지 않는다. Return의 user/counterpart 활성은 선연락 방향 근거로 쓰지 않는다. 본문에서는 기술명보다 연간 배경/월간 배경이라는 사용자 언어를 먼저 쓴다.' : '',
     '- 개인행성·수성의 소통·금성/화성의 끌림·토성의 책임·교점의 관계 관련성을 우선하고 반복 주제와 애스펙트 성격, 오브를 함께 본다. 외행성끼리의 세대 접점을 작은 오브만으로 최우선에 놓지 않는다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',

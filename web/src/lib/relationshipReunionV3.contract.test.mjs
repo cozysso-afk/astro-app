@@ -32,7 +32,7 @@ test('reunion keeps authored synthesis separate from calculated hierarchy withou
 })
 test('six relationship axes remain visible and evidence stays collapsed',()=>{
  const html=render()
- for(const label of ['과거 관계가 다시 떠오름','연락이 닿음','대화가 이어짐','실제 만남','다시 만나기로 정함','관계 유지']) assert.ok(html.includes(label),label)
+ for(const label of ['과거 관계가 다시 떠오름','연락이 닿음','대화가 이어짐','실제 만남','다시 교제하기로 합의','관계 유지']) assert.ok(html.includes(label),label)
  assert.equal((html.match(/data-stage-state=/g) || []).length,6)
  assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
  assert.doesNotMatch(html,/<details[^>]*\bopen/)

@@ -12,10 +12,10 @@ const app=fs.readFileSync(new URL('../AppNext.tsx',import.meta.url),'utf8'),star
 assert(run.includes('relationshipAiCatchMessage'))
 const json=(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json',...headers}})
 const canaries=['authorization: Bearer TEST_CANARY','{"authorization":"Bearer TEST_CANARY"}','client_secret=TEST_CANARY','cookie=session-TEST_CANARY','https://example.test/#access_token=TEST_CANARY','authorization%3ABearer%20TEST_CANARY','%253Fclient_secret%253DTEST_CANARY','client_\u200bsecret=TEST_CANARY','%ZZ%61%70%69%6b%65%79%3DTEST_CANARY','%FF%61%70%69%6b%65%79%3DTEST_CANARY',JSON.stringify(JSON.stringify({error:'client_secret=TEST_CANARY'})),'x'.repeat(20001)+'TEST_CANARY']
-async function invoke(fetcher,cache=null,session=async()=>{}){
+async function invoke(fetcher,cache=null,session=async()=>{},aiRevision={current:0},writeCache=async()=>{}){
   let error='',saved=null,state=null,calls=0
   const client=new FunctionsClient('https://example.test/functions/v1',{customFetch:async(...args)=>{calls++;return fetcher(...args)}})
-  const ctx=vm.createContext({...boundary,Error,relationshipResult:{},relationshipRevisionRef:{current:1},selectedTool:'relationship',marriageMode:'unmarried',relationshipPurpose:'compatibility',relationshipRequestSnapshot:null,reunionTiming:null,aiModel:'gemini-3.7-flash',relationshipAiCacheId:()=> 'synthetic-cache',setRelationshipAiLoading:()=>{},setRelationshipAiError:x=>error=x,readReadingCache:async()=>cache,ensureSupabaseSession:session,supabase:{functions:client},annotatePayload:x=>x,writeReadingCache:async(_id,_kind,x)=>saved=x,RELATIONSHIP_AI_CACHE_TTL_DAYS:30,setRelationshipAi:x=>state=x,setRelationshipAiCacheSource:()=>{}})
+  const ctx=vm.createContext({...boundary,Error,relationshipResult:{},relationshipRevisionRef:{current:1},relationshipAiRevisionRef:aiRevision,selectedTool:'relationship',marriageMode:'unmarried',relationshipPurpose:'compatibility',relationshipRequestSnapshot:null,reunionTiming:null,aiModel:'gemini-3.7-flash',relationshipAiCacheId:()=> 'synthetic-cache',setRelationshipAiLoading:()=>{},setRelationshipAiError:x=>error=x,readReadingCache:async()=>cache,ensureSupabaseSession:session,supabase:{functions:client},annotatePayload:x=>x,writeReadingCache:async(_id,_kind,x)=>{await writeCache();saved=x},RELATIONSHIP_AI_CACHE_TTL_DAYS:30,setRelationshipAi:x=>state=x,setRelationshipAiCacheSource:()=>{}})
   vm.runInContext(compile(run+'\nglobalThis.runTest=runRelationshipAi'),ctx);await ctx.runTest();return {error,saved,state,calls}
 }
 test('FunctionsHttpError known Relationship code maps locally despite hostile extras',async()=>{
@@ -69,4 +69,15 @@ test('valid fresh/local cached results preserve text, usage and metadata while r
     const payload=success();payload.data.overview='Legitimate prose about authorization and cookie parsing.';payload.debug={authorization:canaries[0]};payload.usage.debug={authorization:canaries[0]}
     const r=await invoke(async()=>json(payload),local?payload:null);assert.equal(r.error,'');assert.equal(r.calls,local?0:1);assert.equal(r.state.data.overview,payload.data.overview);assert.equal(r.state.model,payload.model);assert.equal(r.state.usage.total_tokens,33);assert(!JSON.stringify(r.state).includes('TEST_CANARY'));assert(!JSON.stringify(r.saved).includes('TEST_CANARY'))
   }
+})
+
+test('editing observations while a response or cache write is pending cannot publish the old reading',async()=>{
+  const revision={current:0}
+  const discarded=await invoke(async()=>{revision.current++;return json(success())},null,async()=>{},revision)
+  assert.equal(discarded.state,null)
+  assert.equal(discarded.saved,null)
+  const whileSaving=await invoke(async()=>json(success()),null,async()=>{},revision,async()=>{revision.current++})
+  assert.equal(whileSaving.state,null)
+  const beforeProvider=await invoke(async()=>json(success()),null,async()=>{revision.current++},revision)
+  assert.equal(beforeProvider.calls,0)
 })
