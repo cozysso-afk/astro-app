@@ -1,3 +1,5 @@
+import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
+
 // Period reading is a bounded first-screen bundle. It is not a capability
 // certification: available rows describe the evidence, not permission to
 // predict events or to infer unobserved changes between sampled dates.
@@ -17,24 +19,20 @@ export const PERIOD_DETAIL_TOPICS:Record<string,string[]> = {
   'investment.realization':['수익실현'], 'investment.entry':['신규진입'],
 }
 const QUESTION_TOPICS={...PERIOD_PRIMARY_TOPICS,...PERIOD_DETAIL_TOPICS}
-const monthLoveQuestions: Record<string,string> = {
-  'relationship.love_single':'소개나 첫 만남에서 다시 보고 싶은 계기는 무엇일까?',
-  'relationship.love_crush':'내가 표현한 관심에 상대도 관심을 보이는지 무엇으로 확인할까?',
-  'relationship.love_flirting':'서로 알아가는 중이라면 다음 만남을 어떻게 구체화할까?',
-  'relationship.love_ambiguous':'관계가 불분명하다면 서로의 기대와 행동을 어떻게 맞춰 볼까?',
-  'relationship.love_couple':'교제 중이라면 함께 쓸 시간이나 다툰 뒤 대화를 어떻게 돌볼까?',
-}
-const monthLoveKeys = Object.keys(monthLoveQuestions)
-const monthLoveTopics = Object.fromEntries(monthLoveKeys.map(key => [key,['연애']]))
-function monthlyLoveEvidence(payload:any) {
+const loveKeys = Object.keys(loveSituationQuestions)
+const loveTopics = Object.fromEntries(loveKeys.map(key => [key,['연애']]))
+function loveEvidence(payload:any) {
   return (payload?.evidence_ledger ?? []).filter((row:any) =>
     row?.id && row.system !== 'thai' && intersects(row,payload.period) && topicsOf(row).includes('연애'))
 }
 function requiredKeys(payload:any) {
+  const rows=(payload?.evidence_ledger ?? []).filter((row:any)=>row?.id && row.system!=='thai' && intersects(row,payload?.period))
+  const situations=loveEvidence(payload).length ? loveKeys : []
+  const reunionKey='relationship.love_reunion_interest'
+  const reunion=rows.some((row:any)=>topicsOf(row).some(topic=>PERIOD_DETAIL_TOPICS[reunionKey].includes(topic))) ? [reunionKey] : []
   if (payload?.period_kind === 'week') {
     // Reserve space for a useful answer in each evidenced family while keeping
     // the number of full provider sections within the existing response budget.
-    const rows=(payload.evidence_ledger ?? []).filter((row:any)=>row?.id && row.system!=='thai' && intersects(row,payload.period))
     const families=[
       ['relationship.contact_activation','relationship.love_reunion_interest'],
       ['work_study.exam','work_study.career_change'],
@@ -44,10 +42,9 @@ function requiredKeys(payload:any) {
       const key=keys.find(k=>rows.some((row:any)=>topicsOf(row).some(topic=>PERIOD_DETAIL_TOPICS[k].includes(topic))))
       return key ? [key] : []
     })
-    return [...PERIOD_PRIMARY_KEYS,...supported]
+    return unique([...PERIOD_PRIMARY_KEYS,...situations,...reunion,...supported])
   }
-  return payload?.period_kind === 'month' && monthlyLoveEvidence(payload).length
-    ? [...PERIOD_PRIMARY_KEYS,...monthLoveKeys] : PERIOD_PRIMARY_KEYS
+  return [...PERIOD_PRIMARY_KEYS,...situations,...reunion]
 }
 const text=(v:unknown)=>typeof v==='string'?v.trim():''
 const date=(v:unknown)=>{
@@ -102,8 +99,8 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
     requested_period:packet.period,
     temporal_policy:'dated_samples_do_not_establish_continuous_change',
     required_primary_keys:PERIOD_PRIMARY_KEYS,required_section_keys:requiredKeys({...packet,evidence_ledger}),
-    ...(packet.period_kind==='month' && monthlyLoveEvidence({...packet,evidence_ledger}).length
-      ? {love_situations:{questions:monthLoveQuestions, shared_evidence_question:'relationship.love_general'}} : {}),
+    ...(loveEvidence({...packet,evidence_ledger}).length
+      ? {love_situations:{questions:loveSituationQuestions, shared_evidence_question:'relationship.love_general'}} : {}),
     included_ids:[...selectedIds],omitted_ids:omitted.map((r:any)=>r.id),
     omission_reason:omitted.length?'bounded_prompt_selection':null,
     questions:Object.entries(QUESTION_TOPICS).map(([key,topics])=>{
@@ -120,14 +117,19 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
 
 export function buildPeriodReadingInstruction(kind:unknown){
   const word=kind==='week'?'한 주':kind==='month'?'한 달':'한 해'
+  const periodQuestion=kind==='month'
+    ? '이번 달에 되풀이해서 살필 선택 하나를 제시해. 월평균과 특정 날짜의 흐름이 다르면 둘의 차이를 설명해. 표본 하나를 한 달의 경향으로 쓰지 마.'
+    : kind==='annual'
+      ? '한 해의 핵심은 여러 달에 걸쳐 판단이 달라지는 조건이야. 실제 기간 근거가 있으면 그 구간과 선택을 연결해. 흩어진 날짜뿐이면 각각의 관측으로 쓰고 분기 전체로 늘리지 마.'
+      : '이번 주 안에서 판단이 달라지는 날과 이유를 다뤄.'
   const weekly = kind==='week' ? `
 - 주간 본문의 첫 문단은 이번 주 선택에서 무엇이 달라지는지, 실제 근거가 왜 그런 판단을 허용하는지, 그 판단이 적용되는 생활 장면을 서로 다른 문장으로 설명해. 똑같은 조언을 제목·요약·이유에 반복하지 마.
 - overall.dominant_pattern은 독자가 “왜?”라고 물었을 때의 답이야. ‘추진력과 대화상 점검 압박의 공존’처럼 이름만 붙이지 말고, 어느 조건에서 결정을 밀고 나가기 수월한지, 어디에서 다시 확인해야 하는지를 해당 주 근거에 따라 완결된 말로 풀어. 서로 반대되는 근거가 없으면 대비를 만들지 마.
 - 같은 분야에 주 안의 날짜별 차이가 실제로 있으면 그중 의미 있는 관측 둘을 YYYY-MM-DD와 함께 비교해. 한 날짜만 있으면 그날에 한정해. 날짜를 쓴 항목은 자기 evidence_refs로 날짜를 뒷받침해야 해. 단일 표본은 주 전체로 늘리지 마.
 - period_reading.required_section_keys의 추가 질문도 각각 한 번 작성해. 직접 판단할 근거가 부족하면 조건부로 어디까지 말할 수 있는지 밝히고, 전혀 연결되지 않으면 insufficient로 둬. 연락 수신·발신·재회는 각각의 근거로 구분해. 분야별 상세에는 실제 적용 장면과 그 이유를 설명하고, 더 많은 글을 채우려고 근거 없는 사건을 만들지 마.` : ''
   return `[PERIOD FIRST SCREEN · ${PERIOD_READING_VERSION}]
-- 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해.${weekly}
-- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. ${kind==='month'?'period_reading.required_section_keys에 포함된 애정 상황은 각각 한 번씩 작성해. love_situations.questions의 서로 다른 질문에 공통 연애 근거를 조건부로 적용해. applicability는 conditional로 두고, 적용 상황·그 상황에서 근거의 의미·실제로 확인할 행동을 구분해. 상대의 마음, 사용자 관계 상태, 특정 날짜의 만남을 만들어내지 마. 한 날짜만 근거가 있으면 그날의 사례로 한정해.':'상태별 애정·대인 조건부 상세는 근거 범위에서 추가할 수 있으며 모든 상황을 억지로 채울 의무는 없어.'}
+- 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해. ${periodQuestion}${weekly}
+- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. period_reading.required_section_keys에 있는 모든 질문을 각각 한 번 작성해. 애정 상황은 love_situations.questions의 서로 다른 질문에 연애 근거를 조건부로 적용하고 applicability=conditional로 둬. 재회 질문은 “${reunionSituationQuestion}”이며 재회·과거인연접점 근거로만 답해. 서로 다른 여섯 원고를 모두 다음 약속 확인으로 끝내지 마. 사용자 관계 상태나 상대 마음을 정해 놓지 마.
 - 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 해당 조건을 독립된 문장으로 마쳐. 예를 들어 '두 약속 중 하나를 골라야 할 때 해당돼.'처럼 상황만 설명해. '경우라면'에서 끊지 마. evidence_meaning은 실제 기간근거가 왜 그 판단을 허용하는지 생활어로만 설명하고 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.
@@ -229,14 +231,14 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
   }
   const required = payload ? requiredKeys(payload) : PERIOD_PRIMARY_KEYS
-  const loveEvidenceIds = new Set(monthlyLoveEvidence(payload).map((row:any)=>row.id))
+  const loveEvidenceIds = new Set(loveEvidence(payload).map((row:any)=>row.id))
   const conclusions = new Set<string>()
   const actions = new Set<string>()
   for(const key of required){
     const found=rows.filter((r:any)=>r?.key===key)
     if(found.length!==1){issues.push({code:'primary_missing_or_duplicate',path:`clusters.${key}`});continue}
     const row=found[0]
-    if (monthLoveKeys.includes(key)) {
+    if (loveKeys.includes(key)) {
       if (row.applicability!=='conditional' || !row.evidence_refs?.some((ref:string)=>loveEvidenceIds.has(ref))) {
         issues.push({code:'monthly_love_requires_conditional_topic_evidence',path:`clusters.${key}`})
       }
@@ -316,7 +318,7 @@ export function inspectPeriodReading(data:any,payload:any){
     const value=path==='headline'?data?.headline:data?.overall?.summary
     if(!text(value)||text(value).length>max)add('missing_or_overlong_hero',path)
   }
-  const scopedTopics = payload.period_kind==='month' ? {...QUESTION_TOPICS,...monthLoveTopics} : QUESTION_TOPICS
+  const scopedTopics = {...QUESTION_TOPICS,...loveTopics}
   for(const [key,topics] of Object.entries(scopedTopics)){
     const [group,name]=key.split('.'),row=data?.clusters?.[group]?.[name]
     if(!row){if(PERIOD_PRIMARY_KEYS.includes(key))add('primary_missing',`clusters.${key}`);continue}

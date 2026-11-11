@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildTemporalWordingInstruction, buildV23CorePrompt } from './promptV23.ts'
+import { buildTemporalWordingInstruction, buildV23CorePrompt, buildV23PromptBudget, buildV23CorePromptFromPacket } from './promptV23.ts'
 import { buildPeriodNarrativeContext } from './periodNarrativeV23.ts'
 
 function payload(kind='week') {
@@ -154,4 +154,23 @@ test('daily writer receives the actual date-wording contract from the source pay
   assert.deepEqual(out.packet.time_context,input.time_context)
   assert.match(out.text,/DATE WORDING · HARD GATE/)
   assert.equal(JSON.parse(out.text.split('PROMPT_DATA=')[1]).time_context.today_word_allowed,false)
+})
+
+
+test('monthly budget measures the exact writer packet and preserves every selected fact and question mapping', () => {
+  const input = payload('month')
+  input.period = {start:'2026-09-01',end:'2026-09-30'}
+  const budget = buildV23PromptBudget(input)
+  const server = budget.packet
+  const prompt = buildV23CorePromptFromPacket(server).text
+  const writer = JSON.parse(prompt.split('PROMPT_DATA=').at(-1))
+  assert.equal(budget.bytes, Buffer.byteLength(JSON.stringify(writer)))
+  assert.deepEqual(writer.evidence_ledger, server.evidence_ledger)
+  assert.equal(writer.period_reading.omitted_count, server.period_reading.omitted_ids.length)
+  for (const question of writer.period_reading.questions) {
+    const refs = writer.evidence_ledger.filter(row =>
+      [row.topic,...row.source_topics??[]].some(topic=>question.topics.includes(topic))
+    ).map(row=>row.id)
+    assert.deepEqual(refs,server.period_reading.questions.find(q=>q.key===question.key).evidence_refs)
+  }
 })

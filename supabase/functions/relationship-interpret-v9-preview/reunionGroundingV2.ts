@@ -23,10 +23,10 @@ export function hasUnsupportedInitiativeDirection(value: unknown, observation?: 
     const adviceOrQuestion = /(?:기대(?:하며)?\s*기다리기보다|예단하지|기대하지|보내지 마|연락하지 마|고민(?:할|하는|한다)|여부를 확인|인지 확인|정할 필요|결정할 때)/.test(sentence)
     const prediction = /(?:가능성이 (?:높|커)|먼저 (?:움직이는 흐름|움직일 거|연락할 거)|앞서는 것으로)/.test(sentence)
     if (adviceOrQuestion && !prediction) return false
-    const counterpart = /상대(?:가|측|\s*쪽)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
-    const user = /(?:내가|내\s*쪽|나(?:는|의))[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
+    const counterpart = /상대(?:방)?(?:이|가|은|는|측|\s*쪽)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
+    const user = /(?:내가|내\s*쪽|나는)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
     const matchesRecordedInitiator = observation?.initiator === 'counterpart' ? counterpart && !user : observation?.initiator === 'user' ? user && !counterpart : observation?.initiator === 'mutual' && /서로|양쪽|둘 다/.test(sentence)
-    const pastRecord = matchesRecordedInitiator && /입력|기록|알려준|관측/.test(sentence) && /했|왔|보냈|이었/.test(sentence) && !/앞으로|다음|예정|가능성|전망/.test(sentence)
+    const pastRecord = matchesRecordedInitiator && /입력|기록|알려준|관측/.test(sentence) && /했|왔|보냈|이었|걸었/.test(sentence) && !/앞으로|다음|예정|가능성|전망/.test(sentence)
     const conditionalCheck = /(?:연락|메시지)(?:을|를)?\s*(?:하면|한다면|했을 때|하는지 확인)/.test(sentence)
     return !pastRecord && !conditionalCheck
   })
@@ -68,6 +68,14 @@ function refs(value: unknown) { return uniq(arr(value).map(text)) }
 
 function requiredQuestionRefs(payload: any, question: QuestionKey) {
   return new Set(refs(payload?.reunion_evidence_v2?.questions?.[question]?.evidence_refs))
+}
+
+// Constrain the provider's choices to the same evidence set checked after generation.
+export function questionCitationSchema(payload: any, question: QuestionKey) {
+  const valid = validEvidence(payload)
+  const allowed = [...requiredQuestionRefs(payload, question)].filter(id => valid.has(id))
+  if (!allowed.length) return null
+  return {type: 'ARRAY', items: {type: 'STRING', enum: allowed}, minItems: 1, maxItems: Math.min(12, allowed.length)}
 }
 
 function validateRefs(value: unknown, valid: Set<string>, minimum = 1) {

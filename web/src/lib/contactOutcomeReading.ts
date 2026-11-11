@@ -18,6 +18,34 @@ export function observedContactRows(values: unknown[], start: string, end: strin
   return [...latest.values()].sort((a,b) => b.date.localeCompare(a.date))
 }
 
+// Earlier records could only keep a call and the subsequent meeting in one memo.
+// Accept complete affirmative statements; questions, plans and negations stay unknown.
+const legacyMeeting = /^(?:(?:저녁에 |오전에 |오후에 |밤에 )?전화가 (?:먼저 )?와서 )?직접 만남(?:\s*\([^()]{1,20}\))?[.!]?$/u
+
+export function meetingRecorded(row: DailyOutcomeRecord) {
+  if (!row.event || row.event === 'none') return false
+  if (row.channel === 'in_person') return true
+  return row.met_in_person ?? legacyMeeting.test((row.note || '').trim())
+}
+
+export function nextRelationshipQuestion(rows: DailyOutcomeRecord[]) {
+  // No person identifier is stored. Describe one dated observation only.
+  const row = rows.find(record=>record.past_connection && record.event && record.event !== 'none')
+  if (!row) return null
+  if (meetingRecorded(row)) return {
+    label:'만난 뒤 관계는 어떻게 이어질까?',
+    text:`${row.date}에는 과거 인연과 직접 만났어요. 다음으로 살펴볼 건 헤어진 뒤에도 그 사람과 대화를 이어갔는지, 다시 보기로 했다면 두 사람이 그 약속을 실제로 지켰는지예요.`,
+  }
+  if (row.event === 'sent') return {
+    label:'내가 건넨 말에 답이 돌아왔을까?',
+    text:`${row.date}에는 내가 과거 인연에게 먼저 연락했어요. 이 기록만으로는 상대의 답을 알 수 없어요. 답이 왔다면 안부만 주고받았는지, 상대도 질문을 건네 대화가 이어졌는지 돌아봐요.`,
+  }
+  return {
+    label:'연락이 닿은 뒤 무엇이 달라졌을까?',
+    text:`${row.date}에는 과거 인연과 연락이 닿았어요. 그날 이후에도 연락을 이어가고 싶은지, 만나자는 이야기가 나왔다면 날짜까지 정했는지가 다음 질문이에요.`,
+  }
+}
+
 export function recordedSignalReading(row: DailyOutcomeRecord) {
   const signal = row.event === 'sent' ? '발신적합' : '수신신호'
   const score = row.scores?.[signal]
@@ -35,7 +63,7 @@ export function recordedSignalReading(row: DailyOutcomeRecord) {
   const reconnection = row.scores?.['재접점'] ?? row.scores?.['과거인연접점'] ?? row.scores?.['과거인연재접점']
   const past = row.past_connection && row.event && row.event !== 'none'
   const reunion = past && typeof reconnection === 'number' && Number.isFinite(reconnection)
-    ? ` 과거 인연과 다시 연락할 지표는 ${reconnection.toFixed(1)}점이었어요. 이 기록으로 확인되는 건 과거 인연과 관련된 연락이 있었다는 데까지예요.` : ''
+    ? ` 과거 인연과 다시 연락할 지표는 ${reconnection.toFixed(1)}점이었어요. 이날 과거 인연과 관련된 연락이 기록됐어요.` : ''
   return `${row.date}에 저장한 ‘${label}’은 ${score.toFixed(1)}점이에요. ${interpretation}${reunion}`
 }
 

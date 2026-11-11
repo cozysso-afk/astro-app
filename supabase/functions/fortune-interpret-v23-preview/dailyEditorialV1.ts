@@ -1,3 +1,4 @@
+import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
 import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, dailySectionFacts } from './dailyReadingContractV1.ts'
 
 export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v2-supported-details'
@@ -6,7 +7,7 @@ export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY EDITOR: 선택한 운세일 �
 이번 요청은 종합과 기본 여섯 분야, 그리고 근거가 제공된 기존 세부항목의 일일 원고야. 기본 여섯 분야는 첫 화면의 순서이지 지원 항목의 제한이 아니야. 계산은 끝났어. 계산된 배치를 생활에서 어떻게 읽을지 설명하되, 실제 사건이나 사용자 상태를 관측한 것으로 취급하지 마.
 
 [작성 순서]
-애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. 원고의 contact_flow 및 애정 세부항목에서 이 강약을 그대로 설명해. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. ‘흐름이 열려 있어’, ‘세부 조율의 긴장’, ‘충돌 요소가 독립적으로 공존해’ 같은 문장은 쓰지 마. systems는 실제로 계산한 근거 하나와 그 뜻을 쉬운 말로 설명해. 행성 위치만 계산한 경우에는 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
+애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. contact_flow에서는 이 강약을 설명해. 각 상황별 원고는 reader_question에서 물은 선택과 근거를 다루고, 모든 행동을 다음 약속 확인으로 끝내지 마. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. ‘흐름이 열려 있어’, ‘세부 조율의 긴장’, ‘충돌 요소가 독립적으로 공존해’ 같은 문장은 쓰지 마. systems는 실제로 계산한 근거 하나와 그 뜻을 쉬운 말로 설명해. 행성 위치만 계산한 경우에는 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
 1. daily_editorial_brief.questions의 질문에 맞춰 clusters 여섯 분야를 먼저 작성한 뒤 required_detail 항목도 작성해. required_primary와 required_detail은 key를 각각 한 번 반드시 포함해. 근거 ID를 고르고 해당 질문에 적용할 판단을 써. 근거로 해당 질문에 답할 수 없으면 applicability=insufficient, 빈 원고와 빈 refs로 명시해. 다른 분야나 종합 요약으로 대체되는 결과는 실패야. 계산된 연락·재회·시험·이직·투자·소식 항목을 조용히 생략해도 실패야.
 2. editorial_focus에 전체 첫 화면에서 답할 질문 하나, 판단 하나, 적용 상황, 그 판단의 해석상 이유, 근거 ID를 정리해. 여섯 분야 중 사용자가 먼저 읽을 가치가 있는 판단을 선택해. 모든 분야를 묶은 거창한 하루의 성격을 만들 필요는 없어. 반대 근거는 같은 판단에 직접 영향을 줄 때만 함께 고려해.
 3. 그 내용을 읽고 headline을 마지막에 써. 독자가 한 번 읽고 무엇에 대한 어떤 판단인지 말할 수 있어야 해. 제목은 무엇이 수월하거나 까다로운지 읽어주는 짧은 한 문장(25~60자), overall.summary는 적용 상황과 이유를 설명하는 짧은 두 문장(80~180자 목표)이야. 문장 수를 맞추려고 조건을 삭제하지 마. 제목에 이유·행동·제한까지 전부 압축하지 마. 본문을 줄여 붙인 제목도 안 돼.
@@ -49,7 +50,7 @@ const READER_QUESTIONS:Record<string,string>={
   'condition.condition':'활동과 휴식을 정할 때 무엇을 살필까?',
   'relationship.contact_activation':'연락이나 대화가 오가는 흐름에서 무엇을 살필까?',
   'relationship.contact_continuity':'시작된 대화가 이어지는 데 어떤 조건을 살필까?',
-  'relationship.love_reunion_interest':'이전 인연과 다시 접촉하는 문제에서 일일 근거로 어디까지 읽을 수 있을까?',
+  'relationship.love_reunion_interest':reunionSituationQuestion,
   'work_study.exam':'시험 준비와 수행에서 무엇을 살필까?',
   'work_study.career_change':'이직 탐색이나 제안 조건을 검토할 때 무엇을 살필까?',
   'money_news.news':'통보나 회신을 기다리거나 확인하는 상황에서 무엇을 살필까?',
@@ -61,11 +62,7 @@ const READER_QUESTIONS:Record<string,string>={
   'relationship.family':'가족과 일상이나 역할을 조율한다면 무엇을 살필까?',
   'relationship.new_people':'새로운 사람과 교류한다면 무엇을 살필까?',
   'relationship.boundaries':'부탁을 받아들이거나 개인 시간을 지킬 때 무엇을 살필까?',
-  'relationship.love_single':'새로운 만남이나 소개를 생각한다면 무엇을 살필까?',
-  'relationship.love_crush':'짝사랑 중이라면 호감의 상호성을 어떻게 확인할까?',
-  'relationship.love_flirting':'서로 알아가는 중이라면 다음 약속에서 무엇을 살필까?',
-  'relationship.love_ambiguous':'관계가 불분명하다면 합의와 태도의 일관성에서 무엇을 살필까?',
-  'relationship.love_couple':'연애 중이라면 함께 보내는 시간이나 갈등 회복에서 무엇을 살필까?',
+  ...loveSituationQuestions,
 }
 const str=(v:unknown)=>typeof v==='string'?v.trim():''
 function belongsTo(row:any,topics:string[]) {

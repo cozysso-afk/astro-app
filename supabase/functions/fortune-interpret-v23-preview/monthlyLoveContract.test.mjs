@@ -13,7 +13,7 @@ test('monthly love scenarios only require selected in-period love evidence',()=>
   const keys=Object.keys(packet.period_reading.love_situations.questions)
   assert.equal(keys.length,5)
   assert.deepEqual(packet.period_reading.required_section_keys,[...PERIOD_PRIMARY_KEYS,...keys])
-  for(const p of [{...base,period_kind:'week'},{...base,period_kind:'annual'},{...base,evidence_ledger:[{...love,date:'2026-12-01'}]},{...base,evidence_ledger:[{...love,topic:'연락'}]}])
+  for(const p of [{...base,evidence_ledger:[{...love,date:'2026-12-01'}]},{...base,evidence_ledger:[{...love,topic:'연락'}]}])
     assert.deepEqual(attachPeriodReadingContext(p).period_reading.required_section_keys,PERIOD_PRIMARY_KEYS)
   const core=firstSix()
   assert.equal(inspectPeriodProviderDocument(core,'month',packet).issues.length,5)
@@ -33,5 +33,18 @@ test('monthly cache renews for both job paths without changing week or year mark
   for(const build of [exactV23JobKind,provisionalV23JobKind]){
     assert.ok(build('v',{period_kind:'month'},'h').includes(MONTHLY_OUTPUT_CACHE_VERSION))
     for(const kind of ['week','annual'])assert.ok(!build('v',{period_kind:kind},'h').includes(MONTHLY_OUTPUT_CACHE_VERSION))
+  }
+})
+
+test('all extended periods request six distinct love questions when their own topic has in-period evidence',()=>{
+  for(const kind of ['week','month','annual']){
+    const packet=attachPeriodReadingContext({...base,period_kind:kind,evidence_ledger:[love,{...love,id:'r11',topic:'과거인연접점'}]})
+    const questions=packet.period_reading.love_situations.questions
+    assert.equal(new Set(Object.values(questions)).size,5)
+    const requested=packet.period_reading.required_section_keys
+    for(const key of [...Object.keys(questions),'relationship.love_reunion_interest']) assert.equal(requested.filter(k=>k===key).length,1)
+    assert.ok(!attachPeriodReadingContext({...base,period_kind:kind}).period_reading.required_section_keys.includes('relationship.love_reunion_interest'))
+    const data={clusters:{relationship:{love_couple:{applicability:'conditional',evidence_meaning:'2026-11-20에 달라져.',evidence_refs:['w11']}}}}
+    assert.ok(inspectPeriodReading(data,packet).issues.some(i=>i.code==='claim_date_without_local_evidence'))
   }
 })

@@ -72,8 +72,8 @@ const socialApplications: Record<string,Record<ReadingStrength,string>> = {
 const scenarioReadings: Record<string, Record<ReadingStrength, string>> = {
   single: {
     weak: '새 사람을 만나는 데 탄력이 작은 날이야. 소개를 받는다면 첫 자리에서 결론을 내리기보다 함께 이야기하기 편한 주제가 있었는지 돌아봐.',
-    neutral: '처음 만난 자리에서 이야기가 편하게 오갔다면 그 대화가 출발점이야. 다시 보고 싶을 때는 그날 함께 즐겼던 일로 다음 만남을 제안해 봐.',
-    strong: '새 사람과 가까워질 계기를 살려 볼 만한 날이야. 소개 자리에서 관심사가 겹쳤다면 같이 해 볼 일을 제안하고 상대가 시간을 내는지 봐.',
+    neutral: '아직 마음에 둔 사람이 없다면, 낯선 자리에서도 네 취향을 편하게 말할 수 있는 사람에게 눈을 돌려 봐. 대화가 잠시 끊겼을 때도 궁금한 게 남는다면 첫인상 너머로 더 알아보고 싶은 사람이야.',
+    strong: '새 사람에게 먼저 관심을 표현해 볼 만한 날이야. 소개를 받는다면 상대에게 잘 보이려고 취향을 맞추기보다 요즘 네가 즐기는 일을 들려줘. 어떤 이야기에 둘 다 신이 나는지 알아볼 수 있어.',
   },
   crush: {
     weak: '호감이 서로 통하는지 읽기 어려운 날이야. 친절한 답 하나에 의미를 싣기보다 상대도 네게 궁금한 걸 묻는지 살펴봐.',
@@ -93,16 +93,16 @@ const scenarioReadings: Record<string, Record<ReadingStrength, string>> = {
   couple: {
     weak: '작은 서운함이 있을 때 평소처럼 금방 풀릴 거라고 기대하기 어려운 날이야. 가장 마음에 남은 장면 하나와 다음에 바라는 행동 하나를 이야기해 봐.',
     neutral: '평소 관계를 돌보는 데 무리가 크지 않은 날이야. 한쪽이 바쁘다면 짧은 답장의 뜻을 추측하기보다 둘 다 편한 시간을 정해 이야기를 나눠.',
-    strong: '이미 쌓인 친밀함을 표현하기 좋은 날이야. 최근 고마웠던 행동을 구체적으로 짚고 이번 주에 함께할 일을 하나 정해 봐.',
+    strong: '연인에게 평소에 당연하게 받아들였던 수고를 알아봤다고 전해 볼 만한 날이야. 어떤 행동 덕분에 네 마음이 놓였는지 짚어주면 그 사람도 네가 사랑받는다고 느끼는 순간을 알아.',
   },
 }
 // When the saved manuscript omits a situation, relate the day's love reading
 // to the independent signal that actually bears on the reader's decision.
 const scenarioSignals: Record<string, { signal: string; label: string; meaning: Record<ReadingStrength,string> }> = {
   single: {signal:'발신적합',label:'먼저 말 걸기',meaning:{
-    weak:'소개 자리에서 얘기가 잘 통해도 그날 바로 다음 약속까지 정하려고 애쓸 필요는 없어.',
-    neutral:'한 번 더 만나고 싶다면 같이 이야기했던 곳을 하나 꺼내 봐. 상대가 가능한 시간을 보태는지 볼 수 있어.',
-    strong:'다시 만나고 싶은 사람이 생기면 네가 먼저 구체적인 제안을 건네기 편한 쪽이야.'}},
+    weak:'인사를 나눈 뒤 막상 할 말이 없다면 억지로 호감을 표시하지 않아도 돼.',
+    neutral:'말문이 막히면 그 자리에서 상대가 골랐던 음식이나 음악처럼 바로 떠올릴 수 있는 걸 물어봐.',
+    strong:'소개를 받아 보고 싶었다면 친구에게 어떤 사람과 대화가 잘 통하는지 알려 주기 편한 날이야.'}},
   crush: {signal:'수신신호',label:'연락 받기',meaning:{
     weak:'상대의 선연락을 기다리는 방식으로 호감을 가늠하기 어려운 날이야. 이미 대화가 있다면 그 안에서 상대가 먼저 물어온 게 있었는지 봐.',
     neutral:'연락이 먼저 오는지만으로 마음을 읽기 어려워. 답을 주고받을 때 상대도 네 일상을 궁금해하는지 봐.',
@@ -114,10 +114,10 @@ const scenarioSignals: Record<string, { signal: string; label: string; meaning: 
   ambiguous: {signal:'수신신호',label:'연락 받기',meaning:{
     weak:'상대의 연락이 뜸해도 그 하루를 관계에 대한 대답으로 삼기는 어려워. 다음에 이야기할 때 네가 궁금했던 점을 직접 물어봐.',
     neutral:'먼저 연락이 오느냐만으로 두 사람이 어떤 사이인지 정하기는 어려워. 다음 만남을 바라는지 서로 말할 때 더 분명해져.',
-    strong:'먼저 오는 연락이 있어도 안부 한 번과 계속 만날 의사는 별개야. 다음 만남 이야기를 양쪽이 꺼내는지 봐.'}},
+    strong:'안부가 먼저 와도 둘이 같은 관계를 원한다는 뜻까지 담긴 건 아니야. 네가 궁금한 게 서로에게만 집중할 의사라면 그 질문을 그대로 꺼내 봐.'}},
   couple: {signal:'발신적합',label:'대화 시작하기',meaning:{
     weak:'민감한 이야기는 긴 메시지로 한꺼번에 꺼내기보다, 둘 다 이야기할 수 있는 시간을 먼저 잡아 봐.',
-    neutral:'바라는 게 있다면 상대가 짐작해 주길 기다리지 말고, 다음번에 함께 하고 싶은 일을 하나 말해 봐.',
+    neutral:'고마운 일과 서운한 일이 한꺼번에 떠오른다면 오늘 꼭 전하고 싶은 쪽을 먼저 말해. 두 이야기를 섞으면 상대가 어느 말에 답해야 할지 헷갈릴 수 있어.',
     strong:'고마웠거나 서운했던 일을 네가 먼저 꺼내기 편한 쪽이야. 구체적인 장면 하나를 이야기하면 상대도 자기 입장을 설명하기 쉬워.'}},
 }
 
@@ -177,7 +177,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
         const context = scenarioSignals[key]
         const stat = calculation?.western.relationship_signals?.[context.signal]
         const text = stat?.band && Number.isFinite(stat.average)
-          ? `${reading[strength].split('. ')[0]}. 이날 ‘${context.label}’ 지표는 ${stat.average}점(${stat.band})이야. ${context.meaning[readingStrength(stat.band)]}`
+          ? `${reading[strength]} 이날 ‘${context.label}’ 지표는 ${stat.average}점(${stat.band})이야. ${context.meaning[readingStrength(stat.band)]}`
           : reading[strength]
         doc.details.push({id:'application:'+key,label:'이날의 연애 지표를 적용하면',text})
         doc.slots = doc.slots.filter(item => item.id !== slotId)
@@ -185,6 +185,20 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       if (doc.details.some(item => item.id.startsWith('application:'))) {
         doc.details.unshift({id:'application:basis',label:'상황별로 읽는 기준',text:`서양점성술의 연애 지표는 ${loveStat.average}점(${loveStat.band})이야. 아래에서 네 상황을 골라 봐.`})
       }
+    }
+    // A scored re-contact signal can answer a narrower question than reconciliation.
+    // Keep a delivered "insufficient" judgement and any original manuscript intact.
+    const reunionSlot = doc.slots.find(slot=>slot.id==='relationship.love_reunion_interest')
+    const signals = calculation?.western.relationship_signals
+    const reconnection = signals?.['과거인연접점'] ?? signals?.['과거인연재접점']
+    if (reunionSlot?.state==='missing' && reconnection?.band && Number.isFinite(reconnection.average)) {
+      const context = {
+        weak:'아직 연락이 끊긴 사이라면 먼저 소식이 닿으리라고 읽을 근거가 적어.',
+        neutral:'연락이 다시 닿을 여지는 열려 있지만 누가 먼저 움직일지는 드러나지 않아.',
+        strong:'지난 인연과 다시 말이 오갈 계기에 눈길이 가는 날이야.',
+      }[readingStrength(reconnection.band)]
+      doc.details.push({id:reunionSlot.id+':calculated', label:'재접촉 계산값으로 본 재회',text:`이날 과거 인연 접점은 ${reconnection.average}점(${reconnection.band})이야. ${context} 이미 다시 만났다면 접촉은 이뤄진 거야. 그때 멀어졌던 이유를 서로 말할 수 있었는지, 같은 상황이 돌아오면 이번엔 어떻게 하겠다고 했는지가 관계를 다시 시작할 단서야.`})
+      reunionSlot.state='ready'
     }
     if (field.topics.includes('연락')) {
       const signals = calculation?.western.relationship_signals
