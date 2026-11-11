@@ -21,6 +21,11 @@ test('the local daily reader works without a manuscript and limits situational a
     for(const label of ['솔로 · 새 인연','짝사랑','썸','애매한 관계','연애 중','재회']) assert.ok(love.includes('<summary>'+label+'</summary>'),label)
     assert.match(love,/39점/)
     delete calculation.western.relationship_signals['과거인연접점']
+    const general=show(calculation,fortuneGroup('애정'))
+    assert.match(general,/<summary>재회<\/summary>/)
+    assert.match(general,/이날의 재회 지표/)
+    assert.doesNotMatch(general,/재접촉 계산값으로 본 재회/)
+    delete calculation.western.overall['재회']
     assert.doesNotMatch(show(calculation,fortuneGroup('애정')),/<summary>재회<\/summary>/)
     assert.doesNotMatch(show(calculation,fortuneGroup('학업')),/내 상황에 맞춰 보기/)
     assert.equal(show({...calculation,period:{...calculation.period,day_count:7}}),'')

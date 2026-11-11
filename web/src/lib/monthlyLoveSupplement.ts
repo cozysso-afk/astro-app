@@ -1,5 +1,6 @@
 import type {FortuneStat, IntegratedApiResponse} from '../appTypes'
 import type {AuthoredReadingDocument} from './authoredReadingDocument'
+import {periodContactSignals,contactDirectionComparison} from './contactDirectionReading.ts'
 import {monthlyTopicPhases} from './monthlyReadingCore.ts'
 
 export type MonthSupplement = {id:string; label:string; text:string; evidence:string}
@@ -83,12 +84,22 @@ function monthlyReunionTiming(calculation:IntegratedApiResponse) {
 }
 
 function relationshipContext(id:string, topics:Record<string,FortuneStat|null>, calculation:IntegratedApiResponse) {
-  const {start,end}=calculation.period
-  const signals=calculation.western.months?.find(row=>row.start===start && row.end===end)?.relationship_signals ?? calculation.western.relationship_signals
-  const incoming=signals?.['수신신호'], outgoing=signals?.['발신적합']
+  const signals=periodContactSignals(calculation,true)
+  const incoming=signals?.수신신호, outgoing=signals?.발신적합
   const reunion=signals?.['과거인연접점']??signals?.['과거인연재접점']
-  if (id==='relationship.contact_activation' && incoming && outgoing && Number.isFinite(incoming.average) && Number.isFinite(outgoing.average)) {
-    return `상대 쪽 연락을 받을 조건은 ${incoming.average}점, 내가 먼저 말을 꺼낼 조건은 ${outgoing.average}점이야. ${incoming.average===outgoing.average?'시작하는 쪽에 차이가 없어.':incoming.average>outgoing.average?'둘 중에는 상대 쪽에서 오는 연락에 조금 더 무게가 실려.':'둘 중에는 먼저 말을 건네는 쪽에 조금 더 무게가 실려.'}`
+  if(id==='relationship.love_crush' && incoming && Number.isFinite(incoming.average)) {
+    const cue=/약|낮|이하/.test(incoming.band)
+      ? '먼저 오는 연락이 뜸해도 그걸로 호감을 판단하기는 어려워. 내가 안부를 물은 뒤 상대도 내 근황을 궁금해했는지 봐.'
+      : '먼저 온 연락 중에서도 용건이 끝난 뒤 네 이야기를 다시 물었던 대화를 떠올려 봐. 답을 받는 것과 상대도 너를 알아가려는 건 그 지점에서 달라.'
+    return `이달 연락을 받을 조건은 평균 ${incoming.average}점이야. ${cue}`
+  }
+  if(id==='relationship.love_ambiguous' && incoming && outgoing && Number.isFinite(incoming.average) && Number.isFinite(outgoing.average)) {
+    const question=incoming.average===outgoing.average?'누가 대화를 시작했는지보다 서로 어떤 관계를 기대한다고 말했는지가 중요해.':
+      incoming.average>outgoing.average?'상대가 먼저 안부를 물어도 두 사람이 원하는 관계까지 같다고 짐작하긴 일러.':'늘 네가 먼저 말을 꺼내는 사이라면 상대도 다음 만남을 먼저 정한 적이 있는지 돌아봐.'
+    return `받는 쪽은 평균 ${incoming.average}점, 먼저 말을 거는 쪽은 ${outgoing.average}점이야. ${question}`
+  }
+  if(id==='relationship.love_couple' && outgoing && Number.isFinite(outgoing.average)) {
+    return `이달 대화를 먼저 꺼내는 조건은 평균 ${outgoing.average}점이야. ${/약|낮|이하/.test(outgoing.band)?'둘 다 지친 날에는 긴 메시지보다 언제 편하게 얘기할 수 있는지 먼저 물어봐.':'둘이 함께 바꾸고 싶은 일이 있다면 다음에 비슷한 상황이 올 때 어떻게 해 주면 좋은지 하나만 구체적으로 말해 봐.'}`
   }
   if(id==='relationship.love_reunion_interest') {
     const stat=topics['재회']
@@ -120,7 +131,9 @@ export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:
     const stat=topics?.[topic]
     if (!stat?.band || !Number.isFinite(stat.average)) return []
     const text=/약|낮|이하/.test(stat.band)?weak:/강|높|이상/.test(stat.band)?strong:neutral
-    const context=relationshipContext(section.id,topics,calculation) || scoreTiming(topic,stat,start,end)
+    const overviewDirection=doc.scope==='overall' && section.id==='relationship.contact_activation'
+      ? contactDirectionComparison(calculation,true) : ''
+    const context=overviewDirection || relationshipContext(section.id,topics,calculation) || scoreTiming(topic,stat,start,end)
     return [{id:section.id,label:section.label,text:context+' '+text,evidence:evidence(topic,stat,start,end)}]
   })
 }

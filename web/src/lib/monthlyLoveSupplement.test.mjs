@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {monthlyReadingCore} from './monthlyReadingCore.ts'
 import {monthlyLoveSupplements, monthlyPeriodSupplements} from './monthlyLoveSupplement.ts'
 
 const keys=['love_single','love_crush','love_flirting','love_ambiguous','love_couple','contact_activation','contact_continuity','love_reunion_interest']
@@ -51,7 +52,8 @@ test('month timing changes in the explanation even with the same overall band',(
 test('monthly direction uses the selected month and distinguishes receiving and initiating',()=>{
   const row={...period,topics,relationship_signals:{수신신호:{...stat,average:28},발신적합:{...stat,average:60}}}
   const input={period,western:{months:[row],relationship_signals:{수신신호:{...stat,average:85}}}}
-  const item=monthlyLoveSupplements(doc,input).find(s=>s.id==='relationship.contact_activation')
+  const result=monthlyReadingCore({...doc,core:[],exportBlockIds:[]},input,{topics:['연락']})
+  const item=result.core.find(s=>s.id==='month:contact-direction')
   assert.match(item.text,/28점.*60점.*먼저 말을 건네는 쪽/)
   assert.doesNotMatch(item.text,/85점/)
 })

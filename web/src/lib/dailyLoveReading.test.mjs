@@ -62,3 +62,12 @@ test('scenario-specific context survives when a signal is available',()=>{
   assert.match(solo,/대화가 잠시 끊겼을 때도 궁금한 게 남는다면/)
   assert.doesNotMatch(solo,/다음 약속/)
 })
+
+test('a daily general reunion score can answer the reunion situation without a separate contact signal',()=>{
+  const date='2026-11-11'
+  const calc={period:{start:date,end:date},western:{overall:{재회:{average:46,band:'다소 약함'}},relationship_signals:{}}}
+  const row=buildDailyReadingDocument(archived,date,field,true,calc).details.find(b=>b.id==='relationship.love_reunion_interest:calculated')
+  assert.match(row.text,/재회 지표는 46점.*조건은 약한/)
+  assert.doesNotMatch(row.text,/과거 인연 접점은 46점/)
+  assert.equal(buildDailyReadingDocument(archived,'2026-11-12',field,true,calc).details.some(b=>b.id===row.id),false)
+})

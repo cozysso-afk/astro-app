@@ -55,3 +55,15 @@ test('the monthly narrative renders calculated timing for overview and study, ke
     assert.doesNotMatch(study,/직장 점수를|금전 점수를/)
   } finally { await server.close() }
 })
+
+test('month resolves the missing contact direction question only when both matching scores exist',()=>{
+  const id='question:연락:activation_direction'
+  const source={...doc,sections:[{id,label:'연락 · 방향',state:'insufficient',blocks:[]}]}
+  const calc={period,western:{relationship_signals:{수신신호:{average:39},발신적합:{average:38}}}}
+  const overview=monthlyReadingCore(source,calc)
+  assert.equal(overview.sections[0].state,'ready')
+  assert.match(overview.sections[0].blocks[0].text,/1점 높아/)
+  assert.ok(!overview.core.some(b=>b.id==='month:contact-direction'))
+  delete calc.western.relationship_signals.발신적합
+  assert.equal(monthlyReadingCore(source,calc).sections[0].state,'insufficient')
+})
