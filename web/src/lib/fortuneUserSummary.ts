@@ -1,6 +1,7 @@
 import type { AiInterpretationResponse, AiTopicInterpretation, FortuneDailyEvidence, FortuneStat, IntegratedApiResponse, PeriodKey } from '../appTypes'
 import { fortunePresentationTone, fortuneToneAssessment, fortuneEvidenceSnapshot, evidenceDirection, type FortuneEvidenceDirection } from './fortuneToneCalibration.ts'
 import {contactDirectionApplication} from './contactDirectionReading.ts'
+import { monthlyTopicPhases } from './monthlyTopicPhases.ts'
 import { readingDateSemantics } from './readingDateSemantics.ts'
 
 type InterpretationData = NonNullable<AiInterpretationResponse['data']>
@@ -949,7 +950,7 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
         ? `${clean(narrative?.avoid) ?? copy.caution} 부담 근거는 ${snapshot.challenge}야. 이 근거 하나로 사건을 확정하지 마.`
         : clean(narrative?.avoid) ?? (direction === 'challenging' || INVESTMENT_TOPICS.has(topic) ? copy.caution : topic === '연애' ? LIFE.연애[1] : undefined)
     return { topic, conclusion, reason: clean(narrative?.reason) ?? reasonFor(data, context, topic, interpretation, level, direction),
-      timing: periodProgression(context.calculation, topic, frame.kind, direction) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,
+      timing: periodProgression(context.calculation, topic, frame.kind) ?? topicTiming(context, topic, level, frame.kind, direction), action, observe: realLifeDepth(topic) || copy.observe,
       caution: cautionText }
   }
   const focusTopics = selected.map(explainTopic)
@@ -1123,24 +1124,46 @@ export function datedAspectReading(
       lines.push('도움을 주는 배치가 있어도 이 분야 전체의 활성도는 낮은 편이야.')
   }
   const support = examples.find(item => item.sign > 0), pressure = examples.find(item => item.sign < 0)
-  if (support && pressure && pressure.score > support.score)
-    lines.push(`${pressure.score}점인 날에는 마찰도 함께 보여. 점수가 높다는 건 이 주제가 두드러진다는 뜻이라, 어느 날이 더 편한지는 두 날짜의 배치를 같이 봐야 해.`)
-  else if (period==='day' && first.topic==='연애') lines.push('관계가 실제로 가까워지는지는 상대도 만날 시간을 정하거나 다음 약속을 제안하는지에서 살펴봐.')
+  if (period === 'week' && support && pressure) {
+    const easierDay = Number(support.date.slice(-2)) + '일'
+    const harderDay = Number(pressure.date.slice(-2)) + '일'
+    if (pressure.score > support.score) lines.push(`${pressure.score}점인 날에는 마찰도 함께 보여.`)
+    if (first.topic === '연애') {
+      lines.push(support.date < pressure.date
+        ? `${easierDay}에 표현하기 편했던 마음이 ${harderDay}에는 상대의 답을 기다리는 조급함으로 바뀔 수 있어. 만날 생각이 있다면 편하게 얘기가 오갈 때 가능한 날을 물어봐. 이후 답이 짧아지더라도 먼저 나눈 약속을 상대가 지키는지까지 봐.`
+        : `${harderDay}에 반응이 기대에 못 미쳤다면 당일에 결론을 내릴 필요는 없어. ${easierDay}에도 만나고 싶은 마음이 남아 있다면 그때 다시 말을 건네 봐. 상대가 가능한 시간을 함께 찾는지가 다음 단서야.`)
+    } else {
+      lines.push(`이번 주 ${first.topic}에서 같은 일을 두 번 살펴본다면 ${easierDay}에는 무엇이 수월했는지, ${harderDay}에는 어디에서 막혔는지 비교해 봐.`)
+    }
+  }
+  if (period === 'month' && start.slice(0,7) === end.slice(0,7)) {
+    const profile = monthlyTopicPhases(calculation, first.topic)
+    if (profile) {
+      const comparisons = examples.map(item => {
+        const part = profile.parts[phase(item.date)]
+        const gap = item.score - part.average
+        const relative = gap === 0 ? '같아' : `${Math.abs(gap)}점 ${gap > 0 ? '높아' : '낮아'}`
+        return `${Number(item.date.slice(-2))}일의 ${item.score}점은 ${part.label}에 계산된 ${part.count}일 평균 ${part.average}점${gap === 0 ? '과' : '보다'} ${relative}.`
+      })
+      lines.push(...comparisons)
+      if (first.topic === '연애' && support && pressure) {
+        lines.push(`${Number(pressure.date.slice(-2))}일 무렵 대화가 어색했더라도 그 하루로 이달의 관계를 판단하기는 일러. ${Number(support.date.slice(-2))}일 무렵에는 좀 더 편하게 말을 주고받았는지, 만남을 먼저 제안하는 쪽이 한 사람에게만 쏠렸는지도 함께 돌아봐.`)
+      }
+    }
+  }
+  if (period === 'day' && first.topic === '연애') lines.push('관계가 실제로 가까워지는지는 상대도 만날 시간을 정하거나 다음 약속을 제안하는지에서 살펴봐.')
   return {id:period+':aspect:'+first.topic, label:first.topic+(period==='day' ? ' · 이날의 서양점성술 해설' : ' · 날짜로 살펴본 서양점성술 해설'), text:lines.filter(Boolean).join(' ')}
 }
 
 // Group only existing scores for presentation. Never mutate them or fill missing dates.
-export function periodProgression(calculation:Pick<IntegratedApiResponse, 'period' | 'western'>, topic:string, kind:PeriodKind, direction:FortuneEvidenceDirection='neutral'):string | undefined {
+export function periodProgression(calculation:Pick<IntegratedApiResponse, 'period' | 'western'>, topic:string, kind:PeriodKind):string | undefined {
   if(kind==='day') return undefined
-  const polarity=topic==='투자주의'?-1:1
   if(kind==='year') {
     const months=(calculation.western.months ?? []).filter(m=>m.start>=calculation.period.start && m.end<=calculation.period.end && Number.isFinite(m.topics?.[topic]?.average))
     if(months.length<2) return undefined
-    const sorted=[...months].sort((a,b)=>polarity*(b.topics[topic]!.average-a.topics[topic]!.average))
+    const sorted=[...months].sort((a,b)=>b.topics[topic]!.average-a.topics[topic]!.average)
     if(Math.abs(sorted[0].topics[topic]!.average-sorted.at(-1)!.topics[topic]!.average)<5) return `${topic}은 확인된 월별 흐름에서 큰 강약 차이가 없어. 특정 달에 몰기보다 연중 유지 흐름에 가까워.`
-    return direction === 'challenging'
-      ? `올해는 ${sorted[0].start}~${sorted[0].end}보다 ${sorted.at(-1)!.start}~${sorted.at(-1)!.end}에 실제 주의 방향 근거를 더 살펴볼 필요가 있어.`
-      : `올해는 ${sorted[0].start}~${sorted[0].end}에 ${topic} 활성도가 상대적으로 두드러지고, ${sorted.at(-1)!.start}~${sorted.at(-1)!.end}에는 이 분야가 중심에서 멀어져.`
+    return `올해는 ${sorted[0].start}~${sorted[0].end}에 ${topic} 활성도가 상대적으로 두드러지고, ${sorted.at(-1)!.start}~${sorted.at(-1)!.end}에는 이 분야가 중심에서 멀어져.`
   }
   const start=Date.parse(calculation.period.start+'T00:00:00Z'), end=Date.parse(calculation.period.end+'T00:00:00Z')
   const days=Math.round((end-start)/86400000)+1
@@ -1151,14 +1174,10 @@ export function periodProgression(calculation:Pick<IntegratedApiResponse, 'perio
   for(const row of rows){const offset=Math.round((Date.parse(row.date+'T00:00:00Z')-start)/86400000);const index=kind==='week'?Math.min(2,Math.floor(offset*3/days)):Math.floor(offset/7);groups.set(index,[...(groups.get(index)??[]),row])}
   const phases=[...groups].filter(([,rs])=>rs.length>=2).map(([index,rs])=>({index,start:rs[0].date,end:rs.at(-1)!.date,score:rs.reduce((n,r)=>n+r.scores[topic]!,0)/rs.length}))
   if(phases.length<2) return undefined
-  const best=[...phases].sort((a,b)=>polarity*(b.score-a.score))[0], weak=[...phases].sort((a,b)=>polarity*(a.score-b.score))[0]
+  const best=[...phases].sort((a,b)=>b.score-a.score)[0], weak=[...phases].sort((a,b)=>a.score-b.score)[0]
   if(Math.abs(best.score-weak.score)<5) return `${topic}은 ${kind==='week'?'주 초부터 후반까지':'확인된 주별 구간 사이에'} 큰 강약 차이가 없어. 꾸준히 이어가는 흐름에 가까워.`
-  if(kind==='week') return direction === 'challenging'
-    ? `${topic}은 이번 주 ${['초반','중반','후반'][weak.index]}(${weak.start}~${weak.end})에 실제 주의 방향 근거를 더 살펴볼 필요가 있어.`
-    : `${topic}은 이번 주 ${['초반','중반','후반'][best.index]}(${best.start}~${best.end})에 상대적으로 더 두드러지고, ${['초반','중반','후반'][weak.index]}(${weak.start}~${weak.end})에는 중심에서 멀어져.`
-  return direction === 'challenging'
-    ? `${topic}은 이번 달 ${weak.start}~${weak.end}에 실제 주의 방향 근거가 상대적으로 더 두드러져.`
-    : `${topic}은 이번 달 ${best.start}~${best.end} 구간에 활성도가 더 두드러지고 ${weak.start}~${weak.end}에는 중심에서 멀어져.`
+  if(kind==='week') return `${topic}은 이번 주 ${['초반','중반','후반'][best.index]}(${best.start}~${best.end})에 상대적으로 더 두드러지고, ${['초반','중반','후반'][weak.index]}(${weak.start}~${weak.end})에는 중심에서 멀어져.`
+  return `${topic}은 이번 달 ${best.start}~${best.end} 구간에 활성도가 더 두드러지고 ${weak.start}~${weak.end}에는 중심에서 멀어져.`
 }
 
 /** A directional conclusion; an overall contact score cannot answer both questions. */
