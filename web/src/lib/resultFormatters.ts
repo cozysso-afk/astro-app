@@ -1,7 +1,7 @@
-import {observationReading,eventLabels,initiatorLabels} from './reunionObservation'
+import {readReunionObservation,observationReading,eventLabels,initiatorLabels} from './reunionObservation'
 import { relationshipLimitKo } from './relationshipLimitKo'
 import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
-import { buildExternalCompactPrompt, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
+import { buildExternalCompactPrompt, buildRelationshipCompactPacket, buildRelationshipCompactPrompt, type ExternalCopyMode } from './compactDeepPrompt'
 import { externalFortuneInstructions, externalPeriodKind } from './precisionTransport'
 import type { Aspect, FortuneStat, IntegratedApiResponse, RelationshipApiResponse, ReunionTimingContext, ReunionObservationContext } from '../appTypes'
 import { topicOrder } from './fortuneTopics'
@@ -290,9 +290,9 @@ function compactRelationshipExternalPacket(calculation: RelationshipApiResponse 
     policy: rawResult.reunion_transits.policy,
     top_days: rawResult.reunion_transits.top_days.slice(0,caps.transitDays).map((day)=>({
       date:day.date,
-      score:Number(day.score.toFixed(1)), user_score:Number(day.user_score.toFixed(1)), counterpart_score:Number(day.counterpart_score.toFixed(1)),
+      score:day.score, user_score:day.user_score, counterpart_score:day.counterpart_score,
       shared_activation:day.shared_activation,
-      hits:day.hits.slice(0,caps.transitHits).map((hit)=>({ person:hit.person, transit:hit.transit, aspect:hit.aspect, target:hit.target, orb:Number(hit.orb.toFixed(2)), tone:hit.tone, score:Number(hit.score.toFixed(1)) })),
+      hits:(day.hits ?? []).slice(0,caps.transitHits).map((hit)=>({ person:hit.person, transit:hit.transit, aspect:hit.aspect, target:hit.target, orb:hit.orb, tone:hit.tone, score:hit.score })),
     })),
     top_months: rawResult.reunion_transits.top_months.slice(0,caps.transitMonths).map((month)=>({ calendar_month:month.calendar_month, score:Number(month.score.toFixed(1)), top_dates:month.top_dates.slice(0,3) })),
   } : null
@@ -361,26 +361,29 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     : kind === 'reunion' ? '[재회 흐름 한눈에] [상대 차트 쪽 활성] [내 차트 쪽 활성] [과거 인연 재접점] [재접촉 vs 관계 회복] [다시 붙었을 때 유지력] [반복 가능성이 높은 문제] [주요 시기] [현실적으로 확인해야 할 행동]'
     : kind === 'marriage' ? '[결혼궁합 한눈에] [함께 살 때 강점] [감정과 친밀감] [대화와 갈등 해결] [책임 / 역할] [생활 리듬] [장기 유지력] [결혼 전에 확인할 현실 조건]'
     : '[궁합 한눈에] 3~5문장 [자연스럽게 잘 맞는 점] [부딪히기 쉬운 점] [대화와 사고방식] [감정과 친밀감] [끌림] [경계 / 힘의 균형] [장기 유지력] [현실적으로 맞춰야 할 것]'
-  const record=kind==='reunion' && observation ? observationReading(observation) : null
-  const facts=record && observation ? [
-    observation.state ? record.title : '',
-    observation.initiator ? '기록한 첫 연락 주체 · '+initiatorLabels[observation.initiator] : '',
+  const observed=kind==='reunion' ? readReunionObservation(observation) : undefined
+  const record=observed ? observationReading(observed) : null
+  const direction=reunionContext ?? calculation?.result.reunion_transits?.directional_context
+  const facts=record && observed ? [
+    record.title,
+    '기록한 첫 연락 주체 · '+(observed.initiator ? initiatorLabels[observed.initiator] : '미입력'),
     ...record.events.map(event=>eventLabels[event.kind]+' · '+event.date),
   ].filter(Boolean).join(' / ') : ''
   const intro = [
     `[별빛의 운명 · ${label} 외부 AI용 초압축 해석 요청]`,
-    `관계 상태: ${String(request.relationship_status ?? '')} / 분석 모드: ${String(request.analysis_mode ?? kind)} / 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
+    `${kind==='reunion' ? '계산에 입력한 구분' : '관계 상태'}: ${String(request.relationship_status ?? '')} / 분석 모드: ${String(request.analysis_mode ?? kind)} / 기간: ${String(request.start_date ?? '')} ~ ${String(request.end_date ?? '')}`,
     `본인: ${String(user.name ?? '나')} · ${String(user.birth_date ?? '')} ${String(user.birth_time ?? '')}`,
     `상대: ${String(cp.name ?? '상대')} · ${String(cp.birth_date ?? '')} ${cp.time_known ? String(cp.birth_time ?? '') : '출생시간 모름'}`,
     '※ 좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다. 아래 계산값을 다시 천문/사주 계산하지 마라.',
     '',
     facts ? `[사용자가 확인한 관계 기록] ${facts}
-이 기록에서 출발해 다음으로 확인할 점을 해설하라. 날짜가 있는 과거 사건만으로 현재 교제 여부를 단정하지 마라.` : '',
+이 기록에서 출발해 다음으로 확인할 점을 해설하라. 현재 상태와 과거 사건 날짜를 구분하고, 누가 먼저 연락했는지는 기록만으로 판단하라. 합의가 확인됐다면 재회 가능성을 되묻지 말고 관계를 어떻게 이어갈지를 해설하라.` : '',
     '[EXTERNAL_AI_PROMPT_V2 · 관계 심층 상담]',
     '너는 아래 계산값만 근거로 읽는 숙련된 관계 점성술 분석가다. 실제 상담 수준의 연결된 한국어 문단으로 해설하라.',
     '계산 권위는 별빛의 운명 엔진에 있다. 외부 LLM은 해석자이며 두 번째 계산기가 아니다.',
     '[해석 규칙]',
     '- 점성술 해설의 근거는 아래 COMPACT_CALCULATED_DATA로 한정한다. 데이터에 없는 요소·사건 확률·상대 속마음은 만들지 않는다.',
+    kind === 'reunion' && mode==='compact' ? '- 감정 활성, 연락, 만남, 교제 합의를 따로 읽어라. incoming/outgoing은 상대측/내측 차트 활성도다. 진행·회귀는 기간 배경이며 새 날짜나 선연락 주체를 정하지 않는다.' :
     kind === 'reunion' ? '- 재회운은 reunion_dimensions의 감정 활성 / 연락·재접촉 / 실제 만남 / 관계 재결합을 분리한다. incoming/outgoing은 상대측/내측 활성이지 행동 방향이 아니다. reunion_secondary_support는 진행계열 기간 배경이며 exact date를 만들지 않는다. reunion_return_support의 Solar Return(태양회귀)은 연간 배경, Lunar Return(달회귀)은 월간·정서 배경이다. Return은 fast trigger를 통과한 날짜를 교차검증하는 보조층일 뿐 날짜를 새로 만들거나 같은 transit을 중복 가산하지 않는다. Return의 user/counterpart 활성은 선연락 방향 근거로 쓰지 않는다. 본문에서는 기술명보다 연간 배경/월간 배경이라는 사용자 언어를 먼저 쓴다.' : '',
     '- 개인행성·수성의 소통·금성/화성의 끌림·토성의 책임·교점의 관계 관련성을 우선하고 반복 주제와 애스펙트 성격, 오브를 함께 본다. 외행성끼리의 세대 접점을 작은 오브만으로 최우선에 놓지 않는다. 접점 수·점수는 연락/재회/결혼 확률이 아니다.',
     '- timing_contract의 fixed UTC offset·local noon 정책을 그대로 유지하고, advanced.composite 및 월별 progressed_synastry·progressed_composite·marks_tertiary를 서로 다른 층으로 읽는다.',
@@ -402,41 +405,58 @@ export function relationshipPromptText(kind: 'compatibility' | 'reunion' | 'marr
     '실제로 있는 날짜만 쓰고 상대 속마음·사건 확률·새 점수·없는 애스펙트를 만들지 않는다.',
     '한국어 상담형 문단으로 전문용어를 풀어라. 한줄 나열·의미 없는 장황함·같은 결론과 어미 반복·evidence ID·JSON 필드명 낭독을 피한다.',
   ].filter(Boolean)
-  if (mode === 'compact') return buildRelationshipCompactPrompt(intro.join('\n'),kind,request,calculation,reunionContext)
-  let prompt = ''
+  if (mode === 'compact') return buildRelationshipCompactPrompt(intro.join('\n'),kind,request,calculation,direction,observed)
+  const wrap = (packet:unknown, level:number) => [...intro,'',`[COMPACT_CALCULATED_DATA · 압축단계 ${level}]`,JSON.stringify(packet)].join('\n')
+  let broad:Record<string,unknown> = {}
   for (let level=0; level<=2; level++) {
-    const packet = compactRelationshipExternalPacket(calculation,reunionContext,level)
-    const candidate = [...intro, '', `[COMPACT_CALCULATED_DATA · 압축단계 ${level}]`, packet ? JSON.stringify(packet) : '계산 결과 없음'].join('\n')
-    prompt = candidate
-    if (candidate.length <= EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS) break
+    const base=compactRelationshipExternalPacket(calculation,direction,level)
+    if (!base && !observed) return [...intro,'','계산 결과 없음'].join('\n')
+    if (base && observed) {
+      const {relationship_status,...other}=base
+      broad={calculation_relationship_status:relationship_status, reunion_observation:observed, ...other}
+    } else broad=base ?? {reunion_observation:observed, calculation_available:false}
+    const candidate=wrap(broad,level)
+    if (candidate.length<=EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS) return candidate
   }
-  return prompt.length <= EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS
-    ? prompt
-    : `${prompt.slice(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS - 180)}\n[길이 안전 절단] 뒤쪽 저우선순위 근거는 외부 AI 입력 한도를 위해 생략됨. 앞의 계산근거만 사용해 해석해.`
+  // Keep a complete, parseable core. Restore entire detailed sections while they fit.
+  const core:Record<string,unknown>=buildRelationshipCompactPacket(kind,request,calculation,direction,observed,3)
+  const omitted:string[]=[]
+  for (const [key,value] of Object.entries(broad)) {
+    if (wrap({...core,[key]:value,omitted_full_sections:Object.keys(broad)},3).length<=EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS) core[key]=value
+    else omitted.push(key)
+  }
+  const reduced=wrap({...core,omitted_full_sections:omitted},3)
+  if (reduced.length<=EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS) return reduced
+  throw new Error('핵심 계산 근거가 복사 한도를 넘어. 더 짧은 분석 기간을 선택해줘.')
 }
 
-export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marriage', response: RelationshipApiResponse, reunionContext?: ReunionTimingContext | null) {
+export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marriage', response: RelationshipApiResponse, reunionContext?: ReunionTimingContext | null, observation?: ReunionObservationContext) {
   const result = response.result
   const aspects = result.natal_synastry?.aspects ?? []
   const label = kind === 'marriage' ? '결혼운' : kind === 'reunion' ? '재회운' : '궁합운'
+  const facts = kind==='reunion' ? readReunionObservation(observation) : null
+  const direction = reunionContext ?? result.reunion_transits?.directional_context
   const lines = [
     `[별빛의 운명 · ${label} 전체 결과]`,
     `엔진: ${response.engine} / API: ${response.api_version}`,
-    `관계 상태: ${response.relationship_status}`,
+    ...(facts ? [] : [`관계 상태: ${response.relationship_status}`]),
     `기간: ${response.period.start} ~ ${response.period.end}`,
     '',
+    ...(facts ? ['■ 직접 기록한 관계 사실',observationReading(facts).title,
+      '실제 첫 연락 · '+(facts.initiator ? initiatorLabels[facts.initiator] : '기록 안 함'),
+      ...facts.events.map(event=>eventLabels[event.kind]+' · '+event.date),''] : []),
     '■ 기본 관계 구조',
     `- 시너스트리 접점: ${aspects.length}`,
     `- 다빈슨: ${result.davison?.available ? 'ON' : `OFF · ${result.davison?.reason ?? ''}`}`,
     `- 마크스: ${result.marks?.available ? 'ON' : `OFF · ${result.marks?.reason ?? ''}`}`,
   ]
   aspects.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb(오브) ${aspect.orb.toFixed(2)}° · ${aspect.tone}`))
-  if (kind === 'reunion' && reunionContext) {
-    lines.push('', '■ 재회 방향별 활성도')
+  if (kind === 'reunion' && direction) {
+    lines.push('', '■ 재회 방향별 활성도', '각 점수는 차트의 활성도를 나타냅니다. 실제 첫 연락 주체는 위에 표시한 기록에서 확인할 수 있어요.')
     const directional: Array<[string, FortuneStat | null]> = [
-      ['상대 차트 쪽 활성', reunionContext.incoming],
-      ['내 차트 쪽 활성', reunionContext.outgoing],
-      ['과거인연 재접점', reunionContext.reconnection],
+      ['상대 차트 쪽 활성', direction.incoming],
+      ['내 차트 쪽 활성', direction.outgoing],
+      ['과거인연 재접점', direction.reconnection],
     ]
     directional.forEach(([name, stat]) => {
       if (!stat) return
@@ -458,7 +478,7 @@ export function relationshipResultText(kind: 'compatibility' | 'reunion' | 'marr
     month.signal_summary.tightest.forEach((aspect) => lines.push(`- ${aspectText(aspect)} · orb(오브) ${aspect.orb.toFixed(2)}°`))
   }
   if (result.limitations?.length) lines.push('', `제한사항: ${result.limitations.map(relationshipLimitKo).join(' ')}`)
-  const raw = kind === 'reunion' ? { relationship: response, reunion_directional_context: reunionContext ?? null } : response
+  const raw = kind === 'reunion' ? { relationship: response, reunion_directional_context: direction ?? null, reunion_observation: facts } : response
   lines.push('', '[원본 계산 JSON]', JSON.stringify(raw, null, 2))
   return lines.join('\n')
 }

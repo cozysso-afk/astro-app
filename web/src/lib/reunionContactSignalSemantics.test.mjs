@@ -66,3 +66,44 @@ test('compact and full external readings carry the same dated observation and in
     assert.doesNotMatch(formatPrompt('compatibility',{},null,null,mode,observation),/사용자가 확인한 관계 기록|2025-11-08/)
   }
 })
+
+
+test('copied JSON separates observed direction, current state and dated events from the numerical inputs',()=>{
+ const direction={period:{start:'2025-11-01',end:'2025-11-30'},months:[],incoming:{average:22,band:'약함'},outgoing:{average:75,band:'강함'},reconnection:null}
+ const calc={relationship_status:'single',period:direction.period,result:{months:[],reunion_transits:{available:false,directional_context:direction}}}
+ for(const mode of ['compact','full']) for(const initiator of ['user','counterpart','mutual','unknown','']){
+   for(const [state,kind] of [['messaging','recontact'],['met','meeting'],['reunited','rebuilding'],['','meeting']]){
+     const observation={state,initiator,events:[dateEvent(kind,'2025-11-08'),dateEvent('meeting','2099-01-01')]}
+     const text=formatPrompt('reunion',{relationship_status:'single'},calc,null,mode,observation)
+     const payload=JSON.parse(mode==='compact' ? text.split('CALCULATED_DATA=')[1] : text.slice(text.lastIndexOf('[COMPACT_CALCULATED_DATA · 압축단계')).split('\n').slice(1).join('\n'))
+     assert.deepEqual(payload.reunion_observation,{state,initiator,events:[observation.events[0]]})
+     assert.equal(payload.calculation_relationship_status,'single')
+     assert.equal(payload.relationship_status,undefined)
+     assert.equal(payload.reunion_directional_context.incoming.average,22)
+     assert.equal(payload.reunion_directional_context.outgoing.average,75)
+     assert.doesNotMatch(text,/관계 상태: single|2099-01-01/)
+   }
+ }
+})
+
+test('oversized full external prompt preserves complete JSON, direction and confirmed stages',()=>{
+ const state={state:'reunited',initiator:'unknown',events:[dateEvent('rebuilding','2025-11-08')]}
+ const calculation={relationship_status:'single',result:{months:[],reunion_return_support:{historical_rows:Array(9000).fill('extra detail')}}}
+ const text=formatPrompt('reunion',{},calculation,null,'full',state)
+ assert.ok(text.length<=28000)
+ const payload=JSON.parse(text.split('[COMPACT_CALCULATED_DATA · 압축단계 3]')[1])
+ assert.deepEqual(payload.reunion_observation,state)
+ assert.ok(payload.omitted_full_sections.includes('reunion_return_support'))
+})
+
+
+test('a hierarchy-selected transit date can lack individual-side scores',()=>{
+ const transit={date:'2027-09-17',score:60.21,components:{final:60.21},hits:[{person:'counterpart',transit:'Venus',target:'Venus',aspect:'square',orb:0.05296,score:87.128,tone:'challenging'}]}
+ const calc={result:{months:[],reunion_transits:{available:true,top_days:[transit],top_months:[]}}}
+ const text=formatPrompt('reunion',{},calc,null,'full')
+ const data=JSON.parse(text.split(/\[COMPACT_CALCULATED_DATA · 압축단계 \d\]\n/)[1])
+ const persisted=data.reunion_transits.top_days[0]
+ assert.deepEqual(persisted,{date:transit.date,score:transit.score,hits:transit.hits})
+ assert.equal(persisted.user_score,undefined)
+ assert.equal(persisted.counterpart_score,undefined)
+})

@@ -65,8 +65,10 @@ test('10 risk activation is caution; contact headline does not turn receiving in
  f.data.topic_analysis.투자주의.importance='핵심';f.data.topic_analysis.연락.importance='핵심'
  const before=JSON.stringify(f);const v=render(f)
  assert.ok(v.cautionCards.some(t=>t.topic==='투자주의'));assert.ok(!v.favorableCards.some(t=>t.topic==='투자주의'))
- assert.match(v.favorableCards.find(t=>t.topic==='연락').meaning,/받는 연락.*보내는 연락/)
+ assert.ok(!v.favorableCards.some(t=>t.topic==='연락'),'high activity alone is not positive evidence')
  assert.equal(JSON.stringify(f),before)
+ f.calculation.western.daily_scores[0].evidence.push({source_topics:['연락'],transit:'Mercury',target:'Venus',aspect:'trine',contribution:4,polarity:1})
+ assert.match(render(f).favorableCards.find(t=>t.topic==='연락').meaning,/받는 연락.*보내는 연락/)
 })
 test('11 strong reconnection with weak contact never becomes a push-to-reconnect recommendation',()=>{
  const f=fortuneFixture();f.calculation.western.overall.재회=stat(70);f.calculation.western.overall.연락=stat(30)
@@ -75,9 +77,10 @@ test('11 strong reconnection with weak contact never becomes a push-to-reconnect
  const before=JSON.stringify(f);const v=render(f,{focusTopics:['재회','연락']})
  assert.ok(!v.favorableCards.some(t=>t.topic==='재회'))
  assert.ok(!v.bestFlow.includes('재회'))
- assert.match(v.focusTopics.find(t=>t.topic==='재회').conclusion,/실제 연락 움직임은 약/)
+ assert.match(v.focusTopics.find(t=>t.topic==='재회').conclusion,/계산된 연락 활성도는 약.*실제 연락을 주고받았는지는 별도로 확인/)
+ assert.match(v.focusTopics.find(t=>t.topic==='재회').caution,/실제 연락이나 만남을 기록했다면.*기록이 비어 있으면 연락 여부는 아직 알 수 없어.*합의/)
  assert.doesNotMatch(v.headline,/재회(?: 문제)?에 힘/)
- assert.match(v.relationship.reconnection,/연락 전체 흐름이 약/)
+ assert.match(v.relationship.reconnection,/계산된 연락 활성도는 약/)
  assert.equal(JSON.stringify(f),before)
 })
 test('12 strong contact with weak reconnection does not convert contact into reunion',()=>{
@@ -92,7 +95,9 @@ test('13 strong contact and strong reconnection still separates contact from rel
  const f=fortuneFixture();f.calculation.western.overall.재회=stat(75);f.calculation.western.overall.연락=stat(75)
  f.calculation.western.relationship_signals.수신신호=stat(75);f.calculation.western.relationship_signals.발신적합=stat(75);f.calculation.western.relationship_signals.과거인연접점=stat(75)
  const v=render(f,{focusTopics:['재회','연락']})
- assert.match(v.favorableCards.find(t=>t.topic==='재회').meaning,/관계 회복은 별도 확인/)
+ assert.ok(!v.favorableCards.some(t=>t.topic==='재회'))
+ f.calculation.western.daily_scores[0].evidence.push({source_topics:['재회'],transit:'Venus',target:'Mars',aspect:'trine',contribution:3,polarity:1})
+ assert.match(render(f).favorableCards.find(t=>t.topic==='재회').meaning,/관계 회복은 별도 확인/)
  assert.match(v.focusTopics.find(t=>t.topic==='재회').conclusion,/대화가 닿는 것과 관계가 회복되는 것은 다른 단계/)
 })
 test('14 weak incoming and strong outgoing remain directionally distinct',()=>{
@@ -105,11 +110,28 @@ test('15 strong incoming and weak outgoing remain directionally distinct',()=>{
  const f=fortuneFixture();f.calculation.western.overall.연락=stat(65)
  f.calculation.western.relationship_signals.수신신호=stat(75);f.calculation.western.relationship_signals.발신적합=stat(25)
  const text=render(f,{focusTopics:['연락']}).focusTopics[0].conclusion
- assert.match(text,/오는 연락을 살피는 흐름과 내가 먼저 재촉하는 흐름이 서로 달라/)
+ assert.match(text,/외부 연락 반응 신호는 강함.*내 연락 실행 적합도는 약함.*이미 질문을 보냈다면/)
 })
 test('16 reconnection windows never use generic push language',()=>{
  const f=fortuneFixture('week');f.data.key_windows=[{signal:'활용',topics:['재회'],start:'2026-09-14',end:'2026-09-15'}]
  const guidance=render(f,{focusTopics:['재회']}).importantWindows[0].guidance
  assert.match(guidance,/실제 연락과 재접촉/)
  assert.doesNotMatch(guidance,/힘을 써보기/)
+})
+
+test('missing contact total and older reconnection keys remain distinct from a weak contact calculation',()=>{
+ const f=fortuneFixture();delete f.calculation.western.overall.연락
+ f.calculation.western.overall.재회=stat(70)
+ f.calculation.western.relationship_signals.과거인연재접점=stat(68)
+ const view=render(f,{focusTopics:['재회','연락']})
+ assert.match(view.focusTopics[0].conclusion,/연락 전체 지표는 계산 정보가 부족/)
+ assert.match(view.relationship.reconnection,/과거 인연 접점 신호는 강함/)
+ assert.doesNotMatch(view.relationship.reconnection,/전체 흐름이 약|활성도는 약/)
+ assert.ok(applyLoveContext(view,f.calculation,'single').relationship.reconnection)
+})
+test('all four context views retain measured incoming and outgoing direction',()=>{
+ const f=fortuneFixture(),view=render(f,{focusTopics:['연애','연락']})
+ const original=view.focusTopics.find(row=>row.topic==='연락').conclusion
+ for(const context of ['single','flirting','intimate_uncommitted','couple'])
+   assert.equal(applyLoveContext(view,f.calculation,context).focusTopics.find(row=>row.topic==='연락').conclusion,original)
 })

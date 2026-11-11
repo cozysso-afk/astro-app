@@ -7,27 +7,29 @@ const pick = (x: Row | undefined, keys: string[]) => Object.fromEntries(keys.fla
   return v !== undefined && v !== null && (finite(v) || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 240 && !/\b[WST]:/.test(v))) ? [[k, v]] : []
 }))
 
-function hierarchyWindow(x: Row | null | undefined) {
+function hierarchyWindow(x: Row | null | undefined, withComponents:boolean) {
   if (!x) return null
   return {
     ...pick(x,['date','start','end','stage','label','final','temporal_status']),
-    components:pick(x.components,['long_term','mid_term','event_trigger','cross_system','convergence_bonus']),
+    components:withComponents ? pick(x.components,['long_term','mid_term','event_trigger','cross_system','convergence_bonus']) : undefined,
   }
 }
 
 export function compactReunionHierarchyForExternal(h: Row | null | undefined, level: number) {
   if(!h) return null
   const limit=level===0?3:level===1?2:1
-  const stages=Object.fromEntries(Object.entries(h.stages ?? {}).map(([key,value])=>[key,pick(value as Row,['label','activation','candidate_count','gate_pass_count','hierarchy_pass_count'])]))
+  const window=(item:Row)=>hierarchyWindow(item,level<3)
+  const stageFields=level<3 ? ['label','activation','candidate_count','gate_pass_count','hierarchy_pass_count'] : ['activation','candidate_count']
+  const stages=Object.fromEntries(Object.entries(h.stages ?? {}).map(([key,value])=>[key,pick(value as Row,stageFields)]))
   const coverage=Object.fromEntries(Object.entries(h.coverage ?? {}).filter(([,value])=>typeof value==='boolean'))
   return {
     ...pick(h,['version','as_of_date','score_meaning']),
-    validation:h.validation ? {status:h.validation.status,checks:list(h.validation.checks).slice(0,3).map(row=>pick(row,['name','status','detail']))} : undefined,
+    validation:h.validation ? {status:h.validation.status,checks:list(h.validation.checks).slice(0,level===3?0:3).map(row=>pick(row,['name','status','detail']))} : undefined,
     stages,
-    top_periods:list(h.top_periods).slice(0,limit).map(hierarchyWindow).filter(Boolean),
-    nearest_window:hierarchyWindow(h.nearest_window),
-    past_windows:list(h.past_windows).slice(0,limit).map(hierarchyWindow).filter(Boolean),
-    current_windows:list(h.current_windows).slice(0,limit).map(hierarchyWindow).filter(Boolean),
+    top_periods:list(h.top_periods).slice(0,limit).map(window).filter(Boolean),
+    nearest_window:window(h.nearest_window),
+    past_windows:list(h.past_windows).slice(0,limit).map(window).filter(Boolean),
+    current_windows:list(h.current_windows).slice(0,limit).map(window).filter(Boolean),
     initiative:h.initiative ? pick(h.initiative,['available','verdict','reason']) : undefined,
     coverage,
     limitations:(Array.isArray(h.limitations)?h.limitations:[]).filter((s:unknown)=>typeof s==='string'&&s.length<=240).slice(0,3),

@@ -6,6 +6,7 @@ import type { FortuneField } from './lib/fortuneFields'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { periodAiCostPreview } from './lib/aiCostPreview'
+import { useObservedPromptContext } from './ContactObservationScope'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import { CalculatedFortuneReading } from './CalculatedFortuneReading'
 import { PeriodFortuneNarrativeV2, verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
@@ -48,11 +49,12 @@ export function PeriodAiInterpretationPanel({
   error: string
   cacheSource: 'local' | 'server' | 'fresh' | ''
   onRetry: () => void
-  onCopyPrompt: (mode?: ExternalCopyMode, field?: FortuneField) => void
+  onCopyPrompt: (mode?: ExternalCopyMode, field?: FortuneField, observed?:string) => void
   onCancel: () => void
   canCancel: boolean
 }) {
-  const copyPrompt = <ExternalPromptCopy onCopy={mode=>onCopyPrompt(mode,field)}/>
+  const observed = useObservedPromptContext()
+  const copyPrompt = <ExternalPromptCopy onCopy={mode=>onCopyPrompt(mode,field,observed)}/>
   const costPreview = periodAiCostPreview(period)
   const technicalFallback = technicalDetails
     ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>

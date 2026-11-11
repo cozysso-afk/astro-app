@@ -138,7 +138,7 @@ test('relationship AI has bounded paid calls cumulative usage server cache and r
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
   assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.7-grounded-question-reading-contract'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.10-grounded-stage-question-reading-contract'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.11-observed-fact-reading-contract'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 
@@ -146,7 +146,7 @@ test('external relationship prompt is compact bounded and clearly separated from
   assert.match(formatters, /EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS = 28000/)
   assert.match(formatters, /compactRelationshipExternalPacket/)
   assert.match(formatters, /for \(let level=0; level<=2; level\+\+\)/)
-  assert.match(formatters, /prompt\.slice\(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS - 180\)/)
+  assert.doesNotMatch(formatters, /prompt\.slice\(0,EXTERNAL_RELATIONSHIP_PROMPT_MAX_CHARS/)
   assert.match(formatters, /좌표·원본 API 요청은 이미 계산에 반영됐으므로 외부 AI 입력에서는 중복 제거했다/)
   assert.match(app, /ExternalPromptCopy onCopy={mode=>.*relationshipPromptText/)
   assert.doesNotMatch(app, /handleCopy\('요청\/프롬프트 전체복사', relationshipPromptText/)

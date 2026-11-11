@@ -76,11 +76,11 @@ export const THREE_SYSTEM_INSTRUCTIONS = '계산 권위는 별빛의 운명 엔�
 
 export const SAJU_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(TEN_GOD_LENSES),애정:Object.keys(TEN_GOD_LENSES),대인:['식상','비겁'],학업:['인성','식상','관성'],직업:['관성','식상','재성'],금전:['재성'],컨디션:[]}
 export const THAI_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(BHUMI_LENSES),애정:['boriwan','sri','montri','kalakini'],대인:['boriwan','montri','kalakini'],학업:['utsaha','montri'],직업:['det','utsaha','montri'],금전:['mula','sri','kalakini'],컨디션:['ayu']}
-export function compactSystemPrompt(packet: Record<string,unknown>, topic?:LifeTopic) {
+export function compactSystemPrompt(packet: Record<string,unknown>, topic?:LifeTopic, observed = '') {
   for(const limit of [12,8,4,2,1]) {
     const compact = Object.fromEntries(Object.entries(packet).map(([key,value])=>[key,Array.isArray(value)?value.slice(0,limit):value]))
     if (topic==='애정') compact.relationship_contexts = LOVE_SCENARIOS_PROMPT
-    const text=`${THREE_SYSTEM_INSTRUCTIONS}\n선택 체계와 분야만 상담형으로 해설하라. 다른 체계의 계산을 가져오지 말라. 생략된 구간은 추정하지 말라.\nCALCULATED_DATA=${JSON.stringify(compact)}`
+    const text=`${observed}${THREE_SYSTEM_INSTRUCTIONS}\n선택 체계와 분야만 상담형으로 해설하라. 다른 체계의 계산을 가져오지 말라. 생략된 구간은 추정하지 말라.\nCALCULATED_DATA=${JSON.stringify(compact)}`
     if(text.length<=7500)return text
   }
   throw new Error('핵심 근거가 7,500자를 넘어 복사하지 못했어. 더 좁은 기간을 선택해줘.')

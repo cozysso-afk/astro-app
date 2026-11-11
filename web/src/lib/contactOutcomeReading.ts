@@ -118,7 +118,9 @@ function recordedContactFact(row: DailyOutcomeRecord) {
   const callerConfirmed = receivedCall && legacyIncomingCall && /전화가 먼저 와서/.test(memo)
   return meetingRecorded(row) ? receivedCall
     ? `${row.date}에는 ${who}에게서${callerConfirmed ? ' 먼저' : ''} 전화가 왔고, 두 사람은 직접 만났어요.`
-    : `${row.date}에는 ${withWhom} 직접 만났어요.`
+    : row.event==='sent' ? `${row.date}에는 내가 ${who}에게 먼저 연락했고, 두 사람은 직접 만났어요.`
+    : row.event==='both' ? `${row.date}에는 ${withWhom} 서로 연락을 주고받았고, 두 사람은 직접 만났어요.`
+    : `${row.date}에는 연락을 받은 뒤 ${withWhom} 직접 만났어요.`
     : row.event === 'sent' ? `${row.date}에는 내가 ${who}에게 먼저 연락했어요.`
     : row.event === 'both' ? `${row.date}에는 ${withWhom} 서로 연락을 주고받았어요.`
     : `${row.date}에는 ${who}에게서 ${receivedCall ? '전화가 왔어요' : '연락을 받았어요'}.`

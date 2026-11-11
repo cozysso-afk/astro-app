@@ -18,6 +18,7 @@ export type ReunionDirectionV4 = {
   key: 'counterpart_to_user_activation' | 'user_to_counterpart_activation'
   label: string
   metric: string
+  score: number | null
   meaning: string
 }
 
@@ -131,12 +132,14 @@ function directions(rows: DirectionRow[]): ReunionDirectionV4[] {
     {
       key:'counterpart_to_user_activation',
       label:'수신 · 상대 → 나',
+      score: incoming,
       metric: incoming == null ? '정보 부족' : bandOf(rows, 'incoming'),
       meaning:'상대 쪽 흐름이 내 관계와 맞물리는 정도예요.',
     },
     {
       key:'user_to_counterpart_activation',
       label:'발신 · 나 → 상대',
+      score: outgoing,
       metric: outgoing == null ? '정보 부족' : bandOf(rows, 'outgoing'),
       meaning:'내 쪽 흐름이 상대와의 관계를 의식하기 쉬운 정도예요.',
     },

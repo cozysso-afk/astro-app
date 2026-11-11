@@ -2,7 +2,8 @@ import type { Aspect, RelationshipAiResponse, ReunionObservationContext } from '
 import { ReadingTimeline, type DirectionRow } from './ReadingSignals'
 import type { ReunionHierarchy } from './lib/reunionHierarchy'
 import { polishKoreanSentence } from './lib/fortuneNarrativePolish'
-import { compareObservedEvents, observationReading } from './lib/reunionObservation'
+import { compareObservedEvents, initiatorLabels, observationReading } from './lib/reunionObservation'
+import { aspectText } from './lib/resultFormatters'
 import { buildReunionReadingV4 } from './lib/reunionReadingV4'
 
 type ReunionSynthesis = NonNullable<NonNullable<RelationshipAiResponse['data']>['reunion_synthesis_v2']>
@@ -36,20 +37,64 @@ function rowScore(row?: DirectionRow) {
   return typeof row?.score === 'number' && Number.isFinite(row.score) ? row.score : null
 }
 
-function evidenceLabel(row: Aspect) {
-  const a = String(row.a ?? '')
-  const b = String(row.b ?? '')
-  const aspect = String(row.aspect ?? '')
-  const orb = typeof row.orb === 'number' && Number.isFinite(row.orb) ? (row.orb < 0.01 ? '<0.01°' : `${row.orb.toFixed(2)}°`) : '오차 정보 없음'
-  return [a,aspect,b,orb].filter(Boolean).join(' · ')
+const evidenceDirections: Record<string,string> = {
+  counterpart_to_user:'상대의 진행 차트 → 내 출생 차트',
+  user_to_counterpart:'내 진행 차트 → 상대의 출생 차트',
+  shared:'두 사람의 진행 차트',
+  relationship_itself:'관계 자체의 진행 컴포짓',
+  other:'기타 관계 접점',
+}
+const phaseLabels: Record<string,string> = {
+  applying:'월별 표본에서 오브가 좁아지는 흐름',
+  separating:'월별 표본에서 오브가 넓어지는 흐름',
+  indeterminate:'오브의 변화 방향 미확인',
+  exact:'표본에서 정확한 각도에 근접',
 }
 
-export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, historyCalculated=false, observation={state:'',initiator:'',events:[]}, evidence, reunionV2, directionRows, sustainabilityText, authoredReadingSeparate=false }: {
+export function ReunionProgressionEvidence({evidence,showHouses}:{evidence:Aspect[];showHouses:boolean}) {
+  const groups = new Map<string,Aspect[]>()
+  for (const row of evidence) {
+    if (!row || !Number.isFinite(row.orb) || row.orb < 0) continue
+    const direction = row.direction && Object.hasOwn(evidenceDirections,row.direction) ? row.direction : 'other'
+    const group=groups.get(direction) ?? []
+    group.push(row)
+    groups.set(direction,group)
+  }
+  if (!groups.size) return null
+  return <section aria-label="진행 차트 근거"><h4>진행 차트에서 가까운 각</h4>
+    <p>방향별로 오브가 작은 접점을 두 개까지 보여요. 날짜는 차트를 비교한 날이에요.</p>
+    {Object.entries(evidenceDirections).map(([key,label])=>{
+      const group=groups.get(key)
+      if (!group) return null
+      return <section key={key} data-progression-direction={key}><h5>{label}</h5>
+        {group.sort((a,b)=>a.orb-b.orb).slice(0,2).map((row,index)=>{
+          const house=showHouses ? row.target_house : undefined
+          const details=[
+            row.reference_date && `표본일 ${row.reference_date}`,
+            phaseLabels[row.phase ?? ''],
+            house?.whole_house && `홀사인 ${house.whole_house}하우스`,
+            house?.quadrant_house && `사분면 ${house.quadrant_house}하우스`,
+          ].filter(Boolean)
+          return <p key={index}>{aspectText(row)} · 오브 {row.orb<0.01?'<0.01°':row.orb.toFixed(2)+'°'}
+            {details.length>0 && <small> · {details.join(' · ')}</small>}
+          </p>
+        })}
+      </section>
+    })}
+  </section>
+}
+
+export function RecordedFirstContact({initiator}:{initiator?:ReunionObservationContext['initiator']}) {
+  return <p className="reunion-v5-note"><b>실제 첫 연락</b> · {initiator && initiatorLabels[initiator] || '미기록'}</p>
+}
+
+export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, historyCalculated=false, observation={state:'',initiator:'',events:[]}, evidence, showEvidenceHouses=false, reunionV2, directionRows, sustainabilityText, authoredReadingSeparate=false }: {
   hierarchyData: ReunionHierarchy
   historyHierarchyData?: ReunionHierarchy | null
   historyCalculated?: boolean
   observation?: ReunionObservationContext
   evidence: Aspect[]
+  showEvidenceHouses?: boolean
   reunionV2: ReunionSynthesis | null
   directionRows: DirectionRow[]
   sustainabilityText: string
@@ -79,7 +124,6 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
   const rawWhy = reunionV2?.why_reconnect
     ? `${reunionV2.why_reconnect.conclusion ?? ''} ${reunionV2.why_reconnect.interpretation ?? ''}`.trim()
     : ''
-  const evidenceRows = [...evidence].filter(row => Number.isFinite(Number(row.orb))).sort((a,b) => Number(a.orb) - Number(b.orb)).slice(0, 6)
   const historyRows = historyHierarchyData?.past_windows ?? []
   const comparisons = compareObservedEvents(observation, historyHierarchyData ?? null, historyCalculated)
   const safeNarrative = (value?: string | null) => sentenceList(value)
@@ -125,9 +169,9 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
       <section className="reunion-v5-section reunion-v4-directions-section">
         <h4>연락 방향 참고값</h4>
         <div className="reunion-v5-directions">
-          {readingV4.directions.map(row=><article key={row.key}><div className="reunion-v4-direction-head"><b>{row.label}</b><strong>{row.metric}</strong></div><p>{row.meaning}</p></article>)}
+          {readingV4.directions.map(row=><article key={row.key}><div className="reunion-v4-direction-head"><b>{row.label}</b><strong>{row.metric}{row.score != null ? ` · ${row.score}점` : ''}</strong></div><p>{row.meaning}</p></article>)}
         </div>
-        {readingV4.observedInitiator ? <p className="reunion-v5-note"><b>실제 첫 연락</b> · {readingV4.observedInitiator}</p> : null}
+        <RecordedFirstContact initiator={observation.initiator}/>
         <p className="reunion-v5-direction-summary">수신·발신 값은 연락 방향을 비교한 참고값이며, 실제 첫 연락자는 별도 기록으로 확인해요.</p>
       </section>
       {hasObservedState && (aiRises.length || aiFalls.length) ? <section className="reunion-v5-section reunion-v4-next-step">
@@ -159,7 +203,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         {stageRows.map(row=><p key={row.key}>{row.label}: {hierarchyData.stages[row.key]?.activation == null ? '점수 없음' : Math.round(hierarchyData.stages[row.key].activation!)}</p>)}
         {directionRows.filter(row=>row.kind!=='reconnection').map(row=><p key={row.kind}>{row.kind==='incoming'?'상대 차트':'내 차트'} 활성도: {rowScore(row) ?? '정보 없음'}</p>)}
         <p>차트 활성도만으로 수신·발신 행동이나 먼저 연락할 사람을 정할 수 없어요.</p>
-        {evidenceRows.map((row,index)=><p key={index}>{evidenceLabel(row)} <small>· 각도 오차</small></p>)}
+        <ReunionProgressionEvidence evidence={evidence} showHouses={showEvidenceHouses}/>
       </details>
       </section>
     </>}

@@ -2,7 +2,7 @@ import { THREE_SYSTEM_INSTRUCTIONS } from './systemReading'
 import { externalFortuneInstructions, externalPeriodKind, fortuneAiPrecisionReadiness, sanitizeCalculationForExternalAi } from './precisionTransport'
 import { aspectRole, rankRelationshipAspects } from './relationshipUserSummary'
 import { compactReunionHierarchyForExternal, compactReunionTimingForExternal } from './reunionCompactEvidence'
-import type { Aspect } from '../appTypes'
+import type { Aspect, ReunionObservationContext } from '../appTypes'
 
 export type ExternalCopyMode = 'compact' | 'full'
 export const COMPACT_DEEP_MAX_CHARS = 7500
@@ -108,20 +108,22 @@ export function buildExternalCompactPrompt(calculation: Row, analysis?: Row, pre
   return fit(instructions,level=>buildCompactDeepPacket(calculation,level,analysis,focusTopics))
 }
 
-export function buildRelationshipCompactPrompt(instructions: string, kind: string, request: Row, calculation?: Row | null, timing?: Row | null) {
+export function buildRelationshipCompactPacket(kind:string, request:Row, calculation:Row | null | undefined, timing:Row | null | undefined, observation:ReunionObservationContext | undefined, level:number) {
   const r=calculation?.result ?? {}, exact=r.natal_synastry?.partner_time_exact===true
   const ranked=rankRelationshipAspects(r.natal_synastry?.aspects ?? [],exact)
   // Give each semantic role one representative before filling remaining slots.
   const roles=unique(ranked.map(aspectRole))
   const aspects=unique([...roles.map(role=>ranked.find(a=>aspectRole(a)===role)!),...ranked])
   const safeAspects=(items:unknown)=>rankRelationshipAspects(list(items) as Aspect[],exact).slice(0,1).map(evidence)
-  const axis=(r:Row)=>({ ...directions(r),evidence:list(r?.top_evidence).slice(0,1).map(e=>({ ...pick(e,['date','score']),user_evidence:safeAspects(e.user_evidence),counterpart_evidence:safeAspects(e.counterpart_evidence) })) })
-  return fit(instructions.replaceAll('COMPACT_CALCULATED_DATA','CALCULATED_DATA'),level=>({
-    analysis_mode:request.analysis_mode ?? kind,relationship_status:request.relationship_status ?? calculation?.relationship_status,
+  const axis=(r:Row)=>({ ...(level<3 ? directions(r) : Object.fromEntries(['incoming','outgoing','reconnection'].map(key=>[key,r?.[key] ? pick(r[key],['average','band']) : null]))),evidence:list(r?.top_evidence).slice(0,level===3?0:1).map(e=>({ ...pick(e,['date','score']),user_evidence:safeAspects(e.user_evidence),counterpart_evidence:safeAspects(e.counterpart_evidence) })) })
+  const inputStatus=request.relationship_status ?? calculation?.relationship_status
+  return {
+    analysis_mode:request.analysis_mode ?? kind,
+    ...(kind==='reunion' ? {calculation_relationship_status:inputStatus, reunion_observation:observation} : {relationship_status:inputStatus}),
     period:pick(calculation?.period,['start','end']),
     precision:{partner_time_exact:exact,policy:'생시 미검증 시 Moon·ASC/DSC·MC/IC·하우스·Davison·Marks·시간 민감 진행을 추정하거나 복원하지 않는다.'},
-    patterns:aspects.slice(0,level>=1?8:10).map(a=>({role:aspectRole(a),...pick(a,['a','b','aspect','tone','orb'])})),
-    reunion_directional_context:kind==='reunion'?directions(timing):undefined,
+    patterns:aspects.slice(0,level===3?Math.max(4,roles.length):level>=1?8:10).map(a=>({role:aspectRole(a),...pick(a,['a','b','aspect','tone','orb'])})),
+    reunion_directional_context:kind==='reunion'?directions(timing ?? r.reunion_transits?.directional_context):undefined,
     reunion_hierarchy:kind==='reunion'?compactReunionHierarchyForExternal(r.reunion_hierarchy,level):undefined,
     reunion_timing_windows:kind==='reunion'?compactReunionTimingForExternal(r.reunion_timing_windows,level):undefined,
     reunion_dimensions:kind==='reunion'?Object.fromEntries(['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding'].map(k=>[k,axis(r.reunion_dimensions?.[k])])):undefined,
@@ -129,5 +131,9 @@ export function buildRelationshipCompactPrompt(instructions: string, kind: strin
     saju_relationship:r.saju_relationship?.available ? {day_master_relation:r.saju_relationship.day_master_relation,policy:r.saju_relationship.policy,limitations:r.saju_relationship.limitations} : undefined,
     limitations:(r.limitations??[]).filter((s:unknown)=>typeof s==='string'&&s.length<=240).slice(0,3),
     compression_policy:'원자료를 다시 계산하지 않은 선택 뷰. 생략된 층은 전체 근거 모드에서 확인한다. 구조상의 유지력과 시기 활성도는 다르며 합산하지 않는다.',
-  }))
+  }
+}
+
+export function buildRelationshipCompactPrompt(instructions:string, kind:string, request:Row, calculation?:Row|null, timing?:Row|null, observation?:ReunionObservationContext) {
+  return fit(instructions.replaceAll('COMPACT_CALCULATED_DATA','CALCULATED_DATA'),level=>buildRelationshipCompactPacket(kind,request,calculation,timing,observation,level))
 }

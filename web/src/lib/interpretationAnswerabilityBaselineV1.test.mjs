@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { buildPeriodReadingDocument } from './authoredReadingDocument.ts'
+import { compactReunionHierarchyForExternal } from './reunionCompactEvidence.ts'
 import { fortuneField } from './fortuneFields.ts'
 
 const read = (url) => readFileSync(new URL(url, import.meta.url), 'utf8')
@@ -9,7 +10,6 @@ const read = (url) => readFileSync(new URL(url, import.meta.url), 'utf8')
 const hierarchyEngine = read('../../../reunion_hierarchy_v2.py')
 const hierarchyView = read('./reunionHierarchy.ts')
 const compactPrompt = read('./compactDeepPrompt.ts')
-const reunionCompact = read('./reunionCompactEvidence.ts')
 const resultFormatters = read('./resultFormatters.ts')
 const reunionPanel = read('../ReunionHierarchyPanelV3.tsx')
 const providerSchema = read('../../../supabase/functions/fortune-interpret-v23-preview/providerSchemaV23.ts')
@@ -36,11 +36,19 @@ test('A2 baseline: web hierarchy view preserves past and current windows', () =>
 })
 
 test('A3 preserved: relationship compact prompt keeps structured past/current/future hierarchy', () => {
-  assert.match(compactPrompt, /compactReunionHierarchyForExternal/)
-  assert.match(reunionCompact, /top_periods:list\(h\.top_periods\)/)
-  assert.match(reunionCompact, /past_windows:list\(h\.past_windows\)/)
-  assert.match(reunionCompact, /current_windows:list\(h\.current_windows\)/)
-  assert.match(reunionCompact, /nearest_window:hierarchyWindow/)
+  const row=(date,temporal_status,stage)=>({date,start:date,end:date,temporal_status,stage,final:60.21,components:{mid_term:41.3}})
+  const h={as_of_date:'2026-11-11',past_windows:[row('2026-11-08','past','in_person_meeting')],current_windows:[row('2026-11-11','current','contact_recontact')],top_periods:[row('2026-12-02','future','relationship_rebuilding')]}
+  h.nearest_window=h.top_periods[0]
+  for(const level of [0,1,2,3]){
+    const data=compactReunionHierarchyForExternal(h,level)
+    for(const key of ['past_windows','current_windows','top_periods','nearest_window']){
+      const original=key==='nearest_window'?h[key]:h[key][0]
+      const retained=key==='nearest_window'?data[key]:data[key][0]
+      for(const field of ['date','start','end','temporal_status','stage','final'])assert.equal(retained[field],original[field])
+      assert.deepEqual(retained.components,level===3?undefined:original.components)
+    }
+    assert.match(data.temporal_policy,/과거를 미래 후보로 승격하지 않는다/)
+  }
 })
 
 test('A4 preserved: production relationship Edge hierarchy packet keeps bounded past/current windows', () => {

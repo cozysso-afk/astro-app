@@ -1,5 +1,5 @@
 import { reunionContactReference } from './lib/relationshipReferenceFlow'
-import { ContactObservationScope } from './ContactObservationScope'
+import { ContactObservationScope, useObservedPromptContext } from './ContactObservationScope'
 import { westernRankCopy, westernLoveHeadline } from './lib/westernRankCopy'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { fortuneEvidenceSnapshot, fortunePresentationTone } from './lib/fortuneToneCalibration.ts'
@@ -150,9 +150,10 @@ function sajuSegmentHint(selectedStart:string, selectedEnd:string) {
 }
 function BoundedCopy({packet,topic}:{packet:Record<string,unknown> | (()=>Record<string,unknown>);topic:LifeTopic}) {
   const [notice,setNotice] = useState('')
+  const observed = useObservedPromptContext()
   async function copy() {
     let text: string
-    try {text=compactSystemPrompt(typeof packet==='function' ? packet() : packet,topic)} catch(error){setNotice(error instanceof Error?error.message:'프롬프트 생성 실패');return}
+    try {text=compactSystemPrompt(typeof packet==='function' ? packet() : packet,topic,observed)} catch(error){setNotice(error instanceof Error?error.message:'프롬프트 생성 실패');return}
     try {await navigator.clipboard.writeText(text);setNotice(`심층 프롬프트 복사 완료 · ${text.length.toLocaleString()}자`)} catch {setNotice('복사하지 못했어. 브라우저의 클립보드 권한을 확인해줘.')}
   }
   return <div className="system-copy"><button type="button" onClick={copy}><Copy size={16}/>선택 체계 심층 프롬프트 복사</button><small>현재 체계의 계산 근거만 · 최대 7,500자</small><p role="status">{notice}</p></div>
@@ -224,13 +225,13 @@ export function SystemReadingViews({calculation:c,children,field,initialSystem='
         {hasSajuOverview ? <article className="system-saju"><strong><Columns3 size={16}/>사주</strong><p>{sajuOverviewSummary}</p><small>간지·십성은 사주 탭의 계산 근거에서 따로 확인할 수 있어.</small></article>:<p className="system-unavailable">사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어.</p>}
         {view.thai&&(view.natalWheel.length||view.wheels.length)>0 ? <article className="system-thai"><strong><Sparkles size={16}/>태국점성술</strong><p>{thaiReaderSummary}</p><small>{thaiEvidence}</small></article>:<p className="system-unavailable">태국점성술 · 현재 정밀도 또는 사용 가능한 배치가 부족해.</p>}
       </div><details className="system-synthesis"><summary>세 체계에서 지금 확인할 것</summary><p><b>서양점성술</b> · {westernOverviewSummary}</p>{hasSajuOverview ? <p><b>사주</b> · {sajuOverviewSummary}</p> : null}{view.thai && (view.natalWheel.length > 0 || view.wheels.length > 0) ? <p><b>태국점성술</b> · {thaiReaderSummary}</p> : null}<small>세 체계의 수치나 기준은 합산하지 않고 각각의 계산 근거로 확인해.</small></details></section>
-  return <section className={`system-reading system-${system}`}>
+  return <ContactObservationScope calculation={c} field={focusedField} localRecords={outcomeRecords}><section className={`system-reading system-${system}`}>
     <span className="reading-period-date">{periodCaption}</span>
     <div className="system-switcher" role="group" aria-label="해석 체계 선택">{SYSTEMS.map(({id,label,Icon})=><button type="button" aria-pressed={system===id} key={id} onClick={()=>setSystem(id)}><Icon size={18} aria-hidden="true"/><span>{label}</span></button>)}</div>
     {!field&&<div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!available(t)} title={!available(t)?(system==='saju'&&SAJU_LIFE_KEYS[t].length===0?'현재 계산 자료만으로는 이 분야를 직접 설명할 근거가 부족해':'이 체계에서 연결된 근거가 부족해'):undefined} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
     {field&&<h3>{field.label} · {period}</h3>}
     {system==='integrated' ? <>
-      <ContactObservationScope calculation={c} field={focusedField} localRecords={outcomeRecords}>{injectReadingContext(children,{field:focusedField,systemOverview:overview})}</ContactObservationScope>
+      {injectReadingContext(children,{field:focusedField,systemOverview:overview})}
       {reunionReference && <aside className="reading-explanation"><strong>재회와 연락을 함께 보면</strong><p>{reunionReference}</p></aside>}
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>{topic==='애정' ? westernLoveValues : highestWestern ? westernGuidance(highestWestern[0],highestWestern[1],c) : '비교할 수 있는 점수가 부족해.'}</p>{c.period.start!==c.period.end && highestWestern && <p>{highestWestern[0]} · {westernPeriodFact(highestWestern[1],c.period.start,c.period.end)}</p>}{topic==='전체' && lowestWestern && lowestWestern[0]!==highestWestern?.[0] && <p>{lowestWestern[0]}은 {lowestWestern[1].average}점이야. {westernGuidance(lowestWestern[0],lowestWestern[1],c)}</p>}</header>
@@ -270,5 +271,5 @@ export function SystemReadingViews({calculation:c,children,field,initialSystem='
       {view.suriyayat&&<details className="system-raw"><summary>전통 천문 위치 자료 · 상승점 참고</summary><p>수리야얏 방식으로 계산한 행성 위치와 상승점 자료야. 위치가 확인됐다는 사실만으로 사건 발생이나 길흉을 예측하지 않아.</p>{view.suriyayat.lagna?.available&&<p>상승점 위치 · {view.suriyayat.lagna.display}</p>}{(['natal','period_start','period_end'] as const).map(key=><details key={key}><summary>{{natal:'출생 위치',period_start:'기간 시작 위치',period_end:'기간 종료 위치'}[key]}</summary><p>{view.suriyayat![key]?.instant}</p>{Object.entries(view.suriyayat![key]?.positions??{}).map(([name,value])=><p key={name}>{name} · {String((value as {display?:string}).display??'')}</p>)}</details>)}{view.suriyayat.ai_safe_descriptive_packet&&<details><summary>생활 영역 연결 참고</summary><p>확인된 하우스 연결 자료는 생활 영역 사이의 연결을 설명할 때만 사용해. 길흉·사건·점수로 바꾸지 않아.</p></details>}</details>}<details className="system-raw"><summary>태국점성술 계산 범위 자세히 보기</summary><p>출생 요일 · {view.thai?.thai_day} · 출생 행성 {view.thai?.birth_planet?.label}</p><p><b>사용하는 계산</b> · 마하탁사, 타크사 연간 흐름, 수리야얏 위치와 상승점의 생활 영역 연결</p><p><b>해석 범위</b> · 위치와 생활 영역을 설명하는 데만 쓰고, 길흉 최종판정·사건 발생·정확한 시점·확률·점수로 바꾸지 않아.</p><p><b>다른 체계와의 관계</b> · 서양점성술·사주 점수와 합산하지 않고 각각의 근거를 따로 봐.</p><p><b>이번 해설에서 다루지 않는 계산</b> · 학파별 예외 선택, 최종 길흉 판정, 사건 확률 변환, 정확한 수리야얏 진입 시점 계산은 사용하지 않아.</p></details>
       <BoundedCopy topic={topic} packet={{system:'thai',focus_topic:field?.label??topic,period:c.period,wheel:selectedBhumi,placement_observations:thaiObserved,selected_wheel:isNatalWheel?'natal':{start:thaiSampleStart,end:thaiSampleEnd},segments:view.wheels.map(({start,end,annual_boriwan,landed_center})=>({start,end,annual_boriwan,landed_center})),predictive_status:view.thai?.predictive_status,not_calculated:view.thai?.not_calculated}}/>
     </>}
-  </section>
+  </section></ContactObservationScope>
 }

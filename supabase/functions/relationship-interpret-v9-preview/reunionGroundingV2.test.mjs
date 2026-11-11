@@ -133,3 +133,58 @@ test('a recorded call from the other person is distinct from a prediction',()=>{
  d.reunion_synthesis_v2.initiative.conclusion='상대방이 다음에도 먼저 전화를 걸 거야.'
  assert.equal(validateReunionGroundingV2(d,observed).reason,'unsupported_initiative_direction')
 })
+
+test('observed facts take precedence across the narrative, including first-person polite wording',()=>{
+  const observed={...payload,reunion_observation:{state:'met',initiator:'counterpart'}}
+  for(const [claim,reason] of [
+    ['입력 기록상 두 사람은 만난 적이 없어요.','denied_observed_stage'],
+    ['입력 기록상 두 사람은 만났고 다시 교제하기로 합의했어요.','promoted_observed_stage'],
+    ['입력 기록상 제가 먼저 연락했어요.','unsupported_initiative_direction'],
+    ['입력 기록상 본인이 먼저 연락했어요.','unsupported_initiative_direction'],
+  ]){
+    for(const available of [false,true]){
+      const data=reading()
+      data.reunion_synthesis_v2.consultation_answer.current_stage='입력 기록상 두 사람이 실제로 만났어요.'
+      data.reunion_synthesis_v2.rebuild.conclusion=claim
+      const input={...observed,reunion_evidence_v2:{...payload.reunion_evidence_v2,initiative_gate:{available}}}
+      assert.equal(validateReunionGroundingV2(data,input).reason,reason,claim)
+    }
+  }
+})
+test('recorded and conditional milestones retain their meaning across different dates',()=>{
+  for(const [state,claim,events,actor] of [
+    ['met','입력 기록에는 제가 먼저 연락했고 둘이 만났어요.',[],'user'],
+    ['met','그 이후 만남은 없었어요. 다시 교제하기로 합의했다면 각자의 기대도 이야기해 보세요.',[],'unknown'],
+    ['met','과거 기록에서 다시 교제하기로 합의했어요.',[{kind:'rebuilding',date:'2026-03-03'}],'unknown'],
+    ['reunited','두 사람이 다시 교제하기로 합의했어요.',[],'unknown'],
+    ['met','앞으로 상대가 먼저 연락한다면 다음 만남 일정을 물어보세요.',[],'unknown'],
+  ]){
+    const data=reading()
+    data.reunion_synthesis_v2.consultation_answer.current_stage=state==='met'?'입력 기록상 두 사람이 실제로 만났어요.':'입력 기록상 두 사람이 재결합했어요.'
+    data.core_reason=claim
+    assert.equal(validateReunionGroundingV2(data,{...payload,reunion_observation:{state,events,initiator:actor}}).ok,true,claim)
+  }
+})
+
+test('archived agreements are distinguishable from a meeting appointment',async()=>{
+ const {reunionFactContradiction}=await import('./reunionGroundingV2.ts')
+ const facts={state:'met',initiator:'counterpart'}
+ assert.equal(reunionFactContradiction('다음 주에 다시 만나기로 약속했어요.',facts),null)
+ assert.equal(reunionFactContradiction('기록상 제가 먼저 연락했어요.',facts),'contradicted_observed_initiator')
+ assert.equal(reunionFactContradiction('다시 교제하기로 합의했는지 직접 확인해 보세요.',facts),null)
+})
+
+test('confirmed relationship agreement, previous states, and later conversations keep separate scopes',async()=>{
+  const {reunionFactContradiction}=await import('./reunionGroundingV2.ts')
+  const facts={state:'reunited',initiator:'counterpart',events:[{kind:'rebuilding',date:'2026-03-03'}]}
+  for (const claim of ['기록상 두 사람은 재결합한 적이 없어요.','아직 교제에 합의하지 않았어요.']){
+    assert.equal(reunionFactContradiction(claim,facts),'denied_observed_stage',claim)
+  }
+  for (const claim of ['그 전에는 교제에 합의하지 않았어요.','다음 약속에는 아직 합의하지 않았어요.','그 뒤에는 내가 먼저 연락했어요.','기록된 날짜에는 두 사람이 다시 교제하기로 합의했어요.']){
+    assert.equal(reunionFactContradiction(claim,facts),null,claim)
+    const data=reading()
+    data.reunion_synthesis_v2.consultation_answer.current_stage='입력 기록상 두 사람이 재결합했어요.'
+    data.core_reason=claim
+    assert.equal(validateReunionGroundingV2(data,{...payload,reunion_observation:facts}).ok,true,claim)
+  }
+})
