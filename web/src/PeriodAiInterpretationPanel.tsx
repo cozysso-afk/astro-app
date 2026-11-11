@@ -48,10 +48,11 @@ export function PeriodAiInterpretationPanel({
   error: string
   cacheSource: 'local' | 'server' | 'fresh' | ''
   onRetry: () => void
-  onCopyPrompt: (mode?: ExternalCopyMode) => void
+  onCopyPrompt: (mode?: ExternalCopyMode, field?: FortuneField) => void
   onCancel: () => void
   canCancel: boolean
 }) {
+  const copyPrompt = <ExternalPromptCopy onCopy={mode=>onCopyPrompt(mode,field)}/>
   const costPreview = periodAiCostPreview(period)
   const technicalFallback = technicalDetails
     ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>
@@ -66,7 +67,7 @@ export function PeriodAiInterpretationPanel({
         <div className="period-ai-head"><span className="period-ai-orb"><Sparkles size={18}/></span><div><span className="period-ai-kicker">운세 해설</span><h3>AI 해설 추가하기</h3></div></div>
         <p className="period-ai-summary">저장된 AI 해설을 확인할 수 없어. 새 해설이 필요하면 아래에서 직접 생성하거나 프롬프트를 복사해.</p>
         <p className="ai-preflight-cost">{costPreview}</p>
-        <div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div>
+        <div className="period-ai-v21-controls period-ai-ready-controls"><button className="period-ai-generate" type="button" onClick={onRetry}><Sparkles size={15}/>해설 생성</button>{copyPrompt}</div>
       </section>
       {technicalFallback}
     </>
@@ -75,7 +76,7 @@ export function PeriodAiInterpretationPanel({
   if (loading && !hasReading) {
     return <>
       {calculated}
-      <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls"><ExternalPromptCopy onCopy={onCopyPrompt}/>{canCancel && <button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
+      <section className="period-ai-card is-loading"><LoaderCircle className="spin" size={21}/><div><span className="period-ai-kicker">운세 해설</span><h3>운세 흐름을 정리하고 있어…</h3><p className="period-ai-summary">잠시만 기다려줘. 오래 걸리면 자동으로 중단하고 다시 시도할 수 있게 알려줄게.</p><p className="ai-preflight-cost">{costPreview}</p><div className="period-ai-v21-controls">{copyPrompt}{canCancel && <button type="button" className="is-cancel" onClick={onCancel}><CircleStop size={15}/>생성 취소</button>}</div></div></section>
       {technicalFallback}
     </>
   }
@@ -88,7 +89,7 @@ export function PeriodAiInterpretationPanel({
       : error
     return <>
       {calculated}
-      <section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens ?? 0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(failedUsage.thought_tokens ?? 0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count ?? 1}회 · 약 {Math.round(failedUsage.estimated_krw ?? 0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button><ExternalPromptCopy onCopy={onCopyPrompt}/></div></section>
+      <section className="period-ai-card"><span className="period-ai-kicker">운세 해설</span><h3>{quotaLimited ? '해설 서버 한도를 확인해줘' : '자연어 해설을 아직 불러오지 못했어'}</h3><p className="period-ai-summary">{message}</p>{failedUsage?.total_tokens ? <p className="period-ai-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens ?? 0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens ?? 0).toLocaleString()} · 사고 {(failedUsage.thought_tokens ?? 0).toLocaleString()} tokens · 호출 {failedUsage.attempt_count ?? 1}회 · 약 {Math.round(failedUsage.estimated_krw ?? 0).toLocaleString()}원</p> : null}<div className="period-ai-v21-controls"><button className="period-ai-retry" type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 확인' : '해설 다시 확인'}</button>{copyPrompt}</div></section>
       {technicalFallback}
     </>
   }

@@ -72,3 +72,26 @@ test('a week without a manuscript can answer a tagged question in the correct fi
   assert.match(work,/10월 1일에 직장 계산/)
   assert.doesNotMatch(render('week','애정',{calculation:c}),/초안을 보낼 날/)
 })
+
+for(const period of ['today','week','month']) {
+  test(period+' free reader pairs the selected subject with its actual dated aspects',()=>{
+    const calc=fixture(period)
+    if(period==='today') {
+      calc.period={start:'2026-10-01',end:'2026-10-01',day_count:1}
+      calc.western.daily_scores=calc.western.daily_scores.slice(0,1)
+    }
+    const study={kind:'aspect',source_topics:['학업'],transit:'Mercury',target:'Saturn',aspect:'사분위',contribution:4,polarity:-0.8}
+    const opposite={...study,transit:'Venus',target:'Moon',aspect:'trine',contribution:2,polarity:0.65}
+    const first=calc.western.daily_scores[0],last=calc.western.daily_scores.at(-1)
+    first.evidence=[study,{...opposite,source_topics:['직장'],transit:'Pluto',contribution:15}]
+    last.evidence.push(opposite)
+    const actual=render(period,'학업',{calculation:calc})
+    assert.match(actual,/10월 1일 학업 지표는 49점.*운행 중인 수성과 출생차트의 토성/)
+    assert.match(actual,/운행 중인 금성과 출생차트의 달/)
+    assert.doesNotMatch(actual,/운행 중인 명왕성/)
+    if(period==='week') assert.match(actual,/10월 7일 학업 지표는 55점.*주간 평균은 52점/)
+    if(period==='month') assert.match(actual,/10월 31일 학업 지표는 79점.*월간 평균은 52점/)
+    first.evidence=[];last.evidence=[]
+    assert.doesNotMatch(render(period,'학업',{calculation:calc}),/운행 중인 수성과 출생차트의 토성/)
+  })
+}

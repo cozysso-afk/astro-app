@@ -33,7 +33,7 @@ test('western score cards expose plain guidance before date detail', () => {
   assert.match(view, /className="system-score-grid western-score-grid"/)
   assert.match(view, /className="western-score-guidance">\{westernGuidance\(name,s,c\)\}/)
   assert.match(view, /western-score-more.*계산일 보기.*날짜 보기/)
-  assert.match(view, /연애는 만났을 때의 관계 분위기/)
+  assert.match(view, /westernLoveHeadline\(loveScores\)/)
   assert.doesNotMatch(view, /특히 연락·재회·투자 관련 값은/)
 })
 

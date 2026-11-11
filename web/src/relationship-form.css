@@ -76,3 +76,51 @@
     min-height: 44px;
   }
 }
+
+.relationship-input-panel .counterpart-time-heading,
+.relationship-input-panel .counterpart-time-toggle {
+  display: flex;
+  align-items: center;
+}
+.relationship-input-panel .counterpart-time-heading {
+  justify-content: space-between;
+  gap: 8px;
+  color: #60566c;
+  font-size: .875rem;
+  font-weight: 700;
+}
+.relationship-input-panel .counterpart-time-toggle {
+  min-height: 44px;
+  gap: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.relationship-input-panel .counterpart-time-toggle input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: #77598a;
+}
+.relationship-input-panel .counterpart-place-title {
+  margin: 4px 0 2px;
+  font-size: 1rem;
+}
+.relationship-input-panel .counterpart-location-note {
+  margin: 0;
+  font-size: .86rem;
+  line-height: 1.55;
+}
+@media (max-width: 600px) {
+  .app-shell .page-content > .tool-panel.relationship-input-panel {
+    width: calc(100% + 28px) !important;
+    max-width: none !important;
+    margin-inline: -14px;
+  }
+  .tool-panel.relationship-input-panel .advanced-panel > summary {
+    min-height: 44px;
+    font-size: .875rem;
+  }
+}

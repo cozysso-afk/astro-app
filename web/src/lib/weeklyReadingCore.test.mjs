@@ -26,3 +26,12 @@ test('love timing contrasts both indicators on the same day and responds to chan
   daily_scores[1].scores.연락=40
   assert.equal(read(),undefined)
 })
+
+test('weekly comparisons show all dates tied at either endpoint',()=>{
+  const start='2026-11-09',end='2026-11-15'
+  const daily_scores=[34,50,34,48,48,43,50].map((score,i)=>({date:'2026-11-'+String(9+i).padStart(2,'0'),scores:{학업:score}}))
+  const doc={state:'calculated',date:start+' → '+end,core:[],sections:[],exportBlockIds:[]}
+  const calc={period:{start,end,day_count:7},western:{daily_scores}}
+  const result=weeklyReadingCore(doc,undefined,calc,{id:'study',topics:['학업']})
+  assert.match(result.core[0].text,/11월 10일·11월 15일에 50점.*11월 9일·11월 11일에는 34점/)
+})

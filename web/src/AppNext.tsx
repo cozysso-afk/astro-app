@@ -1,6 +1,6 @@
-import { lovePromptContext, type LoveStatus } from './lib/loveReadingContext'
+import { LOVE_SCENARIOS_PROMPT, type LoveStatus } from './lib/loveReadingContext'
 import { SystemReadingViews } from './SystemReadingViews'
-import { fortuneField } from './lib/fortuneFields'
+import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { THREE_SYSTEM_INSTRUCTIONS } from './lib/systemReading'
 import { FortuneFieldHub } from './FortuneFieldHub'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
@@ -1177,7 +1177,7 @@ export default function AppNext() {
       },
       counterpart: {
         name: counterpart.name || '상대', birth_date: counterpart.birthDate, birth_time: counterpart.timeKnown ? counterpart.birthTime : null,
-        ...birthTimeRequestMeta(counterpart, counterpart.timeKnown), latitude: counterpartLatitude,
+        ...birthTimeRequestMeta(counterpart.timeKnown ? counterpart : emptyProfile), latitude: counterpartLatitude,
         longitude: counterpartLongitude, utc_offset_hours: Number(counterpart.utcOffset || 9),
       },
       start_date: relationshipStartDate,
@@ -1334,18 +1334,19 @@ export default function AppNext() {
   }
 
 
-  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult, mode: ExternalCopyMode = 'compact') {
+  async function copyAiInterpretationPrompt(calculation: IntegratedApiResponse | null = integratedResult, mode: ExternalCopyMode = 'compact', field?: FortuneField) {
     if (!calculation) return
+    const readingContext = field?.id==='love' ? LOVE_SCENARIOS_PROMPT : ''
     try {
       if (mode === 'compact') {
-        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, fortuneField(fortuneFieldId)?.topics, fortuneFieldId==='love'?lovePromptContext(loveStatus):''), mode)
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, field?.topics, readingContext), mode)
         return
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, { body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action:'prompt', calculation } })
       if (error) throw error
       if (!data?.ok || !data?.prompt) throw new Error(data?.error || 'AI용 압축 프롬프트를 만들지 못했어.')
-      await copyExternalPrompt((fortuneFieldId==='love'?lovePromptContext(loveStatus):'') + THREE_SYSTEM_INSTRUCTIONS + '\n' + (fortuneFieldId ? 'FOCUS_TOPICS='+fortuneField(fortuneFieldId)?.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
+      await copyExternalPrompt(readingContext + THREE_SYSTEM_INSTRUCTIONS + '\n' + (field ? 'FOCUS_TOPICS='+field.topics.join(',')+'\n' : '') + upgradeCopiedFortunePrompt(String(data.prompt), calculation), mode)
     } catch (error) {
       setActionNotice(error instanceof Error ? error.message : 'AI용 압축 프롬프트 복사에 실패했어.')
       window.setTimeout(() => setActionNotice(''), 3200)
@@ -1779,7 +1780,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
-              <SystemReadingViews calculation={integratedResult}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <SystemReadingViews calculation={integratedResult}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode,field)=>void copyAiInterpretationPrompt(integratedResult,mode,field)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
               <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
@@ -1841,7 +1842,7 @@ export default function AppNext() {
             </div>}
           </section>}
 
-          {selectedToolInfo && (selectedTool === 'compatibility' || selectedTool === 'marriage') && <section className="tool-panel">
+          {selectedToolInfo && (selectedTool === 'compatibility' || selectedTool === 'marriage') && <section className="tool-panel relationship-input-panel">
             <div className="tool-panel-heading"><span className={`tool-icon ${selectedTool==='compatibility'?'tone-rose':'tone-champagne'}`}>{selectedTool==='compatibility'?<Heart size={22}/>:<Gem size={22}/>}</span><div><span className="eyebrow">관계 정밀 계산</span><h2>{selectedToolInfo.label}</h2><p>{selectedTool==='marriage'?'결혼 여부를 단정하지 않고 두 사람의 장기 결속·협력·긴장 흐름을 계산해.':relationshipPurpose==='reunion'?'과거 인연의 재접점·수신·발신 흐름과 강한 시기를 따로 봐.':'두 사람의 기본 관계 구조와 선택 기간의 시기 흐름을 분리해서 봐.'}</p></div></div>
             {selectedTool==='compatibility' && <>
               <div className="relationship-mode-row relationship-main-mode-row">
@@ -1872,16 +1873,21 @@ export default function AppNext() {
             {needsCounterpart&&<>
             <div className="subsection-title" id="counterpart-birth-title">상대 출생정보</div>
             <div className="field-grid counterpart-birth-form" role="group" aria-labelledby="counterpart-birth-title">
-              <label className="field field-wide"><span>이름 / 구분명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: A, 상대방"/></label>
+              <label className="field field-wide"><span>상대 이름 또는 별명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: 연우"/></label>
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
-              <label className="field birth-time-field"><span>출생시간</span><input type="time" value={counterpart.birthTime} disabled={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,birthTime:e.target.value})}/></label>
-              <label className="check-field field-wide"><input type="checkbox" checked={!counterpart.timeKnown} onChange={(e)=>setCounterpart({...counterpart,timeKnown:!e.target.checked,birthTime:e.target.checked?'':counterpart.birthTime,timeSource:e.target.checked?'unknown':counterpart.timeSource,timeConfidence:e.target.checked?'unknown':counterpart.timeConfidence,rectifiedWindowStart:'',rectifiedWindowEnd:''})}/><span>상대 출생시간을 몰라요</span></label>
+              <div className="field-wide counterpart-time-entry">
+                <div className="counterpart-time-heading">
+                  <label htmlFor="counterpart-birth-time">출생시간</label>
+                  <label className="counterpart-time-toggle"><input type="checkbox" checked={!counterpart.timeKnown} onChange={e=>setCounterpart({...counterpart,timeKnown:!e.target.checked})}/><span>시간 모름</span></label>
+                </div>
+                {counterpart.timeKnown && <div className="field birth-time-field"><input id="counterpart-birth-time" type="time" value={counterpart.birthTime} onChange={e=>setCounterpart({...counterpart,birthTime:e.target.value})}/></div>}
+              </div>
               {counterpart.timeKnown ? <details className="advanced-panel field-wide counterpart-time-settings">
-                <summary>출생시간 출처와 가능한 시간 범위</summary>
+                <summary>출생시간 출처·범위</summary>
                 <div className="counterpart-time-fields"><BirthTimeReliabilityFields value={counterpart} concise onChange={(patch)=>setCounterpart({...counterpart,...patch})}/></div>
-              </details> : <p className="field-wide counterpart-time-note">출생지는 선택할 수 있어요. 출생시간에 따라 달라지는 항목은 궁합에서 제외해요.</p>}
-              <KoreaBirthplaceSelector value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
-              <details className="advanced-panel field-wide"><summary>고급 위치 설정 · 위도/경도 직접 수정</summary><div className="advanced-grid">
+              </details> : <p className="field-wide counterpart-time-note">상승점과 하우스 등 출생시간이 필요한 항목은 제외해요. 출생지는 선택할 수 있어요.</p>}
+              <KoreaBirthplaceSelector concise value={counterpart} onChange={(location)=>setCounterpart({...counterpart,...location})}/>
+              <details className="advanced-panel field-wide"><summary>위도·경도 직접 입력</summary><div className="advanced-grid">
                 <label className="field"><span>위도</span><input inputMode="decimal" value={counterpart.latitude} onChange={(e)=>setCounterpart({...counterpart,latitude:e.target.value,placeKey:''})}/></label>
                 <label className="field"><span>경도</span><input inputMode="decimal" value={counterpart.longitude} onChange={(e)=>setCounterpart({...counterpart,longitude:e.target.value,placeKey:''})}/></label>
                 <label className="field field-wide"><span>UTC(협정세계시) 시차</span><input inputMode="decimal" value={counterpart.utcOffset} onChange={(e)=>setCounterpart({...counterpart,utcOffset:e.target.value})}/></label>
@@ -1996,7 +2002,7 @@ export default function AppNext() {
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
               onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps ? 'refresh' : 'generate')}
-              onCopyAiPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)}
+              onCopyAiPrompt={(mode,field)=>void copyAiInterpretationPrompt(integratedResult,mode,field)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}
               onOutcomeChange={setOutcomeDraft}

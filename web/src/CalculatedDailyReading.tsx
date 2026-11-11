@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { IntegratedApiResponse } from './appTypes'
 import { DailyReadingDocumentView } from './DailyReadingPanel'
+import {datedAspectReading} from './lib/fortuneUserSummary'
 import { buildBasicFortuneReading } from './lib/basicFortuneReading'
 import { calculatedDailyApplications, type DailyReadingDocument } from './lib/dailyReadingDocument'
 import type { FortuneField } from './lib/fortuneFields'
@@ -17,6 +18,8 @@ function dailyCalculation(calculation:IntegratedApiResponse, field?:FortuneField
     label:row.topic+' · '+row.score+'점',
     text:[row.meaning,row.why,row.practice].filter(Boolean).join(' '),
   }))
+  const dated=datedAspectReading(calculation,'day',field?.topics ?? rows.map(row=>row.topic))
+  if(dated) blocks.splice(1,0,dated)
   return {...applications,title:'계산값으로 읽는 일간 '+(field?.label??'종합운세'),state:'ready',
     headline:basic.headline,blocks,slots:applications.slots?.filter(slot=>slot.state==='ready')}
 }

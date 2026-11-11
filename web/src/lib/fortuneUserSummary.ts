@@ -478,7 +478,7 @@ function reasonFor(data: InterpretationData, context: FortuneUserSummaryContext,
     }
     readable.push(`선택 기간에는 ${topic}에 힘을 보태는 움직임과 제동을 거는 움직임이 모두 있어. ${conflicts[topic] ?? '수월한 부분과 부담이 큰 부분을 구분해서 읽어. 어느 한 근거만으로 전체 결과를 정하지 않아.'}`)
   }
-  if (level === 'low' && signs.has(1)) readable.push('도움을 주는 개별 근거는 있지만 이 분야의 전체 활성도는 낮아. 작은 수월함을 기간 전체의 강세로 확대하지 않아.')
+  if (level === 'low' && signs.has(1)) readable.push(`${topic}에 도움을 주는 개별 근거가 있어도 전체 흐름은 약한 편이야. 선택 기간의 평균은 ${topicStat(context,topic)?.average}점이어서, 수월한 대목 하나를 기간 전체의 강세로 읽기 어려워.`)
   if (level === 'high' && signs.has(-1)) readable.push('부담을 주는 개별 근거가 있어도 이 분야 전체 흐름은 강한 편이야. 주의할 조건을 확인하되 전체가 불리하다는 뜻으로 읽지는 않아.')
   const strongest = [...linked].sort((a,b)=>Math.abs(b.evidence.contribution??0)-Math.abs(a.evidence.contribution??0)).find(r=>planetName(r.evidence.transit)&&planetName(r.evidence.target))
   if(strongest){
@@ -952,13 +952,17 @@ export function buildFortuneUserSummary(data: InterpretationData, context: Fortu
   }
   const focusTopics = selected.map(explainTopic)
   const referenceTopics = normalized.filter(row => !selected.some(selectedRow => selectedRow.topic === row.topic))
-    .sort(rank('salience')).map(row => { const {topic,level,interpretation} = row; return ({
-      detail: explainTopic(row),
-      topic, band: Number.isFinite(topicStat(context, topic)?.average) ? topicStat(context, topic)?.band ?? '정보 부족' : '정보 부족',
-      summary: !Number.isFinite(topicStat(context, topic)?.average) ? '계산 정보가 부족해 강약을 판단할 수 없어.' : importance(interpretation.importance) === 2 && !normalized.find(row => row.topic === topic)?.support
-        ? topic === '투자주의' ? '뚜렷한 신호가 적어도 안전을 보장하진 않아.' : '별도로 참고할 신호가 뚜렷하지 않아.'
-        : topic === '재회' ? consistency.reconnectionMeaning : (FLOW_COPY[topic]?.[level === 'low' ? 1 : 0] ?? '평소 계획 유지'),
-    })})
+    .sort(rank('salience')).map(row => {
+      const {topic,level,interpretation} = row
+      const detail = explainTopic(row)
+      return {
+        detail: {...detail, caution: detail.caution ?? LIFE[topic]?.[1]},
+        topic, band: Number.isFinite(topicStat(context, topic)?.average) ? topicStat(context, topic)?.band ?? '정보 부족' : '정보 부족',
+        summary: !Number.isFinite(topicStat(context, topic)?.average) ? '계산 정보가 부족해 강약을 판단할 수 없어.' : importance(interpretation.importance) === 2 && !normalized.find(row => row.topic === topic)?.support
+          ? topic === '투자주의' ? '뚜렷한 신호가 적어도 안전을 보장하진 않아.' : '별도로 참고할 신호가 뚜렷하지 않아.'
+          : topic === '재회' ? consistency.reconnectionMeaning : (FLOW_COPY[topic]?.[level === 'low' ? 1 : 0] ?? '평소 계획 유지'),
+      }
+    })
   const windowTopics = [...new Map([...selected, ...best, ...caution].map(row => [row.topic, row])).values()]
   const rawImportantWindows: FortuneUserWindow[] = frame.kind === 'day' ? context.allowIntraday ? (context.calculation.western.detail_days ?? [])
     .filter(day => day.date === context.calculation.period.start)
@@ -1038,6 +1042,90 @@ export function evidenceDepth(evidence: FortuneDailyEvidence[], topic: string, i
   return `${translation}을 읽는 단서야.${includeLimit ? ' ' + (LIFE[topic]?.[1] ?? '이 신호만으로 실제 사건이나 결과를 확정하지는 않아.') : ''}`
 }
 export function realLifeDepth(topic:string):string { return LIFE[topic]?.[0] ?? '' }
+
+const ASPECT_NAMES: Record<string,string> = {
+  삼분위:'삼각',trine:'삼각',육십분위:'육각',sextile:'육각',사분위:'사각',square:'사각',
+  충:'충',opposition:'충',합:'합',conjunction:'합',
+}
+
+function aspectInLife(topic:string,transit:string,target:string,sign:number) {
+  if (!sign) return '이 배치에서는 유리하거나 까다로운 방향이 뚜렷하게 갈리지 않아.'
+  if (['연애','재회','연락'].includes(topic) && transit==='달' && target==='금성')
+    return sign > 0 ? '편안함을 느낀 순간에 반가운 마음을 말로 옮기기 수월하다고 읽어.' : '더 다정한 반응을 기대할수록 평소라면 넘길 짧은 답장에도 서운할 수 있어.'
+  if (topic==='연애' && transit==='금성' && target==='화성')
+    return sign > 0 ? '보고 싶다는 마음을 표현하고 약속을 제안하기 수월한 쪽이야.' : '호감을 느끼는 속도와 실제로 만날 준비가 된 속도가 다를 수 있어.'
+  if (transit==='수성' && target==='토성' && sign<0) {
+    const examples:Record<string,string>={
+      학업:'답을 읽으면 알겠는데 책을 덮고 첫 단계의 이유를 설명할 때 막힐 수 있어. 그 한 단계부터 다시 짚어 봐.',
+      시험:'답을 알고 있어도 문제의 제한 조건을 답안에 빠뜨리기 쉬운 쪽이야. 풀이를 끝내기 전에 문제의 요구와 답안을 한 번 맞춰 봐.',
+      직장:'회의에서 말한 “금요일까지”가 초안을 보내는 날인지, 최종 승인을 받는 날인지 짚어 봐. 같은 마감을 다르게 이해하기 쉬운 배치야.',
+      금전:'결제일과 실제 입금일을 맞춰 봐. 받을 돈의 액수를 알고 있어도 먼저 빠져나가는 지출을 놓칠 수 있어.',
+      연락:'하고 싶은 말이 길어질수록 상대가 무엇에 답하면 될지 놓칠 수 있어. 꼭 물어볼 한 가지부터 보내 봐.',
+    }
+    if (examples[topic]) return examples[topic]
+  }
+  if (transit==='달' && target==='수성' && sign>0) {
+    const examples:Record<string,string>={
+      학업:'읽으면서 막연했던 부분을 말로 정리해 보기 좋은 날이야. 짧은 예제를 풀고 왜 그 방법을 썼는지 설명해 봐.',
+      직장:'혼자 마음에 걸리던 조건을 질문으로 바꾸기 수월해. 담당자와 마감일처럼 답이 분명한 것부터 물어봐.',
+      금전:'마음에 걸리던 지출을 실제 금액과 대조해 볼 때야. 결제 내역에서 한 건만 골라 예상과 달랐던 이유를 확인해 봐.',
+    }
+    if (examples[topic]) return examples[topic]
+  }
+  const scene=DAILY_HEADLINE_SCENE[topic]
+  return sign>0 ? scene.use : scene.caution
+}
+
+// Pair a measured day with an actual aspect for the same topic. An aspect's
+// polarity describes that contribution, while the score measures total activity.
+export function datedAspectReading(
+  calculation: Pick<IntegratedApiResponse, 'period' | 'western'>,
+  period: 'day' | 'week' | 'month',
+  topics?: string[],
+) {
+  const {start, end} = calculation.period
+  const candidates = (calculation.western.daily_scores ?? []).flatMap(day => {
+    if (day.date < start || day.date > end || !/^\d{4}-\d{2}-\d{2}$/.test(day.date) || new Date(day.date+'T00:00:00Z').toJSON()?.slice(0,10) !== day.date) return []
+    return (day.evidence ?? []).flatMap(row => {
+      const transit = planetName(row.transit), target = planetName(row.target)
+      const aspect = ASPECT_NAMES[row.aspect ?? '']
+      const weight = Math.abs(row.contribution ?? 0)
+      if ((row.kind && row.kind !== 'aspect') || !transit || !target || !aspect || !Number.isFinite(weight) || !weight) return []
+      return (row.source_topics ?? []).flatMap(topic => {
+        const score = day.scores?.[topic]
+        if (!DAILY_HEADLINE_SCENE[topic] || (topics && !topics.includes(topic)) || typeof score !== 'number' || !Number.isFinite(score)) return []
+        return [{date:day.date, topic, score, transit, target, aspect, sign:evidenceDirection(row), weight}]
+      })
+    })
+  }).sort((a,b) => b.weight - a.weight || a.date.localeCompare(b.date))
+  const preferred = topics?.find(topic => candidates.some(item => item.topic === topic))
+  const relevant = preferred ? candidates.filter(item => item.topic === preferred) : candidates
+  const first = relevant.find(item => item.sign !== 0) ?? relevant[0]
+  if (!first) return
+  const phase = (date:string) => Math.min(2,Math.floor((Number(date.slice(-2))-1)/10))
+  const opposite = relevant.find(item => item.topic === first.topic && item.sign * first.sign < 0 &&
+    (period === 'day' || (item.date !== first.date && (period !== 'month' || phase(item.date) !== phase(first.date)))))
+  const examples = opposite ? [first,opposite].sort((a,b) => a.date.localeCompare(b.date)) : [first]
+  const lines = examples.map((item,i) => {
+    const date = Number(item.date.slice(5,7)) + '월 ' + Number(item.date.slice(8)) + '일'
+    const when = i && item.date === examples[0].date ? '같은 날' : date + ' ' + item.topic + ' 지표는 ' + item.score + '점이야.'
+    const previous = i ? examples[i-1] : undefined
+    const pair = previous?.transit === item.transit && previous?.target === item.target
+      ? '같은 두 행성이 이번에는' : `운행 중인 ${item.transit}${particle(item.transit,'과','와')} 출생차트의 ${item.target}${particle(item.target,'이','가')}`
+    return `${when} ${pair} ${item.aspect}${particle(item.aspect,'을','를')} 이뤄. ${aspectInLife(item.topic,item.transit,item.target,item.sign)}`
+  })
+  const stat = calculation.western.overall?.[first.topic]
+  if (stat && Number.isFinite(stat.average)) {
+    if (period !== 'day') lines.push(`${period === 'week' ? '주간' : '월간'} 평균은 ${stat.average}점이야.`)
+    if (/약|낮/.test(stat.band) && examples.some(item => item.sign > 0))
+      lines.push('도움을 주는 배치가 있어도 이 분야 전체의 활성도는 낮은 편이야.')
+  }
+  const support = examples.find(item => item.sign > 0), pressure = examples.find(item => item.sign < 0)
+  if (support && pressure && pressure.score > support.score)
+    lines.push(`${pressure.score}점인 날에는 마찰도 함께 보여. 점수가 높다는 건 이 주제가 두드러진다는 뜻이라, 어느 날이 더 편한지는 두 날짜의 배치를 같이 봐야 해.`)
+  else if (period==='day' && first.topic==='연애') lines.push('관계가 실제로 가까워지는지는 상대도 만날 시간을 정하거나 다음 약속을 제안하는지에서 살펴봐.')
+  return {id:period+':aspect:'+first.topic, label:first.topic+(period==='day' ? ' · 이날의 서양점성술 해설' : ' · 날짜로 살펴본 서양점성술 해설'), text:lines.filter(Boolean).join(' ')}
+}
 
 // Group only existing scores for presentation. Never mutate them or fill missing dates.
 export function periodProgression(calculation:Pick<IntegratedApiResponse, 'period' | 'western'>, topic:string, kind:PeriodKind, direction:FortuneEvidenceDirection='neutral'):string | undefined {

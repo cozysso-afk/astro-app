@@ -1,5 +1,6 @@
 import { compactThaiProductSuriyayat } from '../../../supabase/functions/fortune-interpret-v6-preview/thaiContract'
 import type { IntegratedApiResponse } from '../appTypes'
+import { LOVE_SCENARIOS_PROMPT } from './loveReadingContext'
 import { fortuneAiPrecisionReadiness } from './precisionTransport'
 
 export type SystemId = 'integrated' | 'western' | 'saju' | 'thai'
@@ -52,6 +53,7 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   const allowed = readiness.ok && readiness.mode === 'exact'
   const saju = allowed && c.saju?.ok ? c.saju : undefined
   const thai = allowed && c.thai?.ok ? c.thai : undefined
+  const daily = (saju?.daily ?? []).filter(row=>row.date >= c.period.start && row.date <= c.period.end && tenGodLens(row.stem_ten_god)).sort((left,right)=>left.date.localeCompare(right.date))
   const monthly = (saju?.monthly ?? []).filter(r=>overlapsSegment(r,c.period))
   const annual = (saju?.annual ?? []).filter(r=>overlapsSegment(r,c.period))
   const dayun = (saju?.dayun ?? []).filter(r=>r.start_year<=Number(c.period.end.slice(0,4)) && r.end_year>=Number(c.period.start.slice(0,4)))
@@ -68,15 +70,16 @@ export function buildSystemReading(c: IntegratedApiResponse) {
   })() : '이번 기간과 직접 연결되는 사주 운 구간이 없어.'
   const thaiSummary = wheels.length ? `선택한 기간에 적용되는 타크사 연간 배치를 여덟 생활 영역으로 나눠 볼 수 있어. 주변 사람과 관계망, 생활 리듬, 일, 자원, 실행, 도움, 걸림돌 중 필요한 부분부터 펼쳐봐.` : natalWheel.length ? '출생 때의 타크사 배치를 여덟 생활 영역으로 나눠 볼 수 있어. 각 영역은 생활에서 무엇을 확인하면 되는지 먼저 보여줘.' : '이 기간에 읽을 수 있는 태국점성술 배치가 없어.'
   const suriyayat = thai?.suriyayat ? compactThaiProductSuriyayat(thai.suriyayat) : null
-  return { suriyayat, allowed, saju, thai, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
+  return { suriyayat, allowed, saju, thai, daily, monthly, annual, dayun, contexts, lenses, wheels, natalWheel, sajuSummary, thaiSummary, state:'서로 다른 층' as const }
 }
 export const THREE_SYSTEM_INSTRUCTIONS = '계산 권위는 별빛의 운명 엔진이며 너는 해석자다. 재계산·새 점수·데이터 밖 근거 생성 금지. 점수는 확률이 아니다. 실제 자료가 있는 Western·Saju·Thai를 각각 설명하고 근거의 결합과 충돌, 현실 발현·행동·주의·과해석 한계를 종합하라. 사주·Thai를 한 줄 부록으로 축소하지 말라. 세 체계는 독립적이며 합산하거나 강제로 일치시키지 않는다. 미계산 신강·용신·배우자성, Thai 최종 길흉·사건 확률·정확한 예측 시각을 만들지 말라. 연락 수신/발신은 분리한다. 투자 가격·수익 예측 금지. 일간은 실제 하루, 주간은 실제 구간 변화, 월간은 실제 월운/절 경계, 연간은 실제 대운/세운/월 구간을 사용하라.'
 
 export const SAJU_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(TEN_GOD_LENSES),애정:Object.keys(TEN_GOD_LENSES),대인:['식상','비겁'],학업:['인성','식상','관성'],직업:['관성','식상','재성'],금전:['재성'],컨디션:[]}
 export const THAI_LIFE_KEYS: Record<LifeTopic,string[]> = {전체:Object.keys(BHUMI_LENSES),애정:['boriwan','sri','montri','kalakini'],대인:['boriwan','montri','kalakini'],학업:['utsaha','montri'],직업:['det','utsaha','montri'],금전:['mula','sri','kalakini'],컨디션:['ayu']}
-export function compactSystemPrompt(packet: Record<string,unknown>) {
+export function compactSystemPrompt(packet: Record<string,unknown>, topic?:LifeTopic) {
   for(const limit of [12,8,4,2,1]) {
     const compact = Object.fromEntries(Object.entries(packet).map(([key,value])=>[key,Array.isArray(value)?value.slice(0,limit):value]))
+    if (topic==='애정') compact.relationship_contexts = LOVE_SCENARIOS_PROMPT
     const text=`${THREE_SYSTEM_INSTRUCTIONS}\n선택 체계와 분야만 상담형으로 해설하라. 다른 체계의 계산을 가져오지 말라. 생략된 구간은 추정하지 말라.\nCALCULATED_DATA=${JSON.stringify(compact)}`
     if(text.length<=7500)return text
   }
@@ -149,12 +152,14 @@ export function sajuRelationshipSummary(contexts:SajuPeriodContext[]):string {
   const firstLens = lensForTopic(lens,'애정')
   const name = (row:SajuPeriodContext)=>row.stem_ten_god.match(/\(([^)]+)\)/)?.[1] ?? row.stem_ten_god
   const lead = `${name(first)} ${first.layer}에서 보는 관계 주제는 ‘${firstLens.title}’이야. ${firstLens.action}`
-  const change = monthly.find(row=>tenGodLens(row.stem_ten_god)?.key!==lens.key)
+  const change = monthly.find(row=>row.stem_ten_god!==first.stem_ten_god && tenGodLens(row.stem_ten_god))
   if (change) {
     const next = tenGodLens(change.stem_ten_god)
     if (next) {
       const day = change.segment_start.slice(0,10)
-      return `${lead} ${Number(day.slice(5,7))}월 ${Number(day.slice(8))}일에 새 월운(${name(change)})이 시작되면 ‘${lensForTopic(next,'애정').title}’도 살펴봐.`
+      const date = `${Number(day.slice(5,7))}월 ${Number(day.slice(8))}일`
+      if (next.key === lens.key) return `${lead} ${date}에 월운이 ${name(first)}에서 ${name(change)} 월운으로 바뀌어. 둘 다 ${lens.key}에 속해서, 관계에서 살펴볼 주제는 그날 이후에도 이어져.`
+      return `${lead} ${date}에 새 월운(${name(change)})이 시작되면 ‘${lensForTopic(next,'애정').title}’도 살펴봐.`
     }
   }
   return lead
@@ -171,4 +176,42 @@ export function thaiPlacementComparison(current: {bhumi_key:string;planet:{label
   return birth === now
     ? `계산 근거 · ${title}: 출생 ${birth} → 현재 연간 ${now} · 같은 행성`
     : `계산 근거 · ${title}: 출생 ${birth} → 현재 연간 ${now}`
+}
+
+
+type SajuDay = NonNullable<IntegratedApiResponse['saju']['daily']>[number]
+
+export function sajuDayExamples(days:SajuDay[], topic:LifeTopic, period:IntegratedApiResponse['period']) {
+  if (period.day_count > 45) return []
+  const result:Array<{date:string; evidence:string; links:string[]; lens:Lens}> = []
+  const seen = new Set<string>()
+  const frameStart = Date.parse(period.start + 'T00:00:00Z')
+  const windows = Math.min(3,period.day_count)
+  for (let i=0; i<windows; i++) {
+    const window = days.filter(day=>{
+      const elapsed = (Date.parse(day.date + 'T00:00:00Z')-frameStart)/86400000
+      const base = tenGodLens(day.stem_ten_god)
+      return base && SAJU_LIFE_KEYS[topic].includes(base.key) && Math.floor(elapsed*windows/period.day_count) === i
+    })
+    const day = window.find(row=>!seen.has(tenGodLens(row.stem_ten_god)!.key)) ?? window[0]
+    if (!day) continue
+    const base = tenGodLens(day.stem_ten_god)!
+    seen.add(base.key)
+    result.push({date:day.date, evidence:`${ganzhiWithReading(day.ganzhi)} · ${day.stem_ten_god}`, links:day.branch_links ?? [], lens:lensForTopic(base,topic)})
+  }
+  return result
+}
+
+export function thaiPlacementWindow(planetKey:string, planetName:string, start:string, end:string, samples:IntegratedApiResponse['thai']['suriyayat_daily']) {
+  const rows = (samples ?? []).filter(row=>row.date>=start && row.date<=end && row.positions?.[planetKey]?.sign_ko)
+    .sort((left,right)=>left.date.localeCompare(right.date))
+  const first = rows[0]
+  if (!first) return ''
+  const sign = (row:typeof first)=>row.positions![planetKey].sign_ko
+  const date = (row:typeof first)=>`${Number(row.date.slice(5,7))}월 ${Number(row.date.slice(8))}일`
+  const observation = `${date(first)} 수리야얏 계산에서 ${planetName} 위치는 ${sign(first)}야.`
+  const change = rows.find(row=>sign(row)!==sign(first))
+  if (change) return `${observation} ${date(change)} 관측값은 ${sign(change)}로 달라져. 두 날짜는 별자리 위치를 비교한 날이야.`
+  const last = rows.at(-1)!
+  return last.date===first.date ? observation : `${date(first)}부터 ${date(last)}까지 계산된 ${rows.length}일의 자료에서 ${planetName} 위치는 모두 ${sign(first)}야.`
 }

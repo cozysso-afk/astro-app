@@ -1,3 +1,4 @@
+import {datedAspectReading} from './fortuneUserSummary.ts'
 import type {IntegratedApiResponse} from '../appTypes'
 import type {AuthoredReadingDocument,AuthoredSection} from './authoredReadingDocument'
 import {contactDirectionComparison} from './contactDirectionReading.ts'
@@ -79,11 +80,13 @@ export function monthlyReadingCore(doc:AuthoredReadingDocument,calculation:Integ
   })
   const candidates=topics.flatMap(topic=>profiles.get(topic)??[]).sort((a,b)=>b.spread-a.spread)
   const picked=candidates[0]
-  if(!picked && !direction && timingSections.every((s,i)=>s===sections[i])) return doc
+  const dated=datedAspectReading(calculation,'month',field?.topics ?? (picked ? [picked.topic] : undefined))
+  if(!picked && !dated && !direction && timingSections.every((s,i)=>s===sections[i])) return doc
   const core=[...doc.core]
   if(picked) core.splice(Math.min(1,core.length),0,{id:'month:segments:'+picked.topic,label:`${picked.topic} · 초순부터 하순까지`,text:describe(picked)})
+  if(dated) core.push(dated)
   if(showDirection && direction) core.push({id:'month:contact-direction',label:'받는 연락과 먼저 거는 연락',text:direction})
   let revision=2166136261
-  for(const char of JSON.stringify([direction,...profiles.values()])) revision=Math.imul(revision^char.charCodeAt(0),16777619)
+  for(const char of JSON.stringify([dated,direction,...profiles.values()])) revision=Math.imul(revision^char.charCodeAt(0),16777619)
   return {...doc,core,sections:timingSections,revision:doc.revision+'|month:'+revision.toString(16),exportBlockIds:doc.exportBlockIds.length?core.map(b=>b.id):[]}
 }
