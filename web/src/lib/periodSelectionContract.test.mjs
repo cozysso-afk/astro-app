@@ -13,3 +13,15 @@ test('married compatibility is explicitly distinct from married marriage fortune
 
 test('calendar range labels never hardcode 31 or 365 days',()=>{assert.match(app,/return '달력 월'/);assert.match(app,/return '달력 연도'/);assert.doesNotMatch(app,/if \(period === 'month'\) return '31일'/)})
 test('internal evidence ids are stripped from visible AI reasons',()=>{assert.match(ai,/function visibleAiText/);assert.match(ai,/visibleAiText\(item.reason\)/);assert.match(readFileSync(new URL('../AiInterpretationPanel.tsx',import.meta.url),'utf8'),/visibleAiText\(item.reason\)/)})
+
+test('opening day, week and month calculations only restores saved prose until the reader chooses generation',()=>{
+  for (const args of ['cached.result, cached.request','cachedCalculation.result, cachedCalculation.request','calculation, body as unknown as Record<string,unknown>']) {
+    assert.ok(app.includes("runAiInterpretation("+args+", 'open')"))
+  }
+  assert.match(app,/cacheOnly = intent === 'open' && period !== 'year'/)
+  const open=app.indexOf('if (cacheOnly)')
+  const start=app.indexOf("action: 'start', calculation: calculationForInterpretation")
+  assert.ok(open>0 && start>open)
+  assert.match(app.slice(open,start),/setAiLoading\(false\)\s+return/)
+  assert.match(app,/refreshMonthlyGaps \? 'refresh' : 'generate'/)
+})
