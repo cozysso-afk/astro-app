@@ -5,7 +5,7 @@ import {buildDailyReadingDocument} from './dailyReadingDocument.ts'
 const field = {id:'love',label:'애정',topics:['연애','연락','재회']}
 const archived = {clusters:{relationship:{}},contact_flow:{incoming:'안부가 도착할 흐름이 열려 있어.'}}
 function read(band, signals = {}, data = archived) {
-  const calculation = {western:{overall:{연애:{average:53,band}},relationship_signals:signals}}
+  const calculation = {period:{start:'2026-11-11',end:'2026-11-11'},western:{overall:{연애:{average:53,band}},relationship_signals:signals}}
   return buildDailyReadingDocument(data,'2026-11-11',field,true,calculation)
 }
 test('all five legacy applications respond to the daily relationship band', () => {

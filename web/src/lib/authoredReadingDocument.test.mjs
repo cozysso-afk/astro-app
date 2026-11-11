@@ -142,7 +142,7 @@ test('daily love exposes contact and reunion without opening generic details', a
   }))
   assert.match(html, /data-daily-slot="relationship.contact_activation" data-slot-state="ready"><summary>연락운<\/summary>/)
   assert.match(html, /data-daily-slot="relationship.contact_continuity" data-slot-state="missing"/)
-  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><strong>재회운<\/strong>/)
+  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><summary>재회<\/summary><p>이 상황의 운세를 판단할 계산 근거가 부족해/)
   assert.equal(html.split('data-daily-detail="relationship.contact_activation:conclusion"').length, 2)
 })
 

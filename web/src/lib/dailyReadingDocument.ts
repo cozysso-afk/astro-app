@@ -141,9 +141,20 @@ const directionReadings = {
 
 // Migration adapter: preserve provider-owned prose verbatim. In particular,
 // deterministic topic_analysis and another scope's overall summary are not fallbacks.
-export function buildDailyReadingDocument(data: Data, date: string, field?: FortuneField, verified = false, calculation?: IntegratedApiResponse): DailyReadingDocument {
-  const doc: DailyReadingDocument = {version:'daily-document-v1',date,scope:field?.id ?? 'overall',title:field?.label ?? '일일 종합운세',state:verified?'missing':'unverified',headline:'',blocks:[],details:[]}
-  if (!verified) return doc
+export function buildDailyReadingDocument(data: Data, date: string, field?: FortuneField, verified = false, selectedCalculation?: IntegratedApiResponse): DailyReadingDocument {
+  return assembleDailyReading(verified ? data : null,date,field,selectedCalculation)
+}
+
+// A calculation-only reading can reuse the dated applications without loading an archive.
+export function calculatedDailyApplications(date:string,field:FortuneField|undefined,calculation:IntegratedApiResponse) {
+  return assembleDailyReading({},date,field,calculation)
+}
+
+function assembleDailyReading(data: Partial<Data>|null, date:string, field?:FortuneField, selectedCalculation?:IntegratedApiResponse):DailyReadingDocument {
+  const doc: DailyReadingDocument = {version:'daily-document-v1',date,scope:field?.id ?? 'overall',title:field?.label ?? '일일 종합운세',state:data?'missing':'unverified',headline:'',blocks:[],details:[]}
+  if (!data) return doc
+  const calculation = selectedCalculation?.period?.start === date && selectedCalculation.period.end === date
+    ? selectedCalculation : undefined
   if (field) {
     const topicForKey: Record<string,string> = {work:'직장',career_change:'이직',study:'학업',exam:'시험',news:'소식',psychology:'투자심리',realization:'수익실현',entry:'신규진입'}
     const sections = (sectionKeys[field.id] ?? []).filter(([,k])=>!topicForKey[k] || field.topics.includes(topicForKey[k])).map(([g,k,label])=>({key:`${g}.${k}`,label,section:(data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>)?.[g]?.[k]}))
@@ -151,7 +162,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     doc.details=sections.slice(1).filter(s=>ready(s.section)).flatMap(s=>[
       {id:`${s.key}:conclusion`,label:s.label,text:clean(s.section.conclusion)},...blocksFor(s.section,s.key),
     ])
-    if (field.id==='social' && calculation?.period?.start===date && calculation.period.end===date) {
+    if (field.id==='social' && calculation) {
       const stat=calculation.western.overall?.['대인관계']
       if (stat?.band && Number.isFinite(stat.average)) {
         const strength=readingStrength(stat.band)
@@ -168,7 +179,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       }
     }
     const loveStat = calculation?.western.overall?.['연애']
-    if (field.id==='love' && loveStat?.band) {
+    if (field.id==='love' && loveStat?.band && Number.isFinite(loveStat.average)) {
       const strength = readingStrength(loveStat.band)
       for (const [key, reading] of Object.entries(scenarioReadings)) {
         const slotId = 'relationship.love_' + key
@@ -226,7 +237,7 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     }
     const fingerprint=(s:string)=>s.replace(/[\s.,!?·]/g,'')
     const primary=sections[0].section.conclusion
-    if (clean(sections[0].section.real_scene).length>500 || sections[0].section.action.length>300 || sections[0].section.change_condition.length>300) {doc.state='needs_refresh';return doc}
+    if (clean(sections[0].section.real_scene).length>500 || sections[0].section.action.length>300 || clean(sections[0].section.change_condition).length>300) {doc.state='needs_refresh';return doc}
     const peers=Object.values(data.clusters??{}).flatMap(group=>Object.values(group??{})).filter(s=>s && s!==sections[0].section && s.applicability!=='insufficient')
     if(primary.length>180 || fingerprint(primary)===fingerprint(data.overall?.summary??'') || peers.some(s=>fingerprint(clean(s.conclusion))===fingerprint(primary))) {doc.state='needs_refresh';return doc}
     doc.headline = clean(sections[0].section.conclusion)
@@ -237,9 +248,10 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       if (scores.length) doc.blocks.unshift({id:'love:calculated',label:'이날의 관계 지표',text:scores.join(' · ')})
     }
   } else {
-    if (!clean(data.headline) || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
-    if(data.headline.length>180 || data.overall.summary.length>360 || data.headline.trim()===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}
-    doc.headline = clean(data.headline)
+    const headline=clean(data.headline)
+    if (!headline || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
+    if(headline.length>180 || data.overall.summary.length>360 || headline===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}
+    doc.headline = headline
     doc.blocks.push({id:'overall:summary',label:'핵심 요약',text:clean(data.overall.summary)})
     if (clean(data.overall.dominant_pattern)) doc.blocks.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
     const decision = data.decisions?.find(d=>clean(d.action) && d.evidence_refs?.length)

@@ -6,17 +6,17 @@ import { fileURLToPath } from 'node:url'
 const source=readFileSync(fileURLToPath(new URL('../SystemReadingViews.tsx',import.meta.url)),'utf8')
 
 test('Thai life cards show everyday guidance before calculation evidence',()=>{
-  const meaning=source.indexOf('BHUMI_LENSES[r.bhumi_key].meaning')
-  const practice=source.indexOf('BHUMI_LENSES[r.bhumi_key].action')
+  const meaning=source.indexOf('{lens.meaning}')
+  const practice=source.indexOf('{lens.action}')
   const evidence=source.indexOf('thaiPlacementComparison(r,view.natalWheel')
   assert.ok(meaning>0 && practice>meaning && evidence>practice)
-  assert.match(source,/무슨 뜻인지 → 현실에서 볼 것 → 계산 근거/)
+  assert.match(source,/thaiLensForTopic\(r.bhumi_key,topic\)/)
 })
 
 test('Thai disclosures do not use plus or x symbols that look like good and bad marks',()=>{
   assert.doesNotMatch(source,/aria-hidden="true">＋/)
   assert.doesNotMatch(source,/태국점성술[\s\S]*>×</)
-  assert.match(source,/계산값 · \{thaiPlanetLabel\(r\.planet\.label\)\}/)
+  assert.match(source,/kind="reason">\{thaiPlacementComparison\(r,view\.natalWheel,isNatalWheel\)/)
 })
 
 test('single-day annual placement is labelled as the selected date instead of a fake one-day year',()=>{

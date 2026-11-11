@@ -1,5 +1,5 @@
 import type {IntegratedApiResponse} from '../appTypes'
-import type {AuthoredReadingDocument} from './authoredReadingDocument'
+import type {AuthoredReadingDocument,AuthoredSection} from './authoredReadingDocument'
 import type {FortuneField} from './fortuneFields'
 
 // Each sentence describes the topic's strongest segment within the selected
@@ -21,37 +21,60 @@ const meaning:Record<string,string>={
   컨디션:'일정과 쉬는 시간을 같이 봐. 활동이 몰린 뒤 유독 지쳤다면 다음 일정 사이에 어느 정도 여유가 필요한지 가늠할 수 있어.',
 }
 
+export function monthlyTopicPhases(calculation:IntegratedApiResponse,topic:string) {
+  const {start,end}=calculation.period
+  const dates=new Map<string,number>()
+  for(const row of calculation.western.daily_scores??[]){
+    const score=row.scores?.[topic]
+    if(row.date>=start && row.date<=end && /^\d{4}-\d{2}-\d{2}$/.test(row.date) &&
+       new Date(row.date+'T00:00:00Z').toJSON()?.slice(0,10)===row.date && typeof score==='number' && Number.isFinite(score)) dates.set(row.date,score)
+  }
+  const parts=['초순','중순','하순'].map((label,index)=>{
+    const scores=[...dates].filter(([date])=>Math.min(2,Math.floor((Number(date.slice(-2))-1)/10))===index)
+    const average=scores.length?Math.round(scores.reduce((sum,[,score])=>sum+score,0)/scores.length):0
+    return {label,average,count:scores.length}
+  })
+  if(parts.some(part=>part.count<3)) return
+  const values=parts.map(part=>part.average)
+  const high=Math.max(...values),low=Math.min(...values)
+  const leaders=parts.filter(part=>part.average===high)
+  const spread=high-low
+  const scores=parts.map(part=>`${part.label} ${part.average}점`).join(', ')
+  const expected=(Date.parse(end)-Date.parse(start))/86400000+1
+  const sample=dates.size===expected?'저장된 날짜별':`선택 기간 중 계산된 ${dates.size}일의`
+  const summary=`${sample} ${topic} 점수를 나눠 보면 ${scores}이야.`
+  let comparison='세 구간의 평균이 같아. 이 자료에서 특별히 더 두드러지는 시기를 고르기는 어려워.'
+  if(leaders.length===1) comparison=`세 구간 중 ${leaders[0].label}에 이 지표가 가장 높아.`
+  if(leaders.length===2) comparison=`${leaders.map(part=>part.label).join('과 ')}의 평균이 같아서 두 구간이 함께 가장 높아.`
+  return {topic,spread,scores,sample,leader:leaders.length===1?leaders[0].label:undefined,summary,comparison}
+}
+
+function timingTopic(section:AuthoredSection) {
+  if(section.state!=='insufficient') return
+  const [prefix,topic,question]=section.id.split(':')
+  if(prefix==='question' && (question==='timing'||(topic==='직장' && question==='change_timing'))) return topic
+}
+
 export function monthlyReadingCore(doc:AuthoredReadingDocument,calculation:IntegratedApiResponse,field?:FortuneField):AuthoredReadingDocument {
   const {start,end}=calculation.period
   if(doc.state==='unverified' || doc.date!==`${start} → ${end}` || start.slice(0,7)!==end.slice(0,7) || start>=end) return doc
   const topics=field?.topics ?? ['연애','대인관계','학업','직장','금전','컨디션']
-  const rows=calculation.western.daily_scores??[]
-  const candidates=topics.flatMap(topic=>{
-    if(!meaning[topic]) return []
-    const dates=new Map<string,number>()
-    for(const row of rows){
-      const score=row.scores?.[topic]
-      if(row.date>=start && row.date<=end && typeof score==='number' && Number.isFinite(score)) dates.set(row.date,score)
-    }
-    const parts=['초순','중순','하순'].map((label,index)=>{
-      const segment=[...dates].filter(([date])=>Math.min(2,Math.floor((Number(date.slice(-2))-1)/10))===index)
-      const average=segment.length?Math.round(segment.reduce((sum,[,score])=>sum+score,0)/segment.length):0
-      return {label,average,count:segment.length}
-    })
-    if(parts.some(part=>part.count<3)) return []
-    const high=Math.max(...parts.map(p=>p.average)), low=Math.min(...parts.map(p=>p.average))
-    return [{topic,parts,spread:high-low,leaders:parts.filter(p=>p.average===high)}]
-  }).sort((a,b)=>b.spread-a.spread)
+  const sections=doc.sections??[]
+  const timingTopics=sections.map(timingTopic).filter((topic):topic is string=>Boolean(topic))
+  const profiles=new Map([...new Set([...topics,...timingTopics])].filter(topic=>meaning[topic]).map(topic=>[topic,monthlyTopicPhases(calculation,topic)]))
+  const describe=(phase:NonNullable<ReturnType<typeof monthlyTopicPhases>>)=>[phase.summary,phase.comparison,phase.spread>0?meaning[phase.topic]:''].filter(Boolean).join(' ')
+  const timingSections=sections.map(section=>{
+    const topic=timingTopic(section)
+    const phase=topic ? profiles.get(topic) : undefined
+    if(!phase) return section
+    return {...section,state:'ready' as const,label:section.label+' · 부분 해설',blocks:[{id:section.id+':calculation',label:'월간 계산값으로 보면',text:describe(phase)}]}
+  })
+  const candidates=topics.flatMap(topic=>profiles.get(topic)??[]).sort((a,b)=>b.spread-a.spread)
   const picked=candidates[0]
-  if(!picked) return doc
-  const {topic,parts,leaders}=picked
-  const scores=parts.map(p=>`${p.label} ${p.average}점`).join(', ')
-  const interpretation=leaders.length===3
-    ? '세 구간의 평균이 같아. 이 자료에서 특별히 더 두드러지는 시기를 고르기는 어려워.'
-    : `세 구간 중 ${leaders.map(part=>part.label).join('과 ')}에 이 지표가 가장 높아. ${meaning[topic]}`
-  const id='month:segments:'+topic
-  const text=`저장된 날짜별 ${topic} 점수를 나눠 보면 ${scores}이야. ${interpretation}`
+  if(!picked && timingSections.every((s,i)=>s===sections[i])) return doc
   const core=[...doc.core]
-  core.splice(Math.min(1,core.length),0,{id,label:`${topic} · 초순부터 하순까지`,text})
-  return {...doc,core,revision:doc.revision+'|month:'+topic+':'+scores,exportBlockIds:doc.exportBlockIds.length?core.map(b=>b.id):[]}
+  if(picked) core.splice(Math.min(1,core.length),0,{id:'month:segments:'+picked.topic,label:`${picked.topic} · 초순부터 하순까지`,text:describe(picked)})
+  let revision=2166136261
+  for(const char of JSON.stringify([...profiles.values()])) revision=Math.imul(revision^char.charCodeAt(0),16777619)
+  return {...doc,core,sections:timingSections,revision:doc.revision+'|month:'+revision.toString(16),exportBlockIds:doc.exportBlockIds.length?core.map(b=>b.id):[]}
 }

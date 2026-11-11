@@ -1,5 +1,6 @@
 import type {FortuneStat, IntegratedApiResponse} from '../appTypes'
 import type {AuthoredReadingDocument} from './authoredReadingDocument'
+import {monthlyTopicPhases} from './monthlyReadingCore.ts'
 
 export type MonthSupplement = {id:string; label:string; text:string; evidence:string}
 const questions: Record<string,[string,string,string,string]> = {
@@ -54,6 +55,33 @@ function scoreTiming(topic:string, stat:FortuneStat, start:string, end:string) {
   return `${meaning}은 ${date(early.date)}에 ${early.score}점, ${date(late.date)}에 ${late.score}점이야. 이달 평균은 ${stat.average}점이야.`
 }
 
+function monthlyReunionTiming(calculation:IntegratedApiResponse) {
+  const {start,end}=calculation.period
+  const first=Date.parse(start+'T00:00:00Z'),last=Date.parse(end+'T00:00:00Z')
+  if(!start.endsWith('-01') || new Date(last+86400000).getUTCDate()!==1) return ''
+  const rows=(calculation.western.daily_scores??[]).filter(row=>row.date>=start && row.date<=end)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+  const expected=(last-first)/86400000+1
+  if(rows.length!==expected || rows.some((row,i)=>Date.parse(row.date+'T00:00:00Z')!==first+i*86400000 ||
+    !Number.isFinite(row.scores?.['재회']) || !Number.isFinite(row.scores?.['연락']))) return ''
+  const peaks=(topic:string)=>{
+    const high=Math.max(...rows.map(row=>Number(row.scores[topic])))
+    const dates=rows.filter(row=>row.scores[topic]===high).map(row=>row.date)
+    const fmt=(date:string)=>`${Number(date.slice(5,7))}월 ${Number(date.slice(8))}일`
+    const list=dates.slice(0,3).map(fmt).join('·')
+    const when=dates.length>3?`${list} 등 ${dates.length}일`:list
+    const text=dates.length===rows.length?`${topic} 지표는 한 달 내내 ${high}점으로 같아.`:
+      dates.length===1?`${topic} 지표는 ${when}에 ${high}점으로 가장 높아.`:
+      `${topic} 지표는 ${when}에 공동 최고 ${high}점을 기록했어.`
+    return {dates,text}
+  }
+  const reunion=peaks('재회'),contact=peaks('연락')
+  const same=reunion.dates.length===1 && contact.dates.length===1 && reunion.dates[0]===contact.dates[0]
+  const meaning=same?'두 지표가 같은 날 두드러져도 실제로 오간 대화와 다시 교제하기로 한 합의는 각각 확인해야 해.':
+    '연락 지표에는 다른 사람과 주고받는 대화도 포함돼. 그 날짜를 과거 인연이 안부를 전하거나 다시 만나기로 하는 날로 좁혀 읽기는 어려워.'
+  return [reunion.text,contact.text,meaning].join(' ')
+}
+
 function relationshipContext(id:string, topics:Record<string,FortuneStat|null>, calculation:IntegratedApiResponse) {
   const {start,end}=calculation.period
   const signals=calculation.western.months?.find(row=>row.start===start && row.end===end)?.relationship_signals ?? calculation.western.relationship_signals
@@ -62,8 +90,15 @@ function relationshipContext(id:string, topics:Record<string,FortuneStat|null>, 
   if (id==='relationship.contact_activation' && incoming && outgoing && Number.isFinite(incoming.average) && Number.isFinite(outgoing.average)) {
     return `상대 쪽 연락을 받을 조건은 ${incoming.average}점, 내가 먼저 말을 꺼낼 조건은 ${outgoing.average}점이야. ${incoming.average===outgoing.average?'시작하는 쪽에 차이가 없어.':incoming.average>outgoing.average?'둘 중에는 상대 쪽에서 오는 연락에 조금 더 무게가 실려.':'둘 중에는 먼저 말을 건네는 쪽에 조금 더 무게가 실려.'}`
   }
-  if(id==='relationship.love_reunion_interest' && reunion && Number.isFinite(reunion.average)) {
-    return `과거 인연과 다시 접점이 생기는 지표는 월평균 ${reunion.average}점이야. 이 값이 말해 주는 범위는 안부나 만남의 계기까지야.`
+  if(id==='relationship.love_reunion_interest') {
+    const stat=topics['재회']
+    const timing=monthlyReunionTiming(calculation)
+    if(stat && Number.isFinite(stat.average) && (timing || (reunion && Number.isFinite(reunion.average)))) {
+      const means=[`다시 관계를 이어가는 문제를 보는 재회 지표는 평균 ${stat.average}점이야.`]
+      if(reunion && Number.isFinite(reunion.average)) means.push(`과거 인연과 다시 연락하거나 만날 계기를 별도로 본 접점 지표는 ${reunion.average}점이야.`)
+      if(timing) means.push(timing)
+      return means.join(' ')
+    }
   }
   if(id==='relationship.love_single' && topics['대인관계']?.band) {
     return `새로운 사람과 어울리는 데 참고할 이달 대인관계 지표는 ‘${topics['대인관계'].band}’이야. 만날 기회가 얼마나 열리는지와 그 자리에서 호감이 생기는지는 따로 살펴봐.`
@@ -113,6 +148,13 @@ const monthlyActions: Record<string,[string,string]> = {
   'condition.condition':['컨디션','피로가 쌓인 날 전후에 수면과 일정이 어떻게 달랐는지 살펴봐. 회복 시간을 어디에 넣을 수 있는지 정하는 데 참고해.'],
 }
 
+const monthlyFieldApplication:Record<string,(peak:string)=>string>={
+  'relationship.summary':peak=>`사람들과 계획을 맞출 일이 있다면 ${peak}에 어떤 얘기가 실제 약속으로 이어졌는지 살펴봐. 같은 자리에서 호응한 일과 각자 시간을 내기로 한 일은 따로 볼 수 있어.`,
+  'work_study.study':peak=>`${peak}에 집중해서 익힌 단원이 있다면 책을 덮고 문제 하나를 풀어 봐. 그 자리에서 이해됐던 내용이 다음 공부 시간에도 떠오르는지를 보면 어느 부분을 다시 볼지 정할 수 있어.`,
+  'work_study.work':peak=>`협업 중인 일이 있다면 ${peak}에 내 작업을 넘겨야 다음 사람이 시작하는 일정부터 살펴봐. 상대의 회신을 기다릴 일과 혼자 마칠 일을 구분하면 일정이 겹쳐도 먼저 할 일이 보여.`,
+  'money_news.money':peak=>`돈이 움직일 일정이 있다면 ${peak}의 결제일과 입금 예정일을 함께 적어 봐. 들어올 돈보다 먼저 나가는 금액을 따로 보면 잔고가 잠시 모자라는 날을 실제 날짜로 확인할 수 있어.`,
+}
+
 export function monthlyPeriodSupplements(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse):MonthSupplement[] {
   const topics=monthTopics(doc,calculation)
   if (!topics) return []
@@ -124,8 +166,11 @@ export function monthlyPeriodSupplements(doc:AuthoredReadingDocument, calculatio
     const [topic,advice]=action
     const stat=topics[topic]
     if (!stat?.band || !Number.isFinite(stat.average)) return []
-    const timing=scoreTiming(topic,stat,start,end)
-    return [{id:section.id,label:section.label,text:timing+' '+advice,evidence:evidence(topic,stat,start,end)}]
+    const phases=monthlyTopicPhases(calculation,topic)
+    const timing=phases ? phases.summary+' '+phases.comparison : scoreTiming(topic,stat,start,end)
+    const application=phases?.leader && monthlyFieldApplication[section.id]
+      ? monthlyFieldApplication[section.id](phases.leader) : advice
+    return [{id:section.id,label:section.label,text:timing+' '+application,evidence:evidence(topic,stat,start,end)}]
   })
   return [...love,...other]
 }

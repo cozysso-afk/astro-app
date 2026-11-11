@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
+import { buildDailyReadingDocument } from './dailyReadingDocument.ts'
+
 const home=readFileSync(new URL('../HomeControls.tsx',import.meta.url),'utf8')
-const panel=readFileSync(new URL('../PeriodAiInterpretationPanel.tsx',import.meta.url),'utf8')
 const css=readFileSync(new URL('../daily-reading-quality-v75.css',import.meta.url),'utf8')
 const main=readFileSync(new URL('../main.tsx',import.meta.url),'utf8')
 
@@ -13,11 +14,27 @@ test('selected fortune date and actual today stay separate and explicitly labele
   assert.match(home,/onClick=\{\(\)=>onQueryDateChange\(resetDate\)\}/)
 })
 
-test('daily reading leads with an honest domain score and unfolds two full explanations',()=>{
-  assert.match(panel,/오늘 가장 두드러진 분야/)
-  assert.match(panel,/분야별 상대 활성도 · 사건이 생길 확률은 아님/)
-  assert.match(panel,/userSummary\.focusTopics\.indexOf\(item\)<2\?<div className="daily-reading-topic-depth"/)
-  assert.match(panel,/결론부터 현실 장면까지/)
+test('an archived love reading keeps its full scene and action and reports only scores from the selected day',()=>{
+  const date='2026-11-11'
+  const field={id:'love',label:'애정',topics:['연애','연락','재회']}
+  const primary={
+    conclusion:'만날 때 편한 분위기와 이후 연락의 속도는 다르게 볼 수 있어.',
+    real_scene:'함께 있을 때 대화가 즐거웠다면 그 순간의 호감은 소중해. 헤어진 뒤 어느 쪽이 대화를 다시 여는지도 살펴봐.',
+    action:'다시 보고 싶다면 둘이 나눴던 이야기로 안부를 건네 봐.',
+    evidence_refs:['W:love'],
+  }
+  const data={clusters:{relationship:{love_general:primary}}}
+  const calculation={period:{start:date,end:date},western:{overall:{연애:{average:53,band:'보통'}}}}
+  const read=calc=>buildDailyReadingDocument(data,date,field,true,calc)
+  const day=read(calculation)
+  assert.equal(day.state,'ready')
+  assert.equal(day.headline,primary.conclusion)
+  assert.deepEqual(day.blocks.map(block=>block.text),['연애 53점(보통)',primary.real_scene,primary.action])
+  for (const period of [{start:'2026-11-10',end:'2026-11-10'},{start:'2026-11-09',end:'2026-11-15'}]) {
+    const other=read({...calculation,period})
+    assert.deepEqual(other.blocks.map(block=>block.text),[primary.real_scene,primary.action])
+    assert.ok(!other.details.some(block=>block.id.startsWith('application:')))
+  }
 })
 
 test('daily editorial layer owns a consistent readable scale and loads after reunion polish',()=>{

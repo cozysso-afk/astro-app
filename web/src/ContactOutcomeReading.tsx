@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
 import type { IntegratedApiResponse } from './appTypes'
 import type { FortuneField } from './lib/fortuneFields'
-import { listLocalArchive, readCloudContactOutcomes } from './lib/archive'
-import { browserLocalDateIso } from './lib/readingDateSemantics'
-import { nextRelationshipQuestion, compareRecordedSignals, contactRecordReading, recordedSignalReading, observedContactRows } from './lib/contactOutcomeReading'
+import { ContactObservationScope, useContactObservations } from './ContactObservationScope'
+import { nextRelationshipQuestion, compareRecordedSignals, contactRecordReading, recordedSignalReading } from './lib/contactOutcomeReading'
 
 type Props = {
   calculation: IntegratedApiResponse
@@ -12,34 +10,19 @@ type Props = {
   westernOnly?: boolean
 }
 
-export function ContactOutcomeReading({ calculation, localRecords, field, westernOnly }: Props) {
-  const visible = !westernOnly && ['love', 'contact', 'social'].includes(field?.id ?? '')
+export function ContactOutcomeReading(props: Props) {
+  const shared = useContactObservations()
+  if (props.westernOnly || !['love','contact','social'].includes(props.field?.id ?? '')) return null
+  if (!shared) return <ContactObservationScope {...props}><ContactOutcomeSummary {...props}/></ContactObservationScope>
+  return <ContactOutcomeSummary {...props}/>
+}
+function ContactOutcomeSummary({calculation,field}:Props) {
+  const shared = useContactObservations()
+  if (!shared) return null
+  const {observations,remote} = shared
   const {start,end} = calculation.period
-  const today = browserLocalDateIso()
-  const through = end < today ? end : today
   const day = start === end
   const hasRelationshipContext = field?.id === 'love' || field?.id === 'contact'
-  const from = day || hasRelationshipContext ? new Date(Date.parse(start + 'T00:00:00Z') - 30 * 86400000).toISOString().slice(0,10) : start
-  const [cloud,setCloud] = useState<{from:string;end:string;values:unknown[];failed:boolean} | null>(null)
-  useEffect(()=>{
-    if (!visible) return
-    let active = true
-    setCloud(null)
-    if (from > through) {
-      setCloud({from,end:through,values:[],failed:false})
-      return
-    }
-    readCloudContactOutcomes(from,through).then(values=>{
-      if (active) setCloud({from,end:through,values,failed:false})
-    }).catch(()=>{
-      if (active) setCloud({from,end:through,values:[],failed:true})
-    })
-    return ()=>{active = false}
-  },[from,through,visible,localRecords])
-  if (!visible) return null
-  const remote = cloud?.from === from && cloud.end === through ? cloud : null
-  const archived = listLocalArchive().filter(row=>row.kind === 'outcome').map(row=>row.result)
-  const observations = observedContactRows([...archived,...(remote?.values ?? []),...localRecords],from,through)
   const rows = day ? observations : observations.filter(row=>row.date >= start)
   const signals = calculation.western.relationship_signals ?? {}
   const incoming = signals['수신신호']?.band

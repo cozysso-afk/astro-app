@@ -24,3 +24,34 @@ test('leaves sparse and unverified results untouched, and does not invent timing
   const unverified={...doc,state:'unverified'}
   assert.equal(monthlyReadingCore(unverified,calculation),unverified)
 })
+
+test('the monthly narrative renders calculated timing for overview and study, keeping unanswered outcome questions open',async()=>{
+  const {createServer}=await import('vite')
+  const {createElement}=await import('react')
+  const {renderToStaticMarkup}=await import('react-dom/server')
+  const {fileURLToPath}=await import('node:url')
+  const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true},appType:'custom'})
+  try {
+    const {PeriodFortuneNarrativeV2}=await server.ssrLoadModule('/src/PeriodFortuneNarrativeV2.tsx')
+    const names=['학업','직장','금전','대인관계']
+    const daily_scores=days.map((row,i)=>({...row,scores:{학업:i<10?34:56,직장:i<20?60:20,금전:40,대인관계:i<20?30:45}}))
+    const stat={band:'보통',average:50,best_days:[],caution_days:[]}
+    const calculation={period:{...period,day_count:30},western:{overall:Object.fromEntries(names.map(topic=>[topic,stat])),daily_scores}}
+    const domain_answers=['학업:timing','직장:change_timing','금전:timing','금전:contract_recovery'].map(key=>{
+      const [topic,question_key]=key.split(':')
+      return {topic,question_key,label:key,status:'not_calculated',answer:'',evidence_refs:[]}
+    })
+    const result={ok:true,provenance_verified:true,origin:'gemini',usage:{quality_validation:{score:100}},data:{headline:'월간 원고',overall:{summary:'저장된 종합 해설',evidence_refs:['W:original']},domain_answers}}
+    const show=field=>renderToStaticMarkup(createElement(PeriodFortuneNarrativeV2,{result,period:'month',calculation,field}))
+    const overall=show()
+    assert.match(overall,/학업 점수를 나눠 보면 초순 34점, 중순 56점, 하순 56점이야. 중순과 하순의 평균이 같아서/)
+    assert.match(overall,/금전 점수를 나눠 보면 초순 40점, 중순 40점, 하순 40점이야. 세 구간의 평균이 같아/)
+    assert.match(overall,/data-reading-section="question:금전:contract_recovery" data-section-state="insufficient"/)
+    for(const id of ['relationship.friends','work_study.study','work_study.work','money_news.money']){
+      assert.ok(overall.includes('data-calculated-section="'+id+'"'),id)
+    }
+    const study=show({id:'study',label:'학업',topics:['학업']})
+    assert.match(study,/data-reading-section="question:학업:timing"/)
+    assert.doesNotMatch(study,/직장 점수를|금전 점수를/)
+  } finally { await server.close() }
+})

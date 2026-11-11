@@ -70,6 +70,7 @@ import { analysisTools as tools, fortunePeriods as periods, HomeControls } from 
 import type { DailyOutcomeRecord } from './DailyOutcomeCard'
 import { PeriodFortunePanel } from './PeriodFortunePanel'
 import { PeriodFortuneResults } from './PeriodFortuneResults'
+import { verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 import { PrecisionResults } from './PrecisionResults'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { copyToClipboard } from './lib/clipboard'
@@ -802,8 +803,10 @@ export default function AppNext() {
     void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
   }
 
-  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, refreshMonthlyGaps = false) => {
+  const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, intent: 'open'|'generate'|'refresh' = 'generate') => {
     if (!calculation) return
+    const refreshMonthlyGaps = intent === 'refresh'
+    const cacheOnly = intent === 'open' && period !== 'year'
     const generatedAt = new Date()
     const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null
@@ -822,7 +825,7 @@ export default function AppNext() {
     }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
     const ttlDays = fortuneCacheTtlDays(period, selectedTool)
-    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshMonthlyGaps && aiInterpretation?.ok))) return
+    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshMonthlyGaps && verifiedFortuneNarrative(aiInterpretation)))) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
     let startPayload: unknown = null
@@ -834,7 +837,7 @@ export default function AppNext() {
         setAiLoading(false)
         return
       }
-      if (cached?.ok && cached.data) {
+      if (cached && verifiedFortuneNarrative(cached)) {
         const annotated = annotatePayload(cached)
         setAiInterpretation(annotated)
         setAiCacheSource('local')
@@ -849,6 +852,11 @@ export default function AppNext() {
       if (!refreshMonthlyGaps) {
         setAiInterpretation(null)
         setAiCacheSource('')
+      }
+      if (cacheOnly) {
+        aiRequestRef.current = ''
+        setAiLoading(false)
+        return
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
@@ -906,7 +914,7 @@ export default function AppNext() {
       setIntegratedRequestSnapshot(cached.request)
       setIntegratedError('')
       setIntegratedProgress(null)
-      if (selectedTool === null) void runAiInterpretation(cached.result, cached.request)
+      if (selectedTool === null) void runAiInterpretation(cached.result, cached.request, 'open')
     })()
     return ()=>{cancelled=true}
   }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile.birthDate, birthProfile.birthTime, birthProfile.latitude, birthProfile.longitude, birthProfile.utcOffset, birthProfile.gender, birthProfile.placeKey, aiModel])
@@ -941,7 +949,7 @@ export default function AppNext() {
     if (cachedCalculation?.result && cachedCalculation.result.period.start === integratedStartDate && cachedCalculation.result.period.end === integratedSelectionEnd) {
       setIntegratedResult(cachedCalculation.result)
       setIntegratedRequestSnapshot(cachedCalculation.request)
-      if (selectedTool === null) void runAiInterpretation(cachedCalculation.result, cachedCalculation.request)
+      if (selectedTool === null) void runAiInterpretation(cachedCalculation.result, cachedCalculation.request, 'open')
       return
     }
     const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
@@ -1008,9 +1016,8 @@ export default function AppNext() {
       if (selectedTool === null) {
         const archiveRequest = {...body, archive_mode:'period_fortune_v16'} as unknown as Record<string,unknown>
         void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>},`period:${calculationCacheId}`)
-        void runAiInterpretation(calculation, body as unknown as Record<string,unknown>)
+        void runAiInterpretation(calculation, body as unknown as Record<string,unknown>, 'open')
       }
-      // Period fortunes auto-interpret once and cache. Integrated/precision keep explicit AI controls.
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
     } finally { setIntegratedLoading(false); setIntegratedProgress(null) }
@@ -1945,7 +1952,7 @@ export default function AppNext() {
             loading={integratedLoading}
             offline={apiStatus==='offline'}
             error={integratedError}
-            buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 + AI 해설 생성`}
+            buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 ${period==='year'?'+ AI 해설 생성':'계산'}`}
             onCalculate={runIntegrated}
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
@@ -1974,7 +1981,7 @@ export default function AppNext() {
               outcomeCalibration={outcomeCalibration}
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
-              onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps === true)}
+              onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps ? 'refresh' : 'generate')}
               onCopyAiPrompt={(mode)=>void copyAiInterpretationPrompt(integratedResult,mode)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}

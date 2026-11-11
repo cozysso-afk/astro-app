@@ -3,7 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
-const results = readFileSync(new URL('../PeriodFortuneResults.tsx', import.meta.url), 'utf8')
+const fallback = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')
 
 test('topic context reaches nested reading children instead of being attached to a Fragment', () => {
   assert.match(source, /function injectReadingContext\(/)
@@ -25,6 +25,12 @@ test('western gets scoped reading context while Saju and Thai do not append inte
 })
 
 test('fallback copy is reader language, not implementation language', () => {
-  assert.match(results, /기본 해설 보기/)
-  assert.doesNotMatch(results, /계산 기반 보조 해설/)
+  assert.match(fallback, /<summary>계산 근거 자세히 보기<\/summary>/)
+  assert.doesNotMatch(fallback, /계산 기반 보조 해설/)
+})
+
+test('switching systems preserves the selected life topic', () => {
+  const controls=source.slice(source.indexOf('className="system-switcher"'),source.indexOf('aria-label="생활 분야 선택"'))
+  assert.match(controls, /onClick=\{\(\)=>setSystem\(id\)\}/)
+  assert.doesNotMatch(controls, /setTopic\(/)
 })
