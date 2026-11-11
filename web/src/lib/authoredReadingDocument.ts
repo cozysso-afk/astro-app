@@ -47,9 +47,11 @@ function editorialSection(id:string,label:string,section:AiEditorialSection|unde
 function authoredSupplementSections(data:NonNullable<AiInterpretationResponse['data']>,field?:FortuneField):AuthoredSection[] {
   const sections:AuthoredSection[]=[]
   const add=(id:string,label:string,value:unknown)=>{if(text(value))sections.push({id,label,state:'ready',blocks:block(`${id}:text`,'해설',value)})}
-  if(!field||field.topics.some(topic=>['연애','연락','재회','대인관계'].includes(topic))) {
+  if(!field||field.topics.includes('연락')||field.topics.includes('재회')) {
     for(const [key,label] of [['incoming','외부 연락 반응'],['outgoing','내 연락 실행 조건'],['reconnection','과거 인연과의 재접점']] as const)if(!field||key!=='reconnection'||field.topics.includes('재회'))add(`contact:${key}`,label,data.contact_flow?.[key])
-    if(!field)for(const [key,label] of [['context','관계의 배경'],['flow','관계의 흐름'],['focus_timing','관계에서 살필 시기'],['watch','관계에서 확인할 점'],['avoid','관계에서 피할 것']] as const)add(`relationship:${key}`,label,data.relationship_reading?.[key])
+  }
+  if(!field||field.topics.includes('연애')) {
+    for(const [key,label] of [['context','관계의 배경'],['flow','관계의 흐름'],['focus_timing','관계에서 살필 시기'],['watch','관계에서 확인할 점'],['avoid','관계에서 피할 것']] as const)add(`relationship:${key}`,label,data.relationship_reading?.[key])
   }
   if(!field||field.topics.includes('투자심리'))for(const [key,label] of [['psychology','투자 판단'],['realization','수익 실현'],['entry','신규 진입'],['risk','투자 위험']] as const)add(`investment:${key}`,label,data.investment_reading?.[key])
   return sections

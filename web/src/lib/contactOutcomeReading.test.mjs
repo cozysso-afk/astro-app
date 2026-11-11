@@ -28,3 +28,12 @@ test('past record preserves the writer’s account and uses its own snapshot',as
  assert.match(recordedSignalReading(rows[0]),/2026-11-08.*65.0점.*연락을 받았/)
  assert.equal(recordedSignalReading({...rows[0],scores:{}}),'')
 })
+
+test('interpret actual outcome against its own stored direction and distinguish past contact from reunion',async()=>{
+ const {recordedSignalReading}=await import('./contactOutcomeReading.ts')
+ const record={event:'received',date:'2026-11-08',scores:{수신신호:29,발신적합:73,재접점:43},past_connection:true}
+ assert.match(recordedSignalReading(record),/29.0점.*낮았는데도 실제로 연락을 받았어요.*43.0점.*과거 인연과 관련된 연락/)
+ assert.match(recordedSignalReading({...record,event:'none',scores:{수신신호:73}}),/높았어도 이날은 실제 연락이 없었어요/)
+ assert.doesNotMatch(recordedSignalReading({...record,event:'none'}),/다시 연락할 지표/)
+ assert.match(recordedSignalReading({...record,event:'sent'}),/73.0점.*먼저 말 걸기 편한지/)
+})

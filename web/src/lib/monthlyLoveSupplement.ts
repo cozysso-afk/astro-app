@@ -26,6 +26,53 @@ function monthTopics(doc:AuthoredReadingDocument, calculation:IntegratedApiRespo
   const month=calculation.western.months?.find(row=>row.start===start && row.end===end)
   return month?.topics ?? calculation.western.overall
 }
+const topicReadings:Record<string,string> = {
+  연애:'만남에서 호감을 표현하는 흐름', 연락:'말을 걸거나 답을 주고받는 흐름', 재회:'과거 인연과 다시 접점이 생기는 흐름',
+  대인관계:'다른 사람과 의견을 맞추는 흐름', 학업:'배운 내용을 익히고 적용하는 흐름', 시험:'시험 과제를 수행하는 흐름',
+  직장:'일을 나누거나 책임을 맡는 흐름', 이직:'새로운 일자리를 탐색하는 흐름', 금전:'돈의 입출금을 챙기는 흐름',
+  소식:'안내와 회신을 확인하는 흐름', 투자심리:'가격 변화에 관심이 쏠리는 흐름', 수익실현:'보유 자산의 정리를 검토하는 흐름',
+  신규진입:'새 자산을 검토하는 흐름', 컨디션:'활동과 휴식의 리듬',
+}
+
+function scoreTiming(topic:string, stat:FortuneStat, start:string, end:string) {
+  const points=[...(stat.best_days??[]),...(stat.caution_days??[])]
+    .filter(p=>isoDate(p.date) && p.date>=start && p.date<=end && Number.isFinite(p.score))
+    .sort((a,b)=>b.score-a.score || a.date.localeCompare(b.date))
+  const date=(value:string)=>`${Number(value.slice(5,7))}월 ${Number(value.slice(8))}일`
+  const meaning=topicReadings[topic]??topic
+  const high=points[0], low=points.at(-1)
+  if (!high || !low) return `이달 ${topic} 평균은 ${stat.average}점이야. 날짜별 차이는 확인하기 어려워.`
+  if (high.score===low.score && high.date!==low.date) {
+    return `${date(high.date)}와 ${date(low.date)} 모두 ${meaning}이 ${high.score}점으로 같아. 두 날짜의 점수만으로 어느 쪽이 더 유리하다고 고르기는 어려워.`
+  }
+  if (high.score===low.score) {
+    const offset=high.score-stat.average
+    const relation=offset>0?'높아':offset<0?'낮아':'같아'
+    return `${date(high.date)}에 ${meaning}은 ${high.score}점이야. ${offset===0?'월평균과 같아.':`월평균 ${stat.average}점보다 ${Math.abs(offset)}점 ${relation}.`}`
+  }
+  const early=high.date<low.date?high:low, late=early===high?low:high
+  return `${meaning}은 ${date(early.date)}에 ${early.score}점, ${date(late.date)}에 ${late.score}점이야. 이달 평균은 ${stat.average}점이야.`
+}
+
+function relationshipContext(id:string, topics:Record<string,FortuneStat|null>, calculation:IntegratedApiResponse) {
+  const {start,end}=calculation.period
+  const signals=calculation.western.months?.find(row=>row.start===start && row.end===end)?.relationship_signals ?? calculation.western.relationship_signals
+  const incoming=signals?.['수신신호'], outgoing=signals?.['발신적합']
+  const reunion=signals?.['과거인연접점']??signals?.['과거인연재접점']
+  if (id==='relationship.contact_activation' && incoming && outgoing && Number.isFinite(incoming.average) && Number.isFinite(outgoing.average)) {
+    return `상대 쪽 연락을 받을 조건은 ${incoming.average}점, 내가 먼저 말을 꺼낼 조건은 ${outgoing.average}점이야. ${incoming.average===outgoing.average?'시작하는 쪽에 차이가 없어.':incoming.average>outgoing.average?'둘 중에는 상대 쪽에서 오는 연락에 조금 더 무게가 실려.':'둘 중에는 먼저 말을 건네는 쪽에 조금 더 무게가 실려.'}`
+  }
+  if(id==='relationship.love_reunion_interest' && reunion && Number.isFinite(reunion.average)) {
+    return `과거 인연과 다시 접점이 생기는 지표는 월평균 ${reunion.average}점이야. 이 값이 말해 주는 범위는 안부나 만남의 계기까지야.`
+  }
+  if(id==='relationship.love_single' && topics['대인관계']?.band) {
+    return `새로운 사람과 어울리는 데 참고할 이달 대인관계 지표는 ‘${topics['대인관계'].band}’이야. 만날 기회가 얼마나 열리는지와 그 자리에서 호감이 생기는지는 따로 살펴봐.`
+  }
+  if(id==='relationship.love_flirting' && topics['연락']?.band) {
+    return `둘 사이의 연락을 살펴보면 이달 연락 지표는 ‘${topics['연락'].band}’, 연애 지표는 ‘${topics['연애']?.band}’이야. 연락의 빈도만으로 만남의 진전을 판단하면 둘의 차이를 놓칠 수 있어.`
+  }
+  return ''
+}
 export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:IntegratedApiResponse):MonthSupplement[] {
   if (!['love','overall','contact'].includes(doc.scope)) return []
   const topics=monthTopics(doc,calculation)
@@ -38,7 +85,8 @@ export function monthlyLoveSupplements(doc:AuthoredReadingDocument, calculation:
     const stat=topics?.[topic]
     if (!stat?.band || !Number.isFinite(stat.average)) return []
     const text=/약|낮|이하/.test(stat.band)?weak:/강|높|이상/.test(stat.band)?strong:neutral
-    return [{id:section.id,label:section.label,text,evidence:evidence(topic,stat,start,end)}]
+    const context=relationshipContext(section.id,topics,calculation) || scoreTiming(topic,stat,start,end)
+    return [{id:section.id,label:section.label,text:context+' '+text,evidence:evidence(topic,stat,start,end)}]
   })
 }
 
@@ -76,10 +124,8 @@ export function monthlyPeriodSupplements(doc:AuthoredReadingDocument, calculatio
     const [topic,advice]=action
     const stat=topics[topic]
     if (!stat?.band || !Number.isFinite(stat.average)) return []
-    const intro=topic==='대인관계' && section.id!=='relationship.summary'
-      ? `이달 대인관계 전체 활성도는 ‘${stat.band}’이야. `
-      : `이달 ${topic} 활성도는 ‘${stat.band}’이야. `
-    return [{id:section.id,label:section.label,text:intro+advice,evidence:evidence(topic,stat,start,end)}]
+    const timing=scoreTiming(topic,stat,start,end)
+    return [{id:section.id,label:section.label,text:timing+' '+advice,evidence:evidence(topic,stat,start,end)}]
   })
   return [...love,...other]
 }

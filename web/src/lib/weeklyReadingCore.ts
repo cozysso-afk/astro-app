@@ -29,6 +29,23 @@ function communicationReason(refs:string[], calculation:IntegratedApiResponse, a
   return lines.join(' ')
 }
 
+function weeklyLoveTiming(calculation:IntegratedApiResponse):AuthoredBlock|undefined {
+  const {start,end}=calculation.period
+  const days=(calculation.western.daily_scores??[]).filter(day=>day.date>=start && day.date<=end &&
+    Number.isFinite(day.scores?.['연애']) && Number.isFinite(day.scores?.['연락']))
+  if(days.length!==7 || new Set(days.map(day=>day.date)).size!==7) return
+  const peak=(topic:string)=>{
+    const ranked=[...days].sort((a,b)=>Number(b.scores[topic])-Number(a.scores[topic]))
+    return Number(ranked[0].scores[topic])>Number(ranked[1].scores[topic])?ranked[0]:undefined
+  }
+  const love=peak('연애'), contact=peak('연락')
+  if(!love || !contact) return
+  const comparison=love.date===contact.date
+    ? `${calendarDay(love.date)}에는 호감·만남(${love.scores['연애']}점)과 연락(${love.scores['연락']}점)이 각각 이번 주 최고치야. 둘 다 두드러지는 날이라 이미 대화 중이라면 만날 시간을 제안해 볼 만해. 상대가 먼저 연락할지는 이 두 지표만으로 알 수 없어.`
+    : `${calendarDay(love.date)}에는 호감·만남 지표가 이번 주 최고인 ${love.scores['연애']}점인데, 같은 날 연락은 ${love.scores['연락']}점이야. 연락 지표가 가장 높은 날은 ${calendarDay(contact.date)}(${contact.scores['연락']}점)로 따로 있어. ${Number(love.scores['연락'])<50?'만남 분위기가 좋아도 이날은 곧바로 연락까지 이어지는 흐름이 약해.':'만남이 편했던 날과 연락을 주고받기 수월한 날은 따로 살펴봐.'} 연락이 오갔다면 다음 만남까지 서로 구체적으로 정하는지 봐.`
+  return {id:'weekly:love-and-contact',label:'호감과 연락은 같은 날에 두드러질까?',text:comparison}
+}
+
 // Promote the dated reading that older documents kept at the bottom of a disclosure.
 export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data, calculation:IntegratedApiResponse, field?:FortuneField): AuthoredReadingDocument {
   const {start,end,day_count} = calculation.period
@@ -45,6 +62,8 @@ export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data, calcul
     dates.push({id:'weekly:window:'+dates.length,label:w.end&&w.start!==w.end?`${calendarDay(w.start)}부터 ${calendarDay(w.end)}까지`:calendarDay(w.start),text:sentences.join(' ')})
     if(dates.length===2) break
   }
+  const loveTiming=field?.id==='love'?weeklyLoveTiming(calculation):undefined
+  if(loveTiming) dates.unshift(loveTiming)
   if(!dates.length){
     const topics=field?.topics ?? ['연애','대인관계','학업','직장','금전','컨디션']
     const ranges=topics.flatMap(topic=>{

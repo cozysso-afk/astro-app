@@ -40,3 +40,18 @@ test('overall and topic tabs use matching topic statistics without replacing aut
   assert.ok(rows.at(-1).evidence.includes('월간 대인관계 평균 44점'))
   assert.deepEqual(monthlyPeriodSupplements({...overall,state:'unverified'},calculation),[])
 })
+
+test('month timing changes in the explanation even with the same overall band',()=>{
+  const month=(later)=>({period,western:{overall:{시험:{...stat,best_days:[{date:later?'2026-11-24':'2026-11-04',score:62}],caution_days:[{date:'2026-11-16',score:30}]}}}})
+  const exam={...doc,scope:'study',sections:[{id:'work_study.exam',label:'시험',state:'missing'}]}
+  const makeText=(later)=>monthlyPeriodSupplements(exam,month(later))[0].text
+  assert.match(makeText(false),/11월 4일에 62점, 11월 16일에 30점/)
+  assert.match(makeText(true),/11월 16일에 30점, 11월 24일에 62점/)
+})
+test('monthly direction uses the selected month and distinguishes receiving and initiating',()=>{
+  const row={...period,topics,relationship_signals:{수신신호:{...stat,average:28},발신적합:{...stat,average:60}}}
+  const input={period,western:{months:[row],relationship_signals:{수신신호:{...stat,average:85}}}}
+  const item=monthlyLoveSupplements(doc,input).find(s=>s.id==='relationship.contact_activation')
+  assert.match(item.text,/28점.*60점.*먼저 말을 건네는 쪽/)
+  assert.doesNotMatch(item.text,/85점/)
+})

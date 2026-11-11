@@ -5,6 +5,7 @@ import type {LoveStatus} from './lib/loveReadingContext'
 import {DailyReadingPanel} from './DailyReadingPanel'
 import {AuthoredReadingPanel} from './AuthoredReadingPanel'
 import {weeklyPeriodSupplements} from './lib/weeklyPeriodSupplement'
+import {monthlyReadingCore} from './lib/monthlyReadingCore'
 import {weeklyReadingCore} from './lib/weeklyReadingCore'
 import {monthlyPeriodSupplements} from './lib/monthlyLoveSupplement'
 import {buildPeriodReadingDocument} from './lib/authoredReadingDocument'
@@ -45,7 +46,8 @@ export function PeriodFortuneNarrativeV2({
   if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
   const saved=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
   const weekly = period==='week' && verifiedNarrative
-  const document = weekly ? weeklyReadingCore(saved,data,calculation,field) : saved
+  const document = weekly ? weeklyReadingCore(saved,data,calculation,field)
+    : period==='month' && verifiedNarrative ? monthlyReadingCore(saved,calculation,field) : saved
   const monthlyLove = period==='month' && field?.id==='love' && verifiedNarrative
   const supplements = weekly ? weeklyPeriodSupplements(document,calculation) : period==='month' && verifiedNarrative ? monthlyPeriodSupplements(document,calculation) : []
   const retry = onRetry && (weekly || (monthlyLove && document.sections.some(section=>section.state==='missing')))

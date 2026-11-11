@@ -96,6 +96,31 @@ const scenarioReadings: Record<string, Record<ReadingStrength, string>> = {
     strong: '이미 쌓인 친밀함을 표현하기 좋은 날이야. 최근 고마웠던 행동을 구체적으로 짚고 이번 주에 함께할 일을 하나 정해 봐.',
   },
 }
+// When the saved manuscript omits a situation, relate the day's love reading
+// to the independent signal that actually bears on the reader's decision.
+const scenarioSignals: Record<string, { signal: string; label: string; meaning: Record<ReadingStrength,string> }> = {
+  single: {signal:'발신적합',label:'먼저 말 걸기',meaning:{
+    weak:'소개 자리에서 얘기가 잘 통해도 그날 바로 다음 약속까지 정하려고 애쓸 필요는 없어.',
+    neutral:'한 번 더 만나고 싶다면 같이 이야기했던 곳을 하나 꺼내 봐. 상대가 가능한 시간을 보태는지 볼 수 있어.',
+    strong:'다시 만나고 싶은 사람이 생기면 네가 먼저 구체적인 제안을 건네기 편한 쪽이야.'}},
+  crush: {signal:'수신신호',label:'연락 받기',meaning:{
+    weak:'상대의 선연락을 기다리는 방식으로 호감을 가늠하기 어려운 날이야. 이미 대화가 있다면 그 안에서 상대가 먼저 물어온 게 있었는지 봐.',
+    neutral:'연락이 먼저 오는지만으로 마음을 읽기 어려워. 답을 주고받을 때 상대도 네 일상을 궁금해하는지 봐.',
+    strong:'상대에게서 소식이 오면 내용에 주목해 봐. 필요한 답만 보낸 건지, 용건이 끝난 뒤에도 네 이야기를 물었는지에 따라 뜻이 달라.'}},
+  flirting: {signal:'발신적합',label:'먼저 제안하기',meaning:{
+    weak:'먼저 제안을 건넸다면 답을 재촉하기보다 상대에게도 가능한 날을 꺼낼 차례를 줘.',
+    neutral:'약속이 막연하게 끝났다면 가능한 날을 하나만 보내 봐. 상대가 함께 시간을 맞추는지 확인하기 쉬워.',
+    strong:'다음 만남은 네가 먼저 제안하기 편한 날이야. 상대가 장소나 날짜를 보태면 둘이 정한 약속으로 이어갈 수 있어.'}},
+  ambiguous: {signal:'수신신호',label:'연락 받기',meaning:{
+    weak:'상대의 연락이 뜸해도 그 하루를 관계에 대한 대답으로 삼기는 어려워. 다음에 이야기할 때 네가 궁금했던 점을 직접 물어봐.',
+    neutral:'먼저 연락이 오느냐만으로 두 사람이 어떤 사이인지 정하기는 어려워. 다음 만남을 바라는지 서로 말할 때 더 분명해져.',
+    strong:'먼저 오는 연락이 있어도 안부 한 번과 계속 만날 의사는 별개야. 다음 만남 이야기를 양쪽이 꺼내는지 봐.'}},
+  couple: {signal:'발신적합',label:'대화 시작하기',meaning:{
+    weak:'민감한 이야기는 긴 메시지로 한꺼번에 꺼내기보다, 둘 다 이야기할 수 있는 시간을 먼저 잡아 봐.',
+    neutral:'바라는 게 있다면 상대가 짐작해 주길 기다리지 말고, 다음번에 함께 하고 싶은 일을 하나 말해 봐.',
+    strong:'고마웠거나 서운했던 일을 네가 먼저 꺼내기 편한 쪽이야. 구체적인 장면 하나를 이야기하면 상대도 자기 입장을 설명하기 쉬워.'}},
+}
+
 const directionReadings = {
   incoming: {
     weak: '먼저 연락이 올 거라고 기대할 근거는 약해. 기다리던 답이 늦어도 그 사실만으로 상대 마음을 판단하기는 어려워.',
@@ -149,7 +174,12 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
         const slotId = 'relationship.love_' + key
         const slot = doc.slots.find(item => item.id === slotId)
         if (slot?.state !== 'missing') continue
-        doc.details.push({id:'application:'+key,label:'이날의 연애 지표를 적용하면',text:reading[strength]})
+        const context = scenarioSignals[key]
+        const stat = calculation?.western.relationship_signals?.[context.signal]
+        const text = stat?.band && Number.isFinite(stat.average)
+          ? `${reading[strength].split('. ')[0]}. 이날 ‘${context.label}’ 지표는 ${stat.average}점(${stat.band})이야. ${context.meaning[readingStrength(stat.band)]}`
+          : reading[strength]
+        doc.details.push({id:'application:'+key,label:'이날의 연애 지표를 적용하면',text})
         doc.slots = doc.slots.filter(item => item.id !== slotId)
       }
       if (doc.details.some(item => item.id.startsWith('application:'))) {

@@ -23,9 +23,20 @@ export function recordedSignalReading(row: DailyOutcomeRecord) {
   const score = row.scores?.[signal]
   if (typeof score !== 'number' || !Number.isFinite(score)) return ''
   const label = signal === '발신적합' ? '먼저 연락할 조건' : '연락을 받을 흐름'
-  const outcome = { received: '실제로 연락을 받았어요.', both: '실제로 연락을 주고받았어요.',
-    sent: '그날 먼저 연락했어요.', none: '그날 주고받은 연락은 없었어요.', '': '' }
-  return `${row.date}에 저장한 ‘${label}’은 ${score.toFixed(1)}점이었고, ${outcome[row.event]}`
+  const strong = score >= 60
+  const weak = score < 50
+  const interpretation = {
+    received: weak ? '수신 지표가 낮았는데도 실제로 연락을 받았어요.' : strong ? '수신 지표가 높았던 날에 실제로 연락을 받았어요.' : '수신 지표가 중간이었던 날에 실제로 연락을 받았어요.',
+    both: weak ? '수신 지표가 낮았는데도 실제로는 서로 연락을 주고받았어요.' : '실제로 서로 연락을 주고받아, 연락을 받았다는 기록이 있어요.',
+    sent: '그날 먼저 말을 건 선택을 기록했어요. 이 점수는 먼저 말 걸기 편한지를 뜻해서, 상대의 답장 여부와는 별개예요.',
+    none: strong ? '수신 지표가 높았어도 이날은 실제 연락이 없었어요.' : weak ? '수신 지표가 낮았고 이날은 실제 연락도 없었어요.' : '수신 지표가 중간이었고 이날은 실제 연락이 없었어요.',
+    '': '',
+  }[row.event]
+  const reconnection = row.scores?.['재접점'] ?? row.scores?.['과거인연접점'] ?? row.scores?.['과거인연재접점']
+  const past = row.past_connection && row.event && row.event !== 'none'
+  const reunion = past && typeof reconnection === 'number' && Number.isFinite(reconnection)
+    ? ` 과거 인연과 다시 연락할 지표는 ${reconnection.toFixed(1)}점이었어요. 이 기록으로 확인되는 건 과거 인연과 관련된 연락이 있었다는 데까지예요.` : ''
+  return `${row.date}에 저장한 ‘${label}’은 ${score.toFixed(1)}점이에요. ${interpretation}${reunion}`
 }
 
 export function contactRecordReading(rows: DailyOutcomeRecord[], day?: string) {
