@@ -11,6 +11,7 @@ type BirthplaceValue = {
 }
 
 type Props = {
+  concise?: boolean
   value: BirthplaceValue
   onChange: (next: BirthplaceValue) => void
   disabled?: boolean
@@ -274,7 +275,7 @@ function LocationChoice({ value, options, onChange, disabled = false, ariaLabel 
   </div>
 }
 
-export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: Props) {
+export function KoreaBirthplaceSelector({ value, onChange, disabled = false, concise = false }: Props) {
   const initial = splitKey(value.placeKey)
   const [region, setRegion] = useState(initial.region)
   const [district, setDistrict] = useState(initial.district)
@@ -314,6 +315,19 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
     if (parsed.region !== region) setRegion(parsed.region)
     if (parsed.district !== district) setDistrict(parsed.district)
   }, [value, value.placeKey, value.latitude, value.longitude, value.utcOffset, region, district])
+
+  useEffect(() => {
+    // The district can be selected while its boundary data is still loading.
+    const point = coordinateMap[value.placeKey]
+    if (!point || value.latitude || value.longitude) return
+    const next = { ...value, latitude: point.lat, longitude: point.lon }
+    if (stagedSelectionRef.current?.district && stagedValueRef.current && sourceValueRef.current === value) {
+      Object.assign(value, { latitude: point.lat, longitude: point.lon })
+      stagedValueRef.current = next
+    } else {
+      onChange(next)
+    }
+  }, [coordinateMap, value, onChange])
 
   const districts = useMemo(() => region ? KOREA_ADMIN_20260701[region] ?? [] : [], [region])
 
@@ -359,6 +373,7 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
 
   return (
     <div className="birthplace-selector field-wide">
+      {concise && <h3 className="counterpart-place-title">출생지</h3>}
       <div className="birthplace-two-step">
         <div className="field">
           <span>시·도</span>
@@ -381,10 +396,12 @@ export function KoreaBirthplaceSelector({ value, onChange, disabled = false }: P
           />
         </div>
       </div>
-      <div className={`location-data-status ${status}`}>
+      {concise ? district && <p className="counterpart-location-note" role="status">{value.latitude && value.longitude
+        ? '선택한 지역의 대표 좌표를 적용했어요.'
+        : status === 'loading' ? '대표 좌표를 불러오고 있어요.' : '이 지역의 좌표를 불러오지 못했어요. 아래에서 위도와 경도를 입력해 주세요.'}</p> : <div className={`location-data-status ${status}`}>
         <span>2026.07.01 현행 행정체계 · {KOREA_ADMIN_COUNT}개 시·군·구</span>
         <b>{status === 'ready' ? '대표좌표 자동 적용' : status === 'loading' ? '좌표 불러오는 중' : '좌표 원본 연결 제한'}</b>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -52,6 +52,11 @@ export function nextRelationshipQuestion(rows: DailyOutcomeRecord[]) {
 }
 
 const contactFollowUps = {
+  none: {
+    today: '그날 답을 기다리고 있었다면 먼저 메시지를 보냈던 날과 구분해 보세요. 연락이 없었던 하루만으로 상대의 마음까지 알 수는 없어요.',
+    week: '이번 주에는 연락이 없었던 날과 실제로 안부가 오간 날을 따로 보세요. 빈 날짜는 기록하지 않은 날이라서 그날도 조용했다고 셀 수는 없어요.',
+    month: '이달에 연락이 뜸했다고 느꼈다면, 연락이 없었다고 남긴 날과 서로 대화를 나눈 날을 짚어 보세요. 기록이 비어 있는 기간까지 단절로 볼 근거는 없어요.',
+  },
   meeting: {
     today: '만난 뒤 건네고 싶은 말이 있다면 그날 나눈 이야기 하나를 이어 보세요. 답장이 온다면 인사로 끝나는지, 상대도 궁금한 것을 물으며 대화를 이어가는지 살펴보세요.',
     week: '이번 주에는 만난 뒤 대화를 누가 다시 꺼내는지 살펴보세요. 다음 만남 얘기가 나오면 상대도 가능한 날짜를 제안하는지, 시간이 안 맞을 때 다른 날을 잡는지가 단서예요.',
@@ -103,24 +108,32 @@ export function weeklyRecordedQuestions(doc:AuthoredReadingDocument, rows:DailyO
   return {...doc,sections}
 }
 
-export function observedRelationshipPassage(rows: DailyOutcomeRecord[], calculation: IntegratedApiResponse, period: string, scope: string) {
-  if (period !== 'today' && period !== 'week' && period !== 'month') return null
-  if (scope !== 'love' && scope !== 'contact') return null
-  const row = rows.find(item => item.event && item.event !== 'none' && (scope === 'contact' || item.past_connection))
-  if (!row) return null
-  const met = meetingRecorded(row)
+function recordedContactFact(row: DailyOutcomeRecord) {
+  if (row.event === 'none') return `${row.date}에는 연락을 주고받지 않았다고 기록했어요.`
   const who = row.past_connection ? '과거 인연' : '상대'
+  const withWhom = row.past_connection ? '과거 인연과' : '상대와'
   const memo = (row.note || '').trim()
   const legacyIncomingCall = legacyMeeting.test(memo) && /전화가 (?:먼저 )?와서/.test(memo)
   const receivedCall = row.event === 'received' && (row.channel === 'call' || (row.channel === 'in_person' && legacyIncomingCall))
   const callerConfirmed = receivedCall && legacyIncomingCall && /전화가 먼저 와서/.test(memo)
-  const fact = met ? receivedCall
+  return meetingRecorded(row) ? receivedCall
     ? `${row.date}에는 ${who}에게서${callerConfirmed ? ' 먼저' : ''} 전화가 왔고, 두 사람은 직접 만났어요.`
-    : `${row.date}에는 ${who}와 직접 만났어요.`
+    : `${row.date}에는 ${withWhom} 직접 만났어요.`
     : row.event === 'sent' ? `${row.date}에는 내가 ${who}에게 먼저 연락했어요.`
-    : row.event === 'both' ? `${row.date}에는 ${who}와 서로 연락을 주고받았어요.`
+    : row.event === 'both' ? `${row.date}에는 ${withWhom} 서로 연락을 주고받았어요.`
     : `${row.date}에는 ${who}에게서 ${receivedCall ? '전화가 왔어요' : '연락을 받았어요'}.`
-  const stage = met ? 'meeting' : row.event === 'sent' ? 'sent' : 'contacted'
+}
+
+export function observedRelationshipPassage(rows: DailyOutcomeRecord[], calculation: IntegratedApiResponse, period: string, scope: string) {
+  if (period !== 'today' && period !== 'week' && period !== 'month') return null
+  if (scope !== 'love' && scope !== 'contact') return null
+  const contact = rows.find(item => item.event && item.event !== 'none' && (scope === 'contact' || item.past_connection))
+  const quiet = rows.find(item => item.event === 'none')
+  if (!contact && !quiet) return null
+  const facts = contact ? [recordedContactFact(contact)] : []
+  if (quiet && (!contact || quiet.date > contact.date)) facts.push(recordedContactFact(quiet))
+  const fact = facts.join(' ')
+  const stage = !contact ? 'none' : meetingRecorded(contact) ? 'meeting' : contact.event === 'sent' ? 'sent' : 'contacted'
   const monthly = period === 'month' ? monthlyTopicPhases(calculation,'연락') : undefined
   const weekly = period === 'week' ? weeklyTimingValues('연락',calculation) : ''
   const timing = weekly ? `이번 주 연락 지표는 ${weekly}이에요.`
@@ -130,7 +143,7 @@ export function observedRelationshipPassage(rows: DailyOutcomeRecord[], calculat
   const stat=scope==='love' ? (period==='today' ? signals?.['과거인연접점'] ?? signals?.['과거인연재접점'] ?? calculation.western.overall?.['재회'] : calculation.western.overall?.['재회']) : undefined
   const frame = period==='today' ? '이날' : period==='week' ? '이번 주' : '이달'
   const indicator = stat?.band && Number.isFinite(stat.average) ? `${frame} ${period==='today' && (signals?.['과거인연접점'] || signals?.['과거인연재접점']) ? '과거 인연 접점' : '재회'} 지표는 ${stat.average}점(${stat.band})이에요. 이 점수로 상대의 다음 행동을 알 수는 없어요.` : ''
-  const question = met ? '만남 뒤, 다음 약속도 함께 잡을까?' : row.event==='sent' ? '내가 먼저 건넨 말에 답이 이어질까?' : '다시 닿은 연락이 만남으로 이어질까?'
+  const question = stage === 'none' ? '연락이 없었던 날은 어떻게 읽을까?' : stage === 'meeting' ? '만남 뒤, 다음 약속도 함께 잡을까?' : stage === 'sent' ? '내가 먼저 건넨 말에 답이 이어질까?' : '다시 닿은 연락이 만남으로 이어질까?'
   return {fact,followUp,question,indicator}
 }
 

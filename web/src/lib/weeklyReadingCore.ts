@@ -1,5 +1,6 @@
 import type { AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
 import type { AuthoredBlock, AuthoredReadingDocument } from './authoredReadingDocument'
+import {datedAspectReading} from './fortuneUserSummary.ts'
 import { weeklyQuestionSections } from './weeklyQuestionEvidence.ts'
 import type { FortuneField } from './fortuneFields'
 
@@ -71,12 +72,15 @@ export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data|undefin
         .map(day=>({date:day.date,score:Number(day.scores[topic])})).sort((a,b)=>a.score-b.score)
       const low=days[0],high=days.at(-1)
       if(!low||!high||low.date===high.date||high.score<=low.score) return []
-      return [{topic,low,high,spread:high.score-low.score}]
+      const datesAt=(score:number)=>[...new Set(days.filter(day=>day.score===score).map(day=>day.date))].sort().map(calendarDay).join('·')
+      return [{topic,low,high,lowDates:datesAt(low.score),highDates:datesAt(high.score),spread:high.score-low.score}]
     }).sort((a,b)=>b.spread-a.spread)
-    for(const {topic,low,high} of ranges.slice(0,2)){
-      dates.push({id:'weekly:dates:'+topic,label:`${topic} · 날짜별 차이`,text:`이번 주 계산된 날 가운데 ${topic} 지표는 ${calendarDay(high.date)}에 ${high.score}점으로 가장 높고, ${calendarDay(low.date)}에는 ${low.score}점으로 가장 낮아.`})
+    for(const {topic,low,high,lowDates,highDates} of ranges.slice(0,2)){
+      dates.push({id:'weekly:dates:'+topic,label:`${topic} · 날짜별 차이`,text:`이번 주 계산된 날 가운데 ${topic} 지표는 ${highDates}에 ${high.score}점으로 가장 높고, ${lowDates}에는 ${low.score}점으로 가장 낮아.`})
     }
   }
+  const dated=datedAspectReading(calculation,'week',field?.topics)
+  if(dated) dates.push(dated)
   const reason=doc.core.find(b=>b.id==='overall:reason')
   const decisionReason=doc.core.find(b=>b.id==='decision:primary:reason')
   const primary=data?.decisions?.find(d=>d.action?.trim() && d.evidence_refs?.length)

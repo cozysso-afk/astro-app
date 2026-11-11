@@ -20,6 +20,7 @@ test('today wording is used only when the selected date equals actual today', ()
 
 test('system overview does not render an array length as a bare zero', () => {
   const source = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
-  assert.match(source, /view\.contexts\.length > 0 \? <p>/)
+  assert.match(source, /view\.contexts\.length > 0 \|\| sajuDates\.length > 0/)
+  assert.match(source, /hasSajuOverview \? <p>/)
   assert.doesNotMatch(source, /view\.contexts\.length\s*&&\s*<p>/)
 })

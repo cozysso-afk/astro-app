@@ -1,4 +1,5 @@
 import type { AiEditorialSection, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
+import {datedAspectReading} from './fortuneUserSummary.ts'
 import {contactDirectionComparison} from './contactDirectionReading.ts'
 import type { FortuneField } from './fortuneFields'
 
@@ -297,6 +298,8 @@ function assembleDailyReading(data: Partial<Data>|null, date:string, field?:Fort
   // The overall limit has no field scope: a money-specific caveat must not
   // become love, study or condition copy merely because it is globally present.
   if (!field && clean(data.limits)) doc.blocks.push({id:'limits',label:'함께 알아둘 점',text:clean(data.limits)})
+  const dated = calculation && datedAspectReading(calculation,'day',field?.topics)
+  if (dated) doc.blocks.splice(Math.min(doc.blocks.length,1),0,dated)
   doc.state = 'ready'
   return doc
 }

@@ -112,3 +112,15 @@ test('oversized optional text is omitted whole, not sliced; compact output stays
   assert.ok(text.length<=7500);assert.ok(parse(text).topics.length>=3)
   assert.doesNotMatch(text,/아주 긴 중복 설명/)
 })
+
+test('love prompt can be copied for all six situations without assuming a partner, within the compact limit', async()=>{
+  const {LOVE_SCENARIOS_PROMPT}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')
+  for(const period of ['today','week','month']){
+    const fixture=richFortune(period)
+    const text=compact.buildExternalCompactPrompt(fixture.calculation,fixture.data,false,['연애','연락','재회'],LOVE_SCENARIOS_PROMPT)
+    for(const situation of ['솔로','짝사랑','썸','애매한 관계','연애 중','재회']) assert.ok(text.includes(situation))
+    assert.doesNotMatch(text,/LOVE_STATUS=single|싱글의 연애운이다/)
+    assert.ok(text.length<=compact.COMPACT_DEEP_MAX_CHARS)
+    assert.deepEqual(parse(text).focus_topics,['연애','연락','재회'])
+  }
+})

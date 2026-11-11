@@ -115,3 +115,30 @@ test('weekly overview reads only dated contact and reunion facts that were recor
   assert.match(overview([record],ready),/저장한 원고 그대로/)
   assert.doesNotMatch(overview([record],ready),/날짜가 확인된 기록/)
 })
+
+test('an explicitly quiet day changes rereading without erasing a previous meeting or attributing silence to an ex',()=>{
+  const quiet={...record,date:'2020-11-11',event:'none',past_connection:false,channel:'',note:''}
+  for (const period of ['today','week','month']) {
+    for (const field of [love,contact]) {
+      const empty=render(period,field,[])
+      const quietOnly=render(period,field,[quiet])
+      const datedFact='2020-11-11에는 연락을 주고받지 않았다고 기록했어요.'
+      assert.ok(!empty.includes(datedFact))
+      assert.ok(quietOnly.includes(datedFact))
+      assert.match(quietOnly,/연락이 없었던 날은 어떻게 읽을까/)
+      assert.doesNotMatch(quietOnly,/과거 인연과 연락을 주고받지/)
+      const both=render(period,field,[quiet,record])
+      assert.ok(both.includes(datedFact))
+      assert.ok(both.includes('2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요.'))
+      assert.match(both,/만남 뒤, 다음 약속도 함께 잡을까/)
+    }
+  }
+  const clean={...record,channel:'message',note:''}
+  for(const past_connection of [true,false]) {
+    const partner=past_connection?'과거 인연과':'상대와'
+    for (const [event,met_in_person,ending] of [['both',false,'서로 연락을 주고받았어요.'],['received',true,'직접 만났어요.']]) {
+      const passage=observedRelationshipPassage([{...clean,past_connection,event,met_in_person}],calc('week'),'week','contact')
+      assert.ok(passage.fact.endsWith(partner+' '+ending))
+    }
+  }
+})

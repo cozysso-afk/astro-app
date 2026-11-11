@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { DatingArchetypePanel } from './DatingArchetypePanel'
-import { fortuneField } from './lib/fortuneFields'
+import { ExternalPromptCopy } from './ExternalPromptCopy'
+import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { CheckCircle2, ImageDown, LoaderCircle } from 'lucide-react'
@@ -44,11 +45,16 @@ type PeriodFortuneResultsProps = {
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
   onRetryAi: (refreshMonthlyGaps?:boolean) => void
-  onCopyAiPrompt: (mode?: ExternalCopyMode) => void
+  onCopyAiPrompt: (mode?: ExternalCopyMode, field?: FortuneField) => void
   onCancelAi: () => void
   aiCanCancel: boolean
   onOutcomeChange: (draft: DailyOutcomeRecord) => void
   onSaveOutcome: () => void
+}
+
+function SavedReadingPromptCopy({onCopy,field,westernOnly}: {onCopy: PeriodFortuneResultsProps['onCopyAiPrompt'];field?: FortuneField;westernOnly?: boolean}) {
+  if (westernOnly) return null
+  return <div data-reading-export-ignore="true"><ExternalPromptCopy onCopy={mode=>onCopy(mode,field)}/></div>
 }
 
 function periodExportTitle(period: PeriodKey, label: string | undefined, result: IntegratedApiResponse, fieldLabel?: string) {
@@ -154,6 +160,7 @@ export function PeriodFortuneResults({
     {hasNaturalReading && aiError && <p className="result-note" role="alert">{aiError}</p>}
     <SystemReadingViews outcomeRecords={outcomeRecords} initialSystem={initialSystem} onSystemChange={setSelectedSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails} onRetry={aiLoading?undefined:onRetryAi}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>}
+      {hasNaturalReading && <SavedReadingPromptCopy onCopy={onCopyAiPrompt}/>}
       {outcomeRecords && <ContactOutcomeReading calculation={result} localRecords={outcomeRecords}/>}
     </></SystemReadingViews>
     {field?.id==='love'&&<DatingArchetypePanel key={`${JSON.stringify(datingProfile)}-${result.period.start}-${result.period.end}`} calculation={result} profileGender={profileGender} profile={datingProfile} apiBase={datingApiBase}/>}

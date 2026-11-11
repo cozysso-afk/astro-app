@@ -245,3 +245,83 @@ test('Thai love cards apply the actual Bhumi area to relationship questions',()=
  assert.doesNotMatch(cards,/가족·친구·동료|예산|다시 벌이기/)
  assert.match(cards,/계산 근거.*금성/)
 })
+
+
+test('Saju keeps supported topics selectable without a matching monthly lens',()=>{
+ const {calculation}=fixture('today')
+ const render=field=>renderToStaticMarkup(h(Views,{calculation,initialSystem:'saju',field}))
+ const tabs=render().match(/aria-label="생활 분야 선택"[^>]*>([\s\S]*?)<\/div>/)[1]
+ assert.match(tabs,/<button(?![^>]*disabled)[^>]*>금전<\/button>/)
+ assert.match(tabs,/<button[^>]*disabled[^>]*>컨디션<\/button>/)
+ const noMoney=render(fields.find(row=>row.id==='money'))
+ assert.match(noMoney,/금전을 바로 설명할 사주 근거가 많지 않아/)
+})
+
+test('Saju daily love explains the selected day and separates monthly context',()=>{
+ const {calculation}=fixture('today'), field=fields.find(row=>row.id==='love')
+ calculation.saju.daily=[{date:calculation.period.start,ganzhi:'庚申',stem_ten_god:'食神(식신)',branch_links:[]},{date:'2000-01-01',ganzhi:'丙午',stem_ten_god:'正財(정재)',branch_links:[]}]
+ const html=renderToStaticMarkup(h(Views,{calculation,initialSystem:'saju',field}))
+ const hero=html.match(/class="system-hero saju-reader-hero"([\s\S]*?)<\/header>/)[1]
+ assert.match(hero,/9월 12일 일진.*호감과 의사를 표현하는 방식/)
+ assert.match(hero,/경신.*식신.*정인 월운/)
+ assert.doesNotMatch(hero,/새 자료|복습|마감일|정재/)
+})
+
+test('Saju samples the selected week and month and skips days without topic evidence',()=>{
+ const day=(date,god)=>({date,ganzhi:'甲子',stem_ten_god:god,branch_links:[]})
+ for(const [count,end] of [[7,'2026-11-07'],[30,'2026-11-30']]){
+  const period={start:'2026-11-01',end,day_count:count}
+  const data=[day('2026-10-31','正財(정재)'),day('2026-11-01','正財(정재)'),day('2026-11-04','正官(정관)'),day(end,'偏財(편재)')]
+  const rows=systems.sajuDayExamples(data,'금전',period)
+  assert.deepEqual(rows.map(row=>row.date),['2026-11-01',end])
+  assert.ok(rows.every(row=>row.lens.key==='재성'))
+ }
+})
+
+test('Thai reads only the active field planet inside the selected annual segment',()=>{
+ const {calculation}=fixture('week'), field=fields.find(row=>row.id==='love')
+ const sample=(date,sign)=>({date,positions:{venus:{sign_ko:sign},mars:{sign_ko:'처녀자리'}}})
+ calculation.thai.suriyayat_daily=[sample('2026-09-11','사자자리'),sample('2026-09-12','황소자리'),sample('2026-09-14','쌍둥이자리'),sample('2026-09-15','전갈자리')]
+ const html=renderToStaticMarkup(h(Views,{calculation,initialSystem:'thai',field}))
+ const hero=html.match(/<header class="system-hero">([\s\S]*?)<\/header>/)[1]
+ assert.match(hero,/9월 12일.*금성.*황소자리.*9월 14일.*쌍둥이자리/)
+ assert.doesNotMatch(hero,/사자자리|전갈자리|처녀자리/)
+ delete calculation.thai.taksajorn
+ const natal=renderToStaticMarkup(h(Views,{calculation,initialSystem:'thai',field}))
+ assert.doesNotMatch(natal.match(/<header class="system-hero">([\s\S]*?)<\/header>/)[1],/관측값|수리야얏 계산에서/)
+})
+
+
+test('a solar boundary between two distinct ten-gods in the same family is still visible',()=>{
+ const row=(stem_ten_god,segment_start)=>({layer:'월운',stem_ten_god,segment_start})
+ const text=systems.sajuRelationshipSummary([row('偏印(편인)','2026-11-01'),row('正印(정인)','2026-11-07')])
+ assert.match(text,/11월 7일.*편인에서 정인 월운으로.*인성.*이어져/)
+})
+
+test('standalone love prompts retain all six contexts even when large input is trimmed',()=>{
+ for(const system of ['western','saju','thai']){
+   const {calculation}=fixture('today')
+   const markup=renderToStaticMarkup(h(Views,{calculation,initialSystem:system,field:fields.find(row=>row.id==='love')}))
+   assert.match(markup,/선택 체계 심층 프롬프트 복사/)
+   const packet={system,observations:Array.from({length:16},()=> '기'.repeat(1800))}
+   const data=systems.compactSystemPrompt(packet,'애정').split('CALCULATED_DATA=')[1]
+   const parsed=JSON.parse(data)
+   assert.ok(parsed.observations.length < 16)
+   for(const label of ['솔로','짝사랑','썸','애매한 관계','연애 중','재회']) assert.ok(parsed.relationship_contexts.includes(label),label)
+   assert.equal(parsed.love_status,undefined)
+   assert.equal(JSON.parse(systems.compactSystemPrompt(packet,'금전').split('CALCULATED_DATA=')[1]).relationship_contexts,undefined)
+ }
+})
+
+
+test('integrated overview renders day-only Saju evidence and no bare zero without evidence',()=>{
+ const {calculation}=fixture()
+ calculation.saju.monthly=[]
+ calculation.saju.annual=[]
+ const view=()=>renderToStaticMarkup(h(Views,{calculation,initialSystem:'integrated'},h(({systemOverview})=>systemOverview)))
+ assert.doesNotMatch(view(),/>0</)
+ assert.match(view(),/사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어/)
+ calculation.saju.daily=[{date:calculation.period.start,ganzhi:'己丑',stem_ten_god:'正印(정인)',branch_links:[]}]
+ assert.match(view(),/일진의 주제/)
+ assert.doesNotMatch(view(),/>0<|사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어/)
+})

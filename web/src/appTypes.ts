@@ -326,6 +326,7 @@ export type IntegratedApiResponse = {
       total_correction_minutes: number
     }
     dayun?: Array<{ start_year: number; end_year: number; start_age: number; end_age: number; ganzhi: string }>
+    daily?: Array<{ date:string; ganzhi:string; stem_ten_god:string; branch_links:string[] }>
     annual?: Array<{ year: number; ganzhi: string; stem_ten_god: string; branch_links: string[]; segment_start?: string; segment_end_exclusive?: string; start_jie?: string; start_jie_ko?: string; representative_time?: string; boundary_note?: string }>
     monthly?: Array<{ calendar_month: string; ganzhi: string; stem_ten_god: string; branch_links: string[]; segment_start?: string; segment_end_exclusive?: string; representative_time?: string; jie_name?: string; jie_name_ko?: string; next_jie?: string; next_jie_ko?: string; boundary_note?: string }>
     not_calculated?: string[]
@@ -339,6 +340,7 @@ export type IntegratedApiResponse = {
     rule: string
     mahathaksa?: { available:boolean; method:string; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }
     taksajorn?: { available:boolean; method:string; method_variance_note?:string; segments:Array<{ start:string; end:string; age_in_progress:number; annual_boriwan:{ key:string; number:number; thai_name:string; label:string }; landed_center:boolean; wheel:Array<{ bhumi_key:string; bhumi_thai:string; bhumi_label:string; planet:{ key:string; number:number; thai_name:string; label:string } }> }> }
+    suriyayat_daily?: Array<{ date:string; representative_local_time?:string; positions?:Record<string,{sign_ko:string}> }>
     suriyayat?: { available:boolean; engine:string; source_commit?:string; time_basis:string; validation?:{status:string;reference?:string;vectors?:number;dates?:number;max_delta_arcmin?:number;within_1_arcmin?:number}; natal?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_start?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; period_end?:{instant:string;suriyayat_reference_time:string;positions:Record<string,{arcmin:number;longitude_deg:number;sign_index:number;sign_ko:string;degree:number;minute:number;display:string}>}; lagna?:{available:boolean;reason?:string;display?:string;longitude_deg?:number;sign_index?:number;sign_ko?:string;degree?:number;minute?:number;second?:number;interpretation_scope?:string;validation?:{numeric_position_validated?:boolean;global_coordinates_independently_validated?:boolean;world_numeric_checks?:number}}; ai_safe_packet_product?:{eligible_for_gemini?:boolean;research_only?:boolean;route_count?:number;routes?:Array<{route_key?:string;interpretation_level?:string}>}; interpretation_status?:string; policy?:string }
     predictive_status: string
     consensus_policy: string

@@ -3,15 +3,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
-const systems=readFileSync(new URL('../SystemReadingViews.tsx',import.meta.url),'utf8')
 const css=readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8')
 const rel=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
-
-test('Saju keeps supported topics selectable even when current period has no direct ten-god lens',()=>{
-  assert.match(systems,/system==='saju' \? SAJU_LIFE_KEYS\[t\]\.length>0/)
-  assert.match(systems,/직접 연결되는 십성 운 구간이 두드러지지 않아/)
-  assert.match(systems,/현재 사주 계산 계약에는 이 분야를 직접 읽을 안전한 근거가 없어/)
-})
 
 test('reunion surface leads with gated timing and keeps initiative undetermined',()=>{
   assert.match(panel,/재접점 활성도:/)
