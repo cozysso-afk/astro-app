@@ -1,4 +1,4 @@
-name: Approved three-period reading check
+name: Approved monthly reading check
 on:
   push:
     branches: [qa/three-readings-20261111]
@@ -9,13 +9,13 @@ jobs:
   audit:
     if: github.run_attempt == 1
     runs-on: ubuntu-latest
-    timeout-minutes: 24
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Generate one synthetic reading per approved period
+      - name: Check monthly budget and start at most one monthly reading
         env:
           QA_LIVE_APPROVED: 'YES'
           QA_FORTUNE_MODEL: gemini-3.7-flash
@@ -24,7 +24,6 @@ jobs:
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
           QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
-        run: node --experimental-strip-types web/scripts/fortune-live-qa.mjs --max-jobs 3 --period-kinds day,week,month --out /tmp/reading-audit
-      - name: Show sanitized audit details
-        if: always()
+        run: node --experimental-strip-types web/scripts/monthly-one-shot.mjs --max-jobs 1 --period-kinds month --out /tmp/reading-audit
+      - if: always()
         run: test -f /tmp/reading-audit/report.json && cat /tmp/reading-audit/report.json
