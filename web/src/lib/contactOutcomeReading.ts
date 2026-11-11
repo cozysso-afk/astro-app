@@ -1,3 +1,6 @@
+import { weeklyTimingValues } from './weeklyQuestionEvidence.ts'
+import { monthlyTopicPhases } from './monthlyReadingCore.ts'
+import type { IntegratedApiResponse } from '../appTypes'
 import type { DailyOutcomeRecord } from '../DailyOutcomeCard'
 
 const events = {
@@ -44,6 +47,64 @@ export function nextRelationshipQuestion(rows: DailyOutcomeRecord[]) {
     label:'연락이 닿은 뒤 무엇이 달라졌을까?',
     text:`${row.date}에는 과거 인연과 연락이 닿았어요. 그날 이후에도 연락을 이어가고 싶은지, 만나자는 이야기가 나왔다면 날짜까지 정했는지가 다음 질문이에요.`,
   }
+}
+
+const contactFollowUps = {
+  meeting: {
+    today: '만난 뒤 건네고 싶은 말이 있다면 그날 나눈 이야기 하나를 이어 보세요. 답장이 온다면 인사로 끝나는지, 상대도 궁금한 것을 물으며 대화를 이어가는지 살펴보세요.',
+    week: '이번 주에는 만난 뒤 대화를 누가 다시 꺼내는지 살펴보세요. 다음 만남 얘기가 나오면 상대도 가능한 날짜를 제안하는지, 시간이 안 맞을 때 다른 날을 잡는지가 단서예요.',
+    month: '이달에는 만남 직후 며칠과 그 뒤의 연락을 나눠 보세요. 반갑다고 한 말이 다음 약속으로 이어졌는지, 한쪽이 먼저 나서지 않아도 두 사람 모두 관계를 이어가려 했는지 돌아볼 수 있어요.',
+  },
+  sent: {
+    today: '먼저 말을 건 단계까지 확인됐어요. 답이 왔다면 내 질문에 답하는 데서 끝났는지, 상대도 새 질문을 덧붙였는지 살펴보세요.',
+    week: '이번 주에는 내가 보낸 말에 답이 있었는지부터 살펴보세요. 한 번 답을 주고받은 뒤 다른 날에도 상대가 대화를 다시 꺼냈다면, 대화를 이어가는 방식이 달라진 거예요.',
+    month: '이달에는 먼저 연락한 날과 실제로 답을 주고받은 날을 나눠 보세요. 내가 매번 대화를 시작했는지, 시간이 지나며 상대도 먼저 안부를 물었는지에 따라 다음 선택이 달라져요.',
+  },
+  contacted: {
+    today: '이미 닿은 연락에서 어떤 이야기가 오갔는지 살펴보세요. 만나자는 말이 있었다면 가능한 날을 물어보는 게 오늘 확인할 수 있는 다음 단계예요.',
+    week: '이번 주에는 안부를 주고받은 뒤 대화가 다른 날에도 이어지는지 살펴보세요. 만나자는 이야기가 나왔다면 두 사람이 시간을 실제로 맞췄는지까지 구분해 보세요.',
+    month: '이달에는 다시 연락이 닿은 시점과 만남 약속이 구체화된 시점을 나눠 보세요. 대화는 이어졌지만 날짜를 잡지 못했다면 연락이 이어진 데까지가 지금 확인된 변화예요.',
+  },
+} as const
+
+export function observedRelationshipPassage(rows: DailyOutcomeRecord[], calculation: IntegratedApiResponse, period: string, scope: string) {
+  if (period !== 'today' && period !== 'week' && period !== 'month') return null
+  if (scope !== 'love' && scope !== 'contact') return null
+  const row = rows.find(item => item.event && item.event !== 'none' && (scope === 'contact' || item.past_connection))
+  if (!row) return null
+  const met = meetingRecorded(row)
+  const who = row.past_connection ? '과거 인연' : '상대'
+  const memo = (row.note || '').trim()
+  const legacyIncomingCall = legacyMeeting.test(memo) && /전화가 (?:먼저 )?와서/.test(memo)
+  const receivedCall = row.event === 'received' && (row.channel === 'call' || (row.channel === 'in_person' && legacyIncomingCall))
+  const callerConfirmed = receivedCall && legacyIncomingCall && /전화가 먼저 와서/.test(memo)
+  const fact = met ? receivedCall
+    ? `${row.date}에는 ${who}에게서${callerConfirmed ? ' 먼저' : ''} 전화가 왔고, 두 사람은 직접 만났어요.`
+    : `${row.date}에는 ${who}와 직접 만났어요.`
+    : row.event === 'sent' ? `${row.date}에는 내가 ${who}에게 먼저 연락했어요.`
+    : row.event === 'both' ? `${row.date}에는 ${who}와 서로 연락을 주고받았어요.`
+    : `${row.date}에는 ${who}에게서 ${receivedCall ? '전화가 왔어요' : '연락을 받았어요'}.`
+  const stage = met ? 'meeting' : row.event === 'sent' ? 'sent' : 'contacted'
+  const monthly = period === 'month' ? monthlyTopicPhases(calculation,'연락') : undefined
+  const weekly = period === 'week' ? weeklyTimingValues('연락',calculation) : ''
+  const timing = weekly ? `이번 주 연락 지표는 ${weekly}이에요.`
+    : monthly ? `${monthly.sample} 연락 지표의 평균은 ${monthly.scores}이에요.` : ''
+  const followUp = [contactFollowUps[stage][period],timing].filter(Boolean).join(' ')
+  const signals=calculation.western.relationship_signals
+  const stat=scope==='love' ? (period==='today' ? signals?.['과거인연접점'] ?? signals?.['과거인연재접점'] ?? calculation.western.overall?.['재회'] : calculation.western.overall?.['재회']) : undefined
+  const frame = period==='today' ? '이날' : period==='week' ? '이번 주' : '이달'
+  const indicator = stat?.band && Number.isFinite(stat.average) ? `${frame} ${period==='today' && (signals?.['과거인연접점'] || signals?.['과거인연재접점']) ? '과거 인연 접점' : '재회'} 지표는 ${stat.average}점(${stat.band})이에요. 이 점수로 상대의 다음 행동을 알 수는 없어요.` : ''
+  const question = met ? '만남 뒤, 다음 약속도 함께 잡을까?' : row.event==='sent' ? '내가 먼저 건넨 말에 답이 이어질까?' : '다시 닿은 연락이 만남으로 이어질까?'
+  return {fact,followUp,question,indicator}
+}
+
+type ObservedPassage = NonNullable<ReturnType<typeof observedRelationshipPassage>>
+export function observedContactCore(passage: ObservedPassage, headline: string, blocks: Array<{id:string;label:string;text:string}>) {
+  return [
+    {id:'record:contact-follow-up',label:passage.question,text:passage.followUp},
+    ...(headline ? [{id:'source:contact-headline',label:'이 기간에 계산한 연락운',text:headline}] : []),
+    ...blocks,
+  ]
 }
 
 export function recordedSignalReading(row: DailyOutcomeRecord) {

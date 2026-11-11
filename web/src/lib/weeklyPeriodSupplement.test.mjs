@@ -64,3 +64,12 @@ test('week shape describes recorded extrema only for a complete seven-day series
   assert.match(read(Array(7).fill(48)),/일곱 날의 값이 같아서/)
   assert.doesNotMatch(read([30,45,55]),/가장 높/)
 })
+
+test('dated overview gives both tied peaks even when they fall in different calendar months',()=>{
+  const dates=['2026-11-30','2026-12-01','2026-12-02','2026-12-03','2026-12-04','2026-12-05','2026-12-06']
+  const values=[68,52,40,68,52,40,42]
+  const daily_scores=dates.map((date,index)=>({date,scores:{학업:values[index]}}))
+  const input={period,western:{daily_scores,overall:{학업:stat}}}
+  const row=weeklyPeriodSupplements(makeDoc('overall',['work_study.study']),input)[0]
+  assert.match(row.text,/최고값은 68점\(11월 30일·12월 3일\), 최저값은 40점\(12월 2일·12월 5일\)/)
+})

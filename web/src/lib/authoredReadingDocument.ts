@@ -5,7 +5,7 @@ export type AuthoredBlock = { id: string; label: string; text: string }
 export type AuthoredSection = { id: string; label: string; state: 'ready'|'missing'|'insufficient'; blocks: AuthoredBlock[] }
 export type AuthoredReadingDocument = {
   version: 'authored-reading-v1'; revision: string; scope: string; title: string; date: string
-  state: 'ready'|'partial'|'missing'|'unverified'; headline: string
+  state: 'ready'|'partial'|'missing'|'unverified'|'calculated'; headline: string
   core: AuthoredBlock[]; sections: AuthoredSection[]; exportBlockIds: string[]
 }
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : ''
@@ -28,6 +28,20 @@ const sectionMap: Record<string,Array<[string,string,string,string]>> = {
   investment:[['investment','psychology','투자 판단','투자심리'],['investment','realization','수익 실현','수익실현'],['investment','entry','신규 진입','신규진입']],
   contact:[['relationship','contact_activation','연락 흐름','연락'],['relationship','contact_continuity','대화의 지속','연락'],['money_news','news','공식 소식','소식']],
   condition:[['condition','condition','컨디션','컨디션']],
+}
+// Create only the questions this calculation can address. This path never receives provider data.
+export function calculatedPeriodQuestions(period:'week'|'month', start:string, end:string, field?:FortuneField):AuthoredReadingDocument {
+  const rows=field ? (sectionMap[field.id] ?? []).filter(([, , ,topic])=>field.topics.includes(topic))
+    : ['love','social','study','work','money','condition'].flatMap(key=>sectionMap[key])
+  const sections = new Map<string,AuthoredSection>()
+  for(const [group,key,label] of rows) {
+    const id=group+'.'+key
+    sections.set(id,{id,label,state:'missing',blocks:[]})
+  }
+  const scope=field?.id ?? 'overall'
+  const title=`계산값으로 읽는 ${period==='week'?'주간':'월간'} ${field?.label ?? '종합운세'}`
+  return {version:'authored-reading-v1',revision:`calc:${period}:${start}:${end}:${scope}`,scope,title,date:start+' → '+end,
+    state:'calculated',core:[],headline:'',sections:[...sections.values()],exportBlockIds:[]}
 }
 function editorialSection(id:string,label:string,section:AiEditorialSection|undefined,delivered?:string):AuthoredSection {
   const authored=section?.evidence_refs?.length && section.applicability!=='insufficient'

@@ -9,9 +9,7 @@ import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApi
 import { ContactOutcomeReading } from './ContactOutcomeReading'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
-import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
-import { fortuneNarrativeOrigin } from './lib/fortuneNarrativeOrigin'
-import { interpretationHeroEligible } from './lib/interpretationTopics'
+import { PeriodFortuneNarrativeV2, verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 import { exportReadingImages } from './lib/readingImageExport'
 import './reading-image-export.css'
 
@@ -144,12 +142,7 @@ export function PeriodFortuneResults({
   </>
 
   // Do not promote a provisional/unchecked result into a Gemini-authored reading.
-  const hasNaturalReading = Boolean(
-    aiInterpretation?.ok && aiInterpretation.data
-    && fortuneNarrativeOrigin(aiInterpretation.model, aiInterpretation.origin) === 'gemini'
-    && !aiInterpretation.usage?.local_quality_fallback
-    && interpretationHeroEligible(aiInterpretation.usage?.quality_validation, aiInterpretation.usage)
-  )
+  const hasNaturalReading = verifiedFortuneNarrative(aiInterpretation)
   return <div ref={exportRootRef} data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
     <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
     {selectedSystem !== 'integrated' && <div className="reading-export-toolbar" data-reading-export-ignore="true">
@@ -159,7 +152,7 @@ export function PeriodFortuneResults({
     {field?.id==='love'&&<aside className="love-context-note-v3"><strong>애정운은 관계 상태를 하나로 가정하지 않아.</strong><p>솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심을 각각 나눠 보여줘. 내 상황에 맞는 부분만 골라 읽으면 돼.</p></aside>}
     {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>외부 연락 반응 신호와 내 연락 실행 적합도는 서로 다른 계산축이야. 특정 상대가 먼저 연락할 사람을 판정하지는 않아.</p></aside>}
     {hasNaturalReading && aiError && <p className="result-note" role="alert">{aiError}</p>}
-    <SystemReadingViews initialSystem={initialSystem} onSystemChange={setSelectedSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
+    <SystemReadingViews outcomeRecords={outcomeRecords} initialSystem={initialSystem} onSystemChange={setSelectedSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails} onRetry={aiLoading?undefined:onRetryAi}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>}
       {outcomeRecords && <ContactOutcomeReading calculation={result} localRecords={outcomeRecords}/>}
     </></SystemReadingViews>

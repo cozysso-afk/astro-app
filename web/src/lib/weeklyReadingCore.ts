@@ -47,10 +47,10 @@ function weeklyLoveTiming(calculation:IntegratedApiResponse):AuthoredBlock|undef
 }
 
 // Promote the dated reading that older documents kept at the bottom of a disclosure.
-export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data, calculation:IntegratedApiResponse, field?:FortuneField): AuthoredReadingDocument {
+export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data|undefined, calculation:IntegratedApiResponse, field?:FortuneField): AuthoredReadingDocument {
   const {start,end,day_count} = calculation.period
   if (doc.state==='unverified' || doc.date!==`${start} → ${end}` || day_count!==7) return doc
-  const windows=(data.key_windows??[]).filter(w=>w.start>=start && w.start<=end && (w.end||w.start)>=w.start &&
+  const windows=(data?.key_windows??[]).filter(w=>w.start>=start && w.start<=end && (w.end||w.start)>=w.start &&
     (w.end||w.start)<=end && w.evidence_refs?.length && w.summary?.trim() &&
     (!field || w.topics?.some(topic=>field.topics.includes(topic)))).sort((a,b)=>a.start.localeCompare(b.start))
   const seen=new Set(doc.core.map(b=>b.text))
@@ -79,7 +79,7 @@ export function weeklyReadingCore(doc:AuthoredReadingDocument, data:Data, calcul
   }
   const reason=doc.core.find(b=>b.id==='overall:reason')
   const decisionReason=doc.core.find(b=>b.id==='decision:primary:reason')
-  const primary=data.decisions?.find(d=>d.action?.trim() && d.evidence_refs?.length)
+  const primary=data?.decisions?.find(d=>d.action?.trim() && d.evidence_refs?.length)
   const citedReason = !field && primary ? communicationReason(primary.evidence_refs??[],calculation,primary.action) : ''
   const fragment=reason && /(?:공존|압박|긴장|병존|혼재|충돌|상승|하락|집중|강화|중첩)[.!]?$/u.test(reason.text)
   const core:AuthoredBlock[]=doc.core.flatMap(b=>{

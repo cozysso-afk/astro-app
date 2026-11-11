@@ -55,3 +55,30 @@ test('monthly direction uses the selected month and distinguishes receiving and 
   assert.match(item.text,/28점.*60점.*먼저 말을 건네는 쪽/)
   assert.doesNotMatch(item.text,/85점/)
 })
+
+test('the same monthly work score leads to a different scheduling question when the peak moves',()=>{
+  const work={...doc,scope:'work',sections:[{id:'work_study.work',label:'직장',state:'missing'}]}
+  const question=early=>{
+    const daily_scores=Array.from({length:30},(_,i)=>({
+      date:'2026-11-'+String(i+1).padStart(2,'0'),scores:{직장:(early?i<10:i>=20)?60:45}
+    }))
+    return monthlyPeriodSupplements(work,{period,western:{overall:{직장:stat},daily_scores}})[0].text
+  }
+  assert.match(question(true),/초순에 내 작업을 넘겨야 다음 사람이/)
+  assert.match(question(false),/하순에 내 작업을 넘겨야 다음 사람이/)
+})
+
+test('the reunion body compares its own month and past-contact means and complete daily reunion/contact peaks',()=>{
+  const read=(reunionValues,contactValues,trim=0)=>{
+    const daily_scores=reunionValues.map((score,i)=>({date:'2026-11-'+String(i+1).padStart(2,'0'),scores:{재회:score,연락:contactValues[i]}})).slice(trim)
+    const input={period,western:{overall:{재회:{...stat,average:49.5}},relationship_signals:{과거인연접점:{...stat,average:43.6}},daily_scores}}
+    return monthlyLoveSupplements(doc,input).find(row=>row.id.endsWith('love_reunion_interest')).text
+  }
+  const peak=i=>Array.from({length:30},(_,j)=>j===i?64:40)
+  const separate=read(peak(18),peak(28))
+  assert.match(separate,/재회 지표는 평균 49.5점.*별도로 본 접점 지표는 43.6점.*재회 지표는 11월 19일에 64점.*연락 지표는 11월 29일에 64점.*다른 사람과/)
+  assert.match(read(peak(18),peak(18)),/두 지표가 같은 날.*교제하기로 한 합의/)
+  const tied=peak(18);tied[22]=64
+  assert.match(read(tied,Array(30).fill(40)),/11월 19일·11월 23일에 공동 최고 64점.*연락 지표는 한 달 내내 40점/)
+  assert.doesNotMatch(read(peak(18),peak(28),1),/가장 높아|공동 최고|한 달 내내/)
+})

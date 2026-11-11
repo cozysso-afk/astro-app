@@ -221,3 +221,27 @@ test('relationship heroes use the selected Saju lens and retain all three Wester
  for(const value of ['53점','29점','46점'])assert.ok(western.includes(value),value)
  assert.doesNotMatch(western,/투자|수익/)
 })
+
+test('love uses the actual Saju month and only reports a transition inside the selected period',()=>{
+ const f=fixture('today'), c=f.calculation, field=fields.find(row=>row.id==='love')
+ const markup=()=>renderToStaticMarkup(h(Views,{calculation:c,initialSystem:'saju',field}))
+ const hero=()=>markup().match(/class="system-hero saju-reader-hero"[\s\S]*?<h3>([\s\S]*?)<\/h3>/)[1]
+ assert.match(hero(),/정인 월운.*마음을 받아들이는 방식/)
+ assert.doesNotMatch(hero(),/마감|업무|배운 내용|새 월운/)
+ c.period={start:'2026-10-01',end:'2026-10-31',day_count:31,month_segments:2}
+ assert.match(hero(),/10월 8일.*정재.*함께 쓸 시간과 현실 조건/)
+ assert.equal(systems.sajuRelationshipSummary([]),'')
+})
+
+test('Thai love cards apply the actual Bhumi area to relationship questions',()=>{
+ const f=fixture(), field=fields.find(row=>row.id==='love')
+ const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:'thai',field}))
+ const cards=html.match(/<section class="thai-life-map">([\s\S]*?)<\/section>/)[1]
+ for(const key of ['boriwan','sri','montri','kalakini']) {
+  const lens=systems.thaiLensForTopic(key,'애정')
+  assert.ok(cards.includes(lens.title) && cards.includes(lens.action))
+  assert.equal(systems.thaiLensForTopic(key,'전체'),systems.BHUMI_LENSES[key])
+ }
+ assert.doesNotMatch(cards,/가족·친구·동료|예산|다시 벌이기/)
+ assert.match(cards,/계산 근거.*금성/)
+})

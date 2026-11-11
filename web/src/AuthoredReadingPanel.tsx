@@ -1,5 +1,7 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react'
 import type {AuthoredReadingDocument,AuthoredBlock} from './lib/authoredReadingDocument'
+import {useObservedPassage} from './ContactObservationScope'
+import {observedContactCore} from './lib/contactOutcomeReading'
 import {weeklyEvidenceLimit} from './lib/weeklyQuestionEvidence'
 import type {MonthSupplement} from './lib/monthlyLoveSupplement'
 import {exportAuthoredReadingImages} from './lib/readingImageExport'
@@ -23,7 +25,15 @@ const loveQuestions = [
 function Blocks({blocks}:{blocks:AuthoredBlock[]}) {
   return <>{blocks.map(b=><section className="authored-reading-block" data-reading-block={b.id} key={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</>
 }
-export function AuthoredReadingPanel({doc,technicalDetails,supplements=[],period,onRefresh}:{doc:AuthoredReadingDocument;technicalDetails?:ReactNode;supplements?:MonthSupplement[];period?:string;onRefresh?:()=>void}) {
+export function AuthoredReadingPanel({doc:original,technicalDetails,supplements=[],period,onRefresh}:{doc:AuthoredReadingDocument;technicalDetails?:ReactNode;supplements?:MonthSupplement[];period?:string;onRefresh?:()=>void}) {
+  const observed = useObservedPassage(period ?? '',original.scope)
+  const contact = original.scope==='contact' ? observed : null
+  const calculatedOnly=original.state==='calculated'
+  const doc = contact && (original.state==='ready' || calculatedOnly) ? {
+    ...original,headline:contact.fact,core:observedContactCore(contact,original.headline,original.core),
+    exportBlockIds:original.exportBlockIds.length ? ['record:contact-follow-up','source:contact-headline',...original.exportBlockIds] : [],
+    revision:original.revision+'|'+contact.fact+'|'+contact.followUp,
+  } : original
   const weekly=period==='week'
   const periodLabel=weekly?'주간':'월간'
   const job=useRef<AbortController|null>(null)
@@ -33,7 +43,7 @@ export function AuthoredReadingPanel({doc,technicalDetails,supplements=[],period
     const id='relationship.love_'+key
     const section=doc.sections.find(row=>row.id===id)
     const calculated=supplements.find(row=>row.id===id)
-    if(!section || !(section.blocks.length || calculated)) return []
+    if(!section || !(section.blocks.length || calculated || (key==='reunion_interest' && observed))) return []
     return [{id,label,question,section,calculated}]
   }) : []
   const scenarioIds=new Set(scenarios.map(row=>row.id))
@@ -52,27 +62,37 @@ export function AuthoredReadingPanel({doc,technicalDetails,supplements=[],period
   }
   return <section className="authored-reading" data-authored-scope={doc.scope} data-authored-state={doc.state} data-authored-revision={doc.revision}>
     <header><span>{doc.title}</span>{doc.date&&<time>{doc.date}</time>}</header>
+    {contact && doc.state!=='ready' && !calculatedOnly && <section className="authored-reading-block"><h3>{contact.fact}</h3><p>{contact.followUp}</p></section>}
     {doc.headline&&<h3 className="authored-reading-headline">{doc.headline}</h3>}
     {doc.state==='unverified'?<p className="authored-reading-state">확인된 해설을 아직 불러오지 못했어.</p>:<>
-      {doc.state!=='ready'&&<p className="authored-reading-state">이 저장본의 핵심 요약이 아직 완성되지 않았어. 작성된 상세 해설은 아래에서 볼 수 있어.</p>}
+      {doc.state!=='ready'&&!calculatedOnly&&<p className="authored-reading-state">이 저장본의 핵심 요약이 아직 완성되지 않았어. 작성된 상세 해설은 아래에서 볼 수 있어.</p>}
+      {calculatedOnly && !doc.core.length && !supplements.length && !observed && <p>선택한 기간에 이 분야를 해설할 계산 자료가 부족해.</p>}
       <div className="authored-reading-core"><Blocks blocks={doc.core}/></div>
       {doc.state==='ready'&&!!doc.exportBlockIds.length&&<button className="authored-reading-save" type="button" onClick={save} disabled={saving}>{saving?'이미지 만드는 중…':`${doc.title} 핵심 이미지 저장`}</button>}
       {doc.state==='ready'&&!doc.exportBlockIds.length&&<p className="authored-reading-state">이 원고에는 행동·확인점이 따로 작성되지 않았어. 기간 해설은 그대로 읽을 수 있어.</p>}
       {notice&&<p className="authored-reading-notice" role="status">{notice}</p>}
       {!!scenarios.length&&<section className="authored-reading-section" aria-label="내 상황에 맞춰 보기">
         <h3>내 상황에 맞춰 보기</h3>
-        {scenarios.map(({id,label,question,section,calculated})=><details className="authored-reading-details" key={id} data-reading-section={id}>
-          <summary>{label}</summary><h4>{question}</h4>
-          {section.blocks.length ? <Blocks blocks={section.blocks}/> : calculated && <><p>{calculated.text}</p><small>{periodLabel} 계산 근거 · {calculated.evidence}</small></>}
-        </details>)}
+        {scenarios.map(({id,label,question,section,calculated})=>{
+          const stage=id==='relationship.love_reunion_interest' ? observed : null
+          return <details className="authored-reading-details" key={id} data-reading-section={id}>
+            <summary>{label}</summary><h4>{stage?.question ?? question}</h4>
+            {stage ? <>
+              <p>{stage.fact} {stage.followUp}</p>
+              {stage.indicator && <small>{stage.indicator}</small>}
+              {section.blocks.length>0 && <details><summary>저장된 재회 원고</summary><Blocks blocks={section.blocks}/></details>}
+              {!section.blocks.length && !calculated && <p>{section.state==='insufficient'?'이 기간의 재회운을 판단할 계산 근거가 부족해.':'이 기간의 재회 운세 해설은 아직 작성되지 않았어.'}</p>}
+            </> : section.blocks.length ? <Blocks blocks={section.blocks}/> : calculated && <><p>{calculated.text}</p><small>{periodLabel} 계산 근거 · {calculated.evidence}</small></>}
+          </details>
+        })}
       </section>}
       {!!authored.length&&<details className="authored-reading-details" open={doc.state!=='ready'}><summary>질문별 상세 해설</summary>{authored.map(section=><section className="authored-reading-section" key={section.id} data-reading-section={section.id}><h3>{section.label}</h3><Blocks blocks={section.blocks}/></section>)}</details>}
       {!!remainingSupplements.length&&<section className="authored-reading-section"><h3>{periodLabel} 계산값으로 본 {doc.scope==='love'?'애정운':'분야별 해설'}</h3>
-        <p>{weekly?'이번 주에 계산된 지표를 각 질문에 적용했어.':'기존 원고에 빠진 질문을 이달의 서양점성술 계산값으로 풀었어.'}</p>
+        {!calculatedOnly&&<p>{weekly?'이번 주에 계산된 지표를 각 질문에 적용했어.':'기존 원고에 빠진 질문을 이달의 서양점성술 계산값으로 풀었어.'}</p>}
         {remainingSupplements.map(row=><details className="authored-reading-details" key={row.id} data-calculated-section={row.id}><summary>{row.label}</summary><p>{row.text}</p><small>{row.evidence}</small></details>)}
       </section>}
       {onRefresh&&<button className="authored-reading-save" type="button" onClick={onRefresh}>{periodLabel} AI 해설 다시 작성</button>}
-      {!!missing.length&&<details className="authored-reading-coverage"><summary>아직 작성되지 않은 항목 {missing.length}개</summary><ul>{missing.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="missing">{section.label}</li>)}</ul></details>}
+      {!calculatedOnly&&!!missing.length&&<details className="authored-reading-coverage"><summary>아직 작성되지 않은 항목 {missing.length}개</summary><ul>{missing.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="missing">{section.label}</li>)}</ul></details>}
       {!!insufficient.length&&<details className="authored-reading-coverage"><summary>근거가 부족한 항목 {insufficient.length}개</summary>{weekly&&<p>{weeklyEvidenceLimit}</p>}<ul>{insufficient.map(section=><li key={section.id} data-reading-section={section.id} data-section-state="insufficient">{section.label}</li>)}</ul></details>}
     </>}
     {technicalDetails&&<details className="authored-reading-technical"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>}

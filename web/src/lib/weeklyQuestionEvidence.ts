@@ -15,7 +15,7 @@ const timingMeaning:Record<string,string> = {
   컨디션:'일정을 소화하는 생활 리듬을 돌아볼 때 참고할 차이야. 실제 피로나 회복 정도는 그날의 수면과 활동 기록을 함께 봐야 해.',
 }
 
-function weeklyTiming(topic:string, calc:IntegratedApiResponse):string {
+export function weeklyTimingValues(topic:string, calc:IntegratedApiResponse):string {
   const scores=new Map<string,number>()
   const add=(date:string,value:unknown)=>{
     if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date>=calc.period.start && date<=calc.period.end && typeof value==='number' && Number.isFinite(value) && !scores.has(date)) scores.set(date,value)
@@ -27,7 +27,8 @@ function weeklyTiming(topic:string, calc:IntegratedApiResponse):string {
   const high=ranked[0],low=ranked.at(-1)
   if (!high || !low || high[1]===low[1] || !timingMeaning[topic]) return ''
   const day=(date:string)=>Number(date.slice(5,7))+'월 '+Number(date.slice(8))+'일'
-  return `이번 주 ${topic} 지표는 ${day(high[0])}에 ${high[1]}점, ${day(low[0])}에 ${low[1]}점이야. ${timingMeaning[topic]}`
+  const datesFor=(score:number)=>ranked.filter(row=>row[1]===score).map(row=>day(row[0])).join('·')
+  return `${datesFor(high[1])}에 ${high[1]}점, ${datesFor(low[1])}에 ${low[1]}점`
 }
 
 function scoreLabel(stat?:FortuneStat|null) {
@@ -44,7 +45,8 @@ export function weeklyQuestionSections(doc:AuthoredReadingDocument, calc:Integra
     const signals=calc.western.relationship_signals
     let answer=''
     if (question==='timing' || (topic==='직장' && question==='change_timing')) {
-      answer=weeklyTiming(topic,calc)
+      const values=weeklyTimingValues(topic,calc)
+      if (values) answer=`이번 주 ${topic} 지표는 ${values}이야. ${timingMeaning[topic]}`
     } else if (topic==='연락' && question==='activation_direction') {
       const incoming=scoreLabel(signals?.수신신호),outgoing=scoreLabel(signals?.발신적합)
       if (incoming && outgoing) {

@@ -191,10 +191,12 @@ function weekShape(calculation:IntegratedApiResponse, topic:string) {
   const min = Math.min(...days.map(day=>day.score))
   const format = (date:string) => Number(date.slice(5,7))+'월 '+Number(date.slice(8))+'일'
   if (max === min) return '일곱 날의 값이 같아서 이번 주 안에 특정 날짜가 더 두드러지지는 않아. '
-  // Report a single peak or valley only when it is unique.
   const peaks = days.filter(day=>day.score === max)
   const lows = days.filter(day=>day.score === min)
-  if (peaks.length !== 1 || lows.length !== 1) return ''
+  if (peaks.length > 1 || lows.length > 1) {
+    const list=(rows:typeof days)=>rows.map(day=>format(day.date)).join('·')
+    return `주간 최고값은 ${max}점(${list(peaks)}), 최저값은 ${min}점(${list(lows)})이야. `
+  }
   const high = peaks[0], low = lows[0]
   return high.date > low.date
     ? `${format(low.date)}에는 ${low.score}점이었고 ${format(high.date)}에 ${high.score}점으로 이번 주 가장 높아. `

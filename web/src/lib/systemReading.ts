@@ -108,6 +108,17 @@ export function thaiLoveSummary(keys:string[]) {
   : '이번 기간에는 애정 문제로 직접 연결할 태국점성술 생활 영역 근거가 부족해.'
 }
 
+const thaiRelationshipAreas: Record<string, Pick<Lens, 'title'|'meaning'|'action'>> = {
+  boriwan: {title:'두 사람이 연락하고 만나는 방식',meaning:'주변 사람과 맺는 관계를 애정에 적용하면, 두 사람이 평소에 어떤 계기로 대화를 시작하고 시간을 내는지 살펴볼 수 있어.',action:'최근 만남을 떠올려봐. 한 사람이 먼저 제안한 뒤 다른 사람도 시간이나 장소를 보탰는지 살펴봐.'},
+  sri: {title:'둘이 편안함을 느끼는 순간',meaning:'관계에서 이미 편안하게 느끼는 조건을 살피는 영역이야. 대화가 편한 것과 서로에게 같은 관계를 기대하는 일은 따로 확인할 수 있어.',action:'둘이 편했던 대화 하나를 골라봐. 다시 만나고 싶다면 그때 나눈 이야기에서 이어갈 제안을 해봐.'},
+  montri: {title:'관계에 도움이 되는 대화',meaning:'혼자 결론 내리기 어려울 때 어떤 도움을 받을 수 있을지 살펴보는 영역이야. 주변 사람에게 내 생각을 정리해 볼 수도 있고, 상대에게 직접 물어야 풀리는 일도 있어.',action:'예를 들어 다음에 만날 뜻이 있는지는 상대에게 직접 물어봐. 답을 듣기 전 내 걱정을 정리하는 일은 가까운 사람과 나눌 수 있어.'},
+  kalakini: {title:'만남이 자꾸 어긋나는 이유',meaning:'연락이나 약속이 반복해서 어긋난다면 무엇이 걸렸는지 살피는 영역이야. 서로 시간을 내기 어려웠던 경우와 한 사람만 계획을 세웠던 경우는 다음에 할 말이 달라져.',action:'지난 약속이 미뤄졌을 때 다른 날짜를 제안한 사람이 있었는지 떠올려봐. 일정 문제였다면 둘 다 가능한 날부터 찾아봐.'},
+}
+export function thaiLensForTopic(key:string, topic:LifeTopic): Lens {
+  const base = BHUMI_LENSES[key]
+  return topic === '애정' && thaiRelationshipAreas[key] ? {...base, ...thaiRelationshipAreas[key], topic} : base
+}
+
 export function thaiPeriodLabel(start:string,end:string) {
   return start===end ? `선택 날짜의 연간 배치 · ${start}` : `선택 기간의 연간 배치 · ${start}–${end}`
 }
@@ -125,6 +136,28 @@ export function lensForTopic(lens: Lens, topic: LifeTopic): Lens {
   }
   const copy = relationship[lens.key]
   return copy ? {...lens,topic:'애정',title:copy[0],meaning:copy[1],action:copy[2],limit:'계산된 십성을 관계의 생활 맥락으로 읽은 해설이야. 배우자성·상대 마음·연애 성립을 판정한 결과는 아니야.'} : lens
+}
+
+type SajuPeriodContext = Pick<ReturnType<typeof buildSystemReading>['contexts'][number], 'layer'|'segment_start'|'stem_ten_god'>
+
+export function sajuRelationshipSummary(contexts:SajuPeriodContext[]):string {
+  const monthly = contexts.filter((row):row is SajuPeriodContext & {segment_start:string}=>row.layer==='월운' && Boolean(row.segment_start)).sort((a,b)=>a.segment_start.localeCompare(b.segment_start))
+  const first = monthly[0] ?? contexts.find(row=>row.layer==='세운')
+  if (!first) return ''
+  const lens = tenGodLens(first.stem_ten_god)
+  if (!lens) return ''
+  const firstLens = lensForTopic(lens,'애정')
+  const name = (row:SajuPeriodContext)=>row.stem_ten_god.match(/\(([^)]+)\)/)?.[1] ?? row.stem_ten_god
+  const lead = `${name(first)} ${first.layer}에서 보는 관계 주제는 ‘${firstLens.title}’이야. ${firstLens.action}`
+  const change = monthly.find(row=>tenGodLens(row.stem_ten_god)?.key!==lens.key)
+  if (change) {
+    const next = tenGodLens(change.stem_ten_god)
+    if (next) {
+      const day = change.segment_start.slice(0,10)
+      return `${lead} ${Number(day.slice(5,7))}월 ${Number(day.slice(8))}일에 새 월운(${name(change)})이 시작되면 ‘${lensForTopic(next,'애정').title}’도 살펴봐.`
+    }
+  }
+  return lead
 }
 
 export function thaiPlacementComparison(current: {bhumi_key:string;planet:{label:string}}, natal: Array<{bhumi_key:string;planet:{label:string}}>, isNatal: boolean): string {

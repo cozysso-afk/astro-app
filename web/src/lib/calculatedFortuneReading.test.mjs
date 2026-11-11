@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict'
+import {after,before,test} from 'node:test'
+import {fileURLToPath} from 'node:url'
+import {createServer} from 'vite'
+import {createElement as h} from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+import {fortuneFixture} from './readingExperience.fixtures.mjs'
+
+let server,Panel,groups
+before(async()=>{
+  server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+  Panel=(await server.ssrLoadModule('/src/PeriodAiInterpretationPanel.tsx')).PeriodAiInterpretationPanel
+  groups=(await server.ssrLoadModule('/src/lib/fortuneFields.ts')).fortuneGroup
+})
+after(()=>server?.close())
+function fixture(period) {
+  const f=fortuneFixture(period), c=f.calculation
+  const days=period==='week'?7:31
+  c.period={start:'2026-10-01',end:period==='week'?'2026-10-07':'2026-10-31',day_count:days}
+  c.western.daily_scores=Array.from({length:days},(_,i)=>({date:'2026-10-'+String(i+1).padStart(2,'0'),
+    scores:Object.fromEntries(Object.keys(c.western.overall).map(topic=>[topic,49+i])),evidence:[]}))
+  return c
+}
+const noCall=()=>assert.fail('render requested an external action')
+function render(period,field,more={}) {
+  return renderToStaticMarkup(h(Panel,{period,calculation:fixture(period),field:groups(field),result:null,loading:false,error:'',
+    onRetry:noCall,onCopyPrompt:noCall,onCancel:noCall,...more}))
+}
+for(const period of ['week','month']){
+  test(period+' renders six calculated love situations with no provider and retains explicit generation controls',()=>{
+    const html=render(period,'애정')
+    assert.match(html,/계산값으로 읽는 (주간|월간) 애정운/)
+    assert.equal((html.match(/data-reading-section="relationship.love_(?:single|crush|flirting|ambiguous|couple|reunion_interest)"/g)??[]).length,6)
+    assert.match(html,/해설 생성/)
+    assert.doesNotMatch(html,/이미 저장|이 저장본의 핵심|아직 작성되지 않은/)
+  })
+  test(period+' keeps own data and scope on untrusted, error, loading and unavailable paths',()=>{
+    const fake={ok:true,origin:'gemini',provenance_verified:false,data:{headline:'NEVER_RENDER_UNVERIFIED'},usage:{quality_validation:{score:100}}}
+    for(const extra of [{result:fake},{result:fake,error:'사용 한도 도달'},{loading:true},{result:{ok:false},error:'서버 오류'}]){
+      const html=render(period,'학업',extra)
+      assert.match(html,/계산값으로 읽는 (주간|월간) 학업운/)
+      assert.match(html,/시험|문제/)
+      assert.doesNotMatch(html,/NEVER_RENDER_UNVERIFIED|내 상황에 맞춰 보기/)
+      if(extra.error) assert.ok(html.includes(extra.error))
+    }
+    const c=fixture(period)
+    c.western.daily_scores=[];c.western.overall={};c.western.relationship_signals={}
+    assert.match(render(period,'애정',{calculation:c}),/계산 자료가 부족해/)
+    assert.doesNotMatch(render(period,'애정',{westernOnly:true}),/계산값으로 읽는/)
+  })
+}
