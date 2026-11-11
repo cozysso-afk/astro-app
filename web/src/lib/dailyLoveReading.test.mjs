@@ -45,3 +45,20 @@ test('unchanged love score yields different situational decisions when initiatio
   assert.match(text(a,'flirting'),/66점.*먼저 제안하기 편한/)
   assert.match(text(b,'flirting'),/42점.*답을 재촉하기보다/)
 })
+
+test('a reunion supplement uses the re-contact signal and preserves the next question after a meeting',()=>{
+  const signals={과거인연접점:{average:39,band:'약함'}}
+  const item=read('보통',signals).details.find(block=>block.id==='relationship.love_reunion_interest:calculated')
+  assert.match(item.text,/39점.*이미 다시 만났다면 접촉은 이뤄진 거야/)
+  assert.match(item.label,/계산값/)
+  assert.ok(!read('보통',{}).details.some(block=>block.id===item.id))
+  const data={clusters:{relationship:{love_reunion_interest:{applicability:'insufficient'}}},editorial_delivery:{'relationship.love_reunion_interest':'authored'}}
+  assert.ok(!read('보통',signals,data).details.some(block=>block.id===item.id))
+})
+
+test('scenario-specific context survives when a signal is available',()=>{
+  const doc=read('보통',{발신적합:{average:37,band:'약함'}})
+  const solo=doc.details.find(block=>block.id==='application:single').text
+  assert.match(solo,/대화가 잠시 끊겼을 때도 궁금한 게 남는다면/)
+  assert.doesNotMatch(solo,/다음 약속/)
+})

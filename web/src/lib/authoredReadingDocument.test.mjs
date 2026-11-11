@@ -158,3 +158,16 @@ test('the love tab shows the saved relationship interpretation in both week and 
     assert.ok(!social.sections.some(s=>s.id==='contact:incoming'))
   }
 })
+
+test('mixed old and new love sections are accessible by situation without duplicate prose',()=>{
+  const data=fixture()
+  delete data.clusters.relationship.love_single
+  const field=fields.fortuneGroup('애정')
+  const doc=documents.buildPeriodReadingDocument(data,'week','2026-11-09','2026-11-15',field,true)
+  const supplements=[{id:'relationship.love_single',label:'솔로',text:'이번 주 계산을 적용한 솔로 해설',evidence:'이번 주 출처'}]
+  const html=renderToStaticMarkup(createElement(Panel,{doc,period:'week',supplements}))
+  for(const label of ['솔로 · 새 인연','짝사랑','썸','애매한 관계','연애 중','재회'])assert.ok(html.includes('<summary>'+label+'</summary>'))
+  assert.ok(html.indexOf('내 상황에 맞춰 보기')<html.indexOf('질문별 상세 해설'))
+  assert.equal(html.split(supplements[0].text).length,2)
+  assert.ok(html.includes('주간 계산 근거'))
+})

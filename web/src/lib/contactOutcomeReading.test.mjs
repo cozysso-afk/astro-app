@@ -37,3 +37,48 @@ test('interpret actual outcome against its own stored direction and distinguish 
  assert.doesNotMatch(recordedSignalReading({...record,event:'none'}),/다시 연락할 지표/)
  assert.match(recordedSignalReading({...record,event:'sent'}),/73.0점.*먼저 말 걸기 편한지/)
 })
+
+test('a dated encounter moves to the question after the meeting, even with another later contact',async()=>{
+ const {nextRelationshipQuestion}=await import('./contactOutcomeReading.ts')
+ const row={date:'2026-11-08',event:'received',past_connection:true,channel:'call',note:'저녁에 전화가 먼저 와서 직접 만남 (한규)'}
+ const rows=observedContactRows([row,{date:'2026-11-10',event:'both'}, {...row,date:'2026-11-12'}],'2026-11-01','2026-11-11')
+ const next=nextRelationshipQuestion(rows)
+ assert.match(next.label,/만난 뒤/)
+ assert.match(next.text,/2026-11-08에는 과거 인연과 직접 만났어요/)
+ assert.doesNotMatch(next.text,/2026-11-10|2026-11-12/)
+})
+
+test('meeting fact respects explicit edits and never infers a meeting from unclear notes',async()=>{
+ const {meetingRecorded,nextRelationshipQuestion}=await import('./contactOutcomeReading.ts')
+ const row={date:'2026-11-08',event:'received',past_connection:true,channel:'call'}
+ for(const note of ['직접 만날 예정','직접 만남 취소','직접 만남?','직접 만나지 못함','다른 사람과 직접 만남']) assert.equal(meetingRecorded({...row,note}),false)
+ assert.match(nextRelationshipQuestion([{...row,met_in_person:true}]).label,/만난 뒤/)
+ assert.match(nextRelationshipQuestion([{...row,channel:'in_person'}]).label,/만난 뒤/)
+ assert.doesNotMatch(nextRelationshipQuestion([{...row,met_in_person:false,note:'직접 만남'}]).label,/만난 뒤/)
+ assert.match(nextRelationshipQuestion([{...row,event:'sent'}]).label,/답이 돌아/)
+ assert.equal(nextRelationshipQuestion([{...row,event:'none',met_in_person:true}]),null)
+ assert.equal(nextRelationshipQuestion([{...row,past_connection:false,met_in_person:true}]),null)
+})
+
+test('integrated love panel shows the selected date’s score with a separately dated next question', async()=>{
+ const {createServer}=await import('vite')
+ const {createElement}=await import('react')
+ const {renderToStaticMarkup}=await import('react-dom/server')
+ const {fileURLToPath}=await import('node:url')
+ const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true},appType:'custom'})
+ try {
+   const {ContactOutcomeReading}=await server.ssrLoadModule('/src/ContactOutcomeReading.tsx')
+   const calculation={period:{start:'2020-11-11',end:'2020-11-11'},western:{relationship_signals:{수신신호:{band:'약함'}}}}
+   const record={date:'2020-11-08',event:'received',channel:'call',past_connection:true,note:'저녁에 전화가 먼저 와서 직접 만남 (한규)'}
+   const props={calculation,field:{id:'love'},localRecords:[record]}
+   const html=renderToStaticMarkup(createElement(ContactOutcomeReading,props))
+   assert.match(html,/2020-11-11 연락운.*약함/s)
+   assert.match(html,/만난 뒤 관계는 어떻게 이어질까.*2020-11-08에는 과거 인연과 직접 만났어요/s)
+   const weekly=renderToStaticMarkup(createElement(ContactOutcomeReading,{...props,calculation:{...calculation,period:{start:'2020-11-09',end:'2020-11-15'}}}))
+   assert.match(weekly,/2020-11-08에는 과거 인연과 직접 만났어요/)
+   assert.doesNotMatch(weekly,/이 기간에 기록한 1일/)
+   const corrected=renderToStaticMarkup(createElement(ContactOutcomeReading,{...props,localRecords:[{...record,met_in_person:false}]}))
+   assert.match(corrected,/연락이 닿은 뒤 무엇이 달라졌을까/)
+   assert.match(corrected,/2020-11-11 연락운.*약함/s)
+ } finally { await server.close() }
+})

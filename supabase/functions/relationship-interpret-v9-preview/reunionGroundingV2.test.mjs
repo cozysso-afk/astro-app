@@ -113,3 +113,23 @@ test('discussing whether to send a message is not a prediction about who will in
  d.core_action='상대방이 먼저 연락을 취할 가능성이 높아.'
  assert.equal(validateReunionGroundingV2(d,payload).reason,'unsupported_initiative_direction')
 })
+
+test('first call can cite only IDs valid for the chosen question',async()=>{
+ const {questionCitationSchema}=await import('./reunionGroundingV2.ts')
+ const input=structuredClone(payload)
+ input.reunion_evidence_v2.questions.timing.evidence_refs=['E3','unknown','E4','E4']
+ const schema=questionCitationSchema(input,'timing')
+ assert.deepEqual(schema.items.enum,['E3','E4'])
+ assert.equal(schema.maxItems,2)
+ assert.equal(questionCitationSchema({},'timing'),null)
+})
+
+test('a recorded call from the other person is distinct from a prediction',()=>{
+ const d=reading()
+ const observed={...payload,reunion_observation:{state:'met',initiator:'counterpart'}}
+ d.reunion_synthesis_v2.consultation_answer.current_stage='입력 기록에는 상대방이 먼저 전화를 걸었고 둘이 만났어.'
+ assert.equal(validateReunionGroundingV2(d,observed).ok,true)
+ assert.equal(validateReunionGroundingV2(d,{...observed,reunion_observation:{state:'met',initiator:'user'}}).reason,'unsupported_initiative_direction')
+ d.reunion_synthesis_v2.initiative.conclusion='상대방이 다음에도 먼저 전화를 걸 거야.'
+ assert.equal(validateReunionGroundingV2(d,observed).reason,'unsupported_initiative_direction')
+})

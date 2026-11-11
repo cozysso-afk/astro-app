@@ -9,7 +9,7 @@ export const PROVIDER_NORMALIZATION_CACHE_VERSION = 'provider-single-author-prov
 export const FALLBACK_EDITORIAL_CACHE_VERSION = 'evidence-episode-action-v2'
 // Cache identity follows the actual prompt + narrative + normalization contracts so
 // an editorial release cannot silently reuse an older completed Gemini result.
-export const EDITORIAL_CACHE_VERSION = `editorial-runtime:${V23_PROMPT_VERSION}:${PERIOD_NARRATIVE_VERSION}:${PROVIDER_NORMALIZATION_CACHE_VERSION}:${FALLBACK_EDITORIAL_CACHE_VERSION}`
+export const EDITORIAL_CACHE_VERSION = `editorial-runtime:love-scenarios-v2:${V23_PROMPT_VERSION}:${PERIOD_NARRATIVE_VERSION}:${PROVIDER_NORMALIZATION_CACHE_VERSION}:${FALLBACK_EDITORIAL_CACHE_VERSION}`
 
 function periodKind(source: any): string {
   const raw = String(source?.period_kind ?? source?.period?.kind ?? source?.kind ?? '').trim().toLowerCase()

@@ -122,11 +122,23 @@ export function buildV23PromptPacket(payload:any) {
   return packet
 }
 
+// The server keeps the complete selection audit. Every included row already
+// carries its ID and topics in the writer's ledger; excluded IDs are unusable.
+function monthlyWriterPacket(packet:any) {
+  const {included_ids, omitted_ids, questions, ...coverage} = packet.period_reading
+  return {...packet, period_reading:{
+    ...coverage, included_count:included_ids.length, omitted_count:omitted_ids.length,
+    evidence_lookup:'각 질문의 topics와 evidence_ledger 행의 topic 또는 source_topics가 일치하는 행만 인용해.',
+    questions:questions.map(({evidence_refs,...question}:any)=>question),
+  }}
+}
+
 export function buildV23PromptBudget(payload:any) {
   if (payload && typeof payload === 'object') payload.__v23_evidence_timing_repair = true
   const base = promptBudget(payload)
   const packet = buildV23PromptPacket(payload)
-  const bytes = enc.encode(JSON.stringify(packet)).byteLength
+  const budgetPacket = packet.period_kind === 'month' ? monthlyWriterPacket(packet) : packet
+  const bytes = enc.encode(JSON.stringify(budgetPacket)).byteLength
   const estimated_input_tokens = Math.ceil(bytes / 2.6)
   const ratio = estimated_input_tokens / Math.max(1, Number(base.estimated_input_tokens ?? 1))
   const estimated_max_job_krw = Math.max(
@@ -162,7 +174,7 @@ export function buildTemporalWordingInstruction(packet:any) {
 }
 
 export function buildV23CorePromptFromPacket(packet:any) {
-  const writerPacket=packet?.period_kind==='day'?dailyReaderPacket(packet):packet
+  const writerPacket=packet?.period_kind==='day'?dailyReaderPacket(packet):packet?.period_kind==='month'?monthlyWriterPacket(packet):packet
   // Daily copy has one writing contract. The multi-period contract asks for
   // several contrasting themes and a timeline, which dilutes a one-day answer.
   if(packet?.period_kind==='day')return {
