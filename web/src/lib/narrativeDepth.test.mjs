@@ -55,3 +55,28 @@ test('opposed daily contributions preserve their calculation polarity even for t
  assert.match(text,/54점.*합을 이뤄.*서운할 수 있어.*42점.*합을 이뤄.*반가운 마음/)
  assert.match(text,/54점인 날에는 마찰/)
 })
+
+test('weekly reading follows both orders of dates and monthly examples compare against their own ten-day means',async()=>{
+  const {datedAspectReading,periodProgression}=await import('./fortuneUserSummary.ts')
+  const calc={period:{start:'2026-11-01',end:'2026-11-30'},western:{daily_scores:[]}}
+  for(let day=1;day<=30;day++){
+    const date='2026-11-'+String(day).padStart(2,'0')
+    const scores={연애:day===8?56:day===22?50:day<=10?46:50,투자주의:day<15?20:80}
+    const evidence=[8,22].includes(day)?[{kind:'aspect',source_topics:['연애'],transit:'Moon',target:'Venus',aspect:'합',polarity:day===8?-1:1,contribution:4}]:[]
+    calc.western.daily_scores.push({date,scores,evidence})
+  }
+  const month=datedAspectReading(calc,'month',['연애']).text
+  assert.match(month,/8일의 56점은 초순에 계산된 10일 평균 47점보다 9점 높아/)
+  assert.match(month,/22일의 50점은 하순에 계산된 10일 평균 50점과 같아/)
+  assert.match(periodProgression(calc,'투자주의','month'),/이번 달 2026-11-15~2026-11-21 구간에 활성도가/)
+  calc.western.daily_scores=calc.western.daily_scores.filter(d=>d.evidence.length)
+  assert.doesNotMatch(datedAspectReading(calc,'month',['연애']).text,/일 평균/)
+  const [early,late]=calc.western.daily_scores
+  early.date='2026-11-13'
+  late.date='2026-11-15'
+  calc.period={start:'2026-11-09',end:'2026-11-15'}
+  assert.match(datedAspectReading(calc,'week',['연애']).text,/13일에 반응이.*15일에도 만나고 싶은/)
+  early.evidence[0].polarity=1
+  late.evidence[0].polarity=-1
+  assert.match(datedAspectReading(calc,'week',['연애']).text,/13일에 표현하기.*15일에는/)
+})
