@@ -14,7 +14,7 @@ test('contact observed: Gemini-authored reunion answer is the main verdict',()=>
  assert.match(html,/연락은 다시 닿았지만 아직 실제 만남으로 넘어간 것은 아니에요/)
  assert.match(html,/날짜와 장소가 정해진 만남 제안/)
  assert.match(html,/실제 만남<\/span><strong>뚜렷한 시기 없음/)
- assert.match(html,/다시 만나기로 정함<\/span><strong>앞 단계 미확인/)
+ assert.match(html,/다시 교제하기로 합의<\/span><strong>앞 단계 미확인/)
  assert.equal((html.match(/aria-current="step"/g) || []).length,1)
  assert.equal((html.match(/data-stage-state=/g) || []).length,6)
  assert.doesNotMatch(html,/>0</)

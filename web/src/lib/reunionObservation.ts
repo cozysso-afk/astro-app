@@ -1,4 +1,5 @@
 import type { ReunionObservationContext, ReunionObservedEventKind, ReunionObservedState } from '../appTypes'
+import {browserLocalDateIso} from './readingDateSemantics.ts'
 import type { ReunionHierarchy, ReunionPeriod } from './reunionHierarchy'
 
 export const REUNION_STAGE_ORDER = ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding'] as const
@@ -39,43 +40,30 @@ export function nextUnconfirmedStage(state: ReunionObservedState): ReunionStage 
   return REUNION_STAGE_ORDER[index + 1] ?? null
 }
 
+const stateReadings:Record<ReunionObservedState,{title:string;text:string}> = {
+  '':{title:'현재 관계 상태 미입력',text:'최근에 연락을 주고받았는지, 만났는지, 다시 교제하기로 했는지는 입력된 기록에서만 확인할 수 있어요.'},
+  disconnected:{title:'지금은 연락이 끊긴 상태예요',text:'예전에 만난 적이 있어도 지금은 연락이 끊겼다고 기록했어요. 다음에 확인할 일은 실제로 다시 안부가 오갔는지예요.'},
+  recontacted:{title:'다시 연락이 닿았어요',text:'첫 연락은 이미 있었어요. 그 뒤 답이 오갔는지, 다음에 만날 날짜를 함께 정했는지가 지금 살펴볼 부분이에요.'},
+  messaging:{title:'지금은 서로 연락을 주고받고 있어요',text:'대화가 이어지는 건 확인됐어요. 만날 얘기를 꺼냈다면 날짜와 장소를 정했는지, 그 약속이 실제 만남으로 이어졌는지 살펴보세요.'},
+  met:{title:'두 사람이 실제로 다시 만났어요',text:'만남까지는 확인됐어요. 이후 상대도 다음 약속을 제안했는지, 서로 어떤 관계로 지내고 싶은지 이야기했는지를 돌아보세요. 교제를 다시 시작하기로 했는지는 별도의 합의가 있어야 알 수 있어요.'},
+  intimate_undefined:{title:'가까워졌고, 교제 여부는 아직 미정이에요',text:'친밀한 시간이 있었다고 기록했어요. 한쪽만 관계가 정해졌다고 여기고 있지는 않은지, 둘이 기대하는 만남 방식과 관계를 직접 이야기해 보세요.'},
+  reunited:{title:'관계를 다시 이어가기로 합의했어요',text:'두 사람의 합의까지 확인됐어요. 이제 볼 부분은 예전에 멀어졌던 상황이 다시 생겼을 때, 둘이 약속한 행동을 실제로 지키고 있는지예요.'},
+}
+
+export const eventLabels:Record<ReunionObservedEventKind,string> = {recontact:'다시 연락한 날',meeting:'직접 만난 날',rebuilding:'관계에 합의한 날'}
+export const initiatorLabels = {counterpart:'상대가 먼저',user:'내가 먼저',mutual:'서로 비슷한 시점',unknown:'확인 어려움'} as const
+
+export function recordedReunionEvents(events:ReunionObservationContext['events'], today=browserLocalDateIso()) {
+  return events.filter(event=>Object.hasOwn(eventLabels,event.kind) && /^\d{4}-\d{2}-\d{2}$/.test(event.date)
+    && event.date<=today && new Date(event.date+'T00:00:00Z').toJSON()?.slice(0,10)===event.date)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+}
+
 export function observationReading(context: ReunionObservationContext) {
-  const next = nextUnconfirmedStage(context.state)
-  if (!context.state) return {
-    title:'현재 관계 상태 미입력',
-    text:'실제 연락·만남 여부를 입력하지 않았으므로 계산된 구간만 보여 주고 현실의 관계 단계를 추정하지 않아.',
-    next,
-  }
-  if (context.state === 'disconnected') return {
-    title:'관측 사실 · 현재 단절 또는 차단',
-    text:'단절 상태는 사용자가 알려 준 현실 정보야. 계산 점수는 그대로 두고, 아직 확인되지 않은 재접촉 단계의 근거만 다음 질문으로 봐.',
-    next,
-  }
-  if (context.state === 'recontacted') return {
-    title:'관측 사실 · 재접촉은 이미 발생',
-    text:'연락 발생 여부는 이미 확인됐으므로 “연락이 올지”를 중심 결론으로 반복하지 않아. 이제 대화가 이어지는지와 실제 만남 단계의 근거를 분리해 봐.',
-    next,
-  }
-  if (context.state === 'messaging') return {
-    title:'관측 사실 · 현재 서로 연락 중',
-    text:'연락은 이미 진행 중이야. 계산값을 선연락 확률로 바꾸지 않고, 대화 지속과 실제 만남으로 이어지는 별도 근거를 우선해 봐.',
-    next,
-  }
-  if (context.state === 'met') return {
-    title:'관측 사실 · 실제 만남 발생',
-    text:'만남이 있었다는 사실을 계산이 부정하지 않아. 다음 질문은 만남 발생 여부가 아니라 관계를 다시 정의하고 지속할 근거가 따로 있는지야.',
-    next,
-  }
-  if (context.state === 'intimate_undefined') return {
-    title:'관측 사실 · 친밀하지만 관계는 미정',
-    text:'재접촉과 만남은 이미 확인된 단계야. 친밀감만으로 재결합을 확정하지 않고, 관계 정의·다음 만남·지속 행동을 뒷받침하는 재구축 근거를 봐.',
-    next,
-  }
-  return {
-    title:'관측 사실 · 관계 재정립 또는 재결합 합의',
-    text:'관계 합의는 사용자가 확인한 사실이므로 계산 결과로 되돌려 부정하지 않아. 이후에는 관계를 유지하는 행동과 반복 문제를 다루는 구조를 참고해.',
-    next:null,
-  }
+  const state=stateReadings[context.state] ?? stateReadings['']
+  const events=recordedReunionEvents(context.events)
+  const text=!context.state && events.length?'아래 날짜에 있었던 일은 확인됐어요. 그 뒤 지금까지 대화가 이어졌는지, 현재 어떤 관계인지는 별도로 확인해야 해요.':state.text
+  return {...state,text,next:nextUnconfirmedStage(context.state),events}
 }
 
 function containsDate(row: ReunionPeriod, date: string) {
@@ -92,7 +80,7 @@ export type ReunionEventComparison = {
 }
 
 export function compareObservedEvents(context: ReunionObservationContext, history: ReunionHierarchy | null, calculated: boolean): ReunionEventComparison[] {
-  return context.events.filter(event=>/^\d{4}-\d{2}-\d{2}$/.test(event.date)).map(event => {
+  return recordedReunionEvents(context.events).map(event => {
     const stage = EVENT_STAGE[event.kind]
     const label = event.kind === 'recontact' ? '재접촉 기록' : event.kind === 'meeting' ? '실제 만남 기록' : '관계 재구축 기록'
     if (!calculated || !history) return { kind:event.kind,date:event.date,status:'uncalculated',label,detail:'선택한 과거 기간을 아직 계산하지 않아 대조할 수 없어.' }

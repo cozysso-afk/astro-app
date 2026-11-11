@@ -14,11 +14,11 @@ const fixture=JSON.parse(readFileSync(new URL('./fixtures/reunion-observation-hi
 test('all optional observed relationship states remain distinct and no-input does not infer reality',()=>{
   for(const state of ['disconnected','recontacted','messaging','met','intimate_undefined','reunited']) assert.match(helper,new RegExp(`value:'${state}'`))
   assert.match(helper,/현재 상태 입력 안 함/)
-  assert.match(helper,/실제 연락·만남 여부를 입력하지 않았으므로/)
+
   assert.equal(fixture.expected.next_stage,'relationship_rebuilding')
   assert.equal(nextUnconfirmedStage(fixture.observation.state),fixture.expected.next_stage)
-  assert.match(observationReading({state:'',initiator:'',events:[]}).text,/추정하지 않아/)
-  assert.match(observationReading(fixture.observation).text,/관계 정의·다음 만남·지속 행동/)
+  assert.match(observationReading({state:'',initiator:'',events:[]}).text,/입력된 기록에서만/)
+  assert.match(observationReading(fixture.observation).text,/둘이 기대하는 만남 방식/)
 })
 
 test('observed facts never enter the astrology calculation request and do enter interpretation context',()=>{
