@@ -1,0 +1,30 @@
+name: Approved three-period reading check
+on:
+  push:
+    branches: [qa/three-readings-20261111]
+    paths: [.github/workflows/three-reading-check.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate one synthetic reading per approved period
+        env:
+          QA_LIVE_APPROVED: 'YES'
+          QA_FORTUNE_MODEL: gemini-3.7-flash
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+        run: node --experimental-strip-types web/scripts/fortune-live-qa.mjs --max-jobs 3 --period-kinds day,week,month --out /tmp/reading-audit
+      - name: Show sanitized audit details
+        if: always()
+        run: test -f /tmp/reading-audit/report.json && cat /tmp/reading-audit/report.json
