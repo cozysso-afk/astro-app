@@ -1,5 +1,6 @@
 import type {IntegratedApiResponse} from '../appTypes'
 import type {AuthoredReadingDocument,AuthoredSection} from './authoredReadingDocument'
+import {contactDirectionComparison} from './contactDirectionReading.ts'
 import type {FortuneField} from './fortuneFields'
 
 // Each sentence describes the topic's strongest segment within the selected
@@ -63,7 +64,14 @@ export function monthlyReadingCore(doc:AuthoredReadingDocument,calculation:Integ
   const timingTopics=sections.map(timingTopic).filter((topic):topic is string=>Boolean(topic))
   const profiles=new Map([...new Set([...topics,...timingTopics])].filter(topic=>meaning[topic]).map(topic=>[topic,monthlyTopicPhases(calculation,topic)]))
   const describe=(phase:NonNullable<ReturnType<typeof monthlyTopicPhases>>)=>[phase.summary,phase.comparison,phase.spread>0?meaning[phase.topic]:''].filter(Boolean).join(' ')
+  const showDirection=Boolean(field?.topics.includes('연락'))
+  const direction=(showDirection || sections.some(section=>section.id==='question:연락:activation_direction' && section.state==='insufficient'))
+    ? contactDirectionComparison(calculation,true) : ''
   const timingSections=sections.map(section=>{
+    if(direction && section.id==='question:연락:activation_direction' && section.state==='insufficient') {
+      return {...section,state:'ready' as const,label:section.label+' · 부분 해설',
+        blocks:[{id:'month:contact-direction',label:'받는 연락과 먼저 거는 연락',text:direction}]}
+    }
     const topic=timingTopic(section)
     const phase=topic ? profiles.get(topic) : undefined
     if(!phase) return section
@@ -71,10 +79,11 @@ export function monthlyReadingCore(doc:AuthoredReadingDocument,calculation:Integ
   })
   const candidates=topics.flatMap(topic=>profiles.get(topic)??[]).sort((a,b)=>b.spread-a.spread)
   const picked=candidates[0]
-  if(!picked && timingSections.every((s,i)=>s===sections[i])) return doc
+  if(!picked && !direction && timingSections.every((s,i)=>s===sections[i])) return doc
   const core=[...doc.core]
   if(picked) core.splice(Math.min(1,core.length),0,{id:'month:segments:'+picked.topic,label:`${picked.topic} · 초순부터 하순까지`,text:describe(picked)})
+  if(showDirection && direction) core.push({id:'month:contact-direction',label:'받는 연락과 먼저 거는 연락',text:direction})
   let revision=2166136261
-  for(const char of JSON.stringify([...profiles.values()])) revision=Math.imul(revision^char.charCodeAt(0),16777619)
+  for(const char of JSON.stringify([direction,...profiles.values()])) revision=Math.imul(revision^char.charCodeAt(0),16777619)
   return {...doc,core,sections:timingSections,revision:doc.revision+'|month:'+revision.toString(16),exportBlockIds:doc.exportBlockIds.length?core.map(b=>b.id):[]}
 }

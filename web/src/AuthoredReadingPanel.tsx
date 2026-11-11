@@ -50,7 +50,8 @@ export function AuthoredReadingPanel({doc:source,technicalDetails,supplements=[]
   }) : []
   const scenarioIds=new Set(scenarios.map(row=>row.id))
   const remainingSupplements=supplements.filter(row=>!scenarioIds.has(row.id))
-  const authored=doc.sections.filter(section=>!scenarioIds.has(section.id)).filter(section=>section.state==='ready'&&section.blocks.length)
+  const coreIds=new Set(doc.core.map(block=>block.id))
+  const authored=doc.sections.filter(section=>!scenarioIds.has(section.id)).filter(section=>section.state==='ready'&&section.blocks.some(block=>!coreIds.has(block.id)))
   const supplemented=new Set(supplements.map(row=>row.id))
   const missing=doc.sections.filter(section=>section.state==='missing' && !supplemented.has(section.id))
   const insufficient=calculatedOnly ? [] : doc.sections.filter(section=>section.state==='insufficient')

@@ -1,4 +1,5 @@
 import type { AiEditorialSection, AiInterpretationResponse, IntegratedApiResponse } from '../appTypes'
+import {contactDirectionComparison} from './contactDirectionReading.ts'
 import type { FortuneField } from './fortuneFields'
 
 export type DailyBlock = { id: string; label: string; text: string }
@@ -210,9 +211,23 @@ function assembleDailyReading(data: Partial<Data>|null, date:string, field?:Fort
       }[readingStrength(reconnection.band)]
       doc.details.push({id:reunionSlot.id+':calculated', label:'재접촉 계산값으로 본 재회',text:`이날 과거 인연 접점은 ${reconnection.average}점(${reconnection.band})이야. ${context} 이미 다시 만났다면 접촉은 이뤄진 거야. 그때 멀어졌던 이유를 서로 말할 수 있었는지, 같은 상황이 돌아오면 이번엔 어떻게 하겠다고 했는지가 관계를 다시 시작할 단서야.`})
       reunionSlot.state='ready'
+    } else if (reunionSlot?.state==='missing') {
+      const general=calculation?.western.overall?.['재회']
+      if(general?.band && Number.isFinite(general.average)) {
+        const strength=readingStrength(general.band)
+        const meaning={
+          weak:'예전 관계가 다시 이어질 조건은 약한 쪽이야. 최근 안부가 닿았다면 그 뒤에도 서로 대화를 이어 갔는지 봐.',
+          neutral:'다시 가까워질 흐름이 한쪽으로 뚜렷하지 않아. 최근에 만났다면 둘 다 다음 만남을 구체적으로 이야기했는지가 더 직접적인 단서야.',
+          strong:'예전 관계를 다시 생각해 보는 주제가 두드러져. 다시 만날 뜻이 있는지 알고 싶다면 실제로 연락을 주고받거나 다음 약속을 정했는지 살펴봐.',
+        }[strength]
+        doc.details.push({id:reunionSlot.id+':calculated',label:'이날의 재회 지표',text:`이날 재회 지표는 ${general.average}점(${general.band})이야. ${meaning} 이 값만으로 그 사람이 먼저 연락할지는 알 수 없어.`})
+        reunionSlot.state='ready'
+      }
     }
     if (field.topics.includes('연락')) {
       const signals = calculation?.western.relationship_signals
+      const comparison=calculation && contactDirectionComparison(calculation,false)
+      if(comparison) doc.details.push({id:'direction:comparison',label:'받는 연락과 먼저 거는 연락',text:comparison})
       for (const [key,label,signal] of [
         ['incoming','연락을 받을 흐름','수신신호'],
         ['outgoing','내가 먼저 연락할 조건','발신적합'],
