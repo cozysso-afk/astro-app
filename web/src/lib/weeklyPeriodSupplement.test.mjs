@@ -39,3 +39,28 @@ test('old or missing evidence, absent topics, unavailable domains and authored t
     assert.deepEqual(weeklyPeriodSupplements({...doc,date:invalid.start+' → '+invalid.end},{...calc,period:invalid}),[])
   }
 })
+
+test('weekly scenarios change their actual guidance with the week, including a separately scored outgoing contact direction',()=>{
+  const doc = makeDoc('overall',ids)
+  const read = (band,average) => {
+    const stats = {...stat,band,average}
+    const scores = Object.fromEntries(topicNames.map(topic=>[topic,stats]))
+    return weeklyPeriodSupplements(doc,{period,western:{overall:scores}}).map(row=>row.text.split('이야. ')[1])
+  }
+  const variants = [read('약함',35),read('보통',55),read('보통 이상',63)]
+  for (const i of ids.keys()) assert.equal(new Set(variants.map(rows=>rows[i])).size,3,ids[i])
+  const contact = makeDoc('love',[ids[0]])
+  const text = weeklyPeriodSupplements(contact,calc)[0].text
+  assert.match(text,/말을 꺼낼 만해/)
+})
+
+test('week shape describes recorded extrema only for a complete seven-day series and reverses with the series',()=>{
+  const doc = makeDoc('love',['relationship.love_crush'])
+  const dates = ['2026-11-30','2026-12-01','2026-12-02','2026-12-03','2026-12-04','2026-12-05','2026-12-06']
+  const read = values=>weeklyPeriodSupplements(doc,{...calc,western:{...calc.western,
+    daily_scores:values.map((value,i)=>({date:dates[i],scores:{연애:value}}))}})[0].text
+  assert.match(read([30,40,45,50,55,53,49]),/11월 30일에는 30점.*12월 4일에 55점/)
+  assert.match(read([55,40,45,50,30,53,49]),/11월 30일에 55점.*12월 4일에는 30점/)
+  assert.match(read(Array(7).fill(48)),/일곱 날의 값이 같아서/)
+  assert.doesNotMatch(read([30,45,55]),/가장 높/)
+})

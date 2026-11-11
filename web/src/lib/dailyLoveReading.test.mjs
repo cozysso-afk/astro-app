@@ -35,3 +35,13 @@ test('preserve authored and explicitly insufficient scenario readings', () => {
   assert.equal(doc.details.some(row=>['application:crush','application:couple'].includes(row.id)),false)
   assert.equal(doc.slots.find(slot=>slot.id==='relationship.love_couple')?.state,'insufficient')
 })
+
+test('unchanged love score yields different situational decisions when initiation and reception diverge', () => {
+  const a=read('보통',{수신신호:{average:29,band:'매우 약함'},발신적합:{average:66,band:'보통 이상'}})
+  const b=read('보통',{수신신호:{average:70,band:'강함'},발신적합:{average:42,band:'다소 약함'}})
+  const text=(doc,key)=>doc.details.find(row=>row.id==='application:'+key).text
+  assert.match(text(a,'crush'),/29점.*선연락을 기다리는 방식/)
+  assert.match(text(b,'crush'),/70점.*용건이 끝난 뒤/)
+  assert.match(text(a,'flirting'),/66점.*먼저 제안하기 편한/)
+  assert.match(text(b,'flirting'),/42점.*답을 재촉하기보다/)
+})

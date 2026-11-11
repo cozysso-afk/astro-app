@@ -145,3 +145,16 @@ test('daily love exposes contact and reunion without opening generic details', a
   assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><strong>재회운<\/strong>/)
   assert.equal(html.split('data-daily-detail="relationship.contact_activation:conclusion"').length, 2)
 })
+
+test('the love tab shows the saved relationship interpretation in both week and month views',()=>{
+  const data=fixture()
+  data.relationship_reading={context:'관계를 살피는 배경',flow:'관계의 변화',focus_timing:'살펴볼 시기',watch:'확인할 조건',avoid:'피할 행동'}
+  data.contact_flow={incoming:'받는 연락 해설',outgoing:'먼저 거는 연락 해설',reconnection:'다시 닿는 연락 해설'}
+  for(const period of ['week','month']){
+    const doc=documents.buildPeriodReadingDocument(data,period,'2026-11-09','2026-11-15',fields.fortuneGroup('애정'),true)
+    const html=renderToStaticMarkup(createElement(Panel,{doc,period}))
+    for(const text of Object.values(data.relationship_reading)) assert.ok(html.includes(text))
+    const social=documents.buildPeriodReadingDocument(data,period,'2026-11-09','2026-11-15',fields.fortuneGroup('대인'),true)
+    assert.ok(!social.sections.some(s=>s.id==='contact:incoming'))
+  }
+})
