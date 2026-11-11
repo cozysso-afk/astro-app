@@ -504,7 +504,7 @@ type RelationshipConsistency = {
   reconnectionCaution: string
 }
 
-function finiteLevel(stat: FortuneStat | null | undefined): FlowLevel | undefined {
+export function finiteLevel(stat: FortuneStat | null | undefined): FlowLevel | undefined {
   return stat && Number.isFinite(stat.average) ? flowLevel(stat) : undefined
 }
 

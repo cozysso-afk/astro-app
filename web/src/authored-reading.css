@@ -16,3 +16,8 @@
 .authored-reading .authored-reading-coverage ul{margin:8px 0;padding-left:20px;font:400 14px/1.8 var(--reading-ui);color:#625c6d}
 .authored-reading .authored-reading-coverage li{margin:4px 0;overflow-wrap:anywhere}
 @media(max-width:350px){.authored-reading{padding:20px 16px}.authored-reading .authored-reading-headline{font-size:20px}.authored-reading .authored-reading-block p{font-size:15px}}
+
+.authored-reading .weekly-question-limits ul{list-style:none;padding-left:0}
+.authored-reading .weekly-question-limits li{padding:9px 0}
+.authored-reading .weekly-question-limits li + li{border-top:1px solid #74628922}
+.authored-reading .weekly-question-limits p{margin:4px 0 0;word-break:keep-all;overflow-wrap:anywhere}

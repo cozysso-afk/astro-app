@@ -23,3 +23,31 @@ test('wrong week, unverified archive and missing signals make no partial claim',
  const blank=weeklyQuestionSections(doc,{period,western:{}})
  assert.deepEqual(blank,doc.sections)
 })
+
+test('weekly readings use only dated aspects assigned to the question’s topic and matching polarity',()=>{
+  const questions=[
+    ['직장:coordination_responsibility','Mercury','Saturn','사분위',-0.5,'승인'],
+    ['이직:exploration_offer','Uranus','Jupiter','육십분위',0.4,'공고'],
+    ['이직:conditions_movement','Uranus','Saturn','삼분위',0.6,'입사일'],
+    ['학업:review_performance','Mercury','Saturn','사분위',-0.5,'풀이의 첫 단계'],
+    ['시험:preparation','Mercury','Jupiter','사분위',-0.5,'제한 조건'],
+    ['시험:performance_error','Moon','Mars','충',-0.6,'부호'],
+    ['연애:pace_definition','Venus','Mars','삼분위',0.6,'약속 하나'],
+  ]
+  for(const [id,transit,target,aspect,polarity,keyword] of questions){
+    const topic=id.split(':')[0]
+    const section=item(id)
+    const aspectRow={kind:'aspect',transit,target,aspect,polarity,source_topics:[topic]}
+    const read=(e,date='2026-11-10')=>weeklyQuestionSections({...doc,sections:[section]},{
+      period,western:{daily_scores:[{date,evidence:[e]}]}})[0]
+    const partial=read(aspectRow)
+    assert.equal(partial.state,'ready')
+    assert.ok(partial.blocks[0].text.includes(keyword))
+    assert.match(partial.blocks[0].text,/11월 10일/)
+    assert.match(read(aspectRow,'2026-11-12').blocks[0].text,/11월 12일/)
+    for(const changes of [{source_topics:['기타']},{transit:target},{kind:'house'},{polarity:-polarity},{aspect:'기타'}]){
+      assert.equal(read({...aspectRow,...changes}),section)
+    }
+    assert.equal(read(aspectRow,'2026-11-16'),section)
+  }
+})

@@ -1,3 +1,4 @@
+import { reunionContactReference } from './lib/relationshipReferenceFlow'
 import { ContactObservationScope } from './ContactObservationScope'
 import { westernRankCopy } from './lib/westernRankCopy'
 import type { LoveStatus } from './lib/loveReadingContext'
@@ -196,6 +197,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     ? sajuOverviewText(view.lenses, view.sajuSummary)
     : relationshipSummary || sajuOverviewText(selectedLenses, '이번 기간의 사주 흐름은 계산됐지만, 이 분야까지 바로 연결할 근거는 부족해. 사주 탭에서 적용된 운 구간을 확인해줘.')
   const focusedField = field ?? fortuneGroup(topic)
+  const reunionReference = system === 'integrated' && (!focusedField || focusedField.id === 'love') ? reunionContactReference(c) : undefined
   const overview = <section className="system-overview"><h3>세 체계 한눈에</h3><div className="system-overview-grid">
         <article className="system-western"><strong><Orbit size={16}/>서양점성술</strong><p>{westernOverviewSummary}</p><small>점수는 사건 확률이 아니라 같은 기간 안에서의 상대적 강약이야.</small></article>
         {view.saju&&view.contexts.length ? <article className="system-saju"><strong><Columns3 size={16}/>사주</strong><p>{sajuOverviewSummary}</p><small>간지·십성은 사주 탭의 계산 근거에서 따로 확인할 수 있어.</small></article>:<p className="system-unavailable">사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어.</p>}
@@ -208,6 +210,7 @@ export function SystemReadingViews({calculation:c,children,field,loveStatus,init
     {field&&<h3>{field.label} · {period}</h3>}
     {system==='integrated' ? <>
       <ContactObservationScope calculation={c} field={focusedField} localRecords={outcomeRecords}>{injectReadingContext(children,{field:focusedField,systemOverview:overview})}</ContactObservationScope>
+      {reunionReference && <aside className="reading-explanation"><strong>재회와 연락을 함께 보면</strong><p>{reunionReference}</p></aside>}
     </> : system==='western' ? <>
       <header className="system-hero western-reader-hero"><span>서양점성술 · {westernPeriod}</span><h3>{westernReaderHeadline}</h3><p>{topic==='애정' ? '연애는 만났을 때의 관계 분위기, 연락은 대화가 오갈 조건, 재회는 과거 인연과 다시 이어질 조건을 봐. 세 점수는 따로 읽어.' : topic==='전체' && lowestWestern ? `상대적으로 낮은 항목은 ${lowestWestern[0]}(${lowestWestern[1].average}점)이야. ${westernGuidance(lowestWestern[0],lowestWestern[1],c)}` : '점수는 선택한 기간에 각 주제가 얼마나 두드러지는지를 나타내.'}</p></header>
       {!field&&topic==='전체'&&<p className="western-score-overview-note">전체에서는 대표 흐름 6개만 먼저 보여줘. 더 세부적인 값은 위의 애정·대인·학업·직업·금전 탭에서 확인해.</p>}

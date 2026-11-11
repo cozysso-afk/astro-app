@@ -1,3 +1,4 @@
+import { readerFacingFortune } from './lib/readerFacingFortune'
 import type {ReactNode} from 'react'
 import type {AiInterpretationResponse,IntegratedApiResponse,PeriodKey} from './appTypes'
 import type {FortuneField} from './lib/fortuneFields'
@@ -46,7 +47,7 @@ export function PeriodFortuneNarrativeV2({
   const verifiedNarrative = verifiedFortuneNarrative(result)
   if ((!verifiedNarrative || !result.data) && period!=='year') return <CalculatedFortuneReading period={period} calculation={calculation} field={field}/>
   if (!result.ok || !result.data) return null
-  const data = result.data
+  const data = readerFacingFortune(result.data)
   if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry}/>
   const saved=buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
   const weekly = period==='week' && verifiedNarrative
