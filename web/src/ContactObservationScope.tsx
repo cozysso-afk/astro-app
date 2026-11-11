@@ -21,7 +21,8 @@ export function useObservedPassage(period:string, scope:string) {
 
 type ScopeProps = {calculation: IntegratedApiResponse; field?: FortuneField; localRecords?: unknown[]; children: ReactNode}
 export function ContactObservationScope(props: ScopeProps) {
-  if (!props.localRecords || !['love','contact','social'].includes(props.field?.id ?? '')) return <>{props.children}</>
+  const weeklyOverview = !props.field && props.calculation.period.day_count === 7
+  if (!props.localRecords || (!weeklyOverview && !['love','contact','social'].includes(props.field?.id ?? ''))) return <>{props.children}</>
   return <LoadObservations {...props} localRecords={props.localRecords}/>
 }
 function LoadObservations({calculation,field,localRecords,children}: ScopeProps & {localRecords:unknown[]}) {
@@ -29,7 +30,7 @@ function LoadObservations({calculation,field,localRecords,children}: ScopeProps 
   const today = browserLocalDateIso()
   const through = end < today ? end : today
   const day = start === end
-  const hasRelationshipContext = field?.id === 'love' || field?.id === 'contact'
+  const hasRelationshipContext = !field || field.id === 'love' || field.id === 'contact'
   const from = day || hasRelationshipContext ? new Date(Date.parse(start + 'T00:00:00Z') - 30 * 86400000).toISOString().slice(0,10) : start
   const [cloud,setCloud] = useState<{from:string;end:string;values:unknown[];failed:boolean} | null>(null)
   useEffect(()=>{

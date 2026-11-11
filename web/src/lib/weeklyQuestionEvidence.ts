@@ -1,7 +1,6 @@
 import type { FortuneStat, IntegratedApiResponse } from '../appTypes'
 import type { AuthoredReadingDocument, AuthoredSection } from './authoredReadingDocument'
-
-export const weeklyEvidenceLimit = '주간 지표로 비교할 수 있는 날짜와 연락 방향은 상세 해설에 표시했어. 아래 질문은 그 질문에 직접 연결되는 자료가 부족해. 실제 회신·합격·정산이나 두 사람의 관계 변화는 별도의 기록이 필요해.'
+import type { FortuneField } from './fortuneFields'
 
 const timingMeaning:Record<string,string> = {
   직장:'업무를 둘러싼 흐름의 차이로 읽을 수 있어. 실제 보직이나 책임 범위가 바뀌는 날까지 정할 수는 없어.',
@@ -35,6 +34,75 @@ function scoreLabel(stat?:FortuneStat|null) {
   return stat && Number.isFinite(stat.average) && stat.band?.trim() ? `${stat.average}점(${stat.band})` : ''
 }
 
+type AspectReading = {
+  transit: string; target: string; aspect: string; sign: number
+  label: string; name: string; reading: string
+}
+
+const questionAspects: Record<string, AspectReading> = {
+  '직장:coordination_responsibility': {
+    label:'협업 · 책임', transit:'Mercury', target:'Saturn', aspect:'사분위', sign:-1, name:'수성과 토성의 사분위',
+    reading:'일을 맡기는 사람과 실제로 마무리할 사람이 같은 뜻으로 약속했는지 살필 때야. 회의에서 “이번 주까지”라고 했다면 초안을 보낼 날인지, 승인까지 받을 날인지 짚어 봐. 담당 변경 여부는 합의한 내용에서 확인할 수 있어.',
+  },
+  '이직:exploration_offer': {
+    label:'탐색 · 제안', transit:'Uranus', target:'Jupiter', aspect:'육십분위', sign:1, name:'천왕성과 목성의 육십분위',
+    reading:'지금 해 온 일을 다른 자리에서도 활용할 길을 찾아보는 쪽으로 읽어. 눈에 들어오는 공고가 있다면 직함보다 실제 맡을 일을 지금 업무와 비교해 봐. 지원할 만한 곳을 발견한 단계와 회사에서 면담을 제안한 단계는 구분해 두면 좋아.',
+  },
+  '이직:conditions_movement': {
+    label:'조건 · 실제 이동', transit:'Uranus', target:'Saturn', aspect:'삼분위', sign:1, name:'천왕성과 토성의 삼분위',
+    reading:'변화를 지금 지키고 있는 일정에 맞춰 보는 흐름이야. 이직을 검토 중이라면 가능한 입사일과 현 직장에서 마쳐야 할 일을 함께 적어 봐. 이동이 구체화됐는지는 근무 조건과 시작일을 양쪽에서 확인했을 때 판단할 수 있어.',
+  },
+  '학업:review_performance': {
+    label:'복습 · 수행', transit:'Mercury', target:'Saturn', aspect:'사분위', sign:-1, name:'수성과 토성의 사분위',
+    reading:'배운 내용 중 설명이 막히는 지점을 찾아 다시 짚는 데 초점을 둬. 예제를 덮고 풀이의 첫 단계부터 말해 봐. 답은 기억나는데 그 방법을 고른 이유가 막힌다면 바로 그 부분이 이번 복습의 출발점이야.',
+  },
+  '시험:preparation': {
+    label:'준비 흐름', transit:'Mercury', target:'Jupiter', aspect:'사분위', sign:-1, name:'수성과 목성의 사분위',
+    reading:'큰 줄거리를 아는 것과 문제에서 요구한 범위까지 답하는 것을 나눠 연습해 봐. 기출 한 문제를 고르고 답안을 쓰기 전에 제한 조건 두 가지를 표시해. 다 쓴 뒤 그 조건이 실제 답에 들어갔는지 확인하면 준비할 부분이 좁혀져.',
+  },
+  '시험:performance_error': {
+    label:'수행 · 실수', transit:'Moon', target:'Mars', aspect:'충', sign:-1, name:'달과 화성의 충',
+    reading:'풀이 속도를 올릴 때 검토할 시간이 남는지 살펴봐. 시간 제한을 두고 풀어 본 뒤, 틀린 문항에서 개념이 막혔는지 마지막 단위나 부호를 건너뛰었는지 나눠 봐. 실제 시험에서 실수할 문항을 이 배치로 특정할 수는 없어.',
+  },
+  '연애:pace_definition': {
+    label:'관계 속도 · 정의', transit:'Venus', target:'Mars', aspect:'삼분위', sign:1, name:'금성과 화성의 삼분위',
+    reading:'호감을 표현하거나 만나고 싶은 마음을 행동에 옮기는 쪽으로 읽어. 가까워지고 싶다면 둘이 편하게 할 수 있는 약속 하나를 제안해 봐. 제안을 반갑게 받는 것과 같은 속도로 관계를 이어가고 싶다고 말하는 건 서로 다른 단계야. 관계를 어떻게 부를지는 두 사람이 직접 나눈 말에서 확인해.',
+  },
+}
+
+// Uncached weeks use the same question resolver as archived reports.
+export function calculatedWeeklyQuestions(field?:FortuneField):AuthoredSection[] {
+  const names:Record<string,string> = Object.fromEntries(Object.entries(questionAspects).map(([id,rule])=>[id,rule.label]))
+  for(const topic of Object.keys(timingMeaning)) {
+    names[topic+':'+(topic==='직장'?'change_timing':'timing')]='시기'
+  }
+  names['연락:activation_direction']='연락 강도 · 방향'
+  names['연락:continuity']='대화 지속'
+  names['재회:contact_meeting']='연락 · 만남'
+  names['재회:stage_progression']='현재 단계'
+  return Object.entries(names).flatMap(([key,label])=>{
+    const topic=key.split(':')[0]
+    if(field && !field.topics.includes(topic)) return []
+    return [{id:'question:'+key,label:topic+' · '+label,state:'insufficient' as const,blocks:[]}]
+  })
+}
+
+function questionAspectAnswer(topic:string, question:string, calc:IntegratedApiResponse) {
+  const rule=questionAspects[topic+':'+question]
+  if (!rule) return ''
+  const dates=Array.from(new Set((calc.western.daily_scores??[]).filter(row=>
+    /^\d{4}-\d{2}-\d{2}$/.test(row.date) && row.date>=calc.period.start && row.date<=calc.period.end &&
+    row.evidence?.some(e=>e.kind==='aspect' && e.source_topics?.includes(topic) &&
+      e.transit===rule.transit && e.target===rule.target && e.aspect===rule.aspect &&
+      typeof e.polarity==='number' && Number.isFinite(e.polarity) && Math.sign(e.polarity)===rule.sign)
+  ).map(row=>row.date))).sort()
+  if (!dates.length) return ''
+  const day=(value:string)=>Number(value.slice(5,7))+'월 '+Number(value.slice(8))+'일'
+  const contiguous=Date.parse(dates[dates.length-1])-Date.parse(dates[0])===(dates.length-1)*86400000
+  const when=dates.length>1 && contiguous ? day(dates[0])+'부터 '+day(dates[dates.length-1])+'까지' : dates.map(day).join('·')+'에'
+  return `${when} ${topic} 계산에 ${rule.name} 배치가 보여. ${rule.reading}`
+}
+
 export function weeklyQuestionSections(doc:AuthoredReadingDocument, calc:IntegratedApiResponse):AuthoredSection[] {
   const {start,end,day_count}=calc.period
   if (doc.state==='unverified' || day_count!==7 || Date.parse(end)-Date.parse(start)!==6*86400000 ||
@@ -58,6 +126,7 @@ export function weeklyQuestionSections(doc:AuthoredReadingDocument, calc:Integra
       const signal=scoreLabel(signals?.과거인연접점??signals?.과거인연재접점)
       if (signal) answer=`이번 주 과거 인연과의 재접점 지표는 ${signal}이야. 예전 인연과 다시 연결될 조건을 본 값이야. 실제로 연락이 닿았는지, 만남까지 이어졌는지는 각각 따로 확인해야 해.`
     }
+    if (!answer) answer=questionAspectAnswer(topic,question,calc)
     if (!answer) return section
     return {...section,state:'ready',label:section.label+' · 부분 해설',blocks:[{id:section.id+':calculation',label:'주간 계산값으로 보면',text:answer}]}
   })

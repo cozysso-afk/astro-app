@@ -6,6 +6,7 @@ import type {FortuneField} from './lib/fortuneFields'
 import {monthlyPeriodSupplements} from './lib/monthlyLoveSupplement'
 import {monthlyReadingCore} from './lib/monthlyReadingCore'
 import {weeklyPeriodSupplements} from './lib/weeklyPeriodSupplement'
+import {calculatedWeeklyQuestions} from './lib/weeklyQuestionEvidence'
 import {weeklyReadingCore} from './lib/weeklyReadingCore'
 
 export function CalculatedFortuneReading({period,calculation,field}:{period:PeriodKey;calculation:IntegratedApiResponse;field?:FortuneField}) {
@@ -14,6 +15,7 @@ export function CalculatedFortuneReading({period,calculation,field}:{period:Peri
   const {start,end}=calculation.period
   const questions=calculatedPeriodQuestions(period,start,end,field)
   const weekly=period==='week'
+  if(weekly) questions.sections.push(...calculatedWeeklyQuestions(field))
   const doc=weekly ? weeklyReadingCore(questions,undefined,calculation,field) : monthlyReadingCore(questions,calculation,field)
   const supplements=weekly ? weeklyPeriodSupplements(doc,calculation) : monthlyPeriodSupplements(doc,calculation)
   // Bring the selected field's answer into the body even if there is no usable date comparison.
@@ -22,5 +24,5 @@ export function CalculatedFortuneReading({period,calculation,field}:{period:Peri
     ...doc.core.filter(block=>block.id!=='month:segments:'+field?.topics[0]),
     {id:lead.id+':calculation',label:lead.label,text:lead.text},
   ] : doc.core
-  return <AuthoredReadingPanel doc={{...doc,core}} period={period} supplements={supplements.filter(row=>row!==lead)}/>
+  return <AuthoredReadingPanel doc={{...doc,core,exportBlockIds:core.map(block=>block.id)}} period={period} supplements={supplements.filter(row=>row!==lead)}/>
 }

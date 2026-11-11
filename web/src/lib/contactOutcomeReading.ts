@@ -1,3 +1,5 @@
+import type { AuthoredReadingDocument } from './authoredReadingDocument'
+import { browserLocalDateIso } from './readingDateSemantics.ts'
 import { weeklyTimingValues } from './weeklyQuestionEvidence.ts'
 import { monthlyTopicPhases } from './monthlyReadingCore.ts'
 import type { IntegratedApiResponse } from '../appTypes'
@@ -66,6 +68,40 @@ const contactFollowUps = {
     month: '이달에는 다시 연락이 닿은 시점과 만남 약속이 구체화된 시점을 나눠 보세요. 대화는 이어졌지만 날짜를 잡지 못했다면 연락이 이어진 데까지가 지금 확인된 변화예요.',
   },
 } as const
+
+// These records identify an event on one date, not a person across dates.
+export function weeklyRecordedQuestions(doc:AuthoredReadingDocument, rows:DailyOutcomeRecord[], calculation:IntegratedApiResponse) {
+  const {start,end,day_count}=calculation.period
+  if (doc.state==='unverified' || day_count!==7 || Date.parse(end)-Date.parse(start)!==6*86400000 ||
+      doc.date!==`${start} → ${end}` || !rows.length) return doc
+  const today=browserLocalDateIso()
+  const from=new Date(Date.parse(start)-30*86400000).toISOString().slice(0,10)
+  const eligible=observedContactRows(rows,from,end<today?end:today)
+  const past=eligible.find(row=>row.past_connection && row.event!=='none')
+  const sections=doc.sections.map(section=>{
+    if (section.state!=='insufficient') return section
+    let answer=''
+    if (section.id==='question:재회:stage_progression' && past) {
+      const followUp=meetingRecorded(past)
+        ? '다시 얼굴을 본 단계까지 확인돼요. 관계를 다시 시작하기로 했는지는 그날 두 사람이 어떤 이야기를 나눴는지에 달려 있어요.'
+        : past.event==='sent' ? '먼저 안부를 건넨 단계예요. 상대가 답했는지는 이 기록에 없어요. 답이 왔다면 안부에서 끝났는지 다음 약속 이야기도 나왔는지 살펴보세요.'
+        : '연락이 다시 닿은 단계까지 확인돼요. 만나자는 말이 있었다면 두 사람이 날짜를 잡고 실제로 만났는지가 그다음 단계예요.'
+      const fact=observedRelationshipPassage([past],calculation,'week','love')?.fact
+      if (fact) answer=(past.date<start?'이번 주가 시작되기 전인 ':'')+fact+' '+followUp
+    } else if (section.id==='question:연락:continuity') {
+      const exchange=eligible.find(row=>
+        row.event==='both' || (row.event==='received' && meetingRecorded(row) &&
+          (row.channel==='call' || (legacyMeeting.test(row.note?.trim() || '') && /전화가 (?:먼저 )?와서/.test(row.note)))))
+      if (exchange) {
+        const onDate=exchange.event==='both' ? '서로 연락을 주고받았어요.' : '상대에게서 전화가 왔고 그날 직접 만났어요.'
+        answer=`${exchange.date<start?'이번 주가 시작되기 전인 ':''}${exchange.date}에는 ${onDate} 이날의 연락이 다른 날까지 이어졌는지는 이 한 건으로 알기 어려워요. 같은 사람과 이어간 대화가 있다면 누가 다시 말을 꺼냈고 어떤 이야기를 이어갔는지가 단서예요.`
+      }
+    }
+    if (!answer) return section
+    return {...section,state:'ready' as const,label:section.label+' · 기록으로 본 부분',blocks:[{id:section.id+':record',label:'날짜가 확인된 기록',text:answer}]}
+  })
+  return {...doc,sections}
+}
 
 export function observedRelationshipPassage(rows: DailyOutcomeRecord[], calculation: IntegratedApiResponse, period: string, scope: string) {
   if (period !== 'today' && period !== 'week' && period !== 'month') return null

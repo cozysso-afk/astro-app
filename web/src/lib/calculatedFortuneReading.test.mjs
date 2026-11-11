@@ -6,10 +6,11 @@ import {createElement as h} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
 import {fortuneFixture} from './readingExperience.fixtures.mjs'
 
-let server,Panel,groups
+let server,Panel,groups,exportModel
 before(async()=>{
   server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
   Panel=(await server.ssrLoadModule('/src/PeriodAiInterpretationPanel.tsx')).PeriodAiInterpretationPanel
+  exportModel=(await server.ssrLoadModule('/src/lib/readingImageExport.ts')).authoredReadingExportModel
   groups=(await server.ssrLoadModule('/src/lib/fortuneFields.ts')).fortuneGroup
 })
 after(()=>server?.close())
@@ -32,6 +33,7 @@ for(const period of ['week','month']){
     assert.match(html,/계산값으로 읽는 (주간|월간) 애정운/)
     assert.equal((html.match(/data-reading-section="relationship.love_(?:single|crush|flirting|ambiguous|couple|reunion_interest)"/g)??[]).length,6)
     assert.match(html,/해설 생성/)
+    assert.match(html,/핵심 이미지 저장/)
     assert.doesNotMatch(html,/이미 저장|이 저장본의 핵심|아직 작성되지 않은/)
   })
   test(period+' keeps own data and scope on untrusted, error, loading and unavailable paths',()=>{
@@ -45,7 +47,28 @@ for(const period of ['week','month']){
     }
     const c=fixture(period)
     c.western.daily_scores=[];c.western.overall={};c.western.relationship_signals={}
-    assert.match(render(period,'애정',{calculation:c}),/계산 자료가 부족해/)
+    const empty=render(period,'애정',{calculation:c})
+    assert.match(empty,/계산 자료가 부족해/)
+    assert.doesNotMatch(empty,/핵심 이미지 저장/)
     assert.doesNotMatch(render(period,'애정',{westernOnly:true}),/계산값으로 읽는/)
   })
 }
+
+test('calculated PNG uses exactly the visible core and rejects incomplete or unverified input',()=>{
+  const row={id:'week:dates',label:'학업 · 날짜별 차이',text:'10월 7일 수요일에 복습 흐름을 살펴봐.'}
+  const doc={state:'calculated',title:'계산값으로 읽는 주간 학업운',date:'2026-10-01 → 2026-10-07',headline:'',core:[row],exportBlockIds:[row.id]}
+  const cards=exportModel(doc).sections[0].cards
+  assert.deepEqual(cards.map(({title,body})=>[title,body]),[[row.label,row.text]])
+  for(const patch of [{state:'unverified'},{state:'partial'},{core:[]},{exportBlockIds:['absent']}]){
+    assert.throws(()=>exportModel({...doc,...patch}))
+  }
+})
+
+test('a week without a manuscript can answer a tagged question in the correct field',()=>{
+  const c=fixture('week')
+  c.western.daily_scores[0].evidence=[{kind:'aspect',source_topics:['직장'],transit:'Mercury',target:'Saturn',aspect:'사분위',polarity:-1}]
+  const work=render('week','직업',{calculation:c})
+  assert.match(work,/data-reading-section="question:직장:coordination_responsibility"/)
+  assert.match(work,/10월 1일에 직장 계산/)
+  assert.doesNotMatch(render('week','애정',{calculation:c}),/초안을 보낼 날/)
+})

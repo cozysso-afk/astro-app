@@ -1,3 +1,4 @@
+import { readerFacingFortune } from './lib/readerFacingFortune'
 import { AlertTriangle, CheckCircle2, CircleStop, Copy, LoaderCircle, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse } from './appTypes'
 import { ANNUAL_SCORE_FOCUS_EVENT } from './AnnualDailyScoresPanel'
@@ -13,9 +14,6 @@ function periodLabel(start: string, end: string) {
 
 function visibleAiText(value: string | undefined) {
   return String(value ?? '')
-    .replace(/\b(?:W|S|T):[^\s),]+/g, '계산 근거')
-    .replace(/\(\s*계산 근거\s*\)/g, '')
-    .replace(/계산 근거(?:\s*[·,;]\s*계산 근거)+/g, '계산 근거')
     .replace(/이직\s*및\s*진로\s*타깃\s*시간/g, '이직·진로 집중 시간')
     .replace(/타깃/g, '집중')
     .replace(/\s{2,}/g, ' ')
@@ -54,7 +52,7 @@ export function AiInterpretationPanel({ result, loading, error, onRetry, onCopyP
     return <section className="ai-interpret-card is-error"><AlertTriangle size={20}/><div><span className="eyebrow">AI(인공지능) 해설</span><strong>{quotaLimited ? 'AI 해설 서버 한도를 확인해줘' : 'AI 해설을 아직 붙이지 못했어'}</strong><p>{message}</p>{failedUsage?.total_tokens ? <p className="ai-v21-failed-usage">실패 전 실제 사용량 · 입력 {(failedUsage.prompt_tokens??0).toLocaleString()} · 출력 {(failedUsage.candidate_tokens??0).toLocaleString()} · 사고 {(failedUsage.thought_tokens??0).toLocaleString()} tokens · Gemini 호출 {failedUsage.attempt_count??1}회 · 약 {Math.round(failedUsage.estimated_krw??0).toLocaleString()}원</p> : null}<div className="ai-v21-controls"><button type="button" onClick={onRetry}>{quotaLimited ? '한도 복구 후 다시 시도' : 'AI 해설 다시 시도'}</button><button type="button" onClick={onCopyPrompt}><Copy size={15}/>AI용 프롬프트 복사</button></div></div></section>
   }
   if (!result?.ok || !result.data) return null
-  const data = result.data
+  const data = readerFacingFortune(result.data)
   const usage = estimateGeminiUsage(result.usage)
   const validation = result.usage?.quality_validation
   const validationPassed = validation?.score === 100 || (!!validation?.stages?.length && validation.stages.every((stage)=>stage.passed))

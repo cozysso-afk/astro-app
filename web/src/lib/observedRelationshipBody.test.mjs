@@ -86,3 +86,32 @@ test('dated evidence stays inside the selected week, monthly segments require en
   monthly.western.daily_scores=seven
   assert.doesNotMatch(observedRelationshipPassage([record],monthly,'month','love').followUp,/초순.*점/)
 })
+
+test('weekly overview reads only dated contact and reunion facts that were recorded',()=>{
+  const field=undefined
+  const calculation=calc('week')
+  calculation.period.day_count=7
+  const original=documents.buildPeriodReadingDocument(data,'week',...periods.week,field,true)
+  const names=['question:연락:continuity','question:재회:stage_progression','question:재회:rebuilding_timing']
+  const doc={...original,sections:names.map(id=>({id,label:id.split(':')[2],state:'insufficient',blocks:[]}))}
+  function overview(records,source=doc){
+    return renderToStaticMarkup(h(Scope,{calculation,field,localRecords:records},h(Panel,{doc:source,period:'week'})))
+  }
+  const beforeWeek=overview([record])
+  assert.match(beforeWeek,/이번 주가 시작되기 전인 2020-11-08/)
+  assert.match(beforeWeek,/그날 직접 만났어요/)
+  assert.match(beforeWeek,/다시 얼굴을 본 단계/)
+  assert.doesNotMatch(beforeWeek,/재회가 확정|\(A\)/)
+  assert.equal(doc.sections[0].state,'insufficient')
+  const latest=overview([{...record,date:'2020-11-11',event:'both',channel:'message',note:'',met_in_person:false}])
+  assert.match(latest,/2020-11-11에는 서로 연락을 주고받았어요/)
+  assert.doesNotMatch(latest,/직접 만났어요|이번 주가 시작되기 전인/)
+  const unrelated=overview([{...record,past_connection:false},{...record,date:'2020-11-16'},{...record,date:'2020-09-01'}])
+  assert.doesNotMatch(unrelated,/다시 얼굴을 본 단계|2020-09-01|2020-11-16/)
+  const oneWay=overview([{...record,event:'sent',channel:'message',note:'직접 만남 취소',met_in_person:false}])
+  assert.match(oneWay,/먼저 안부를 건넨 단계/)
+  assert.doesNotMatch(oneWay,/서로 연락을 주고받았어요|다시 얼굴을 본 단계|연락이 다시 닿은 단계/)
+  const ready={...doc,sections:[{...doc.sections[1],state:'ready',blocks:[{id:'saved',label:'기존 해설',text:'저장한 원고 그대로'}]}]}
+  assert.match(overview([record],ready),/저장한 원고 그대로/)
+  assert.doesNotMatch(overview([record],ready),/날짜가 확인된 기록/)
+})

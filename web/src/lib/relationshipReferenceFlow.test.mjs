@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { fortuneFixture, stat } from './readingExperience.fixtures.mjs'
 
-const server = await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true,hmr:false},appType:'custom'})
+const server = await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
 const {buildFortuneUserSummary} = await server.ssrLoadModule('/src/lib/fortuneUserSummary.ts')
 const {relationshipReferenceFlowCards} = await server.ssrLoadModule('/src/lib/relationshipReferenceFlow.ts')
 after(()=>server.close())
@@ -18,6 +18,7 @@ test('suppressed reunion remains visible as a non-actionable reference card',()=
   f.calculation.western.relationship_signals.수신신호=stat(30)
   f.calculation.western.relationship_signals.발신적합=stat(30)
   f.calculation.western.relationship_signals.과거인연접점=stat(58)
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['재회'],transit:'Venus',target:'Moon',aspect:'trine',contribution:4,polarity:0.8})
   f.data.topic_analysis.재회.importance='핵심'
   f.data.topic_analysis.연락.importance='핵심'
 
@@ -39,6 +40,7 @@ test('reference card is not duplicated when reunion is already actionable',()=>{
   f.calculation.western.relationship_signals.수신신호=stat(70)
   f.calculation.western.relationship_signals.발신적합=stat(70)
   f.calculation.western.relationship_signals.과거인연접점=stat(70)
+  f.calculation.western.daily_scores[0].evidence.push({source_topics:['재회'],transit:'Venus',target:'Moon',aspect:'trine',contribution:4,polarity:0.8})
   f.data.topic_analysis.재회.importance='핵심'
   f.data.topic_analysis.연락.importance='핵심'
 
