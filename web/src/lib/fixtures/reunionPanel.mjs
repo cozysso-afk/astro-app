@@ -6,6 +6,7 @@ import {renderToStaticMarkup} from 'react-dom/server'
 import {timing} from '../readingExperience.fixtures.mjs'
 
 const server=await createServer({root:fileURLToPath(new URL('../../../',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+const {ReunionHierarchyPanel}=await server.ssrLoadModule('/src/ReunionHierarchyPanelV3.tsx')
 const {RelationshipInterpretationPanel}=await server.ssrLoadModule('/src/RelationshipInterpretationPanel.tsx')
 after(()=>server.close())
 
@@ -19,4 +20,15 @@ export function renderReunion(props={}) {
     ai:null,aiLoading:false,aiError:'',onAi:()=>{throw Error('unexpected provider request')},
     hierarchy,timing,observation:{state:'recontacted',initiator:'',events:[]},...props,
   }))
+}
+
+export function renderHierarchy(props={}) {
+  return renderToStaticMarkup(createElement(ReunionHierarchyPanel,{
+    hierarchyData:hierarchy,observation:{state:'recontacted',initiator:'',events:[]},
+    directionRows:[],evidence:[],sustainabilityText:'',...props,
+  }))
+}
+
+export function candidate(date, stage='in_person_meeting', label='오프라인 대면') {
+  return {start:date,end:date,date,stage,label,final:50,components:{}}
 }

@@ -170,11 +170,20 @@ export function buildReunionReadingV4({ hierarchy, observation, directionRows, h
         : observation.state === 'reunited'
           ? undefined
           : recordedReunionEvents(observation.events).length ? undefined : 'recontact'
+  const seenRanges = new Set<string>()
   const futureWindows = hierarchy.top_periods
     .filter(row => row.end >= hierarchy.as_of_date)
     .filter(row => targetAxis && STAGE_FOR_AXIS[targetAxis] === row.stage)
-    .slice(0, 2)
-    .map(row => ({ date: row.start === row.end ? row.start : `${row.start}~${row.end}`, label: windowLabel(row), stage: row.stage }))
+    .map(row => {
+      const start = row.start < hierarchy.as_of_date ? hierarchy.as_of_date : row.start
+      return {date: start === row.end ? start : `${start}~${row.end}`, label: windowLabel(row), stage: row.stage}
+    })
+    .filter(row => {
+      if (seenRanges.has(row.date)) return false
+      seenRanges.add(row.date)
+      return true
+    })
+    .slice(0, 3)
   return {
     axes,
     directions: directions(directionRows),

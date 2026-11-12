@@ -17,8 +17,9 @@ import { fetchAuthorizedReunionRelationship } from './lib/auth'
 import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, parseArchiveBackupText } from './lib/archiveBackup'
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
-import { fortuneAiCacheId, fortuneCalculationCacheId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
-import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY } from './lib/fortuneAiJob'
+import { resumePeriodArchive, savePeriodArchive } from './lib/periodArchive'
+import { fortuneAiCacheId, fortuneCalculationCacheId, periodCalculationRequest, storedFortuneCalculationId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY, type PendingFortuneAiJob } from './lib/fortuneAiJob'
 import { fortuneAiFailedJobMessage, fortuneAiPublicErrorMessage, fortuneAiStartErrorMessage, fortuneAiStatusErrorMessage } from './lib/fortuneAiPublicError'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
 import { KoreaBirthplaceSelector } from './koreaBirthplaces'
@@ -427,6 +428,7 @@ export default function AppNext() {
   const [reunionHistoryLoading, setReunionHistoryLoading] = useState(false)
   const [reunionHistoryError, setReunionHistoryError] = useState('')
   const [birthProfile, setBirthProfile] = useState<BirthProfile>(() => loadStoredProfile())
+  const currentBirthProfile = useRef(birthProfile)
   const [profileSaved, setProfileSaved] = useState(false)
   const [counterpart, setCounterpart] = useState<CounterpartProfile>(emptyCounterpart)
   const previousCounterpartIdentityRef = useRef<string[] | null>(null)
@@ -628,8 +630,9 @@ export default function AppNext() {
   const periodSelectionStart = periodStart(queryDate, period)
   const integratedStartDate = selectedTool === 'integrated' ? `${annualFortuneYear}-01-01` : periodSelectionStart
   const integratedSelectionEnd = selectedTool === 'integrated' ? `${annualFortuneYear}-12-31` : periodEnd(queryDate, period)
-  const selectedReadingPeriod = useRef({start:integratedStartDate,end:integratedSelectionEnd})
-  selectedReadingPeriod.current = {start:integratedStartDate,end:integratedSelectionEnd}
+  const selectedReadingPeriod = useRef({start:integratedStartDate,end:integratedSelectionEnd,calculationId:''})
+  selectedReadingPeriod.current = {start:integratedStartDate,end:integratedSelectionEnd,
+    calculationId:integratedRequestSnapshot ? storedFortuneCalculationId(integratedRequestSnapshot) : ''}
   const clampedRelationshipDays = Math.max(7, Math.min(365, Number(relationshipDays) || 365))
   const relationshipStartDate = relationshipCalendarYear ? `${relationshipCalendarYear}-01-01` : queryDate
   const relationshipEndDate = relationshipCalendarYear ? `${relationshipCalendarYear}-12-31` : addDays(queryDate, clampedRelationshipDays - 1)
@@ -722,7 +725,8 @@ export default function AppNext() {
     window.setTimeout(() => setActionNotice(''), 3200)
   }
 
-  const pollAiInterpretationJob = async (jobId: string, periodStart?: string, periodEndValue?: string, cacheId?: string, ttlDays = PERIOD_CACHE_TTL_DAYS.today, requestForArchive?: Record<string, unknown>) => {
+  const pollAiInterpretationJob = async (job: Omit<PendingFortuneAiJob,'contract'|'precisionMode'>, calculationForArchive?: IntegratedApiResponse) => {
+    const {jobId, periodStart, periodEnd:periodEndValue, cacheId, ttlDays=PERIOD_CACHE_TTL_DAYS.today, request:requestForArchive, archivePeriod} = job
     if (!jobId || aiPollRef.current === jobId) return
     aiPollRef.current = jobId
     setAiActiveJobId(jobId)
@@ -750,22 +754,25 @@ export default function AppNext() {
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
           const annotated = annotatePayload(payload)
           if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', annotated, ttlDays)
-          const {start:currentStart,end:currentEnd} = selectedReadingPeriod.current
-          if (!periodStart || (currentStart === periodStart && currentEnd === periodEndValue)) {
+          if (aiPollRef.current !== jobId) return
+          const selected = selectedReadingPeriod.current
+          if (selected.start === periodStart && selected.end === periodEndValue && requestForArchive
+              && selected.calculationId === storedFortuneCalculationId(requestForArchive)) {
             setAiInterpretation(annotated)
             setAiCacheSource(data?.reused ? 'server' : 'fresh')
           }
-          if (requestForArchive && selectedTool === null && periodStart && periodEndValue) {
-            const calc = integratedResult
-            if (calc && calc.period.start === periodStart && calc.period.end === periodEndValue) {
-              const archiveRequest = {...requestForArchive, archive_mode:'period_fortune_v16'}
-              void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${periodStart}`,periodStart,periodEnd:periodEndValue,engine:calc.engine,request:archiveRequest,result:calc as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForArchive)}`)
+          if (requestForArchive && verifiedFortuneNarrative(annotated)) {
+            if (archivePeriod && calculationForArchive) {
+              await savePeriodArchive(calculationForArchive, requestForArchive, archivePeriod, annotated)
+            } else {
+              await resumePeriodArchive(requestForArchive, archivePeriod, annotated)
             }
           }
+          if (aiPollRef.current !== jobId) return
           removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
           setAiActiveJobId(null)
           setAiConfigured(true)
-          aiRequestRef.current = cacheId || ''
+          if (selectedReadingPeriod.current.calculationId === (requestForArchive && storedFortuneCalculationId(requestForArchive))) aiRequestRef.current = cacheId || ''
           return
         }
         if (data?.status === 'failed') {
@@ -801,7 +808,7 @@ export default function AppNext() {
       return
     }
     setAiActiveJobId(saved.jobId)
-    void pollAiInterpretationJob(saved.jobId, saved.periodStart, saved.periodEnd, saved.cacheId, saved.ttlDays ?? PERIOD_CACHE_TTL_DAYS.today, saved.request)
+    void pollAiInterpretationJob(saved)
   }
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, intent: 'open'|'generate'|'refresh' = 'generate') => {
@@ -812,7 +819,7 @@ export default function AppNext() {
     const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null
     const requestForCache = {
-      ...(requestOverride ?? { start_date: calculation.period.start, end_date: calculation.period.end }),
+      ...periodCalculationRequest(requestOverride ?? {start_date:calculation.period.start,end_date:calculation.period.end}),
       interpretation_current_date: currentDate,
       interpretation_timezone: timezone,
     }
@@ -845,8 +852,7 @@ export default function AppNext() {
         setAiLoading(false)
         setAiActiveJobId(null)
         if (selectedTool === null) {
-          const archiveRequest = {...requestForCache, archive_mode:'period_fortune_v16'}
-          void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},`period:${fortuneCalculationCacheId(requestForCache)}`)
+          void savePeriodArchive(calculation, requestForCache, period, annotated)
         }
         return
       }
@@ -870,11 +876,11 @@ export default function AppNext() {
         throw new Error(fortuneAiPublicErrorMessage(data, 'AI 해설 서버 작업을 시작하지 못했어.'))
       }
       const archiveRequest = refreshMonthlyGaps ? {...requestForCache, reading_revision_job: String(data.job_id)} : requestForCache
-      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: archiveRequest }
+      const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: archiveRequest, archivePeriod:selectedTool === null ? period : null }
       setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
       setAiConfigured(true)
-      void pollAiInterpretationJob(pending.jobId, pending.periodStart, pending.periodEnd, pending.cacheId, pending.ttlDays, pending.request)
+      void pollAiInterpretationJob(pending, calculation)
       if (!jobPersisted) {
         setActionNotice('브라우저 저장소를 사용할 수 없어. AI 해설은 이 화면을 열어둔 동안 계속 확인할게.')
         window.setTimeout(()=>setActionNotice(''),3200)
@@ -901,7 +907,7 @@ export default function AppNext() {
     const longitude = parseOptionalNumber(birthProfile.longitude)
     if (latitude === null || longitude === null) return
     const body: Record<string,unknown> = {
-      profile: { name: birthProfile.name || '나', birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey },
+      profile: { name: birthProfile.name || null, birth_date: birthProfile.birthDate, birth_time: birthProfile.birthTime, latitude, longitude, utc_offset_hours: Number(birthProfile.utcOffset || 9), gender: birthProfile.gender, place_key: birthProfile.placeKey },
       start_date: integratedStartDate,
       end_date: integratedSelectionEnd,
     }
@@ -918,7 +924,7 @@ export default function AppNext() {
       if (selectedTool === null) void runAiInterpretation(cached.result, cached.request, 'open')
     })()
     return ()=>{cancelled=true}
-  }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile.birthDate, birthProfile.birthTime, birthProfile.latitude, birthProfile.longitude, birthProfile.utcOffset, birthProfile.gender, birthProfile.placeKey, aiModel])
+  }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile, aiModel])
 
   const runIntegrated = async () => {
     if (aiLoading || aiActiveJobId || readLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)) await cancelAiInterpretation(true)
@@ -945,9 +951,12 @@ export default function AppNext() {
       start_date: integratedStartDate,
       end_date: integratedSelectionEnd,
     }
+    const selectionIsCurrent = () => currentBirthProfile.current === birthProfile
+      && selectedReadingPeriod.current.start === integratedStartDate && selectedReadingPeriod.current.end === integratedSelectionEnd
     const calculationCacheId = fortuneCalculationCacheId(body as unknown as Record<string,unknown>)
     const cachedCalculation = await readReadingCache<{request:Record<string,unknown>;result:IntegratedApiResponse}>(calculationCacheId)
     if (cachedCalculation?.result && cachedCalculation.result.period.start === integratedStartDate && cachedCalculation.result.period.end === integratedSelectionEnd) {
+      if (!selectionIsCurrent()) return
       setIntegratedResult(cachedCalculation.result)
       setIntegratedRequestSnapshot(cachedCalculation.request)
       if (selectedTool === null) void runAiInterpretation(cachedCalculation.result, cachedCalculation.request, 'open')
@@ -1010,14 +1019,15 @@ export default function AppNext() {
         if (!calculation && lostJob && launch === 0) { await sleep(900); continue }
       }
       if (!calculation) throw new Error(lastMessage || '정밀 계산 시간이 길어지고 있어. 다시 시도해줘.')
-      setIntegratedResult(calculation)
-      setIntegratedRequestSnapshot(body)
+      if (selectionIsCurrent()) {
+        setIntegratedResult(calculation)
+        setIntegratedRequestSnapshot(body)
+      }
       const calcTtlDays = fortuneCacheTtlDays(period, selectedTool)
       await writeReadingCache(calculationCacheId, 'fortune-calculation', {request:body as unknown as Record<string,unknown>, result:calculation}, calcTtlDays)
       if (selectedTool === null) {
-        const archiveRequest = {...body, archive_mode:'period_fortune_v16'} as unknown as Record<string,unknown>
-        void saveArchive({kind:'daily',periodKey:period,title:`${period==='today'?'오늘':period==='week'?'주간':period==='month'?'월간':'연간'}운세 · ${calculation.period.start}`,periodStart:calculation.period.start,periodEnd:calculation.period.end,engine:calculation.engine,request:archiveRequest,result:calculation as unknown as Record<string,unknown>},`period:${calculationCacheId}`)
-        void runAiInterpretation(calculation, body as unknown as Record<string,unknown>, 'open')
+        void savePeriodArchive(calculation, body, period)
+        if (selectionIsCurrent()) void runAiInterpretation(calculation, body, 'open')
       }
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
@@ -2032,7 +2042,15 @@ export default function AppNext() {
         {mainView === 'profile' && <ProfileView
           birthProfile={birthProfile}
           profileSaved={profileSaved}
-          onChange={setBirthProfile}
+          onChange={profile=>{
+            currentBirthProfile.current = profile
+            selectedReadingPeriod.current.calculationId = ''
+            aiRequestRef.current = ''
+            setIntegratedResult(null)
+            setIntegratedRequestSnapshot(null)
+            setAiInterpretation(null)
+            setBirthProfile(profile)
+          }}
           onSave={saveBirthProfile}
         />}
 

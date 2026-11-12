@@ -48,3 +48,43 @@ test('all extended periods request six distinct love questions when their own to
     assert.ok(inspectPeriodReading(data,packet).issues.some(i=>i.code==='claim_date_without_local_evidence'))
   }
 })
+
+test('ordinary monthly scores preserve dated relationship observations and their original indexes in the writer prompt',async ()=>{
+  const {compactCalculation}=await import('../fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+  const {buildV23PromptBudget,buildV23CorePrompt}=await import('./promptV23.ts')
+  const evidence=(topic,aspect)=>({source_topics:[topic],transit:'Moon',target:'Venus',aspect,polarity:aspect==='충'?-0.5:0.5})
+  const row=(date)=>({date,scores:{연애:50,재회:48},evidence:[evidence('재회','합'),evidence('연애','충')]})
+  const calc={period:{start:'2026-11-01',end:'2026-11-30',day_count:30},western:{overall:{연애:{average:50},재회:{average:48}},daily_scores:[
+    row('2026-12-01'),row('2026-11-25'),row('2026-11-12'),row('2026-11-04'),
+  ]}}
+  const compact=compactCalculation(calc), {packet,ok}=buildV23PromptBudget(compact)
+  assert.equal(ok,true)
+  assert.equal(compact.key_dates.length,0)
+  const refs=packet.evidence_ledger.filter(r=>r.scope==='daily_actual_aspect_house')
+  assert.deepEqual(refs.map(r=>r.id).sort(),['W:daily:2026-11-04:1','W:daily:2026-11-04:2','W:daily:2026-11-25:1','W:daily:2026-11-25:2'])
+  assert.equal(packet.period_reading.required_section_keys.length,12)
+  const prompt=buildV23CorePrompt(compact).text
+  for(const row of refs) assert.ok(prompt.includes(row.id))
+  assert.doesNotMatch(prompt,/W:daily:2026-12-01/)
+  const missing=compactCalculation({...calc,western:{overall:calc.western.overall,daily_scores:[row('2026-12-01')]}})
+  assert.equal(buildV23PromptBudget(missing).packet.period_reading.required_section_keys.length,6)
+})
+
+test('monthly cost estimate uses both actual output ceilings and full input, retaining job and packet limits',async()=>{
+  const {compactCalculation,SCHEMA}=await import('../fortune-interpret-v6-preview/integratedInterpretationV2.ts')
+  const {estimatedGeminiJobKrw}=await import('../fortune-interpret-v21-preview/costGuardV21.ts')
+  const {buildV23PromptBudget,buildV23CorePrompt,SYSTEM}=await import('./promptV23.ts')
+  const {buildProviderCoreSchema}=await import('./providerSchemaV23.ts')
+  const {v23OutputTokenLimit}=await import('./runtimeBudgetV23.ts')
+  const payload=compactCalculation({period:{start:'2026-11-01',end:'2026-11-30',day_count:30},western:{daily_scores:[]}})
+  const budget=buildV23PromptBudget(payload)
+  const input=SYSTEM+buildV23CorePrompt(payload).text+JSON.stringify(buildProviderCoreSchema(SCHEMA,'month'))
+  const tokens=Math.ceil(new TextEncoder().encode(input).length/2.6)
+  assert.equal(budget.estimated_input_tokens,tokens)
+  assert.equal(budget.estimated_max_job_krw,estimatedGeminiJobKrw(tokens,'month',[v23OutputTokenLimit('month'),v23OutputTokenLimit('month',true)]))
+  assert.equal(budget.ok,true)
+  const oversized=buildV23PromptBudget({...payload,period:{...payload.period,metadata:'x'.repeat(budget.max_bytes)}})
+  assert.ok(oversized.bytes>oversized.max_bytes)
+  assert.ok(oversized.estimated_max_job_krw>oversized.max_job_krw)
+  assert.equal(oversized.ok,false)
+})

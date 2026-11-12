@@ -736,10 +736,10 @@ const HARD_PROMPT_BYTES=180000;
 const GEMINI_USD_KRW_ESTIMATE=1384;
 const GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");
 function fortuneOutputCaps(kind:string){if(kind==="annual")return [7200,6200];if(kind==="month")return [5600,4800];if(kind==="week")return [4700,4000];return [4000,3400];}
-function estimatedGeminiJobKrw(inputTokens:number,kind:string){
+export function estimatedGeminiJobKrw(inputTokens:number,kind:string,outputCaps=fortuneOutputCaps(kind)){
   const intro=Date.now()<=GEMINI_INTRO_END;
   const inputRate=intro ? .75 : 1.5, outputRate=intro ? 3.75 : 7.5;
-  const [firstOutput,retryOutput]=fortuneOutputCaps(kind),thoughtReserve=3000;
+  const [firstOutput,retryOutput]=outputCaps,thoughtReserve=3000;
   const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;
   return one(firstOutput)+one(retryOutput);
 }

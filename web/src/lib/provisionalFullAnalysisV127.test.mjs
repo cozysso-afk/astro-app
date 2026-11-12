@@ -20,8 +20,13 @@ test('circled precision summaries have visible mobile inset and rhythm',()=>{
 })
 
 test('AI contract analyzes all entered-time layers while marking uncertainty',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.3-stage-answer"/)
+  const version=edge.match(/const REUNION_VERSION="([^"]+)"/)?.[1]
+  assert.ok(version)
+  assert.match(edge,/if\(!available\)aspects=aspects\.filter/)
+  assert.doesNotMatch(edge,/if\(!exact\)aspects=aspects\.filter/)
+  assert.match(edge,/partner_time_available:available,partner_time_exact:exact/)
   assert.match(edge,/누락하거나 제외하지 말고 전부 분석한다/)
   assert.match(edge,/exact\/provisional 모두 whole_house/)
-  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
+  assert.match(edge,/exact가 아닌 시간민감 근거는 provisional\(잠정\)이라고 명시/)
+  assert.equal(cache.match(/const RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = '([^']+)'/)?.[1],version)
 })

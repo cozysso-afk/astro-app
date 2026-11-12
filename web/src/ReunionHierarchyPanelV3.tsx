@@ -195,7 +195,7 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         <p>이미 지난 날짜의 비교 자료예요. 예측 적중률을 뜻하지 않아요.</p>
         {!historyCalculated ? <p>과거 분석을 실행하면 기록과 비교할 수 있어요.</p> : null}
         {historyCalculated && historyRows.length === 0 ? <p>선택한 과거 기간을 계산했지만 비교할 시기 신호를 찾지 못했어요.</p> : null}
-        {historyRows.map((row,index)=><p key={index}><time>{row.start} ~ {row.end}</time> · {STAGE_LABEL[row.stage] ?? row.label}</p>)}
+        {historyRows.map((row,index)=><p key={index}><time>{row.start} ~ {row.end}</time> · {Object.hasOwn(STAGE_LABEL,row.stage) ? STAGE_LABEL[row.stage] : '관계 단계 미확인'}</p>)}
         {comparisons.map(row=><p key={row.kind+row.date}>{row.label} · {row.date}: {row.detail}</p>)}
       </details>
       <details className="reunion-v5-details"><summary>계산 근거와 점수 보기</summary>

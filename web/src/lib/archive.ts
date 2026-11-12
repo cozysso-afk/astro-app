@@ -211,24 +211,53 @@ function calculationJson(item: ArchiveItem) {
   }
 }
 
-async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<UploadLocalItemResult> {
+type PeriodArchiveInput = Pick<ArchiveItem,'kind'|'request'>
+function isPeriodArchive(item: PeriodArchiveInput) {
+  return item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16'
+}
+
+const periodWrites = new Map<string,Promise<unknown>>()
+function serializePeriodWrite<T>(id: string, write: () => Promise<T>): Promise<T> {
+  const previous = periodWrites.get(id)
+  const operation = previous ? previous.catch(() => {}).then(write) : write()
+  periodWrites.set(id,operation)
+  return operation.finally(() => { if (periodWrites.get(id) === operation) periodWrites.delete(id) })
+}
+
+// Distinct devices can both discover an empty archive before either inserts.
+// A user-scoped primary key lets them converge on one row while existing UUIDs remain valid.
+async function periodCloudId(userId: string, id: string) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId + '/' + id)))
+  const hex = Array.from(digest.slice(0,16),byte => byte.toString(16).padStart(2,'0')).join('')
+  return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-')
+}
+
+async function uploadLocalItem(item: ArchiveItem, userId: string, calculationOnly = !item.interpretation): Promise<UploadLocalItemResult> {
   const isFortune = item.kind === 'integrated' || item.kind === 'precision' || item.kind === 'daily' || item.kind === 'outcome'
   const table = isFortune ? 'readings' : 'relationship_readings'
   let cloudId = item.cloudId
   let cloudCreatedAt: string | undefined
 
-  if (!cloudId) {
-    const existing = await supabase
-      .from(table)
-      .select('id, created_at')
-      .eq('user_id', userId)
-      .contains('calculation_json', { archive_v: 1, local_id: item.id })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (!existing.error && existing.data?.id) {
-      cloudId = String(existing.data.id)
-      cloudCreatedAt = String(existing.data.created_at ?? item.createdAt)
+  const period = isPeriodArchive(item)
+  if (!cloudId || (period && calculationOnly)) {
+    const columns = period ? 'id,created_at,interpretation_json,legacy_ai:calculation_json->interpretation' : 'id,created_at'
+    const lookup = supabase.from(table).select(columns).eq('user_id',userId)
+    const byId = cloudId ? lookup.eq('id',cloudId) : lookup.contains('calculation_json', {archive_v:1,local_id:item.id})
+    const existing = await byId.order('created_at',{ascending:false}).limit(1).maybeSingle()
+    if (existing.error && period) throw existing.error
+    const row = existing.data as unknown as {id:string; created_at:string; interpretation_json?:{ai?:Record<string,unknown>}; legacy_ai?:Record<string,unknown>} | null
+    if (row?.id) {
+      cloudId = row.id
+      cloudCreatedAt = row.created_at
+      // A calculation-only refresh must never write null over a remote manuscript.
+      if (period && calculationOnly) {
+        const remote = row.interpretation_json?.ai ?? row.legacy_ai
+        const saved: ArchiveItem = {...item,cloudId,createdAt:cloudCreatedAt,
+          interpretation:remote ?? item.interpretation,
+          syncState: !remote && item.interpretation ? 'local' : 'cloud',
+        }
+        return {item:saved,local:upsertLocal(saved)}
+      }
     }
   }
 
@@ -244,9 +273,14 @@ async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<Uploa
     ? { user_id: userId, profile_id: null, reading_type: item.kind, ...common }
     : { user_id: userId, profile_id: null, counterpart_id: null, reading_type: item.kind, relationship_status: String(item.request.relationship_status ?? ''), ...common }
 
+  const insertId = !cloudId && period ? await periodCloudId(userId,item.id) : undefined
+  const insertPayload = {...payload, id:insertId}
   const response = cloudId
     ? await supabase.from(table).update(payload).eq('id', cloudId).eq('user_id', userId).select('id, created_at').single()
-    : await supabase.from(table).insert(payload).select('id, created_at').single()
+    : await supabase.from(table).insert(insertPayload).select('id, created_at').single()
+  if (insertId && response.error?.code === '23505') {
+    return uploadLocalItem({...item,cloudId:insertId},userId,calculationOnly)
+  }
   if (response.error) throw response.error
   if (!response.data?.id) throw new Error('클라우드 저장 결과가 비어 있어.')
 
@@ -260,14 +294,23 @@ async function uploadLocalItem(item: ArchiveItem, userId: string): Promise<Uploa
   return { item: synced, local }
 }
 
-export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 'syncState'>, stableId?: string): Promise<ArchiveSaveResult> {
+type ArchiveInput = Omit<ArchiveItem, 'id' | 'createdAt' | 'syncState'>
+
+export function saveArchive(input: ArchiveInput, stableId?: string): Promise<ArchiveSaveResult> {
+  return stableId && isPeriodArchive(input)
+    ? serializePeriodWrite(stableId,() => writeArchive(input,stableId))
+    : writeArchive(input,stableId)
+}
+
+async function writeArchive(input: ArchiveInput, stableId?: string): Promise<ArchiveSaveResult> {
   const previous = stableId ? loadLocal().find((row)=>row.id === stableId) : undefined
   let item: ArchiveItem = {
     ...input,
     id: stableId ?? newId(),
     cloudId: previous?.cloudId,
     createdAt: previous?.createdAt ?? new Date().toISOString(),
-    syncState: previous?.syncState ?? 'local',
+    interpretation: isPeriodArchive(input) ? input.interpretation ?? previous?.interpretation : input.interpretation,
+    syncState: isPeriodArchive(input) ? 'local' : previous?.syncState ?? 'local',
   }
   const initialLocal = upsertLocal(item)
   const initialLocalError = initialLocal.ok ? undefined : initialLocal.error
@@ -284,13 +327,13 @@ export async function saveArchive(input: Omit<ArchiveItem, 'id' | 'createdAt' | 
   }
 
   try {
-    const uploaded = await uploadLocalItem(item, auth.userId)
+    const uploaded = await uploadLocalItem(item, auth.userId, !input.interpretation)
     item = uploaded.item
     const localSaved = initialLocal.ok || uploaded.local.ok
     const localError = localSaved
       ? undefined
       : (uploaded.local.ok ? initialLocalError : uploaded.local.error)
-    return { item, localSaved, localError, cloudSynced: true }
+    return { item, localSaved, localError, cloudSynced: item.syncState === 'cloud' }
   } catch (error) {
     return {
       item,
@@ -466,10 +509,12 @@ export async function listArchive(): Promise<ArchiveListResult> {
     }
   }
 
-  const pendingUploads = local.filter((row) => !row.cloudId)
+  const pendingUploads = local.filter((row) => !row.cloudId || (isPeriodArchive(row) && row.syncState === 'local'))
   if (pendingUploads.length) {
     void Promise.allSettled(pendingUploads.map((item) => withArchiveTimeout(
-      uploadLocalItem(item, auth.userId!),
+      isPeriodArchive(item)
+        ? serializePeriodWrite(item.id,() => uploadLocalItem(loadLocal().find(row => row.id === item.id) ?? item, auth.userId!))
+        : uploadLocalItem(item, auth.userId!),
       ARCHIVE_QUERY_TIMEOUT_MS,
       '로컬 기록의 클라우드 동기화가 지연되고 있어.',
     )))
@@ -486,9 +531,9 @@ export async function listArchive(): Promise<ArchiveListResult> {
     local.forEach((item) => merged.set(item.id, item))
     cloud.items.forEach((item) => {
       const existing = merged.get(item.id)
-      const existingHasFullResult = Boolean(existing && existing.hydrated !== false && Object.keys(existing.result ?? {}).length > 0)
-      if (existingHasFullResult) {
-        merged.set(item.id, { ...item, ...existing, cloudId: item.cloudId, cloudSource: item.cloudSource, hydrated: true, syncState: 'cloud' })
+      const existingHasFullResult = Boolean(existing && Object.keys(existing.result ?? {}).length > 0)
+      if (existing && existingHasFullResult) {
+        merged.set(item.id, { ...item, ...existing, cloudId: item.cloudId, cloudSource: item.cloudSource, hydrated: isPeriodArchive(existing) ? Boolean(existing.interpretation) : true, syncState: isPeriodArchive(existing) ? existing.syncState : 'cloud' })
       } else {
         merged.set(item.id, { ...existing, ...item })
       }

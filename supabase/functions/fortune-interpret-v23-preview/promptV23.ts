@@ -1,11 +1,33 @@
 import { attachPeriodReadingContext, buildPeriodReadingInstruction } from './periodReadingContractV1.ts'
-import { buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
+import { v23OutputTokenLimit } from './runtimeBudgetV23.ts'
+import { buildProviderCoreSchema } from './providerSchemaV23.ts'
+import { SCHEMA } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
+import { estimatedGeminiJobKrw, buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
 export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.15-grounded-reader-contract'
 const enc = new TextEncoder()
+
+export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
+절대규칙:
+- PROMPT_DATA와 evidence_ledger 밖의 사실·날짜·상대 속마음·사건 확률을 만들지 않는다.
+- 점수는 상대활성도이지 확률이 아니다. 숫자%로 바꾸지 않는다.
+- 서사는 점수나 topic 이름부터 시작하지 않고 period_narrative.phenomena의 현상 묶음부터 시작한다.
+- 같은 현상이 여러 topic에 걸쳐 있으면 현상은 한 번 설명하고 분야별 발현 차이만 덧붙인다.
+- day/week/month/annual은 서로 다른 시간해상도와 서사 구조를 사용한다. 기간 이름만 바꾼 같은 문장을 재사용하지 않는다.
+- 중요한 결론·날짜·행동은 실제 evidence_refs와 연결한다.
+- supportive와 caution이 같이 있으면 혼합 또는 긴장으로 표현한다.
+- Western·사주·Thai는 합산하지 않고 독립 맥락으로 비교한다. 같은 시기라는 이유로 시너지·합일·확정으로 표현하지 않는다.
+- observation.transit은 현재 운행 행성, target은 출생차트 비교 대상이다. 둘을 구분해서 왜 개인에게 해당하는지 풀어쓴다.
+- 관측일을 임의의 시작일·종료일로 바꾸지 않는다. applying/separating은 접촉에 가까워짐/멀어짐이지 상대의 접근/이탈이 아니다.
+- 같은 애스펙트가 여러 날짜에 반복되면 독립된 여러 근거처럼 부풀리지 않는다.
+- 점수·평균·변동폭은 강약 보조정보일 뿐 해설 자체가 아니다.
+- 투자 상대지수는 가격방향·수익률·매수·매도 적기 예측으로 바꾸지 않는다.
+- 관계가 중요할 때만 상대→나, 나→상대, 과거인연 재접점을 분리해 읽고 실제 반응으로 확인한다.
+- 한 문단에는 새로운 판단 하나만 넣고, 근거의 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결한다.
+- 한국어 반말. JSON만 반환한다.`;
 
 function unique(values: unknown[]) { return [...new Set(values.map(value => String(value ?? '').trim()).filter(Boolean))] }
 function bandRole(row:any) {
@@ -139,9 +161,17 @@ export function buildV23PromptBudget(payload:any) {
   const packet = buildV23PromptPacket(payload)
   const budgetPacket = packet.period_kind === 'month' ? monthlyWriterPacket(packet) : packet
   const bytes = enc.encode(JSON.stringify(budgetPacket)).byteLength
-  const estimated_input_tokens = Math.ceil(bytes / 2.6)
+  const monthly = packet.period_kind === 'month'
+  const inputBytes = monthly
+    ? enc.encode(SYSTEM + buildV23CorePromptFromPacket(packet).text + JSON.stringify(buildProviderCoreSchema(SCHEMA,'month'))).byteLength
+    : bytes
+  const estimated_input_tokens = Math.ceil(inputBytes / 2.6)
   const ratio = estimated_input_tokens / Math.max(1, Number(base.estimated_input_tokens ?? 1))
-  const estimated_max_job_krw = Math.max(
+  // Longer input only changes the input bill. Scaling a fixed completion
+  // allowance by that ratio incorrectly rejects small monthly packets.
+  const estimated_max_job_krw = monthly
+    ? estimatedGeminiJobKrw(estimated_input_tokens, 'month', [v23OutputTokenLimit('month'),v23OutputTokenLimit('month',true)])
+    : Math.max(
     Number(base.estimated_max_job_krw ?? 0),
     Number(base.estimated_max_job_krw ?? 0) * ratio,
   )

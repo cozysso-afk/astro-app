@@ -186,7 +186,11 @@ try {
   await formPage.goto(formUrl.href)
   await formPage.getByRole('button',{name:/궁합운/}).first().click()
   const form = formPage.locator('.counterpart-birth-form')
-  for (const width of [320,375,402,430]) {
+  const birthDate = form.locator('input[type=date]')
+  const birthTime = form.locator('#counterpart-birth-time')
+  await birthDate.fill('1990-06-15')
+  await birthTime.fill('08:45')
+  for (const width of [320,375,393,402,430]) {
     await formPage.setViewportSize({width,height:874})
     await form.waitFor()
     const issues = await form.evaluate(root=>{
@@ -201,17 +205,31 @@ try {
     assert(!issues.length,'partner form clipped or only partly fills row at '+width+'px: '+issues.join(', '))
     const settings = form.locator('.counterpart-time-settings')
     await settings.locator('summary').click()
-    assert(await form.locator('.counterpart-time-note:visible').count()===1,'duplicate birth time hint')
+    const note = form.locator('.counterpart-time-note:visible')
+    assert(await note.count()===1,'duplicate birth time hint')
+    const range = settings.locator('.birth-time-range-field input')
+    await range.nth(0).fill('08:00')
+    await range.nth(1).fill('09:00')
+    assert((await note.innerText()).includes('08:00~09:00'),'time range missing from the form hint')
     await settings.locator('summary').click()
     await form.screenshot({path:path.join(outDir,'partner-form-'+width+'.png')})
+    const clearance = await formPage.getByRole('button',{name:'궁합 정밀 계산',exact:true}).evaluate(button=>{
+      window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})
+      return document.querySelector('.bottom-nav').getBoundingClientRect().top - button.getBoundingClientRect().bottom
+    })
+    assert(clearance >= -1,'bottom navigation covers the calculation button at '+width+'px')
   }
   const unknown = form.getByRole('checkbox')
   await unknown.check()
   assert(!await form.getByRole('button',{name:'출생시간 신뢰도'}).count(),'inactive time precision is still visible')
-  await unknown.uncheck()
+  assert(!await birthTime.count(),'unknown time still exposes the time input')
   await form.getByRole('button',{name:'출생 시·도'}).click()
   await formPage.getByRole('listbox',{name:'출생 시·도'}).getByRole('option').nth(1).click()
   assert(await form.getByRole('button',{name:'출생 시·군·구'}).isEnabled(),'district control did not activate')
+  await form.getByRole('button',{name:'출생 시·군·구'}).click()
+  await formPage.getByRole('listbox',{name:'출생 시·군·구'}).getByRole('option').nth(1).click()
+  await unknown.uncheck()
+  assert(await birthTime.inputValue()==='08:45' && await birthDate.inputValue()==='1990-06-15','toggling unknown time discarded entered values')
   await formPage.close()
 
   await writeFile(path.join(outDir, 'diagnostics.json'), JSON.stringify({ ...diagnostics, expectedPages, downloadCount: downloads.length }, null, 2))

@@ -49,7 +49,7 @@ test('daily, weekly, monthly and annual saved readings retain prose and provenan
 })
 
 test('opening day, week and month calculations only restores saved prose until the reader chooses generation',()=>{
-  for (const args of ['cached.result, cached.request','cachedCalculation.result, cachedCalculation.request','calculation, body as unknown as Record<string,unknown>']) {
+  for (const args of ['cached.result, cached.request','cachedCalculation.result, cachedCalculation.request','calculation, body']) {
     assert.ok(app.includes("runAiInterpretation("+args+", 'open')"))
   }
   assert.match(app,/cacheOnly = intent === 'open' && period !== 'year'/)

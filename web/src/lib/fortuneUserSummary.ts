@@ -731,7 +731,7 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
       const primaryText = primaryLevel === 'low' ? primaryScene.caution : primaryScene.use
       const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== overallPrimary && DAILY_HEADLINE_SCENE[topic])
       const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''
-      return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${overallPrimary}이야. ${primaryText}${secondaryText}`
+      return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${overallPrimary}${particle(overallPrimary, '이야', '야')}. ${primaryText}${secondaryText}`
     }
     return focusedDayFallback(context, bestFlow, cautionFlow)
   }
@@ -748,7 +748,7 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   const separating = /Separating|분리/i.test(motion)
   if (separating) {
     const followThrough = DAILY_FOLLOW_THROUGH[lead.topic] ?? '이미 시작된 일이 실제 행동으로 이어지는지 확인해.'
-    return `${lead.topic}에서 ${dayLabel} 남아 있는 핵심은 ${focus}이야. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}${readableEvidenceNote(context, lead.topic)}`
+    return `${lead.topic}에서 ${dayLabel} 남아 있는 핵심은 ${focus}${particle(focus, '이야', '야')}. 이 흐름은 가장 강했던 구간을 지나고 있어. ${followThrough}${readableEvidenceNote(context, lead.topic)}`
   }
   const phase = applying
     ? '이 흐름은 아직 강해지는 중이라 첫 반응 하나보다 실제 변화가 이어지는지를 봐.'
@@ -758,12 +758,12 @@ function dayEvidenceHeadline(context: FortuneUserSummaryContext, bestFlow: strin
   if (!scopedTopics.size) {
     const secondary = [...bestFlow, ...cautionFlow].find(topic => topic !== lead.topic && DAILY_HEADLINE_SCENE[topic])
     const secondaryText = secondary ? ` ${secondary} 쪽은 ${cautionFlow.includes(secondary) ? DAILY_HEADLINE_SCENE[secondary].caution : DAILY_HEADLINE_SCENE[secondary].use}` : ''
-    return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}이야. ${sceneText} ${phase}${secondaryText}${readableEvidenceNote(context, lead.topic)}`
+    return `${dayLabel} 전체 흐름에서 가장 먼저 볼 건 ${lead.topic}${particle(lead.topic, '이야', '야')}. ${sceneText} ${phase}${secondaryText}${readableEvidenceNote(context, lead.topic)}`
   }
   const variant = [...context.calculation.period.start].reduce((sum,ch)=>sum+ch.charCodeAt(0),0) % 3
   const evidenceNote = readableEvidenceNote(context, lead.topic)
   if (variant === 0) return `${sceneText} ${dayLabel} ${lead.topic}에서는 ${focus}이 핵심이야. ${phase}${evidenceNote}`
-  if (variant === 1) return `${lead.topic}에서 ${dayLabel} 가장 눈에 띄는 건 ${focus}이야. ${sceneText} ${phase}${evidenceNote}`
+  if (variant === 1) return `${lead.topic}에서 ${dayLabel} 가장 눈에 띄는 건 ${focus}${particle(focus, '이야', '야')}. ${sceneText} ${phase}${evidenceNote}`
   return `${subjectLabel} ${sceneText} ${lead.topic}에서는 ${focus}이 먼저 보여. ${phase}${evidenceNote}`
 }
 
@@ -1185,10 +1185,10 @@ export function contactReading(value: FortuneUserRelationship): string {
   const incoming = value.incomingBand, outgoing = value.outgoingBand
   const receive = !incoming || incoming === '정보 부족'
     ? '외부 연락 반응 신호는 독립 계산 정보가 부족해.'
-    : `외부 연락 반응 신호는 ${incoming}이야. 이 강약만으로 특정 상대의 연락 여부를 판단하지 않아.`
+    : `외부 연락 반응 신호는 ${incoming}${particle(incoming, '이야', '야')}. 이 강약만으로 특정 상대의 연락 여부를 판단하지 않아.`
   const send = !outgoing || outgoing === '정보 부족'
     ? '내 연락 실행 적합도도 계산 정보가 부족해.'
-    : `내 연락 실행 적합도는 ${outgoing}이야. 이 값은 내가 말을 꺼낼 때의 상대적 조건이지 상대의 답장 의향은 아니야.`
+    : `내 연락 실행 적합도는 ${outgoing}${particle(outgoing, '이야', '야')}. 이 값은 내가 말을 꺼낼 때의 상대적 조건이지 상대의 답장 의향은 아니야.`
   const application=contactDirectionApplication(incoming,outgoing)
   return [receive,send,application || '실제로 누가 먼저 연락했는지는 주고받은 연락에서 확인할 수 있어.'].join(' ')
 }

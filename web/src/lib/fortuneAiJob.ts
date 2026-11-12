@@ -17,6 +17,7 @@ export type PendingFortuneAiJob = {
   periodEnd?: string
   cacheId?: string
   ttlDays?: number
+  archivePeriod?: 'today' | 'week' | 'month' | 'year' | null
   request?: Record<string, unknown>
 }
 
@@ -54,6 +55,7 @@ export function decodePendingFortuneAiJob(raw: string): PendingFortuneAiJob | nu
       periodEnd: typeof value.periodEnd === 'string' ? value.periodEnd : undefined,
       cacheId: typeof value.cacheId === 'string' ? value.cacheId : undefined,
       ttlDays: typeof value.ttlDays === 'number' && Number.isFinite(value.ttlDays) ? value.ttlDays : undefined,
+      archivePeriod: value.archivePeriod === null || value.archivePeriod === 'today' || value.archivePeriod === 'week' || value.archivePeriod === 'month' || value.archivePeriod === 'year' ? value.archivePeriod : undefined,
       request,
     }
   } catch { return null }

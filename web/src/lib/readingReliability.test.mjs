@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { fortuneFixture, stat } from './readingExperience.fixtures.mjs'
-const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true,hmr:false},appType:'custom'})
+const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
 try {
  const {buildFortuneUserSummary:build}=await server.ssrLoadModule('/src/lib/fortuneUserSummary.ts')
  const {applyLoveContext}=await server.ssrLoadModule('/src/lib/loveReadingContext.ts')

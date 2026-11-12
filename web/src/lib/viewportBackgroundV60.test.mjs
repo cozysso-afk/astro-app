@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { applyIntegratedPrecisionToRequest, rememberBirthTimeReliability } from './precisionTransport.ts'
 
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../viewport-background-v60.css', import.meta.url), 'utf8')
@@ -96,13 +97,28 @@ test('birth and location form uses one readable type and control scale', () => {
   assert.match(css, /\.app-shell \.birth-time-reliability-note[\s\S]*font-size:\s*14px\s*!important/)
 })
 
-test('provisional birth time keeps an explicit optional range without claiming the app generated it', () => {
+test('provisional birth time keeps an explicit optional range without claiming the app generated it', (t) => {
   assert.match(reliability, /가능 생시 범위 시작 · 선택/)
   assert.match(reliability, /가능 생시 범위 끝 · 선택/)
   assert.match(reliability, /birth-time-range-field/)
   assert.match(reliability, /showTimeRange = value\.timeSource === 'rectified' \|\| value\.timeConfidence !== 'exact'/)
   assert.doesNotMatch(reliability, /exact\(정확 생시\)|ASC\(상승점\)/)
-  assert.match(reliability, /범위는 자동 생성하지 않아요/)
+  assert.match(reliability, /가능 범위는 직접 입력한 값만 보관해요/)
+  // The transport must use only what the person entered, including an empty range.
+  const values = new Map()
+  const saved = Object.getOwnPropertyDescriptor(globalThis,'localStorage')
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{
+    getItem:key=>values.get(key) ?? null, setItem:(key,value)=>values.set(key,value),
+  }})
+  t.after(()=>{if(saved) Object.defineProperty(globalThis,'localStorage',saved); else delete globalThis.localStorage})
+  const profile = {birthDate:'1990-04-03',birthTime:'09:00',placeKey:'test',timeSource:'user_estimate',timeConfidence:'medium'}
+  const range = () => applyIntegratedPrecisionToRequest({profile:{birth_date:profile.birthDate,birth_time:profile.birthTime,place_key:profile.placeKey}}).profile.rectified_window
+  rememberBirthTimeReliability(profile)
+  assert.equal(range(), null)
+  rememberBirthTimeReliability({...profile,rectifiedWindowStart:'08:45',rectifiedWindowEnd:'09:10'})
+  assert.deepEqual(range(),{start:'08:45',end:'09:10'})
+  rememberBirthTimeReliability({...profile,timeSource:'official_record',timeConfidence:'exact',rectifiedWindowStart:'08:45',rectifiedWindowEnd:'09:10'})
+  assert.equal(range(), null)
   assert.match(app, /rectified_window:\s*rectifiedWindow/)
   assert.match(precisionTransport, /confidence !== 'exact' && snapshot/)
 })
