@@ -237,15 +237,15 @@ try {
       await page.evaluate(()=>document.fonts.ready)
       const stats=await panel.evaluate(el=>({width:innerWidth,overflow:Math.max(document.documentElement.scrollWidth-innerWidth,el.scrollWidth-el.clientWidth),clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1),bodyFont:el.querySelector('.daily-reading-block p')?getComputedStyle(el.querySelector('.daily-reading-block p')).fontFamily:null}))
       assert.ok(stats.overflow<=1&&!stats.clipped,`${label}: clipped at ${width}`)
-      if(state==='ready')assert.match(stats.bodyFont,/Nanum Myeongjo/)
+      if(state==='ready')assert.match(stats.bodyFont,/Noto Sans KR/)
       report.widths.push({label,state,...stats})
     }
     await page.setViewportSize({width:393,height:852})
     await panel.screenshot({path:path.join(out,`${index}-mobile-393.png`)})
     if(state!=='ready'){assert.equal(await panel.locator('.daily-reading-save').count(),0);report.scopes.push({label,state});continue}
     const heading=await panel.locator('.daily-reading-headline').innerText()
-    const blocks=await panel.locator('.daily-reading-blocks .daily-reading-block p').allTextContents()
-    assert.ok(heading.trim()&&blocks.length,`${label}: empty reading`)
+    const blocks=await panel.locator('.daily-reading-blocks [data-core-image="true"] p').allTextContents()
+    assert.ok(heading.trim(),`${label}: empty reading`)
     await page.evaluate(()=>{window.__dailyQaDrawn=[]})
     const before=downloads.length
     await panel.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).click()

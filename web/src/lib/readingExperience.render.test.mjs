@@ -55,8 +55,8 @@ for(const period of ['today','week','month','year']) test(`actual Fortune ${peri
     for(const value of [authored.overall.summary,authored.overall.dominant_pattern,...['action','timing','watch','avoid','reason'].map(key=>authored.decisions[0][key]),authored.systems.western]) assert.ok(html.includes(`<p>${value}</p>`),value)
     assert.doesNotMatch(html.replace(/<[^>]*>/g,''),/orb|W:fixture|기술 원문|private-auth-logout|2026-09-14|2026-09-17/)
     assert.match(html,/핵심 해설 이미지 저장/)
-    assert.ok(html.indexOf('daily-reading-headline')<html.indexOf('data-daily-block="overall:summary"'))
-    assert.ok(html.indexOf('data-daily-block="overall:summary"')<html.indexOf('daily-reading-details'))
+    assert.ok(html.indexOf('daily-reading-headline')<html.indexOf('data-daily-block="overall:action"'))
+    assert.ok(html.indexOf('data-daily-block="overall:action"')<html.indexOf('daily-reading-details'))
     return
   }
   assert.match(html,/data-authored-scope="overall"/)
@@ -132,9 +132,9 @@ test('portrait prompt is only existing hints plus explicit creative art directio
 test('daily reason action and conditions render as separately labelled accessible blocks',()=>{
   const f=fortuneFixture()
   const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
-  for(const [kind,label] of [['summary','핵심 요약'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
+  for(const [kind,label] of [['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
   assert.match(html,/<time dateTime="2026-09-12">2026-09-12<\/time>/)
-  assert.ok(html.indexOf('overall:reason')<html.indexOf('overall:action'))
+  assert.ok(html.indexOf('overall:action')<html.indexOf('overall:reason'))
   assert.ok(html.indexOf('overall:action')<html.indexOf('overall:watch'))
 })
 test('field hero does not repeat its projected cluster in a second detail card',()=>{
@@ -162,7 +162,11 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} pr
   if(period==='today') {
     assert.match(html,/data-daily-state="ready"/)
     assert.doesNotMatch(html,/signal-incoming|signal-outgoing/)
-    for(const block of ['overall:summary','overall:reason','overall:action','overall:watch','overall:avoid']) assert.ok(html.indexOf(`data-daily-block="${block}"`)>=0 && html.indexOf(`data-daily-block="${block}"`)<html.indexOf('daily-reading-details'),block)
+    const conditions=html.indexOf('적용 조건과 주의할 점')
+    const details=html.indexOf('<summary>상세 해설</summary>')
+    assert.ok(html.indexOf('data-daily-block="overall:action"') < conditions && conditions < details)
+    for(const block of ['overall:watch','overall:avoid']) assert.ok(html.indexOf(`data-daily-block="${block}"`) > conditions)
+    for(const block of ['overall:summary','overall:reason']) assert.ok(html.indexOf(`data-daily-detail="${block}"`) > details)
     assert.match(html,/<details class="daily-reading-details"><summary>상세 해설<\/summary>/)
     assert.ok(html.includes(verifiedResult(f.data).data.decisions[0].reason))
     return

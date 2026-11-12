@@ -33,7 +33,7 @@ try{
   for(const width of [320,350,393,430]){
     await page.setViewportSize({width,height:852})
     const stats=await root.evaluate(el=>({width:innerWidth,overflow:Math.max(document.documentElement.scrollWidth-innerWidth,el.scrollWidth-el.clientWidth),clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1),bodyFont:getComputedStyle(el.querySelector('.daily-reading-block p')).fontFamily}))
-    assert.ok(stats.overflow<=1&&!stats.clipped,JSON.stringify(stats));assert.match(stats.bodyFont,/Nanum Myeongjo/);widths.push(stats)
+    assert.ok(stats.overflow<=1&&!stats.clipped,JSON.stringify(stats));assert.match(stats.bodyFont,/Noto Sans KR/);widths.push(stats)
   }
   await page.setViewportSize({width:393,height:852})
   const scopes=[]
@@ -50,7 +50,7 @@ try{
       scopes.push({label,state});continue
     }
     const heading=await panel.locator('.daily-reading-headline').innerText()
-    const blocks=await panel.locator('.daily-reading-blocks .daily-reading-block p').allTextContents()
+    const blocks=await panel.locator('.daily-reading-blocks [data-core-image="true"] p').allTextContents()
     await page.evaluate(()=>{window.__drawn=[]})
     await panel.getByRole('button',{name:'핵심 해설 이미지 저장'}).click()
     await panel.getByRole('status').filter({hasText:'저장 요청 완료'}).waitFor({timeout:20000})

@@ -39,7 +39,9 @@ test('stored daily, weekly and monthly readings retain the dated field evidence 
      const doc={state:'ready',date:start+' → '+f.calculation.period.end,core:[{id:'saved',label:'원고',text:section.conclusion}],sections:[],exportBlockIds:['saved']}
      return (period==='week'?weeklyReadingCore(doc,{},f.calculation,field):monthlyReadingCore(doc,f.calculation,field)).core
    }
-   assert.match(datedDoc().find(b=>b.id.endsWith(':aspect:학업')).text,/9월 12일 학업 지표는 39점.*출생차트의 토성이 사각을 이뤄.*첫 단계/)
+   assert.match(datedDoc().find(b=>b.id.endsWith(':aspect:학업')).text,period==='today'
+     ? /첫 단계[\s\S]*9월 12일 학업 39점 · 운행 수성 · 출생 토성 사각$/
+     : /9월 12일 학업 지표는 39점.*출생차트의 토성이 사각을 이뤄.*첫 단계/)
    day.evidence[0].source_topics=['시험']
    assert.equal(datedDoc().some(b=>b.id.endsWith(':aspect:학업')),false)
  }
@@ -79,4 +81,22 @@ test('weekly reading follows both orders of dates and monthly examples compare a
   early.evidence[0].polarity=1
   late.evidence[0].polarity=-1
   assert.match(datedAspectReading(calc,'week',['연애']).text,/13일에 표현하기.*15일에는/)
+})
+
+
+test('daily money reading leads with the dates that matter and cites only matching aspects',async()=>{
+ const {datedAspectReading}=await import('./fortuneUserSummary.ts')
+ const date='2026-11-12'
+ const evidence=[
+   {kind:'aspect',source_topics:['금전'],transit:'Mercury',target:'Saturn',aspect:'square',contribution:5,polarity:-1},
+   {kind:'aspect',source_topics:['금전'],transit:'Uranus',target:'Saturn',aspect:'trine',contribution:3,polarity:1},
+ ]
+ const calc={period:{start:date,end:date},western:{daily_scores:[{date,scores:{금전:42},evidence}]}}
+ const read=()=>datedAspectReading(calc,'day',['금전']).text
+ const [lead,adjustment,source]=read().split('\n\n')
+ assert.match(lead,/^이번 결제에 쓸 돈이 결제일 전에/)
+ assert.match(adjustment,/미룰 수 있는 구매/)
+ assert.equal(source,'11월 12일 금전 42점 · 운행 수성 · 출생 토성 사각 / 운행 천왕성 · 출생 토성 삼각')
+ evidence.pop()
+ assert.doesNotMatch(read(),/미룰 수 있는 구매|천왕성/)
 })

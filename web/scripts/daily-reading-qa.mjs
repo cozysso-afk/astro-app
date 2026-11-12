@@ -31,7 +31,7 @@ try {
       const title=el.querySelector('.daily-reading-headline'),body=el.querySelector('.daily-reading-block p')
       return {width:innerWidth,overflow:el.scrollWidth-el.clientWidth,title:parseFloat(getComputedStyle(title).fontSize),titleFont:getComputedStyle(title).fontFamily,body:parseFloat(getComputedStyle(body).fontSize),font:getComputedStyle(body).fontFamily,clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1)}
     })
-    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Nanum Myeongjo/);assert.match(stats.titleFont,/Nanum Myeongjo/)
+    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Noto Sans KR/);assert.match(stats.titleFont,/Nanum Myeongjo/)
     widths.push(stats)
   }
   const headings=[]
@@ -49,7 +49,7 @@ try {
   await page.setViewportSize({width:393,height:852})
   await page.evaluate(()=>document.fonts.ready)
   await root.screenshot({path:path.join(out,'daily-mobile-393.png')})
-  const expected=await root.locator('.daily-reading-blocks .daily-reading-block p').allTextContents()
+  const expected=await root.locator('.daily-reading-blocks [data-core-image="true"] p').allTextContents()
   await root.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).click()
   await root.getByRole('status').filter({hasText:'저장 요청 완료'}).waitFor({timeout:20000})
   await Promise.all(downloads)

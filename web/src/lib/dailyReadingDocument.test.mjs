@@ -79,3 +79,54 @@ test('overall financial caveats do not leak to field readings and date-only timi
    assert.ok(dailyReadingExportModel(doc).fitContentHeight)
  }
 })
+
+test('an archived overview leads with one conclusion and one action while retaining qualifications',()=>{
+ const d=data()
+ d.overall.summary=d.headline
+ d.decisions[0].avoid=d.decisions[0].action
+ d.decisions[0].reason='별도 이유를 보존해.'
+ const doc=buildDailyReadingDocument(d,'2026-11-04',undefined,true)
+ assert.equal(doc.state,'ready')
+ assert.equal(doc.blocks[0].id,'overall:action')
+ assert.ok(doc.blocks.some(b=>b.text===d.decisions[0].watch))
+ assert.ok(doc.blocks.some(b=>b.text===d.limits))
+ assert.ok(doc.details.some(b=>b.text===d.decisions[0].reason))
+ const texts=[doc.headline,...doc.blocks.map(b=>b.text),...doc.details.map(b=>b.text)]
+ assert.equal(texts.filter(t=>t===d.headline).length,1)
+ assert.equal(texts.filter(t=>t===d.decisions[0].action).length,1)
+})
+
+test('a duplicated headline never produces an empty export',()=>{
+ const d=data()
+ d.overall.summary=d.headline
+ d.decisions=[];d.limits=''
+ const doc=buildDailyReadingDocument(d,'2026-11-04',undefined,true)
+ assert.equal(doc.blocks[0].id,'overall:reason')
+ assert.doesNotThrow(()=>dailyReadingExportModel(doc))
+ d.overall.dominant_pattern=''
+ const headlineOnly=buildDailyReadingDocument(d,'2026-11-04',undefined,true)
+ assert.equal(headlineOnly.state,'ready')
+ assert.deepEqual(dailyReadingExportModel(headlineOnly).sections[0].cards.map(card=>card.body),[d.headline])
+})
+
+test('the overall core image keeps the action and its timing with the full cautions in the document',()=>{
+ const d=data()
+ d.decisions[0].timing='상대가 시간을 정했을 때'
+ const doc=buildDailyReadingDocument(d,'2026-11-04',undefined,true)
+ const cards=dailyReadingExportModel(doc).sections[0].cards
+ assert.deepEqual(cards.map(card=>card.body),[d.headline,d.decisions[0].action,d.decisions[0].timing])
+ for(const text of [d.decisions[0].watch,d.decisions[0].avoid,d.limits]) assert.ok(doc.blocks.some(block=>block.text===text))
+})
+
+test('confirmed archive wording is clarified without changing manuscripts with extra qualifications',()=>{
+ const d=data()
+ d.headline='의견 교환은 활발하지만 책임과 마감 같은 세부 약속을 확정하기는 까다로운 날이야.'
+ d.decisions[0].action='합의한 조건과 역할의 범위를 서면으로 명확히 기록해 둬.'
+ const overall=()=>buildDailyReadingDocument(d,'2026-11-12',undefined,true)
+ assert.equal(overall().headline,'의견은 잘 오가도 누가 언제까지 맡을지는 서로 다르게 이해할 수 있어.')
+ assert.equal(overall().blocks[0].text,'약속한 조건과 각자 맡은 일을 한 줄로 적어 봐.')
+ d.headline+=' 단, 이미 정한 약속은 그대로 이어가.'
+ d.decisions[0].action+=' 상대가 답하면 다시 확인해.'
+ assert.equal(overall().headline,d.headline)
+ assert.equal(overall().blocks[0].text,d.decisions[0].action)
+})
