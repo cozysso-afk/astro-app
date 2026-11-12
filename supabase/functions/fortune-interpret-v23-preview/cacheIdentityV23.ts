@@ -3,7 +3,7 @@ import { PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 
 export const DAY_WEEK_NARRATIVE_CACHE_VERSION = 'dw-period-distinct-v4-human-scene'
 export const DAILY_OUTPUT_CACHE_VERSION = 'daily-output-reading-contract-v8-love'
-export const MONTHLY_OUTPUT_CACHE_VERSION = 'monthly-love-situations-v1'
+export const MONTHLY_OUTPUT_CACHE_VERSION = 'monthly-love-situations-v2-dated-samples'
 export const WEEKLY_OUTPUT_CACHE_VERSION = 'weekly-reading-evidence-v3'
 export const PROVIDER_NORMALIZATION_CACHE_VERSION = 'provider-single-author-provenance-v2'
 export const FALLBACK_EDITORIAL_CACHE_VERSION = 'evidence-episode-action-v2'

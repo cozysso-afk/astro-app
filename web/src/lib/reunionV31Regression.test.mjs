@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const birthplace = readFileSync(new URL('../koreaBirthplaces.tsx', import.meta.url), 'utf8')
 const fontCss = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
-const panel = readFileSync(new URL('../ReunionHierarchyPanel.tsx', import.meta.url), 'utf8')
+import {renderReunion,hierarchy,candidate} from './fixtures/reunionPanel.mjs'
 
 test('birthplace chooser avoids native select and preserves rendered relationship results', () => {
   assert.match(birthplace, /createPortal/)
@@ -33,13 +33,17 @@ test('reunion consultation prose uses one serif family while headings and contro
 })
 
 test('main reunion reader never exposes internal stage identifiers', () => {
-  assert.match(panel, /normalizeReaderLanguage/)
-  for (const id of ['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding','initiative_gate']) {
-    assert.match(panel, new RegExp(`\\b${id}\\b`))
-  }
-  assert.match(panel, /const summary = phaseVerdict\(hierarchyData\)/)
-  assert.match(panel, /function dedupeTimingWindows/)
-  assert.match(panel, /같은 종류의 신호라 날짜마다 서로 다른 사건을 뜻하는 것은 아니야/)
+  const ids=['emotional_reactivation','contact_recontact','in_person_meeting','relationship_rebuilding','initiative_gate']
+  const stages=Object.fromEntries(ids.map(id=>[id,{label:id,activation:60,candidate_count:1}]))
+  const data={...hierarchy,stages,top_periods:[candidate('2027-01-09')]}
+  const archive={...hierarchy,past_windows:[candidate('2026-08-01','initiative_gate','initiative_gate')]}
+  const html=renderReunion({hierarchy:data,historyHierarchy:archive,historyCalculated:true})
+  const prose=html.replace(/<[^>]*>/g,' ')
+  for(const id of ids) assert.ok(!prose.includes(id),id)
+  assert.match(prose,/2026-08-01 ~ 2026-08-01\s+· 관계 단계 미확인/)
+  assert.match(prose,/만남을 살펴볼 시기/)
+  assert.match(prose,/연락이 닿음\s+확인됨/)
+  assert.equal((html.match(/aria-current="step"/g)||[]).length,1)
 })
 
 test('birthplace region step stays staged while placeKey is empty', () => {

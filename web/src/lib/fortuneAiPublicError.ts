@@ -124,6 +124,12 @@ export async function fortuneAiStartErrorMessage(error: unknown, invokeData: unk
 }
 
 export function fortuneAiFailedJobMessage(payload: unknown) {
+  const job = recordFromUnknown(payload)
+  const trace = recordFromUnknown(job?.usage)?.call_trace
+  if (job?.error_code === 'JOB_GENERATION_FAILED' && Array.isArray(trace) &&
+      recordFromUnknown(trace.at(-1))?.http_status === 402) {
+    return 'AI 제공사의 결제 제한으로 해설을 생성하지 못했어. 계산 결과는 볼 수 있고, 프롬프트를 복사해 따로 해석할 수 있어.'
+  }
   return fortuneAiPublicErrorMessage(payload, FORTUNE_AI_FAILED_JOB_FALLBACK)
 }
 

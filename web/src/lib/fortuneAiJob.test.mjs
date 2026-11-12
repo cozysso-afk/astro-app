@@ -259,6 +259,13 @@ test('fortune malformed FunctionsHttpError body falls back safely', async () => 
   assert.equal(await fortuneAiStartErrorMessage(error, null), FORTUNE_AI_START_ERROR_FALLBACK)
 })
 
+test('only a final upstream billing refusal explains the payment limit and free prompt route', () => {
+  const failed = (...statuses) => ({ error_code: 'JOB_GENERATION_FAILED', usage: {call_trace: statuses.map(http_status => ({http_status}))} })
+  assert.match(fortuneAiFailedJobMessage(failed(402)), /결제 제한.*프롬프트를 복사/)
+  assert.doesNotMatch(fortuneAiFailedJobMessage(failed(402, 200)), /결제 제한/)
+  assert.doesNotMatch(fortuneAiFailedJobMessage({...failed(402), error_code:'JOB_CANCELED'}), /결제 제한/)
+})
+
 test('fortune failed job payload uses known codes, safe legacy text, and blocks encoded secrets', () => {
   assert.equal(
     fortuneAiFailedJobMessage({ status:'failed', error_code:'JOB_TIMEOUT', error:'ignored' }),

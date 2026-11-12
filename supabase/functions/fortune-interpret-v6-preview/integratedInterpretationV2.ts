@@ -212,10 +212,32 @@ export function compactCalculation(calc:any){
       keyDates=[keyDateRow([dayDate,dateRank.get(dayDate)??fallback]),...keyDates].slice(0,16);
     }
   }
+  function addDailyEvidence(date:string,ev:any,index:number){
+    const topics=Array.isArray(ev?.source_topics)?ev.source_topics.filter((x:any)=>typeof x==="string"):[];
+    const source=topics.join(", ");
+    return addEvidence({id:`W:daily:${date}:${index+1}`,system:"western",scope:"daily_actual_aspect_house",source_topics:topics,direction:"context",date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});
+  }
   for(const kd of keyDates){
     const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
-    rows.forEach((ev:any,index:number)=>{const id=`W:daily:${kd.date}:${index+1}`;const source=Array.isArray(ev?.source_topics)?ev.source_topics.join(", "):"";addEvidence({id,system:"western",scope:"daily_actual_aspect_house",source_topics:Array.isArray(ev?.source_topics)?ev.source_topics.filter((x:any)=>typeof x==="string"):[],direction:"context",date:kd.date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});kd.western_refs.push(id);});
+    rows.forEach((ev:any,index:number)=>kd.western_refs.push(addDailyEvidence(kd.date,ev,index)));
     kd.western_refs=uniq(kd.western_refs);
+  }
+  if(calculationPeriodKind==="month"){
+    // Ordinary scores can still have dated observations. Retain two real
+    // samples without turning them into ranked dates or event forecasts.
+    const sorted=[...dailyByDate.values()].filter((d:any)=>typeof d?.date==="string"&&
+      d.date>=calculationPeriod.start&&d.date<=calculationPeriod.end&&Array.isArray(d.evidence)&&
+      new Date(d.date+"T00:00:00Z").toJSON()?.slice(0,10)===d.date)
+      .sort((a:any,b:any)=>a.date.localeCompare(b.date));
+    for(const topic of ["연애","재회"]){
+      if(evidence.some(row=>row.scope==="daily_actual_aspect_house"&&row.source_topics?.includes(topic)))continue;
+      const samples=sorted.flatMap((d:any)=>{
+        const index=d.evidence.findIndex((ev:any)=>Array.isArray(ev?.source_topics)&&ev.source_topics.includes(topic)&&
+          ev.transit&&ev.target&&ev.aspect);
+        return index<0?[]:[{date:d.date,index,ev:d.evidence[index]}];
+      });
+      for(const item of [samples[0],samples.at(-1)])if(item)addDailyEvidence(item.date,item.ev,item.index);
+    }
   }
 
   const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];

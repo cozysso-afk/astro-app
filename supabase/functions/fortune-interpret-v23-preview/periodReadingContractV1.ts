@@ -91,6 +91,15 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
     // samples, never the start/end of an inferred continuous influence.
     for(const row of [rows[0],rows.at(-1)].filter(Boolean))selected.set(row.id,row)
   }
+  if(packet.period_kind==='month'){
+    for(const topic of ['연애','재회']){
+      const observed=(row:any)=>row.scope==='daily_actual_aspect_house'&&row.system==='western'&&
+        intersects(row,packet.period)&&topicsOf(row).includes(topic)
+      if([...selected.values()].some(observed))continue
+      const rows=full.filter(observed).sort((a:any,b:any)=>a.date.localeCompare(b.date))
+      for(const row of [rows[0],rows.at(-1)])if(row)selected.set(row.id,row)
+    }
+  }
   const evidence_ledger=[...selected.values()]
   const selectedIds=new Set(selected.keys())
   const omitted=full.filter((r:any)=>!selectedIds.has(r.id))

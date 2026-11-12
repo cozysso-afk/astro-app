@@ -1,4 +1,5 @@
 import test from 'node:test'
+import {renderHierarchy,renderReunion,hierarchy,candidate} from './fixtures/reunionPanel.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
@@ -7,7 +8,6 @@ const css=readFileSync(new URL('../reunion-quality-v74.css',import.meta.url),'ut
 const readingCss=readFileSync(new URL('../reading-experience.css',import.meta.url),'utf8')
 const edge=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const cache=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
-const host=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 
 test('final app background owner no longer ties aurora y positions to content height',()=>{
   assert.doesNotMatch(readingCss,/ellipse at 0 8%/)
@@ -17,27 +17,35 @@ test('final app background owner no longer ties aurora y positions to content he
 })
 
 test('reunion story precedes technical progression evidence',()=>{
-  const headings=['재회 흐름 한눈에','재회 단계별 흐름','받는 연락 · 보내는 연락','앞으로 주목할 시기','지금 확인할 것','관계를 이해하는 해설','왜 다시 연결됐나','재회로 넘어가려면','다시 만났을 때의 유지력','다시 깨질 수 있는 지점']
+  const html=renderHierarchy({hierarchyData:{...hierarchy,top_periods:[candidate('2027-01-12')]},
+    reunionV2:{summary:'실제 상황부터 확인해요.',why_reconnect:{conclusion:'연락을 다시 한 이유를 확인해요.'},
+    rebuild:{conclusion:'다음 대화를 함께 정해요.'},repeat_risks:{conclusion:'예전 갈등이 반복되는지 봐요.'},
+    consultation_answer:{next_stage_up_conditions:['둘이 약속을 정하는지 봐요.']}},sustainabilityText:'만남 뒤에도 약속을 지키는지 봐요.'})
+  const headings=['현재 판정','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','다음 단계로 넘어가는 변화','관계 배경과 반복 위험 더 보기','왜 다시 연결됐나','재회로 넘어가려면','다시 만났을 때의 유지력','다시 깨질 수 있는 지점','계산 근거와 점수 보기']
   let cursor=-1
-  for(const heading of headings){const next=panel.indexOf(heading);assert.ok(next>cursor,heading);cursor=next}
-  assert.ok(panel.indexOf('계산 근거와 점수 보기')>cursor)
-  assert.match(panel,/다음 관문/)
+  for(const heading of headings){const next=html.indexOf(heading);assert.ok(next>cursor,heading);cursor=next}
+
 })
 
 test('raw progression evidence is collapsed and has breathing room',()=>{
   assert.match(panel,/details className="reunion-v5-details"/)
   assert.match(panel,/summary>계산 근거와 점수 보기/)
-  assert.match(css,/\.reunion-v5-stages[\s\S]*gap:\s*8px/)
-  assert.match(css,/\.reunion-v5-section[\s\S]*padding:\s*16px 0/)
+  assert.match(css,/\.reunion-v4-stage-rail > li\s*\{[^}]*gap:\s*(?:[89]|[1-9]\d+)px/)
+  assert.match(css,/\.reunion-v5-section\s*\{[^}]*padding:\s*(?:1[6-9]|[2-9]\d)px 0/)
 })
 
 test('modern hierarchy keeps generic appendix closed by default',()=>{
-  assert.match(host,/open=\{!hierarchyData && !\(ai\?\.ok && ai\.data\)\}/)
+  for(const props of [{},{hierarchy:null}]) {
+    const html=renderReunion(props)
+    assert.match(html,/<details class="relationship-technical"><summary>기술 근거 자세히 보기/)
+    assert.doesNotMatch(html,/<details[^>]*class="relationship-technical"[^>]*open/)
+  }
 })
 
 test('v12.6 invalidates shallow cache and enforces editorial stage story',()=>{
-  assert.match(edge,/REUNION_VERSION="relationship-v13\.3-stage-answer"/)
-  assert.match(cache,/relationship-v13\.3-stage-answer-v1/)
+  const v=edge.match(/REUNION_VERSION="([^"]+)"/)?.[1]
+  assert.ok(v && !v.startsWith('relationship-v13.3'))
+  assert.ok(cache.includes(`RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = '${v}'`))
   assert.match(edge,/마음이 다시 움직이는 시기/)
   assert.match(edge,/실제 관계가 움직이는 시기/)
   assert.match(edge,/독립 카드 여러 장처럼 쓰지 말고 하나의 상담 서사로 이어라/)

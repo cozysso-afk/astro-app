@@ -127,6 +127,18 @@ export async function deleteReadingCache(id: string): Promise<void> {
 
 export function fortuneCalculationCacheId(request: Record<string, unknown>): string {
   applyIntegratedPrecisionToRequest(request)
+  return storedFortuneCalculationId(request)
+}
+
+// The persisted request already contains the precision used for that calculation.
+// An archive, retry or resumed job must not re-read the currently selected profile.
+export function periodCalculationRequest(snapshot: Record<string, unknown>): Record<string,unknown> {
+  const {archive_mode, interpretation_current_date, interpretation_timezone, reading_revision_job, ...request} = snapshot
+  return request
+}
+
+export function storedFortuneCalculationId(snapshot: Record<string, unknown>): string {
+  const request = periodCalculationRequest(snapshot)
   return `fortune-calc:${hashText(stableStringify({ contract: FORTUNE_CALC_CACHE_CONTRACT, request }))}`
 }
 
@@ -144,7 +156,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
     interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
     ...(periodKind === 'day' ? {daily_relationship_revision: 3} : {}),
     ...(periodKind === 'week' ? {weekly_reading_revision: 1} : {}),
-    ...(periodKind === 'month' ? {monthly_relationship_revision: 1} : {}),
+    ...(periodKind === 'month' ? {monthly_relationship_revision: 2} : {}),
     narrative_contract: narrativeContract,
     precision_contract: FORTUNE_PRECISION_CACHE_CONTRACT,
     ...fortuneProvisionalSynthesisSignature(precision.ok ? precision.mode : 'invalid'),

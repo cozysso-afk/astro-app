@@ -4,7 +4,7 @@ import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstru
 import { addGeminiUsage, inspectThaiOutputSafety, thaiOutputGuardRequired, strictThaiRetryInstruction, THAI_CONTRACT_VERSION } from "../fortune-interpret-v6-preview/thaiContract.ts";
 import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-preview/costGuardV21.ts";
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
-import { buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
+import { SYSTEM, buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, reusePlainHeadlineFromSummary, retainValidPeriodFields } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
@@ -57,24 +57,7 @@ function structureReport(value:any){
 function structureFailure(result:any,value:any){const report=structureReport(value);if(!report.issues.length)report.issues.push("validator_rejected_normalized_core");return {...result,ok:false,error:"provider 구조화 응답 검증 실패",structure_guard_failed:true,structure_report:report,candidate_data:result?.data,validation:undefined};}
 function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- period_section_not_plain_language 또는 period_hero_not_plain_language가 있으면 headline·overall·각 conclusion/action/applies_when/evidence_meaning/real_scene 첫 문장에서 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용을 모두 빼고 생활 장면부터 써.\n- 각 fields에 정확한 날짜나 기간을 쓰려면 그 fields의 evidence_refs가 그 날짜 또는 구간을 직접 포함해야 해. 아니면 날짜를 삭제하고 장면만 설명해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
 
-const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
-절대규칙:
-- PROMPT_DATA와 evidence_ledger 밖의 사실·날짜·상대 속마음·사건 확률을 만들지 않는다.
-- 점수는 상대활성도이지 확률이 아니다. 숫자%로 바꾸지 않는다.
-- 서사는 점수나 topic 이름부터 시작하지 않고 period_narrative.phenomena의 현상 묶음부터 시작한다.
-- 같은 현상이 여러 topic에 걸쳐 있으면 현상은 한 번 설명하고 분야별 발현 차이만 덧붙인다.
-- day/week/month/annual은 서로 다른 시간해상도와 서사 구조를 사용한다. 기간 이름만 바꾼 같은 문장을 재사용하지 않는다.
-- 중요한 결론·날짜·행동은 실제 evidence_refs와 연결한다.
-- supportive와 caution이 같이 있으면 혼합 또는 긴장으로 표현한다.
-- Western·사주·Thai는 합산하지 않고 독립 맥락으로 비교한다. 같은 시기라는 이유로 시너지·합일·확정으로 표현하지 않는다.
-- observation.transit은 현재 운행 행성, target은 출생차트 비교 대상이다. 둘을 구분해서 왜 개인에게 해당하는지 풀어쓴다.
-- 관측일을 임의의 시작일·종료일로 바꾸지 않는다. applying/separating은 접촉에 가까워짐/멀어짐이지 상대의 접근/이탈이 아니다.
-- 같은 애스펙트가 여러 날짜에 반복되면 독립된 여러 근거처럼 부풀리지 않는다.
-- 점수·평균·변동폭은 강약 보조정보일 뿐 해설 자체가 아니다.
-- 투자 상대지수는 가격방향·수익률·매수·매도 적기 예측으로 바꾸지 않는다.
-- 관계가 중요할 때만 상대→나, 나→상대, 과거인연 재접점을 분리해 읽고 실제 반응으로 확인한다.
-- 한 문단에는 새로운 판단 하나만 넣고, 근거의 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결한다.
-- 한국어 반말. JSON만 반환한다.`;
+
 
 function coreInstruction(periodKind:unknown,compact=false){const kind=String(periodKind??"annual");if(kind==="day")return `
 [DAILY OUTPUT]

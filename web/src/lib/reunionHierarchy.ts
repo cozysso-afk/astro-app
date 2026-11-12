@@ -22,7 +22,7 @@ export function hierarchyView(raw: Record<string,unknown>|null|undefined):Reunio
   if(!raw || typeof raw.version!=='string' || !Array.isArray(raw.top_periods) || !raw.validation) return null
   const value = raw as unknown as ReunionHierarchy
   const asOf = isoDay(value.as_of_date)
-  const topPeriods = value.top_periods.filter((row)=>futurePeriod(row,asOf)).slice(0,3)
+  const topPeriods = value.top_periods.filter((row)=>futurePeriod(row,asOf))
   const nearest = value.nearest_window && futurePeriod(value.nearest_window,asOf)
     ? value.nearest_window
     : [...topPeriods].sort((a,b)=>a.date.localeCompare(b.date) || b.final-a.final)[0] ?? null
