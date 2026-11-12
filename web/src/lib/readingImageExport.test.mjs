@@ -32,25 +32,21 @@ test('fortune export uses an iPhone-readable 4:5 aurora glass renderer instead o
   assert.match(exporter,/anchor\.download\s*=\s*file\.name/)
 })
 
-test('export keeps UI labels sans but renders editorial reading prose in Myeongjo after fonts load',()=>{
-  assert.match(exporter,/editorial\?: boolean/)
-  assert.match(exporter,/function readingFont/)
-  assert.match(exporter,/"Nanum Myeongjo", "Noto Serif KR", AppleMyungjo, Batang, serif/)
-  assert.match(exporter,/async function ensureExportFonts/)
-  assert.match(exporter,/document\.fonts\.load\('500 32px "Nanum Myeongjo"'\)/)
-  assert.match(exporter,/document\.fonts\.load\('700 32px "Nanum Myeongjo"'\)/)
-  assert.match(exporter,/periodTopicCards[\s\S]*editorial:\s*true/)
-  assert.match(exporter,/전체를 통틀어 보면[\s\S]*editorial:\s*true/)
-  assert.match(exporter,/if \(card\.editorial\) readingFont\(ctx, metrics\.bodySize, 500\)/)
-  assert.match(exporter,/await ensureExportFonts\(\)[\s\S]*const canvases = renderPages\(model\)/)
+test('saved text uses locally loaded Korean sans with a distinct lead weight and readable body size',()=>{
+  assert.match(exporter,/bodySize: card.emphasis \? 52/)
+  assert.match(exporter,/BODY_SIZE = 44/)
+  assert.match(exporter,/BODY_LINE = 67/)
+  assert.match(exporter,/metrics.bodySize, card.emphasis \? 700 : 400/)
+  assert.match(exporter,/document.fonts.load\(.*Noto Sans KR.*copy/)
+  assert.match(exporter,/await ensureExportFonts\(model\)[\s\S]*const canvases = renderPages\(model\)/)
 })
 
 test('short flow and timing cards use compact geometry instead of wasting vertical space',()=>{
   assert.match(exporter,/compact\?: boolean/)
   assert.match(exporter,/compact:\s*true/)
   assert.match(exporter,/function cardMetrics/)
-  assert.match(exporter,/titleSize:\s*compact\s*\?\s*27\s*:\s*30/)
-  assert.match(exporter,/bodySize:\s*compact\s*\?\s*29\s*:\s*BODY_SIZE/)
+  assert.match(exporter,/titleSize:\s*compact\s*\?\s*29\s*:\s*34/)
+  assert.match(exporter,/bodySize:.*compact\s*\?\s*36\s*:\s*BODY_SIZE/)
   assert.match(exporter,/maxBodyLines:\s*card\.complete\s*\?\s*Infinity\s*:\s*compact\s*\?\s*3/)
 })
 
@@ -101,11 +97,13 @@ test('export keeps a stable rhythm and actively rebalances sparse tail pages',()
   assert.doesNotMatch(exporter,/sections\.push\(\{\s*title:\s*['"](?:면책|주의사항)/)
 })
 
-test('canvas wrapping keeps common closing punctuation attached to the previous line',()=>{
-  assert.match(exporter,/function wrap\(/)
-  assert.match(exporter,/，。！？、/)
-  assert.match(exporter,/line\s*\+=\s*ch/)
-  assert.match(exporter,/out\.push\(line\.trimEnd\(\)\)/)
+test('Korean text wraps at word boundaries and oversized unbroken tokens still fit',()=>{
+  const source=exporter.slice(exporter.indexOf('function wrap('),exporter.indexOf('function font('))
+    .replace(/: CanvasRenderingContext2D|: string\[\]|: string|: number/g,'')
+  const wrap=new Function('normalizeText',source+';return wrap')(text=>text.trim().replace(/\s+/g,' '))
+  const context={measureText:text=>({width:[...text].length})}
+  assert.deepEqual(wrap(context,'금요일 저녁까지 답을 줘.',7),['금요일','저녁까지 답을','줘.'])
+  assert.deepEqual(wrap(context,'123456789',4),['1234','5678','9'])
 })
 
 test('relationship exports only the same authored document used on screen',()=>{

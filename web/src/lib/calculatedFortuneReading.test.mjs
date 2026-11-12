@@ -86,12 +86,16 @@ for(const period of ['today','week','month']) {
     first.evidence=[study,{...opposite,source_topics:['직장'],transit:'Pluto',contribution:15}]
     last.evidence.push(opposite)
     const actual=render(period,'학업',{calculation:calc})
-    assert.match(actual,/10월 1일 학업 지표는 49점.*운행 중인 수성과 출생차트의 토성/)
-    assert.match(actual,/운행 중인 금성과 출생차트의 달/)
-    assert.doesNotMatch(actual,/운행 중인 명왕성/)
+    if(period==='today') {
+      assert.match(actual,/책을 덮고 첫 단계의 이유를 설명할 때 막힐 수 있어[\s\S]*10월 1일 학업 49점 · 운행 수성 · 출생 토성 사각 \/ 운행 금성 · 출생 달 삼각/)
+    } else {
+      assert.match(actual,/10월 1일 학업 지표는 49점.*운행 중인 수성과 출생차트의 토성/)
+      assert.match(actual,/운행 중인 금성과 출생차트의 달/)
+    }
+    assert.doesNotMatch(actual,/운행(?: 중인)? 명왕성/)
     if(period==='week') assert.match(actual,/10월 7일 학업 지표는 55점.*주간 평균은 52점/)
     if(period==='month') assert.match(actual,/10월 31일 학업 지표는 79점.*월간 평균은 52점/)
     first.evidence=[];last.evidence=[]
-    assert.doesNotMatch(render(period,'학업',{calculation:calc}),/운행 중인 수성과 출생차트의 토성/)
+    assert.doesNotMatch(render(period,'학업',{calculation:calc}),/운행(?: 중인)? 수성(?:과 출생차트의| · 출생) 토성/)
   })
 }

@@ -51,7 +51,7 @@ export function buildDailyClarityRequest(candidate:any,payload:any,quality?:any)
   const request=buildDailyRewriteRequest(candidate,{stages:quality?.stages??[],daily_editorial:{issues}},payload)
   if(!request)return null
   request.prompt+=`\n[FINAL READER EDIT]\n자동검사 통과와 문장 품질은 달라. 아래 기준으로 각 target을 편집해. 제목·요약과 실제 오류가 있는 필드만 고쳐. 이미 기준에 맞는 문장은 그대로 반환해. 원문보다 확신을 높이거나 새로운 손해·효과·예외를 추가하지 마.\n- 원고의 의미와 조건, 근거 방향을 보존해. 사건·증상·상대 행동을 새로 만들지 마.\n- headline/conclusion은 행동 명령이 아니라 무엇이 수월하거나 까다로운지 해석한 결과야. 독자가 묻는 운세에 먼저 답하고 행동은 action에 남겨. 모든 결론을 확인·미루기·조심하기로 바꾸지 마.
-- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단이 해당하는 상황과 이유를 짧은 두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나야. 일일 change_condition은 빈 문자열로 유지해. 분야 이름만 바꾸어 통하는 조언은 다시 써. 연락의 활성·지속과 연애, 재회와 관계 재결합을 서로 바꾸지 마.\n${DAILY_EDITORIAL_INSTRUCTION}`
+- headline은 추상적인 하루의 성격이 아니라 무엇에 대한 어떤 판단인지 한 번에 읽히는 문장이야. '큰 틀/세부 조건/현실적 기준/무리한 확장'은 구체적 대상이 없으면 답이 아니야. '구체적인 조건을 확인해'로 바꾸는 것도 실패야. 무엇에 관해 서로 다르게 이해하거나 무엇을 과하게 기대하는지 풀어 써. 근거와 원고에서 실제로 뜻하는 대상 하나를 골라 직접 써.\n- summary는 제목을 반복하지 말고 그 판단을 이해할 생활 장면을 한두 문장으로 설명해. 행성명과 각도는 systems에 이미 있으니 원고에서 반복하지 마.\n- 근거의 상징을 실제 생활의 원인으로 단정하지 마. '배치가 신체 긴장감을 준다'처럼 관측되지 않은 인과를 만들지 마. 조건부 해석임을 유지해.\n- action은 실행할 선택 하나야. 일일 change_condition은 빈 문자열로 유지해. 분야 이름만 바꾸어 통하는 조언은 다시 써. 연락의 활성·지속과 연애, 재회와 관계 재결합을 서로 바꾸지 마.\n${DAILY_EDITORIAL_INSTRUCTION}`
   return request
 }
 
@@ -163,7 +163,7 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
 이 원고에는 사용자의 직업·학업·시험·이직·투자·연애 상태 정보가 없다. headline, overall.summary, overall.best_phase, overall.caution_phase에서 직장·업무·실무·출근·퇴근·학업·공부·시험·이직·투자·매수·매도·연애·연락·재회·금전·컨디션을 사용자의 실제 일정처럼 쓰거나 분야 목록으로 나열하지 마.
 기류·에너지·작용·조율·정돈·신중하게·균형이 중요 같은 추상어만으로 결론을 만들지 마. 행성명·각 이름·영문 전문어·사주 용어도 쓰지 마.
 대신 기존 원고와 분야 결론이 공통으로 말하는 실제 대상을 하나 골라, 약속·요청·지출·휴식·대화·선택 기준처럼 역할과 무관한 생활 장면으로 바꿔. 근거에 없는 사건·성과·상대 행동은 새로 만들지 마.
-headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.summary는 제목을 반복하지 말고 적용 상황과 이유를 두 문장, 80~180자 정도로 설명해. best_phase와 caution_phase도 분야명이 아니라 무엇을 할 때 판단이 달라지는지 짧게 써.
+headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.summary는 제목을 반복하지 말고 어떤 장면에서 그 판단이 드러나는지 한두 문장으로 설명해. best_phase와 caution_phase도 분야명이 아니라 무엇을 할 때 판단이 달라지는지 짧게 써.
 첫 화면 네 문장에는 직장·업무·실무·학업·공부·시험·이직·투자·매수·매도·연애·재회·금전·컨디션이라는 분야명을 넣지 마. 기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}

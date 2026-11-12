@@ -48,8 +48,11 @@ test('V23 prompt carries phenomenon-first contract instead of topic-first narrat
 
 test('daily copy contract keeps the headline and summary short and forbids overall fallback', () => {
   const out = buildV23CorePrompt(payload('day')).text
-  assert.match(out, /문장 수를 맞추려고 조건을 삭제/)
-  assert.match(out, /80~180자/)
+  assert.match(out,/headline은 읽고 나서 기억할 판단 하나, overall.summary는 그 판단이 드러나는 장면, decisions.action은 그 상황에서 해볼 행동 하나/)
+  assert.match(out,/decisions.watch와 avoid에는 action을 다시 말하거나 반대로 뒤집어 넣지 마/)
+  assert.match(out,/이미 알려준 한계뿐이면 빈 문자열/)
+  assert.match(out,/이 예시의 표현·분야를 복사하지 말고 실제 근거/)
+  assert.doesNotMatch(out,/80~180자/)
   assert.match(out, /종합 요약으로 대체되는 결과는 실패/)
   assert.doesNotMatch(out,/relationship은 summary, friends, coworkers/)
   assert.match(out,/이번 요청은 종합과 기본 여섯 분야/)
@@ -110,7 +113,7 @@ test('daily prompt has one scope and does not reference missing narrative plans'
   const out=buildV23CorePrompt(payload('day')).text
   assert.match(out,/editorial_focus/)
   assert.match(out,/clusters 여섯 분야를 먼저 작성/)
-  assert.match(out,/짧은 두 문장/)
+  assert.match(out,/생활 장면을 한두 문장/)
   assert.match(out,/직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마/)
   assert.match(out,/점수가 낮거나 band가 약하다는 이유만으로/)
   assert.doesNotMatch(out,/HUMAN_LANGUAGE_CONTRACT|V23 CORE CONTRACT|반드시 따를 서사 순서|narrative_plan|domain_answer_contracts/)

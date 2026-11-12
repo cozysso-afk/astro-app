@@ -3,7 +3,7 @@ import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes
 import type { FortuneField } from './lib/fortuneFields'
 import { useObservedPassage } from './ContactObservationScope'
 import { observedContactCore } from './lib/contactOutcomeReading'
-import { buildDailyReadingDocument, type DailyReadingDocument } from './lib/dailyReadingDocument'
+import { buildDailyReadingDocument, includeInDailyCoreImage, type DailyBlock, type DailyReadingDocument } from './lib/dailyReadingDocument'
 import { exportDailyReadingImages } from './lib/readingImageExport'
 import './daily-reading.css'
 import '@fontsource/nanum-myeongjo/korean-400.css'
@@ -65,12 +65,20 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
   const scenarioIds = new Set(scenarios.flatMap(row=>row.blocks.map(block=>block.id)))
   const basis=doc.details.find(block=>block.id==='application:basis')
   const otherDetails = doc.details.filter(block => block!==basis && !scenarioIds.has(block.id) && !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
+  const conditionIds = new Set(['overall:watch','overall:avoid','overall:timing','limits'])
+  const conditions = doc.blocks.filter(b=>conditionIds.has(b.id))
+  const mainBlocks = doc.blocks.filter(b=>!conditionIds.has(b.id))
+  const renderBlock = (b:DailyBlock) => <section className="daily-reading-block" key={b.id} data-core-image={includeInDailyCoreImage(doc.scope,b)} data-daily-block={b.id}>
+    <h4>{b.label}</h4><p>{b.text}</p>
+  </section>
   return <section className="daily-reading" data-daily-scope={doc.scope} data-daily-state={doc.state}>
     <header className="daily-reading-heading"><span>{doc.title}</span><time dateTime={date}>{date}</time></header>
     {contact && doc.state!=='ready' && <section className="daily-reading-block"><h3>{contact.fact}</h3><p>{contact.followUp}</p></section>}
     {doc.state === 'ready' ? <>
       <h3 className="daily-reading-headline">{doc.headline}</h3>
-      <div className="daily-reading-blocks">{doc.blocks.map(b=><section className="daily-reading-block" key={b.id} data-daily-block={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</div>
+      <div className="daily-reading-blocks">{mainBlocks.map(renderBlock)}
+        {conditions.length>0 && <details className="daily-reading-details"><summary>적용 조건과 주의할 점</summary>{conditions.map(renderBlock)}</details>}
+      </div>
     </> : <p className="daily-reading-state">{{unverified:'확인된 해설을 아직 불러오지 못했어.',missing:'이 분야의 해설이 아직 완성되지 않았어.',insufficient:'이번 해설에서는 이 분야에 답할 근거를 충분히 연결하지 못했어.',needs_refresh:'기존 해설의 길이나 내용 중복을 다시 확인해야 해. 해설을 새로 불러와줘.'}[doc.state]}</p>}
     {directions.map(block=><section className="daily-reading-block" key={block.id} data-daily-detail={block.id}>
       {block.id==='direction:reconnection' && observed ? <><h4>기록된 재접촉</h4><p>{observed.fact}</p>{observed.indicator && <small>{observed.indicator}</small>}</> : <><h4>{block.label}</h4><p>{block.text}</p></>}

@@ -62,7 +62,7 @@ function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETR
 function coreInstruction(periodKind:unknown,compact=false){const kind=String(periodKind??"annual");if(kind==="day")return `
 [DAILY OUTPUT]
 - clusters는 sparse 배열이고 key는 ${DAILY_PRIMARY_KEYS.join(', ')} 여섯 기본 분야를 먼저 작성해. daily_editorial_brief.questions에서 generation_policy가 required_detail인 연락·재회·시험·이직·투자·소식 세부도 빠짐없이 작성해. 나머지 기존 조건부 상세는 근거가 뒷받침할 때 추가해. 각 항목은 conclusion/real_scene/action/change_condition/evidence_refs/applicability를 포함해.
-- headline 한 문장, overall.summary 80~180자, 기본 각 분야는 판단 한 문장과 설명·행동·판단 조건을 구분해. 친근한 반말로 ~해/~야로 끝내. 보고서식 ~한다/~이다는 쓰지 마.
+- headline에는 판단 하나, overall.summary에는 그 판단이 드러나는 장면을 한두 문장으로 써. 기본 각 분야도 판단·설명·행동이 서로 다른 정보를 줘야 해. 친근한 반말로 ~해/~야로 끝내. 보고서식 ~한다/~이다는 쓰지 마.
 - time_of_day=not_in_this_reading_scope이다. 시각·아침·오전·오후·저녁·밤·새벽을 새로 붙이지 마. 모든 key_windows의 start/end는 근거의 날짜로 쓰되 시간대 행동을 만들지 마.
 - key_windows 1개, decisions 1개, priorities 1~2개. decision은 key_window와 하나 이상의 실제 evidence_ref를 공유해. year_phases와 cross_checks는 빈 배열로 둬. domain_answers는 빈 배열로 두고 이번 세부 해설은 clusters에서 작성해. relationship_reading/contact_flow/investment_reading은 기존 기능이며 해당 질문의 근거가 있으면 작성할 수 있어. 실제 선연락·재회·수익을 확정하지 마.
 - systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.

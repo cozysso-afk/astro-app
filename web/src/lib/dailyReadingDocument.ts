@@ -10,6 +10,9 @@ export type DailyReadingDocument = {
   blocks: DailyBlock[]; details: DailyBlock[]
   slots?: Array<{id:string;label:string;state:'ready'|'missing'|'insufficient'}>
 }
+export function includeInDailyCoreImage(scope:string, block:DailyBlock):boolean {
+  return scope !== 'overall' || !['overall:watch','overall:avoid','limits'].includes(block.id)
+}
 type Data = NonNullable<AiInterpretationResponse['data']>
 const clean = (s: unknown): string => typeof s === 'string' ? s.trim() : ''
 const sectionKeys: Record<string, [string, string, string][]> = {
@@ -266,11 +269,13 @@ function assembleDailyReading(data: Partial<Data>|null, date:string, field?:Fort
   } else {
     const headline=clean(data.headline)
     if (!headline || !clean(data.overall?.summary) || !data.overall?.evidence_refs?.length) return doc
-    if(headline.length>180 || data.overall.summary.length>360 || headline===data.overall.summary.trim()) {doc.state='needs_refresh';return doc}
+    if(headline.length>180 || data.overall.summary.length>360) {doc.state='needs_refresh';return doc}
     doc.headline = headline
-    doc.blocks.push({id:'overall:summary',label:'핵심 요약',text:clean(data.overall.summary)})
-    if (clean(data.overall.dominant_pattern)) doc.blocks.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
     const decision = data.decisions?.find(d=>clean(d.action) && d.evidence_refs?.length)
+    const summary = {id:'overall:summary',label:'오늘의 흐름',text:clean(data.overall.summary)}
+    if (decision) doc.details.push(summary)
+    else doc.blocks.push(summary)
+    if (clean(data.overall.dominant_pattern)) doc.details.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
     if (decision) {
       doc.blocks.push({id:'overall:action',label:'지금 할 일',text:decision.action})
       if (clean(decision.timing) && clean(decision.timing) !== date) doc.blocks.push({id:'overall:timing',label:'이 행동을 적용할 때',text:decision.timing})
@@ -300,6 +305,32 @@ function assembleDailyReading(data: Partial<Data>|null, date:string, field?:Fort
   if (!field && clean(data.limits)) doc.blocks.push({id:'limits',label:'함께 알아둘 점',text:clean(data.limits)})
   const dated = calculation && datedAspectReading(calculation,'day',field?.topics)
   if (dated) doc.blocks.splice(Math.min(doc.blocks.length,1),0,dated)
+  if (!field) {
+    // Archived manuscripts can repeat a complete passage under several labels.
+    // Keep the first occurrence in reading order, preserving all other authored text.
+    const fingerprint = (text:string) => text.trim().replace(/\s+/g,' ').replace(/[.!?。]+$/u,'')
+    const seen = new Set([fingerprint(doc.headline)])
+    const distinct = (block:DailyBlock) => {
+      const key = fingerprint(block.text)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }
+    doc.blocks = doc.blocks.filter(distinct)
+    doc.details = doc.details.filter(b => !['overall:summary','overall:reason','decision:reason'].includes(b.id) || distinct(b))
+    // Migrate two archived sentences after comparing their original wording for duplicates.
+    if (doc.headline === '의견 교환은 활발하지만 책임과 마감 같은 세부 약속을 확정하기는 까다로운 날이야.') {
+      doc.headline = '의견은 잘 오가도 누가 언제까지 맡을지는 서로 다르게 이해할 수 있어.'
+    }
+    const action = doc.blocks.find(b => b.id === 'overall:action')
+    if (action?.text.trim() === '합의한 조건과 역할의 범위를 서면으로 명확히 기록해 둬.') {
+      action.text = '약속한 조건과 각자 맡은 일을 한 줄로 적어 봐.'
+    }
+    if (!doc.blocks.length) {
+      const context = doc.details.findIndex(b => b.id === 'overall:summary' || b.id === 'overall:reason' || b.id === 'decision:reason')
+      if (context >= 0) doc.blocks.push(...doc.details.splice(context,1))
+    }
+  }
   doc.state = 'ready'
   return doc
 }

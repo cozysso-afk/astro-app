@@ -1062,11 +1062,13 @@ function aspectInLife(topic:string,transit:string,target:string,sign:number) {
       학업:'답을 읽으면 알겠는데 책을 덮고 첫 단계의 이유를 설명할 때 막힐 수 있어. 그 한 단계부터 다시 짚어 봐.',
       시험:'답을 알고 있어도 문제의 제한 조건을 답안에 빠뜨리기 쉬운 쪽이야. 풀이를 끝내기 전에 문제의 요구와 답안을 한 번 맞춰 봐.',
       직장:'회의에서 말한 “금요일까지”가 초안을 보내는 날인지, 최종 승인을 받는 날인지 짚어 봐. 같은 마감을 다르게 이해하기 쉬운 배치야.',
-      금전:'결제일과 실제 입금일을 맞춰 봐. 받을 돈의 액수를 알고 있어도 먼저 빠져나가는 지출을 놓칠 수 있어.',
+      금전:'이번 결제에 쓸 돈이 결제일 전에 들어오는지 확인해 봐. 입금이 하루만 늦어져도 그날 쓸 수 있는 잔액은 달라져.',
       연락:'하고 싶은 말이 길어질수록 상대가 무엇에 답하면 될지 놓칠 수 있어. 꼭 물어볼 한 가지부터 보내 봐.',
     }
     if (examples[topic]) return examples[topic]
   }
+  if (topic==='금전' && transit==='천왕성' && target==='토성' && sign>0)
+    return '지출 일정을 조정하기에는 괜찮은 날이야. 날짜가 겹친다면 고정비를 먼저 남겨 두고 미룰 수 있는 구매를 골라 봐.'
   if (transit==='달' && target==='수성' && sign>0) {
     const examples:Record<string,string>={
       학업:'읽으면서 막연했던 부분을 말로 정리해 보기 좋은 날이야. 짧은 예제를 풀고 왜 그 방법을 썼는지 설명해 봐.',
@@ -1107,8 +1109,18 @@ export function datedAspectReading(
   if (!first) return
   const phase = (date:string) => Math.min(2,Math.floor((Number(date.slice(-2))-1)/10))
   const opposite = relevant.find(item => item.topic === first.topic && item.sign * first.sign < 0 &&
-    (period === 'day' || (item.date !== first.date && (period !== 'month' || phase(item.date) !== phase(first.date)))))
+    (period === 'day' ? item.date === first.date : (item.date !== first.date && (period !== 'month' || phase(item.date) !== phase(first.date)))))
   const examples = opposite ? [first,opposite].sort((a,b) => a.date.localeCompare(b.date)) : [first]
+  if (period === 'day') {
+    const scenes = examples.map(item => aspectInLife(item.topic,item.transit,item.target,item.sign))
+    const pairs = examples.map(item => `운행 ${item.transit} · 출생 ${item.target} ${item.aspect}`)
+    const date = Number(first.date.slice(5,7)) + '월 ' + Number(first.date.slice(8)) + '일'
+    return {
+      id:'day:aspect:'+first.topic,
+      label:first.topic+' · 이날의 서양점성술 해설',
+      text:[...scenes, `${date} ${first.topic} ${first.score}점 · ${pairs.join(' / ')}`].join('\n\n'),
+    }
+  }
   const lines = examples.map((item,i) => {
     const date = Number(item.date.slice(5,7)) + '월 ' + Number(item.date.slice(8)) + '일'
     const when = i && item.date === examples[0].date ? '같은 날' : date + ' ' + item.topic + ' 지표는 ' + item.score + '점이야.'
@@ -1119,7 +1131,7 @@ export function datedAspectReading(
   })
   const stat = calculation.western.overall?.[first.topic]
   if (stat && Number.isFinite(stat.average)) {
-    if (period !== 'day') lines.push(`${period === 'week' ? '주간' : '월간'} 평균은 ${stat.average}점이야.`)
+    lines.push(`${period === 'week' ? '주간' : '월간'} 평균은 ${stat.average}점이야.`)
     if (/약|낮/.test(stat.band) && examples.some(item => item.sign > 0))
       lines.push('도움을 주는 배치가 있어도 이 분야 전체의 활성도는 낮은 편이야.')
   }
@@ -1151,8 +1163,7 @@ export function datedAspectReading(
       }
     }
   }
-  if (period === 'day' && first.topic === '연애') lines.push('관계가 실제로 가까워지는지는 상대도 만날 시간을 정하거나 다음 약속을 제안하는지에서 살펴봐.')
-  return {id:period+':aspect:'+first.topic, label:first.topic+(period==='day' ? ' · 이날의 서양점성술 해설' : ' · 날짜로 살펴본 서양점성술 해설'), text:lines.filter(Boolean).join(' ')}
+  return {id:period+':aspect:'+first.topic, label:first.topic+' · 날짜로 살펴본 서양점성술 해설', text:lines.filter(Boolean).join(' ')}
 }
 
 // Group only existing scores for presentation. Never mutate them or fill missing dates.
