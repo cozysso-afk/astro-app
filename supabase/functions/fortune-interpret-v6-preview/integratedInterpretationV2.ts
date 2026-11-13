@@ -28,6 +28,7 @@ type Evidence = {
   band?: string;
   text: string;
   observation?: Record<string,string|number>;
+  topic_contributions?: Record<string,{contribution:number;polarity:number}>;
 };
 
 export function compactObservation(ev:any):Record<string,string|number>{
@@ -122,6 +123,15 @@ function evidenceDirection(topic:string,kind:"best"|"caution"|"average",score:nu
 }
 
 function finiteDailyScore(v:any){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
+function topicMeasurements<T>(values:unknown, read:(row:any)=>T|null):Record<string,T> {
+  if(!values || typeof values!=="object" || Array.isArray(values))return {};
+  const result:Record<string,T>={};
+  for(const topic of [...TOPICS,...REL]){
+    const row=read((values as Record<string,unknown>)[topic]);
+    if(row!==null)result[topic]=row;
+  }
+  return result;
+}
 function clockToken(v:unknown){ const m=String(v??"").match(/(?:[01]\d|2[0-3]):[0-5]\d/); return m?m[0]:""; }
 function intradayWindow(value:any){
   if(!value)return "";
@@ -163,12 +173,12 @@ export function compactCalculation(calc:any){
   const addEvidence=(row:Evidence)=>{ if(!row.id||evidenceIds.has(row.id))return row.id; evidenceIds.add(row.id); evidence.push(row); return row.id; };
 
   for(const [topic,s] of Object.entries(overall) as any[]){
-    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"period_average",topic,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")} · 변동폭 ${num(s.spread).toFixed(1)}`});
+    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"period_average",topic,start:calc?.period?.start,end:calc?.period?.end,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")} · 변동폭 ${num(s.spread).toFixed(1)}`});
     for(const p of s.best_days??[])addEvidence({id:`W:date:${p.date}:${topic}:best`,system:"western",scope:"best_day",topic,direction:evidenceDirection(topic,"best",num(p.score)),date:p.date,score:num(p.score),text:`${p.date} ${topic} 상위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
     for(const p of s.caution_days??[])addEvidence({id:`W:date:${p.date}:${topic}:caution`,system:"western",scope:"caution_day",topic,direction:evidenceDirection(topic,"caution",num(p.score)),date:p.date,score:num(p.score),text:`${p.date} ${topic} 하위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
   }
   for(const [topic,s] of Object.entries(rel) as any[]){
-    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"relationship_average",topic,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")}`});
+    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"relationship_average",topic,start:calc?.period?.start,end:calc?.period?.end,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")}`});
     for(const p of s.best_days??[])addEvidence({id:`W:date:${p.date}:${topic}:best`,system:"western",scope:"relationship_best_day",topic,direction:"supportive",date:p.date,score:num(p.score),text:`${p.date} ${topic} 상위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
     for(const p of s.caution_days??[])addEvidence({id:`W:date:${p.date}:${topic}:caution`,system:"western",scope:"relationship_caution_day",topic,direction:"caution",date:p.date,score:num(p.score),text:`${p.date} ${topic} 하위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
   }
@@ -184,6 +194,13 @@ export function compactCalculation(calc:any){
   const dailyRaw=Array.isArray(w?.daily_scores)?w.daily_scores.slice(0,400):[];
   const dailyTopicOrder=[...TOPICS,...REL];
   const dailyScoreMatrix={topic_order:dailyTopicOrder,rows:dailyRaw.map((d:any)=>[String(d?.date??""),...dailyTopicOrder.map((topic)=>finiteDailyScore(d?.scores?.[topic]))])};
+  const dailyScoreComponents=dailyRaw.flatMap((day:any)=>{
+    const topics=topicMeasurements(day?.score_components,(row)=>{
+      const activation=finiteDailyScore(row?.activation),favorability=finiteDailyScore(row?.favorability);
+      return activation!==null && favorability!==null ? {activation,favorability} : null;
+    });
+    return Object.keys(topics).length ? [{date:day.date,topics}] : [];
+  });
   const dailyPatternDigest=Object.fromEntries(dailyTopicOrder.map((topic)=>[topic,trajectoryDigest(dailyRaw,topic)]).filter(([,value])=>Boolean(value)));
   const dailyByDate=new Map(dailyRaw.map((d:any)=>[String(d?.date??""),d]));
   const calculationPeriod=calc?.period??{};
@@ -214,8 +231,12 @@ export function compactCalculation(calc:any){
   }
   function addDailyEvidence(date:string,ev:any,index:number){
     const topics=Array.isArray(ev?.source_topics)?ev.source_topics.filter((x:any)=>typeof x==="string"):[];
+    const topicContributions=topicMeasurements(ev?.topic_contributions,(row)=>{
+      const contribution=finiteDailyScore(row?.contribution),polarity=finiteDailyScore(row?.polarity);
+      return contribution!==null && polarity!==null ? {contribution,polarity} : null;
+    });
     const source=topics.join(", ");
-    return addEvidence({id:`W:daily:${date}:${index+1}`,system:"western",scope:"daily_actual_aspect_house",source_topics:topics,direction:"context",date,observation:compactObservation(ev),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});
+    return addEvidence({id:`W:daily:${date}:${index+1}`,system:"western",scope:"daily_actual_aspect_house",source_topics:topics,direction:"context",date,observation:compactObservation(ev),...(Object.keys(topicContributions).length?{topic_contributions:topicContributions}:{}),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});
   }
   for(const kd of keyDates){
     const daily:any=dailyByDate.get(kd.date); const rows=Array.isArray(daily?.evidence)?daily.evidence.slice(0,10):[];
@@ -332,7 +353,7 @@ export function compactCalculation(calc:any){
     time_context:timeContext,
     integration_policy:{score_merging:false,western_score_probability:false,saju_independent:true,thai_predictive_vote:false,important_date_rule:importantDateRule},
     ranking:{strongest:[...rank].sort((a,b)=>b.average-a.average).slice(0,6),weakest:[...rank].sort((a,b)=>a.average-b.average).slice(0,6)},
-    western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
+    western:{engine:w?.engine,ephemeris:w?.ephemeris,score_policy:w?.score_policy,natal:w?.natal??null,overall,relationship_signals:rel,months,detail_days:detail,daily_score_matrix:dailyScoreMatrix,...(dailyScoreComponents.length?{daily_score_components:dailyScoreComponents}:{}),daily_pattern_digest:dailyPatternDigest,daily_evidence_coverage:{days:dailyRaw.length,days_with_evidence:dailyRaw.filter((d:any)=>Array.isArray(d?.evidence)&&d.evidence.length>0).length},key_date_details:Array.isArray(w?.key_dates)?w.key_dates.slice(0,16):[],market:{has_open_session:Boolean(w?.market?.has_open_session),session_count:num(w?.market?.session_count),calendar_mode:w?.market?.calendar_mode??null,calendar_warning:w?.market?.calendar_warning??null}},
     key_dates:keyDates,
     cross_system_timeline:crossSystemTimeline,
     saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,daily:sajuDaily,daily_coverage:{computed_days:sajuDailyRaw.length,selected_days:sajuDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},daily_policy:s?.daily_policy??null,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
@@ -426,7 +447,7 @@ function cleanEditorialGroup(v:any,keys:string[]){
   for(const key of keys){const section=cleanEditorialSection(v?.[key]);if(!section)return null;out[key]=section;}
   return out;
 }
-export function validateOutput(o:any){
+export function validateOutput(o:any, annotateTerms=true){
   if(!o||typeof o!=="object"||!o.overall||!o.clusters||!o.systems||!o.topic_analysis)return null;
   const analyses:any={};
   const topicRows=Array.isArray(o.topic_analysis)?o.topic_analysis:Object.entries(o.topic_analysis??{}).map(([topic,x]:any)=>({...x,topic}));
@@ -446,5 +467,6 @@ export function validateOutput(o:any){
     condition:cleanEditorialGroup(o?.clusters?.condition,["condition"]),
   };
   if(Object.values(clusters).some(value=>!value))return null;
-  return deep({headline:txt(o.headline,300),overall:{summary:txt(o?.overall?.summary,3600),dominant_pattern:txt(o?.overall?.dominant_pattern,2200),best_phase:txt(o?.overall?.best_phase,1500),caution_phase:txt(o?.overall?.caution_phase,1500),evidence_refs:cleanRefs(o?.overall?.evidence_refs)},key_windows:keyWindows,year_phases:yearPhases,cross_checks:crossChecks,decisions,clusters,domain_answers:cleanDomainAnswers(o?.domain_answers),relationship_reading:{context:txt(o?.relationship_reading?.context,1300),flow:txt(o?.relationship_reading?.flow,1700),focus_timing:txt(o?.relationship_reading?.focus_timing,1100),watch:txt(o?.relationship_reading?.watch,1000),avoid:txt(o?.relationship_reading?.avoid,900),evidence_refs:cleanRefs(o?.relationship_reading?.evidence_refs)},contact_flow:{incoming:txt(o?.contact_flow?.incoming,1700),outgoing:txt(o?.contact_flow?.outgoing,1700),reconnection:txt(o?.contact_flow?.reconnection,1700)},investment_reading:{psychology:txt(o?.investment_reading?.psychology,1300),realization:txt(o?.investment_reading?.realization,1300),entry:txt(o?.investment_reading?.entry,1300),risk:txt(o?.investment_reading?.risk,1300)},systems:{western:txt(o?.systems?.western,1700),saju:txt(o?.systems?.saju,1900),thai:txt(o?.systems?.thai,1700)},priorities:Array.isArray(o?.priorities)?o.priorities.slice(0,5).map((x:any)=>txt(x,650)).filter(Boolean):[],topic_analysis:analyses,limits:txt(o.limits,1700)});
+  const clean={headline:txt(o.headline,300),overall:{summary:txt(o?.overall?.summary,3600),dominant_pattern:txt(o?.overall?.dominant_pattern,2200),best_phase:txt(o?.overall?.best_phase,1500),caution_phase:txt(o?.overall?.caution_phase,1500),evidence_refs:cleanRefs(o?.overall?.evidence_refs)},key_windows:keyWindows,year_phases:yearPhases,cross_checks:crossChecks,decisions,clusters,domain_answers:cleanDomainAnswers(o?.domain_answers),relationship_reading:{context:txt(o?.relationship_reading?.context,1300),flow:txt(o?.relationship_reading?.flow,1700),focus_timing:txt(o?.relationship_reading?.focus_timing,1100),watch:txt(o?.relationship_reading?.watch,1000),avoid:txt(o?.relationship_reading?.avoid,900),evidence_refs:cleanRefs(o?.relationship_reading?.evidence_refs)},contact_flow:{incoming:txt(o?.contact_flow?.incoming,1700),outgoing:txt(o?.contact_flow?.outgoing,1700),reconnection:txt(o?.contact_flow?.reconnection,1700)},investment_reading:{psychology:txt(o?.investment_reading?.psychology,1300),realization:txt(o?.investment_reading?.realization,1300),entry:txt(o?.investment_reading?.entry,1300),risk:txt(o?.investment_reading?.risk,1300)},systems:{western:txt(o?.systems?.western,1700),saju:txt(o?.systems?.saju,1900),thai:txt(o?.systems?.thai,1700)},priorities:Array.isArray(o?.priorities)?o.priorities.slice(0,5).map((x:any)=>txt(x,650)).filter(Boolean):[],topic_analysis:analyses,limits:txt(o.limits,1700)};
+  return annotateTerms?deep(clean):clean;
 }

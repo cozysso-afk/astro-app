@@ -298,9 +298,10 @@ export function inspectInterpretationQuality(data:any,payload:any,options:{requi
     if(!String(rr?.watch??"").trim())s5.push("관계·재회 현실 확인 신호 누락");
     if(!String(rr?.avoid??"").trim())s5.push("관계·재회 과대해석 방지 설명 누락");
     if(String(rr?.context??"").length>600||String(rr?.flow??"").length>850||String(rr?.focus_timing??"").length>550||String(rr?.watch??"").length>550||String(rr?.avoid??"").length>500)s5.push("관계·재회 핵심 흐름이 지나치게 장황함");
-    if(!String(cf?.incoming??"").trim())s5.push("관계·재회 상대→나 방향 설명 누락");
-    if(!String(cf?.outgoing??"").trim())s5.push("관계·재회 나→상대 방향 설명 누락");
-    if(!String(cf?.reconnection??"").trim())s5.push("관계·재회 과거인연 방향 설명 누락");
+    const hasAxis=(topic:string)=>!options.periodReadingContract || (payload?.evidence_ledger??[]).some((row:any)=>row.topic===topic&&row.scope==="relationship_average"&&Number.isFinite(row.score)&&row.start===payload?.period?.start&&row.end===payload?.period?.end);
+    if(hasAxis("수신신호")&&!String(cf?.incoming??"").trim())s5.push("관계·재회 상대→나 방향 설명 누락");
+    if(hasAxis("발신적합")&&!String(cf?.outgoing??"").trim())s5.push("관계·재회 나→상대 방향 설명 누락");
+    if(hasAxis("과거인연접점")&&!String(cf?.reconnection??"").trim())s5.push("관계·재회 과거인연 방향 설명 누락");
   }
   if(investmentSalient){
     const ir=data?.investment_reading??{};

@@ -7,8 +7,6 @@ type FortuneData = NonNullable<AiInterpretationResponse['data']>
 const sourceId = String.raw`\b[WST]:[\p{L}\p{N}_-]+(?::[\p{L}\p{N}_-]+)*`
 const inlineCitations = new RegExp(`${sourceId}(?:[ \t]*[,;·/][ \t]*${sourceId})*`, 'gu')
 function cleanCitation(value: string) {
-  // A previous writer sometimes supplied the closing condition twice.
-  value = value.replace(/(^|[.!?]\s+)만약 ([^.!?\n]+? 때) 그럴 때 해당돼\./g, '$1$2 적용돼.')
   if (!/\b[WST]:/.test(value)) return value
   return value.replace(inlineCitations, '').replace(/[ \t]*(?:\(\s*\)|\[\s*\])/g, '')
     .replace(/ +([.,!?])/g, '$1').replace(/ {2,}/g, ' ').trim()

@@ -14,7 +14,8 @@ type CacheRecord<T = unknown> = {
 const DB_NAME = 'starlight-destiny-reading-cache-v1'
 const STORE_NAME = 'records'
 const DB_VERSION = 1
-const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-calc-v1'
+const PERIOD_ARCHIVE_ID_CONTRACT = 'integrated-precision-v2-calc-v1'
+const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-field-evidence-v2'
 const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.26-question-evidence'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'
 const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v6-daily-reading-contract-v9'
@@ -127,7 +128,7 @@ export async function deleteReadingCache(id: string): Promise<void> {
 
 export function fortuneCalculationCacheId(request: Record<string, unknown>): string {
   applyIntegratedPrecisionToRequest(request)
-  return storedFortuneCalculationId(request)
+  return currentCalculationCacheId(request)
 }
 
 // The persisted request already contains the precision used for that calculation.
@@ -137,9 +138,15 @@ export function periodCalculationRequest(snapshot: Record<string, unknown>): Rec
   return request
 }
 
-export function storedFortuneCalculationId(snapshot: Record<string, unknown>): string {
+export function currentCalculationCacheId(snapshot: Record<string, unknown>): string {
   const request = periodCalculationRequest(snapshot)
   return `fortune-calc:${hashText(stableStringify({ contract: FORTUNE_CALC_CACHE_CONTRACT, request }))}`
+}
+
+// Archive identities stay stable across calculation releases.
+export function storedFortuneCalculationId(snapshot: Record<string, unknown>): string {
+  const request = periodCalculationRequest(snapshot)
+  return `fortune-calc:${hashText(stableStringify({ contract: PERIOD_ARCHIVE_ID_CONTRACT, request }))}`
 }
 
 export function fortuneAiCacheId(request: Record<string, unknown>, calculation: Record<string, unknown>, model: string): string {

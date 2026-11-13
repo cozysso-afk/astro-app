@@ -11,7 +11,7 @@ ENGINE_VERSION = f"{legacy.ENGINE_VERSION}+precision-v2"
 _ROBUST_NATAL_BODIES = tuple(body for body in legacy.PLANET_KEYS if body != "Moon")
 _STATIC_TRANSITS = ("Jupiter", "Saturn", "Uranus", "Neptune", "Pluto")
 _DYNAMIC_TRANSITS = ("Sun", "Moon", "Mercury", "Venus", "Mars")
-_LIFE_TOPICS = ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션")
+_LIFE_TOPICS = legacy._LIFE_SCORE_TOPICS
 _MARKET_TOPICS = ("금전", "투자심리")
 _RELATIONSHIP_SIGNALS = ("수신신호", "발신적합", "과거인연접점")
 

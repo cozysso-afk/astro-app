@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 from datetime import date, datetime, time as dt_time, timedelta, timezone
 from functools import lru_cache
+from math import isfinite
 from typing import Any
 
 import pytz
@@ -913,7 +914,7 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
             stamp = sample.get("dt")
             sample_time = stamp.strftime("%H:%M") if stamp is not None else ""
             for topic in topic_names:
-                for evidence in (topics.get(topic) or {}).get("evidence", []):
+                for evidence in (topics.get(topic) or {}).get("evidence") or []:
                     if not isinstance(evidence, dict):
                         continue
                     kind = evidence.get("kind")
@@ -931,6 +932,11 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
                         contribution = float(evidence.get("score") or 0.0)
                     except (TypeError, ValueError):
                         continue
+                    if not isfinite(contribution) or contribution <= 0:
+                        continue
+                    polarity = evidence.get("polarity")
+                    if not isinstance(polarity, (int, float)) or not isfinite(polarity):
+                        polarity = 0.0
                     # A stable tie break keeps the same representative regardless of scan order.
                     orb = evidence.get("orb")
                     rank = (contribution, -(orb if orb is not None else float("inf")), sample_time, topic)
@@ -939,7 +945,7 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
                     links.update(derived_links.get(topic, ()))
                     per_topic = strongest_by_topic.setdefault(key, {})
                     if topic not in per_topic or rank > per_topic[topic][0]:
-                        per_topic[topic] = (rank, evidence.get("polarity"))
+                        per_topic[topic] = (rank, polarity)
                     if key not in representatives or rank > representatives[key][0]:
                         representatives[key] = (rank, evidence, sample_time)
 
@@ -964,6 +970,7 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
         0 if item.get("kind") == "aspect" else 1, -item["contribution"],
         item["orb"] if item.get("orb") is not None else 99.0, item["text"],
         str(item.get("motion", "")), str(item.get("direction", "")),
+        str(item.get("quadrant_system", "")),
     ))
     if provisional:
         return out[:max(1, int(limit))]
@@ -980,7 +987,7 @@ def _compact_daily_evidence(life_rows: list[dict], market_rows: list[dict], limi
             key=lambda item: (
                 len(set(item.get("source_topics") or []) & uncovered),
                 float(item.get("contribution") or 0.0),
-                -float(item.get("orb") or 99.0),
+                -(item["orb"] if item.get("orb") is not None else 99.0),
             ),
         )
         coverage = set(candidate.get("source_topics") or []) & uncovered

@@ -40,14 +40,14 @@ export function nextUnconfirmedStage(state: ReunionObservedState): ReunionStage 
   return REUNION_STAGE_ORDER[index + 1] ?? null
 }
 
-const stateReadings:Record<ReunionObservedState,{title:string;text:string}> = {
-  '':{title:'현재 관계 상태 미입력',text:'최근에 연락을 주고받았는지, 만났는지, 다시 교제하기로 했는지는 입력된 기록에서만 확인할 수 있어요.'},
-  disconnected:{title:'지금은 연락이 끊긴 상태예요',text:'예전에 만난 적이 있어도 지금은 연락이 끊겼다고 기록했어요. 다음에 확인할 일은 실제로 다시 안부가 오갔는지예요.'},
-  recontacted:{title:'다시 연락이 닿았어요',text:'첫 연락은 이미 있었어요. 그 뒤 답이 오갔는지, 다음에 만날 날짜를 함께 정했는지가 지금 살펴볼 부분이에요.'},
-  messaging:{title:'지금은 서로 연락을 주고받고 있어요',text:'대화가 이어지는 건 확인됐어요. 만날 얘기를 꺼냈다면 날짜와 장소를 정했는지, 그 약속이 실제 만남으로 이어졌는지 살펴보세요.'},
-  met:{title:'두 사람이 실제로 다시 만났어요',text:'만남까지는 확인됐어요. 이후 상대도 다음 약속을 제안했는지, 서로 어떤 관계로 지내고 싶은지 이야기했는지를 돌아보세요. 교제를 다시 시작하기로 했는지는 별도의 합의가 있어야 알 수 있어요.'},
-  intimate_undefined:{title:'가까워졌고, 교제 여부는 아직 미정이에요',text:'친밀한 시간이 있었다고 기록했어요. 한쪽만 관계가 정해졌다고 여기고 있지는 않은지, 둘이 기대하는 만남 방식과 관계를 직접 이야기해 보세요.'},
-  reunited:{title:'관계를 다시 이어가기로 합의했어요',text:'두 사람의 합의까지 확인됐어요. 이제 볼 부분은 예전에 멀어졌던 상황이 다시 생겼을 때, 둘이 약속한 행동을 실제로 지키고 있는지예요.'},
+const stateTitles: Record<ReunionObservedState, string> = {
+  '':'현재 관계 상태 미입력',
+  disconnected:'지금은 연락이 끊긴 상태예요',
+  recontacted:'다시 연락이 닿았어요',
+  messaging:'지금은 서로 연락을 주고받고 있어요',
+  met:'두 사람이 실제로 다시 만났어요',
+  intimate_undefined:'가까워졌고, 교제 여부는 아직 미정이에요',
+  reunited:'관계를 다시 이어가기로 합의했어요',
 }
 
 export const eventLabels:Record<ReunionObservedEventKind,string> = {recontact:'다시 연락한 날',meeting:'직접 만난 날',rebuilding:'관계에 합의한 날'}
@@ -68,10 +68,11 @@ export function readReunionObservation(value: unknown): ReunionObservationContex
 }
 
 export function observationReading(context: ReunionObservationContext) {
-  const state=stateReadings[context.state] ?? stateReadings['']
-  const events=recordedReunionEvents(context.events)
-  const text=!context.state && events.length?'아래 날짜에 있었던 일은 확인됐어요. 그 뒤 지금까지 대화가 이어졌는지, 현재 어떤 관계인지는 별도로 확인해야 해요.':state.text
-  return {...state,text,next:nextUnconfirmedStage(context.state),events}
+  return {
+    title:stateTitles[context.state] ?? stateTitles[''],
+    next:nextUnconfirmedStage(context.state),
+    events:recordedReunionEvents(context.events),
+  }
 }
 
 function containsDate(row: ReunionPeriod, date: string) {

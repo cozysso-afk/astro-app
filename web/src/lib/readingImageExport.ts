@@ -1,6 +1,6 @@
 type ExportTone = 'plain' | 'favorable' | 'caution' | 'love' | 'date' | 'system'
 type ExportResult = { pages: number; shared: boolean; cancelled: boolean }
-import type { DailyReadingDocument } from './dailyReadingDocument'
+import type { DailyReadingDocument } from './dailyReadingDocument.ts'
 import type { AuthoredReadingDocument } from './authoredReadingDocument'
 type ExportCard = { eyebrow?: string; title: string; body?: string; meta?: string; tone: ExportTone; emphasis?: boolean; compact?: boolean; editorial?: boolean; complete?: boolean }
 type ExportSection = { title?: string; cards: ExportCard[] }
@@ -13,16 +13,16 @@ const PAGE_PADDING = 64
 const HEADER_HEIGHT = 148
 const FOOTER_HEIGHT = 58
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2
-const BODY_SIZE = 32
-const BODY_LINE = 44
+const BODY_SIZE = 44
+const BODY_LINE = 67
 const SMALL_SIZE = 23
 const SMALL_LINE = 31
 const CARD_GAP = 18
 const SECTION_HEIGHT = 38
 
 const COLORS = {
-  ink: '#34405d',
-  inkSoft: '#52617a',
+  ink: '#26223b',
+  inkSoft: '#302f40',
   muted: '#7b879c',
   favorable: ['rgba(219,250,239,.76)', 'rgba(246,255,252,.58)'],
   caution: ['rgba(255,229,239,.74)', 'rgba(255,247,232,.56)'],
@@ -405,46 +405,46 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.closePath()
 }
 
-function wrap(ctx: CanvasRenderingContext2D, text: string, width: number) {
-  const out: string[] = []
+function wrap(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const paragraphs = text.trim().split(/\n+/)
+  if (paragraphs.length > 1) return paragraphs.flatMap((part, i): string[] => [...(i ? [''] : []), ...wrap(ctx, part, width)])
+  const lines: string[] = []
   let line = ''
-  for (const ch of normalizeText(text)) {
-    const next = line + ch
-    if (line && ctx.measureText(next).width > width) {
-      if (/^[,.;:!?%)\]}，。！？、]/.test(ch)) {
-        line += ch
-        out.push(line.trimEnd())
+  for (const word of normalizeText(text).split(' ')) {
+    if (!word) continue
+    const next = line ? `${line} ${word}` : word
+    if (ctx.measureText(next).width <= width) {
+      line = next
+      continue
+    }
+    if (line) lines.push(line)
+    line = ''
+    for (const char of word) {
+      if (line && ctx.measureText(line + char).width > width) {
+        lines.push(line)
         line = ''
-      } else {
-        out.push(line.trimEnd())
-        line = ch.trimStart()
       }
-    } else line = next
+      line += char
+    }
   }
-  if (line) out.push(line.trimEnd())
-  return out
+  if (line) lines.push(line)
+  return lines
 }
 
-function font(ctx: CanvasRenderingContext2D, size: number, weight = 500) {
-  ctx.font = `${weight} ${size}px system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", sans-serif`
+function font(ctx: CanvasRenderingContext2D, size: number, weight = 400) {
+  ctx.font = `${weight >= 600 ? 700 : 400} ${size}px "Noto Sans KR", "Apple SD Gothic Neo", "Noto Sans CJK KR", system-ui, sans-serif`
 }
 
-function readingFont(ctx: CanvasRenderingContext2D, size: number, weight = 500) {
-  ctx.font = `${weight} ${size}px "Nanum Myeongjo", "Noto Serif KR", AppleMyungjo, Batang, serif`
-}
-
-async function ensureExportFonts() {
-  if (typeof document === 'undefined' || !document.fonts) throw new Error('저장할 글꼴을 확인하지 못했어.')
-  const [myeongjo500,myeongjo700,serif500,serif700,sans700] = await Promise.all([
-    document.fonts.load('500 32px "Nanum Myeongjo"'),
-    document.fonts.load('700 32px "Nanum Myeongjo"'),
-    document.fonts.load('500 32px "Noto Serif KR"'),
-    document.fonts.load('700 32px "Noto Serif KR"'),
-    document.fonts.load('700 32px "Noto Sans KR"'),
-  ])
-  if((!myeongjo500.length&&!serif500.length)||(!myeongjo700.length&&!serif700.length)||!sans700.length){
-    throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
-  }
+async function ensureExportFonts(model: ExportModel) {
+  const copy = [
+    model.title, model.date, model.hero, model.subtitle, '별빛의 운명 핵심 요약 전체를 통틀어 보면 계속', SCORE_LEGEND,
+    ...model.sections.flatMap(section => [
+      section.title, ...section.cards.flatMap(card => [card.eyebrow, card.title, card.body, card.meta]),
+    ]),
+  ].join(' ')
+  const fonts = await Promise.all([400, 700].map(weight =>
+    document.fonts.load(`${weight} 44px "Noto Sans KR"`, copy)))
+  if (fonts.some(faces => !faces.length)) throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
 }
 
 function linesHeight(lines: number, lineHeight: number) {
@@ -464,10 +464,10 @@ function cardMetrics(card: ExportCard) {
   const compact = Boolean(card.compact)
   return {
     compact,
-    titleSize: compact ? 27 : 30,
-    titleLine: compact ? 36 : 40,
-    bodySize: compact ? 29 : BODY_SIZE,
-    bodyLine: compact ? 39 : BODY_LINE,
+    titleSize: compact ? 29 : 34,
+    titleLine: compact ? 40 : 48,
+    bodySize: card.emphasis ? 52 : compact ? 36 : BODY_SIZE,
+    bodyLine: card.emphasis ? 76 : compact ? 53 : BODY_LINE,
     smallSize: compact ? 21 : SMALL_SIZE,
     smallLine: compact ? 28 : SMALL_LINE,
     maxBodyLines: card.complete ? Infinity : compact ? 3 : card.emphasis ? 5 : 6,
@@ -483,8 +483,7 @@ function measureCard(ctx: CanvasRenderingContext2D, card: ExportCard) {
   const textWidth = CONTENT_WIDTH - metrics.xPad * 2
   font(ctx, metrics.titleSize, 760)
   const titleLines = wrap(ctx, card.title, textWidth).slice(0, 2)
-  if (card.editorial) readingFont(ctx, metrics.bodySize, 500)
-  else font(ctx, metrics.bodySize, 480)
+  font(ctx, metrics.bodySize, card.emphasis ? 700 : 400)
   const bodyLines = card.body ? wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines) : []
   font(ctx, metrics.smallSize, 650)
   const metaLines = card.meta ? wrap(ctx, card.meta, textWidth).slice(0, 2) : []
@@ -509,32 +508,18 @@ function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: numbe
   ctx.save()
   ctx.textBaseline = 'top'
 
-  ctx.save()
-  ctx.shadowColor = 'rgba(67,83,119,.09)'
-  ctx.shadowBlur = metrics.compact ? 20 : 24
-  ctx.shadowOffsetY = metrics.compact ? 7 : 9
-  roundRect(ctx, x, y, width, height, radius)
-  ctx.fillStyle = toneGradient(ctx, card.tone, x, y, width, height)
-  ctx.fill()
-  ctx.restore()
-
-  roundRect(ctx, x, y, width, height, radius)
-  ctx.strokeStyle = 'rgba(118,137,180,.18)'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  roundRect(ctx, x + 3, y + 3, width - 6, height - 6, radius - 3)
-  ctx.strokeStyle = 'rgba(255,255,255,.54)'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  const shineHeight = Math.max(metrics.compact ? 58 : 68, height * .38)
-  const shine = ctx.createLinearGradient(0, y, 0, y + shineHeight)
-  shine.addColorStop(0, 'rgba(255,255,255,.72)')
-  shine.addColorStop(1, 'rgba(255,255,255,0)')
-  roundRect(ctx, x + 5, y + 5, width - 10, shineHeight, radius - 5)
-  ctx.fillStyle = shine
-  ctx.fill()
+  if (card.editorial && !card.emphasis) {
+    ctx.strokeStyle = '#d5d1df'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(x + metrics.xPad, y)
+    ctx.lineTo(x + width - metrics.xPad, y)
+    ctx.stroke()
+  } else {
+    roundRect(ctx, x, y, width, height, radius)
+    ctx.fillStyle = card.emphasis ? '#e8e2f5' : toneGradient(ctx, card.tone, x, y, width, height)
+    ctx.fill()
+  }
 
   const textWidth = width - metrics.xPad * 2
   let cy = y + metrics.top
@@ -553,8 +538,7 @@ function drawGlassCard(ctx: CanvasRenderingContext2D, card: ExportCard, y: numbe
 
   if (card.body) {
     cy += metrics.compact ? 10 : 13
-    if (card.editorial) readingFont(ctx, metrics.bodySize, 500)
-    else font(ctx, metrics.bodySize, 480)
+    font(ctx, metrics.bodySize, card.emphasis ? 700 : 400)
     ctx.fillStyle = COLORS.inkSoft
     const bodyLines = wrap(ctx, card.body, textWidth).slice(0, metrics.maxBodyLines)
     bodyLines.forEach((line, index) => ctx.fillText(line, x + metrics.xPad, cy + index * metrics.bodyLine))
@@ -602,6 +586,8 @@ function drawHeader(ctx: CanvasRenderingContext2D, model: ExportModel, page: num
   ctx.fillText(pageText, PAGE_WIDTH - PAGE_PADDING - pageWidth, 132)
 }
 
+const SCORE_LEGEND = '점수는 분야별 계산 지표야. 높은 점수가 실제 사건의 확률을 뜻하지는 않아.'
+
 function drawFooter(ctx: CanvasRenderingContext2D) {
   const y = ctx.canvas.height - FOOTER_HEIGHT
   ctx.strokeStyle = 'rgba(123,140,180,.11)'
@@ -610,8 +596,8 @@ function drawFooter(ctx: CanvasRenderingContext2D) {
   ctx.lineTo(PAGE_WIDTH - PAGE_PADDING, y)
   ctx.stroke()
   font(ctx, 21, 550)
-  ctx.fillStyle = '#96a0b2'
-  ctx.fillText('점수는 사건 확률이 아니라 선택 기간 안의 상대적 활성도야.', PAGE_PADDING, y + 37)
+  ctx.fillStyle = '#5d6173'
+  ctx.fillText(SCORE_LEGEND, PAGE_PADDING, y + 37)
 }
 
 function drawSectionTitle(ctx: CanvasRenderingContext2D, title: string, y: number) {
@@ -638,39 +624,61 @@ function pageFits(ctx: CanvasRenderingContext2D, items: LayoutItem[]) {
 }
 
 function layoutCards(ctx: CanvasRenderingContext2D, model: ExportModel) {
-  const groups: LayoutItem[] = []
-  if (model.hero) groups.push({ section: '핵심 요약', card: { title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true, complete: true } })
-  for (const section of model.sections) {
-    const clean = section.cards.some(c=>c.complete) ? section.cards : dedupeCards(section.cards)
-    clean.forEach((card, index) => {
-      if (!card.complete || !card.body) { groups.push({ section: index === 0 ? section.title : undefined, card }); return }
-      // Split by measured capacity, keeping every source character. A long legacy
-      // paragraph may take multiple cards/pages, never an invisible line clamp.
+  const sections: ExportSection[] = model.hero ? [{
+    title: '핵심 요약', cards: [{title: '전체를 통틀어 보면', body: model.hero + (model.subtitle ? ` ${model.subtitle}` : ''), tone: 'love', emphasis: true, editorial: true, complete: true}],
+  }, ...model.sections] : model.sections
+  const pages: LayoutItem[][] = [[]]
+  let current = pages[0]
+  const nextPage = () => {
+    current = []
+    pages.push(current)
+  }
+  const capacity = pageCapacity() - HEADER_HEIGHT
+  for (const section of sections) {
+    const cards = section.cards.some(card => card.complete) ? section.cards : dedupeCards(section.cards)
+    cards.forEach((card, index) => {
+      const item = {card, section: index === 0 ? section.title : undefined}
+      if (!card.body || !card.complete || itemHeight(ctx, item) <= capacity) {
+        if (current.length && !pageFits(ctx, [...current, item])) nextPage()
+        current.push(item)
+        return
+      }
+
       let remaining = Array.from(card.body)
       let part = 0
       while (remaining.length) {
+        const heading = part === 0 ? item.section : undefined
         const title = part ? `${card.title} · 계속` : card.title
+        let available = capacity - (heading ? SECTION_HEIGHT : 0)
+        if (current.length) {
+          const spare = available - pageUsedHeight(ctx, current) - CARD_GAP
+          // Only start a continued section here if its heading and several lines fit.
+          if (spare < 400) nextPage()
+          else available = spare
+        }
+
         let low = 1, high = remaining.length, fit = 0
         while (low <= high) {
-          const mid = Math.floor((low+high)/2)
-          const candidate = {...card,title,body:remaining.slice(0,mid).join('')}
-          if (measureCard(ctx,candidate) <= pageCapacity()-HEADER_HEIGHT-SECTION_HEIGHT) {fit=mid;low=mid+1} else high=mid-1
+          const mid = Math.floor((low + high) / 2)
+          const candidate = {...card, title, body: remaining.slice(0, mid).join('')}
+          if (measureCard(ctx, candidate) <= available) { fit = mid; low = mid + 1 }
+          else high = mid - 1
         }
         if (!fit) throw new Error('저장 이미지에 문장을 배치하지 못했어.')
-        groups.push({section:index===0 && part===0 ? section.title:undefined,card:{...card,title,body:remaining.slice(0,fit).join('')}})
-        remaining = remaining.slice(fit); part++
+        if (fit < remaining.length) {
+          const candidate = remaining.slice(0, fit).join('')
+          const sentenceEnds = [...candidate.matchAll(/[.!?。！？]\s+/gu)]
+          const words = [...candidate.matchAll(/\s+/gu)]
+          const sentence = sentenceEnds[sentenceEnds.length - 1]
+          const last = sentence && sentence.index! > candidate.length * 0.65 ? sentence : words[words.length - 1]
+          if (last?.index !== undefined) fit = Array.from(candidate.slice(0, last.index + last[0].length)).length
+        }
+        current.push({section: heading, card: {...card, title, body: remaining.slice(0, fit).join('')}})
+        remaining = remaining.slice(fit)
+        part++
+        if (remaining.length) nextPage()
       }
     })
-  }
-
-  const pages: LayoutItem[][] = [[]]
-  for (const item of groups) {
-    let current = pages[pages.length - 1]
-    if (current.length && !pageFits(ctx, [...current, item])) {
-      current = []
-      pages.push(current)
-    }
-    current.push(item)
   }
 
   for (let pass = 0; pass < 8; pass++) {
@@ -737,7 +745,7 @@ function renderPages(model: ExportModel) {
       if (item.section) y = drawSectionTitle(ctx, item.section, y)
       y = drawGlassCard(ctx, item.card, y) + (itemIndex < items.length - 1 ? CARD_GAP + spacing.extraGap : 0)
     })
-    drawFooter(ctx)
+    if (items.some(({card}) => /[0-9]\s*점/.test([card.title,card.body,card.meta].join(' ')))) drawFooter(ctx)
     canvases.push(canvas)
   })
 
@@ -763,21 +771,15 @@ export async function exportReadingImages(root: HTMLElement, label: string): Pro
 }
 
 export function dailyReadingExportModel(doc: DailyReadingDocument): ExportModel {
-  if (doc.state !== 'ready' || !doc.headline || !doc.blocks.length) throw new Error('완성된 해설이 있어야 저장할 수 있어.')
+  if (doc.state !== 'ready' || !doc.headline) throw new Error('완성된 해설이 있어야 저장할 수 있어.')
   return {title:doc.title,date:doc.date,hero:'',fitContentHeight:true,sections:[{cards:[
-    {title:'이 날의 핵심',body:doc.headline,tone:'love',editorial:true,complete:true},
+    {title:'이 날의 핵심',body:doc.headline,tone:'love',emphasis:true,editorial:true,complete:true},
     ...doc.blocks.map(b=>({title:b.label,body:b.text,tone:'plain' as const,editorial:true,complete:true})),
   ]}]}
 }
 
 export async function exportDailyReadingImages(doc: DailyReadingDocument, signal: AbortSignal): Promise<ExportResult> {
   const model = dailyReadingExportModel(doc)
-  // A font failure must not silently change the saved typography.
-  const copy = [doc.headline,...doc.blocks.map(b=>b.text)].join(' ')
-  const fonts = await Promise.all([400,700].map(weight=>document.fonts.load(`${weight} 32px "Nanum Myeongjo"`,copy)))
-  const labels = `${doc.title} 별빛의 운명 이 날의 핵심 점수는 사건 확률이 아니라 선택 기간 안의 상대적 활성도야. ${doc.blocks.map(b=>b.label).join(' ')}`
-  const labelFonts = await document.fonts.load('700 32px "Noto Sans KR"',labels)
-  if (fonts.some(f=>!f.length) || !labelFonts.length) throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
   signal.throwIfAborted()
   return exportModelImages(model, `${doc.title} ${doc.date}`, signal)
 }
@@ -788,24 +790,20 @@ export function authoredReadingExportModel(doc:AuthoredReadingDocument):ExportMo
   const byId=new Map(doc.core.map(block=>[block.id,block]))
   const blocks=doc.exportBlockIds.map(id=>{const block=byId.get(id);if(!block)throw new Error('저장할 원고 항목이 빠졌어. 화면을 다시 확인해줘.');return block})
   return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[
-    ...(doc.headline ? [{title:'핵심 답',body:doc.headline,tone:'love' as const,editorial:true,complete:true}] : []),
+    ...(doc.headline ? [{title:'핵심 답',body:doc.headline,tone:'love' as const,emphasis:true,editorial:true,complete:true}] : []),
     ...blocks.map(block=>({title:block.label,body:block.text,tone:'plain' as const,editorial:true,complete:true})),
   ]}]}
 }
 
 export async function exportAuthoredReadingImages(doc:AuthoredReadingDocument,signal:AbortSignal):Promise<ExportResult> {
   const model=authoredReadingExportModel(doc)
-  const copy=[doc.headline,...doc.core.filter(b=>doc.exportBlockIds.includes(b.id)).map(b=>b.text)].join(' ')
-  const fonts=await Promise.all([400,700].map(weight=>document.fonts.load(`${weight} 32px "Nanum Myeongjo"`,copy)))
-  const labels=await document.fonts.load('700 32px "Noto Sans KR"',`${doc.title} 핵심 답 ${doc.core.map(b=>b.label).join(' ')}`)
-  if(fonts.some(f=>!f.length)||!labels.length)throw new Error('저장할 글꼴을 불러오지 못했어. 잠시 후 다시 저장해줘.')
   signal.throwIfAborted()
   return exportModelImages(model,`${doc.title} ${doc.date}`,signal)
 }
 
 async function exportModelImages(model: ExportModel, label: string, signal?: AbortSignal): Promise<ExportResult> {
   if (!model.hero && !model.sections.some(section => section.cards.length)) throw new Error('저장할 결과 내용을 찾지 못했어.')
-  await ensureExportFonts()
+  await ensureExportFonts(model)
   signal?.throwIfAborted()
   const canvases = renderPages(model)
   const blobs = await Promise.all(canvases.map(canvasToBlob))

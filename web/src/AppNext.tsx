@@ -752,20 +752,19 @@ export default function AppNext() {
             data: data.data ?? undefined,
           }
           if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
-          const annotated = annotatePayload(payload)
-          if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', annotated, ttlDays)
+          if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', payload, ttlDays)
           if (aiPollRef.current !== jobId) return
           const selected = selectedReadingPeriod.current
           if (selected.start === periodStart && selected.end === periodEndValue && requestForArchive
               && selected.calculationId === storedFortuneCalculationId(requestForArchive)) {
-            setAiInterpretation(annotated)
+            setAiInterpretation(payload)
             setAiCacheSource(data?.reused ? 'server' : 'fresh')
           }
-          if (requestForArchive && verifiedFortuneNarrative(annotated)) {
+          if (requestForArchive && verifiedFortuneNarrative(payload)) {
             if (archivePeriod && calculationForArchive) {
-              await savePeriodArchive(calculationForArchive, requestForArchive, archivePeriod, annotated)
+              await savePeriodArchive(calculationForArchive, requestForArchive, archivePeriod, payload)
             } else {
-              await resumePeriodArchive(requestForArchive, archivePeriod, annotated)
+              await resumePeriodArchive(requestForArchive, archivePeriod, payload)
             }
           }
           if (aiPollRef.current !== jobId) return
@@ -813,8 +812,8 @@ export default function AppNext() {
 
   const runAiInterpretation = async (calculation: IntegratedApiResponse | null = integratedResult, requestOverride: Record<string,unknown> | null = integratedRequestSnapshot, intent: 'open'|'generate'|'refresh' = 'generate') => {
     if (!calculation) return
-    const refreshMonthlyGaps = intent === 'refresh'
-    const cacheOnly = intent === 'open' && period !== 'year'
+    const refreshReading = intent === 'refresh'
+    const cacheOnly = intent === 'open'
     const generatedAt = new Date()
     const currentDate = new Date(generatedAt.getTime() - generatedAt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null
@@ -833,12 +832,12 @@ export default function AppNext() {
     }
     const cacheId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel)
     const ttlDays = fortuneCacheTtlDays(period, selectedTool)
-    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshMonthlyGaps && verifiedFortuneNarrative(aiInterpretation)))) return
+    if (aiRequestRef.current === cacheId && (aiLoading || (!refreshReading && verifiedFortuneNarrative(aiInterpretation)))) return
     aiRequestRef.current = cacheId
     setAiLoading(true); setAiError('')
     let startPayload: unknown = null
     try {
-      const cached = refreshMonthlyGaps ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
+      const cached = refreshReading ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
       if (aiRequestRef.current !== cacheId) return
       if (selectedReadingPeriod.current.start !== calculation.period.start || selectedReadingPeriod.current.end !== calculation.period.end) {
         aiRequestRef.current = ''
@@ -846,17 +845,16 @@ export default function AppNext() {
         return
       }
       if (cached && verifiedFortuneNarrative(cached)) {
-        const annotated = annotatePayload(cached)
-        setAiInterpretation(annotated)
+        setAiInterpretation(cached)
         setAiCacheSource('local')
         setAiLoading(false)
         setAiActiveJobId(null)
         if (selectedTool === null) {
-          void savePeriodArchive(calculation, requestForCache, period, annotated)
+          void savePeriodArchive(calculation, requestForCache, period, cached)
         }
         return
       }
-      if (!refreshMonthlyGaps) {
+      if (!refreshReading) {
         setAiInterpretation(null)
         setAiCacheSource('')
       }
@@ -875,7 +873,7 @@ export default function AppNext() {
         if (data?.missing_key) setAiConfigured(false)
         throw new Error(fortuneAiPublicErrorMessage(data, 'AI 해설 서버 작업을 시작하지 못했어.'))
       }
-      const archiveRequest = refreshMonthlyGaps ? {...requestForCache, reading_revision_job: String(data.job_id)} : requestForCache
+      const archiveRequest = refreshReading ? {...requestForCache, reading_revision_job: String(data.job_id)} : requestForCache
       const pending = { jobId: String(data.job_id), periodStart: calculation.period.start, periodEnd: calculation.period.end, cacheId, ttlDays, request: archiveRequest, archivePeriod:selectedTool === null ? period : null }
       setAiActiveJobId(pending.jobId)
       const jobPersisted = writeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY, encodePendingFortuneAiJob(pending))
@@ -1286,7 +1284,7 @@ export default function AppNext() {
       const cached = relationshipAiSuccess(await readReadingCache<RelationshipAiResponse>(relationshipCacheId))
       if (cached?.ok && cached.data) {
         if (!current()) return
-        setRelationshipAi(annotatePayload(cached))
+        setRelationshipAi(cached)
         setRelationshipAiCacheSource('local')
         return
       }
@@ -1299,10 +1297,9 @@ export default function AppNext() {
       const payload = relationshipAiSuccess(data)
       if (!payload) throw new RelationshipAiPublicError(data)
       if (!current()) return
-      const annotated = annotatePayload(payload)
-      await writeReadingCache(relationshipCacheId, 'relationship-ai', annotated, RELATIONSHIP_AI_CACHE_TTL_DAYS)
+      await writeReadingCache(relationshipCacheId, 'relationship-ai', payload, RELATIONSHIP_AI_CACHE_TTL_DAYS)
       if (!current()) return
-      setRelationshipAi(annotated)
+      setRelationshipAi(payload)
       setRelationshipAiCacheSource('fresh')
       if (relationshipRequestSnapshot) {
         const autoKind = selectedTool === 'marriage' ? 'marriage' : 'compatibility'
@@ -1310,7 +1307,7 @@ export default function AppNext() {
         const autoRequest = autoIsReunion ? { ...relationshipRequestSnapshot, reunion_context: reunionTiming, reunion_observation:reunionObservation, archive_mode:'relationship_ai_auto_v1' } : { ...relationshipRequestSnapshot, archive_mode:'relationship_ai_auto_v1' }
         const cp = (relationshipRequestSnapshot.counterpart ?? {}) as Record<string, unknown>
         const autoLabel = autoKind === 'marriage' ? '결혼운' : autoIsReunion ? '재회운' : '궁합운'
-        void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:annotated as unknown as Record<string,unknown>},relationshipCacheId)
+        void saveArchive({kind:autoKind,periodKey:relationshipPeriodKey,title:`${autoLabel} · ${String(cp.name ?? '상대')} · ${relationshipResult.period.start}`,periodStart:relationshipResult.period.start,periodEnd:relationshipResult.period.end,engine:relationshipResult.engine,request:autoRequest,result:relationshipResult as unknown as Record<string,unknown>,interpretation:payload as unknown as Record<string,unknown>},relationshipCacheId)
       }
     } catch (error) {
       if (current()) setRelationshipAiError(relationshipAiCatchMessage(error))
@@ -1563,9 +1560,10 @@ export default function AppNext() {
     } else {
       restoringRelationshipRef.current = true
       relationshipRevisionRef.current += 1
-      setRelationshipAi(item.interpretation as unknown as RelationshipAiResponse || null)
-      setRelationshipAiCacheSource(item.interpretation ? 'local' : '')
-      setRelationshipAiError('')
+      const archivedReading = relationshipAiSuccess(item.interpretation)
+      setRelationshipAi(archivedReading)
+      setRelationshipAiCacheSource(archivedReading ? 'local' : '')
+      setRelationshipAiError(item.interpretation && !archivedReading ? '작성 출처를 확인할 수 없는 이전 해설이에요. 저장된 계산값과 관계 기록은 그대로 확인할 수 있어요.' : '')
       setRelationshipLoading(false)
       setRelationshipAiLoading(false)
       setReunionTimingLoading(false)
@@ -1807,7 +1805,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
-              <SystemReadingViews calculation={integratedResult}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={()=>void runAiInterpretation()} onCopyPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <SystemReadingViews calculation={integratedResult} interpretation={aiInterpretation} onGenerate={()=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,verifiedFortuneNarrative(aiInterpretation)?'refresh':'generate')} generating={aiLoading} generationError={aiError}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={(refresh?:boolean)=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,refresh?'refresh':'generate')} onCopyPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
               <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 
@@ -1886,7 +1884,7 @@ export default function AppNext() {
               </div>
             </>}
             {selectedTool==='marriage' && <div className="relationship-purpose-row marriage-purpose-row"><button type="button" className={marriageMode==='unmarried'?'is-active':''} onClick={()=>{setMarriageMode('unmarried');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>미혼</strong><span>상대 유무에 따라 개인 결혼운 또는 특정 상대 결혼궁합</span></button><button type="button" className={marriageMode==='married'?'is-active':''} onClick={()=>{setMarriageMode('married');setMarriageScope('partner');setRelationshipAi(null);setRelationshipResult(null);setPersonalMarriage(null)}}><strong>기혼</strong><span>배우자와 현재 결속·생활·갈등·회복 주기</span></button></div>}
-            {selectedTool==='marriage'&&marriageMode==='unmarried'&&<div className="relationship-purpose-row marriage-scope-row"><button type="button" className={marriageScope==='personal'?'is-active':''} onClick={()=>{setMarriageScope('personal');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setRelationshipError('')}}><strong>상대 없음 · 개인 결혼운</strong><span>결혼 가능성 · 시기 · 미래 배우자상</span></button><button type="button" className={marriageScope==='partner'?'is-active':''} onClick={()=>{setMarriageScope('partner');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setPersonalMarriageError('')}}><strong>특정 상대 있음 · 결혼궁합</strong><span>이 사람과의 생활궁합 · 결속 · 갈등 · 친밀감</span></button></div>}
+            {selectedTool==='marriage'&&marriageMode==='unmarried'&&<div className="relationship-purpose-row marriage-scope-row"><button type="button" className={marriageScope==='personal'?'is-active':''} onClick={()=>{setMarriageScope('personal');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setRelationshipError('')}}><strong>상대 없음 · 개인 결혼운</strong><span>출생 차트 · 기간별 지표 · 창작 초상</span></button><button type="button" className={marriageScope==='partner'?'is-active':''} onClick={()=>{setMarriageScope('partner');setRelationshipResult(null);setRelationshipAi(null);setPersonalMarriage(null);setPersonalMarriageError('')}}><strong>특정 상대 있음 · 결혼궁합</strong><span>이 사람과의 생활궁합 · 결속 · 갈등 · 친밀감</span></button></div>}
             {selectedTool==='marriage'&&<div className="status-banner marriage-intro"><Gem size={16}/><span>{marriageMode==='married'?'이미 결혼한 관계 기준으로 현재 결속·정서적 거리·역할분담·공유자원·갈등과 회복 흐름을 봐.':marriageScope==='personal'?'상대가 없어도 내 차트로 결혼 가능성 지수·강한 시기·배우자 외모/성향/직업군·만남 경로를 적극적으로 봐. 0~100은 점성 엔터테인먼트 지수이고 실제 이름·주소·회사처럼 특정 신원만 만들어내지 않아.':'이 특정 상대와 결혼생활로 들어갈 때의 결속·생활·친밀감·돈/공유자원·갈등·지속성과 결혼 흐름을 깊게 봐.'}</span></div>}
             {selectedTool==='marriage'&&<div className="relationship-range-block marriage-range-block"><div><strong>{marriageMode==='unmarried'?'미혼 결혼운 분석기간':'기혼 결혼운 분석기간'}</strong><span>{relationshipStartDate} ~ {relationshipEndDate} · {relationshipCalendarYear?`${relationshipCalendarYear}년 전체`:`${clampedRelationshipDays}일`}</span></div><div className="relationship-range-buttons">{relationshipDayPresets.map((days)=><button key={days} type="button" className={clampedRelationshipDays===days?'is-active':''} onClick={()=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}>{days===365?'1년':`${days}일`}</button>)}</div><RelationshipDayInput days={clampedRelationshipDays} onCommit={days=>{setRelationshipDays(days);setRelationshipCalendarYear(null)}}/><div className="calendar-year-selector relationship-calendar-year"><div><strong>연도 전체</strong><span>해당 연도 1/1~12/31</span></div><select aria-label="결혼운 달력 연도 선택" value={relationshipCalendarYear??''} onChange={(e)=>{setRelationshipCalendarYear(e.target.value?Number(e.target.value):null);setRelationshipAi(null)}}><option value="">선택 안 함</option>{calendarYearOptions.map((year)=><option key={year} value={year}>{year}년</option>)}</select></div><small className="relationship-range-note">결혼운은 기본 365일. 관계 구조와 선택 기간의 긴장·완화 흐름을 분리해서 봐.</small></div>}
             {selectedTool==='compatibility'&&relationshipPurpose==='reunion'&&<div className="status-banner reunion-intro"><Heart size={16}/><span>재회를 누르면 기본 분석기간은 1년(365일)이야. 현재 범위는 {relationshipStartDate}~{relationshipEndDate}이고, 7~365일 안에서 직접 바꿀 수 있어. 상대와 내 차트의 활성도를 각각 계산해요. 실제로 누가 먼저 연락했는지는 아래에 기록할 수 있어요.</span></div>}
@@ -1999,13 +1997,10 @@ export default function AppNext() {
             loading={integratedLoading}
             offline={apiStatus==='offline'}
             error={integratedError}
-            buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 ${period==='year'?'+ AI 해설 생성':'계산'}`}
+            buttonLabel={`${period==='today'?'오늘':periods.find((item)=>item.key===period)?.label}운세 계산`}
             onCalculate={runIntegrated}
           >
             {integratedMatchesSelection && integratedResult && <PeriodFortuneResults
-              datingProfile={integratedRequestSnapshot?.profile as Record<string,unknown>|undefined}
-              datingApiBase={API_BASE}
-              profileGender={(integratedRequestSnapshot?.profile as {gender?:unknown}|undefined)?.gender}
               loveStatus={loveStatus}
               onLoveStatusChange={setLoveStatus}
               initialSystem={['saju','thai','western'].includes(readingWorkspace)?readingWorkspace as 'saju'|'thai'|'western':'integrated'}
@@ -2028,7 +2023,7 @@ export default function AppNext() {
               outcomeCalibration={outcomeCalibration}
               topicDisplay={topicDisplay}
               humanizeEvidence={humanizeEvidence}
-              onRetryAi={(refreshMonthlyGaps?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshMonthlyGaps ? 'refresh' : 'generate')}
+              onRetryAi={(refreshReading?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshReading ? 'refresh' : 'generate')}
               onCopyAiPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)}
               onCancelAi={()=>void cancelAiInterpretation(false)}
               aiCanCancel={Boolean(aiLoading&&aiActiveJobId)}

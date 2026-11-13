@@ -14,7 +14,7 @@ test('selected fortune date and actual today stay separate and explicitly labele
   assert.match(home,/onClick=\{\(\)=>onQueryDateChange\(resetDate\)\}/)
 })
 
-test('an archived love reading keeps its full scene and action and reports only scores from the selected day',()=>{
+test('an archived love reading keeps its full scene and action without adding calculated prose or scores to the manuscript',()=>{
   const date='2026-11-11'
   const field={id:'love',label:'애정',topics:['연애','연락','재회']}
   const primary={
@@ -29,7 +29,7 @@ test('an archived love reading keeps its full scene and action and reports only 
   const day=read(calculation)
   assert.equal(day.state,'ready')
   assert.equal(day.headline,primary.conclusion)
-  assert.deepEqual(day.blocks.map(block=>block.text),['연애 53점(보통)',primary.real_scene,primary.action])
+  assert.deepEqual(day.blocks.map(block=>block.text),[primary.real_scene,primary.action])
   for (const period of [{start:'2026-11-10',end:'2026-11-10'},{start:'2026-11-09',end:'2026-11-15'}]) {
     const other=read({...calculation,period})
     assert.deepEqual(other.blocks.map(block=>block.text),[primary.real_scene,primary.action])

@@ -7,6 +7,7 @@ type EvidenceRow = {
   system?: string
   topic?: string
   source_topics?: string[]
+  topic_contributions?: Record<string,{contribution:number;polarity:number}>
   scope?: string
   date?: string
   start?: string
@@ -30,6 +31,7 @@ type PhenomenonCluster = {
   dates: string[]
   topics: string[]
   directions: string[]
+  topic_directions?: Record<string,string[]>
   evidence_refs: string[]
   evidence_count: number
   distinct_dates: number
@@ -167,6 +169,14 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
 
   return [...grouped.entries()].map(([id, rows]) => {
     const role = roleFor(rows)
+    const topicDirections:Record<string,string[]>={}
+    for(const row of rows){
+      for(const [topic,value] of Object.entries(row.topic_contributions??{})){
+        if(!Number.isFinite(value.polarity))continue
+        const direction=value.polarity>0?'supportive':value.polarity<0?'caution':'context'
+        topicDirections[topic]=uniq([...(topicDirections[topic]??[]),direction])
+      }
+    }
     const refs = uniq(rows.map(row => text(row.id)).filter(Boolean))
     const dates = uniq(rows.map(evidenceDate).filter(Boolean)).sort()
     return {
@@ -177,6 +187,7 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
       dates,
       topics: uniq(rows.flatMap(evidenceTopics)),
       directions: uniq(rows.map(row => text(row.direction)).filter(Boolean)),
+      ...(Object.keys(topicDirections).length?{topic_directions:topicDirections}:{}),
       evidence_refs: refs,
       evidence_count: refs.length,
       distinct_dates: dates.length,

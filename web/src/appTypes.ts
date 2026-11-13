@@ -195,6 +195,9 @@ export type RelationshipAiResponse = {
     reunion_context: string
     felt_scenarios?: string[]
     reunion_reading?: {
+      contact_recontact?: string
+      emotional_reactivation?: string
+      relationship_rebuilding?: string
       bottom_line: string
       incoming_contact: string
       outgoing_contact: string

@@ -147,6 +147,11 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
   };
   if(periodKind!==undefined){
     const kind=normalizePeriodKind(periodKind);
+    core.properties.contact_evidence_refs={type:"OBJECT",properties:{
+      incoming:structuredClone(section.properties.evidence_refs),outgoing:structuredClone(section.properties.evidence_refs),
+      reconnection:structuredClone(section.properties.evidence_refs),
+    },required:["incoming","outgoing","reconnection"]};
+    core.required.push("contact_evidence_refs");
     const minimums={
       day:{key_windows:1,decisions:1,priorities:1},
       week:{key_windows:0,decisions:0,priorities:0},
@@ -175,10 +180,10 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       // Write field interpretations before the first-screen answer. This plan
       // is model-authored working data, never a server-written fortune.
       const focus={type:"OBJECT",properties:{
-        reader_question:{type:"STRING"},judgment:{type:"STRING"},
+        section_key:{type:"STRING",description:"종합의 판단을 실제로 뒷받침한 clusters의 key 하나"},reader_question:{type:"STRING"},judgment:{type:"STRING"},
         applicable_situation:{type:"STRING"},interpretation_reason:{type:"STRING"},
         limitation:{type:"STRING"},evidence_refs:{type:"ARRAY",items:{type:"STRING"}},
-      },required:["reader_question","judgment","applicable_situation","interpretation_reason","limitation","evidence_refs"]};
+      },required:["section_key","reader_question","judgment","applicable_situation","interpretation_reason","limitation","evidence_refs"]};
       const {clusters,headline,overall,...rest}=core.properties;
       core.properties={clusters,editorial_focus:focus,overall,headline,...rest};
       core.required=[...core.required,"editorial_focus"];

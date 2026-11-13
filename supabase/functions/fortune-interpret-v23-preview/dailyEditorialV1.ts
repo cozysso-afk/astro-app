@@ -1,22 +1,23 @@
+import { contactAxisEvidence } from './contactAxesV1.ts'
 import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
 import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, dailySectionFacts } from './dailyReadingContractV1.ts'
 
-export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v2-supported-details'
+export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v3-question-evidence'
 
 export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY EDITOR: 선택한 운세일 안에서 읽는 해설]
 이번 요청은 종합과 기본 여섯 분야, 그리고 근거가 제공된 기존 세부항목의 일일 원고야. 기본 여섯 분야는 첫 화면의 순서이지 지원 항목의 제한이 아니야. 계산은 끝났어. 계산된 배치를 생활에서 어떻게 읽을지 설명하되, 실제 사건이나 사용자 상태를 관측한 것으로 취급하지 마.
 
 [작성 순서]
-애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. contact_flow에서는 이 강약을 설명해. 각 상황별 원고는 reader_question에서 물은 선택과 근거를 다루고, 모든 행동을 다음 약속 확인으로 끝내지 마. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. ‘흐름이 열려 있어’, ‘세부 조율의 긴장’, ‘충돌 요소가 독립적으로 공존해’ 같은 문장은 쓰지 마. systems는 실제로 계산한 근거 하나와 그 뜻을 쉬운 말로 설명해. 행성 위치만 계산한 경우에는 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
+애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. contact_flow에서는 이 강약을 설명해. contact_flow.incoming은 수신신호, outgoing은 발신적합, reconnection은 과거인연접점의 값이 제공될 때만 작성해. 해당 값이 없으면 그 필드는 빈 문자열로 둬. contact_evidence_refs의 같은 필드에 contact_axes가 허용한 근거만 넣어. 근거가 없으면 해당 필드와 참조 배열을 비워. 총점이나 다른 축으로 추정하지 마. 각 상황별 원고는 reader_question에서 물은 선택과 근거를 다루고, 모든 행동을 다음 약속 확인으로 끝내지 마. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. ‘흐름이 열려 있어’, ‘세부 조율의 긴장’, ‘충돌 요소가 독립적으로 공존해’ 같은 문장은 쓰지 마. systems는 실제로 계산한 근거 하나와 그 뜻을 쉬운 말로 설명해. 행성 위치만 계산한 경우에는 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
 1. daily_editorial_brief.questions의 질문에 맞춰 clusters 여섯 분야를 먼저 작성한 뒤 required_detail 항목도 작성해. required_primary와 required_detail은 key를 각각 한 번 반드시 포함해. 근거 ID를 고르고 해당 질문에 적용할 판단을 써. 근거로 해당 질문에 답할 수 없으면 applicability=insufficient, 빈 원고와 빈 refs로 명시해. 다른 분야나 종합 요약으로 대체되는 결과는 실패야. 계산된 연락·재회·시험·이직·투자·소식 항목을 조용히 생략해도 실패야.
-2. editorial_focus에 전체 첫 화면에서 답할 질문 하나, 판단 하나, 적용 상황, 그 판단의 해석상 이유, 근거 ID를 정리해. 여섯 분야 중 사용자가 먼저 읽을 가치가 있는 판단을 선택해. 모든 분야를 묶은 거창한 하루의 성격을 만들 필요는 없어. 반대 근거는 같은 판단에 직접 영향을 줄 때만 함께 고려해.
+2. editorial_focus에 전체 첫 화면에서 답할 질문 하나, 판단 하나, 적용 상황, 그 판단의 해석상 이유, section_key 하나와 해당 분야 원고가 직접 인용한 근거 ID를 정리해. overall.evidence_refs는 선택한 질문의 focus.evidence_refs에서만 가져와. 여섯 분야 중 사용자가 먼저 읽을 가치가 있는 판단을 선택해. 모든 분야를 묶은 거창한 하루의 성격을 만들 필요는 없어. 반대 근거는 같은 판단에 직접 영향을 줄 때만 함께 고려해.
 3. 그 내용을 읽고 headline을 마지막에 써. 독자가 한 번 읽고 무엇에 대한 어떤 판단인지 말할 수 있어야 해. 제목은 무엇이 수월하거나 까다로운지 읽어주는 짧은 한 문장(25~60자), overall.summary는 적용 상황과 이유를 설명하는 짧은 두 문장(80~180자 목표)이야. 문장 수를 맞추려고 조건을 삭제하지 마. 제목에 이유·행동·제한까지 전부 압축하지 마. 본문을 줄여 붙인 제목도 안 돼.
 
 [필드 역할]
 - conclusion: 그 분야에서 무엇이 수월하거나 까다로운지 설명하는 판단 하나. 확인해·미뤄·줄여 같은 행동 지시가 아니야. 애정은 만남·호감의 상호성·관계 속도, 대인은 협력·요청·의견 차이, 직업은 맡은 일·조건·진행, 학업은 이해·정리·집중, 금전은 지출·예산, 컨디션은 활동·휴식의 범위에서 구분해.
 - real_scene: 이 판단이 어떤 상황에 해당하며 왜 그렇게 읽는지 설명해. 세부항목은 한 문장으로 충분하면 늘이지 마. 사용자에게 그 일이 이미 일어났다고 쓰지 말고 필요하면 조건을 밝혀.
 - action: 앞의 판단과 연결된 확인 또는 선택 하나. 무엇을 확인하는지 대상을 밝혀. 결론을 동의어로 반복하지 마.
-- change_condition: 이번 일일 자료에는 해석을 무효로 만드는 예외의 직접 근거가 없어. 빈 문자열로 둬. 예산 안이면 문제없다거나 급하면 미루라는 허가·명령으로 채우지 마.
+- change_condition: 지금 판단을 달리 볼 현실 조건이 같은 날짜·분야의 인용 근거로 설명되면 그 조건을 보존해. 뒷받침할 내용이 없으면 빈 문자열로 둬. 예산 안이면 문제없다거나 급하면 미루라는 허가·명령으로 채우지 마.
 - headline은 판단, overall.summary는 적용 상황과 이유, decisions는 행동이야. dominant_pattern은 새 설명이 없으면 빈 문자열로 둬.
 - 세부항목은 짧은 결론 하나, 판단 이유나 적용 상황 하나, 행동 하나로 구분해. 같은 근거와 설명을 반복해 분량을 채우지 마. conditional_optional은 실제 관계 상태가 입력되지 않은 상황별 적용이므로 기본 원고와 다른 답을 근거 안에서 줄 수 있을 때만 추가하고, 생략한 항목을 근거 부족이라고 꾸미지 마. 전체 25개에 장문을 강제로 채우지 마.
 - 세부항목의 분량 목표는 conclusion 약 35자, real_scene 약 80자, action 약 35자야. 목표는 빈칸을 채우거나 중요한 조건을 잘라내라는 뜻이 아니야. 기본과 세부에 필요한 원고를 먼저 완성하고 선택적인 상황별 설명은 남은 한도 안에서만 추가해.
@@ -104,13 +105,17 @@ export function dailyReaderPacket(packet:any) {
   for(const system of ['saju','thai']){
     for(const row of source.filter((r:any)=>r.system===system&&/daily/.test(str(r.scope))).slice(0,2))chosen.set(row.id,row)
   }
+  const contact_axes=contactAxisEvidence(packet)
+  const axisIds=new Set(Object.values(contact_axes).flatMap(axis=>axis.refs))
+  for(const row of source)if(axisIds.has(row.id))chosen.set(row.id,row)
   const evidence_ledger=[...chosen.values()]
   return {packet_version:packet.packet_version,period_kind:'day',period:packet.period,time_context:packet.time_context,
     user_context:{life_role:'unknown',relationship_status:'unknown',activity_hours:'unknown',observed_events:[]},
     relationship_scores:Object.fromEntries(Object.entries(packet?.western?.relationship_signals??{}).flatMap(([key,value]:[string,any])=>
       value && Number.isFinite(value.average) ? [[key,{average:value.average,band:value.band}]] : [])),
-    time_of_day:'not_in_this_reading_scope',evidence_ledger,
-    daily_editorial_brief:dailyEditorialBrief({evidence_ledger})}
+    ...(packet?.western?.daily_score_components?.length?{daily_score_components:packet.western.daily_score_components}:{}),
+    time_of_day:'not_in_this_reading_scope',contact_axes,evidence_ledger,
+    daily_editorial_brief:dailyEditorialBrief({period:packet.period,evidence_ledger})}
 }
 
 type Issue={code:string;path:string}
@@ -134,7 +139,7 @@ export function inspectDailyEditorial(data:any,payload:any) {
     const topics=TOPIC_BY_SECTION[`${g}.${k}`]
     const refs=Array.isArray(s?.evidence_refs)?s.evidence_refs:[]
     const cited=refs.map((ref:string)=>ledger.get(ref))
-    if(topics&&s?.applicability!=='insufficient'&&cited.length&&cited.every((row:any)=>
+    if(topics&&s?.applicability!=='insufficient'&&cited.some((row:any)=>
       row&&(str(row.topic)||(Array.isArray(row.source_topics)&&row.source_topics.length))&&!belongsTo(row,topics)
     ))add('evidence_from_other_field',`clusters.${g}.${k}`)
     for(const key of ['conclusion','real_scene','action','change_condition'])record(`clusters.${g}.${k}.${key}`,s?.[key],s?.evidence_refs,key==='action'?'action':'prose')

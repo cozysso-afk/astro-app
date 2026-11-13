@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, inspectDailyProviderDocument, omitUnsupportedDailyConditions } from './dailyReadingContractV1.ts'
+import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, inspectDailyProviderDocument } from './dailyReadingContractV1.ts'
 import { EDITORIAL_SECTION_KEYS, normalizeProviderCore } from './providerSchemaV23.ts'
 const core=()=>({headline:'하루의 핵심 장면.',overall:{summary:'종합 요약은 분야별 결론과 구분해.'},clusters:DAILY_PRIMARY_KEYS.map(key=>({key,conclusion:`${key} 결론`,real_scene:'실제 장면',action:'구체적 행동',change_condition:'달라지는 조건',evidence_refs:['W:test'],applicability:'conditional'}))})
 test('all six daily fields are mandatory, including compact retries',()=>{
@@ -43,19 +43,11 @@ test('a grounded daily reading does not have to invent an exception',()=>{
  assert.ok(!inspectDailyProviderDocument(d,'day').passed)
 })
 
-test('unsupported optional exceptions are omitted without rewriting retained Gemini prose',()=>{
- const d=core(),original=structuredClone(d)
- const result=omitUnsupportedDailyConditions(d,'day')
- for(let i=0;i<d.clusters.length;i++){
-  assert.equal(result.clusters[i].change_condition,'')
-  for(const field of ['conclusion','real_scene','action','evidence_refs','applicability'])assert.deepEqual(result.clusters[i][field],d.clusters[i][field])
- }
- assert.deepEqual(d,original)
- assert.equal(result.headline,d.headline);assert.deepEqual(result.overall,d.overall)
- assert.equal(omitUnsupportedDailyConditions(d,'week'),d)
- assert.ok(inspectDailyProviderDocument(result,'day').passed)
- const normalized={clusters:{relationship:{summary:original.clusters[0]}}}
- assert.equal(omitUnsupportedDailyConditions(normalized,'day').clusters.relationship.summary.change_condition,'')
+test('a supported condition survives provider validation and normalization',()=>{
+ const d=core()
+ d.clusters[0].change_condition='상대도 가능한 날을 제안하면 다음 만남을 함께 준비하는 단계야.'
+ assert.equal(inspectDailyProviderDocument(d,'day').passed,true)
+ assert.equal(normalizeProviderCore(d).clusters.relationship.love_general.change_condition,d.clusters[0].change_condition)
 })
 
 test('contact evidence requires both contact questions and cannot disappear behind six primary readings',()=>{

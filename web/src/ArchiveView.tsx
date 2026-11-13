@@ -245,7 +245,8 @@ export function ArchiveView({
 
     {legacyOpen && <section className={`legacy-archive-detail legacy-${legacyOpen.kind}`}>
       <div className="legacy-archive-head"><div><span className={`archive-kind kind-${legacyOpen.kind}`}>{archiveKindLabel(legacyOpen)}</span><strong>{legacyOpen.title}</strong><small>{legacyOpen.periodStart} · {new Date(legacyOpen.createdAt).toLocaleString('ko-KR')}</small></div><button type="button" onClick={onCloseLegacy}>닫기</button></div>
-      <p>{legacyOpen.kind==='daily'?'이전 앱에서 저장한 일일운세 원문이야. 기존 계산·해석 데이터를 수정하지 않고 그대로 보존했어.':legacyOpen.kind==='outcome'?'직접 남긴 실제 결과 검증 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.':'이전 앱에서 남긴 실제 결과/피드백 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.'}</p>
+      <p>{legacyOpen.kind==='daily'?'이전 앱에서 저장한 일일운세예요. 당시 계산과 해설의 작성 출처는 별도로 확인되지 않았어요.':legacyOpen.kind==='outcome'?'직접 남긴 실제 결과 검증 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.':'이전 앱에서 남긴 실제 결과/피드백 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.'}</p>
+      {legacyOpen.interpretation && <details><summary>당시 저장한 해설 원문</summary><pre>{JSON.stringify(legacyOpen.interpretation, null, 2)}</pre></details>}
       <details open><summary>원문 데이터 보기</summary><pre>{JSON.stringify(legacyOpen.result,null,2)}</pre></details>
     </section>}
     {error && <div className="status-banner error"><AlertTriangle size={16}/><span>{error}</span></div>}

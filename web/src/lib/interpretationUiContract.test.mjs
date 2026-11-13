@@ -429,10 +429,7 @@ test('V23 timing-repaired narrative can remain visible without relaxing strict q
   assert.equal(interpretationHeroEligible({score:100,stages:[1,2,3,4,5].map(stage=>({stage,passed:true}))},{degraded_quality:false}),true)
 })
 
-test('independent period copy uses Korean particle selection instead of hard-coded 올해은', () => {
-  assert.match(systemViews, /function koreanParticle/)
-  assert.doesNotMatch(systemViews, /`\$\{when\}은/)
-  assert.match(systemViews, /koreanParticle\(when,'은는'\)/)
-  assert.match(systemViews, /westernRankCopy\(rows, when\)/)
-  assert.doesNotMatch(systemViews, /흐름이 점수가/)
+test('system views display calculation facts without synthesizing their own period conclusions', () => {
+  assert.doesNotMatch(systemViews, /westernRankCopy\(|흐름이 점수가/)
+  assert.match(systemViews, /계산 점수/)
 })

@@ -36,6 +36,15 @@ function render(period, field, records) {
 for (const period of Object.keys(periods)) test(period+' opens reunion body with the dated meeting and a period-specific follow-up',()=>{
   const saved=JSON.stringify([scores,data,record])
   const html=render(period,love,[record])
+  if(period==='today'){
+    const note=html.split('<aside')[1].split('</aside>')[0]
+    assert.ok(note.includes('aria-label="내가 기록한 연락"'))
+    assert.ok(note.includes('2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요.'))
+    assert.ok(html.includes('<h3 class="daily-reading-headline">호감을 나누는 분위기가 있어.</h3>'))
+    assert.doesNotMatch(html,/42점|그날 나눈 이야기/)
+    assert.equal(JSON.stringify([scores,data,record]),saved)
+    return
+  }
   const scenario=html.split(/data-(?:daily-slot|reading-section)="relationship.love_reunion_interest"/)[1].split('</details>')[0]
   assert.match(scenario,/2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요/)
   assert.match(scenario,{today:/그날 나눈 이야기/,week:/이번 주에는 만난 뒤/,month:/이달에는 만남 직후/}[period])
@@ -65,9 +74,16 @@ test('contact presentation and its export carry the same recorded stage while re
     const original='전화가 올지 기다려 봐.'
     const blocks=observedContactCore(passage,original,[])
     const html=render(period,contact,[record])
-    const model=period==='today'
-      ? exporters.dailyReadingExportModel({state:'ready',headline:passage.fact,blocks,title:'연락',date:record.date})
-      : exporters.authoredReadingExportModel({state:'ready',headline:passage.fact,core:blocks,exportBlockIds:blocks.map(b=>b.id),title:'연락',date:record.date})
+    if(period==='today'){
+      const doc={state:'ready',headline:original,blocks:[{id:'scene',label:'생활에서 보면',text:'약속이 구체적인지 확인해.'},{id:'action',label:'지금 할 일',text:'다음 일정을 정해.'}],title:'연락',date:record.date}
+      const image=exporters.dailyReadingExportModel(doc)
+      for(const card of image.sections[0].cards)assert.ok(html.includes(card.body))
+      assert.match(html,/<aside[^>]*aria-label="내가 기록한 연락"/)
+      assert.ok(html.includes(passage.fact))
+      assert.ok(!image.sections[0].cards.some(c=>c.body===passage.fact))
+      continue
+    }
+    const model=exporters.authoredReadingExportModel({state:'ready',headline:passage.fact,core:blocks,exportBlockIds:blocks.map(b=>b.id),title:'연락',date:record.date})
     for(const card of model.sections[0].cards)assert.ok(html.includes(card.body))
     assert.ok(html.indexOf(passage.fact)<html.indexOf(original))
   }
@@ -125,12 +141,12 @@ test('an explicitly quiet day changes rereading without erasing a previous meeti
       const datedFact='2020-11-11에는 연락을 주고받지 않았다고 기록했어요.'
       assert.ok(!empty.includes(datedFact))
       assert.ok(quietOnly.includes(datedFact))
-      assert.match(quietOnly,/연락이 없었던 날은 어떻게 읽을까/)
+      if(period!=='today') assert.match(quietOnly,/연락이 없었던 날은 어떻게 읽을까/)
       assert.doesNotMatch(quietOnly,/과거 인연과 연락을 주고받지/)
       const both=render(period,field,[quiet,record])
       assert.ok(both.includes(datedFact))
       assert.ok(both.includes('2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요.'))
-      assert.match(both,/만남 뒤, 다음 약속도 함께 잡을까/)
+      if(period!=='today') assert.match(both,/만남 뒤, 다음 약속도 함께 잡을까/)
     }
   }
   const clean={...record,channel:'message',note:''}

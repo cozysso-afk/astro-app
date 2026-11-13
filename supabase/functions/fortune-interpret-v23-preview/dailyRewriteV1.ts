@@ -37,7 +37,7 @@ unprovided/unobserved/unmeasured: 입력 없는 사건·실제 체력·신체 �
 mixed_life_roles: 업무와 공부를 독자의 실제 일정처럼 함께 가정하지 마. 해당 주장의 공통 확인 대상을 역할 중립적으로 설명해.
 unprovided_role_in_overview: 특정 직업·학업·이직 일정을 전제하지 말고 공통 생활 상황으로 종합해.
 opaque: 명사만 바꿔 같은 모호한 말을 반복하지 말고 무슨 상황에서 무엇을 확인할지 직접 써.
-오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. 일일 change_condition은 빈 문자열로 반환해. 빠진 연락·재회·시험·이직·투자·소식 항목을 이 문장 편집 단계에서 새로 작성하지 마. 항목 누락은 전체 구조 검증에서 처리하며 이미 작성된 다른 세부 원고를 지우거나 종합으로 바꾸지 마.
+오늘이라는 표현은 time_context.today_word_allowed가 true일 때만 써. change_condition의 적용 범위와 근거 있는 조건은 보존하고, 근거 없는 예외만 빈 문자열로 반환해. 빠진 연락·재회·시험·이직·투자·소식 항목을 이 문장 편집 단계에서 새로 작성하지 마. 항목 누락은 전체 구조 검증에서 처리하며 이미 작성된 다른 세부 원고를 지우거나 종합으로 바꾸지 마.
 time_context=${JSON.stringify(payload.time_context??{})}
 TARGETS=${JSON.stringify(targets)}`}
 }

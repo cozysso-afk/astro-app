@@ -1,6 +1,6 @@
 import type {AiInterpretationResponse, IntegratedApiResponse, PeriodKey} from '../appTypes'
 import {hydrateArchiveItem, listLocalArchive, saveArchive, type ArchiveItem} from './archive'
-import {readReadingCache, storedFortuneCalculationId} from './readingCache'
+import {currentCalculationCacheId, readReadingCache, storedFortuneCalculationId} from './readingCache'
 
 const periodTitles: Record<PeriodKey, string> = {today:'오늘', week:'주간', month:'월간', year:'연간'}
 
@@ -31,7 +31,7 @@ export async function resumePeriodArchive(
   // can establish that such a job belongs in the period archive.
   const period = archivePeriod ?? entry?.periodKey
   if (!period) return
-  const cached = await readReadingCache<{request:Record<string,unknown>; result:IntegratedApiResponse}>(id)
+  const cached = await readReadingCache<{request:Record<string,unknown>; result:IntegratedApiResponse}>(currentCalculationCacheId(request))
   let calc = cached && storedFortuneCalculationId(cached.request) === id ? cached.result : undefined
   if (!calc && entry) {
     const full = await hydrateArchiveItem(entry)

@@ -9,9 +9,9 @@
 .daily-reading .daily-reading-headline {font:700 22px/1.65 var(--daily-serif);letter-spacing:-.035em;margin:16px 0 24px;word-break:keep-all;overflow-wrap:anywhere;}
 .daily-reading .daily-reading-block {margin:0;padding:18px 0;border-top:1px solid #74628921;}
 .daily-reading .daily-reading-block h4 {font:700 13px/1.6 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;color:#6d557f;margin:0 0 8px;}
-.daily-reading .daily-reading-block p {font:400 16px/1.9 var(--daily-serif);letter-spacing:-.02em;word-break:keep-all;overflow-wrap:anywhere;margin:0;color:#3f4153;}
+.daily-reading .daily-reading-block p {font:400 16px/1.7 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;white-space:pre-line;letter-spacing:-.015em;word-break:keep-all;overflow-wrap:anywhere;margin:0;color:#3f4153;}
 .daily-reading .daily-reading-details {margin-top:18px;border-top:1px solid #74628921;padding-top:14px;}
-.daily-reading .daily-reading-details>summary {font:700 14px/1.6 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;cursor:pointer;padding:6px 0;}
+.daily-reading .daily-reading-details>summary {font:700 14px/1.6 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;cursor:pointer;padding:10px 0;}
 .daily-reading .daily-reading-save {width:100%;min-height:44px;border:1px solid #b7a9c7;border-radius:12px;background:#ffffffb8;color:#5d4774;font:700 14px/1.5 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;padding:12px;margin-top:10px;}
 .daily-reading .daily-reading-save:disabled {opacity:.6;}
 .daily-reading .daily-reading-notice,.daily-reading .daily-reading-state {font:400 14px/1.7 "Noto Sans KR",system-ui,"Apple SD Gothic Neo",sans-serif;margin:14px 0;color:#625c6d;}

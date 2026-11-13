@@ -142,7 +142,7 @@ test('daily love exposes contact and reunion without opening generic details', a
   }))
   assert.match(html, /data-daily-slot="relationship.contact_activation" data-slot-state="ready"><summary>연락운<\/summary>/)
   assert.match(html, /data-daily-slot="relationship.contact_continuity" data-slot-state="missing"/)
-  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><summary>재회<\/summary><p>이 상황의 운세를 판단할 계산 근거가 부족해/)
+  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><summary>재회<\/summary><p>이 상황을 판단할 근거가 부족해/)
   assert.equal(html.split('data-daily-detail="relationship.contact_activation:conclusion"').length, 2)
 })
 
@@ -159,17 +159,18 @@ test('the love tab shows the saved relationship interpretation in both week and 
   }
 })
 
-test('mixed old and new love sections are accessible by situation without duplicate prose',()=>{
+test('the verified weekly love document keeps an omitted situation separate from the written answers',()=>{
   const data=fixture()
   delete data.clusters.relationship.love_single
   const field=fields.fortuneGroup('애정')
   const doc=documents.buildPeriodReadingDocument(data,'week','2026-11-09','2026-11-15',field,true)
   const supplements=[{id:'relationship.love_single',label:'솔로',text:'이번 주 계산을 적용한 솔로 해설',evidence:'이번 주 출처'}]
   const html=renderToStaticMarkup(createElement(Panel,{doc,period:'week',supplements}))
-  for(const label of ['솔로 · 새 인연','짝사랑','썸','애매한 관계','연애 중','재회'])assert.ok(html.includes('<summary>'+label+'</summary>'))
-  assert.ok(html.indexOf('내 상황에 맞춰 보기')<html.indexOf('질문별 상세 해설'))
-  assert.equal(html.split(supplements[0].text).length,2)
-  assert.ok(html.includes('주간 계산 근거'))
+  assert.ok(html.includes('data-reading-section="relationship.love_single" data-section-state="missing"'))
+  for(const name of ['crush','flirting','ambiguous','couple','reunion_interest']){
+    assert.ok(html.includes(data.clusters.relationship['love_'+name].conclusion))
+  }
+  assert.ok(!html.includes(supplements[0].text))
 })
 
 test('opening an old reunion draft keeps valid sentences while removing a statement that contradicts the saved meeting',()=>{

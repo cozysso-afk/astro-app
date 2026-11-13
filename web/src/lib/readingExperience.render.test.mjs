@@ -132,7 +132,7 @@ test('portrait prompt is only existing hints plus explicit creative art directio
 test('daily reason action and conditions render as separately labelled accessible blocks',()=>{
   const f=fortuneFixture()
   const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
-  for(const [kind,label] of [['summary','핵심 요약'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
+  for(const [kind,label] of [['summary','오늘의 흐름'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
   assert.match(html,/<time dateTime="2026-09-12">2026-09-12<\/time>/)
   assert.ok(html.indexOf('overall:reason')<html.indexOf('overall:action'))
   assert.ok(html.indexOf('overall:action')<html.indexOf('overall:watch'))

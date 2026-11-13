@@ -1,3 +1,4 @@
+import { CONTACT_AXES, contactAxisEvidence } from './contactAxesV1.ts'
 import { attachPeriodReadingContext, buildPeriodReadingInstruction } from './periodReadingContractV1.ts'
 import { v23OutputTokenLimit } from './runtimeBudgetV23.ts'
 import { buildProviderCoreSchema } from './providerSchemaV23.ts'
@@ -7,13 +8,14 @@ import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NA
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.15-grounded-reader-contract'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.16-question-evidence'
 const enc = new TextEncoder()
 
 export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
 절대규칙:
 - PROMPT_DATA와 evidence_ledger 밖의 사실·날짜·상대 속마음·사건 확률을 만들지 않는다.
-- 점수는 상대활성도이지 확률이 아니다. 숫자%로 바꾸지 않는다.
+- scores의 종합 점수와 관계축 강도는 사건 확률이 아니다. 기본 분야의 score_components가 있으면 activation(그 분야가 두드러진 정도)과 favorability(수월함·부담의 상대적 균형)를 구분한다. 큰 수치 자체로 좋은 날이나 나쁜 날을 정하지 않는다.
+- 같은 관측의 topic_contributions에서 반드시 묻는 분야의 polarity를 읽는다. 같은 행성쌍도 분야별 부호가 다를 수 있다. 해당 분야의 수치가 없으면 다른 분야의 부호를 빌리거나 가중치를 역산하지 않는다. 파생 분야는 원래 연결과 제공 범위만 해석한다.
 - 서사는 점수나 topic 이름부터 시작하지 않고 period_narrative.phenomena의 현상 묶음부터 시작한다.
 - 같은 현상이 여러 topic에 걸쳐 있으면 현상은 한 번 설명하고 분야별 발현 차이만 덧붙인다.
 - day/week/month/annual은 서로 다른 시간해상도와 서사 구조를 사용한다. 기간 이름만 바꾼 같은 문장을 재사용하지 않는다.
@@ -25,7 +27,7 @@ export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산
 - 같은 애스펙트가 여러 날짜에 반복되면 독립된 여러 근거처럼 부풀리지 않는다.
 - 점수·평균·변동폭은 강약 보조정보일 뿐 해설 자체가 아니다.
 - 투자 상대지수는 가격방향·수익률·매수·매도 적기 예측으로 바꾸지 않는다.
-- 관계가 중요할 때만 상대→나, 나→상대, 과거인연 재접점을 분리해 읽고 실제 반응으로 확인한다.
+- contact_flow.incoming/outgoing/reconnection은 contact_axes에서 같은 축이 허용한 근거만 contact_evidence_refs의 해당 필드에 인용한다. 해당 축 근거가 없으면 문장과 참조 배열을 비운다. 당사자가 실제로 먼저 연락한 기록이나 다음 연락을 예측한 것으로 바꾸지 않는다.
 - 한 문단에는 새로운 판단 하나만 넣고, 근거의 작용 → 체감/환경 → 기간 내 위치 → 현실 확인 신호 순으로 연결한다.
 - 한국어 반말. JSON만 반환한다.`;
 
@@ -38,9 +40,11 @@ function bandRole(row:any) {
 
 function phenomenonRole(phenomena:any[], topic:string) {
   const rows=phenomena.filter((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic))
-  const directions=new Set(rows.flatMap((row:any)=>Array.isArray(row?.directions)?row.directions:[]).map(String))
-  const caution=rows.some((row:any)=>row?.role==='caution'||row?.role==='tension')||directions.has('caution')||directions.has('challenging')
-  const support=rows.some((row:any)=>row?.role==='support')||directions.has('supportive')
+  const directions=new Set(rows.flatMap((row:any)=>row.topic_directions
+    ? row.topic_directions[topic]??[]
+    : [...(row.directions??[]),...({support:['supportive'],caution:['caution'],tension:['supportive','caution']} as Record<string,string[]>)[row.role]??[]]))
+  const caution=directions.has('caution')||directions.has('challenging')
+  const support=directions.has('supportive')
   if(caution&&support)return 'mixed' as const
   if(caution)return 'caution' as const
   if(support)return 'support' as const
@@ -117,13 +121,38 @@ const HUMAN_LANGUAGE_CONTRACT = `[HUMAN_LANGUAGE_CONTRACT]
 - 행동 조언은 해석을 다시 말하는 문장이 아니라, 사용자가 현실에서 확인하거나 조정할 수 있는 구체 행동 하나로 써.`
 
 export function buildV23PromptPacket(payload:any) {
-  const base = attachPeriodReadingContext(buildPromptPacket(payload),payload)
+  const bounded=buildPromptPacket(payload)
+  const retained=new Set(bounded.evidence_ledger.map((row:any)=>row.id))
+  const axes=new Set<string>(Object.values(CONTACT_AXES))
+  for(const row of payload?.evidence_ledger??[]) {
+    if(row.scope==='relationship_average' && axes.has(row.topic) && row.start===payload.period.start && row.end===payload.period.end && !retained.has(row.id)) {
+      bounded.evidence_ledger.push(row)
+      retained.add(row.id)
+    }
+  }
+  const base:any = attachPeriodReadingContext(bounded,payload)
+  // Spend the prompt budget on measurements for dates and topics the writer actually sees.
+  const listedTopics=new Map<string,Set<string>>();
+  for(const row of base.evidence_ledger??[]){
+    if(!row.date)continue;
+    const topics=listedTopics.get(row.date)??new Set<string>();
+    for(const topic of [row.topic,...(row.source_topics??[])])if(topic)topics.add(topic);
+    listedTopics.set(row.date,topics);
+  }
+  const samples=(payload?.western?.daily_score_components??[]).flatMap((sample:any)=>{
+    const included=listedTopics.get(sample.date);
+    if(!included)return [];
+    const topics=Object.fromEntries(Object.entries(sample.topics).filter(([key])=>included.has(key)));
+    return Object.keys(topics).length?[{date:sample.date,topics}]:[];
+  });
+  if(samples.length)base.western={...base.western,daily_score_components:samples};
   const narrative = buildPeriodNarrativeContext(base)
   const packet:any = {
     ...base,
     time_context:payload?.time_context,
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
+    contact_axes:contactAxisEvidence(base),
     domain_answer_contract_version: DOMAIN_ANSWER_CONTRACT_VERSION,
     domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
