@@ -274,3 +274,17 @@ test('tone 22: counterpart observation is reset when identity changes but archiv
   assert.match(app,/setReunionObservedState\(''\)/)
   assert.match(app,/setReunionMeetingDate\(''\)/)
 })
+
+test('each field uses its own contribution and polarity with newer calculations', () => {
+  const row = {
+    source_topics: ['금전', '연애', '수신신호'], contribution: 4, polarity: 1,
+    topic_contributions: {
+      금전: { contribution: 1, polarity: -0.5 },
+      연애: { contribution: 4, polarity: 1 },
+    },
+  }
+  const calc = calculation({}, [row])
+  assert.equal(fortuneToneAssessment(calc, '금전').challengingWeight, 0.5)
+  assert.equal(fortuneToneAssessment(calc, '연애').supportiveWeight, 4)
+  assert.equal(fortuneToneAssessment(calc, '수신신호').direction, 'neutral')
+})

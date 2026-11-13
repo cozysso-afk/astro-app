@@ -272,6 +272,7 @@ export type FortuneDailyEvidence = {
   kind: string
   sample_time?: string
   source_topics?: string[]
+  topic_contributions?: Record<string, { contribution: number; polarity: number }>
   contribution?: number
   text: string
   transit?: string
@@ -292,6 +293,7 @@ export type FortuneDailyScore = {
   market_open: boolean
   scores: Record<string, number | null>
   evidence?: FortuneDailyEvidence[]
+  score_components?: Record<string, { activation: number; favorability: number }>
 }
 
 export type IntegratedApiResponse = {
