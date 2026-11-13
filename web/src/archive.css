@@ -431,6 +431,16 @@
   background: #f4eee7;
 }
 
+.archive-reading-source {
+  margin-block: 0.5rem;
+}
+.archive-reading-source pre {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .archive-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

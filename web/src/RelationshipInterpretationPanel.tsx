@@ -48,7 +48,7 @@ export function RelationshipInterpretationPanel({ sajuContext, aspects, partnerE
     {reunion&&hierarchyData&&<ReunionHierarchyPanel hierarchyData={hierarchyData} historyHierarchyData={hierarchyView(historyHierarchy)} historyCalculated={historyCalculated} observation={observation} evidence={evidence} showEvidenceHouses={showHouses} showObservation={false} directionRows={directionRows}/>}
     {!verified && <section className="reading-section relationship-natural-reading" data-relationship-state={aiLoading?'generating':aiError?'failed':'not_requested'}>
       <h3>{aiLoading?'관계 해설을 정리하고 있어…':'관계 해설이 아직 작성되지 않았어.'}</h3>
-      <p>{reunion?'저장된 계산과 관계 기록은 바로 볼 수 있어요. 추가 해설을 원할 때만 생성하세요.':'계산된 근거와 실제 관계 기록은 아래에서 확인할 수 있어.'}</p>
+      {!reunion && <p>계산된 관계 접점 {ranked.length}개</p>}
       {aiError&&<p className="reading-alert" role="status">{aiError}</p>}
       <p className="ai-preflight-cost">{relationshipAiCostPreview(analysisMode)}</p>
       <button type="button" onClick={onAi} disabled={aiLoading}><Sparkles size={16}/>{aiLoading?'해설 생성 중…':'제미나이 해설 생성'}</button>

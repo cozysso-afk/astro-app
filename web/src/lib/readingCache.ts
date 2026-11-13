@@ -180,5 +180,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
 
 export function relationshipAiCacheId(calculation: Record<string, unknown>, purpose: string, model: string, context?: unknown): string {
   const contract = purpose === 'reunion' ? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT
-  return `relationship-ai:${hashText(stableStringify({ contract, model, purpose, calculation, context: context ?? null }))}`
+  // Older client caches may contain added glosses. Reopen those in the archive;
+  // a new reading uses the unmodified response, including a provider cache hit.
+  return `relationship-ai:${hashText(stableStringify({ contract, transport_revision: 'provider-original-v1', model, purpose, calculation, context: context ?? null }))}`
 }

@@ -54,7 +54,7 @@ test('opening day, week and month calculations only restores saved prose until t
   }
   assert.match(app,/cacheOnly = intent === 'open'\s*\n/)
   const open=app.indexOf('if (cacheOnly)')
-  const start=app.indexOf("action: 'start', calculation: calculationForInterpretation")
+  const start=app.indexOf("action: 'start'", open)
   assert.ok(open>0 && start>open)
   assert.match(app.slice(open,start),/setAiLoading\(false\)\s+return/)
   assert.match(app,/refreshReading \? 'refresh' : 'generate'/)

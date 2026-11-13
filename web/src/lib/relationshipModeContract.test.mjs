@@ -117,6 +117,27 @@ test('compatibility and both marriage modes prioritize different real-life quest
   for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term'])assert.equal(compatibility.sections.find(s=>s.id===key).blocks[0].text,data[key])
 })
 
+test('archive preserves the entered manuscript and distinguishes provider, temporary and unknown sources', async () => {
+  const {ArchiveView} = await server.ssrLoadModule('/src/ArchiveView.tsx')
+  const data={...fixture(),reunion_reading:Object.fromEntries(['bottom_line','contact_recontact','emotional_reactivation','relationship_rebuilding','incoming_contact','outgoing_contact','reconnection_windows','low_windows','relationship_filter','precision_note'].map(key=>[key,''])),
+    marriage_reading:{...fixture().marriage_reading,mode:'compatibility'}, overview:'  Mercury  ·  庚申  '}
+  const verified=aiFor(data)
+  const entry={id:'archive-test',kind:'compatibility',periodKey:'month',title:'저장 결과',periodStart:'2026-11-01',periodEnd:'2026-11-30',request:{},result:{},engine:'fixture',createdAt:'2026-11-01T00:00:00Z',syncState:'local'}
+  const original=JSON.stringify(verified)
+  for(const [reading,source] of [
+    [verified,'제미나이 생성 기록 · 저장 원문'],
+    [{...verified,usage:undefined},'작성 출처 미확인 · 저장 원문'],
+    [{...verified,origin:'deterministic_safe'},'기존 임시 해설 · 저장 원문'],
+  ]) {
+    const html=renderToStaticMarkup(createElement(ArchiveView,{items:[{...entry,interpretation:reading}],status:'',error:'',legacyOpen:null}))
+    assert.ok(html.includes(`<details class="archive-reading-source"><summary>${source}</summary>`))
+    assert.ok(html.includes('  Mercury  ·  庚申  '))
+  }
+  const unknown=renderToStaticMarkup(createElement(ArchiveView,{items:[{...entry,hydrated:false}],status:'',error:'',legacyOpen:null}))
+  assert.ok(unknown.includes('저장된 해설 확인'))
+  assert.equal(original,JSON.stringify(verified))
+})
+
 test('relationship modes never render deterministic prose as the authored reading', () => {
   for(const mode of ['compatibility','reunion','marriage_unmarried','marriage_married']){
     const data=fixture(),unverified=renderPanel(mode,{...aiFor(data),provenance_verified:false})
