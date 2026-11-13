@@ -88,7 +88,7 @@ test('crosswalk accepts exact engine names only and never creates missing meanin
 test('provisional system views exclude all disallowed source data',()=>{
  const f=fixture('week',true),v=systems.buildSystemReading(f.calculation)
  assert.equal(v.saju,undefined);assert.equal(v.thai,undefined)
- for(const system of ['saju','thai']){const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:system}));assert.match(html,/신뢰도 있게 계산할 수 없어/);assert.doesNotMatch(html,/甲子|乙未|Boriwan|금성/)}
+ for(const system of ['saju','thai']){const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:system}));assert.match(html,/현재 입력으로 확인된 .* 계산 자료가 없어/);assert.doesNotMatch(html,/甲子|乙未|Boriwan|금성/)}
 })
 test('Thai birthday segments remain separate; Saju solar-term segments are not calendar-merged',()=>{
  const f=fixture('year'),v=systems.buildSystemReading(f.calculation)
@@ -214,38 +214,33 @@ test('relationship heroes use the selected Saju lens and retain all three Wester
    f.calculation.western.overall[name]={average,band,spread:0,best_days:[],caution_days:[]}
  }
  const render=initialSystem=>renderToStaticMarkup(h(Views,{calculation:f.calculation,field,initialSystem}))
- const hero=markup=>markup.match(/<header class="system-hero [^"]*">([\s\S]*?)<\/header>/)?.[1]??''
- const saju=hero(render('saju')), western=hero(render('western'))
- assert.match(saju,/관계|상대|약속|만남|호감|들은 말/)
- assert.doesNotMatch(saju,/새 자료|이미 배운|마감일/)
- for(const value of ['53점','29점','46점'])assert.ok(western.includes(value),value)
- assert.doesNotMatch(western,/투자|수익/)
+ const saju=render('saju'), western=render('western')
+ assert.match(saju,/사주 계산 근거/)
+ assert.match(saju,/이 기간에 저장된 체계별 Gemini 원고가 없어/)
+ for(const [topic,value] of [['연애',53],['연락',29],['재회',46]]) assert.ok(western.includes('<strong>'+topic+'</strong><b>'+value+'</b>'))
+ assert.doesNotMatch(western,/<strong>투자|<strong>수익/)
 })
 
-test('love uses the actual Saju month and only reports a transition inside the selected period',()=>{
- const f=fixture('today'), c=f.calculation, field=fields.find(row=>row.id==='love')
- const markup=()=>renderToStaticMarkup(h(Views,{calculation:c,initialSystem:'saju',field}))
- const hero=()=>markup().match(/class="system-hero saju-reader-hero"[\s\S]*?<h3>([\s\S]*?)<\/h3>/)[1]
- assert.match(hero(),/정인 월운.*마음을 받아들이는 방식/)
- assert.doesNotMatch(hero(),/마감|업무|배운 내용|새 월운/)
- c.period={start:'2026-10-01',end:'2026-10-31',day_count:31,month_segments:2}
- assert.match(hero(),/10월 8일.*정재.*함께 쓸 시간과 현실 조건/)
- assert.equal(systems.sajuRelationshipSummary([]),'')
+test('Saju displays the source month and its exact transition only when the period overlaps',()=>{
+ const {calculation}=fixture('today'), field=fields.find(row=>row.id==='love')
+ const markup=()=>renderToStaticMarkup(h(Views,{calculation,initialSystem:'saju',field}))
+ assert.match(markup(),/正印\(정인\)/)
+ assert.doesNotMatch(markup(),/正財\(정재\)|마음을 받아들이는 방식/)
+ calculation.period={start:'2026-10-01',end:'2026-10-31',day_count:31,month_segments:2}
+ assert.match(markup(),/正財\(정재\)/)
+ assert.ok(markup().includes('2026-10-08T12:00:00+09:00'))
 })
 
-test('Thai love cards apply the actual Bhumi area to relationship questions',()=>{
- const f=fixture(), field=fields.find(row=>row.id==='love')
- const html=renderToStaticMarkup(h(Views,{calculation:f.calculation,initialSystem:'thai',field}))
- const cards=html.match(/<section class="thai-life-map">([\s\S]*?)<\/section>/)[1]
- for(const key of ['boriwan','sri','montri','kalakini']) {
-  const lens=systems.thaiLensForTopic(key,'애정')
-  assert.ok(cards.includes(lens.title) && cards.includes(lens.action))
-  assert.equal(systems.thaiLensForTopic(key,'전체'),systems.BHUMI_LENSES[key])
+test('Thai love shows only the relevant Bhumi placements without locally authored advice',()=>{
+ const {calculation}=fixture(), field=fields.find(row=>row.id==='love')
+ const html=renderToStaticMarkup(h(Views,{calculation,initialSystem:'thai',field}))
+ assert.deepEqual(new Set([...html.matchAll(/data-bhumi="([^"]+)"/g)].map(match=>match[1])),new Set(systems.THAI_LIFE_KEYS['애정']))
+ for(const key of systems.THAI_LIFE_KEYS['애정']){
+  assert.ok(html.includes(systems.BHUMI_LENSES[key].title))
+  assert.ok(!html.includes(systems.thaiLensForTopic(key,'애정').action))
  }
- assert.doesNotMatch(cards,/가족·친구·동료|예산|다시 벌이기/)
- assert.match(cards,/계산 근거.*금성/)
+ assert.match(html,/금성/)
 })
-
 
 test('Saju keeps supported topics selectable without a matching monthly lens',()=>{
  const {calculation}=fixture('today')
@@ -254,17 +249,20 @@ test('Saju keeps supported topics selectable without a matching monthly lens',()
  assert.match(tabs,/<button(?![^>]*disabled)[^>]*>금전<\/button>/)
  assert.match(tabs,/<button[^>]*disabled[^>]*>컨디션<\/button>/)
  const noMoney=render(fields.find(row=>row.id==='money'))
- assert.match(noMoney,/금전을 바로 설명할 사주 근거가 많지 않아/)
+ assert.match(noMoney,/사주 계산 근거/)
+ assert.match(noMoney,/저장된 체계별 Gemini 원고가 없어/)
+ assert.doesNotMatch(noMoney,/正財|正印|正官/)
 })
 
 test('Saju daily love explains the selected day and separates monthly context',()=>{
  const {calculation}=fixture('today'), field=fields.find(row=>row.id==='love')
  calculation.saju.daily=[{date:calculation.period.start,ganzhi:'庚申',stem_ten_god:'食神(식신)',branch_links:[]},{date:'2000-01-01',ganzhi:'丙午',stem_ten_god:'正財(정재)',branch_links:[]}]
  const html=renderToStaticMarkup(h(Views,{calculation,initialSystem:'saju',field}))
- const hero=html.match(/class="system-hero saju-reader-hero"([\s\S]*?)<\/header>/)[1]
- assert.match(hero,/9월 12일 일진.*호감과 의사를 표현하는 방식/)
- assert.match(hero,/경신.*식신.*정인 월운/)
- assert.doesNotMatch(hero,/새 자료|복습|마감일|정재/)
+ assert.match(html,/날짜별 일진/)
+ assert.match(html,/2026-09-12 · [^<]*식신/)
+ assert.match(html,/정인/)
+ assert.doesNotMatch(html,/2000-01-01|正財|호감과 의사를 표현하는 방식/)
+
 })
 
 test('Saju samples the selected week and month and skips days without topic evidence',()=>{
@@ -283,12 +281,13 @@ test('Thai reads only the active field planet inside the selected annual segment
  const sample=(date,sign)=>({date,positions:{venus:{sign_ko:sign},mars:{sign_ko:'처녀자리'}}})
  calculation.thai.suriyayat_daily=[sample('2026-09-11','사자자리'),sample('2026-09-12','황소자리'),sample('2026-09-14','쌍둥이자리'),sample('2026-09-15','전갈자리')]
  const html=renderToStaticMarkup(h(Views,{calculation,initialSystem:'thai',field}))
- const hero=html.match(/<header class="system-hero">([\s\S]*?)<\/header>/)[1]
- assert.match(hero,/9월 12일.*금성.*황소자리.*9월 14일.*쌍둥이자리/)
- assert.doesNotMatch(hero,/사자자리|전갈자리|처녀자리/)
+ assert.match(html,/2026-09-12 · 금성 · 황소자리/)
+ assert.match(html,/2026-09-14 · 금성 · 쌍둥이자리/)
+ assert.doesNotMatch(html,/사자자리|전갈자리|처녀자리/)
  delete calculation.thai.taksajorn
  const natal=renderToStaticMarkup(h(Views,{calculation,initialSystem:'thai',field}))
- assert.doesNotMatch(natal.match(/<header class="system-hero">([\s\S]*?)<\/header>/)[1],/관측값|수리야얏 계산에서/)
+ assert.doesNotMatch(natal,/선택한 구간의 날짜별 행성 위치|쌍둥이자리|황소자리/)
+
 })
 
 
@@ -318,10 +317,12 @@ test('integrated overview renders day-only Saju evidence and no bare zero withou
  const {calculation}=fixture()
  calculation.saju.monthly=[]
  calculation.saju.annual=[]
- const view=()=>renderToStaticMarkup(h(Views,{calculation,initialSystem:'integrated'},h(({systemOverview})=>systemOverview)))
- assert.doesNotMatch(view(),/>0</)
- assert.match(view(),/사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어/)
+ const view=initialSystem=>renderToStaticMarkup(h(Views,{calculation,initialSystem},h('p',{},'저장된 통합 원고')))
+ assert.match(view('integrated'),/저장된 통합 원고/)
+ assert.doesNotMatch(view('integrated'),/>0<|일진의 주제/)
+ assert.doesNotMatch(view('saju'),/날짜별 일진/)
  calculation.saju.daily=[{date:calculation.period.start,ganzhi:'己丑',stem_ten_god:'正印(정인)',branch_links:[]}]
- assert.match(view(),/일진의 주제/)
- assert.doesNotMatch(view(),/>0<|사주 · 현재 정밀도 또는 기간 근거로는 해석할 수 없어/)
+ assert.match(view('saju'),/날짜별 일진/)
+ assert.match(view('saju'),/正印\(정인\)/)
+ assert.doesNotMatch(view('integrated'),/正印|일진의 주제/)
 })

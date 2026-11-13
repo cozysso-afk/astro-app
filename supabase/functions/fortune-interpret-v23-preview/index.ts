@@ -121,7 +121,7 @@ function normalizeDirectionalWindows(data:any,payload:any){
   return data;
 }
 
-function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
+function finalizeCandidate(core:any,payload:any,writerPacket:any,model:string,u:any,meta:any={}){
   const {editorial_trace_seed:traceSeed=[],editorial_trace_origin:traceOrigin,...resultMeta}=meta??{};
   const traceStages=Array.isArray(traceSeed)?[...traceSeed]:[];
   if(!traceStages.length)traceStages.push(captureEditorialStage("finalize_input",core));
@@ -142,7 +142,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   }
   traceStages.push(captureEditorialStage("post_thai_guard",data));
   const quality=applyDailyEditorialGate(inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false,allowEmptyDailyChangeCondition:true,periodReadingContract:true}),dailyEditorial);
-  const gatedQuality=applyPeriodReadingGate(quality,inspectPeriodReading(data,payload));
+  const gatedQuality=applyPeriodReadingGate(quality,inspectPeriodReading(data,writerPacket));
   traceStages.push(captureEditorialStage("post_quality_validation",data));
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini",quality_ok:Boolean(gatedQuality?.ok)});
   if(!gatedQuality.ok){
@@ -162,7 +162,7 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
   const normalizedCore=normalizeProviderCore(providerCore);
   const normalizedTrace=captureEditorialStage("provider_normalized",normalizedCore);
-  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  return {...finalizeCandidate(normalizedCore,payload,pb.packet,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
 }
 
 async function rewriteDailyCandidate(first:any,payload:any,model:string,key:string,budget:Budget,request:any){
@@ -171,9 +171,10 @@ async function rewriteDailyCandidate(first:any,payload:any,model:string,key:stri
   try{
     const patched=applyDailyRewrite(first.candidate_data,request,result.partial);
     const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
-    const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day",buildV23PromptBudget(payload).packet);
+    const packet=buildV23PromptBudget(payload).packet;
+    const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day",packet);
     if(!structure.passed)return {ok:false,error:"일일 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:structure};
-    const edited=finalizeCandidate(patched,payload,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
+    const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"일일 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
@@ -190,7 +191,7 @@ async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:strin
     const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
     if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
     const normalized=normalizeProviderCore(patched);
-    const edited=finalizeCandidate(normalized,payload,model,result.usage,{targeted_role_neutral_hero:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.partial),captureEditorialStage("provider_hero_patch_applied",patched)]});
+    const edited=finalizeCandidate(normalized,payload,packet,model,result.usage,{targeted_role_neutral_hero:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.partial),captureEditorialStage("provider_hero_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"첫 화면 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
@@ -205,7 +206,7 @@ async function rewritePeriodCandidate(first:any,payload:any,model:string,key:str
     const packet=buildV23PromptBudget(payload).packet;
     const structure=inspectPeriodProviderDocument({...patched,clusters:rows},payload?.period_kind,packet);
     if(!structure.passed)return {ok:false,error:"기간 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>`${issue.path}: ${issue.code}`)}};
-    const edited=finalizeCandidate(patched,payload,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});
+    const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"기간 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }

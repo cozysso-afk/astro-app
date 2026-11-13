@@ -46,7 +46,7 @@ try{
     await page.evaluate(()=>document.fonts.ready)
     await root.screenshot({path:path.join(out,`${i}-mobile-393.png`)})
     if(state!=='ready'){
-      assert.equal(await panel.locator('.daily-reading-save').count(),0)
+      assert.equal(await panel.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).count(),0)
       scopes.push({label,state});continue
     }
     const heading=await panel.locator('.daily-reading-headline').innerText()

@@ -16,6 +16,7 @@ test('V23 validates Gemini prose without deterministic rewriting or local long-f
   assert.doesNotMatch(source, /buildLocalQualityFallbackCore\(payload\)/)
   assert.doesNotMatch(source, /allow_degraded_quality/)
   assert.doesNotMatch(source, /safe_summary_required:true|reusePlainHeadlineFromSummary\(|omitUnsupportedDailyConditions\(/)
+  assert.match(source, /applyPeriodReadingGate\(quality,inspectPeriodReading\(data,writerPacket\)\)/)
   assert.match(source, /data:provenanceVerified\?data.result_json:null/)
   assert.match(source, /if\(first\.ok&&payload\?\.period_kind!=="day"\)return \{\.\.\.first,attempt_count:budget\.used,call_trace:budget\.calls\}/)
 })

@@ -611,7 +611,7 @@ export default function AppNext() {
   const topIntegratedTopics = [...orderedIntegratedTopics].sort((a,b) => b.stat.average - a.stat.average)
   const orderedRelationshipSignals = integratedResult
     ? relationshipSignalOrder
-        .map((topic) => ({ topic, stat: integratedResult.western.relationship_signals[topic] }))
+        .map((topic) => ({ topic, stat: integratedResult.western.relationship_signals?.[topic] }))
         .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
     : []
   const activeDayun = currentDayun(integratedResult)
@@ -655,7 +655,7 @@ export default function AppNext() {
     ? collectFortuneHighlights(topIntegratedTopics, 'caution_days')
     : []
   const precisionRelationshipSignals = integratedResult
-    ? Object.entries(integratedResult.western.relationship_signals)
+    ? Object.entries(integratedResult.western.relationship_signals ?? {})
         .filter((row): row is [string, FortuneStat] => Boolean(row[1]))
         .sort((a, b) => b[1].average - a[1].average)
     : []
@@ -742,7 +742,11 @@ export default function AppNext() {
             usage: data.usage ?? undefined,
             data: data.data ?? undefined,
           }
-          if (!payload.data) throw new Error('완료된 AI 해설 결과가 비어 있어.')
+          if (!verifiedFortuneNarrative(payload)) {
+            removeLocalStorage(FORTUNE_AI_JOB_STORAGE_KEY)
+            setAiActiveJobId(null)
+            throw new Error('완료된 작업에서 확인된 Gemini 원고를 받지 못했어. 계산 자료에서 해설을 다시 요청할 수 있어.')
+          }
           if (cacheId) await writeReadingCache(cacheId, 'fortune-ai', payload, ttlDays)
           if (aiPollRef.current !== jobId) return
           const selected = selectedReadingPeriod.current
@@ -751,7 +755,7 @@ export default function AppNext() {
             setAiInterpretation(payload)
             setAiCacheSource(data?.reused ? 'server' : 'fresh')
           }
-          if (requestForArchive && verifiedFortuneNarrative(payload)) {
+          if (requestForArchive) {
             if (archivePeriod && calculationForArchive) {
               await savePeriodArchive(calculationForArchive, requestForArchive, archivePeriod, payload)
             } else {
@@ -910,7 +914,7 @@ export default function AppNext() {
       setIntegratedRequestSnapshot(cached.request)
       setIntegratedError('')
       setIntegratedProgress(null)
-      if (selectedTool === null) void runAiInterpretation(cached.result, cached.request, 'open')
+      if (selectedTool === null || selectedTool === 'integrated') void runAiInterpretation(cached.result, cached.request, 'open')
     })()
     return ()=>{cancelled=true}
   }, [mainView, selectedTool, period, queryDate, annualFortuneYear, birthProfile, aiModel])
@@ -948,7 +952,7 @@ export default function AppNext() {
       if (!selectionIsCurrent()) return
       setIntegratedResult(cachedCalculation.result)
       setIntegratedRequestSnapshot(cachedCalculation.request)
-      if (selectedTool === null) void runAiInterpretation(cachedCalculation.result, cachedCalculation.request, 'open')
+      if (selectedTool === null || selectedTool === 'integrated') void runAiInterpretation(cachedCalculation.result, cachedCalculation.request, 'open')
       return
     }
     const sleep = (ms: number) => new Promise((resolve)=>window.setTimeout(resolve, ms))
@@ -1014,10 +1018,8 @@ export default function AppNext() {
       }
       const calcTtlDays = fortuneCacheTtlDays(period, selectedTool)
       await writeReadingCache(calculationCacheId, 'fortune-calculation', {request:body as unknown as Record<string,unknown>, result:calculation}, calcTtlDays)
-      if (selectedTool === null) {
-        void savePeriodArchive(calculation, body, period)
-        if (selectionIsCurrent()) void runAiInterpretation(calculation, body, 'open')
-      }
+      if (selectedTool === null) void savePeriodArchive(calculation, body, period)
+      if ((selectedTool === null || selectedTool === 'integrated') && selectionIsCurrent()) void runAiInterpretation(calculation, body, 'open')
     } catch (error) {
       setIntegratedError(error instanceof Error ? error.message : '통합운세 계산 중 오류가 발생했어.')
     } finally { setIntegratedLoading(false); setIntegratedProgress(null) }
@@ -1348,7 +1350,7 @@ export default function AppNext() {
     const readingContext = (field?.id==='love' ? LOVE_SCENARIOS_PROMPT : '') + observed
     try {
       if (mode === 'compact') {
-        await copyExternalPrompt(buildExternalCompactPrompt(calculation, aiInterpretation?.data, false, field?.topics, readingContext), mode)
+        await copyExternalPrompt(buildExternalCompactPrompt(calculation, verifiedFortuneNarrative(aiInterpretation) ? aiInterpretation?.data : undefined, false, field?.topics, readingContext), mode)
         return
       }
       await ensureSupabaseSession()
@@ -1521,7 +1523,10 @@ export default function AppNext() {
       setMainView('history')
       return
     }
+    const archivedFortune = item.interpretation as unknown as AiInterpretationResponse | null
+    const savedFortune = verifiedFortuneNarrative(archivedFortune) ? archivedFortune : null
     if (currentPeriodArchive) {
+      aiRequestRef.current = ''
       restoredPeriodRef.current = item.periodStart + '/' + item.periodEnd
       setLegacyArchiveOpen(null)
       setQueryDate(item.periodStart)
@@ -1530,8 +1535,9 @@ export default function AppNext() {
       setSelectedTool(null)
       setIntegratedResult(item.result as unknown as IntegratedApiResponse)
       setIntegratedRequestSnapshot(item.request)
-      setAiInterpretation(item.interpretation as unknown as AiInterpretationResponse || null)
-      setAiCacheSource(item.interpretation ? 'local' : '')
+      setAiInterpretation(savedFortune)
+      setAiCacheSource(savedFortune ? 'local' : '')
+      setAiError('')
       setMainView('home')
       return
     }
@@ -1541,12 +1547,15 @@ export default function AppNext() {
     const archiveYear = Number(item.periodStart.slice(0,4))
     const isFullCalendarYear = Number.isFinite(archiveYear) && item.periodStart === `${archiveYear}-01-01` && item.periodEnd === `${archiveYear}-12-31`
     if (item.kind === 'integrated' || item.kind === 'precision') {
+      restoredPeriodRef.current = item.periodStart + '/' + item.periodEnd
+      aiRequestRef.current = ''
       setIntegratedCalendarYear(isFullCalendarYear ? archiveYear : null)
       setRelationshipCalendarYear(null)
       setIntegratedResult(item.result as unknown as IntegratedApiResponse)
       setIntegratedRequestSnapshot(item.request)
-      setAiInterpretation(item.interpretation as unknown as AiInterpretationResponse || null)
-      setAiCacheSource(item.interpretation ? 'local' : '')
+      setAiInterpretation(savedFortune)
+      setAiCacheSource(savedFortune ? 'local' : '')
+      setAiError('')
       setSelectedTool(item.kind)
     } else {
       restoringRelationshipRef.current = true

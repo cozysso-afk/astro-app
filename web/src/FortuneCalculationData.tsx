@@ -8,7 +8,8 @@ const finite = (value:unknown):value is number => typeof value==='number' && Num
 export function ContactSignalData({calculation,topics,period}:DataProps) {
   if (topics?.length && !topics.some(t=>t==='연락' || t==='재회')) return null
   const signals=periodContactSignals(calculation,period==='month')
-  const labels:Record<string,string>={수신신호:'외부 연락 반응 신호',발신적합:'내 연락 실행 적합도',과거인연접점:'과거 인연 접점'}
+  const pastKey=finite(signals?.과거인연접점?.average) ? '과거인연접점' : '과거인연재접점'
+  const labels:Record<string,string>={수신신호:'외부 연락 반응 신호',발신적합:'내 연락 실행 적합도',[pastKey]:'과거 인연 접점'}
   const rows=Object.entries(labels).filter(([name])=>finite(signals?.[name]?.average))
   if (!rows.length) return null
   return <div aria-label="연락 방향별 계산값">
