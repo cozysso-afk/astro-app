@@ -3,6 +3,7 @@ import type {ReactNode} from 'react'
 import type {AiInterpretationResponse,IntegratedApiResponse,PeriodKey} from './appTypes'
 import type {FortuneField} from './lib/fortuneFields'
 import type {LoveStatus} from './lib/loveReadingContext'
+import {FortuneCalculationData} from './FortuneCalculationData'
 import {DailyReadingPanel} from './DailyReadingPanel'
 import {AuthoredReadingPanel} from './AuthoredReadingPanel'
 import {buildPeriodReadingDocument} from './lib/authoredReadingDocument'
@@ -18,7 +19,6 @@ export function verifiedFortuneNarrative(result:AiInterpretationResponse|null|un
 
 export function PeriodFortuneNarrativeV2({
   loveStatus: _loveStatus,
-  systemOverview,
   westernOnly = false,
   field,
   period,
@@ -36,15 +36,16 @@ export function PeriodFortuneNarrativeV2({
   calculation: IntegratedApiResponse
   result: AiInterpretationResponse
   technicalDetails?: ReactNode
-  onRetry?: (refreshMonthlyGaps?:boolean) => void
+  onRetry?: (refreshIncomplete?:boolean) => void
 }) {
   if (westernOnly) return null
   const verifiedNarrative = verifiedFortuneNarrative(result)
   if (!verifiedNarrative || !result.data) return null
   const data = readerFacingFortune(result.data)
-  if (period === 'today' && !westernOnly) return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={technicalDetails} onRetry={onRetry ? () => onRetry(true) : undefined}/>
+  const details = <><FortuneCalculationData calculation={calculation} topics={field?.topics} period={period}/>{technicalDetails}</>
+  if (period === 'today') return <DailyReadingPanel calculation={calculation} data={data} date={calculation.period.start} field={field} verified={verifiedNarrative} technicalDetails={details} onRetry={onRetry ? () => onRetry(true) : undefined}/>
   const document = buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,verifiedNarrative,result.interpreter_version)
   const incomplete = document.state !== 'ready' || document.sections.some(section => section.state === 'missing')
   const retry = onRetry && incomplete ? () => onRetry(true) : undefined
-  return <AuthoredReadingPanel doc={document} technicalDetails={technicalDetails} period={period} onRefresh={retry}/>
+  return <AuthoredReadingPanel doc={document} technicalDetails={details} period={period} onRefresh={retry}/>
 }

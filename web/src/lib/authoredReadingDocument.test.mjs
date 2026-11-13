@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'vite'
@@ -102,7 +103,7 @@ test('long and repeated authored text is preserved rather than silently shortene
 })
 test('relationship new core and old detailed questions remain separate, unchanged and mode specific',()=>{
   const data={headline:'관계의 핵심',overview:'첫 문장. 둘째 문장. 셋째 문장. 넷째 문장. 다섯째 문장.',core_summary:'짧게 작성된 핵심 요약.',core_reason:'근거를 설명한 원문.',core_action:'실제 행동을 확인해.',core_conditions:['조건을 지켜.'],chemistry:'끌림 원문',emotional_dynamic:'정서 원문',communication:'소통 원문',conflict_pattern:'갈등 원문',power_boundaries:'경계 원문',long_term:'지속 원문',timing:'시기 원문',limits:'한계 원문',practical_advice:['확인 원문'],marriage_reading:{bottom_line:'결혼 핵심',bond:'결속 원문',daily_life:'역할 원문'}}
-  const ai={ok:true,origin:'gemini',provenance_verified:true,data}
+  const ai={...relationshipProvider,data}
   const doc=documents.buildRelationshipReadingDocument(ai,'compatibility','2026-11-04')
   assert.equal(doc.state,'ready');assert.equal(doc.sections.find(s=>s.id==='overview').blocks[0].text,data.overview)
   for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term'])assert.equal(doc.sections.find(s=>s.id===key).blocks[0].text,data[key])
@@ -118,6 +119,12 @@ test('unverified source cannot expose prose and export manifest cannot reference
   assert.equal(doc.state,'unverified');assert.deepEqual(doc.sections,[]);assert.equal(doc.headline,'')
   const ready=documents.buildPeriodReadingDocument(fixture(),'week','a','b',undefined,true)
   assert.throws(()=>exporter.authoredReadingExportModel({...ready,exportBlockIds:['lost']}),/빠졌어/)
+})
+test('a verified single system passage exports once while unverified and calculated documents do not export',()=>{
+  const block={id:'system:western',label:'서양점성술',text:'서양점성술의 단일 원문.'}
+  const doc={state:'ready',scope:'western',title:'서양점성술',date:'2026-11-04',headline:'',core:[block],exportBlockIds:[block.id]}
+  assert.deepEqual(exporter.authoredReadingExportModel(doc).sections[0].cards.map(c=>c.body),[block.text])
+  for(const state of ['calculated','unverified','missing','partial'])assert.throws(()=>exporter.authoredReadingExportModel({...doc,state}))
 })
 test('missing questions keep all labels in one collapsed list after available authored details',()=>{
   const data=fixture();delete data.clusters.relationship.contact_activation
@@ -173,16 +180,16 @@ test('the verified weekly love document keeps an omitted situation separate from
   assert.ok(!html.includes(supplements[0].text))
 })
 
-test('opening an old reunion draft keeps valid sentences while removing a statement that contradicts the saved meeting',()=>{
-  const ai={ok:true,origin:'gemini',provenance_verified:true,interpreter_version:'legacy',data:{
+test('opening a verified old reunion draft flags a conflicting observation and retains the entire original',()=>{
+  const ai={...relationshipProvider,data:{
     headline:'다시 연락을 주고받은 뒤',core_summary:'입력 기록상 두 사람은 만난 적이 없어요. 다음 약속이 잡히는지 보세요.',
     core_reason:'두 사람이 시간을 내는지 살펴보세요.',core_action:'약속을 함께 정해 보세요.',core_conditions:[],
     reunion_synthesis_v2:{consultation_answer:{current_stage:'입력 기록상 두 사람은 다시 교제하기로 합의했어요.'}}
   }}
   const original=JSON.stringify(ai)
   const doc=documents.buildRelationshipReadingDocument(ai,'reunion','2026-11-11',{state:'met',initiator:'counterpart',events:[]})
-  assert.equal(doc.omittedObservationConflict,true)
-  assert.equal(doc.core.find(x=>x.id==='core:summary').text,'다음 약속이 잡히는지 보세요.')
-  assert.ok(!doc.sections.some(s=>s.blocks.some(b=>b.text.includes('교제하기로 합의했어요'))))
+  assert.equal(doc.observationConflict,true)
+  assert.equal(doc.core.find(x=>x.id==='core:summary').text,ai.data.core_summary)
+  assert.ok(doc.sections.some(s=>s.blocks.some(b=>b.text===ai.data.reunion_synthesis_v2.consultation_answer.current_stage)))
   assert.equal(JSON.stringify(ai),original)
 })

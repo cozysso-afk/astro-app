@@ -1,25 +1,23 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+import { renderSystem, systemFixture, systemResponse } from './systemReadingView.fixtures.mjs'
 
-const source=readFileSync(fileURLToPath(new URL('../SystemReadingViews.tsx',import.meta.url)),'utf8')
-
-test('Thai life cards show everyday guidance before calculation evidence',()=>{
-  const meaning=source.indexOf('{lens.meaning}')
-  const practice=source.indexOf('{lens.action}')
-  const evidence=source.indexOf('thaiPlacementComparison(r,view.natalWheel')
-  assert.ok(meaning>0 && practice>meaning && evidence>practice)
-  assert.match(source,/thaiLensForTopic\(r.bhumi_key,topic\)/)
+test('Thai results display the actual selected placements without writing a meaning from them', () => {
+  const calculation=systemFixture()
+  const money=renderSystem('thai',{calculation,field:'money'})
+  assert.match(money,/물질적 기반 · 금성/)
+  assert.doesNotMatch(money,/생활 리듬 · 토성|class="system-hero"|internal-prediction-status/)
+  const health=renderSystem('thai',{calculation,field:'condition'})
+  assert.match(health,/생활 리듬 · 토성/)
+  assert.doesNotMatch(health,/물질적 기반 · 금성/)
 })
 
-test('Thai disclosures do not use plus or x symbols that look like good and bad marks',()=>{
-  assert.doesNotMatch(source,/aria-hidden="true">＋/)
-  assert.doesNotMatch(source,/태국점성술[\s\S]*>×</)
-  assert.match(source,/kind="reason">\{thaiPlacementComparison\(r,view\.natalWheel,isNatalWheel\)/)
-})
-
-test('single-day annual placement is labelled as the selected date instead of a fake one-day year',()=>{
-  assert.match(source,/thaiPeriodLabel\(w\.start,w\.end\)/)
-  assert.match(source,/w\.start===w\.end\?w\.start/)
+test('a verified Thai manuscript precedes the wheel and its own period is preserved', () => {
+  const calculation=systemFixture()
+  const interpretation=systemResponse({thai:'계산된 배치에 대한 생성 원고',saju:'사용하지 않는 다른 체계 원고'})
+  const html=renderSystem('thai',{calculation,interpretation})
+  assert.ok(html.includes('계산된 배치에 대한 생성 원고'))
+  assert.ok(html.indexOf('계산된 배치에 대한 생성 원고')<html.indexOf('태국점성술 계산 근거'))
+  assert.match(html,/>2026-09-12<\/button>/)
+  assert.doesNotMatch(html,/2026-09-12–2026-09-12|사용하지 않는 다른 체계 원고|>＋<|>×</)
 })

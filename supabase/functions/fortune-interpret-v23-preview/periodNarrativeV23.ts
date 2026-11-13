@@ -7,7 +7,7 @@ type EvidenceRow = {
   system?: string
   topic?: string
   source_topics?: string[]
-  topic_contributions?: Record<string,{contribution:number;polarity:number}>
+  topic_contributions?: Record<string,{contribution:number;polarity:number|null}>
   scope?: string
   date?: string
   start?: string
@@ -172,8 +172,8 @@ export function clusterPhenomena(payload: any): PhenomenonCluster[] {
     const topicDirections:Record<string,string[]>={}
     for(const row of rows){
       for(const [topic,value] of Object.entries(row.topic_contributions??{})){
-        if(!Number.isFinite(value.polarity))continue
-        const direction=value.polarity>0?'supportive':value.polarity<0?'caution':'context'
+        const polarity=value.polarity
+        const direction=typeof polarity==='number' && polarity>0?'supportive':typeof polarity==='number' && polarity<0?'caution':'context'
         topicDirections[topic]=uniq([...(topicDirections[topic]??[]),direction])
       }
     }

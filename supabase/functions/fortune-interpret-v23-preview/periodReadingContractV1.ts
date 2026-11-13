@@ -235,7 +235,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   }
   const investmentSupported=rows.some((row:any)=>String(row?.key??'').startsWith('investment.')&&row?.applicability!=='insufficient')
   if(!investmentSupported)for(const [field,value] of Object.entries(core?.investment_reading??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`investment_reading.${field}`})
-  if(!contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
+  if(!payload?.period?.start && !contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
   const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.applies_when,row?.evidence_meaning,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
   if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>3))issues.push({code:'period_generic_repetition',path:'root'})

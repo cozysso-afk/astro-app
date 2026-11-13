@@ -87,3 +87,45 @@ test('ordinary contact does not assign the reader a relationship or profession',
  const d=core(); d.headline='약속 시간을 바꾸려면 먼저 연락해 두는 게 좋아.'
  assert.equal(inspectDailyProviderDocument(d,'day').passed,true)
 })
+
+test('every cited fact belongs to the section, reader question and chosen day',()=>{
+ const day='2026-11-12', section='work_study.work'
+ const fact=(id,topic,date=day)=>({id,topic,date,scope:'daily_actual_aspect_house',system:'western'})
+ const packet={period:{start:day,end:day},evidence_ledger:[fact('work','직장'),fact('money','금전'),fact('other-day','직장','2026-11-13')]}
+ const d=core()
+ for(const row of d.clusters)Object.assign(row,{applicability:'insufficient',conclusion:'',action:'',real_scene:'',change_condition:'',evidence_refs:[]})
+ const work=d.clusters.find(row=>row.key===section)
+ Object.assign(work,{applicability:'conditional',conclusion:'맡은 일의 범위를 정할 때야.',real_scene:'일을 나눠 맡는 상황이라면 책임 경계를 점검해.',action:'결정을 맡은 사람과 필요한 결과를 정해.',change_condition:'일을 나눌 필요가 없는 상황에는 이 판단을 적용하기 어려워.',evidence_refs:['work']})
+ d.editorial_focus={section_key:section,evidence_refs:['work']}
+ d.overall.evidence_refs=['work']
+ d.domain_answers=[{topic:'직장',question_key:'progress',status:'partial',evidence_refs:['work']}]
+ assert.deepEqual(inspectDailyProviderDocument(d,'day',packet).issues,[])
+ for(const id of ['money','other-day','unknown']){
+   work.evidence_refs=['work',id]
+   d.domain_answers[0].evidence_refs=['work',id]
+   const issues=inspectDailyProviderDocument(d,'day',packet).issues
+   assert.ok(issues.includes('daily_evidence_outside_question:'+section))
+   assert.ok(issues.includes('daily_answer_outside_question:직장:progress'))
+ }
+ work.evidence_refs=['work'];d.domain_answers=[]
+ d.overall.evidence_refs=['money']
+ assert.ok(inspectDailyProviderDocument(d,'day',packet).issues.includes('daily_overview_evidence_outside_selected_question'))
+ const empty=d.clusters.find(row=>row.applicability==='insufficient')
+ empty.evidence_refs=['money']
+ assert.ok(inspectDailyProviderDocument(d,'day',packet).issues.includes('daily_insufficient_with_prose:'+empty.key))
+})
+
+test('incoming, outgoing and reconnection claims use their own axis from the requested period',()=>{
+ const day='2026-11-12'
+ const row=(id,topic,score,start=day)=>({id,topic,score,start,end:day,scope:'relationship_average',system:'western'})
+ const p={period:{start:day,end:day},evidence_ledger:[row('incoming','수신신호',0),row('outgoing','발신적합',35),row('previous','과거인연접점',70,'2026-10-15')]}
+ const d={...core(),contact_flow:{incoming:'외부 연락에 열려 있는 정도는 낮게 읽혀.',outgoing:'먼저 말을 꺼낼 때의 부담을 살펴봐.',reconnection:''},contact_evidence_refs:{incoming:['incoming'],outgoing:['outgoing'],reconnection:[]}}
+ const axisIssues=()=>inspectDailyProviderDocument(d,'day',p).issues.filter(value=>value.includes('contact_axis'))
+ assert.deepEqual(axisIssues(),[])
+ d.contact_evidence_refs.incoming=['incoming','outgoing']
+ d.contact_flow.reconnection='예전 인연과의 접점이 두드러져.'
+ d.contact_evidence_refs.reconnection=['previous']
+ assert.deepEqual(axisIssues(),['contact_axis_without_own_period_evidence:contact_flow.incoming','contact_axis_without_own_period_evidence:contact_flow.reconnection'])
+ d.contact_flow.reconnection=''
+ assert.ok(axisIssues().includes('empty_contact_axis_with_references:contact_flow.reconnection'))
+})

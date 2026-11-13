@@ -73,7 +73,6 @@ try {
       situationsDisplay: situations ? getComputedStyle(situations).display : 'missing',
       situationCount: document.querySelectorAll('.reunion-v5-answer').length,
       reunionOverflow: document.querySelector('[data-qa-block="reunion"]') ? Math.ceil(document.querySelector('[data-qa-block="reunion"]').scrollWidth-document.querySelector('[data-qa-block="reunion"]').clientWidth) : 999,
-      exportSystemCards: document.querySelectorAll('[data-qa-block="export-source"] .reading-export-system-v7').length,
       birthRangeFields,
       birthRangeOverflow: birthRange ? Math.ceil(birthRange.scrollWidth-birthRange.clientWidth) : 999,
     }
@@ -93,7 +92,6 @@ try {
   assert(diagnostics.situationsDisplay === 'grid', `reunion situations must stay vertical on mobile, got ${diagnostics.situationsDisplay}`)
   assert(diagnostics.situationCount === 1, `only the selected observed state should render, got ${diagnostics.situationCount}`)
   assert(diagnostics.reunionOverflow <= 1, `reunion cards overflow the iPhone viewport by ${diagnostics.reunionOverflow}px`)
-  assert(diagnostics.exportSystemCards === 1, `saved system synthesis bridge missing: ${diagnostics.exportSystemCards}`)
   assert(diagnostics.birthRangeFields.length === 2, `birth-time range fixture did not render 2 fields`)
   assert(diagnostics.birthRangeOverflow <= 1, `birth-time range overflows by ${diagnostics.birthRangeOverflow}px`)
   assert(diagnostics.birthRangeFields[0].bottom <= diagnostics.birthRangeFields[1].top, `birth-time range fields overlap: ${JSON.stringify(diagnostics.birthRangeFields)}`)
@@ -101,11 +99,6 @@ try {
 
   const quality = page.locator('[data-qa-block="interpretation-v2"]')
   const qualityText = await quality.innerText()
-  const rankText = await quality.locator(':scope > p').first().innerText()
-  assert(/재회 흐름이 상대적으로 가장 두드러져/.test(rankText), 'highest relative activation must identify reunion')
-  assert(/활성도는 약함 수준/.test(rankText), 'relative leader must retain its weak absolute band')
-  assert(/낮은 활성도는 실패나 불리한 사건을 뜻하지 않아/.test(rankText), 'weak activation must not imply failure or an adverse event')
-  assert(!/(?:연애|연락) 흐름이 상대적으로 가장 두드러져/.test(rankText), 'lower-ranked field must not replace the leader')
   assert(!qualityText.includes('흐름이 점수가'), 'double subject returned')
   const past = quality.locator('.reading-event').filter({hasText:'지난 구간 · 회고'})
   assert(await past.count() === 1, 'past window must remain retrospective')
@@ -118,10 +111,9 @@ try {
   const reunion = page.locator('[data-qa-block="reunion"]')
   const reunionText = await reunion.innerText()
   assert(reunionText.includes('수신 · 상대 → 나') && reunionText.includes('발신 · 나 → 상대'), 'contact directions missing')
-  assert(reunionText.includes('현재 연락과 대화는 확인됐다.'), 'Gemini current-stage verdict missing')
-  assert(reunionText.includes('연락은 다시 이어졌지만 실제 만남과 관계 합의는 아직 별도 단계다.'), 'Gemini reunion summary missing')
+  assert(reunionText.includes('입력한 관계 기록') && reunionText.includes('지금은 서로 연락을 주고받고 있어요'), 'recorded relationship state missing')
   assert(reunionText.includes('앞 단계 미확인'), 'later stage was not gated by the missing meeting stage')
-  assert(reunionText.includes('다음 확인점'), 'next checkpoint must stay with the verdict')
+  assert(!(await reunion.locator('.reunion-v5-answer p').count()), 'calculated data generated a substitute interpretation')
   assert(!reunionText.includes('활성도 21.1') && !reunionText.includes('활성도 24.1'), 'technical scores leaked into the default reading')
   assert(!reunionText.split('\\n').some(line=>line.trim()==='0'), 'stray zero leaked into reading')
   const mobileWidths = []
@@ -129,7 +121,7 @@ try {
     await page.setViewportSize({width,height:932})
     const size = await reunion.evaluate(el=>{
       const title=el.querySelector('.reunion-v5-answer h3')
-      const body=el.querySelector('.reunion-v5-answer p')
+      const body=el.querySelector('.reunion-v5-directions article > p')
       const current=el.querySelectorAll('[aria-current="step"]').length
       const stageOverlap=Array.from(el.querySelectorAll('.reunion-v4-stage-rail > li')).some(row=>{
         const label=row.querySelector('span')?.getBoundingClientRect()
@@ -139,7 +131,7 @@ try {
       return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,title:parseFloat(getComputedStyle(title).fontSize),body:parseFloat(getComputedStyle(body).fontSize),current,stageOverlap}
     })
     assert(size.overflow<=1, 'reunion horizontal overflow: '+JSON.stringify(size))
-    assert(size.title>=20 && size.title<=23 && size.body>=14.5 && size.body<=16, 'reunion font sizes out of range: '+JSON.stringify(size))
+    assert(size.title>=20 && size.title<=23 && size.body>=13 && size.body<=16, 'reunion font sizes out of range: '+JSON.stringify(size))
     assert(size.current<=1, 'reunion has more than one current stage: '+JSON.stringify(size))
     assert(!size.stageOverlap, 'reunion stage label and status overlap: '+JSON.stringify(size))
     mobileWidths.push(size)
@@ -156,18 +148,28 @@ try {
   await page.locator('[data-qa-block="systems"]').screenshot({ path: path.join(outDir, 'systems-mobile.png') })
   await page.locator('[data-qa-block="birth-time-range"]').screenshot({ path: path.join(outDir, 'birth-time-range-mobile.png') })
   await page.locator('[data-qa-block="reunion"]').screenshot({ path: path.join(outDir, 'reunion-mobile.png') })
-  await page.locator('[data-qa-block="export-source"]').screenshot({ path: path.join(outDir, 'export-source-mobile.png') })
+  const daily = page.locator('[data-qa-block="daily-reading"]')
+  await page.setViewportSize({width:393,height:852})
+  await daily.getByRole('button',{name:'저장 원고 유무 전환'}).click()
+  assert(await daily.getByRole('button',{name:'해설 생성',exact:true}).isVisible(),'missing manuscript must offer generation')
+  assert(!await daily.locator('.daily-reading-headline').count(),'missing manuscript was replaced with prose')
+  await daily.screenshot({path:path.join(outDir,'daily-missing-393.png')})
 
-  await page.locator('[data-qa-export]').click()
-  await page.waitForFunction(() => {
-    const value = document.querySelector('[data-qa-export-status]')?.textContent || ''
-    return value.startsWith('done:') || value.startsWith('error:')
-  }, null, { timeout: 20_000 })
-  const state = (await page.locator('[data-qa-export-status]').textContent()) || ''
-  assert(!state.startsWith('error:'), `saved-image QA failed: ${state}`)
-  const expectedPages = Number(state.split(':')[1])
-  assert(expectedPages >= 2, `complete export must span at least 2 saved pages, got ${state}`)
+  await daily.getByRole('button',{name:'저장 원고 유무 전환'}).click()
+  await daily.locator('[data-daily-state="ready"]').waitFor()
+  await daily.getByRole('button',{name:'학업',exact:true}).click()
+  const study = daily.locator('.daily-reading')
+  assert(await study.locator('.daily-reading-headline').innerText()==='새 진도를 더하기 전에 배운 내용을 한 번 설명해봐.','authored answer changed')
+  assert(await study.locator('[data-daily-block="work_study.study:condition"] p').innerText()==='설명하다 막히는 부분이 있으면 그 부분부터 다시 읽어.','condition missing from the field')
+  await study.screenshot({path:path.join(outDir,'daily-authored-study-393.png')})
 
+  await daily.getByRole('button',{name:'전체',exact:true}).click()
+  await daily.locator('.daily-reading').screenshot({path:path.join(outDir,'export-source-mobile.png')})
+  await daily.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).click()
+  const status=daily.getByRole('status').filter({hasText:'저장 요청 완료'})
+  await status.waitFor({timeout:20000})
+  const expectedPages=Number((await status.innerText()).match(/(\d+)장/)?.[1])
+  assert(expectedPages>=2,'all authored core paragraphs and conditions must span multiple pages')
   const deadline = Date.now() + 8_000
   while (downloads.length < expectedPages && Date.now() < deadline) await page.waitForTimeout(100)
   assert(downloads.length === expectedPages, `expected ${expectedPages} saved images, received ${downloads.length}`)

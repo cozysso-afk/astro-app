@@ -785,8 +785,7 @@ export async function exportDailyReadingImages(doc: DailyReadingDocument, signal
 }
 
 export function authoredReadingExportModel(doc:AuthoredReadingDocument):ExportModel {
-  const available=doc.state==='ready' ? Boolean(doc.headline) : doc.state==='calculated' && doc.core.length>0
-  if(!available||!doc.exportBlockIds.length)throw new Error('완성된 핵심 해설이 있어야 저장할 수 있어.')
+  if(doc.state!=='ready'||!doc.exportBlockIds.length)throw new Error('완성된 핵심 해설이 있어야 저장할 수 있어.')
   const byId=new Map(doc.core.map(block=>[block.id,block]))
   const blocks=doc.exportBlockIds.map(id=>{const block=byId.get(id);if(!block)throw new Error('저장할 원고 항목이 빠졌어. 화면을 다시 확인해줘.');return block})
   return {title:doc.title,date:doc.date,hero:'',sections:[{cards:[

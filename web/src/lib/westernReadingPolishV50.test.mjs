@@ -1,23 +1,25 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { renderSystem, systemFixture, systemResponse } from './systemReadingView.fixtures.mjs'
 
-const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
-const copy = readFileSync(new URL('./westernRankCopy.ts', import.meta.url), 'utf8')
-
-test('Western whole view limits the first screen to representative life groups', () => {
-  assert.match(view, /const WESTERN_OVERVIEW_GROUPS = \[/)
-  assert.match(view, /function representativeWesternRows/)
-  assert.match(view, /representativeWesternRows\(selectedWestern\)/)
-  assert.match(view, /전체에서는 대표 흐름 6개만 먼저 보여줘/)
-  assert.match(view, /westernDisplayRows\.map/)
+test('a verified Western manuscript leads the result and an unverified one stays hidden', () => {
+  const systems={western:'서양점성술로 읽은 고유한 기간 해설'}
+  const result=systemResponse(systems)
+  const verified=renderSystem('western',{interpretation:result})
+  assert.ok(verified.indexOf(systems.western)>=0)
+  assert.ok(verified.indexOf(systems.western)<verified.indexOf('분야별 계산 점수'))
+  const unavailable=renderSystem('western',{interpretation:{...result,provenance_verified:false},onGenerate:()=>{}})
+  assert.doesNotMatch(unavailable,/서양점성술로 읽은 고유한 기간 해설/)
+  assert.match(unavailable,/해설 생성<\/button>/)
 })
 
-test('Western summary speaks in relative life-language rather than raw band pairs', () => {
-  assert.match(view, /function westernOverviewText/)
-  assert.match(copy, /slice\(0, 2\)/)
-  assert.match(copy, /상대적으로 가장 두드러져/)
-  assert.doesNotMatch(copy, /valid\.map\(row => row\.name\)\.join\('·'\)/)
-  assert.match(view, /westernOverviewSummary/)
-  assert.doesNotMatch(view, /선택 기간의 강약과 날짜를 읽는 층/)
+test('a Western score of zero remains distinct from missing Western data', () => {
+  const calculation=systemFixture()
+  calculation.western.overall.금전={average:0,band:'매우 약함',spread:0}
+  const zero=renderSystem('western',{calculation,field:'money'})
+  assert.match(zero,/<strong>금전<\/strong><b>0<\/b>/)
+  calculation.western.overall.금전=null
+  const missing=renderSystem('western',{calculation,field:'money'})
+  assert.match(missing,/이 분야에 계산된 점수가 없어/)
+  assert.doesNotMatch(missing,/western-score-card/)
 })

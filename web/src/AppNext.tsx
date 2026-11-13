@@ -138,15 +138,6 @@ function annotateUserFacingText(value: string) {
   text = text.replace(/([子丑寅卯辰巳午未申酉戌亥])([子丑寅卯辰巳午未申酉戌亥])([沖冲合刑破害])(?!\()/g, (m,a,b,c) => `${m}(${hanjaReading[a]}${hanjaReading[b]}${hanjaReading[c]})`)
   return text
 }
-function annotatePayload<T>(value: T): T {
-  if (typeof value === 'string') return annotateUserFacingText(value) as T
-  if (Array.isArray(value)) return value.map((x) => annotatePayload(x)) as T
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k,v]) => [k, annotatePayload(v)])) as T
-  }
-  return value
-}
-
 function humanizeEvidence(value: string) {
   let text = String(value ?? '')
   const replacements: Array<[RegExp, string]> = [
@@ -865,7 +856,7 @@ export default function AppNext() {
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
-        body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', calculation: calculationForInterpretation, model: aiModel },
+        body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', ...(refreshReading ? {refresh:true} : {}), calculation: calculationForInterpretation, model: aiModel },
       })
       startPayload = data
       if (error) throw error
@@ -1805,7 +1796,7 @@ export default function AppNext() {
             <button className="primary-button" type="button" onClick={runIntegrated} disabled={integratedLoading||apiStatus==='offline'}>{integratedLoading?<LoaderCircle className="spin" size={18}/>:<Sparkles size={18}/>}<span>{integratedLoading?(integratedProgress?`연간 통합 계산 중 · ${integratedProgress.completed}/${integratedProgress.total}일 (${integratedProgress.percent}%)`:'연간 통합 계산 준비 중…'):'연간 통합운세 계산'}</span></button>
 
             {integratedMatchesSelection && integratedResult && <div className="results-wrap integrated-results fortune-experience">
-              <SystemReadingViews calculation={integratedResult} interpretation={aiInterpretation} onGenerate={()=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,verifiedFortuneNarrative(aiInterpretation)?'refresh':'generate')} generating={aiLoading} generationError={aiError}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={(refresh?:boolean)=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,refresh?'refresh':'generate')} onCopyPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
+              <SystemReadingViews periodKey="year" calculation={integratedResult} interpretation={aiInterpretation} onGenerate={()=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,verifiedFortuneNarrative(aiInterpretation)?'refresh':'generate')} generating={aiLoading} generationError={aiError}><PeriodAiInterpretationPanel period="year" calculation={integratedResult} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={(refresh?:boolean)=>void runAiInterpretation(integratedResult,integratedRequestSnapshot,refresh?'refresh':'generate')} onCopyPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)} onCancel={()=>void cancelAiInterpretation(false)} canCancel={Boolean(aiLoading&&aiActiveJobId)} technicalDetails={<>
               <p className="result-note">Gemini 해설 정상 경로 1회 · 품질 수선이 필요할 때만 최대 2회. 계산 자체는 Gemini를 호출하지 않아.</p>
               <AnnualDailyScoresPanel rows={integratedResult.western.daily_scores ?? []}/>
 

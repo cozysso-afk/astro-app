@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url'
 import {createServer} from 'vite'
 import {createElement as h} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
-import {observedRelationshipPassage, observedContactCore} from './contactOutcomeReading.ts'
+import {observedRelationshipPassage} from './contactOutcomeReading.ts'
 
 const record={date:'2020-11-08',event:'received',past_connection:true,channel:'in_person',note:'저녁에 전화가 먼저 와서 직접 만남 (A)'}
 const scores={overall:{연애:{average:54,band:'보통'},재회:{average:46.9,band:'다소 약함'}},relationship_signals:{과거인연접점:{average:42,band:'약함'}}}
@@ -28,12 +28,11 @@ after(async()=>{await server?.close()})
 function render(period, field, records) {
   const calculation=calc(period)
   const doc=documents.buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,field,true)
-  const supplements=[{id:'relationship.love_reunion_interest',text:'예전 인연에게서 소식이 올 기대로 한 주를 잡아 두기엔 흐름이 약해.',evidence:'재회 46.9점'}]
-  const reading=period==='today' ? h(Daily,{data,date:calculation.period.start,field,verified:true,calculation}) : h(Panel,{doc,supplements,period})
+  const reading=period==='today' ? h(Daily,{data,date:calculation.period.start,field,verified:true,calculation}) : h(Panel,{doc,period})
   return renderToStaticMarkup(h(Scope,{calculation,field,localRecords:records},reading))
 }
 
-for (const period of Object.keys(periods)) test(period+' opens reunion body with the dated meeting and a period-specific follow-up',()=>{
+for (const period of Object.keys(periods)) test(period+' keeps dated meeting records outside the authored reading',()=>{
   const saved=JSON.stringify([scores,data,record])
   const html=render(period,love,[record])
   if(period==='today'){
@@ -45,15 +44,13 @@ for (const period of Object.keys(periods)) test(period+' opens reunion body with
     assert.equal(JSON.stringify([scores,data,record]),saved)
     return
   }
-  const scenario=html.split(/data-(?:daily-slot|reading-section)="relationship.love_reunion_interest"/)[1].split('</details>')[0]
-  assert.match(scenario,/2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요/)
-  assert.match(scenario,{today:/그날 나눈 이야기/,week:/이번 주에는 만난 뒤/,month:/이달에는 만남 직후/}[period])
-  assert.match(scenario,period==='today'?/42점/:/46\.9점/)
-  assert.doesNotMatch(scenario,/소식이 올 기대|아직 연락이 끊긴/)
+  const note=html.split('<aside')[1].split('</aside>')[0]
+  assert.ok(note.includes('2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요.'))
+  assert.match(html,/호감을 나누는 분위기가 있어/)
+  assert.doesNotMatch(html,/재회 46\.9점|이번 주에는 만난 뒤|이달에는 만남 직후/)
   assert.equal(JSON.stringify([scores,data,record]),saved)
-  const noRecord=render(period,love,[])
-  assert.doesNotMatch(noRecord,/2020-11-08/)
-  if(period==='today')assert.equal(html.match(/<summary>재회<\/summary>/g)?.length,1)
+  assert.doesNotMatch(render(period,love,[]),/2020-11-08/)
+
 })
 
 test('latest unrelated, future, corrected and ambiguous notes do not change the factual starting point',()=>{
@@ -62,17 +59,16 @@ test('latest unrelated, future, corrected and ambiguous notes do not change the 
   assert.doesNotMatch(weekly,/2020-11-10에는|2020-11-16에는/)
   const edited=render('week',love,[{...record,channel:'call',note:'직접 만남 취소',met_in_person:false}])
   assert.doesNotMatch(edited,/직접 만났어요|먼저 전화가/)
-  assert.match(edited,/연락이 만남으로 이어질까/)
+  assert.doesNotMatch(edited,/연락이 만남으로 이어질까/)
   for(const channel of ['in_person','call']) assert.match(observedRelationshipPassage([{...record,channel} ],calc('week'),'week','love').fact,/먼저 전화가/)
   assert.doesNotMatch(observedRelationshipPassage([{...record,channel:'call',note:''}],calc('week'),'week','love').fact,/먼저/)
 })
 
-test('contact presentation and its export carry the same recorded stage while retaining the original report',()=>{
+test('the dated observation is separate from both the original contact manuscript and its image',()=>{
   for(const period of ['today','week','month']){
     const calculation=calc(period)
     const passage=observedRelationshipPassage([record],calculation,period,'contact')
     const original='전화가 올지 기다려 봐.'
-    const blocks=observedContactCore(passage,original,[])
     const html=render(period,contact,[record])
     if(period==='today'){
       const doc={state:'ready',headline:original,blocks:[{id:'scene',label:'생활에서 보면',text:'약속이 구체적인지 확인해.'},{id:'action',label:'지금 할 일',text:'다음 일정을 정해.'}],title:'연락',date:record.date}
@@ -83,9 +79,13 @@ test('contact presentation and its export carry the same recorded stage while re
       assert.ok(!image.sections[0].cards.some(c=>c.body===passage.fact))
       continue
     }
-    const model=exporters.authoredReadingExportModel({state:'ready',headline:passage.fact,core:blocks,exportBlockIds:blocks.map(b=>b.id),title:'연락',date:record.date})
+    const doc=documents.buildPeriodReadingDocument(data,period,calculation.period.start,calculation.period.end,contact,true)
+    const model=exporters.authoredReadingExportModel(doc)
     for(const card of model.sections[0].cards)assert.ok(html.includes(card.body))
-    assert.ok(html.indexOf(passage.fact)<html.indexOf(original))
+    assert.match(html,/<aside[^>]*aria-label="내가 기록한 연락"/)
+    assert.ok(html.includes(passage.fact))
+    assert.ok(!model.sections[0].cards.some(c=>c.body.includes(passage.fact)))
+
   }
 })
 
@@ -103,7 +103,7 @@ test('dated evidence stays inside the selected week, monthly segments require en
   assert.doesNotMatch(observedRelationshipPassage([record],monthly,'month','love').followUp,/초순.*점/)
 })
 
-test('weekly overview reads only dated contact and reunion facts that were recorded',()=>{
+test('weekly overview keeps missing questions unanswered as contact records change',()=>{
   const field=undefined
   const calculation=calc('week')
   calculation.period.day_count=7
@@ -113,20 +113,11 @@ test('weekly overview reads only dated contact and reunion facts that were recor
   function overview(records,source=doc){
     return renderToStaticMarkup(h(Scope,{calculation,field,localRecords:records},h(Panel,{doc:source,period:'week'})))
   }
-  const beforeWeek=overview([record])
-  assert.match(beforeWeek,/이번 주가 시작되기 전인 2020-11-08/)
-  assert.match(beforeWeek,/그날 직접 만났어요/)
-  assert.match(beforeWeek,/다시 얼굴을 본 단계/)
-  assert.doesNotMatch(beforeWeek,/재회가 확정|\(A\)/)
-  assert.equal(doc.sections[0].state,'insufficient')
-  const latest=overview([{...record,date:'2020-11-11',event:'both',channel:'message',note:'',met_in_person:false}])
-  assert.match(latest,/2020-11-11에는 서로 연락을 주고받았어요/)
-  assert.doesNotMatch(latest,/직접 만났어요|이번 주가 시작되기 전인/)
-  const unrelated=overview([{...record,past_connection:false},{...record,date:'2020-11-16'},{...record,date:'2020-09-01'}])
-  assert.doesNotMatch(unrelated,/다시 얼굴을 본 단계|2020-09-01|2020-11-16/)
-  const oneWay=overview([{...record,event:'sent',channel:'message',note:'직접 만남 취소',met_in_person:false}])
-  assert.match(oneWay,/먼저 안부를 건넨 단계/)
-  assert.doesNotMatch(oneWay,/서로 연락을 주고받았어요|다시 얼굴을 본 단계|연락이 다시 닿은 단계/)
+  for(const records of [[record],[],[{...record,date:'2020-11-11',event:'both'}]]) {
+    const shown=overview(records)
+    for(const id of names) assert.ok(shown.includes('data-reading-section="'+id+'" data-section-state="insufficient"'))
+    assert.doesNotMatch(shown,/다시 얼굴을 본 단계|먼저 안부를 건넨 단계|이번 주가 시작되기 전인/)
+  }
   const ready={...doc,sections:[{...doc.sections[1],state:'ready',blocks:[{id:'saved',label:'기존 해설',text:'저장한 원고 그대로'}]}]}
   assert.match(overview([record],ready),/저장한 원고 그대로/)
   assert.doesNotMatch(overview([record],ready),/날짜가 확인된 기록/)
@@ -141,12 +132,12 @@ test('an explicitly quiet day changes rereading without erasing a previous meeti
       const datedFact='2020-11-11에는 연락을 주고받지 않았다고 기록했어요.'
       assert.ok(!empty.includes(datedFact))
       assert.ok(quietOnly.includes(datedFact))
-      if(period!=='today') assert.match(quietOnly,/연락이 없었던 날은 어떻게 읽을까/)
+      if(period!=='today') assert.doesNotMatch(quietOnly,/연락이 없었던 날은 어떻게 읽을까/)
       assert.doesNotMatch(quietOnly,/과거 인연과 연락을 주고받지/)
       const both=render(period,field,[quiet,record])
       assert.ok(both.includes(datedFact))
       assert.ok(both.includes('2020-11-08에는 과거 인연에게서 먼저 전화가 왔고, 두 사람은 직접 만났어요.'))
-      if(period!=='today') assert.match(both,/만남 뒤, 다음 약속도 함께 잡을까/)
+      if(period!=='today') assert.doesNotMatch(both,/만남 뒤, 다음 약속도 함께 잡을까/)
     }
   }
   const clean={...record,channel:'message',note:''}

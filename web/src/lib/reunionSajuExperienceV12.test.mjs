@@ -33,7 +33,7 @@ test('fallback gives old results a bounded card and keeps the generation action 
   assert.match(html,/class="reading-section reunion-legacy-result" role="status"/)
   assert.match(html,/과거 날짜를 현재나 미래의 추천 시기로 읽지 마/)
   assert.match(html,/class="reading-section relationship-natural-reading" data-relationship-state="not_requested"/)
-  assert.match(html,/자연어 해설 생성<\/button>/)
+  assert.match(html,/제미나이 해설 생성<\/button>/)
   assert.match(css,/\.app-shell \.relationship-experience \{[^}]*overflow-x: clip !important;[^}]*touch-action: pan-y;/)
   assert.match(css,/\.relationship-experience \.reading-section,[^{]+\{[^}]*min-width: 0 !important;[^}]*max-width: 100% !important;/)
 })

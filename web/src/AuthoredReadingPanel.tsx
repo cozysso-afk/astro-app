@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react'
 import type {AuthoredReadingDocument, AuthoredBlock} from './lib/authoredReadingDocument'
+import {useObservedPassage} from './ContactObservationScope'
 import {exportAuthoredReadingImages} from './lib/readingImageExport'
 import './authored-reading.css'
 import '@fontsource/nanum-myeongjo/korean-400.css'
@@ -15,6 +16,7 @@ function Blocks({blocks}:{blocks:AuthoredBlock[]}) {
 
 type Props = {doc:AuthoredReadingDocument; technicalDetails?:ReactNode; period?:string; onRefresh?:()=>void}
 export function AuthoredReadingPanel({doc,technicalDetails,period,onRefresh}:Props) {
+  const observed = useObservedPassage(period ?? '',doc.scope)
   const job = useRef<AbortController|null>(null)
   const [saving,setSaving] = useState(false)
   const [notice,setNotice] = useState('')
@@ -62,6 +64,7 @@ export function AuthoredReadingPanel({doc,technicalDetails,period,onRefresh}:Pro
         <ul>{sections.map(s=><li key={s.id} data-reading-section={s.id} data-section-state={s.state}>{s.label}</li>)}</ul>
       </details>)}
     </> : <p className="authored-reading-state">작성자가 확인된 Gemini 해설이 없어.</p>}
+    {observed && <aside className="authored-reading-block" aria-label="내가 기록한 연락"><h4>내가 기록한 연락</h4><p>{observed.fact}</p></aside>}
     {onRefresh && <button className="authored-reading-save" type="button" onClick={onRefresh}>{periodLabel} AI 해설 다시 작성</button>}
     {technicalDetails && <details className="authored-reading-technical"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>}
   </section>

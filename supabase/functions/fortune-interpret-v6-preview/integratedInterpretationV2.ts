@@ -28,7 +28,7 @@ type Evidence = {
   band?: string;
   text: string;
   observation?: Record<string,string|number>;
-  topic_contributions?: Record<string,{contribution:number;polarity:number}>;
+  topic_contributions?: Record<string,{contribution:number;polarity:number|null}>;
 };
 
 export function compactObservation(ev:any):Record<string,string|number>{
@@ -166,14 +166,14 @@ function trajectoryDigest(rows:any[],topic:string){
 export function compactCalculation(calc:any){
   const w=calc?.western??{}, overall:Record<string,any>={}, rel:Record<string,any>={};
   for(const k of TOPICS){const s=compactStat(w?.overall?.[k],3);if(s)overall[k]=s;}
-  for(const k of REL){const s=compactStat(w?.relationship_signals?.[k],3);if(s)rel[k]=s;}
+  for(const k of REL){const stat=w?.relationship_signals?.[k];if(finiteDailyScore(stat?.average)!==null)rel[k]=compactStat(stat,3);}
 
   const evidence:Evidence[]=[];
   const evidenceIds=new Set<string>();
   const addEvidence=(row:Evidence)=>{ if(!row.id||evidenceIds.has(row.id))return row.id; evidenceIds.add(row.id); evidence.push(row); return row.id; };
 
   for(const [topic,s] of Object.entries(overall) as any[]){
-    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"period_average",topic,start:calc?.period?.start,end:calc?.period?.end,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")} · 변동폭 ${num(s.spread).toFixed(1)}`});
+    addEvidence({id:`W:overall:${topic}`,system:"western",scope:"period_average",topic,direction:evidenceDirection(topic,"average",num(s.average)),score:num(s.average),band:String(s.band??""),text:`${topic} 기간 평균 ${num(s.average).toFixed(1)} · ${String(s.band??"")} · 변동폭 ${num(s.spread).toFixed(1)}`});
     for(const p of s.best_days??[])addEvidence({id:`W:date:${p.date}:${topic}:best`,system:"western",scope:"best_day",topic,direction:evidenceDirection(topic,"best",num(p.score)),date:p.date,score:num(p.score),text:`${p.date} ${topic} 상위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
     for(const p of s.caution_days??[])addEvidence({id:`W:date:${p.date}:${topic}:caution`,system:"western",scope:"caution_day",topic,direction:evidenceDirection(topic,"caution",num(p.score)),date:p.date,score:num(p.score),text:`${p.date} ${topic} 하위 날짜 · 상대지수 ${num(p.score).toFixed(1)}`});
   }
@@ -233,7 +233,7 @@ export function compactCalculation(calc:any){
     const topics=Array.isArray(ev?.source_topics)?ev.source_topics.filter((x:any)=>typeof x==="string"):[];
     const topicContributions=topicMeasurements(ev?.topic_contributions,(row)=>{
       const contribution=finiteDailyScore(row?.contribution),polarity=finiteDailyScore(row?.polarity);
-      return contribution!==null && polarity!==null ? {contribution,polarity} : null;
+      return contribution!==null ? {contribution,polarity} : null;
     });
     const source=topics.join(", ");
     return addEvidence({id:`W:daily:${date}:${index+1}`,system:"western",scope:"daily_actual_aspect_house",source_topics:topics,direction:"context",date,observation:compactObservation(ev),...(Object.keys(topicContributions).length?{topic_contributions:topicContributions}:{}),text:`${ev?.sample_time?`${ev.sample_time} · `:""}${String(ev?.text??"")}${source?` · 관련분야 ${source}`:""}`});

@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test, {before,after} from 'node:test'
@@ -16,7 +17,7 @@ before(async()=>{
 })
 after(async()=>server?.close())
 const fixture=()=>({headline:'합성 핵심 제목',overview:'전체 상세 원고',core_summary:'이것은 원문 전달 검사용 핵심이야.',core_reason:'계산 원고의 이유를 보존해.',core_action:'실제 행동을 확인해.',core_conditions:[],chemistry:'끌림 원문',emotional_dynamic:'정서 원문',communication:'대화 원문',conflict_pattern:'갈등 원문',power_boundaries:'경계 원문',long_term:'지속 원문',timing:'기간 원문',reunion_context:'',felt_scenarios:['생활 장면 원문'],practical_advice:[],top_aspects:[],limits:'해석 범위 원문',marriage_reading:Object.fromEntries(['bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(key=>[key,`${key} 원문`]))})
-const aiFor=data=>({ok:true,origin:'gemini',provenance_verified:true,data})
+const aiFor=data=>({...relationshipProvider,data})
 const renderPanel=(analysisMode,ai)=>renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai,aiLoading:false,aiError:'',onAi:()=>{},analysisMode,timeSensitivePoints:new Set(),formatAspect:()=>'',readingPeriod:{start:'2026-11-04',end:'2026-11-04'}}))
 
 const app = readFileSync(new URL('../AppNext.tsx', import.meta.url), 'utf8')
@@ -32,7 +33,7 @@ const personalEngine = readFileSync(new URL('../../../personal_marriage_v1.py', 
 test('unmarried marriage splits no-counterpart forecast from specific-partner marriage compatibility', () => {
   assert.match(app, /marriageScope.*'personal'.*'partner'/s)
   assert.match(app, /상대 없음 · 개인 결혼운/)
-  assert.match(app, /결혼 가능성 · 시기 · 미래 배우자상/)
+  assert.match(app, /출생 차트 · 기간별 지표 · 창작 초상/)
   assert.match(app, /특정 상대 있음 · 결혼궁합/)
   assert.match(app, /const isPersonalMarriage/)
   assert.match(app, /const needsCounterpart/)

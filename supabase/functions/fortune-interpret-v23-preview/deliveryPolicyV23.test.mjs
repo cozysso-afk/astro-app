@@ -59,4 +59,6 @@ test('V23 provenance is derived from stored successful calls and the stored gene
   assert.match(source, /trace\.some\(\(row:any\)=>Number\(row\?\.http_status\)>=200/)
   assert.match(source, /stages\.length===6&&stages\.every/)
   assert.match(source, /provenance_verified:provenanceVerified/)
+  const refresh=source.indexOf('if(b.refresh!==true)'),completed=source.indexOf('verifiedGeminiJob(cached)'),pending=source.indexOf('if(!pendingError&&pending?.id)'),guard=source.indexOf('const rolling=await checkRollingJobBudget')
+  assert.ok(refresh>=0 && completed>refresh && pending>completed && guard>pending)
 })

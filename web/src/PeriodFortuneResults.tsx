@@ -1,17 +1,15 @@
-import { useRef, useState } from 'react'
 import type { LoveStatus } from './lib/loveReadingContext'
 import { useObservedPromptContext } from './ContactObservationScope'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
-import { CheckCircle2, ImageDown, LoaderCircle } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { ContactOutcomeReading } from './ContactOutcomeReading'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { PeriodFortuneNarrativeV2, verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
-import { exportReadingImages } from './lib/readingImageExport'
 import './reading-image-export.css'
 
 type TopicRow = { topic: string; stat: FortuneStat }
@@ -41,7 +39,7 @@ type PeriodFortuneResultsProps = {
   outcomeCalibration: OutcomeCalibration
   topicDisplay: (topic: string) => string
   humanizeEvidence: (value: string) => string
-  onRetryAi: (refreshMonthlyGaps?:boolean) => void
+  onRetryAi: (refreshIncomplete?:boolean) => void
   onCopyAiPrompt: (mode?: ExternalCopyMode, field?: FortuneField, observed?:string) => void
   onCancelAi: () => void
   aiCanCancel: boolean
@@ -53,12 +51,6 @@ function SavedReadingPromptCopy({onCopy,field,westernOnly}: {onCopy: PeriodFortu
   const observed = useObservedPromptContext()
   if (westernOnly) return null
   return <div data-reading-export-ignore="true"><ExternalPromptCopy onCopy={mode=>onCopy(mode,field,observed)}/></div>
-}
-
-function periodExportTitle(period: PeriodKey, label: string | undefined, result: IntegratedApiResponse, fieldLabel?: string) {
-  const base = label || (period === 'today' ? '오늘' : period === 'week' ? '주간' : period === 'month' ? '월간' : '연간')
-  const range = result.period.start === result.period.end ? result.period.start : `${result.period.start}~${result.period.end}`
-  return `${fieldLabel ? `${fieldLabel} · ` : ''}${base} 운세 · ${range}`
 }
 
 export function PeriodFortuneResults({
@@ -91,26 +83,6 @@ export function PeriodFortuneResults({
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
   const field = fortuneField(fieldId)
-  const exportRootRef = useRef<HTMLDivElement | null>(null)
-  const [exporting, setExporting] = useState(false)
-  const [exportNotice, setExportNotice] = useState('')
-  const [selectedSystem, setSelectedSystem] = useState(initialSystem)
-  const exportTitle = periodExportTitle(period, periodLabel, result, field?.label)
-
-  const saveImages = async () => {
-    if (!exportRootRef.current || exporting) return
-    setExporting(true)
-    setExportNotice('')
-    try {
-      const saved = await exportReadingImages(exportRootRef.current, exportTitle)
-      if (!saved.cancelled) setExportNotice(saved.shared ? `${saved.pages}장 공유 준비 완료` : `${saved.pages}장 PNG 저장 완료`)
-    } catch (error) {
-      setExportNotice(error instanceof Error ? error.message : '이미지 저장에 실패했어.')
-    } finally {
-      setExporting(false)
-    }
-  }
-
   const technicalDetails = <>
     <section className="result-card">
       <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>
@@ -144,16 +116,10 @@ export function PeriodFortuneResults({
 
   // Do not promote a provisional/unchecked result into a Gemini-authored reading.
   const hasNaturalReading = verifiedFortuneNarrative(aiInterpretation)
-  return <div ref={exportRootRef} data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
+  return <div data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
     <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
-    {selectedSystem !== 'integrated' && <div className="reading-export-toolbar" data-reading-export-ignore="true">
-      <button type="button" onClick={saveImages} disabled={exporting}>{exporting ? <LoaderCircle className="reading-export-spinner" size={17}/> : <ImageDown size={17}/>} {exporting ? '이미지 만드는 중' : '결과 이미지 저장'}</button>
-      {exportNotice && <small>{exportNotice}</small>}
-    </div>}
-    {field?.id==='love'&&<aside className="love-context-note-v3"><strong>애정운은 관계 상태를 하나로 가정하지 않아.</strong><p>솔로·짝사랑·썸·애매한 관계·연애 중·재회 관심을 각각 나눠 보여줘. 내 상황에 맞는 부분만 골라 읽으면 돼.</p></aside>}
-    {field?.id==='contact'&&<aside className="contact-scope-note"><strong>어떤 연락을 보는 운세일까?</strong><p>연애 상대가 없어도 볼 수 있어. 지인과의 대화, 업무 문의, DM처럼 직접 주고받는 연락과 공식 안내·결과 발표는 구분해서 읽어.</p><p>외부 연락 반응 신호와 내 연락 실행 적합도는 서로 다른 계산축이야. 특정 상대가 먼저 연락할 사람을 판정하지는 않아.</p></aside>}
     {hasNaturalReading && aiError && <p className="result-note" role="alert">{aiError}</p>}
-    <SystemReadingViews outcomeRecords={outcomeRecords} initialSystem={initialSystem} onSystemChange={setSelectedSystem} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} interpretation={aiInterpretation} onGenerate={()=>onRetryAi(hasNaturalReading)} generating={aiLoading} generationError={aiError} field={field}><>
+    <SystemReadingViews outcomeRecords={outcomeRecords} initialSystem={initialSystem} periodKey={period} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} interpretation={aiInterpretation} onGenerate={()=>onRetryAi(hasNaturalReading)} generating={aiLoading} generationError={aiError} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails} onRetry={aiLoading?undefined:onRetryAi}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>}
       {hasNaturalReading && <SavedReadingPromptCopy onCopy={onCopyAiPrompt}/>}
       {outcomeRecords && <ContactOutcomeReading calculation={result} localRecords={outcomeRecords}/>}

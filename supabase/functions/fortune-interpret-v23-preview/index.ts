@@ -309,8 +309,10 @@ Deno.serve(async(req)=>{
   if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);
   if(!pb.ok)return res(publicFortuneError("PROMPT_BUDGET_EXCEEDED",undefined,{cost_guard_blocked:true}),413);
   const hash=await payloadHash(payload);const kind=exactV23JobKind(VERSION,payload,hash);const a=admin();const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
-  const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,result_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
-  if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
+  if(b.refresh!==true){
+    const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,model,result_json,usage_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
+    if(!cacheError&&cached?.id&&verifiedGeminiJob(cached))return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
+  }
   const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(!pendingError&&pending?.id)return res({ok:true,job_id:pending.id,status:pending.status,interpreter_version:VERSION,reused:true,inflight:true},202);
   const rolling=await checkRollingJobBudget(a,u.id);if(!rolling.ok)return res({...rolling,cost_guard_blocked:true,rolling_job_guard:true},200);

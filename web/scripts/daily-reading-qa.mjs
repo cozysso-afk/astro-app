@@ -31,7 +31,7 @@ try {
       const title=el.querySelector('.daily-reading-headline'),body=el.querySelector('.daily-reading-block p')
       return {width:innerWidth,overflow:el.scrollWidth-el.clientWidth,title:parseFloat(getComputedStyle(title).fontSize),titleFont:getComputedStyle(title).fontFamily,body:parseFloat(getComputedStyle(body).fontSize),font:getComputedStyle(body).fontFamily,clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1)}
     })
-    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Nanum Myeongjo/);assert.match(stats.titleFont,/Nanum Myeongjo/)
+    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Noto Sans KR/);assert.match(stats.titleFont,/Nanum Myeongjo/)
     widths.push(stats)
   }
   const headings=[]

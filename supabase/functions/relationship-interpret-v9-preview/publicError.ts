@@ -102,18 +102,18 @@ export function hasRelationshipProvenance(value: unknown, usageValue?: unknown):
   const r = record(value);
   if (!r || r.ok !== true || !model(r.model) || !version(r.interpreter_version)
     || r.origin !== 'gemini' || r.provenance_verified !== true) return false;
-  const usage = record(usageValue ?? r.usage);
+  const usage = record(usageValue === undefined ? r.usage : usageValue);
   return usage?.generation_version === r.interpreter_version && Array.isArray(usage?.call_trace)
     && usage.call_trace.slice(0, 2).some((value: unknown) => {
       const row = record(value);
-      return row?.model === r.model && row.outcome === 'success'
+      return row !== null && row.model === r.model && row.outcome === 'success'
         && Number.isInteger(row.http_status) && row.http_status >= 200 && row.http_status < 300;
     });
 }
 export function publicRelationshipResult(value:unknown,usageValue?:unknown) {
   const r=record(value);
   if(!r || !hasRelationshipProvenance(r,usageValue))return null;
-  const safeUsage=publicUsage(usageValue ?? r.usage);
+  const safeUsage=publicUsage(usageValue === undefined ? r.usage : usageValue);
   const data=publicInterpretation(r.data);if(!data)return null;
   if(/question-reading-contract$/.test(r.interpreter_version)&&typeof data.core_summary!=='string')return null;
   return {ok:true,data,...metadata(r),usage:safeUsage};

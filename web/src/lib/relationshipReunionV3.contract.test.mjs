@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -24,7 +25,7 @@ test('reunion keeps authored synthesis separate from calculated hierarchy withou
  assert.match(wrapper,/ReunionHierarchyPanelV3/)
  const data={headline:'합성 재회 제목',overview:'상세 원고 보존',core_summary:'합성 재회 핵심 원문',core_reason:'합성 근거 원문',core_action:'합성 확인 원문',core_conditions:[],limits:'조건 원문',reunion_synthesis_v2:{summary:'재회 상세 요약 원문',consultation_answer:{current_stage:'입력 기록에서는 연락을 주고받았어.',next_stage_up_conditions:[],down_conditions:[],repeat_risks:[]},why_reconnect:{conclusion:'연결 이유 원문',interpretation:'연결 해석 원문'},initiative:{conclusion:'주체 미확인 원문',interpretation:'방향 제한 원문'},timing:{conclusion:'시기 설명 원문',windows:[]},rebuild:{conclusion:'재구축 조건 원문',conditions:[]},repeat_risks:{conclusion:'반복 위험 원문',patterns:[]},convergence:[],precision_note:'정밀도 원문'}}
  const hierarchy={version:'test',as_of_date:'2026-11-04',validation:{status:'PASS'},stages:{emotional_reactivation:{activation:50,candidate_count:1},contact_recontact:{activation:40,candidate_count:1},in_person_meeting:{activation:null,candidate_count:0},relationship_rebuilding:{activation:null,candidate_count:0}},top_periods:[],current_windows:[],past_windows:[],limitations:[]}
- const html=renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai:{ok:true,origin:'gemini',provenance_verified:true,data},aiLoading:false,aiError:'',onAi:()=>{},analysisMode:'reunion',timeSensitivePoints:new Set(),formatAspect:()=>'',hierarchy,observation:{state:'messaging',initiator:'user',events:[]}}))
+ const html=renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai:{...relationshipProvider,data},aiLoading:false,aiError:'',onAi:()=>{},analysisMode:'reunion',timeSensitivePoints:new Set(),formatAspect:()=>'',hierarchy,observation:{state:'messaging',initiator:'user',events:[]}}))
  for(const value of [data.core_summary,data.reunion_synthesis_v2.summary,data.reunion_synthesis_v2.consultation_answer.current_stage])assert.equal(html.split(value).length-1,1,value)
  assert.match(html,/data-authored-scope="reunion"/)
  assert.equal((html.match(/data-stage-state=/g)||[]).length,6)
@@ -32,7 +33,7 @@ test('reunion keeps authored synthesis separate from calculated hierarchy withou
 })
 test('six relationship axes remain visible and evidence stays collapsed',()=>{
  const html=render()
- for(const label of ['과거 관계가 다시 떠오름','연락이 닿음','대화가 이어짐','실제 만남','다시 교제하기로 합의','관계 유지']) assert.ok(html.includes(label),label)
+ for(const label of ['정서 재활성 지표','연락이 닿음','대화가 이어짐','실제 만남','다시 교제하기로 합의','관계 유지']) assert.ok(html.includes(label),label)
  assert.equal((html.match(/data-stage-state=/g) || []).length,6)
  assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
  assert.doesNotMatch(html,/<details[^>]*\bopen/)
@@ -40,6 +41,6 @@ test('six relationship axes remain visible and evidence stays collapsed',()=>{
 })
 test('missing observation does not claim actual contact',()=>{
  const html=render({observation:{state:'',initiator:'',events:[]}})
- assert.match(html,/현재 상태를 입력하면/)
+ assert.match(html,/현재 관계 상태 미입력/)
  assert.doesNotMatch(html,/실제 연락은 이미 닿았어요|연락은 이미 재개됐어요/)
 })

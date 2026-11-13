@@ -14,7 +14,7 @@ const enc = new TextEncoder()
 export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
 절대규칙:
 - PROMPT_DATA와 evidence_ledger 밖의 사실·날짜·상대 속마음·사건 확률을 만들지 않는다.
-- scores의 종합 점수와 관계축 강도는 사건 확률이 아니다. 기본 분야의 score_components가 있으면 activation(그 분야가 두드러진 정도)과 favorability(수월함·부담의 상대적 균형)를 구분한다. 큰 수치 자체로 좋은 날이나 나쁜 날을 정하지 않는다.
+- scores의 종합 점수와 관계축 강도는 사건 확률이 아니다. 기본 분야의 score_components가 있으면 activation(그 분야가 두드러진 정도)과 favorability(수월함·부담의 상대적 균형)를 구분한다. 기본 분야 종합 점수는 시점별로 두 지표를 46:54로 합성한 뒤 하루 단위로 집계했다. 반올림된 일 점수로 구성값을 역산하지 않는다.
 - 같은 관측의 topic_contributions에서 반드시 묻는 분야의 polarity를 읽는다. 같은 행성쌍도 분야별 부호가 다를 수 있다. 해당 분야의 수치가 없으면 다른 분야의 부호를 빌리거나 가중치를 역산하지 않는다. 파생 분야는 원래 연결과 제공 범위만 해석한다.
 - 서사는 점수나 topic 이름부터 시작하지 않고 period_narrative.phenomena의 현상 묶음부터 시작한다.
 - 같은 현상이 여러 topic에 걸쳐 있으면 현상은 한 번 설명하고 분야별 발현 차이만 덧붙인다.
@@ -40,9 +40,11 @@ function bandRole(row:any) {
 
 function phenomenonRole(phenomena:any[], topic:string) {
   const rows=phenomena.filter((row:any)=>Array.isArray(row?.topics)&&row.topics.includes(topic))
-  const directions=new Set(rows.flatMap((row:any)=>row.topic_directions
-    ? row.topic_directions[topic]??[]
-    : [...(row.directions??[]),...({support:['supportive'],caution:['caution'],tension:['supportive','caution']} as Record<string,string[]>)[row.role]??[]]))
+  const impliedDirections:Record<string,string[]>={support:['supportive'],caution:['caution'],tension:['supportive','caution']}
+  const directions=new Set(rows.flatMap((row:any)=>{
+    if(row.topic_directions)return row.topic_directions[topic]??[]
+    return [...(row.directions??[]),...(impliedDirections[row.role]??[])]
+  }))
   const caution=directions.has('caution')||directions.has('challenging')
   const support=directions.has('supportive')
   if(caution&&support)return 'mixed' as const
@@ -130,7 +132,14 @@ export function buildV23PromptPacket(payload:any) {
       retained.add(row.id)
     }
   }
-  const base:any = attachPeriodReadingContext(bounded,payload)
+  const {deterministic_topic_summary, ...selected}=attachPeriodReadingContext(bounded,payload)
+  // Numerical ranks and scores are already available. A prewritten topic verdict
+  // would turn the writer's input into a second, unrelated source of copy.
+  const base:any={...selected}
+  base.evidence_ledger=base.evidence_ledger.map((row:any)=>{
+    if(row.system==='western' && /(?:_average|_day)$/.test(row.scope))return {...row,direction:'context'}
+    return row
+  })
   // Spend the prompt budget on measurements for dates and topics the writer actually sees.
   const listedTopics=new Map<string,Set<string>>();
   for(const row of base.evidence_ledger??[]){

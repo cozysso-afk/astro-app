@@ -68,11 +68,9 @@ test('A5 baseline: result formatter preserves hierarchy fields except audit-heav
   assert.match(resultFormatters, /saju_boundaries/)
 })
 
-test('A6 improved: readable reunion prose never restores technical sentences just to fill a quota', () => {
-  assert.match(reunionPanel, /const TECHNICAL_RE/)
-  assert.match(reunionPanel, /function readerSentences/)
-  assert.match(reunionPanel, /return plain\.slice\(0, limit\)\.join\(' '\)/)
-  assert.doesNotMatch(reunionPanel, /selected\.push\(row\)/)
+test('A6: the calculation panel shows observed stages and does not truncate Gemini sentences', () => {
+  assert.match(reunionPanel, /readingV4.axes/)
+  assert.doesNotMatch(reunionPanel, /readerSentences|TECHNICAL_RE|selected\.push\(row\)/)
 })
 
 test('A7 improved: shared editorial base remains compatible while domain-specific answer extension exists', () => {

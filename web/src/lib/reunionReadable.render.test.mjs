@@ -8,11 +8,10 @@ new Function('module','exports','require',result.outputFiles[0].text)(mod,mod.ex
 const hierarchy={version:'test',as_of_date:'2026-10-22',validation:{status:'PASS'},stages:{emotional_reactivation:{activation:76,candidate_count:1},contact_recontact:{activation:59,candidate_count:4},in_person_meeting:{activation:null,candidate_count:0},relationship_rebuilding:{activation:32,candidate_count:1}},top_periods:[],current_windows:[],past_windows:[],limitations:[]}
 const reunionV2={summary:'연락은 다시 닿았지만 아직 실제 만남으로 넘어간 것은 아니에요. 지금은 대화가 이어지고 구체적인 약속이 생기는지를 보는 단계예요.',consultation_answer:{current_stage:'현재는 재접촉 단계예요.',next_stage_up_conditions:['날짜와 장소가 정해진 만남 제안이 실제 행동으로 이어져요.'],down_conditions:['안부만 오가고 구체적인 약속은 계속 미뤄져요.']},why_reconnect:{conclusion:'서로를 다시 의식하게 하는 배경이 남아 있어요.'},repeat_risks:{patterns:[]},rebuild:{conditions:[]}}
 export const render=(extra={})=>mod.exports.render({hierarchyData:hierarchy,observation:{state:'messaging',initiator:'user',events:[]},evidence:[],reunionV2,directionRows:[],sustainabilityText:'',...extra})
-test('contact observed: Gemini-authored reunion answer is the main verdict',()=>{
+test('contact observed: calculations and the recorded status never promote the unverified narrative',()=>{
  const html=render()
- assert.match(html,/현재는 재접촉 단계예요/)
- assert.match(html,/연락은 다시 닿았지만 아직 실제 만남으로 넘어간 것은 아니에요/)
- assert.match(html,/날짜와 장소가 정해진 만남 제안/)
+ assert.match(html,/지금은 서로 연락을 주고받고 있어요/)
+ for(const value of [reunionV2.summary,reunionV2.consultation_answer.current_stage,...reunionV2.consultation_answer.next_stage_up_conditions])assert.equal(html.includes(value),false)
  assert.match(html,/실제 만남<\/span><strong>뚜렷한 시기 없음/)
  assert.match(html,/다시 교제하기로 합의<\/span><strong>앞 단계 미확인/)
  assert.equal((html.match(/aria-current="step"/g) || []).length,1)

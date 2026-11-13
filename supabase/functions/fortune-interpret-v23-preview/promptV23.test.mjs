@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildTemporalWordingInstruction, buildV23CorePrompt, buildV23PromptBudget, buildV23CorePromptFromPacket } from './promptV23.ts'
+import { compactCalculation } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { buildPeriodNarrativeContext } from './periodNarrativeV23.ts'
 
 function payload(kind='week') {
@@ -173,4 +174,33 @@ test('monthly budget measures the exact writer packet and preserves every select
     ).map(row=>row.id)
     assert.deepEqual(refs,server.period_reading.questions.find(q=>q.key===question.key).evidence_refs)
   }
+})
+
+test('actual writer input preserves measured zero, per-topic signs and independent contact axes',()=>{
+  const day='2026-11-12'
+  const calc={period:{start:day,end:day,day_count:1},western:{
+    overall:{연애:{average:75},금전:{average:25}},
+    relationship_signals:{수신신호:{average:0},발신적합:{band:'약'},과거인연접점:{average:41}},
+    daily_scores:[{date:day,scores:{연애:75,금전:25},score_components:{
+      연애:{activation:80,favorability:70},금전:{activation:55,favorability:0}},
+      evidence:[{transit:'Mercury',target:'Venus',aspect:'삼각',polarity:1,source_topics:['연애','금전','수신신호'],
+        topic_contributions:{연애:{contribution:7,polarity:1},금전:{contribution:5,polarity:-0.5}}}],
+    }],
+  }}
+  const out=buildV23CorePrompt(compactCalculation(calc))
+  const packet=JSON.parse(out.text.split('PROMPT_DATA=').at(-1))
+  assert.deepEqual(packet.daily_score_components,[{date:day,topics:{금전:{activation:55,favorability:0},연애:{activation:80,favorability:70}}}])
+  const observed=packet.evidence_ledger.find(row=>row.id==='W:daily:'+day+':1')
+  assert.deepEqual(observed.topic_contributions,{연애:{contribution:7,polarity:1},금전:{contribution:5,polarity:-0.5}})
+  assert.deepEqual(out.packet.period_narrative.phenomena.find(row=>row.evidence_refs.includes(observed.id)).topic_directions,{연애:['supportive'],금전:['caution']})
+  assert.deepEqual(packet.contact_axes.incoming.refs,['W:overall:수신신호'])
+  assert.deepEqual(packet.contact_axes.outgoing.refs,[])
+  assert.equal(packet.relationship_scores.수신신호.average,0)
+  assert.equal(packet.relationship_scores.발신적합,undefined)
+  delete calc.western.daily_scores[0].score_components
+  delete calc.western.daily_scores[0].evidence[0].topic_contributions
+  const old=JSON.parse(buildV23CorePrompt(compactCalculation(calc)).text.split('PROMPT_DATA=').at(-1))
+  assert.equal(old.daily_score_components,undefined)
+  assert.equal(old.evidence_ledger.find(row=>row.id===observed.id).topic_contributions,undefined)
+  assert.equal(buildV23CorePrompt(payload('week')).packet.deterministic_topic_summary,undefined)
 })

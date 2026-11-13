@@ -64,8 +64,8 @@ test('수신과 발신은 차트 활성축으로 분리하고 실제 첫 연락�
     directionRows:directions,
   })
   assert.deepEqual(result.directions.map(row=>row.label),['수신 · 상대 → 나','발신 · 나 → 상대'])
-  assert.match(result.directions[0].meaning,/상대 쪽 흐름/)
-  assert.match(result.directions[1].meaning,/내 쪽 흐름/)
+  assert.match(result.directions[0].meaning,/상대 쪽 차트의 기간 평균 활성도/)
+  assert.match(result.directions[1].meaning,/내 쪽 차트의 기간 평균 활성도/)
   assert.deepEqual(result.directions.map(row=>row.metric),['보통','약함'])
   assert.equal(result.observedInitiator,'상대가 먼저')
 })

@@ -74,6 +74,13 @@ function authoredSupplementSections(data:NonNullable<AiInterpretationResponse['d
 }
 // Migration is intentionally lossless: no sentence slicing, score-derived prose,
 // paraphrasing or substitution of the overall summary for a missing field.
+export function buildSystemReadingDocument(system:'western'|'saju'|'thai',value:unknown,date:string,version='legacy'):AuthoredReadingDocument {
+  const title = {western:'서양점성술',saju:'사주',thai:'태국점성술'}[system]
+  const core = block('systems.'+system,'기간 전체 해설',value)
+  return finish({version:'authored-reading-v1',revision:'',scope:system,title:title+' Gemini 해설',date,
+    state:'missing',headline:'',core,sections:[],exportBlockIds:[]},core.length>0,version)
+}
+
 export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResponse['data']>,period:PeriodKey,start:string,end:string,field:FortuneField|undefined,verified:boolean,version='legacy'):AuthoredReadingDocument {
   const label=period==='week'?'주간':period==='month'?'월간':period==='year'?'연간':'일일'
   const doc:AuthoredReadingDocument={version:'authored-reading-v1',revision:'',scope:field?.id??'overall',title:`${label} ${field?.label??'종합운세'}`,date:start===end?start:`${start} → ${end}`,state:verified?'missing':'unverified',headline:'',core:[],sections:[],exportBlockIds:[]}

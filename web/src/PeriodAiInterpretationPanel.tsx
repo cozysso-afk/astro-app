@@ -7,6 +7,7 @@ import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { estimateGeminiUsage } from './lib/aiUsage'
 import { periodAiCostPreview } from './lib/aiCostPreview'
 import { useObservedPromptContext } from './ContactObservationScope'
+import { FortuneCalculationData } from './FortuneCalculationData'
 import { ExternalPromptCopy } from './ExternalPromptCopy'
 import { PeriodFortuneNarrativeV2, verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 
@@ -55,9 +56,9 @@ export function PeriodAiInterpretationPanel({
   const observed = useObservedPromptContext()
   const copyPrompt = <ExternalPromptCopy onCopy={mode=>onCopyPrompt(mode,field,observed)}/>
   const costPreview = periodAiCostPreview(period)
-  const technicalFallback = technicalDetails
-    ? <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>{technicalDetails}</details>
-    : null
+  const technicalFallback = <details className="period-ai-details"><summary>계산 근거 자세히 보기</summary>
+    <FortuneCalculationData calculation={calculation} topics={field?.topics} period={period}/>{technicalDetails}
+  </details>
 
   const hasReading = verifiedFortuneNarrative(result)
   if (!loading && !error && !hasReading) {

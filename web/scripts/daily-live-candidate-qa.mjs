@@ -33,7 +33,7 @@ try{
   for(const width of [320,350,393,430]){
     await page.setViewportSize({width,height:852})
     const stats=await root.evaluate(el=>({width:innerWidth,overflow:Math.max(document.documentElement.scrollWidth-innerWidth,el.scrollWidth-el.clientWidth),clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1),bodyFont:getComputedStyle(el.querySelector('.daily-reading-block p')).fontFamily}))
-    assert.ok(stats.overflow<=1&&!stats.clipped,JSON.stringify(stats));assert.match(stats.bodyFont,/Nanum Myeongjo/);widths.push(stats)
+    assert.ok(stats.overflow<=1&&!stats.clipped,JSON.stringify(stats));assert.match(stats.bodyFont,/Noto Sans KR/);widths.push(stats)
   }
   await page.setViewportSize({width:393,height:852})
   const scopes=[]

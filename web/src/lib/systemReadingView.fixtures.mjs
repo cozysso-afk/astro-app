@@ -9,7 +9,7 @@ import { fortuneField } from './fortuneFields.ts'
 const server = await createServer({
   root: fileURLToPath(new URL('../..', import.meta.url)),
   optimizeDeps: { noDiscovery: true },
-  server: { middlewareMode: true, hmr: false },
+  server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
 })
 const { SystemReadingViews } = await server.ssrLoadModule('/src/SystemReadingViews.tsx')

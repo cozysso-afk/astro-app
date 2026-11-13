@@ -1,7 +1,10 @@
 import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Columns3, Copy, Layers3, Orbit, Sparkles } from 'lucide-react'
-import type { AiInterpretationResponse, FortuneStat, IntegratedApiResponse } from './appTypes'
+import type { AiInterpretationResponse, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { ContactObservationScope, useObservedPromptContext } from './ContactObservationScope'
+import { AuthoredReadingPanel } from './AuthoredReadingPanel'
+import { ContactSignalData } from './FortuneCalculationData'
+import { buildSystemReadingDocument } from './lib/authoredReadingDocument'
 import { verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 import { fortuneEvidenceSnapshot } from './lib/fortuneToneCalibration'
 import { fortuneGroup, type FortuneField } from './lib/fortuneFields'
@@ -37,6 +40,7 @@ function BoundedCopy({packet,topic}:{packet:Record<string,unknown> | (()=>Record
 
 type Props = {
   calculation:IntegratedApiResponse
+  periodKey?:PeriodKey
   interpretation?:AiInterpretationResponse|null
   children:ReactNode
   field?:FortuneField
@@ -48,7 +52,7 @@ type Props = {
   generating?:boolean
   generationError?:string
 }
-export function SystemReadingViews({calculation:c,interpretation,children,field,initialSystem='integrated',onSystemChange,outcomeRecords,onGenerate,generating,generationError}:Props) {
+export function SystemReadingViews({calculation:c,periodKey,interpretation,children,field,initialSystem='integrated',onSystemChange,outcomeRecords,onGenerate,generating,generationError}:Props) {
   const [system,setSystem] = useState<SystemId>(initialSystem)
   const [topic,setTopic] = useState<LifeTopic>(field?.lens ?? '전체')
   const [wheelIndex,setWheelIndex] = useState(0)
@@ -66,7 +70,11 @@ export function SystemReadingViews({calculation:c,interpretation,children,field,
   const systemTitle = SYSTEMS.find(s=>s.id===system)!.label
   const period = c.period.start===c.period.end ? c.period.start : `${c.period.start} — ${c.period.end}`
   const verified = verifiedFortuneNarrative(interpretation)
-  const authored = verified && system!=='integrated' ? interpretation?.data?.systems?.[system]?.trim() : undefined
+  const authored = verified && system!=='integrated' ? buildSystemReadingDocument(system,interpretation?.data?.systems?.[system],period,interpretation?.interpreter_version) : null
+  const sampleStart = segment && (segment.start>c.period.start ? segment.start : c.period.start)
+  const sampleEnd = segment && (segment.end<c.period.end ? segment.end : c.period.end)
+  const samplePlanets = new Map(placements.map(row=>[row.planet.key,thaiPlanetLabel(row.planet.label)]))
+  const thaiSamples = (view.thai?.suriyayat_daily ?? []).filter(row=>sampleStart && sampleEnd && row.date>=sampleStart && row.date<=sampleEnd)
   const available = system==='western' || system==='integrated' || (system==='saju' ? Boolean(view.saju) : Boolean(view.thai))
   const canSelect = (t:LifeTopic) => t==='전체' || system==='western' || system==='integrated' || (system==='saju' ? SAJU_LIFE_KEYS[t].length>0 : wheel.some(r=>THAI_LIFE_KEYS[t].includes(r.bhumi_key)))
 
@@ -77,8 +85,8 @@ export function SystemReadingViews({calculation:c,interpretation,children,field,
       {!field && <div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!canSelect(t)} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
       {field && <h3>{field.label} · {period}</h3>}
       {system==='integrated' ? injectReadingContext(children,{field:focusedField}) : !available ? <p className="system-unavailable">현재 입력으로 확인된 {systemTitle} 계산 자료가 없어.</p> : <>
-        {authored ? <header className="system-hero"><span>{systemTitle} · 기간 전체 Gemini 해설</span><p>{authored}</p></header> :
-          <section className="period-ai-card"><h3>{systemTitle} Gemini 해설</h3>
+        {authored?.state==='ready' ? <AuthoredReadingPanel doc={authored}/> :
+          <section className="result-card system-generation-card"><h3>{systemTitle} Gemini 해설</h3>
             <p role="status">{generating?'Gemini 해설을 생성하고 있어.':generationError || '이 기간에 저장된 체계별 Gemini 원고가 없어.'}</p>
             {onGenerate && <button type="button" className="period-ai-generate" disabled={generating} onClick={onGenerate}>{generationError || verified ? '해설 다시 생성' : '해설 생성'}</button>}
           </section>}
@@ -89,6 +97,7 @@ export function SystemReadingViews({calculation:c,interpretation,children,field,
               <p>{westernPeriodFact(s,c.period.start,c.period.end)}</p>
               {Object.entries(fortuneEvidenceSnapshot(c,name)).filter(([k,v])=>['support','challenge','neutral'].includes(k)&&v).map(([k,v])=><p key={k}>{{support:'도움 근거',challenge:'부담 근거',neutral:'중립 근거'}[k]} · {v}</p>)}
             </details>)}</div>
+            <ContactSignalData calculation={c} topics={chosenTopics} period={periodKey ?? 'today'}/>
             {!westernRows.length && <p>이 분야에 계산된 점수가 없어.</p>}
           </section>
           <BoundedCopy topic={topic} packet={()=>({system,focus_topic:field?.label??topic,period:c.period,topics:Object.fromEntries(westernRows.map(([name,s])=>[name,{average:s.average,band:s.band,period_fact:westernPeriodFact(s,c.period.start,c.period.end)}])),relationship_signals:westernRows.some(([name])=>name==='연락'||name==='재회')?c.western.relationship_signals:undefined,evidence:westernRows.map(([name])=>({topic:name,...fortuneEvidenceSnapshot(c,name)}))})}/>
@@ -110,7 +119,10 @@ export function SystemReadingViews({calculation:c,interpretation,children,field,
             <p>출생 요일 · {view.thai?.thai_day} · {view.thai?.birth_planet?.label ?? view.thai?.ruler}</p>
             <div className="system-topic-selector" role="group" aria-label="태국점성술 운 구간 선택">{view.natalWheel.length>0 && <button type="button" aria-pressed={!segment} onClick={()=>setWheelIndex(-1)}>출생 배치</button>}{view.wheels.map((w,i)=><button type="button" key={w.start} aria-pressed={segment===w} onClick={()=>setWheelIndex(i)}>{w.start===w.end?w.start:w.start+'–'+w.end}</button>)}</div>
             {segment && <p>진행 나이 {segment.age_in_progress} · 연간 보리완 {thaiPlanetLabel(segment.annual_boriwan.label)}</p>}
-            {placements.map(row=><p key={row.bhumi_key}>{row.bhumi_label} · {thaiPlanetLabel(row.planet.label)}</p>)}
+            {placements.map(row=><p key={row.bhumi_key} data-bhumi={row.bhumi_key}>{row.bhumi_label} · {thaiPlanetLabel(row.planet.label)}</p>)}
+            {thaiSamples.length>0 && <details className="system-raw"><summary>선택한 구간의 날짜별 행성 위치</summary>
+              {thaiSamples.map(sample=>Array.from(samplePlanets,([key,label])=>sample.positions?.[key]?.sign_ko && <p key={sample.date+key}>{sample.date} · {label} · {sample.positions[key].sign_ko}</p>))}
+            </details>}
             {view.suriyayat && <details className="system-raw"><summary>수리야얏 위치 자료</summary>
               {view.suriyayat.lagna?.available && <p>상승점 · {view.suriyayat.lagna.display}</p>}
               {(['natal','period_start','period_end'] as const).map(key=><details key={key}><summary>{{natal:'출생 위치',period_start:'기간 시작 위치',period_end:'기간 종료 위치'}[key]}</summary><p>{view.suriyayat?.[key]?.instant}</p>{Object.entries(view.suriyayat?.[key]?.positions??{}).map(([name,v])=><p key={name}>{name} · {String((v as {display?:string}).display??'')}</p>)}</details>)}

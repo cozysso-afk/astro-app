@@ -15,7 +15,7 @@ const canaries=['authorization: Bearer TEST_CANARY','{"authorization":"Bearer TE
 async function invoke(fetcher,cache=null,session=async()=>{},aiRevision={current:0},writeCache=async()=>{}){
   let error='',saved=null,state=null,calls=0
   const client=new FunctionsClient('https://example.test/functions/v1',{customFetch:async(...args)=>{calls++;return fetcher(...args)}})
-  const ctx=vm.createContext({...boundary,Error,relationshipResult:{},relationshipRevisionRef:{current:1},relationshipAiRevisionRef:aiRevision,selectedTool:'relationship',marriageMode:'unmarried',relationshipPurpose:'compatibility',relationshipRequestSnapshot:null,reunionTiming:null,aiModel:'gemini-3.7-flash',relationshipAiCacheId:()=> 'synthetic-cache',setRelationshipAiLoading:()=>{},setRelationshipAiError:x=>error=x,readReadingCache:async()=>cache,ensureSupabaseSession:session,supabase:{functions:client},annotatePayload:x=>x,writeReadingCache:async(_id,_kind,x)=>{await writeCache();saved=x},RELATIONSHIP_AI_CACHE_TTL_DAYS:30,setRelationshipAi:x=>state=x,setRelationshipAiCacheSource:()=>{}})
+  const ctx=vm.createContext({...boundary,Error,relationshipResult:{},relationshipRevisionRef:{current:1},relationshipAiRevisionRef:aiRevision,selectedTool:'relationship',marriageMode:'unmarried',relationshipPurpose:'compatibility',relationshipRequestSnapshot:null,reunionTiming:null,aiModel:'gemini-3.7-flash',relationshipAiCacheId:()=> 'synthetic-cache',setRelationshipAiLoading:()=>{},setRelationshipAiError:x=>error=x,readReadingCache:async()=>cache,ensureSupabaseSession:session,supabase:{functions:client},writeReadingCache:async(_id,_kind,x)=>{await writeCache();saved=x},RELATIONSHIP_AI_CACHE_TTL_DAYS:30,setRelationshipAi:x=>state=x,setRelationshipAiCacheSource:()=>{}})
   vm.runInContext(compile(run+'\nglobalThis.runTest=runRelationshipAi'),ctx);await ctx.runTest();return {error,saved,state,calls}
 }
 test('FunctionsHttpError known Relationship code maps locally despite hostile extras',async()=>{
@@ -66,8 +66,8 @@ test('unexpected 2xx success envelopes cannot populate state/cache',async()=>{
 })
 test('valid fresh/local cached results preserve text, usage and metadata while removing diagnostics',async()=>{
   for(const local of [true,false]){
-    const payload=success();payload.data.overview='Legitimate prose about authorization and cookie parsing.';payload.debug={authorization:canaries[0]};payload.usage.debug={authorization:canaries[0]}
-    const r=await invoke(async()=>json(payload),local?payload:null);assert.equal(r.error,'');assert.equal(r.calls,local?0:1);assert.equal(r.state.data.overview,payload.data.overview);assert.equal(r.state.model,payload.model);assert.equal(r.state.usage.total_tokens,33);assert(!JSON.stringify(r.state).includes('TEST_CANARY'));assert(!JSON.stringify(r.saved).includes('TEST_CANARY'))
+    const payload=success();payload.data.overview='  Mercury · 庚申  원문.\n  두 번째 줄.';payload.debug={authorization:canaries[0]};payload.usage.debug={authorization:canaries[0]}
+    const r=await invoke(async()=>json(payload),local?payload:null);assert.equal(r.error,'');assert.equal(r.calls,local?0:1);assert.equal(r.state.data.overview,payload.data.overview);if(!local)assert.equal(r.saved.data.overview,payload.data.overview);assert.equal(r.state.model,payload.model);assert.equal(r.state.usage.total_tokens,33);assert(!JSON.stringify(r.state).includes('TEST_CANARY'));assert(!JSON.stringify(r.saved).includes('TEST_CANARY'))
   }
 })
 
@@ -80,4 +80,21 @@ test('editing observations while a response or cache write is pending cannot pub
   assert.equal(whileSaving.state,null)
   const beforeProvider=await invoke(async()=>json(success()),null,async()=>{revision.current++},revision)
   assert.equal(beforeProvider.calls,0)
+})
+
+
+test('restored archives use the same provider validation as fresh and cached relationship interpretations',()=>{
+  assert.match(app, /const archivedReading = relationshipAiSuccess\(item\.interpretation\)/)
+  assert.match(app, /setRelationshipAi\(archivedReading\)/)
+  const valid=success()
+  const original='  庚申 · Mercury\n  원문  '
+  valid.data.overview=original
+  assert.equal(boundary.relationshipAiSuccess(valid).data.overview,original)
+  for(const invalid of [
+    {...valid, model:'deterministic-provisional-v1.0'},
+    {...valid, usage:undefined},
+    {...valid, usage:{...valid.usage,generation_version:'relationship-v1'}},
+    {...valid, usage:{...valid.usage,call_trace:[{model:'gemini-3.7-flash',http_status:200,outcome:'success'}]}},
+    {...valid, usage:{...valid.usage,call_trace:[{model:valid.model,http_status:403,outcome:'failed'}]}},
+  ]) assert.equal(boundary.relationshipAiSuccess(invalid),null)
 })

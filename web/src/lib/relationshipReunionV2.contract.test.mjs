@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import test from 'node:test'
 import {candidate,hierarchy,renderHierarchy,renderReunion} from './fixtures/reunionPanel.mjs'
 import {buildRelationshipReadingDocument} from './authoredReadingDocument.ts'
@@ -7,6 +8,7 @@ import { readFileSync } from 'node:fs'
 const server=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/index.ts',import.meta.url),'utf8')
 const publicError=readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts',import.meta.url),'utf8')
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
+const documentSource=readFileSync(new URL('./authoredReadingDocument.ts',import.meta.url),'utf8')
 const hierarchyPanel=readFileSync(new URL('../ReunionHierarchyPanelV3.tsx',import.meta.url),'utf8')
 const reunionReadingV4=readFileSync(new URL('./reunionReadingV4.ts',import.meta.url),'utf8')
 const relationshipSummary=readFileSync(new URL('./relationshipUserSummary.ts',import.meta.url),'utf8')
@@ -45,7 +47,7 @@ test('server compiles question-first evidence and validates returned evidence re
 
 test('web routes reunion v2 into the single-author hierarchy view',()=>{
   assert.match(types,/reunion_synthesis_v2\?:/)
-  const options={ok:true,origin:'gemini',provenance_verified:true,data:{
+  const options={...relationshipProvider,data:{
     headline:'다시 대화를 시작한 두 사람',core_summary:'같은 글이 두 번 표시되는지 확인해요.',
     core_reason:'관계 기록을 확인했어요.',core_action:'다음 약속을 함께 정해 봐요.',core_conditions:[],
     reunion_synthesis_v2:{summary:'그 뒤에 오간 대화를 함께 돌아봐요.'},
@@ -64,7 +66,7 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.match(html,/수신 · 상대 → 나[\s\S]*발신 · 나 → 상대/)
   assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
   assert.match(html,/점수는 계산 신호의 상대적 강도이며 연락·만남·재회 확률이 아니에요/)
-  const result=buildRelationshipReadingDocument({ok:true,origin:'gemini',provenance_verified:true,data:{
+  const result=buildRelationshipReadingDocument({...relationshipProvider,data:{
     core_summary:'다시 안부를 주고받았어요.',core_reason:'두 번 모두 상대가 먼저 말을 꺼냈어요.',
     reunion_synthesis_v2:{timing:{conclusion:'연간·월간 배경과 개별 날짜를 함께 봐요.',windows:[{period:'2027-01-09',meaning:'실제 약속이 정해지는지 봐요.'}]}}
   }},'reunion','')
@@ -72,9 +74,9 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
   assert.equal(result.sections.find(s=>s.id==='timing:conclusion').blocks[0].text,'연간·월간 배경과 개별 날짜를 함께 봐요.')
 })
 
-test('reunion hierarchy puts concise consultation answers before technical engine state',()=>{
+test('reunion calculations show recorded status, dates and scores with technical details collapsed',()=>{
   const html=renderHierarchy({hierarchyData:{...hierarchy,top_periods:[candidate('2027-01-09')]},reunionV2:{summary:'저장한 실제 관계 상태를 먼저 살펴봐요.',consultation_answer:{next_stage_up_conditions:['만날 날짜를 약속했는지 살펴봐요.']}}})
-  const headingMarkup=['현재 판정','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','다음 단계로 넘어가는 변화','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
+  const headingMarkup=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
   let cursor=-1
   for(const markup of headingMarkup) {
     const next=html.indexOf(markup)
@@ -105,16 +107,12 @@ test('reunion hierarchy puts concise consultation answers before technical engin
 })
 
 test('reunion quality guard preserves depth while moving technical detail behind disclosures',()=>{
-  assert.match(hierarchyPanel,/const hasObservedState = Boolean\(observation\.state\)/)
-  assert.match(hierarchyPanel,/const aiSummary = readerSentences/)
-  assert.match(hierarchyPanel,/현재 관계 상태를 먼저 입력해 주세요/)
+  const prose='둘이 다시 연락할지 단정하지 않는 다섯 번째 문장.'
+  const ai={...relationshipProvider,data:{headline:'저장된 해설', reunion_synthesis_v2:{summary:prose,consultation_answer:{next_stage_up_conditions:[prose]}}}}
+  assert.doesNotMatch(renderReunion(),new RegExp(prose))
+  assert.match(renderReunion({ai}),new RegExp(prose))
+  assert.doesNotMatch(hierarchyPanel,/whyFallback|readerSentences|sustainabilityNarrative/)
   assert.match(reunionReadingV4,/앞 단계 미확인/)
-  assert.match(hierarchyPanel,/왜 다시 연결됐나/)
-  assert.match(hierarchyPanel,/재회로 넘어가려면/)
-  assert.match(hierarchyPanel,/다시 만났을 때의 유지력/)
-  assert.match(hierarchyPanel,/다시 깨질 수 있는 지점/)
-  assert.match(hierarchyPanel,/다음 단계로 보는 변화/)
-  assert.match(hierarchyPanel,/현재 단계에 머무는 신호/)
   assert.match(hierarchyPanel,/<details className="reunion-v5-details"><summary>지난 시기와 실제 기록 비교<\/summary>/)
   assert.match(hierarchyPanel,/<details className="reunion-v5-details"><summary>계산 근거와 점수 보기<\/summary>/)
 })
@@ -124,7 +122,7 @@ test('reunion exposes relative contact direction and behavioral change without s
   assert.match(reunionReadingV4,/발신 · 나 → 상대/)
   assert.match(hierarchyPanel,/실제 첫 연락/)
   assert.match(hierarchyPanel,/실제 첫 연락자는 별도 기록으로 확인해요/)
-  assert.match(hierarchyPanel,/next_stage_up_conditions/)
+  assert.match(documentSource,/next_stage_up_conditions/)
   assert.doesNotMatch(hierarchyPanel,/연락 가능성[^\n]{0,40}\d+%/)
 })
 
@@ -139,8 +137,8 @@ test('reunion grounding validates Gemini prose without composing or rewriting it
 })
 
 test('calculated direction axes never become a first-contact prediction',()=>{
-  assert.match(reunionReadingV4,/상대 쪽 흐름이 내 관계와 맞물리는 정도예요/)
-  assert.match(reunionReadingV4,/내 쪽 흐름이 상대와의 관계를 의식하기 쉬운 정도예요/)
+  assert.match(reunionReadingV4,/상대 쪽 차트의 기간 평균 활성도예요/)
+  assert.match(reunionReadingV4,/내 쪽 차트의 기간 평균 활성도예요/)
   assert.match(hierarchyPanel,/실제 첫 연락자는 별도 기록으로 확인해요/)
   for(const legacy of ['상대가 먼저 연락할 흐름은 약한 편이야','내가 먼저 짧게 말을 꺼내기 좋은 편이야','재접촉의 움직임은 살아 있어','다시 대화할 여지는 열려 있지만']) {
     assert.equal(hierarchyPanel.includes(legacy),false,`legacy directional copy must stay removed: ${legacy}`)
@@ -148,7 +146,7 @@ test('calculated direction axes never become a first-contact prediction',()=>{
 })
 
 test('all relationship modes keep distinct decision questions instead of one swapped-name template',()=>{
-  const ai={ok:true,origin:'gemini',provenance_verified:true,data:{chemistry:'호감이 오가는 표현',marriage_reading:{commitment_or_current_cycle:'둘이 합의한 생활 조건'},reunion_synthesis_v2:{consultation_answer:{meeting_gate:'다음 약속의 조건'}}}}
+  const ai={...relationshipProvider,data:{chemistry:'호감이 오가는 표현',marriage_reading:{commitment_or_current_cycle:'둘이 합의한 생활 조건'},reunion_synthesis_v2:{consultation_answer:{meeting_gate:'다음 약속의 조건'}}}}
   const expected={
     compatibility:['궁합 해설','서로 끌리는 지점','호감이 오가는 표현'],
     marriage_unmarried:['결혼궁합 해설','약속과 결혼의 조건','둘이 합의한 생활 조건'],
