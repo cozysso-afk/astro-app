@@ -1,8 +1,5 @@
 import { useState } from 'react'
 import { Copy, Moon, Sparkles } from 'lucide-react'
-import { ReadingExplanation } from './ReadingExplanation'
-import { ReadingTimeline } from './ReadingSignals'
-import { rankRelationshipAspects } from './lib/relationshipUserSummary'
 
 export type PersonalMarriageResponse = {
   ok: boolean
@@ -88,7 +85,7 @@ function rulerLine(row: PersonalMarriageResponse['result']['relationship_houses'
 }
 
 function hitText(hit?: { transit: string; aspect: string; target: string; orb: number }) {
-  if (!hit) return '직접 활성 접점은 약한 편'
+  if (!hit) return '접점 미기록'
   return `${hit.transit}(${planetKo[hit.transit] ?? hit.transit}) ${aspectKo[hit.aspect] ?? hit.aspect} ${pointKo[hit.target] ?? hit.target} · 오브 ${hit.orb.toFixed(2)}°`
 }
 
@@ -113,43 +110,31 @@ export function PersonalMarriagePanel({ data }: { data: PersonalMarriageResponse
   const planets = Object.entries(result.relationship_planets)
   const windows = forecast.strong_windows.filter(w => w.date >= data.period.start && w.date <= data.period.end).slice(0, 3)
   const pressureDays = result.timing.pressure_days.filter(w => w.pressure_load > 0 && w.date >= data.period.start && w.date <= data.period.end).slice(0, 2)
-  const hasCommitment = forecast.commitment_component > 0
-  const hasPressure = forecast.pressure_component > 0
-  const coreAspects = rankRelationshipAspects(result.natal_aspects.map(a=>({...a,tone:a.tone==='supportive'?'supportive' as const:a.tone==='challenging'?'challenging' as const:'mixed' as const})), true).slice(0,2)
-  const coreReason = coreAspects.length ? coreAspects.map(a=>`${planetKo[a.a]}와 ${planetKo[a.b]} 사이에는 ${a.tone==='supportive'?'조화를 돕는':a.tone==='challenging'?'긴장을 만드는':'함께 작용하는'} 배치가 있어.`).join(' ')
-    + (coreAspects.some(a=>a.tone==='supportive')&&coreAspects.some(a=>a.tone==='challenging') ? '편안하게 끌리는 부분과 조정이 필요한 부분이 함께 보여. 마음에 드는 사람이라는 느낌만으로 생활 방식도 맞을 거라고 넘기지 않는 게 중요해.' : '이는 본인이 관계에 반응하는 성향을 읽는 단서야. 아직 만나지 않은 사람의 성격이나 두 사람의 궁합을 확정하는 근거는 아니야.')
-    : '관계 성향을 행성 배치와 연결해 풀어낼 세부 접점은 부족해. 계산에 있는 성향 설명까지만 참고하고, 특정 사람의 외모나 행동으로 확대하지 않을게.'
-  const hitMeaning = (hit: { transit: string; target: string; tone: string } | null) => {
-    if (!hit || !planetKo[hit.transit]) return '이 날짜를 구체적인 사건으로 설명할 세부 정보는 부족해.'
-    const focus = ['Saturn','7th_ruler','DSC'].includes(hit.target) ? '관계의 약속과 책임' : ['Moon','IC','4th_ruler'].includes(hit.target) ? '정서적 편안함과 함께하는 생활' : '애정 표현과 서로의 거리'
-    return `${planetKo[hit.transit]}의 움직임이 ${focus}에 연결돼 있어. ${hit.tone === 'challenging' ? '결정을 재촉하기보다 서로 부담스러운 조건을 이야기해볼 때로 읽어봐.' : hit.tone === 'supportive' ? '서로 원하는 관계를 구체적으로 이야기하는 데 활용해봐.' : '좋거나 나쁜 사건을 정하기보다 이 주제가 실제로 떠오르는지 살펴봐.'}`
-  }
   const copy = async () => {
     try { await navigator.clipboard.writeText(portrait); setCopyStatus('프롬프트를 복사했어.') }
     catch { setCopyStatus('자동 복사가 안 됐어. 아래 프롬프트를 펼쳐 직접 복사해줘.') }
   }
   return <section className="relationship-experience reading-experience personal-marriage-card">
-    <header className="reading-hero"><Moon className="celestial-mark" size={26} aria-hidden="true"/><p className="eyebrow">나의 관계 성향 · 미혼 결혼</p><span className="reading-period-date">{data.period.start} — {data.period.end}</span>
-      <h3>{hasCommitment ? '끌리는 마음에서 함께하는 생활로, 어떤 약속이 필요한지 살펴볼 때야.' : '누가 나타날지보다, 어떤 관계에서 편안한 나인지 먼저 읽어봐.'}</h3>
-      <p className="reading-hero-subtitle">{hasPressure ? '관계에 대한 관심과 현실적인 부담을 따로 살펴봐. 결혼이 이루어질 확률을 말하는 화면은 아니야.' : '본인 차트에서 관계의 취향과 선택을 읽는 해설이야. 특정 상대와의 궁합은 별도로 봐야 해.'}</p>
+    <header className="reading-hero"><Moon className="celestial-mark" size={26} aria-hidden="true"/>
+      <h3>개인 결혼운 계산 결과</h3><span className="reading-period-date">{data.period.start} — {data.period.end}</span>
+      <p>상대 없이 계산한 개인 결혼운은 현재 제미나이 해설을 지원하지 않아요.</p>
     </header>
-    <section className="reading-section"><h3>내가 편안해지는 관계</h3><p className="reading-conclusion">{spouse.summary}</p><ReadingExplanation kind="reason">{coreReason}</ReadingExplanation><ReadingExplanation kind="practice">{spouse.personality_hints.length ? [...new Set(spouse.personality_hints)].join(' ') : '관계 성향을 구체적으로 풀 단서가 부족해.'} 서로 원하는 연락 빈도와 혼자 쉴 시간부터 이야기해봐.</ReadingExplanation></section>
-    {(spouse.meeting_route || spouse.identity_clues.length) && <section className="reading-section"><h3>인연을 알아가는 경로</h3><p className="reading-conclusion">{spouse.meeting_route || '인연을 만나는 특정 경로까지 좁힐 정보는 부족해.'}</p>{spouse.identity_clues.length > 0 && <ReadingExplanation kind="reason">{[...new Set(spouse.identity_clues)].slice(0, 3).join(' ')}</ReadingExplanation>}<ReadingExplanation kind="practice">이 단서와 닮은 사람이 나타나더라도 배우자로 정해진 건 아니야. 반복해서 만나며 서로의 생활과 약속 방식이 맞는지 알아가는 과정이 필요해.</ReadingExplanation></section>}
-    <section className="reading-section"><h3>생활에서 맞춰야 할 것</h3><p>설레는 마음과 같이 살기 편한 조건은 따로 봐야 해. 돈을 쓰는 방식과 쉬는 시간, 맡을 책임을 구체적으로 나누는 과정이 중요해.</p><ReadingExplanation kind="caution">{hasPressure ? '이번 계산에는 관계 결정의 부담도 잡혀 있어. 불안해서 약속을 서두르거나, 한 사람이 생활을 전부 맞추는 방향은 피하는 편이 좋아.' : '부담이 두드러지지 않아도 모든 생활 조건이 맞는다는 뜻은 아니야. 아직 이야기하지 않은 부분까지 합의됐다고 생각하지 마.'}</ReadingExplanation></section>
-    <section className="reading-section"><h3>관계를 생각해볼 시기</h3>{windows.length || pressureDays.length ? <ReadingTimeline events={[
-      ...windows.map(w=>({date:w.date,kind:w.pressure_load>0&&w.supportive_load>0?'mixed' as const:w.pressure_load>w.supportive_load?'caution' as const:'rebuilding' as const,status:w.pressure_load>w.supportive_load?'주의':'활용',label:w.pressure_load>w.supportive_load?'서로 감당할 조건을 맞출 때':'관계의 다음 단계를 이야기할 때',detail:hitMeaning(w.strongest_hit)})),
-      ...pressureDays.filter(w=>!windows.some(x=>x.date===w.date&&x.pressure_load>x.supportive_load)).map(w=>({date:w.date,kind:'caution' as const,status:'주의',label:'결정에 여유를 두고 볼 날짜',detail:hitMeaning(w.hits.find(h=>h.tone==='challenging')??null)})),
-    ]}/> : <p className="reading-muted">다른 날과 구별할 만한 시기는 뚜렷하지 않아.</p>}</section>
+    <section className="reading-section"><h4>기간별 계산 지표</h4>
+      <p>결혼 관련 활성 지수 {forecast.marriage_probability_percent.toFixed(1)}/100 · 통계 확률 아님</p>
+      <dl><dt>지원 지표</dt><dd>{forecast.supportive_component}</dd><dt>긴장 지표</dt><dd>{forecast.pressure_component}</dd><dt>약속 지표</dt><dd>{forecast.commitment_component}</dd></dl>
+    </section>
+    {(windows.length > 0 || pressureDays.length > 0) && <section className="reading-section"><h4>날짜별 계산값</h4>
+      {windows.map(w=><p key={w.date}><time>{w.date}</time> · 활성 {w.score} · {hitText(w.strongest_hit ?? undefined)}</p>)}
+      {pressureDays.map(w=><p key={w.date}><time>{w.date}</time> · 긴장 {w.pressure_load} · {hitText(w.hits.find(h=>h.tone==='challenging'))}</p>)}
+    </section>}
     <details className="portrait-concept"><summary><Sparkles size={16} aria-hidden="true"/> 나의 취향을 그려본다면</summary><p className="reading-muted">미래 사람의 외모를 맞히는 기능이 아니야. 아래 단서를 바탕으로 만든 창작 이미지 콘셉트야.</p>
       {portrait ? <><div className="portrait-hints">{spouse.appearance_hints.map((h,i) => <span key={i}>{h}</span>)}</div><button type="button" onClick={() => void copy()}><Copy size={16}/>AI 초상 콘셉트 프롬프트 복사</button><p role="status" aria-live="polite">{copyStatus}</p><details><summary>프롬프트 펼쳐 보기</summary><pre>{portrait}</pre></details></> : <p>외모 분위기를 만들 단서가 없어. 닮은꼴이나 체형을 임의로 덧붙이지 않을게.</p>}
     </details>
     <details className="relationship-technical"><summary>기술 근거 자세히 보기</summary>
-      <p>{forecast.probability_note} · 원자료 지수 {forecast.marriage_probability_percent.toFixed(1)}/100 — 통계 확률 아님</p>
       {houses.map(([key,row]) => <div key={key}><h4>{houseMeaning[key]}</h4><p>{rulerLine(row)}</p></div>)}
       {planets.map(([name,row]) => <p key={name}>{planetKo[name] ?? name} · {row.sign} {row.degree.toFixed(1)}°</p>)}
-      {windows.map(w => <p key={w.date}>{w.date} · {hitText(w.strongest_hit ?? undefined)}</p>)}
-      <pre>{JSON.stringify(result, null, 2)}</pre>
+      {result.natal_aspects.map((a,i)=><p key={i}>{planetKo[a.a] ?? a.a} · {aspectKo[a.aspect] ?? a.aspect} · {planetKo[a.b] ?? a.b} · 오브 {a.orb.toFixed(2)}°</p>)}
+      <details><summary>계산 엔진 원자료</summary><pre>{JSON.stringify(result, null, 2)}</pre></details>
     </details>
-    <p className="reading-safety-note">출생 정보에 따라 읽을 수 있는 범위가 달라져. 미래의 사람이나 결혼 성사를 확정하지 않아.</p>
   </section>
 }

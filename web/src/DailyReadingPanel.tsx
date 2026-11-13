@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes'
 import type { FortuneField } from './lib/fortuneFields'
 import { useObservedPassage } from './ContactObservationScope'
-import { observedContactCore } from './lib/contactOutcomeReading'
 import { buildDailyReadingDocument, type DailyReadingDocument } from './lib/dailyReadingDocument'
 import { exportDailyReadingImages } from './lib/readingImageExport'
 import './daily-reading.css'
@@ -13,19 +12,15 @@ import '@fontsource/nanum-myeongjo/latin-700.css'
 import '@fontsource/noto-sans-kr/korean-400.css'
 import '@fontsource/noto-sans-kr/korean-700.css'
 
-export function DailyReadingPanel({data,date,field,verified,technicalDetails,onRetry,calculation}:{calculation?:IntegratedApiResponse;data:NonNullable<AiInterpretationResponse['data']>;date:string;field?:FortuneField;verified:boolean;technicalDetails?:ReactNode;onRetry?:()=>void}) {
-  const original = useMemo(()=>buildDailyReadingDocument(data,date,field,verified,calculation),[data,date,field,verified,calculation])
+export function DailyReadingPanel({data,date,field,verified,technicalDetails,onRetry}:{calculation?:IntegratedApiResponse;data:NonNullable<AiInterpretationResponse['data']>;date:string;field?:FortuneField;verified:boolean;technicalDetails?:ReactNode;onRetry?:()=>void}) {
+  const original = useMemo(()=>buildDailyReadingDocument(data,date,field,verified),[data,date,field,verified])
   return <DailyReadingDocumentView original={original} technicalDetails={technicalDetails} onRetry={onRetry}/>
 }
 
 export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{original:DailyReadingDocument;technicalDetails?:ReactNode;onRetry?:()=>void}) {
-  const date=original.date
-  const observed = useObservedPassage('today',original.scope)
-  const contact = original.scope==='contact' ? observed : null
-  const doc = useMemo(()=>{
-    if (!contact || original.state!=='ready') return original
-    return {...original,headline:contact.fact,blocks:observedContactCore(contact,original.headline,original.blocks)}
-  },[original,contact?.fact,contact?.followUp,contact?.question])
+  const doc=original
+  const date=doc.date
+  const observed = useObservedPassage('today',doc.scope)
   const exportJob = useRef<AbortController | null>(null)
   const [saving,setSaving] = useState(false)
   const [notice,setNotice] = useState('')
@@ -59,21 +54,21 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
   const scenarios=doc.scope==='love' && doc.state!=='unverified' ? Object.entries(scenarioLabels).map(([key,label])=>{
     const id='relationship.love_'+key
     const slot=doc.slots?.find(slot=>slot.id===id)
-    const blocks=doc.details.filter(block=>block.id==='application:'+key || block.id.startsWith(id+':'))
+    const blocks=doc.details.filter(block=>block.id.startsWith(id+':'))
     return {key,id,label,slot,blocks}
   }).filter(row=>row.slot || row.blocks.length) : []
   const scenarioIds = new Set(scenarios.flatMap(row=>row.blocks.map(block=>block.id)))
-  const basis=doc.details.find(block=>block.id==='application:basis')
-  const otherDetails = doc.details.filter(block => block!==basis && !scenarioIds.has(block.id) && !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
+  const otherDetails = doc.details.filter(block => !scenarioIds.has(block.id) && !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
   return <section className="daily-reading" data-daily-scope={doc.scope} data-daily-state={doc.state}>
     <header className="daily-reading-heading"><span>{doc.title}</span><time dateTime={date}>{date}</time></header>
-    {contact && doc.state!=='ready' && <section className="daily-reading-block"><h3>{contact.fact}</h3><p>{contact.followUp}</p></section>}
+
     {doc.state === 'ready' ? <>
       <h3 className="daily-reading-headline">{doc.headline}</h3>
       <div className="daily-reading-blocks">{doc.blocks.map(b=><section className="daily-reading-block" key={b.id} data-daily-block={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</div>
     </> : <p className="daily-reading-state">{{unverified:'확인된 해설을 아직 불러오지 못했어.',missing:'이 분야의 해설이 아직 완성되지 않았어.',insufficient:'이번 해설에서는 이 분야에 답할 근거를 충분히 연결하지 못했어.',needs_refresh:'기존 해설의 길이나 내용 중복을 다시 확인해야 해. 해설을 새로 불러와줘.'}[doc.state]}</p>}
+    {observed && <aside className="daily-reading-block" aria-label="내가 기록한 연락"><h4>내가 기록한 연락</h4><p>{observed.fact}</p></aside>}
     {directions.map(block=><section className="daily-reading-block" key={block.id} data-daily-detail={block.id}>
-      {block.id==='direction:reconnection' && observed ? <><h4>기록된 재접촉</h4><p>{observed.fact}</p>{observed.indicator && <small>{observed.indicator}</small>}</> : <><h4>{block.label}</h4><p>{block.text}</p></>}
+      <h4>{block.label}</h4><p>{block.text}</p>
     </section>)}
     {featured.map(slot => {
       const label = relationshipLabels[slot.id]
@@ -92,15 +87,10 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
       </details>
     })}
     {scenarios.length>0 && <section className="daily-reading-block"><h4>내 상황에 맞춰 보기</h4>
-      {basis && <p>{basis.text}</p>}
-      {scenarios.map(row=>{
-        const stage=row.key==='reunion_interest' ? observed : null
-        return <details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
-          <summary>{row.label}</summary>
-          {stage && <section className="daily-reading-block"><h4>{stage.question}</h4><p>{stage.fact} {stage.followUp}</p>{stage.indicator&&<small>{stage.indicator}</small>}</section>}
-          {row.blocks.length ? (stage ? row.blocks.some(block=>!block.id.endsWith(':calculated')) && <details><summary>저장된 재회 원고</summary>{row.blocks.map(block=><section key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>)}</details> : row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>)) : <p>{row.slot?.state==='insufficient' ? '이 상황의 운세를 판단할 계산 근거가 부족해.' : '이 상황의 운세 해설은 아직 작성되지 않았어.'}</p>}
-        </details>
-      })}
+      {scenarios.map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
+        <summary>{row.label}</summary>
+        {row.blocks.length ? row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{row.slot?.state==='insufficient' ? '이 상황을 판단할 근거가 부족해.' : '이 상황의 해설은 아직 작성되지 않았어.'}</p>}
+      </details>)}
     </section>}
     {!!otherDetails.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{otherDetails.map(b=><section className="daily-reading-block" key={b.id} data-daily-detail={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
     {(['missing','insufficient'] as const).map(state=>{const slots=doc.slots?.filter(slot=>slot.state===state && !featuredIds.has(slot.id) && !scenarios.some(row=>row.id===slot.id))??[];return slots.length?<details className="daily-reading-coverage" key={state}><summary>{state==='missing'?'아직 작성되지 않은 항목':'근거가 부족한 항목'} {slots.length}개</summary><ul>{slots.map(slot=><li key={slot.id} data-daily-slot={slot.id} data-slot-state={state}>{slot.label}</li>)}</ul></details>:null})}

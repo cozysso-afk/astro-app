@@ -1,3 +1,6 @@
+import { contactEvidenceIssues } from './contactAxesV1.ts'
+import { DAILY_SECTION_TOPICS } from './dailyReadingContractV1.ts'
+import { DOMAIN_ANSWER_LOOKUP, domainAnswerContractKey } from './domainAnswerContractsV1.ts'
 import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
 
 // Period reading is a bounded first-screen bundle. It is not a capability
@@ -164,6 +167,7 @@ type Issue={code:string;path:string}
 export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any){
   const issues:Issue[]=[]
   if(!isExtendedPeriod(kind))return {version:PERIOD_READING_VERSION,passed:true,issues}
+  if(payload?.period?.start)issues.push(...contactEvidenceIssues(core,payload))
   const rows=Array.isArray(core?.clusters)?core.clusters:[]
   const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|(?<!이번\s)(?<!한\s)달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
   const hero=[core?.headline,core?.overall?.summary,core?.overall?.best_phase,core?.overall?.caution_phase].map(text).join(' ')
@@ -231,7 +235,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   }
   const investmentSupported=rows.some((row:any)=>String(row?.key??'').startsWith('investment.')&&row?.applicability!=='insufficient')
   if(!investmentSupported)for(const [field,value] of Object.entries(core?.investment_reading??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`investment_reading.${field}`})
-  if(!contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
+  if(!payload?.period?.start && !contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
   const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.applies_when,row?.evidence_meaning,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
   if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>3))issues.push({code:'period_generic_repetition',path:'root'})
@@ -327,13 +331,13 @@ export function inspectPeriodReading(data:any,payload:any){
     const value=path==='headline'?data?.headline:data?.overall?.summary
     if(!text(value)||text(value).length>max)add('missing_or_overlong_hero',path)
   }
-  const scopedTopics = {...QUESTION_TOPICS,...loveTopics}
+  const scopedTopics = {...DAILY_SECTION_TOPICS,...QUESTION_TOPICS,...loveTopics}
   for(const [key,topics] of Object.entries(scopedTopics)){
     const [group,name]=key.split('.'),row=data?.clusters?.[group]?.[name]
     if(!row){if(PERIOD_PRIMARY_KEYS.includes(key))add('primary_missing',`clusters.${key}`);continue}
     if(row.applicability==='insufficient')continue
-    const linked=(row.evidence_refs??[]).map((id:string)=>ledger.get(id)).filter(Boolean)
-    if(!linked.some((r:any)=>intersects(r,payload.period)&&topicsOf(r).some(t=>topics.includes(t))))add('primary_without_same_topic_period_evidence',`clusters.${key}`)
+    const linked=(row.evidence_refs??[]).map((id:string)=>ledger.get(id))
+    if(!linked.length || linked.some((r:any)=>!r || r.system==='thai' || !intersects(r,payload.period) || !topicsOf(r).some(t=>topics.includes(t))))add('primary_without_same_topic_period_evidence',`clusters.${key}`)
   }
   for(const [key,topics] of Object.entries(scopedTopics)){
     const [group,name]=key.split('.'),section=data?.clusters?.[group]?.[name]
@@ -358,6 +362,15 @@ export function inspectPeriodReading(data:any,payload:any){
           if(!linked.some((r:any)=>intersects(r,{start,end})))add('claim_period_without_local_evidence',`clusters.${key}.${field}`)
         }
       }
+    }
+  }
+  for (const [i,answer] of (data?.domain_answers??[]).entries()) {
+    if (answer.status==='not_calculated') continue
+    const contract=DOMAIN_ANSWER_LOOKUP.get(domainAnswerContractKey(answer.topic,answer.question_key))
+    const topics=contract && scopedTopics[contract.section_key]
+    const linked=(answer.evidence_refs??[]).map((id:string)=>ledger.get(id))
+    if (!topics || !linked.length || linked.some((row:any)=>!row || row.system==='thai' || !intersects(row,payload.period) || !topicsOf(row).some(t=>topics.includes(t)))) {
+      add('question_without_same_topic_period_evidence',`domain_answers[${i}]`)
     }
   }
   const relationshipTopics=new Set(['연애','연락','재회','대인관계','수신신호','발신적합','과거인연접점'])

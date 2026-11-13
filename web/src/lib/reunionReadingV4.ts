@@ -37,7 +37,7 @@ const STAGE_FOR_AXIS: Partial<Record<ReunionAxisKey, string>> = {
 }
 
 const AXIS_LABEL: Record<ReunionAxisKey, string> = {
-  awareness: '과거 관계가 다시 떠오름',
+  awareness: '정서 재활성 지표',
   recontact: '연락이 닿음',
   continuity: '대화가 이어짐',
   meeting: '실제 만남',
@@ -134,14 +134,14 @@ function directions(rows: DirectionRow[]): ReunionDirectionV4[] {
       label:'수신 · 상대 → 나',
       score: incoming,
       metric: incoming == null ? '정보 부족' : bandOf(rows, 'incoming'),
-      meaning:'상대 쪽 흐름이 내 관계와 맞물리는 정도예요.',
+      meaning:'상대 쪽 차트의 기간 평균 활성도예요.',
     },
     {
       key:'user_to_counterpart_activation',
       label:'발신 · 나 → 상대',
       score: outgoing,
       metric: outgoing == null ? '정보 부족' : bandOf(rows, 'outgoing'),
-      meaning:'내 쪽 흐름이 상대와의 관계를 의식하기 쉬운 정도예요.',
+      meaning:'내 쪽 차트의 기간 평균 활성도예요.',
     },
   ]
 }

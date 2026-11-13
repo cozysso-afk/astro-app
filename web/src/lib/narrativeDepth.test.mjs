@@ -39,7 +39,8 @@ test('stored daily, weekly and monthly readings retain the dated field evidence 
      const doc={state:'ready',date:start+' → '+f.calculation.period.end,core:[{id:'saved',label:'원고',text:section.conclusion}],sections:[],exportBlockIds:['saved']}
      return (period==='week'?weeklyReadingCore(doc,{},f.calculation,field):monthlyReadingCore(doc,f.calculation,field)).core
    }
-   assert.match(datedDoc().find(b=>b.id.endsWith(':aspect:학업')).text,/9월 12일 학업 지표는 39점.*출생차트의 토성이 사각을 이뤄.*첫 단계/)
+   if(period==='today') assert.deepEqual(datedDoc().map(b=>b.text),[section.real_scene,section.action,section.change_condition])
+   else assert.match(datedDoc().find(b=>b.id.endsWith(':aspect:학업')).text,/9월 12일 학업 지표는 39점.*출생차트의 토성이 사각을 이뤄.*첫 단계/)
    day.evidence[0].source_topics=['시험']
    assert.equal(datedDoc().some(b=>b.id.endsWith(':aspect:학업')),false)
  }

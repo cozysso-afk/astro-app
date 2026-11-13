@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test, {before,after} from 'node:test'
@@ -16,7 +17,7 @@ before(async()=>{
 })
 after(async()=>server?.close())
 const fixture=()=>({headline:'합성 핵심 제목',overview:'전체 상세 원고',core_summary:'이것은 원문 전달 검사용 핵심이야.',core_reason:'계산 원고의 이유를 보존해.',core_action:'실제 행동을 확인해.',core_conditions:[],chemistry:'끌림 원문',emotional_dynamic:'정서 원문',communication:'대화 원문',conflict_pattern:'갈등 원문',power_boundaries:'경계 원문',long_term:'지속 원문',timing:'기간 원문',reunion_context:'',felt_scenarios:['생활 장면 원문'],practical_advice:[],top_aspects:[],limits:'해석 범위 원문',marriage_reading:Object.fromEntries(['bottom_line','bond','emotional_home','daily_life','intimacy_resources','conflict_repair','commitment_or_current_cycle','timing','caution','precision_note'].map(key=>[key,`${key} 원문`]))})
-const aiFor=data=>({ok:true,origin:'gemini',provenance_verified:true,data})
+const aiFor=data=>({...relationshipProvider,data})
 const renderPanel=(analysisMode,ai)=>renderToStaticMarkup(createElement(Panel,{aspects:[],partnerExact:false,ai,aiLoading:false,aiError:'',onAi:()=>{},analysisMode,timeSensitivePoints:new Set(),formatAspect:()=>'',readingPeriod:{start:'2026-11-04',end:'2026-11-04'}}))
 
 const app = readFileSync(new URL('../AppNext.tsx', import.meta.url), 'utf8')
@@ -32,7 +33,7 @@ const personalEngine = readFileSync(new URL('../../../personal_marriage_v1.py', 
 test('unmarried marriage splits no-counterpart forecast from specific-partner marriage compatibility', () => {
   assert.match(app, /marriageScope.*'personal'.*'partner'/s)
   assert.match(app, /상대 없음 · 개인 결혼운/)
-  assert.match(app, /결혼 가능성 · 시기 · 미래 배우자상/)
+  assert.match(app, /출생 차트 · 기간별 지표 · 창작 초상/)
   assert.match(app, /특정 상대 있음 · 결혼궁합/)
   assert.match(app, /const isPersonalMarriage/)
   assert.match(app, /const needsCounterpart/)
@@ -114,6 +115,27 @@ test('compatibility and both marriage modes prioritize different real-life quest
   assert.equal(married.sections.find(s=>s.id==='marriage:commitment_or_current_cycle').label,'현재 관계의 과제')
   const compatibility=documents.buildRelationshipReadingDocument(aiFor(data),'compatibility','2026-11-04')
   for(const key of ['chemistry','emotional_dynamic','communication','conflict_pattern','power_boundaries','long_term'])assert.equal(compatibility.sections.find(s=>s.id===key).blocks[0].text,data[key])
+})
+
+test('archive preserves the entered manuscript and distinguishes provider, temporary and unknown sources', async () => {
+  const {ArchiveView} = await server.ssrLoadModule('/src/ArchiveView.tsx')
+  const data={...fixture(),reunion_reading:Object.fromEntries(['bottom_line','contact_recontact','emotional_reactivation','relationship_rebuilding','incoming_contact','outgoing_contact','reconnection_windows','low_windows','relationship_filter','precision_note'].map(key=>[key,''])),
+    marriage_reading:{...fixture().marriage_reading,mode:'compatibility'}, overview:'  Mercury  ·  庚申  '}
+  const verified=aiFor(data)
+  const entry={id:'archive-test',kind:'compatibility',periodKey:'month',title:'저장 결과',periodStart:'2026-11-01',periodEnd:'2026-11-30',request:{},result:{},engine:'fixture',createdAt:'2026-11-01T00:00:00Z',syncState:'local'}
+  const original=JSON.stringify(verified)
+  for(const [reading,source] of [
+    [verified,'제미나이 생성 기록 · 저장 원문'],
+    [{...verified,usage:undefined},'작성 출처 미확인 · 저장 원문'],
+    [{...verified,origin:'deterministic_safe'},'기존 임시 해설 · 저장 원문'],
+  ]) {
+    const html=renderToStaticMarkup(createElement(ArchiveView,{items:[{...entry,interpretation:reading}],status:'',error:'',legacyOpen:null}))
+    assert.ok(html.includes(`<details class="archive-reading-source"><summary>${source}</summary>`))
+    assert.ok(html.includes('  Mercury  ·  庚申  '))
+  }
+  const unknown=renderToStaticMarkup(createElement(ArchiveView,{items:[{...entry,hydrated:false}],status:'',error:'',legacyOpen:null}))
+  assert.ok(unknown.includes('저장된 해설 확인'))
+  assert.equal(original,JSON.stringify(verified))
 })
 
 test('relationship modes never render deterministic prose as the authored reading', () => {

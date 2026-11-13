@@ -10,7 +10,7 @@ const compiled = await build({
   stdin:{resolveDir:fileURLToPath(new URL('.',import.meta.url)),contents:`
     export {savePeriodArchive,resumePeriodArchive} from './periodArchive'
     export {listLocalArchive,importArchiveItems} from './archive'
-    export {storedFortuneCalculationId} from './readingCache'`},
+    export {currentCalculationCacheId,storedFortuneCalculationId} from './readingCache'`},
   plugins:[{name:'archive-transport',setup(b){
     b.onResolve({filter:/^\.\/(auth|supabase)$/}, args => ({path:args.path,namespace:'fake'}))
     b.onLoad({filter:/.*/,namespace:'fake'}, args => ({contents:args.path==='./auth'
@@ -90,4 +90,11 @@ test('resumed job restores its original period and exact saved profile, includin
   entries=archive.listLocalArchive()
   assert.deepEqual(entries.find(x=>x.id===saved.item.id).interpretation,prose)
   assert.equal(await archive.resumePeriodArchive({...request,profile:{...request.profile,birth_time:'11:10'}},'month',prose),undefined)
+})
+
+
+test('new calculations bypass older evidence while saved archive identities stay stable', () => {
+  assert.notEqual(archive.currentCalculationCacheId(request), archive.storedFortuneCalculationId(request))
+  assert.equal(archive.currentCalculationCacheId(request), archive.currentCalculationCacheId(aiRequest))
+  assert.equal(archive.storedFortuneCalculationId(request), archive.storedFortuneCalculationId(aiRequest))
 })

@@ -85,6 +85,8 @@ test('an annual work claim about the second half cannot cite only February or a 
  data.clusters.work_study.work={...blank('work_study.work'),applicability:'conditional',conclusion:'하반기에는 역할이 안정적으로 정리돼.',evidence_refs:['work','study']}
  assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='claim_period_without_local_evidence'))
  data.clusters.work_study.work.conclusion='하반기를 판단할 근거는 부족해.'
+ assert.equal(inspectPeriodReading(data,p).passed,false)
+ data.clusters.work_study.work.evidence_refs=['work']
  assert.equal(inspectPeriodReading(data,p).passed,true)
  data.clusters.work_study.work.conclusion='2026-11-21에 역할이 정리돼.'
  assert.ok(inspectPeriodReading(data,p).issues.some(i=>i.code==='claim_date_without_local_evidence'))

@@ -1,3 +1,4 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -24,7 +25,7 @@ test('daily home headline never drops back to the generic topic-list sentence',(
 
 test('hierarchy reunion shows a full human story before technical evidence',()=>{
   const sections={why_reconnect:{conclusion:'예전 약속에서 대화의 실마리를 찾아봐.'},timing:{conclusion:'같은 기간 안에서도 약속을 확인할 때가 달라.'},rebuild:{conclusion:'둘이 다시 정한 약속이 이어지는지 봐.'},repeat_risks:{conclusion:'답장을 기다리며 서로의 기대가 어긋날 수 있어.'}}
-  const ai={ok:true,origin:'gemini',provenance_verified:true,data:{headline:'연락이 이어지는 동안 볼 변화',core_summary:'대화는 이어졌고 다음 약속을 기다리는 때야.',core_reason:'같은 대화라도 다음 만남을 정하는지는 별개야.',core_action:'둘 다 가능한 날을 하나 골라봐.',reunion_synthesis_v2:sections}}
+  const ai={...relationshipProvider,data:{headline:'연락이 이어지는 동안 볼 변화',core_summary:'대화는 이어졌고 다음 약속을 기다리는 때야.',core_reason:'같은 대화라도 다음 만남을 정하는지는 별개야.',core_action:'둘 다 가능한 날을 하나 골라봐.',reunion_synthesis_v2:sections}}
   const [story,evidence]=renderReunion({ai}).split('계산 근거와 점수 보기')
   assert.ok(evidence?.includes('연락·대화: 42'))
   for(const value of [ai.data.headline,ai.data.core_summary,ai.data.core_reason,ai.data.core_action,...Object.values(sections).map(s=>s.conclusion)]) assert.ok(story.includes(value),value)

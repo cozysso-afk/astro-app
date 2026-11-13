@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs'
 
 const css = readFileSync(new URL('../reading-font-fix-v54.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
-const views = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
+import { createElement as h } from 'react'
+import { renderSystem } from './systemReadingView.fixtures.mjs'
 
 test('live integrated daily headline and summary share the Myeongjo owner', () => {
   assert.match(css, /#root \.app-shell \.fortune-experience \.system-reading\.system-integrated[\s\S]*?\.period-ai-head h3[\s\S]*?font-family:\s*'Nanum Myeongjo'/)
@@ -13,8 +14,8 @@ test('live integrated daily headline and summary share the Myeongjo owner', () =
   assert.ok(main.indexOf("import './reading-experience.css'") < main.indexOf("import './reading-font-fix-v54.css'"))
 })
 
-test('focused integrated topics use their own summary instead of the overall Saju summary', () => {
-  assert.match(views, /injectReadingContext\(children,\{field:focusedField,systemOverview:overview\}\)/)
+test('focused integrated readings pass the selected field to the generated-reading surface', () => {
+  const child = ({field}) => h('span', {className:'selected-field'}, field?.id ?? 'overall')
+  assert.match(renderSystem('integrated',{field:'study',children:h(child)}), /class="selected-field">study</)
+  assert.match(renderSystem('integrated',{children:h(child)}), /class="selected-field">overall</)
 })
-
-// Keep this contract on the user-authored PR head so all protected checks run normally.

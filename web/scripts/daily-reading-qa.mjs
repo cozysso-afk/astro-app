@@ -31,7 +31,7 @@ try {
       const title=el.querySelector('.daily-reading-headline'),body=el.querySelector('.daily-reading-block p')
       return {width:innerWidth,overflow:el.scrollWidth-el.clientWidth,title:parseFloat(getComputedStyle(title).fontSize),titleFont:getComputedStyle(title).fontFamily,body:parseFloat(getComputedStyle(body).fontSize),font:getComputedStyle(body).fontFamily,clipped:[...el.querySelectorAll('.daily-reading-headline,.daily-reading-block p')].some(n=>n.scrollHeight>n.clientHeight+1)}
     })
-    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Nanum Myeongjo/);assert.match(stats.titleFont,/Nanum Myeongjo/)
+    assert.ok(stats.overflow<=1,JSON.stringify(stats));assert.ok(!stats.clipped,JSON.stringify(stats));assert.ok(stats.title>=20 && stats.title<=22 && stats.body>=15,JSON.stringify(stats));assert.match(stats.font,/Noto Sans KR/);assert.match(stats.titleFont,/Nanum Myeongjo/)
     widths.push(stats)
   }
   const headings=[]
@@ -43,7 +43,7 @@ try {
   await root.getByRole('button',{name:'금전 원고 누락 테스트',exact:true}).click()
   await root.getByRole('button',{name:'금전',exact:true}).click()
   await root.locator('[data-daily-state="missing"]').waitFor()
-  assert.equal(await root.locator('.daily-reading-save').count(),0)
+  assert.equal(await root.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).count(),0)
   await root.getByRole('button',{name:'금전 원고 누락 테스트',exact:true}).click()
   await root.getByRole('button',{name:'전체',exact:true}).click()
   await page.setViewportSize({width:393,height:852})
@@ -53,6 +53,7 @@ try {
   await root.getByRole('button',{name:'핵심 해설 이미지 저장',exact:true}).click()
   await root.getByRole('status').filter({hasText:'저장 요청 완료'}).waitFor({timeout:20000})
   await Promise.all(downloads)
+  const samplePages=downloads.length
   const drawn=await page.evaluate(()=>window.__drawn)
   const joined=drawn.map(r=>r.text).join('').replace(/\s/g,'')
   for(const copy of expected)assert.ok(joined.includes(copy.replace(/\s/g,'')),`saved image lost text: ${copy}`)
@@ -92,7 +93,7 @@ try {
   assert.deepEqual(errors,[])
   const report={fixture:'synthetic; not live fortune quality verification',widths,distinctScopes:headings.length,exportTextParity:true,longResult,scopeChangeCancelled:true,fontFailureBlocked:true,errors}
   await writeFile(path.join(out,'qa-report.json'),JSON.stringify(report,null,2))
-  // Keep the normal two-page sample; the stress-case files are reproducible.
-  await Promise.all(downloads.slice(2).map((_,i)=>unlink(path.join(out,`daily-export-${i+3}.png`))))
+  // Keep all pages from the normal reading and remove the synthetic long export.
+  await Promise.all(downloads.slice(samplePages).map((_,i)=>unlink(path.join(out,`daily-export-${samplePages+i+1}.png`))))
   console.log(JSON.stringify(report))
 } finally {await browser.close();await server?.close()}

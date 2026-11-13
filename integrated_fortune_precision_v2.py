@@ -11,7 +11,7 @@ ENGINE_VERSION = f"{legacy.ENGINE_VERSION}+precision-v2"
 _ROBUST_NATAL_BODIES = tuple(body for body in legacy.PLANET_KEYS if body != "Moon")
 _STATIC_TRANSITS = ("Jupiter", "Saturn", "Uranus", "Neptune", "Pluto")
 _DYNAMIC_TRANSITS = ("Sun", "Moon", "Mercury", "Venus", "Mars")
-_LIFE_TOPICS = ("금전", "학업", "시험", "직장", "이직", "대인관계", "연애", "연락", "재회", "소식", "컨디션")
+_LIFE_TOPICS = legacy._LIFE_SCORE_TOPICS
 _MARKET_TOPICS = ("금전", "투자심리")
 _RELATIONSHIP_SIGNALS = ("수신신호", "발신적합", "과거인연접점")
 
@@ -150,52 +150,7 @@ def _rows_avg(rows: list[dict[str, Any]], key: str):
 
 
 def _compact_provisional_evidence(life_rows: list[dict[str, Any]], market_rows: list[dict[str, Any]], limit: int = 10):
-    relationship_links = {
-        "연락": _RELATIONSHIP_SIGNALS,
-        "소식": ("수신신호", "발신적합"),
-        "재회": _RELATIONSHIP_SIGNALS,
-        "연애": ("수신신호", "발신적합"),
-    }
-    investment_links = {
-        "금전": ("수익실현", "신규진입", "투자주의"),
-        "투자심리": ("수익실현", "신규진입", "투자주의"),
-    }
-    best: dict[tuple[Any, ...], dict[str, Any]] = {}
-
-    def ingest(rows, topic_names, derived_links=None):
-        links = derived_links or {}
-        for sample in rows:
-            topics = sample.get("topics") if isinstance(sample.get("topics"), dict) else {}
-            for topic in topic_names:
-                result = topics.get(topic)
-                if not isinstance(result, dict):
-                    continue
-                for evidence in result.get("evidence") or []:
-                    if not isinstance(evidence, dict) or evidence.get("kind") != "aspect":
-                        continue
-                    identity = ("aspect", evidence.get("transit"), evidence.get("target"), evidence.get("aspect"), evidence.get("motion"), evidence.get("direction"))
-                    contribution = float(evidence.get("score") or 0.0)
-                    linked_topics = [topic, *links.get(topic, ())]
-                    current = best.get(identity)
-                    if current is not None and float(current.get("contribution") or 0.0) >= contribution:
-                        current["source_topics"] = sorted(set([*(current.get("source_topics") or []), *linked_topics]))
-                        continue
-                    packed = {
-                        "kind": "aspect",
-                        "source_topics": sorted(set(linked_topics)),
-                        "contribution": round(contribution, 4),
-                        "text": legacy._evidence_text(evidence),
-                    }
-                    for key in ("transit", "target", "aspect", "orb", "motion", "direction", "polarity"):
-                        if evidence.get(key) is not None:
-                            packed[key] = evidence.get(key)
-                    best[identity] = packed
-
-    ingest(life_rows, _LIFE_TOPICS, relationship_links)
-    ingest(market_rows, _MARKET_TOPICS, investment_links)
-    rows = list(best.values())
-    rows.sort(key=lambda item: (-float(item.get("contribution") or 0.0), float(item.get("orb") or 99.0), str(item.get("text") or "")))
-    return rows[: max(1, int(limit))]
+    return legacy._compact_daily_evidence(life_rows, market_rows, limit, provisional=True)
 
 
 def _provisional_daily_row(day_value: date, natal_lons: dict[str, float], offset_hours: float):
@@ -211,6 +166,7 @@ def _provisional_daily_row(day_value: date, natal_lons: dict[str, float], offset
     row["투자심리"] = _rows_avg(market, "투자심리") if market else None
     for key in ("수익실현", "신규진입", "투자주의"):
         row[key] = _rows_avg(market, key) if market else None
+    row["_score_components"] = legacy._daily_score_components(life, market)
     row["_evidence"] = _compact_provisional_evidence(life, market, 10)
     return row
 
@@ -237,6 +193,7 @@ def _western_provisional(birth_date: date, birth_time: dt_time, utc_offset_hours
             "label": row["label"],
             "market_open": bool(row.get("market_open")),
             "scores": {key: (float(row[key]) if isinstance(row.get(key), (int, float)) else None) for key in daily_keys},
+            "score_components": row.get("_score_components", {}),
             "evidence": list(row.get("_evidence") or [])[:10],
         } for row in rows]
         market_precision = legacy._krx_calendar_precision(start_date, end_date)
@@ -257,7 +214,7 @@ def _western_provisional(birth_date: date, birth_time: dt_time, utc_offset_hours
             "engine": f"{legacy.WESTERN_ENGINE_VERSION}+planet-only-provisional-v2",
             "ephemeris": ephemeris_used,
             "ephemeris_fallback_reason": fallback_reason,
-            "score_policy": "provisional: 입력 시각의 안정 행성만 사용한 planet-only 상대 흐름; 출생 Moon·ASC/MC·하우스·하우스 룰러 보너스 제외",
+            "score_policy": "서양 기본 분야 점수는 출생 시각에 덜 민감한 행성 배치의 활동 강도 46%와 유리도 54%를 반영해. 수신·발신, 과거 인연 접점, 수익실현·신규진입·투자주의에는 별도 산식을 써.",
             "method": "provisional planet-only period sampling; exact clock timing is intentionally not exposed",
             "performance": {
                 "vector_ephemeris_prewarm": bool(prewarmed_longitudes),

@@ -60,7 +60,7 @@ test('meeting fact respects explicit edits and never infers a meeting from uncle
  assert.equal(nextRelationshipQuestion([{...row,past_connection:false,met_in_person:true}]),null)
 })
 
-test('integrated love panel shows the selected date’s score with a separately dated next question', async()=>{
+test('observation panel shows recorded facts without forecasting from them', async()=>{
  const {createServer}=await import('vite')
  const {createElement}=await import('react')
  const {renderToStaticMarkup}=await import('react-dom/server')
@@ -72,13 +72,10 @@ test('integrated love panel shows the selected date’s score with a separately 
    const record={date:'2020-11-08',event:'received',channel:'call',past_connection:true,note:'저녁에 전화가 먼저 와서 직접 만남 (한규)'}
    const props={calculation,field:{id:'love'},localRecords:[record]}
    const html=renderToStaticMarkup(createElement(ContactOutcomeReading,props))
-   assert.match(html,/2020-11-11 연락운.*약함/s)
-   assert.match(html,/만난 뒤 관계는 어떻게 이어질까.*2020-11-08에는 과거 인연과 직접 만났어요/s)
+   assert.match(html,/내가 기록한 연락/)
+   assert.match(html,/전화/)
+   assert.doesNotMatch(html,/관계는 어떻게 이어질까|2020-11-11 연락운/)
    const weekly=renderToStaticMarkup(createElement(ContactOutcomeReading,{...props,calculation:{...calculation,period:{start:'2020-11-09',end:'2020-11-15'}}}))
-   assert.match(weekly,/2020-11-08에는 과거 인연과 직접 만났어요/)
-   assert.doesNotMatch(weekly,/이 기간에 기록한 1일/)
-   const corrected=renderToStaticMarkup(createElement(ContactOutcomeReading,{...props,localRecords:[{...record,met_in_person:false}]}))
-   assert.match(corrected,/연락이 닿은 뒤 무엇이 달라졌을까/)
-   assert.match(corrected,/2020-11-11 연락운.*약함/s)
+   assert.doesNotMatch(weekly,/저녁에 전화가 먼저 와서|과거 인연과 직접 만났어요/)
  } finally { await server.close() }
 })

@@ -16,12 +16,13 @@ test('final app background owner no longer ties aurora y positions to content he
   assert.match(readingCss,/linear-gradient\(90deg,#c5eaf13d/)
 })
 
-test('reunion story precedes technical progression evidence',()=>{
+test('recorded facts and calculated dates precede technical progression evidence',()=>{
   const html=renderHierarchy({hierarchyData:{...hierarchy,top_periods:[candidate('2027-01-12')]},
     reunionV2:{summary:'실제 상황부터 확인해요.',why_reconnect:{conclusion:'연락을 다시 한 이유를 확인해요.'},
     rebuild:{conclusion:'다음 대화를 함께 정해요.'},repeat_risks:{conclusion:'예전 갈등이 반복되는지 봐요.'},
     consultation_answer:{next_stage_up_conditions:['둘이 약속을 정하는지 봐요.']}},sustainabilityText:'만남 뒤에도 약속을 지키는지 봐요.'})
-  const headings=['현재 판정','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','다음 단계로 넘어가는 변화','관계 배경과 반복 위험 더 보기','왜 다시 연결됐나','재회로 넘어가려면','다시 만났을 때의 유지력','다시 깨질 수 있는 지점','계산 근거와 점수 보기']
+  const headings=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','계산 근거와 점수 보기']
+  assert.doesNotMatch(html,/만남 뒤에도 약속을 지키는지 봐요|다음 대화를 함께 정해요/)
   let cursor=-1
   for(const heading of headings){const next=html.indexOf(heading);assert.ok(next>cursor,heading);cursor=next}
 

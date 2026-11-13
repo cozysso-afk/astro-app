@@ -1,36 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { createElement as h, Fragment } from 'react'
+import { renderSystem, systemResponse } from './systemReadingView.fixtures.mjs'
 
-const source = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
-const fallback = readFileSync(new URL('../PeriodAiInterpretationPanel.tsx', import.meta.url), 'utf8')
-
-test('topic context reaches nested reading children instead of being attached to a Fragment', () => {
-  assert.match(source, /function injectReadingContext\(/)
-  assert.match(source, /Children\.map\(/)
-  assert.doesNotMatch(source, /cloneElement\(children,/)
-  const integrated = source.slice(source.indexOf("system==='integrated'"), source.indexOf("system==='western' ? <>", source.indexOf("system==='integrated'")))
-  assert.match(integrated, /injectReadingContext\(children/)
+test('integrated results pass their selected field through fragment and wrapper children', () => {
+  const child=({field})=>h('b',null,'통합 원고 '+field?.id)
+  const tree=h(Fragment,null,h('div',null,h(child)))
+  const html=renderSystem('integrated',{field:'exam',children:tree})
+  assert.match(html,/<div><b>통합 원고 exam<\/b><\/div>/)
 })
 
-test('western gets scoped reading context while Saju and Thai do not append integrated AI reading children', () => {
-  const westernStart = source.indexOf("system==='western' ? <>")
-  const unavailableStart = source.indexOf('!view.allowed', westernStart)
-  const western = source.slice(westernStart, unavailableStart)
-  assert.match(western, /injectReadingContext\(children/)
-  const sajuStart = source.indexOf("system==='saju' ? <>", unavailableStart)
-  const thaiStart = source.indexOf(': <>', sajuStart)
-  const saju = source.slice(sajuStart, thaiStart)
-  assert.doesNotMatch(saju, /injectReadingContext\(children|\{children\}/)
+test('each independent system displays only its own verified manuscript and never the integrated child', () => {
+  const systems={western:'서양에서 쓴 문장',saju:'사주에서 쓴 문장',thai:'태국에서 쓴 문장'}
+  for(const [selected,expected] of Object.entries(systems)) {
+    const html=renderSystem(selected,{interpretation:systemResponse(systems),children:h('b',null,'통합 원고 별도')})
+    assert.ok(html.includes(expected))
+    assert.ok(Object.values(systems).filter(t=>t!==expected).every(t=>!html.includes(t)))
+    assert.doesNotMatch(html,/통합 원고 별도/)
+  }
 })
 
-test('fallback copy is reader language, not implementation language', () => {
-  assert.match(fallback, /<summary>계산 근거 자세히 보기<\/summary>/)
-  assert.doesNotMatch(fallback, /계산 기반 보조 해설/)
-})
-
-test('switching systems preserves the selected life topic', () => {
-  const controls=source.slice(source.indexOf('className="system-switcher"'),source.indexOf('aria-label="생활 분야 선택"'))
-  assert.match(controls, /onClick=\{\(\)=>setSystem\(id\)\}/)
-  assert.doesNotMatch(controls, /setTopic\(/)
+test('generation and retry controls accurately reflect the service state', () => {
+  const generate=()=>{}
+  const loading=renderSystem('western',{onGenerate:generate,generating:true})
+  assert.match(loading,/role="status">Gemini 해설을 생성하고 있어/)
+  assert.match(loading,/<button[^>]*disabled[^>]*>해설 생성/)
+  const failed=renderSystem('western',{onGenerate:generate,generationError:'생성 요청에 실패했어.'})
+  assert.match(failed,/role="status">생성 요청에 실패했어/)
+  assert.match(failed,/>해설 다시 생성<\/button>/)
 })

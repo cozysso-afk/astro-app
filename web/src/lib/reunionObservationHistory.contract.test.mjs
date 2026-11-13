@@ -17,8 +17,8 @@ test('all optional observed relationship states remain distinct and no-input doe
 
   assert.equal(fixture.expected.next_stage,'relationship_rebuilding')
   assert.equal(nextUnconfirmedStage(fixture.observation.state),fixture.expected.next_stage)
-  assert.match(observationReading({state:'',initiator:'',events:[]}).text,/입력된 기록에서만/)
-  assert.match(observationReading(fixture.observation).text,/둘이 기대하는 만남 방식/)
+  assert.equal(observationReading({state:'',initiator:'',events:[]}).title,'현재 관계 상태 미입력')
+  assert.equal(observationReading(fixture.observation).title,'가까워졌고, 교제 여부는 아직 미정이에요')
 })
 
 test('observed facts never enter the astrology calculation request and do enter interpretation context',()=>{

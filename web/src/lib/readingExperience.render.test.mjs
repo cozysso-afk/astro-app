@@ -114,9 +114,9 @@ test('personal marriage renders creative hints with no future certainty or gener
   const fixture=personalMarriageFixture();const before=JSON.stringify(fixture)
   const html=renderToStaticMarkup(createElement(Personal,{data:fixture}))
   const visible=html.split('<details class="relationship-technical"')[0].replace(/<[^>]*>/g,'')
-  assert.match(visible,/나의 관계 성향/);assert.match(visible,/목성/)
+  assert.match(visible,/개인 결혼운 계산 결과/);assert.match(visible,/개인 결혼운은 현재 제미나이 해설을 지원하지 않아요/);assert.match(visible,/목성/)
   assert.match(visible,/AI 초상 콘셉트 프롬프트 복사/)
-  assert.doesNotMatch(visible,/62|orb|Taurus|결혼 가능성 지수|178|181/)
+  assert.match(visible,/62.0\/100/);assert.doesNotMatch(visible,/Taurus|결혼 가능성 지수|178|181/)
   assert.match(html,/<details class="portrait-concept">/)
   assert.equal(JSON.stringify(fixture),before)
 })
@@ -132,7 +132,7 @@ test('portrait prompt is only existing hints plus explicit creative art directio
 test('daily reason action and conditions render as separately labelled accessible blocks',()=>{
   const f=fortuneFixture()
   const html=renderToStaticMarkup(createElement(Fortune,{period:'today',calculation:f.calculation,result:verifiedResult(f.data),loading:false,error:'',cacheSource:'local',onRetry:noAction,onCopyPrompt:noAction,onCancel:noAction,canCancel:false}))
-  for(const [kind,label] of [['summary','핵심 요약'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
+  for(const [kind,label] of [['summary','오늘의 흐름'],['reason','이렇게 읽는 이유'],['action','지금 할 일'],['timing','이 행동을 적용할 때'],['watch','다시 판단할 조건'],['avoid','피할 것']]) assert.ok(html.includes(`data-daily-block="overall:${kind}"><h4>${label}</h4><p>`))
   assert.match(html,/<time dateTime="2026-09-12">2026-09-12<\/time>/)
   assert.ok(html.indexOf('overall:reason')<html.indexOf('overall:action'))
   assert.ok(html.indexOf('overall:action')<html.indexOf('overall:watch'))
@@ -172,10 +172,11 @@ for(const period of ['today','week','month','year']) test(`rendered ${period} pr
   assert.ok(html.includes(verifiedResult(f.data,period).data.overall.summary))
 
 })
-test('personal spouse route uses existing hints without manufacturing a meeting or a person',()=>{
+test('personal spouse route preserves legacy generated hints as engine data and never promotes them to interpretation',()=>{
   const f=personalMarriageFixture();f.result.spouse_archetype.meeting_route='반복해서 참여하는 모임에서 천천히 알아가는 방식';f.result.spouse_archetype.identity_clues=['생활 리듬을 맞추는 관계']
-  const html=renderToStaticMarkup(createElement(Personal,{data:f})).split('<details class="relationship-technical"')[0]
-  assert.match(html,/반복해서 참여하는 모임/);assert.match(html,/배우자로 정해진 건 아니야/)
+  const all=renderToStaticMarkup(createElement(Personal,{data:f}))
+  const html=all.split('<details class="relationship-technical"')[0]
+  assert.doesNotMatch(html,/반복해서 참여하는 모임|배우자로 정해진|생활 리듬을 맞추는 관계/);assert.match(all,/반복해서 참여하는 모임/)
   assert.doesNotMatch(html,/178|181|연예인|고양이상/)
 })
 

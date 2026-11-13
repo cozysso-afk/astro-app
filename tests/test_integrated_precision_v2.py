@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 
+import pytest
 from fastapi.testclient import TestClient
 
 import api.main as api_main
@@ -104,3 +105,44 @@ def test_time_known_true_without_birth_time_is_422_before_personal_love_normaliz
     response = client.post("/v1/love/personal", json=payload)
     assert response.status_code == 422, response.text
     assert "birth_time" in response.text
+
+
+@pytest.mark.parametrize("provisional", [False, True])
+def test_daily_evidence_preserves_direct_weights_and_direction_in_any_scan_order(provisional):
+    compact = precision_v2._compact_provisional_evidence if provisional else precision_v2.legacy._compact_daily_evidence
+    def sample(hour, topic, weight, polarity):
+        return {"dt": datetime(2026, 11, 5, hour), "topics": {topic: {"evidence": [{
+            "kind": "aspect", "transit": "Mercury", "target": "Saturn", "aspect": "합",
+            "motion": "적용", "direction": "역행", "orb": 0.1,
+            "score": weight, "polarity": polarity,
+        }]}}}
+
+    samples = [sample(8, "금전", 1.0, 0.04), sample(10, "연락", 2.0, -0.03), sample(12, "금전", 1.1, 0.04)]
+    forward = compact(samples, [])
+    assert forward == compact(list(reversed(samples)), [])
+    assert len(forward) == 1
+    row = forward[0]
+    assert row["source_topics"] == sorted(["금전", "연락", "수신신호", "발신적합", "과거인연접점"])
+    assert row["topic_contributions"] == {
+        "금전": {"contribution": 1.1, "polarity": 0.04},
+        "연락": {"contribution": 2.0, "polarity": -0.03},
+    }
+    assert row["contribution"] == 2.0 and row["polarity"] == -0.03
+    assert ("sample_time" in row) is (not provisional)
+
+
+def test_daily_score_components_preserve_distinct_meanings_and_market_scope():
+    engine = precision_v2.legacy
+    def sample(money, invest):
+        return {"topics": {"금전": {"activation": money[0], "favorability": money[1]},
+                           "투자심리": {"activation": invest[0], "favorability": invest[1]}}}
+
+    first = sample((80, 20), (18, 88))
+    second = sample((78, 22), (82, 46))
+    market = sample((10, 90), (25, 64))
+    assert engine._blend_topic(first["topics"]["금전"]) == engine._blend_topic({"activation": 26, "favorability": 66}) == 48
+    assert engine._daily_score_components([first, second], [market]) == {
+        "금전": {"activation": 79, "favorability": 21},
+        "투자심리": {"activation": 25, "favorability": 64},
+    }
+    assert engine._daily_score_components([first], []) == {"금전": first["topics"]["금전"]}

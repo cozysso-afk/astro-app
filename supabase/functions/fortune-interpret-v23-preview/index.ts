@@ -6,19 +6,19 @@ import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-previe
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { SYSTEM, buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
-import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, reusePlainHeadlineFromSummary, retainValidPeriodFields } from "./periodReadingContractV1.ts";
+import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
 import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildPeriodStructureRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
-import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, omitUnsupportedDailyConditions } from "./dailyReadingContractV1.ts";
+import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.25-period-split-evidence-v1";
+const VERSION="supabase-ai-v23.26-question-evidence";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -67,7 +67,7 @@ function coreInstruction(periodKind:unknown,compact=false){const kind=String(per
 - key_windows 1개, decisions 1개, priorities 1~2개. decision은 key_window와 하나 이상의 실제 evidence_ref를 공유해. year_phases와 cross_checks는 빈 배열로 둬. domain_answers는 빈 배열로 두고 이번 세부 해설은 clusters에서 작성해. relationship_reading/contact_flow/investment_reading은 기존 기능이며 해당 질문의 근거가 있으면 작성할 수 있어. 실제 선연락·재회·수익을 확정하지 마.
 - systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.
 - 종합에서 특정 역할을 나열하지 마. 애정은 만남·호감의 상호성·관계 속도를 다루고 연락 조언으로만 채우지 마. 현실 사건·증상·학습 효과를 관측한 것처럼 단정하지 마.
-- change_condition은 이번 일일 계약에서는 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
+- change_condition은 이 질문의 인용 근거가 판단을 바꾸는 조건을 설명할 때만 작성하고, 없으면 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
 - 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘 대신 선택 운세일이라고 써.
 `;return "";}
 
@@ -121,21 +121,20 @@ function normalizeDirectionalWindows(data:any,payload:any){
   return data;
 }
 
-function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
+function finalizeCandidate(core:any,payload:any,writerPacket:any,model:string,u:any,meta:any={}){
   const {editorial_trace_seed:traceSeed=[],editorial_trace_origin:traceOrigin,...resultMeta}=meta??{};
   const traceStages=Array.isArray(traceSeed)?[...traceSeed]:[];
   if(!traceStages.length)traceStages.push(captureEditorialStage("finalize_input",core));
-  core=omitUnsupportedDailyConditions(core,payload?.period_kind);
-  if(payload?.period_kind==="day")traceStages.push(captureEditorialStage("omit_unsupported_daily_exceptions",core));
   const withTopics={...core,topic_analysis:buildAuthoredTopicAnalysisOnly(core,buildDeterministicTopicAnalysis(payload),payload)};
   traceStages.push(captureEditorialStage("post_authored_projection",withTopics));
-  const validated=validateOutput(withTopics);
+  const validated=validateOutput(withTopics,false);
   if(!validated){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??(resultMeta?.local_quality_fallback?"local_fallback":"gemini")});
     return structureFailure({model,usage:u,data:withTopics,origin:"gemini",editorial_trace,...resultMeta},withTopics);
   }
   const dailyEditorial=inspectDailyEditorial(validated,payload);
-  const data={...attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload),editorial_delivery:core.editorial_delivery};
+  const data={...attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload),editorial_delivery:core.editorial_delivery,
+    contact_evidence_refs:core.contact_evidence_refs,...(core.editorial_focus?{editorial_focus:core.editorial_focus}:{})};
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
   if(!guard.safe){
     const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini"});
@@ -143,7 +142,7 @@ function finalizeCandidate(core:any,payload:any,model:string,u:any,meta:any={}){
   }
   traceStages.push(captureEditorialStage("post_thai_guard",data));
   const quality=applyDailyEditorialGate(inspectInterpretationQuality(data,payload,{requireDailyTimedDecision:false,allowEmptyDailyChangeCondition:true,periodReadingContract:true}),dailyEditorial);
-  const gatedQuality=applyPeriodReadingGate(quality,inspectPeriodReading(data,payload));
+  const gatedQuality=applyPeriodReadingGate(quality,inspectPeriodReading(data,writerPacket));
   traceStages.push(captureEditorialStage("post_quality_validation",data));
   const editorial_trace=buildEditorialTrace(traceStages,{model,origin:traceOrigin??"gemini",quality_ok:Boolean(gatedQuality?.ok)});
   if(!gatedQuality.ok){
@@ -158,17 +157,12 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  let providerCore=core.partial;
-  let headlineReused=false;
-  let dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
-  if(!dailyReport.passed&&isExtendedPeriod(payload?.period_kind)){
-    const reused=reusePlainHeadlineFromSummary(providerCore,payload?.period_kind);
-    if(reused!==providerCore){providerCore=reused;headlineReused=true;dailyReport=inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet);}
-  }
+  const providerCore=core.partial;
+  const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
   const normalizedCore=normalizeProviderCore(providerCore);
   const normalizedTrace=captureEditorialStage("provider_normalized",normalizedCore);
-  return {...finalizeCandidate(normalizedCore,payload,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,headline_reused_from_summary:headlineReused,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
+  return {...finalizeCandidate(normalizedCore,payload,pb.packet,model,core.usage,{single_core_generation:true,v23_period_narrative:true,provider_compact_schema:true,editorial_trace_seed:[rawTrace,normalizedTrace],editorial_trace_origin:"gemini"}),prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
 }
 
 async function rewriteDailyCandidate(first:any,payload:any,model:string,key:string,budget:Budget,request:any){
@@ -177,9 +171,10 @@ async function rewriteDailyCandidate(first:any,payload:any,model:string,key:stri
   try{
     const patched=applyDailyRewrite(first.candidate_data,request,result.partial);
     const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
-    const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day",payload);
+    const packet=buildV23PromptBudget(payload).packet;
+    const structure=inspectDailyProviderDocument({...patched,clusters:rows},"day",packet);
     if(!structure.passed)return {ok:false,error:"일일 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:structure};
-    const edited=finalizeCandidate(patched,payload,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
+    const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_daily_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"일일 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
@@ -196,7 +191,7 @@ async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:strin
     const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
     if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
     const normalized=normalizeProviderCore(patched);
-    const edited=finalizeCandidate(normalized,payload,model,result.usage,{targeted_role_neutral_hero:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.partial),captureEditorialStage("provider_hero_patch_applied",patched)]});
+    const edited=finalizeCandidate(normalized,payload,packet,model,result.usage,{targeted_role_neutral_hero:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.partial),captureEditorialStage("provider_hero_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"첫 화면 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
@@ -211,7 +206,7 @@ async function rewritePeriodCandidate(first:any,payload:any,model:string,key:str
     const packet=buildV23PromptBudget(payload).packet;
     const structure=inspectPeriodProviderDocument({...patched,clusters:rows},payload?.period_kind,packet);
     if(!structure.passed)return {ok:false,error:"기간 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>`${issue.path}: ${issue.code}`)}};
-    const edited=finalizeCandidate(patched,payload,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});
+    const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});
     return {...edited,editorial_trace:{...edited.editorial_trace,previous:first.editorial_trace??null}};
   }catch{return {ok:false,error:"기간 수정 원고 범위 검증 실패",model,usage:result.usage};}
 }
@@ -240,7 +235,7 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
   if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,first_structure_report:first?.structure_report??null,...(preferred===second.model?{}:{fallback_from:preferred})};
-  return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,origin:"deterministic_safe",safe_summary_required:true,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
+  return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -263,7 +258,7 @@ async function job(id:string,payload:any,model:string,key:string){
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
     const callTrace=publicCallTrace(r.call_trace);
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.origin??(r.ok?"gemini":"deterministic_safe"),safe_summary_required:Boolean(r.safe_summary_required),local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,first_structure_report:r.first_structure_report??null,structure_report:r.structure_report??null,editorial_trace:r.editorial_trace??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.ok?"gemini":null,local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,first_structure_report:r.first_structure_report??null,structure_report:r.structure_report??null,editorial_trace:r.editorial_trace??null};
     if(!(await jobActive(id))){await a.from("ai_interpret_jobs").update({usage_json:usageJson,updated_at:new Date().toISOString()}).eq("id",id);return;}
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
@@ -273,7 +268,9 @@ async function job(id:string,payload:any,model:string,key:string){
 
 function verifiedGeminiJob(data:any){
   if(data?.status!=="done"||!data?.result_json||data?.usage_json?.origin!=="gemini")return false;
-  if(data?.usage_json?.generation_version!==VERSION||data?.usage_json?.cost_guard_version!==VERSION)return false;
+  const version=data.usage_json.generation_version;
+  if(![VERSION,"supabase-ai-v23.25-period-split-evidence-v1"].includes(version) || version!==data.usage_json.cost_guard_version ||
+    data.usage_json.degraded_quality===true || data.usage_json.local_quality_fallback===true)return false;
   const trace=Array.isArray(data?.usage_json?.call_trace)?data.usage_json.call_trace:[];
   const successful=trace.some((row:any)=>Number(row?.http_status)>=200&&Number(row?.http_status)<300&&String(row?.model??"")===String(data?.model??""));
   const stages=data?.usage_json?.quality_validation?.stages;
@@ -293,9 +290,9 @@ Deno.serve(async(req)=>{
     if(["queued","running"].includes(String(data.status))&&Date.now()-Date.parse(String(data.updated_at??data.created_at))>MAX_JOB_MS+30000){await a.from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_TIMEOUT"),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);data.status="failed";data.error=storedFortuneJobError("JOB_TIMEOUT");}
     const failureFields=data.status==="failed"?publicFortuneFailureFields(storedFortuneJobErrorCode(data.error)):null;
     const provenanceVerified=verifiedGeminiJob(data);
-    const origin=provenanceVerified?"gemini":"deterministic_safe";
+    const origin=provenanceVerified?"gemini":undefined;
     const storedVersion=typeof data.usage_json?.generation_version==="string"?data.usage_json.generation_version:"unverified";
-    return res({ok:true,job_id:data.id,status:data.status,origin,provenance_verified:provenanceVerified,model:data.model,fallback_from:data.fallback_from,data:data.result_json,usage:data.status==="failed"?publicFailedUsage(data.usage_json):publicJobUsage(data.usage_json),error:failureFields?.error??null,...(failureFields??{}),created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:data.status==="done"?storedVersion:VERSION});
+    return res({ok:true,job_id:data.id,status:data.status,origin,provenance_verified:provenanceVerified,model:data.model,fallback_from:data.fallback_from,data:provenanceVerified?data.result_json:null,usage:data.status==="failed"?publicFailedUsage(data.usage_json):publicJobUsage(data.usage_json),error:failureFields?.error??null,...(failureFields??{}),created_at:data.created_at,updated_at:data.updated_at,completed_at:data.completed_at,period_start:data.period_start,period_end:data.period_end,interpreter_version:data.status==="done"?storedVersion:VERSION});
   }
   if(b?.action==="cancel"){
     const id=txt(b.job_id,100);const now=new Date().toISOString();const {data,error}=await admin().from("ai_interpret_jobs").update({status:"failed",error:storedFortuneJobError("JOB_CANCELED"),updated_at:now,completed_at:now}).eq("id",id).eq("user_id",u.id).in("status",["queued","running"]).select("id,status").maybeSingle();
@@ -313,8 +310,10 @@ Deno.serve(async(req)=>{
   if(!key)return res(publicFortuneError("UPSTREAM_NOT_CONFIGURED",undefined,{missing_key:true}),503);
   if(!pb.ok)return res(publicFortuneError("PROMPT_BUDGET_EXCEEDED",undefined,{cost_guard_blocked:true}),413);
   const hash=await payloadHash(payload);const kind=exactV23JobKind(VERSION,payload,hash);const a=admin();const modelFilter=`model.eq.${preferred},fallback_from.eq.${preferred}`;
-  const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,result_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
-  if(!cacheError&&cached?.id&&cached?.result_json)return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
+  if(b.refresh!==true){
+    const {data:cached,error:cacheError}=await a.from("ai_interpret_jobs").select("id,status,model,result_json,usage_json").eq("user_id",u.id).eq("kind",kind).eq("status","done").or(modelFilter).order("completed_at",{ascending:false}).limit(1).maybeSingle();
+    if(!cacheError&&cached?.id&&verifiedGeminiJob(cached))return res({ok:true,job_id:cached.id,status:"done",interpreter_version:VERSION,reused:true,inflight:false},200);
+  }
   const {data:pending,error:pendingError}=await a.from("ai_interpret_jobs").select("id,status").eq("user_id",u.id).eq("kind",kind).eq("model",preferred).in("status",["queued","running"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(!pendingError&&pending?.id)return res({ok:true,job_id:pending.id,status:pending.status,interpreter_version:VERSION,reused:true,inflight:true},202);
   const rolling=await checkRollingJobBudget(a,u.id);if(!rolling.ok)return res({...rolling,cost_guard_blocked:true,rolling_job_guard:true},200);

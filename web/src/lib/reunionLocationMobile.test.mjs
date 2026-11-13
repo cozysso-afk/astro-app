@@ -12,18 +12,11 @@ test('location results have a scoped mobile owner', () => {
   assert.match(css, /\.location-results \.location-rank-row > div > small[\s\S]*white-space:\s*normal\s*!important/)
 })
 
-test('location results explain the ranking before raw lists', () => {
-  assert.match(location, /지역·국가운 해설/)
-  assert.match(location, /locationEvidenceText/)
-  assert.match(location, /출생 순간의 행성과 각도 축/)
-  assert.match(location, /비자, 직업시장, 생활비, 치안, 언어/)
-  assert.match(location, /location-purpose-reading/)
-  assert.match(location, /ReadingExplanation kind="reason"/)
-  assert.match(location, /ReadingExplanation kind="practice"/)
-  assert.match(location, /ReadingExplanation kind="caution"/)
-  const explanation = location.indexOf('location-reading-card')
-  const ranking = location.indexOf('국가 순위')
-  assert.ok(explanation >= 0 && ranking > explanation)
+test('location displays calculated rankings and angle measurements without authored advice', () => {
+  assert.match(location, /지역·국가 계산 결과/)
+  assert.match(location, /separation_deg/)
+  assert.match(location, /group.cities/)
+  assert.doesNotMatch(location, /ReadingExplanation|지역·국가운 해설/)
 })
 
 test('location mobile filters no longer require sideways scrolling', () => {

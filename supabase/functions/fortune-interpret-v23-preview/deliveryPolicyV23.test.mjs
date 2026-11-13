@@ -15,7 +15,9 @@ test('V23 validates Gemini prose without deterministic rewriting or local long-f
   assert.match(source, /post_quality_validation/)
   assert.doesNotMatch(source, /buildLocalQualityFallbackCore\(payload\)/)
   assert.doesNotMatch(source, /allow_degraded_quality/)
-  assert.match(source, /safe_summary_required:true/)
+  assert.doesNotMatch(source, /safe_summary_required:true|reusePlainHeadlineFromSummary\(|omitUnsupportedDailyConditions\(/)
+  assert.match(source, /applyPeriodReadingGate\(quality,inspectPeriodReading\(data,writerPacket\)\)/)
+  assert.match(source, /data:provenanceVerified\?data.result_json:null/)
   assert.match(source, /if\(first\.ok&&payload\?\.period_kind!=="day"\)return \{\.\.\.first,attempt_count:budget\.used,call_trace:budget\.calls\}/)
 })
 
@@ -58,4 +60,6 @@ test('V23 provenance is derived from stored successful calls and the stored gene
   assert.match(source, /trace\.some\(\(row:any\)=>Number\(row\?\.http_status\)>=200/)
   assert.match(source, /stages\.length===6&&stages\.every/)
   assert.match(source, /provenance_verified:provenanceVerified/)
+  const refresh=source.indexOf('if(b.refresh!==true)'),completed=source.indexOf('verifiedGeminiJob(cached)'),pending=source.indexOf('if(!pendingError&&pending?.id)'),guard=source.indexOf('const rolling=await checkRollingJobBudget')
+  assert.ok(refresh>=0 && completed>refresh && pending>completed && guard>pending)
 })

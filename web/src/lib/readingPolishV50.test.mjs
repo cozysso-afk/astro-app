@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { westernRankCopy, westernLoveHeadline } from './westernRankCopy.ts'
 
-const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
+import { renderSystem } from './systemReadingView.fixtures.mjs'
 const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const polish = readFileSync(new URL('../reading-polish-v50.css', import.meta.url), 'utf8')
@@ -29,12 +29,11 @@ test('Western independent surface suppresses every integrated period panel wrapp
   assert.match(polish, /system-reading\.system-western > \.period-deep-reading/)
 })
 
-test('Western overall reading is summarized instead of dumping every subtopic', () => {
-  assert.match(view, /function representativeWesternRows/)
-  assert.match(view, /const westernDisplayRows = field \|\| topic!=='전체' \? selectedWestern : representativeWesternRows\(selectedWestern\)/)
-  assert.match(view, /전체에서는 대표 흐름 6개만 먼저 보여줘/)
-  assert.match(view, /westernDisplayRows\.map/)
-  assert.doesNotMatch(view, /선택 기간의 강약과 날짜를 읽는 층/)
+test('Western score detail is available when no Gemini manuscript exists', () => {
+  const html = renderSystem('western',{onGenerate:()=>{}})
+  assert.match(html,/해설 생성<\/button>/)
+  assert.match(html,/class="western-score-card"/)
+  assert.doesNotMatch(html,/class="system-hero"|class="western-score-guidance"/)
 })
 
 test('Western overview uses a readable relative sentence instead of comma-separated bands', () => {

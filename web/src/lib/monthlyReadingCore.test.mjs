@@ -25,7 +25,7 @@ test('leaves sparse and unverified results untouched, and does not invent timing
   assert.equal(monthlyReadingCore(unverified,calculation),unverified)
 })
 
-test('the monthly narrative renders calculated timing for overview and study, keeping unanswered outcome questions open',async()=>{
+test('the verified monthly report preserves authored timing and labels unanswered fields without filling them from numbers',async()=>{
   const {createServer}=await import('vite')
   const {createElement}=await import('react')
   const {renderToStaticMarkup}=await import('react-dom/server')
@@ -41,17 +41,14 @@ test('the monthly narrative renders calculated timing for overview and study, ke
       const [topic,question_key]=key.split(':')
       return {topic,question_key,label:key,status:'not_calculated',answer:'',evidence_refs:[]}
     })
-    const result={ok:true,provenance_verified:true,origin:'gemini',usage:{quality_validation:{score:100}},data:{headline:'월간 원고',overall:{summary:'저장된 종합 해설',evidence_refs:['W:original']},domain_answers}}
+    const result={ok:true,model:'gemini-3.7-flash',provenance_verified:true,origin:'gemini',usage:{quality_validation:{score:100}},data:{headline:'월간 원고',overall:{summary:'저장된 종합 해설',evidence_refs:['W:original']},domain_answers}}
     const show=field=>renderToStaticMarkup(createElement(PeriodFortuneNarrativeV2,{result,period:'month',calculation,field}))
     const overall=show()
-    assert.match(overall,/학업 점수를 나눠 보면 초순 34점, 중순 56점, 하순 56점이야. 중순과 하순의 평균이 같아서/)
-    assert.match(overall,/금전 점수를 나눠 보면 초순 40점, 중순 40점, 하순 40점이야. 세 구간의 평균이 같아/)
+    assert.match(overall,/저장된 종합 해설/)
     assert.match(overall,/data-reading-section="question:금전:contract_recovery" data-section-state="insufficient"/)
-    for(const id of ['relationship.friends','work_study.study','work_study.work','money_news.money']){
-      assert.ok(overall.includes('data-calculated-section="'+id+'"'),id)
-    }
+    assert.doesNotMatch(overall,/data-calculated-section|점수를 나눠 보면|가장 먼저 살필/)
     const study=show({id:'study',label:'학업',topics:['학업']})
-    assert.match(study,/data-reading-section="question:학업:timing"/)
+    assert.match(study,/data-reading-section="question:학업:timing" data-section-state="insufficient"/)
     assert.doesNotMatch(study,/직장 점수를|금전 점수를/)
   } finally { await server.close() }
 })

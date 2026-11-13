@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { renderSystem, systemFixture } from './systemReadingView.fixtures.mjs'
 
-const view = readFileSync(new URL('../SystemReadingViews.tsx', import.meta.url), 'utf8')
-
-test('overall Western reading has six semantic groups rather than fifteen raw fields', () => {
-  const block = view.slice(view.indexOf('const WESTERN_OVERVIEW_GROUPS'), view.indexOf('const SAJU_LEAD_COPY'))
-  const groups = (block.match(/^\s*\[/gm) || []).length
-  assert.equal(groups, 6)
+test('Western scores start collapsed and preserve available fields without inventing missing scores', () => {
+  const calculation = systemFixture()
+  calculation.western.overall.재회 = null
+  const html = renderSystem('western',{calculation})
+  const cards = [...html.matchAll(/<details class="western-score-card"([^>]*)><summary><span class="western-score-topline"><strong>([^<]+)/g)]
+  assert.deepEqual(new Set(cards.map(m=>m[2])), new Set(Object.keys(calculation.western.overall).filter(key=>key!=='재회')))
+  assert.ok(cards.every(m=>!m[1].includes('open')))
 })

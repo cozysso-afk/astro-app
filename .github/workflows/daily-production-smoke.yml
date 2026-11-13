@@ -1,13 +1,30 @@
 name: Daily production smoke
 on:
-  pull_request:
-    types: [closed]
   workflow_dispatch:
     inputs:
-      existing_job_id:
-        description: 'QA-owned completed job to reuse with zero paid generation'
+      mode:
+        description: 'Replay a completed QA job, or request one synthetic Gemini job'
+        type: choice
+        options: [replay, generate]
+        default: replay
+      period:
+        description: 'Period to check'
+        type: choice
+        options: [day, week, month]
+        default: day
+      start_date:
+        description: 'Period start (YYYY-MM-DD, Monday for weeks or first of month)'
         required: true
-        default: 'cd1abe43-8046-4083-a82a-c223df3a9a85'
+      interpreter_version:
+        description: 'Exact V23 interpreter version to verify'
+        required: true
+      existing_job_id:
+        description: 'Completed synthetic QA job ID; required only in replay mode'
+        required: false
+      confirm_paid_calls:
+        description: 'Enable one generation job (up to two Gemini calls); leave off for replay'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -15,14 +32,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   production:
-    # One post-merge replay only; no paid generation is enabled by this workflow.
-    if: inputs.existing_job_id != '' || (github.event.pull_request.number == 337 && github.event.pull_request.merged == true)
-    strategy:
-      fail-fast: false
-      matrix:
-        period: ${{ github.event_name == 'workflow_dispatch' && fromJSON('["manual"]') || fromJSON('["day","month"]') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 18
     defaults:
       run:
         working-directory: web
@@ -38,23 +49,24 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1
           npx playwright install --with-deps chromium
-      - name: Verify actual production with one synthetic generation maximum
+      - name: Verify selected period on the production web app
         env:
           QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
           QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
           QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
           QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
-          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
-          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id || (matrix.period == 'month' && 'bc3d3c8a-68f4-47a0-a32f-b1f6c909a693' || '0d11e830-3871-4eff-ac76-6c8e13cff050') }}
-          QA_VERIFY_MONTH: ${{ matrix.period == 'month' && 'yes' || 'no' }}
-          QA_REPLAY_DATE: ${{ matrix.period == 'month' && '2026-11-01' || (matrix.period == 'day' && '2026-10-26' || '') }}
-          QA_REPLAY_VERSION: ${{ matrix.period != 'manual' && 'supabase-ai-v23.25-period-split-evidence-v1' || '' }}
-        run: node scripts/daily-production-smoke.mjs
+          QA_RUN_MODE: ${{ inputs.mode }}
+          QA_PERIOD: ${{ inputs.period }}
+          QA_REPLAY_DATE: ${{ inputs.start_date }}
+          QA_REPLAY_VERSION: ${{ inputs.interpreter_version }}
+          QA_EXISTING_JOB_ID: ${{ inputs.existing_job_id }}
+          QA_CONFIRM_PAID_CALLS: ${{ inputs.confirm_paid_calls }}
+        run: node --experimental-strip-types scripts/daily-production-smoke.mjs
       - name: Save synthetic-only verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-production-smoke-${{ matrix.period }}
+          name: production-reading-${{ inputs.period }}-${{ inputs.mode }}-${{ github.run_id }}
           path: web/daily-production-artifacts/
           retention-days: 7
           if-no-files-found: warn

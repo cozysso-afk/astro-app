@@ -52,7 +52,8 @@ test('saved image adds one hidden three-system synthesis card without extending 
   assert.match(runtime, /system-overview-grid > article/)
   assert.match(runtime, /ensureExportSystemSummary\(reading\)/)
   assert.match(runtime, /applyExportOnlyStyle\(article\)/)
-  assert.match(visualQa, /qa-export-system-source/)
+  assert.match(visualQa, /<DailyReadingQaPreview\/>/)
+  assert.doesNotMatch(visualQa, /qa-export-system-source/)
 })
 
 test('mobile vertical density keeps general secondary cards horizontal but reunion cards fully visible', () => {

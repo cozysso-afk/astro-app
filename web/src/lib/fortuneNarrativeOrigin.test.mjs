@@ -18,8 +18,10 @@ test('all deterministic provisional model versions are classified as safe local 
   assert.equal(origin.fortuneNarrativeOrigin('deterministic-provisional-v23'),'deterministic_safe')
 })
 
-test('declared origin wins and Gemini models remain Gemini authored',()=>{
+test('verified model and declared origin must agree',()=>{
   assert.equal(origin.fortuneNarrativeOrigin('gemini-2.5-flash'),'deterministic_safe')
   assert.equal(origin.fortuneNarrativeOrigin('gemini-2.5-flash','gemini'),'gemini')
   assert.equal(origin.fortuneNarrativeOrigin('gemini-2.5-flash','deterministic_safe'),'deterministic_safe')
+  assert.equal(origin.fortuneNarrativeOrigin('deterministic-provisional-v23','gemini'),'deterministic_safe')
+  assert.equal(origin.fortuneNarrativeOrigin(undefined,'gemini'),'deterministic_safe')
 })

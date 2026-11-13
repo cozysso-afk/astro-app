@@ -35,7 +35,7 @@ test('daily, weekly, monthly and annual saved readings retain prose and provenan
     data.decisions=[{action:'만날 시간을 먼저 정해 '+ids.join(' · ')+'.',reason:'19:30에 확인해 ('+ids.join(', ')+').',evidence_refs:ids}]
     data.key_windows=[{start:calculation.period.start,end:calculation.period.start,topics:['직장'],signal:'활용',label:'약속을 정할 날',summary:'오후에 일정에 여유가 있어 ('+ids[0]+').',evidence_refs:ids}]
     const before=JSON.stringify(data)
-    const result={ok:true,origin:'gemini',provenance_verified:true,usage:{quality_validation:{score:100}},data}
+    const result={ok:true,model:'gemini-3.7-flash',origin:'gemini',provenance_verified:true,usage:{quality_validation:{score:100}},data}
     const pages=[renderToStaticMarkup(h(PeriodFortuneNarrativeV2,{period,calculation,result}))]
     if(period==='year')pages.push(renderToStaticMarkup(h(AiInterpretationPanel,{topics:[],result})))
     for(const html of pages) {
@@ -52,10 +52,20 @@ test('opening day, week and month calculations only restores saved prose until t
   for (const args of ['cached.result, cached.request','cachedCalculation.result, cachedCalculation.request','calculation, body']) {
     assert.ok(app.includes("runAiInterpretation("+args+", 'open')"))
   }
-  assert.match(app,/cacheOnly = intent === 'open' && period !== 'year'/)
+  assert.match(app,/cacheOnly = intent === 'open'\s*\n/)
   const open=app.indexOf('if (cacheOnly)')
-  const start=app.indexOf("action: 'start', calculation: calculationForInterpretation")
+  const start=app.indexOf("action: 'start'", open)
   assert.ok(open>0 && start>open)
   assert.match(app.slice(open,start),/setAiLoading\(false\)\s+return/)
-  assert.match(app,/refreshMonthlyGaps \? 'refresh' : 'generate'/)
+  assert.match(app,/refreshReading \? 'refresh' : 'generate'/)
+})
+
+test('display preserves the wording of a Gemini condition and its source array',async t=>{
+  const server=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),optimizeDeps:{noDiscovery:true},server:{middlewareMode:true,hmr:false},appType:'custom'})
+  t.after(()=>server.close())
+  const {readerFacingFortune}=await server.ssrLoadModule('/src/lib/readerFacingFortune.ts')
+  const condition='만약 두 사람이 다음 만남을 정할 때 그럴 때 해당돼.'
+  const result=readerFacingFortune({decisions:[{watch:condition,evidence_refs:['W:day:1']}]})
+  assert.equal(result.decisions[0].watch,condition)
+  assert.deepEqual(result.decisions[0].evidence_refs,['W:day:1'])
 })

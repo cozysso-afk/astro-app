@@ -1,3 +1,5 @@
+import {relationshipProvider} from './fixtures/relationshipProvider.mjs'
+import {buildRelationshipReadingDocument} from './authoredReadingDocument.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -90,10 +92,14 @@ test('reunion UI distinguishes availability states instead of collapsing no-cand
   assert.match(panel,/예측 적중률을 뜻하지 않아요/)
 })
 
-test('technical causal prose is never restored just to fill reader-language slots', () => {
-  const body=panel.slice(panel.indexOf('function readerSentences'),panel.indexOf('function stageSet'))
-  assert.match(body,/return plain\.slice\(0, limit\)\.join\(' '\)/)
-  assert.doesNotMatch(body,/selected\.push\(row\)/)
+test('reunion calculations do not write a narrative and every sentence of verified provider prose is preserved', () => {
+  const original='첫 문장. Mercury · 庚申 · 오브 1.2°가 포함된 문장. 세 번째. 네 번째. 다섯 번째.'
+  const data={headline:'재회',reunion_synthesis_v2:{why_reconnect:{interpretation:original}}}
+  const verified=buildRelationshipReadingDocument({...relationshipProvider,data},'reunion','2026-11-13')
+  assert.equal(verified.sections.find(section=>section.id==='why_reconnect:interpretation').blocks[0].text,original)
+  const unknown=buildRelationshipReadingDocument({ok:true,data},'reunion','2026-11-13')
+  assert.deepEqual(unknown.sections,[])
+  assert.doesNotMatch(panel,/readerSentences|whyFallback|sustainabilityNarrative/)
 })
 
 test('reunion authored cache rotates with the backend contract and cannot reuse the prior generation key', async () => {

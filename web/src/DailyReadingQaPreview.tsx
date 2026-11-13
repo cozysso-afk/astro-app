@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes'
 import { SystemReadingViews } from './SystemReadingViews'
-import { PeriodFortuneNarrativeV2 } from './PeriodFortuneNarrativeV2'
+import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 
 // Synthetic copy for layout and routing tests only; never a generated prediction.
 const section=(conclusion:string,real_scene:string,action:string,change_condition:string)=>({conclusion,real_scene,action,change_condition,evidence_refs:['W:qa-only'],applicability:'conditional' as const})
@@ -21,11 +21,16 @@ const calculation={period:{start:'2026-11-04',end:'2026-11-04',day_count:1},west
 
 export function DailyReadingQaPreview() {
   const [missing,setMissing]=useState(false)
+  const [hasManuscript,setHasManuscript]=useState(true)
   const data=missing?{...dailyQaData,clusters:{...dailyQaData.clusters,money_news:{...dailyQaData.clusters.money_news,money:undefined}}} as unknown as typeof dailyQaData:dailyQaData
-  const result:AiInterpretationResponse={ok:true,origin:'gemini',provenance_verified:true,data,usage:{quality_validation:{score:100}}}
+  const result:AiInterpretationResponse={ok:true,model:'gemini-layout-fixture',origin:'gemini',provenance_verified:true,data,usage:{quality_validation:{score:100}}}
   return <section data-qa-block="daily-reading" className="fortune-experience period-today">
     <p>일일 해설 화면 검수 · 실제 운세가 아닌 예시</p>
     <button type="button" onClick={()=>setMissing(v=>!v)}>금전 원고 누락 테스트</button>
-    <SystemReadingViews calculation={calculation}><PeriodFortuneNarrativeV2 period="today" calculation={calculation} result={result}/></SystemReadingViews>
+    <button type="button" onClick={()=>setHasManuscript(value=>!value)}>저장 원고 유무 전환</button>
+    <SystemReadingViews calculation={calculation} interpretation={hasManuscript ? result : null}>
+      <PeriodAiInterpretationPanel period="today" calculation={calculation} result={hasManuscript ? result : null}
+        loading={false} error="" cacheSource="local" onRetry={()=>{}} onCopyPrompt={()=>{}} onCancel={()=>{}} canCancel={false}/>
+    </SystemReadingViews>
   </section>
 }

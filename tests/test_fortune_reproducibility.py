@@ -23,3 +23,8 @@ def test_identical_single_day_scores(exact):
     assert first["western"]["overall"] == second["western"]["overall"]
     assert first["western"]["daily_scores"] == second["western"]["daily_scores"]
     assert len(first["western"]["overall"]) >= 15
+    day = first["western"]["daily_scores"][0]
+    assert set(day["score_components"]["금전"]) == {"activation", "favorability"}
+    assert "수신신호" not in day["score_components"]
+    assert "투자주의" not in day["score_components"]
+    assert all("topic_contributions" in row for row in day["evidence"])

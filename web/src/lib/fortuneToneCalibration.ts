@@ -61,10 +61,12 @@ function episodesFor(calculation: CalculationSlice, topic: string): EvidenceEpis
     if (day.date < calculation.period.start || day.date > calculation.period.end) continue
     for (const row of day.evidence ?? []) {
       if (!row.source_topics?.includes(topic)) continue
-      const contribution = Math.abs(Number(row.contribution ?? 0))
+      const scoped = row.topic_contributions?.[topic]
+      if (row.topic_contributions && !scoped) continue
+      const contribution = Math.abs(Number(scoped?.contribution ?? row.contribution ?? 0))
       if (!Number.isFinite(contribution) || contribution <= 0) continue
-      const sign = evidenceDirection(row)
-      const polarity = row.polarity
+      const polarity = scoped?.polarity ?? row.polarity
+      const sign = scoped ? Math.sign(scoped.polarity) : evidenceDirection(row)
       // Neutral conjunctions retain their activation; zero polarity means
       // unknown/neutral direction, not a non-existent configuration.
       const weight = sign === 0 ? contribution

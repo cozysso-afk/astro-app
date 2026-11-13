@@ -1,3 +1,4 @@
+import {relationshipProvider} from '../src/lib/fixtures/relationshipProvider.mjs'
 // Offline component QA. Existing private Gemini output is replayed, never regenerated.
 // Screenshots/output stay in the explicitly supplied private directory.
 import assert from 'node:assert/strict'
@@ -33,7 +34,7 @@ try{
   }
   for(const mode of ['compatibility','marriage_unmarried','marriage_married','reunion']){
     const data={headline:`${mode} 합성 계약 검사용 제목`,core_summary:'관계의 실제 반응을 확인하면서 서로의 차이를 살펴봐.',core_reason:'각 질문에 붙은 이유 원문을 별도 블록으로 읽도록 만든 합성 예시야.',core_action:'기대와 역할을 한 가지씩 확인해.',core_conditions:['상대가 대화를 원하지 않으면 더 밀어붙이지 마.'],overview:'이 단락은 실제 생성 품질을 증명하지 않는 합성 상세 원고야. 중간 문장의 부정 조건을 지우지 않아. 마지막 문장도 그대로 남아.',chemistry:'서로 끌리는 지점을 설명한 합성 원고.',communication:'다른 소통 방식을 설명한 합성 원고.',limits:'이 화면 검사는 해석 내용의 정확성을 인증하지 않아.',marriage_reading:{mode,bottom_line:'생활의 역할을 나눠 확인해.',bond:'관계의 결속을 설명한 원고.',daily_life:'누가 어떤 일을 맡을지 실제 합의를 확인해.'}}
-    cases.push({id:`synthetic-${mode}`,source:'synthetic-contract-only',doc:buildRelationshipReadingDocument({ok:true,origin:'gemini',provenance_verified:true,data},mode,'2026-11-04 → 2026-11-30')})
+    cases.push({id:`synthetic-${mode}`,source:'synthetic-contract-only',doc:buildRelationshipReadingDocument({...relationshipProvider,data},mode,'2026-11-04 → 2026-11-30')})
   }
   if(process.env.REMAINING_QA_CASES){const selected=new Set(process.env.REMAINING_QA_CASES.split(','));cases.splice(0,cases.length,...cases.filter(row=>selected.has(row.id)));assert.equal(cases.length,selected.size,'Requested QA case missing')}
   await writeFile(path.join(temp,'index.html'),'<html lang="ko"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f8f7fb"><div id="root"></div><script type="module" src="./main.tsx"></script></body></html>')

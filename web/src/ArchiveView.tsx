@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AlertTriangle, Cloud, Copy, Download, History, Home, LoaderCircle, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
-import type { ArchiveItem } from './lib/archive'
+import { hydrateArchiveItem, type ArchiveItem } from './lib/archive'
+import type { AiInterpretationResponse } from './appTypes'
+import { verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
+import { publicRelationshipResult } from '../../supabase/functions/relationship-interpret-v9-preview/publicError.ts'
+import { isDeterministicFortuneModel } from './lib/fortuneNarrativeOrigin'
 
 type ArchiveViewProps = {
   items: ArchiveItem[]
@@ -22,6 +26,33 @@ type ArchiveViewProps = {
 type ArchiveSection = 'fortune' | 'verification'
 type ArchiveDateField = 'target' | 'saved'
 type ArchiveTypeFilter = 'all' | 'integrated' | 'precision' | 'marriage' | 'compatibility' | 'today' | 'week' | 'month' | 'year' | 'legacy-daily'
+
+function ArchiveReadingSource({item}: {item: ArchiveItem}) {
+  const [loaded, setLoaded] = useState<ArchiveItem | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const current = item.hydrated === false ? loaded : item
+  const original = current?.interpretation
+  if (current && !original && !loaded) return null
+  const fortune = original as AiInterpretationResponse | undefined
+  const relationship = item.kind === 'compatibility' || item.kind === 'marriage'
+  const verified = relationship ? Boolean(publicRelationshipResult(original)) : verifiedFortuneNarrative(fortune)
+  const provisional = fortune?.origin === 'deterministic_safe' || fortune?.usage?.local_quality_fallback || isDeterministicFortuneModel(fortune?.model)
+  const label = !original ? '저장된 해설 확인' : verified ? '제미나이 생성 기록 · 저장 원문' : provisional ? '기존 임시 해설 · 저장 원문' : '작성 출처 미확인 · 저장 원문'
+  async function loadOriginal() {
+    setLoading(true)
+    setError('')
+    try { setLoaded(await hydrateArchiveItem(item)) }
+    catch { setError('저장 원문을 불러오지 못했어요. 닫았다가 다시 열어 주세요.') }
+    finally { setLoading(false) }
+  }
+  return <details className="archive-reading-source" onToggle={event => {
+    if(event.currentTarget.open && !current && !loading) void loadOriginal()
+  }}><summary>{label}</summary>
+    {original ? <pre>{JSON.stringify(original.data ?? original, null, 2)}</pre>
+      : <p role="status">{error || (current ? '저장된 해설이 없어요.' : '저장 원문을 불러오는 중이에요.')}</p>}
+  </details>
+}
 
 function archiveKindLabel(item: ArchiveItem) {
   if (item.kind === 'integrated') return '통합운세'
@@ -245,7 +276,8 @@ export function ArchiveView({
 
     {legacyOpen && <section className={`legacy-archive-detail legacy-${legacyOpen.kind}`}>
       <div className="legacy-archive-head"><div><span className={`archive-kind kind-${legacyOpen.kind}`}>{archiveKindLabel(legacyOpen)}</span><strong>{legacyOpen.title}</strong><small>{legacyOpen.periodStart} · {new Date(legacyOpen.createdAt).toLocaleString('ko-KR')}</small></div><button type="button" onClick={onCloseLegacy}>닫기</button></div>
-      <p>{legacyOpen.kind==='daily'?'이전 앱에서 저장한 일일운세 원문이야. 기존 계산·해석 데이터를 수정하지 않고 그대로 보존했어.':legacyOpen.kind==='outcome'?'직접 남긴 실제 결과 검증 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.':'이전 앱에서 남긴 실제 결과/피드백 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.'}</p>
+      <p>{legacyOpen.kind==='daily'?'이전 앱에서 저장한 일일운세예요. 당시 계산과 해설의 작성 출처는 별도로 확인되지 않았어요.':legacyOpen.kind==='outcome'?'직접 남긴 실제 결과 검증 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.':'이전 앱에서 남긴 실제 결과/피드백 기록이야. 당시 메모와 점수를 원본 그대로 보존했어.'}</p>
+      {legacyOpen.interpretation && <details><summary>당시 저장한 해설 원문</summary><pre>{JSON.stringify(legacyOpen.interpretation, null, 2)}</pre></details>}
       <details open><summary>원문 데이터 보기</summary><pre>{JSON.stringify(legacyOpen.result,null,2)}</pre></details>
     </section>}
     {error && <div className="status-banner error"><AlertTriangle size={16}/><span>{error}</span></div>}
@@ -254,6 +286,7 @@ export function ArchiveView({
     {!loading && !error && sectionItemCount>0 && visibleItems.length===0 && <div className={`archive-empty archive-empty-${section} archive-search-empty`}><Search size={22}/><strong>검색 조건에 맞는 기록이 없어</strong><span>검색어 또는 날짜 범위를 바꾸거나 조건을 초기화해봐.</span><button className="archive-empty-action" type="button" onClick={resetSearch}><X size={15}/>검색 조건 초기화</button></div>}
     <div className={`archive-list archive-list-${section}`}>{visibleItems.map((item)=><article className={`archive-card archive-card-${section}`} key={item.id}>
       <div className="archive-card-top"><div><span className={`archive-kind kind-${item.kind}`}>{archiveKindLabel(item)}</span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.periodStart}~{item.periodEnd}</small></div><span className={`sync-chip ${item.syncState}`}><Cloud size={12}/>{item.syncState==='cloud'?'클라우드':'이 기기'}</span></div>
+      {section==='fortune' && (item.kind!=='daily' || item.request.archive_mode==='period_fortune_v16') && <ArchiveReadingSource item={item}/>}
       <div className="archive-actions">
         <button type="button" onClick={()=>onRestore(item)}><Search size={14}/>다시 열기</button>
         <button type="button" onClick={()=>onCopy(item)}><Copy size={14}/>전체복사</button>

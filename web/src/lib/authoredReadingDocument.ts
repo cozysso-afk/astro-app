@@ -1,3 +1,4 @@
+import { hasRelationshipProvenance } from '../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts'
 import { reunionFactContradiction } from '../../../supabase/functions/relationship-interpret-v9-preview/reunionGroundingV2.ts'
 import type { ReunionObservationContext, AiEditorialSection, AiInterpretationResponse, PeriodKey, RelationshipAiResponse, RelationshipAnalysisMode } from '../appTypes'
 import type { FortuneField } from './fortuneFields'
@@ -7,7 +8,7 @@ export type AuthoredSection = { id: string; label: string; state: 'ready'|'missi
 export type AuthoredReadingDocument = {
   version: 'authored-reading-v1'; revision: string; scope: string; title: string; date: string
   state: 'ready'|'partial'|'missing'|'unverified'|'calculated'; headline: string
-  core: AuthoredBlock[]; sections: AuthoredSection[]; exportBlockIds: string[]; omittedObservationConflict?: boolean
+  core: AuthoredBlock[]; sections: AuthoredSection[]; exportBlockIds: string[]; observationConflict?: boolean
 }
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : ''
 const block = (id:string,label:string,value:unknown): AuthoredBlock[] => text(value) ? [{id,label,text:text(value)}] : []
@@ -73,6 +74,13 @@ function authoredSupplementSections(data:NonNullable<AiInterpretationResponse['d
 }
 // Migration is intentionally lossless: no sentence slicing, score-derived prose,
 // paraphrasing or substitution of the overall summary for a missing field.
+export function buildSystemReadingDocument(system:'western'|'saju'|'thai',value:unknown,date:string,version='legacy'):AuthoredReadingDocument {
+  const title = {western:'서양점성술',saju:'사주',thai:'태국점성술'}[system]
+  const core = block('systems.'+system,'기간 전체 해설',value)
+  return finish({version:'authored-reading-v1',revision:'',scope:system,title:title+' Gemini 해설',date,
+    state:'missing',headline:'',core,sections:[],exportBlockIds:[]},core.length>0,version)
+}
+
 export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResponse['data']>,period:PeriodKey,start:string,end:string,field:FortuneField|undefined,verified:boolean,version='legacy'):AuthoredReadingDocument {
   const label=period==='week'?'주간':period==='month'?'월간':period==='year'?'연간':'일일'
   const doc:AuthoredReadingDocument={version:'authored-reading-v1',revision:'',scope:field?.id??'overall',title:`${label} ${field?.label??'종합운세'}`,date:start===end?start:`${start} → ${end}`,state:verified?'missing':'unverified',headline:'',core:[],sections:[],exportBlockIds:[]}
@@ -119,23 +127,30 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
 
 export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,mode:RelationshipAnalysisMode,date:string,observation?:ReunionObservationContext):AuthoredReadingDocument {
   const labels:Record<string,string>={compatibility:'궁합',reunion:'재회',marriage_unmarried:'결혼궁합',marriage_married:'결혼생활'}
-  const verified=ai?.ok&&ai.origin==='gemini'&&ai.provenance_verified===true&&ai.data
+  const verified=hasRelationshipProvenance(ai) && ai?.data
   const doc:AuthoredReadingDocument={version:'authored-reading-v1',revision:'',scope:mode,title:`${labels[mode]??'궁합'} 해설`,date,state:verified?'missing':'unverified',headline:'',core:[],sections:[],exportBlockIds:[]}
   if(!verified||!ai?.data)return finish(doc,false,ai?.interpreter_version??'legacy')
   const data=ai.data
   const core=data as typeof data & {core_summary?:string;core_reason?:string;core_action?:string;core_conditions?:string[]}
-  doc.headline=text(data.headline)
-  doc.core=[...block('core:summary','핵심 요약',core.core_summary),...block('core:reason','이렇게 읽는 이유',core.core_reason),...block('core:action','할 일 · 확인할 점',core.core_action),...(core.core_conditions??[]).flatMap((value,i)=>block(`core:condition:${i}`,'함께 알아둘 조건',value)),...block('limits','해석의 범위',data.limits)]
-  const add=(id:string,label:string,value:unknown)=>doc.sections.push({id,label,state:text(value)?'ready':'missing',blocks:block(`${id}:text`,'해설',value)})
+  const originalBlock = (id: string, label: string, value: unknown): AuthoredBlock[] =>
+    typeof value === 'string' && value.trim() ? [{id, label, text: value}] : []
+  doc.headline = data.headline ?? ''
+  doc.core=[...originalBlock('core:summary','핵심 요약',core.core_summary),...originalBlock('core:reason','이렇게 읽는 이유',core.core_reason),...originalBlock('core:action','할 일 · 확인할 점',core.core_action),...(core.core_conditions??[]).flatMap((value,i)=>originalBlock(`core:condition:${i}`,'함께 알아둘 조건',value)),...originalBlock('limits','해석의 범위',data.limits)]
+  const add=(id:string,label:string,value:unknown)=>doc.sections.push({id,label,state:text(value)?'ready':'missing',blocks:originalBlock(`${id}:text`,'해설',value)})
   add('overview','전체 상세 해설',data.overview)
   if(mode.startsWith('marriage_')) {
     const marriage=data.marriage_reading
     for(const [key,label] of [['bottom_line','함께 생활할 때의 핵심'],['bond','관계의 결속'],['emotional_home','정서와 가정'],['daily_life','일상과 역할'],['intimacy_resources','친밀감과 자원'],['conflict_repair','갈등과 회복'],['commitment_or_current_cycle',mode==='marriage_married'?'현재 관계의 과제':'약속과 결혼의 조건'],['timing','시기'],['caution','주의할 조건'],['precision_note','정밀도와 한계']] as const)add(`marriage:${key}`,label,marriage?.[key])
   } else if(mode==='reunion') {
+    if(text(data.reunion_context))add('reunion:context','재회 해설의 배경',data.reunion_context)
     const reunion=data.reunion_synthesis_v2
     if(reunion) {
       add('reunion:summary','재회 해설',reunion.summary)
       for(const [key,label] of [['current_stage','실제 관계 상태를 바탕으로 보면'],['contact_type_if_any','연락이 있다면 그 성격'],['initiative','연락의 방향'],['continuity','대화의 지속'],['meeting_gate','만남으로 넘어갈 조건'],['rebuild_gate','관계를 다시 만들 조건'],['behavior_change_evidence','달라진 행동의 확인']] as const)add(`consultation:${key}`,label,reunion.consultation_answer?.[key])
+      for(const [key,label] of [['complete_cutoff','완전히 단절된 경우'],['no_contact','연락이 없는 경우'],['occasional_contact','가끔 연락하는 경우'],['meeting_again','다시 만나고 있는 경우'],['ambiguous_relationship','관계가 아직 정해지지 않은 경우']] as const) {
+        const application = reunion.consultation_answer?.contextual_application?.[key]
+        if(text(application)) add(`consultation:context:${key}`,label,application)
+      }
       for(const [key,label] of [['next_stage_up_conditions','다음 단계의 확인점'],['down_conditions','멈추거나 다시 볼 조건'],['repeat_risks','반복 위험']] as const)(reunion.consultation_answer?.[key]??[]).forEach((value,i)=>add(`consultation:${key}:${i}`,label,value))
       for(const [key,label] of [['why_reconnect','다시 연결될 여지'],['initiative','양쪽 차트의 활성']] as const){add(`${key}:conclusion`,label,reunion[key]?.conclusion);add(`${key}:interpretation`,`${label}의 이유`,reunion[key]?.interpretation)}
       add('timing:conclusion','계산상 시기',reunion.timing?.conclusion)
@@ -147,26 +162,16 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
       ;(reunion.convergence??[]).forEach((value,i)=>add(`convergence:${i}`,`${value.theme}${value.period?` · ${value.period}`:''}`,value.meaning))
       add('precision','정밀도와 한계',reunion.precision_note)
     } else {
-      for(const [key,label] of [['bottom_line','이전 저장본 핵심'],['incoming_contact','상대 차트 쪽 활성'],['outgoing_contact','내 차트 쪽 활성'],['reconnection_windows','이전 저장본 시기'],['low_windows','주의 구간'],['relationship_filter','관계 유지 조건'],['precision_note','정밀도와 한계']] as const)add(`legacy:${key}`,label,data.reunion_reading?.[key])
+      for(const [key,label] of [['bottom_line','이전 저장본 핵심'],['contact_recontact','재접촉'],['emotional_reactivation','정서 재활성'],['relationship_rebuilding','관계 재구축'],['incoming_contact','상대 차트 쪽 활성'],['outgoing_contact','내 차트 쪽 활성'],['reconnection_windows','이전 저장본 시기'],['low_windows','주의 구간'],['relationship_filter','관계 유지 조건'],['precision_note','정밀도와 한계']] as const)add(`legacy:${key}`,label,data.reunion_reading?.[key])
     }
   } else for(const [key,label] of [['chemistry','서로 끌리는 지점'],['emotional_dynamic','감정을 주고받는 방식'],['communication','소통 방식'],['conflict_pattern','반복 갈등'],['power_boundaries','관계의 경계'],['long_term','오래 이어가는 조건'],['stability','관계의 안정'],['tensions','긴장과 차이'],['timing','선택 기간의 시기']] as const)add(key,label,data[key])
   ;(data.practical_advice??[]).forEach((value,i)=>add(`advice:${i}`,'현실에서 확인할 점',value))
   ;(data.felt_scenarios??[]).forEach((value,i)=>add(`scene:${i}`,'생활 장면',value))
   ;(data.top_aspects??[]).forEach((value,i)=>add(`aspect:${i}`,value.label,value.meaning))
   if(mode==='reunion' && observation) {
-    // Apply the same factual checks on reopening old drafts, without modifying the archive.
-    const clean = (value:string) => {
-      if(!reunionFactContradiction(value,observation)) return value
-      doc.omittedObservationConflict=true
-      return value.split(/(?<=[.!?。])\s+|\n+/u).filter(sentence=>!reunionFactContradiction(sentence,observation)).join(' ').trim()
-    }
-    const cleanBlocks=(rows:AuthoredBlock[])=>rows.map(row=>({...row,text:clean(row.text)})).filter(row=>row.text)
-    doc.headline=clean(doc.headline)
-    doc.core=cleanBlocks(doc.core)
-    doc.sections=doc.sections.flatMap(section=>{
-      const blocks=cleanBlocks(section.blocks)
-      return section.blocks.length && !blocks.length ? [] : [{...section,blocks}]
-    })
+    const passages = [doc.headline, ...doc.core.map(row => row.text),
+      ...doc.sections.flatMap(section => section.blocks.map(row => row.text))]
+    doc.observationConflict = passages.some(value => reunionFactContradiction(value, observation))
   }
   return finish(doc,Boolean(doc.headline&&['core:summary','core:reason','core:action'].every(id=>doc.core.some(b=>b.id===id))&&Array.isArray(core.core_conditions)&&core.core_conditions.length<=4&&core.core_conditions.every(value=>Boolean(text(value)))),ai.interpreter_version??'legacy')
 }
