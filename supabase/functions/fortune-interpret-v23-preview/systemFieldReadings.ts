@@ -28,7 +28,9 @@ export function buildSystemFieldSources(payload:any,packet:any):SystemFieldSourc
     }
   }
   for(const row of [...(payload.saju?.daily??[]),...(payload.saju?.monthly??[]),...(payload.saju?.annual??[])]){
-    if(row.date ? row.date<from||row.date>to : !(row.segment_start?.slice(0,10)<=to && row.segment_end_exclusive?.slice(0,10)>=from))continue
+    // Local midnight belongs to the next segment. A solar-term transition
+    // later on the selected date still supports a partial-day reading.
+    if(row.date ? row.date<from||row.date>to : !(row.segment_start?.slice(0,10)<=to && row.segment_end_exclusive?.slice(0,19)>from+'T00:00:00'))continue
     const god=Object.keys(SAJU_TOPICS).find(name=>String(row.stem_ten_god??'').includes(name))
     if(god && row.ganzhi)add('saju',SAJU_TOPICS[god],`${row.date??row.segment_start} ${row.ganzhi} · ${row.stem_ten_god}`,row.evidence_id)
   }
