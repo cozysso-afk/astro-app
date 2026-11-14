@@ -76,7 +76,7 @@ function authoredSupplementSections(data:NonNullable<AiInterpretationResponse['d
 // paraphrasing or substitution of the overall summary for a missing field.
 type ReadingSystem = 'western'|'saju'|'thai'
 type FortuneData = NonNullable<AiInterpretationResponse['data']>
-function systemFieldSections(system:ReadingSystem,data:FortuneData,field:FortuneField):AuthoredSection[] {
+function systemFieldSections(system:ReadingSystem,data:FortuneData,field:FortuneField,version:string):AuthoredSection[] {
   const prefix = {western:'W:',saju:'S:',thai:'T:'}[system]
   const ownRefs = (refs:string[]|undefined) => Boolean(refs?.length && refs.every(ref=>typeof ref==='string' && ref.startsWith(prefix)))
   const sections:AuthoredSection[] = []
@@ -99,6 +99,18 @@ function systemFieldSections(system:ReadingSystem,data:FortuneData,field:Fortune
     const id = `question:${answer.topic}:${answer.question_key}`
     sections.push({id,label:answer.label,state:'ready',blocks:block(id,answer.label,answer.answer)})
   }
+  // v23.26 introduced the provider-only projection. Older topic_analysis can
+  // contain locally written defaults even when the job itself used Gemini.
+  if (/^supabase-ai-v23\.(?:26-question-evidence|27-field-readings)$/.test(version)) {
+    for(const topic of field.topics) {
+      const row=data.topic_analysis?.[topic]
+      if(!row || !ownRefs(row.evidence_refs) || !text(row.verdict) || sections.some(s=>s.blocks.some(b=>b.text===text(row.verdict))))continue
+      const id=`topic:${topic}`
+      const blocks=([['verdict',topic],['reason','근거가 뜻하는 것'],['action','확인할 점'],['avoid','피할 것']] as const)
+        .flatMap(([key,label])=>block(`${id}:${key}`,label,row[key]))
+      sections.push({id,label:topic,state:'ready',blocks})
+    }
+  }
   return sections
 }
 
@@ -107,7 +119,7 @@ export function buildSystemReadingDocument(system:ReadingSystem,data:FortuneData
   const doc:AuthoredReadingDocument={version:'authored-reading-v1',revision:'',scope:field?`${system}:${field.id}`:system,
     title:[title,field?.label,'Gemini 해설'].filter(Boolean).join(' '),date,state:'missing',headline:'',core:[],sections:[],exportBlockIds:[]}
   if (field) {
-    const [first,...rest]=systemFieldSections(system,data,field)
+    const [first,...rest]=systemFieldSections(system,data,field,version)
     if (first) {
       doc.core=first.blocks.map((b,i)=>i===0 ? {...b,label:first.label} : b)
       doc.sections=rest
@@ -116,7 +128,7 @@ export function buildSystemReadingDocument(system:ReadingSystem,data:FortuneData
     doc.core=block('systems.'+system,'기간 전체 해설',data.systems?.[system])
     for (const lens of ['애정','대인','학업','직업','금전','컨디션'] as const) {
       const group=fortuneGroup(lens)!
-      const [first]=systemFieldSections(system,data,group)
+      const [first]=systemFieldSections(system,data,group,version)
       if(first)doc.core.push({...first.blocks[0],label:lens})
     }
   }
@@ -146,6 +158,16 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
   }
   doc.headline=text(data.headline)
   doc.core=[...block('overall:summary','핵심 요약',data.overall?.summary),...block('overall:reason','이렇게 읽는 이유',data.overall?.dominant_pattern)]
+  for (const lens of ['애정','대인','학업','직업','금전','컨디션'] as const) {
+    const group = fortuneGroup(lens)!
+    const [cluster,key] = sectionMap[group.id][0]
+    const id = cluster+'.'+key
+    const delivery = data.editorial_delivery?.[id]
+    if (delivery==='omitted' || delivery==='invalid') continue
+    const section = (data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>)?.[cluster]?.[key]
+    const reading = editorialSection(id,lens,section,delivery)
+    if (reading.state==='ready') doc.core.push({...reading.blocks[0],label:lens})
+  }
   const decisions=data.decisions??[]
   const first=decisions.find(d=>text(d.action)&&d.evidence_refs?.length)
   if(first)for(const [key,label] of [['action','먼저 할 일'],['reason','행동의 이유'],['timing','적용 시기'],['watch','다시 판단할 조건'],['avoid','피할 것']] as const)doc.core.push(...block(`decision:primary:${key}`,label,first[key]))

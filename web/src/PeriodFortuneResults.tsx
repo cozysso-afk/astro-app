@@ -69,9 +69,7 @@ export function PeriodFortuneResults({
   onSaveOutcome,
 }: PeriodFortuneResultsProps) {
   const field = fortuneField(fieldId)
-  const technicalDetails = <>
-
-    <section className="result-card">
+  const technicalDetails = <section className="result-card">
       <div className="result-card-title"><span>SYSTEMS</span><strong>체계별 보조 흐름</strong></div>
       <div className="saju-summary">
         {result.saju.ok && result.saju.day_master && <span>사주 일간 <b>{result.saju.day_master}</b></span>}
@@ -79,7 +77,6 @@ export function PeriodFortuneResults({
         <span>Thai(태국점성술) <b>{result.thai.thai_day}</b> · {result.thai.ruler}</span>
       </div>
     </section>
-  </>
 
   // Do not promote a provisional/unchecked result into a Gemini-authored reading.
   const hasNaturalReading = verifiedFortuneNarrative(aiInterpretation)

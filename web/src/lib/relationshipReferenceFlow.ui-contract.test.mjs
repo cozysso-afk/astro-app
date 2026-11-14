@@ -20,8 +20,13 @@ test('the relationship scores stay independently accessible without generating a
 
 test('only verified provider text answers a relationship question on an independent tab', () => {
   const calculation = systemFixture('week')
-  const systems = {western:'연락과 만남을 구분한 원고', saju:'사주에서 읽은 원고'}
-  assert.match(renderSystem('western',{calculation,field:'love',interpretation:systemResponse(systems)}), /연락과 만남을 구분한 원고/)
-  assert.doesNotMatch(renderSystem('western',{calculation,field:'love',interpretation:systemResponse(systems,{origin:'deterministic_safe'})}), /연락과 만남을 구분한 원고/)
-  assert.doesNotMatch(renderSystem('saju',{calculation,field:'love',interpretation:systemResponse(systems)}), /연락과 만남을 구분한 원고/)
+  const systems = {western:'기간 전체에 쓴 원고', saju:'사주에서 읽은 원고'}
+  const interpretation=systemResponse(systems,{data:{systems,clusters:{relationship:{love_general:{
+    conclusion:'연락과 만남을 구분한 원고',real_scene:'만남을 조율할 때',action:'약속을 살펴봐.',applicability:'direct',evidence_refs:['W:daily:2026-09-12:1'],
+  }}}}})
+  const selected=renderSystem('western',{calculation,field:'love',interpretation})
+  assert.match(selected,/연락과 만남을 구분한 원고/)
+  assert.doesNotMatch(selected,/기간 전체에 쓴 원고/)
+  assert.doesNotMatch(renderSystem('western',{calculation,field:'love',interpretation:{...interpretation,origin:'deterministic_safe'}}), /연락과 만남을 구분한 원고/)
+  assert.doesNotMatch(renderSystem('saju',{calculation,field:'love',interpretation}), /연락과 만남을 구분한 원고/)
 })

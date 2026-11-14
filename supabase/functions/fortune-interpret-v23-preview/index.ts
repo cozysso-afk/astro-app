@@ -271,7 +271,7 @@ async function job(id:string,payload:any,model:string,key:string){
 function verifiedGeminiJob(data:any){
   if(data?.status!=="done"||!data?.result_json||data?.usage_json?.origin!=="gemini")return false;
   const version=data.usage_json.generation_version;
-  if(![VERSION,"supabase-ai-v23.25-period-split-evidence-v1"].includes(version) || version!==data.usage_json.cost_guard_version ||
+  if(![VERSION,"supabase-ai-v23.26-question-evidence","supabase-ai-v23.25-period-split-evidence-v1"].includes(version) || version!==data.usage_json.cost_guard_version ||
     data.usage_json.degraded_quality===true || data.usage_json.local_quality_fallback===true)return false;
   const trace=Array.isArray(data?.usage_json?.call_trace)?data.usage_json.call_trace:[];
   const successful=trace.some((row:any)=>Number(row?.http_status)>=200&&Number(row?.http_status)<300&&String(row?.model??"")===String(data?.model??""));

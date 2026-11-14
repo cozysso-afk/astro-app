@@ -34,6 +34,13 @@ for(const period of ['week','month','year'])test(`${period} keeps authored core 
   const model=exporter.authoredReadingExportModel(doc)
   const exported=model.sections.flatMap(s=>s.cards).map(c=>c.body)
   for(const value of [data.headline,data.overall.summary,data.overall.dominant_pattern,...Object.values(data.decisions[0]).filter(v=>typeof v==='string'),data.limits])if(value)assert.ok(exported.includes(value),value)
+  const areas = [data.clusters.relationship.love_general, data.clusters.relationship.summary,
+    data.clusters.work_study.study, data.clusters.work_study.work,
+    data.clusters.money_news.money, data.clusters.condition.condition]
+  for (const area of areas) {
+    assert.ok(doc.core.some(block=>block.text===area.conclusion))
+    assert.ok(exported.includes(area.conclusion))
+  }
   assert.ok(html.indexOf('authored-reading-core')<html.indexOf('authored-reading-details'))
   assert.equal(JSON.stringify(data),before)
 })

@@ -61,7 +61,15 @@ export function FortuneCalculationData({calculation,topics=[],period}:DataProps)
   }
   const evidence=(day?.evidence ?? []).filter(row=>!topics.length || row.source_topics?.some(selectedTopic))
   const axesRows=Object.entries(day?.score_components ?? {}).filter(([name,v])=>dayScores.has(name) && finite(v?.activation) && finite(v?.favorability))
-  const rankedStats=stats.filter(([,stat])=>stat!.best_days?.length || stat!.caution_days?.length)
+  const rankedStats=stats.flatMap(([name,stat])=>{
+    const points=[...(stat!.best_days ?? []),...(stat!.caution_days ?? [])]
+      .filter(point=>point.date>=start && point.date<=end && finite(point.score))
+    const scores=points.map(point=>point.score)
+    if(new Set(scores).size<2)return []
+    const datesAt=(score:number)=>[...new Set(points.filter(point=>point.score===score).map(point=>point.date))].sort().join(' · ')
+    const high=Math.max(...scores), low=Math.min(...scores)
+    return [{name,high,low,highDates:datesAt(high),lowDates:datesAt(low)}]
+  })
   const hourly=calculation.western.detail_days?.find(row=>row.date===(day?.date ?? start))
   const hourlyTopics=Object.entries(hourly?.topics ?? {}).filter(([topic,value])=>selectedTopic(topic) && (value.best_window || value.caution_window || value.evidence?.length))
   return <section className="result-card calculation-data" aria-label="기간 계산 원자료">
@@ -71,11 +79,10 @@ export function FortuneCalculationData({calculation,topics=[],period}:DataProps)
       {stats.map(([name,s])=><p key={name}>{name} · {s!.average}점</p>)}
       <ContactSignalData calculation={calculation} topics={topics} period={period}/>
       {rankedStats.length>0 && <details><summary>분야별 점수가 높은 날과 낮은 날</summary>
-        {rankedStats.map(([name,s])=>{
-          const rows=[['높은 날',s!.best_days],['낮은 날',s!.caution_days]] as const
-          return <div key={name}><h4>{name}</h4>{rows.map(([label,points])=>
-            points?.length ? <p key={label}>{label} · {points.map(point=>`${point.date} (${point.score}점)`).join(' · ')}</p> : null)}</div>
-        })}
+        {rankedStats.map(row=><div key={row.name}><h4>{row.name}</h4>
+          <p>높은 날 · {row.highDates} ({row.high}점)</p>
+          <p>낮은 날 · {row.lowDates} ({row.low}점)</p>
+        </div>)}
       </details>}
     </>}
     {(day || dayScores.size>0) && <div>

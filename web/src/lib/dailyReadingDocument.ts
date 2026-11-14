@@ -93,10 +93,12 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
   } else {
     const headline = clean(data.headline)
     const summary = clean(data.overall?.summary)
-    if (!headline || !summary || !data.overall?.evidence_refs?.length) return doc
-    doc.headline = headline
-    if (summary !== headline) doc.blocks.push({id:'overall:summary',label:'오늘의 흐름',text:summary})
-    if (clean(data.overall.dominant_pattern)) doc.blocks.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
+    const completeLead = Boolean(headline && summary && data.overall?.evidence_refs?.length)
+    if (completeLead) {
+      doc.headline = headline
+      if (summary !== headline) doc.blocks.push({id:'overall:summary',label:'이날의 흐름',text:summary})
+      if (clean(data.overall.dominant_pattern)) doc.blocks.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
+    }
     // The lead may address one subject. The six authored primary conclusions give
     // the complete reading, including previously saved documents with that layout.
     const clusters = data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>
@@ -107,8 +109,12 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
       const section = clusters?.[group]?.[key]
       const state = sectionState(section, data.editorial_delivery?.[id])
       doc.slots.push({id,label,state})
-      if (state === 'ready') doc.blocks.push({id:id+':overview',label,text:clean(section.conclusion)})
+      if (state === 'ready') {
+        const destination = completeLead ? doc.blocks : doc.details
+        destination.push({id:id+':overview',label,text:clean(section.conclusion)})
+      }
     }
+    if (!completeLead) return doc
     const decisions = data.decisions ?? []
     const decision = decisions.find(item => clean(item.action) && item.evidence_refs?.length)
     if (decision) {

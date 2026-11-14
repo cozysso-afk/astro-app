@@ -122,4 +122,10 @@ test('a social lead cannot hide the other supported fields in the overview or it
   const partial=buildDailyReadingDocument(d,'2026-11-14',undefined,true)
   assert.ok(!partial.blocks.some(b=>['학업 고유 결론.','직장 고유 결론.'].includes(b.text)))
   assert.equal(partial.slots.find(s=>s.id==='work_study.work').state,'missing')
+  delete d.overall
+  const incomplete=buildDailyReadingDocument(d,'2026-11-14',undefined,true)
+  assert.equal(incomplete.state,'missing')
+  assert.equal(incomplete.headline,'')
+  assert.ok(incomplete.details.some(b=>b.text==='금전 고유 결론.'))
+  assert.throws(()=>dailyReadingExportModel(incomplete))
 })

@@ -157,6 +157,19 @@ try {
 
   await daily.getByRole('button',{name:'저장 원고 유무 전환'}).click()
   await daily.locator('[data-daily-state="ready"]').waitFor()
+  await daily.getByRole('button',{name:'서양점성술',exact:true}).click()
+  const systemBodies=new Set()
+  for(const topic of ['전체','애정','대인','학업','직업','금전','컨디션']){
+    await daily.getByRole('button',{name:topic,exact:true}).click()
+    const body=await daily.locator('[data-system-manuscript="western"][data-reading-state="ready"] .authored-reading-core').innerText()
+    assert(body.trim() && !systemBodies.has(body),'Western tab repeated or empty: '+topic)
+    systemBodies.add(body)
+  }
+  await daily.getByRole('button',{name:'금전 원고 누락 테스트'}).click()
+  await daily.getByRole('button',{name:'금전',exact:true}).click()
+  assert(await daily.locator('[data-reading-field="money"][data-reading-state="missing"]').count()===1,'missing Western money manuscript silently fell back')
+  await daily.getByRole('button',{name:'금전 원고 누락 테스트'}).click()
+  await daily.getByRole('button',{name:'통합',exact:true}).click()
   await daily.getByRole('button',{name:'학업',exact:true}).click()
   const study = daily.locator('.daily-reading')
   assert(await study.locator('.daily-reading-headline').innerText()==='새 진도를 더하기 전에 배운 내용을 한 번 설명해봐.','authored answer changed')

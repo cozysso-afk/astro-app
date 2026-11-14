@@ -1,9 +1,10 @@
-import { Children, Fragment, useEffect, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { Children, Fragment, useEffect, useMemo, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Columns3, Copy, Layers3, Orbit, Sparkles } from 'lucide-react'
 import type { AiInterpretationResponse, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { ContactObservationScope, useObservedPromptContext } from './ContactObservationScope'
 import { AuthoredReadingPanel } from './AuthoredReadingPanel'
 import { ContactSignalData } from './FortuneCalculationData'
+import { readerFacingFortune } from './lib/readerFacingFortune'
 import { buildSystemReadingDocument } from './lib/authoredReadingDocument'
 import { verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 import { fortuneEvidenceSnapshot } from './lib/fortuneToneCalibration'
@@ -70,7 +71,8 @@ export function SystemReadingViews({calculation:c,periodKey,interpretation,child
   const systemTitle = SYSTEMS.find(s=>s.id===system)!.label
   const period = c.period.start===c.period.end ? c.period.start : `${c.period.start} — ${c.period.end}`
   const verified = verifiedFortuneNarrative(interpretation)
-  const authored = verified && interpretation?.data && system!=='integrated' ? buildSystemReadingDocument(system,interpretation.data,period,focusedField,interpretation.interpreter_version) : null
+  const manuscript = useMemo(()=>verified && interpretation?.data ? readerFacingFortune(interpretation.data) : null,[verified,interpretation?.data])
+  const authored = manuscript && system!=='integrated' ? buildSystemReadingDocument(system,manuscript,period,focusedField,interpretation?.interpreter_version) : null
   const sampleStart = segment && (segment.start>c.period.start ? segment.start : c.period.start)
   const sampleEnd = segment && (segment.end<c.period.end ? segment.end : c.period.end)
   const samplePlanets = new Map(placements.map(row=>[row.planet.key,thaiPlanetLabel(row.planet.label)]))
@@ -93,9 +95,10 @@ export function SystemReadingViews({calculation:c,periodKey,interpretation,child
           </section>}</div>
         {system==='western' && <>
           <section className="result-card"><h3>{topic==='전체'?'분야별':topic} 계산 점수</h3>
+            <p>일반 분야 점수는 해당 분야의 신호 강도와 수월함·부담의 균형을 함께 반영해.</p>
             <div className="system-score-grid western-score-grid">{westernRows.map(([name,s])=><details className="western-score-card" key={name}>
               <summary><span className="western-score-topline"><strong>{name}</strong><b>{s.average}</b></span><span className="western-score-band">{s.band}</span></summary>
-              <p>{westernPeriodFact(s,c.period.start,c.period.end)}</p>
+              {c.period.start!==c.period.end && <p>{westernPeriodFact(s,c.period.start,c.period.end)}</p>}
               {Object.entries(fortuneEvidenceSnapshot(c,name)).filter(([k,v])=>['support','challenge','neutral'].includes(k)&&v).map(([k,v])=><p key={k}>{{support:'도움 근거',challenge:'부담 근거',neutral:'중립 근거'}[k]} · {v}</p>)}
             </details>)}</div>
             <ContactSignalData calculation={c} topics={chosenTopics} period={periodKey ?? 'today'}/>
