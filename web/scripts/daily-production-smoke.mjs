@@ -24,7 +24,7 @@ const model = 'gemini-3.7-flash'
 const endpoint = 'fortune-interpret-v22-preview'
 const existingJobId = process.env.QA_EXISTING_JOB_ID || ''
 const profile = {name:'synthetic-qa-only',birthDate:'1987-06-15',birthTime:'08:30',placeKey:'',latitude:'37.5665',longitude:'126.978',utcOffset:'9',gender:'female',timeSource:'official_record',timeConfidence:'exact',rectifiedWindowStart:'',rectifiedWindowEnd:''}
-const report = {source:'Authenticated production homepage, synthetic QA profile',url:origin,period,date,mode,expectedVersion:version,expectedModel:model,replay:!!existingJobId,replayPolicy:existingJobId?'Only start response bridges to explicitly supplied real existing job; authentication, calculation, polling and UI are production':'No route responses mocked',startAttempts:0,forwardedStarts:0,blockedStarts:0,geminiCallsThisRun:0,jobGeminiCalls:null,reused:null,rawManuscriptPresent:false,widths:[],scopes:[],exportedImages:0,errors:[],stage:'configuration'}
+const report = {source:'Authenticated production homepage, synthetic QA profile',url:origin,period,date,mode,expectedVersion:version,expectedModel:model,replay:!!existingJobId,replayPolicy:existingJobId?'Only start response bridges to explicitly supplied real existing job; authentication, calculation, polling and UI are production':'No route responses mocked',startAttempts:0,forwardedStarts:0,blockedStarts:0,geminiCallsThisRun:0,jobGeminiCalls:null,reused:null,rawManuscriptPresent:false,widths:[],scopes:[],systemScopes:[],exportedImages:0,errors:[],stage:'configuration'}
 let browser, page, session, calculation, finalStatus, jobId = existingJobId
 let explicitGeneration = false
 const pending = new Set()
@@ -68,6 +68,91 @@ function indexManuscript(raw,display,fieldPath='',index=new Map()) {
     }
   }
   return index
+}
+// Read provider fields directly here: an identical bug in the UI and its
+// document builder must not qualify a one-topic overview as a complete reading.
+const primaryAreas = [
+  ['애정','relationship','love_general'], ['대인','relationship','summary'],
+  ['학업','work_study','study'], ['직업','work_study','work'],
+  ['금전','money_news','money'], ['컨디션','condition','condition'],
+]
+function availablePrimary(manuscript, group, key) {
+  const section = manuscript.clusters?.[group]?.[key]
+  const delivery = manuscript.editorial_delivery?.[group+'.'+key]
+  return section?.evidence_refs?.length && section.conclusion?.trim() && section.action?.trim()
+    && (section.real_scene?.trim() || (section.applies_when?.trim() && section.evidence_meaning?.trim()))
+    && section.applicability !== 'insufficient' && !['invalid','omitted'].includes(delivery)
+    ? section : null
+}
+async function verifyDailyBreadth(panel, manuscript) {
+  const coverage = []
+  for (const [label,group,key] of primaryAreas) {
+    const section = availablePrimary(manuscript,group,key)
+    if (!section) continue
+    const block = panel.locator(`[data-daily-block="${group}.${key}:overview"] p`)
+    assert.ok(await block.isVisible(), `Overall hides the authored ${label} reading`)
+    assert.equal(await block.innerText(), section.conclusion.trim(), `Overall misroutes the ${label} conclusion`)
+    coverage.push(label)
+  }
+  assert.ok(coverage.length >= 2, 'No cross-field daily overview could be verified on this sample')
+  report.overallCoverage = coverage
+}
+async function verifySystemNavigation(root, manuscript, originalFields) {
+  const systems = root.getByRole('group',{name:'해석 체계 선택'})
+  const fields = root.getByRole('group',{name:'생활 분야 선택'})
+  for (const [system,name,prefix] of [['western','서양점성술','W:'],['saju','사주','S:'],['thai','태국점성술','T:']]) {
+    await systems.getByRole('button',{name,exact:true}).click()
+    const unavailable = root.locator('.system-unavailable')
+    if (await unavailable.count()) {
+      assert.notEqual(system,'western','Western calculation unavailable in the exact-time QA sample')
+      report.systemScopes.push({system,state:'unavailable',message:await unavailable.innerText()})
+      continue
+    }
+    let lastWesternStudy
+    for (const label of ['전체',...primaryAreas.map(([area])=>area), '학업']) {
+      const button = fields.getByRole('button',{name:label,exact:true})
+      if (await button.isDisabled()) {
+        assert.notEqual(system, 'western', 'Western navigation unexpectedly disabled '+label)
+        continue
+      }
+      await button.click()
+      assert.equal(await button.getAttribute('aria-pressed'),'true')
+      const field = fortuneGroup(label)?.id ?? 'overall'
+      const current = root.locator(`[data-system-manuscript="${system}"][data-reading-field="${field}"]`)
+      await current.waitFor()
+      const state = await current.getAttribute('data-reading-state')
+      const fragments = await current.locator('.authored-reading-headline, .authored-reading-core [data-reading-block] p').allTextContents()
+      const words = fragments.map(value=>value.trim()).filter(Boolean)
+      const overall = manuscript.systems?.[system]?.trim()
+      const sources = primaryAreas.filter(([area])=>label==='전체' || label===area)
+      const required = sources.flatMap(([area,group,key])=>{
+        const allowed = fortuneGroup(area).topics
+        const dedicated = manuscript.system_field_readings?.find(row=>row.system===system && allowed.includes(row.topic)
+          && row.reading?.trim() && row.evidence_refs?.length && row.evidence_refs.every(id=>id.startsWith(prefix)))
+        if (dedicated) return [dedicated.reading.trim()]
+        const section = availablePrimary(manuscript,group,key)
+        return section?.evidence_refs.every(id=>id.startsWith(prefix)) ? [section.conclusion.trim()] : []
+      })
+      if (label==='전체' && overall) assert.ok(words.includes(overall), name+' overview omits its Gemini manuscript')
+      if (label!=='전체' && overall) assert.ok(!words.includes(overall), name+' / '+label+' repeated the system-wide summary')
+      for (const conclusion of required) {
+        assert.equal(state,'ready',name+' / '+label+' lost its primary source')
+        assert.ok(words.includes(conclusion),name+' / '+label+' rendered a different primary conclusion')
+      }
+      if (state==='ready') {
+        assert.ok(words.length && words.every(word=>originalFields.has(word)), name+' / '+label+' shows content outside the provider manuscript')
+      } else {
+        assert.equal(await current.getByRole('button',{name:/이미지 저장$/}).count(),0,'Unavailable manuscript offers an export')
+      }
+      if (system==='western' && label==='학업') {
+        if (lastWesternStudy) assert.deepEqual(words,lastWesternStudy,'Returning to Western study shows stale content')
+        lastWesternStudy=words
+      }
+      report.systemScopes.push({system,label,state,visibleManuscript:words})
+    }
+  }
+  await systems.getByRole('button',{name:'통합',exact:true}).click()
+  await fields.getByRole('button',{name:'전체',exact:true}).click()
 }
 function track(promise) {
   pending.add(promise)
@@ -314,6 +399,10 @@ try {
     }
     const heading=await headingElement.innerText()
     const blocks=await coreText.allTextContents()
+    if (daily && label==='전체') {
+      const timing=panel.locator('[data-daily-block="overall:timing"] p')
+      if (await timing.count()) assert.doesNotMatch((await timing.innerText()).trim(),/^(?:선택(?:한)? (?:운세일|날짜)|운세일|해당일|오늘|\d{4}-\d\d-\d\d)[.!]?$/)
+    }
     const sourceFields=[heading,...blocks].map(text=>originalFields.get(text.trim()) ?? null)
     const scopeReport={label,state,heading,blocks,sourceFields,sourceTextParity:false,exportTextParity:null,images:0}
     report.scopes.push(scopeReport)
@@ -321,6 +410,7 @@ try {
     assert.equal(heading,expected.headline,`${label}: screen headline differs from Gemini`)
     assert.deepEqual(blocks,sourceValues.map(value=>value.text),`${label}: screen core text differs from Gemini`)
     scopeReport.sourceTextParity=true
+    if (daily && label==='전체') await verifyDailyBreadth(panel,manuscript)
     const exportIds=daily ? sourceValues.map(block=>block.id) : expected.exportBlockIds
     if (!exportIds.length && !daily) {
       assert.equal(await exportButton.count(),0,'No actionable core can be exported')
@@ -341,6 +431,8 @@ try {
     scopeReport.exportTextParity=true
     scopeReport.images=downloads.length-before
   }
+  report.stage='system-topic-navigation'
+  await verifySystemNavigation(root,manuscript,originalFields)
   const ready=report.scopes.filter(row=>row.state==='ready')
   assert.equal(new Set(ready.map(row=>row.heading)).size,ready.length,'Duplicate scope headings')
   await Promise.all([...pending])
@@ -365,6 +457,6 @@ try {
   report.exportedImages=downloads.length
   await persistCandidate()
   await save('browser-report.json',report)
-  console.log(JSON.stringify({stage:report.stage,passed:!process.exitCode,job_id:jobId||null,forwardedStarts:report.forwardedStarts,jobGeminiCalls:report.jobGeminiCalls,geminiCallsThisRun:report.geminiCallsThisRun,reused:report.reused,blockedStarts:report.blockedStarts,scopeCount:report.scopes.length,exportedImages:report.exportedImages,failure:report.failure||null}))
+  console.log(JSON.stringify({stage:report.stage,passed:!process.exitCode,job_id:jobId||null,forwardedStarts:report.forwardedStarts,jobGeminiCalls:report.jobGeminiCalls,geminiCallsThisRun:report.geminiCallsThisRun,reused:report.reused,blockedStarts:report.blockedStarts,scopeCount:report.scopes.length,systemTransitions:report.systemScopes.length,overallCoverage:report.overallCoverage,exportedImages:report.exportedImages,failure:report.failure||null}))
   await browser?.close()
 }

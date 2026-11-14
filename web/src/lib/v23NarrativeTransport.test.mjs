@@ -36,7 +36,11 @@ test('legacy V21 compatibility adapter preserves historical status routing',asyn
 
 test('browser Fortune cache keeps interpreter identity and invalidates day/week under the daily reading contract',()=>{
   const source=readFileSync(new URL('./readingCache.ts',import.meta.url),'utf8')
-  assert.match(source,/FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23\.26-question-evidence'/)
+  const edge=readFileSync(new URL('../../../supabase/functions/fortune-interpret-v23-preview/index.ts',import.meta.url),'utf8')
+  const version=edge.match(/const VERSION="([^"]+)"/)?.[1]
+  assert.ok(version)
+  assert.ok(source.includes("const FORTUNE_AI_CACHE_CONTRACT = '"+version+"'"))
+  assert.match(source,/PREVIOUS_FORTUNE_CACHE_CONTRACT = 'supabase-ai-v23\.26-question-evidence'/)
   assert.match(source,/FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'/)
   assert.match(source,/FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v6-daily-reading-contract-v9'/)
   assert.match(source,/periodKind === 'day' \|\| periodKind === 'week'/)

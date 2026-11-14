@@ -3,6 +3,7 @@ import type { AiInterpretationResponse, IntegratedApiResponse } from './appTypes
 import type { FortuneField } from './lib/fortuneFields'
 import { useObservedPassage } from './ContactObservationScope'
 import { buildDailyReadingDocument, type DailyReadingDocument } from './lib/dailyReadingDocument'
+import { periodAiCostPreview } from './lib/aiCostPreview'
 import { exportDailyReadingImages } from './lib/readingImageExport'
 import './daily-reading.css'
 import '@fontsource/nanum-myeongjo/korean-400.css'
@@ -94,10 +95,15 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
     </section>}
     {!!otherDetails.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{otherDetails.map(b=><section className="daily-reading-block" key={b.id} data-daily-detail={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
     {(['missing','insufficient'] as const).map(state=>{const slots=doc.slots?.filter(slot=>slot.state===state && !featuredIds.has(slot.id) && !scenarios.some(row=>row.id===slot.id))??[];return slots.length?<details className="daily-reading-coverage" key={state}><summary>{state==='missing'?'아직 작성되지 않은 항목':'근거가 부족한 항목'} {slots.length}개</summary><ul>{slots.map(slot=><li key={slot.id} data-daily-slot={slot.id} data-slot-state={state}>{slot.label}</li>)}</ul></details>:null})}
-    {onRetry && (doc.state==='missing' || doc.state==='needs_refresh') && <button type="button" className="daily-reading-save" onClick={onRetry}>해설 다시 불러오기</button>}
+
     {doc.state==='ready' && <>      <button className="daily-reading-save" type="button" disabled={saving} onClick={save}>{saving?'이미지 만드는 중…':'핵심 해설 이미지 저장'}</button>
       {notice&&<p className="daily-reading-notice" role="status">{notice}</p>}
 </>}
+    {onRetry && doc.state!=='unverified' && <details className="daily-reading-details">
+      <summary>Gemini 해설 새로 생성</summary>
+      <p>{periodAiCostPreview('today')}</p>
+      <button type="button" className="daily-reading-save" onClick={onRetry}>일간 해설 다시 생성</button>
+    </details>}
     {technicalDetails&&<details className="daily-reading-details"><summary>계산 근거 보기</summary>{technicalDetails}</details>}
   </section>
 }

@@ -152,6 +152,10 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       reconnection:structuredClone(section.properties.evidence_refs),
     },required:["incoming","outgoing","reconnection"]};
     core.required.push("contact_evidence_refs");
+    core.properties.system_field_readings={type:"ARRAY",description:"system_field_sources 각 행의 system/topic에 한해 해당 fact의 명칭과 그 분야에서의 뜻을 독립된 한국어 한두 문장으로 풀어 써. 해당 행의 evidence_ref 하나만 인용해. 점수·시기·사건 예측으로 바꾸지 마. 뜻을 뒷받침할 수 없으면 그 행은 생략해. sources가 없으면 빈 배열.",items:{type:"OBJECT",properties:{
+      system:{type:"STRING",enum:["saju","thai"]},topic:{type:"STRING"},reading:{type:"STRING"},evidence_refs:structuredClone(section.properties.evidence_refs),
+    },required:["system","topic","reading","evidence_refs"]}};
+    core.required.push("system_field_readings");
     const minimums={
       day:{key_windows:1,decisions:1,priorities:1},
       week:{key_windows:0,decisions:0,priorities:0},
@@ -189,7 +193,7 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       core.required=[...core.required,"editorial_focus"];
       core.propertyOrdering=Object.keys(core.properties);
       core.properties.headline.description="분야별 해석과 editorial_focus를 작성한 뒤, 구체적 대상에 대한 판단 하나를 짧은 한국어 한 문장으로 써. 이유·행동·제한을 전부 압축하지 마.";
-      core.properties.overall.properties.summary.description="editorial_focus의 적용 상황과 해석 이유를 짧은 한국어 두 문장으로 설명해. 제목을 반복하거나 여러 분야를 나열하지 마.";
+      core.properties.overall.properties.summary.description="focus를 먼저 설명하고 근거가 다른 기본 분야가 있으면 그 분야와 무엇이 다른지 두 문장으로 설명해. 각 판단은 해당 분야 원고에서 직접 인용한 근거를 overall.evidence_refs에 담아.";
     }
   }
   return core;

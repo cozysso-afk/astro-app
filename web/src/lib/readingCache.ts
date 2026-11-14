@@ -16,7 +16,8 @@ const STORE_NAME = 'records'
 const DB_VERSION = 1
 const PERIOD_ARCHIVE_ID_CONTRACT = 'integrated-precision-v2-calc-v1'
 const FORTUNE_CALC_CACHE_CONTRACT = 'integrated-precision-v2-field-evidence-v2'
-const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.26-question-evidence'
+const FORTUNE_AI_CACHE_CONTRACT = 'supabase-ai-v23.27-field-readings'
+export const PREVIOUS_FORTUNE_CACHE_CONTRACT = 'supabase-ai-v23.26-question-evidence'
 const FORTUNE_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-v2-editorial-v4-domain-answers'
 const FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT = 'v23-period-narrative-dw-v6-daily-reading-contract-v9'
 const FORTUNE_PRECISION_CACHE_CONTRACT = 'integrated-precision-v2'
@@ -149,7 +150,7 @@ export function storedFortuneCalculationId(snapshot: Record<string, unknown>): s
   return `fortune-calc:${hashText(stableStringify({ contract: PERIOD_ARCHIVE_ID_CONTRACT, request }))}`
 }
 
-export function fortuneAiCacheId(request: Record<string, unknown>, calculation: Record<string, unknown>, model: string): string {
+export function fortuneAiCacheId(request: Record<string, unknown>, calculation: Record<string, unknown>, model: string, contract = FORTUNE_AI_CACHE_CONTRACT): string {
   const period = calculation.period && typeof calculation.period === 'object' ? calculation.period as Record<string, unknown> : {}
   const western = calculation.western && typeof calculation.western === 'object' ? calculation.western as Record<string, unknown> : {}
   const saju = calculation.saju && typeof calculation.saju === 'object' ? calculation.saju as Record<string, unknown> : {}
@@ -160,7 +161,7 @@ export function fortuneAiCacheId(request: Record<string, unknown>, calculation: 
     ? FORTUNE_DAY_WEEK_NARRATIVE_CACHE_CONTRACT
     : FORTUNE_NARRATIVE_CACHE_CONTRACT
   const signature = {
-    interpretation_contract: FORTUNE_AI_CACHE_CONTRACT,
+    interpretation_contract: contract,
     ...(periodKind === 'day' ? {daily_relationship_revision: 3} : {}),
     ...(periodKind === 'week' ? {weekly_reading_revision: 1} : {}),
     ...(periodKind === 'month' ? {monthly_relationship_revision: 2} : {}),

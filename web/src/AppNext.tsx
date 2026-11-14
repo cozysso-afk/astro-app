@@ -18,7 +18,7 @@ import { ARCHIVE_BACKUP_MAX_BYTES, createArchiveBackup, downloadArchiveBackup, p
 import { disablePush, enablePush, getPushState, type PushSnapshot } from './lib/push'
 import { ensureSupabaseSession, supabase } from './lib/supabase'
 import { resumePeriodArchive, savePeriodArchive } from './lib/periodArchive'
-import { fortuneAiCacheId, fortuneCalculationCacheId, periodCalculationRequest, storedFortuneCalculationId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
+import { PREVIOUS_FORTUNE_CACHE_CONTRACT, fortuneAiCacheId, fortuneCalculationCacheId, periodCalculationRequest, storedFortuneCalculationId, readReadingCache, relationshipAiCacheId, writeReadingCache } from './lib/readingCache'
 import { decodePendingFortuneAiJob, encodePendingFortuneAiJob, FORTUNE_AI_JOB_STORAGE_KEY, type PendingFortuneAiJob } from './lib/fortuneAiJob'
 import { fortuneAiFailedJobMessage, fortuneAiPublicErrorMessage, fortuneAiStartErrorMessage, fortuneAiStatusErrorMessage } from './lib/fortuneAiPublicError'
 import { readLocalStorage, removeLocalStorage, writeLocalStorage } from './lib/browserStorage'
@@ -40,7 +40,6 @@ import type {
   RelationshipMonth,
   RelationshipApiResponse,
   RelationshipAiResponse,
-  FortunePoint,
   FortuneStat,
   FortuneMonth,
   ReunionTimingContext,
@@ -138,23 +137,7 @@ function annotateUserFacingText(value: string) {
   text = text.replace(/([子丑寅卯辰巳午未申酉戌亥])([子丑寅卯辰巳午未申酉戌亥])([沖冲合刑破害])(?!\()/g, (m,a,b,c) => `${m}(${hanjaReading[a]}${hanjaReading[b]}${hanjaReading[c]})`)
   return text
 }
-function humanizeEvidence(value: string) {
-  let text = String(value ?? '')
-  const replacements: Array<[RegExp, string]> = [
-    [/True Node/g, '진북교점'], [/Uranus/g, '천왕성'], [/Neptune/g, '해왕성'], [/Saturn/g, '토성'],
-    [/Jupiter/g, '목성'], [/Mercury/g, '수성'], [/Venus/g, '금성'], [/Pluto/g, '명왕성'], [/Mars/g, '화성'],
-    [/Moon/g, '달'], [/Sun/g, '태양'], [/ASC/g, '상승점'], [/DSC/g, '하강점'], [/MC/g, '중천점'], [/IC/g, '천저점'],
-    [/Whole Sign/g, '홀사인'], [/Placidus/g, '플라시두스'],
-  ]
-  replacements.forEach(([pattern, label]) => { text = text.replace(pattern, label) })
-  text = text.replace(/(\d+)H\b/g, '$1하우스')
-  text = text.replace(/orb\s*/gi, '오브 ')
-  return text
-}
-const topicEmoji: Record<string,string> = {금전:'💰',학업:'📚',시험:'✍️',직장:'💼',이직:'🧭',대인관계:'🤝',연애:'💗',연락:'💌',재회:'🪐',소식:'💌',컨디션:'🌿',투자심리:'📈',수익실현:'💵',신규진입:'🚪',투자주의:'⚠️'}
-const topicDisplay = (topic:string) => `${topicEmoji[topic] ?? '✦'} ${topic}`
 const relationshipDayPresets = [7,31,90,180,365]
-const relationshipSignalOrder = ['수신신호','발신적합','과거인연접점']
 const relationshipTimeSensitivePoints = new Set(['ASC','DSC','MC','IC'])
 
 const OUTCOME_STORAGE_KEY = 'starlight-destiny.relationship-outcomes.v2'
@@ -307,24 +290,6 @@ function currentDayun(result: IntegratedApiResponse | null) {
   if (!result?.saju.dayun?.length) return null
   const y = Number(result.period.start.slice(0,4))
   return result.saju.dayun.find((row) => row.start_year <= y && row.end_year >= y) ?? result.saju.dayun[0]
-}
-
-function collectFortuneHighlights(
-  rows: Array<{ topic: string; stat: FortuneStat }>,
-  key: 'best_days' | 'caution_days',
-  limit = 3,
-) {
-  const byDate = new Map<string, FortunePoint & { topic: string }>()
-  rows.forEach(({ topic, stat }) => {
-    for (const point of stat[key] ?? []) {
-      const previous = byDate.get(point.date)
-      const shouldReplace = !previous || (key === 'best_days' ? point.score > previous.score : point.score < previous.score)
-      if (shouldReplace) byDate.set(point.date, { ...point, topic })
-    }
-  })
-  return [...byDate.values()]
-    .sort((a, b) => key === 'best_days' ? b.score - a.score : a.score - b.score)
-    .slice(0, limit)
 }
 
 function buildReunionTimingContext(result: IntegratedApiResponse): ReunionTimingContext {
@@ -609,11 +574,6 @@ export default function AppNext() {
         .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
     : []
   const topIntegratedTopics = [...orderedIntegratedTopics].sort((a,b) => b.stat.average - a.stat.average)
-  const orderedRelationshipSignals = integratedResult
-    ? relationshipSignalOrder
-        .map((topic) => ({ topic, stat: integratedResult.western.relationship_signals?.[topic] }))
-        .filter((row): row is { topic: string; stat: FortuneStat } => Boolean(row.stat))
-    : []
   const activeDayun = currentDayun(integratedResult)
   const queryYear = Number(queryDate.slice(0,4)) || new Date().getFullYear()
   const calendarYearOptions = Array.from({length:6},(_,index)=>queryYear - 1 + index)
@@ -645,15 +605,6 @@ export default function AppNext() {
     integratedResult.period.start === integratedStartDate &&
     integratedResult.period.end === integratedSelectionEnd
   )
-  const cautionIntegratedTopics = [...topIntegratedTopics]
-    .sort((a,b) => a.stat.average - b.stat.average)
-    .slice(0,2)
-  const bestIntegratedDays = integratedMatchesSelection
-    ? collectFortuneHighlights(topIntegratedTopics, 'best_days')
-    : []
-  const cautionIntegratedDays = integratedMatchesSelection
-    ? collectFortuneHighlights(topIntegratedTopics, 'caution_days')
-    : []
   const precisionRelationshipSignals = integratedResult
     ? Object.entries(integratedResult.western.relationship_signals ?? {})
         .filter((row): row is [string, FortuneStat] => Boolean(row[1]))
@@ -832,7 +783,11 @@ export default function AppNext() {
     setAiLoading(true); setAiError('')
     let startPayload: unknown = null
     try {
-      const cached = refreshReading ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
+      let cached = refreshReading ? null : await readReadingCache<AiInterpretationResponse>(cacheId)
+      if (cacheOnly && !verifiedFortuneNarrative(cached)) {
+        const previousId = fortuneAiCacheId(requestForCache, calculation as unknown as Record<string,unknown>, aiModel, PREVIOUS_FORTUNE_CACHE_CONTRACT)
+        cached = await readReadingCache<AiInterpretationResponse>(previousId)
+      }
       if (aiRequestRef.current !== cacheId) return
       if (selectedReadingPeriod.current.start !== calculation.period.start || selectedReadingPeriod.current.end !== calculation.period.end) {
         aiRequestRef.current = ''
@@ -1625,8 +1580,11 @@ export default function AppNext() {
       setArchiveStatus(error instanceof Error ? error.message : '저장 기록 원문을 불러오지 못했어.')
       return
     }
+    const reading = item.interpretation as unknown as AiInterpretationResponse | undefined
+    const manuscript = verifiedFortuneNarrative(reading) && reading?.data
+      ? '\n\n[저장된 Gemini 해설 원문]\n' + JSON.stringify(reading.data, null, 2) : ''
     if (item.kind === 'daily' && item.request.archive_mode === 'period_fortune_v16') {
-      await handleCopy('기간운세 전체복사', integratedResultText(item.result as unknown as IntegratedApiResponse))
+      await handleCopy('기간운세 전체복사', integratedResultText(item.result as unknown as IntegratedApiResponse) + manuscript)
       return
     }
     if (item.kind === 'daily' || item.kind === 'outcome') {
@@ -1635,7 +1593,7 @@ export default function AppNext() {
     }
     if (item.kind === 'integrated' || item.kind === 'precision') {
       const result = item.result as unknown as IntegratedApiResponse
-      await handleCopy('저장 결과 전체복사', item.kind === 'precision' ? precisionResultText(result) : integratedResultText(result))
+      await handleCopy('저장 결과 전체복사', (item.kind === 'precision' ? precisionResultText(result) : integratedResultText(result)) + manuscript)
     } else {
       const analysisMode = String(item.request.analysis_mode ?? '')
       const copyKind: 'compatibility' | 'reunion' | 'marriage' = item.kind === 'marriage' ? 'marriage' : analysisMode === 'reunion' ? 'reunion' : 'compatibility'
@@ -1813,18 +1771,8 @@ export default function AppNext() {
                 <div className="result-card-title"><span>WESTERN</span><strong>서양점성술 기간 흐름</strong></div>
                 <p className="result-note">{integratedResult.western.score_policy} · {integratedResult.western.ephemeris}</p>
                 {integratedResult.western.market?.calendar_warning && <div className="status-banner subtle"><AlertTriangle size={16}/><span>KRX 거래일 정밀도: {integratedResult.western.market.calendar_warning}</span></div>}
-                <div className="integrated-topic-grid">
-                  {orderedIntegratedTopics.map(({topic,stat})=><div className="integrated-topic" key={topic}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
-                </div>
-                {topIntegratedTopics.length>0 && <div className="best-window"><span>가장 강한 흐름</span><strong>{topIntegratedTopics.slice(0,3).map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
-                {cautionIntegratedTopics.length>0 && <div className="best-window caution-window"><span>상대적 주의 흐름</span><strong>{cautionIntegratedTopics.map((row)=>`${row.topic} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
               </section>
 
-              {orderedRelationshipSignals.length > 0 && <section className="result-card integrated-relationship-flow"><div className="result-card-title"><span>RELATIONSHIP</span><strong>연애 · 연락 · 재접점 흐름</strong></div><div className="integrated-topic-grid signal-grid">{orderedRelationshipSignals.map(({topic,stat})=><div className="integrated-topic signal-topic" key={`integrated-signal-${topic}`}><span>{topic === '수신신호' ? '외부 연락 반응' : topic === '발신적합' ? '내 연락 실행 적합도' : '과거 인연 · 재접점'}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}</div><p className="result-note">세 계산축은 서로 섞지 않아. 점수는 사건 확률이나 먼저 연락할 사람을 뜻하지 않아.</p></section>}
-
-              {integratedResult.western.market?.has_open_session && <section className="result-card market-flow-card"><div className="result-card-title"><span>MONEY · MARKET</span><strong>금전 · 주식 · 투자 흐름</strong></div><div className="integrated-topic-grid">{['투자심리','수익실현','신규진입','투자주의'].map((topic)=>{const stat=integratedResult.western.overall[topic]; if(!stat) return null; return <div className="integrated-topic market-topic" key={`integrated-market-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>})}</div><p className="result-note">투자주의는 높을수록 좋은 점수가 아니라 위험 경계가 강하다는 뜻이야.</p></section>}
-
-              {integratedResult.western.detail_days?.length ? <details className="result-card integrated-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{integratedResult.western.detail_days.map((day)=><details key={`integrated-day-${day.date}`} open={integratedResult.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`integrated-${day.date}-${topic}`}><strong className="time-topic-name">{topic}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`integrated-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
 
               <section className="result-card">
                 <div className="result-card-title"><span>SAJU</span><strong>사주 원국 · 진태양시</strong></div>
@@ -2012,17 +1960,11 @@ export default function AppNext() {
               aiLoading={aiLoading}
               aiError={aiError}
               aiCacheSource={aiCacheSource}
-              topTopics={topIntegratedTopics}
-              cautionTopics={cautionIntegratedTopics}
-              bestDays={bestIntegratedDays}
-              cautionDays={cautionIntegratedDays}
               activeDayun={activeDayun}
               outcomeRecords={outcomeRecords}
               outcomeDraft={outcomeDraft}
               outcomeSaved={outcomeSaved}
               outcomeCalibration={outcomeCalibration}
-              topicDisplay={topicDisplay}
-              humanizeEvidence={humanizeEvidence}
               onRetryAi={(refreshReading?:boolean)=>void runAiInterpretation(integratedResult, integratedRequestSnapshot, refreshReading ? 'refresh' : 'generate')}
               onCopyAiPrompt={(mode,field,observed)=>void copyAiInterpretationPrompt(integratedResult,mode,field,observed)}
               onCancelAi={()=>void cancelAiInterpretation(false)}

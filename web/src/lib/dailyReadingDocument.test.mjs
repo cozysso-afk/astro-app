@@ -102,3 +102,30 @@ test('overall financial caveats do not leak to field readings and date-only timi
    assert.ok(dailyReadingExportModel(doc).fitContentHeight)
  }
 })
+
+test('a social lead cannot hide the other supported fields in the overview or its exported images',()=>{
+  const d=data()
+  d.headline='요청의 뜻을 서로 다르게 받아들이기 쉬워.'
+  d.overall.summary='대화할 때 요청의 의도를 다시 물어봐.'
+  d.decisions[0].timing='선택 운세일'
+  d.decisions.push({action:'두 번째 행동.',timing:'해당 날짜',evidence_refs:['W:test']})
+  const before=JSON.stringify(d)
+  const doc=buildDailyReadingDocument(d,'2026-11-14',undefined,true)
+  const overview=doc.blocks.filter(row=>row.id.endsWith(':overview'))
+  assert.deepEqual(overview.map(row=>row.text),['애정','대인','학업','직장','금전','컨디션'].map(name=>name+' 고유 결론.'))
+  const exported=dailyReadingExportModel(doc).sections.flatMap(section=>section.cards.map(card=>card.body))
+  assert.ok(overview.every(row=>exported.includes(row.text)))
+  assert.ok(![...doc.blocks,...doc.details].some(row=>['선택 운세일','해당 날짜'].includes(row.text)))
+  assert.equal(JSON.stringify(d),before)
+  d.editorial_delivery={'work_study.work':'omitted'}
+  d.clusters.work_study.study.evidence_refs=[]
+  const partial=buildDailyReadingDocument(d,'2026-11-14',undefined,true)
+  assert.ok(!partial.blocks.some(b=>['학업 고유 결론.','직장 고유 결론.'].includes(b.text)))
+  assert.equal(partial.slots.find(s=>s.id==='work_study.work').state,'missing')
+  delete d.overall
+  const incomplete=buildDailyReadingDocument(d,'2026-11-14',undefined,true)
+  assert.equal(incomplete.state,'missing')
+  assert.equal(incomplete.headline,'')
+  assert.ok(incomplete.details.some(b=>b.text==='금전 고유 결론.'))
+  assert.throws(()=>dailyReadingExportModel(incomplete))
+})
