@@ -22,6 +22,13 @@ const sectionKeys: Record<string, [string, string, string][]> = {
   contact: [['relationship','contact_activation','연락'],['relationship','contact_continuity','대화의 지속'],['money_news','news','공식 소식']],
   condition: [['condition','condition','컨디션']],
 }
+// Dates are in the card header. Keep authored conditions, including a date followed by a condition.
+function usefulTiming(value: unknown, date: string): string {
+  const timing = clean(value)
+  const label = timing.replace(/[.。]$/, '').trim()
+  return label === date || /^(?:선택(?:한|된)?\s*(?:운세일|날짜|날)|해당\s*(?:날짜|일자|날|운세일)|당일|오늘)(?:\s*하루)?$/.test(label) ? '' : timing
+}
+
 function blocksFor(section: AiEditorialSection, prefix: string): DailyBlock[] {
   const applies = clean(section.applies_when)
   const reason = clean(section.evidence_meaning)
@@ -90,11 +97,24 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     doc.headline = headline
     if (summary !== headline) doc.blocks.push({id:'overall:summary',label:'오늘의 흐름',text:summary})
     if (clean(data.overall.dominant_pattern)) doc.blocks.push({id:'overall:reason',label:'이렇게 읽는 이유',text:clean(data.overall.dominant_pattern)})
+    // The lead may address one subject. The six authored primary conclusions give
+    // the complete reading, including previously saved documents with that layout.
+    const clusters = data.clusters as unknown as Record<string,Record<string,AiEditorialSection>>
+    doc.slots = []
+    for (const scope of ['love','social','study','work','money','condition']) {
+      const [group,key,label] = sectionKeys[scope][0]
+      const id = group + '.' + key
+      const section = clusters?.[group]?.[key]
+      const state = sectionState(section, data.editorial_delivery?.[id])
+      doc.slots.push({id,label,state})
+      if (state === 'ready') doc.blocks.push({id:id+':overview',label,text:clean(section.conclusion)})
+    }
     const decisions = data.decisions ?? []
     const decision = decisions.find(item => clean(item.action) && item.evidence_refs?.length)
     if (decision) {
       doc.blocks.push({id:'overall:action',label:'지금 할 일',text:clean(decision.action)})
-      if (clean(decision.timing) && clean(decision.timing) !== date) doc.blocks.push({id:'overall:timing',label:'이 행동을 적용할 때',text:clean(decision.timing)})
+      const timing = usefulTiming(decision.timing, date)
+      if (timing) doc.blocks.push({id:'overall:timing',label:'이 행동을 적용할 때',text:timing})
       for (const [key,label] of [['watch','다시 판단할 조건'],['avoid','피할 것']] as const) {
         if (clean(decision[key])) doc.blocks.push({id:`overall:${key}`,label,text:clean(decision[key])})
       }
@@ -103,7 +123,8 @@ export function buildDailyReadingDocument(data: Data, date: string, field?: Fort
     for (const [index,item] of decisions.entries()) {
       if (item === decision || !item.evidence_refs?.length) continue
       for (const [key,label] of [['action','함께 살필 행동'],['timing','적용 시기'],['reason','이유'],['watch','다시 판단할 조건'],['avoid','피할 것']] as const) {
-        if (clean(item[key])) doc.details.push({id:`decision:${index}:${key}`,label,text:clean(item[key])})
+        const value = key === 'timing' ? usefulTiming(item[key], date) : clean(item[key])
+        if (value) doc.details.push({id:`decision:${index}:${key}`,label,text:value})
       }
     }
     for (const [key,label] of [['best_phase','활용할 때'],['caution_phase','주의할 때']] as const) {

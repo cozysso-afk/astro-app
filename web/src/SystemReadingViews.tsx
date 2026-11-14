@@ -70,7 +70,7 @@ export function SystemReadingViews({calculation:c,periodKey,interpretation,child
   const systemTitle = SYSTEMS.find(s=>s.id===system)!.label
   const period = c.period.start===c.period.end ? c.period.start : `${c.period.start} — ${c.period.end}`
   const verified = verifiedFortuneNarrative(interpretation)
-  const authored = verified && system!=='integrated' ? buildSystemReadingDocument(system,interpretation?.data?.systems?.[system],period,interpretation?.interpreter_version) : null
+  const authored = verified && interpretation?.data && system!=='integrated' ? buildSystemReadingDocument(system,interpretation.data,period,focusedField,interpretation.interpreter_version) : null
   const sampleStart = segment && (segment.start>c.period.start ? segment.start : c.period.start)
   const sampleEnd = segment && (segment.end<c.period.end ? segment.end : c.period.end)
   const samplePlanets = new Map(placements.map(row=>[row.planet.key,thaiPlanetLabel(row.planet.label)]))
@@ -85,11 +85,12 @@ export function SystemReadingViews({calculation:c,periodKey,interpretation,child
       {!field && <div className="system-topic-selector system-topic-selector-fixed" role="group" aria-label="생활 분야 선택">{TOPICS.map(t=><button type="button" key={t} disabled={!canSelect(t)} aria-pressed={topic===t} onClick={()=>setTopic(t)}>{t}</button>)}</div>}
       {field && <h3>{field.label} · {period}</h3>}
       {system==='integrated' ? injectReadingContext(children,{field:focusedField}) : !available ? <p className="system-unavailable">현재 입력으로 확인된 {systemTitle} 계산 자료가 없어.</p> : <>
+        <div data-system-manuscript={system} data-reading-field={focusedField?.id ?? 'overall'} data-reading-state={authored?.state ?? 'missing'}>
         {authored?.state==='ready' ? <AuthoredReadingPanel doc={authored}/> :
-          <section className="result-card system-generation-card"><h3>{systemTitle} Gemini 해설</h3>
-            <p role="status">{generating?'Gemini 해설을 생성하고 있어.':generationError || '이 기간에 저장된 체계별 Gemini 원고가 없어.'}</p>
+          <section className="result-card system-generation-card"><h3>{authored?.title ?? (systemTitle+' Gemini 해설')}</h3>
+            <p role="status">{generating?'Gemini 해설을 생성하고 있어.':generationError || (verified && focusedField ? `이 저장본에는 ${systemTitle} 근거로 작성한 ${focusedField.label} 해설이 없어.` : '이 기간에 저장된 체계별 Gemini 원고가 없어.')}</p>
             {onGenerate && <button type="button" className="period-ai-generate" disabled={generating} onClick={onGenerate}>{generationError || verified ? '해설 다시 생성' : '해설 생성'}</button>}
-          </section>}
+          </section>}</div>
         {system==='western' && <>
           <section className="result-card"><h3>{topic==='전체'?'분야별':topic} 계산 점수</h3>
             <div className="system-score-grid western-score-grid">{westernRows.map(([name,s])=><details className="western-score-card" key={name}>

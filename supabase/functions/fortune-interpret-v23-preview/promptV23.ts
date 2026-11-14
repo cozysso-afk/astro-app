@@ -1,3 +1,4 @@
+import { buildSystemFieldSources } from './systemFieldReadings.ts'
 import { CONTACT_AXES, contactAxisEvidence } from './contactAxesV1.ts'
 import { attachPeriodReadingContext, buildPeriodReadingInstruction } from './periodReadingContractV1.ts'
 import { v23OutputTokenLimit } from './runtimeBudgetV23.ts'
@@ -165,6 +166,8 @@ export function buildV23PromptPacket(payload:any) {
     domain_answer_contract_version: DOMAIN_ANSWER_CONTRACT_VERSION,
     domain_answer_contracts: DOMAIN_ANSWER_CONTRACTS,
   }
+  const systemSources=buildSystemFieldSources(payload,packet)
+  if(systemSources.length)packet.system_field_sources=systemSources
   packet.narrative_plan=buildNarrativePlan(packet)
   if(packet.period_kind==='annual'){
     // Annual inputs are the largest. The instruction already carries these

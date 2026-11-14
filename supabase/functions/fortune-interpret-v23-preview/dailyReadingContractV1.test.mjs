@@ -129,3 +129,19 @@ test('incoming, outgoing and reconnection claims use their own axis from the req
  d.contact_flow.reconnection=''
  assert.ok(axisIssues().includes('empty_contact_axis_with_references:contact_flow.reconnection'))
 })
+
+test('daily overview can cite another authored field and must use independent evidence when available',()=>{
+ const date='2026-11-14'
+ const doc=core()
+ for (const row of doc.clusters) Object.assign(row,{applicability:'insufficient',conclusion:'',action:'',real_scene:'',change_condition:'',evidence_refs:[]})
+ const facts=[['relationship.summary','대인관계','social'],['money_news.money','금전','money']]
+ for (const [key,label,id] of facts) Object.assign(doc.clusters.find(r=>r.key===key),{applicability:'conditional',conclusion:label+'의 판단이야.',real_scene:label+'의 상황이야.',action:label+'의 선택을 살펴.',evidence_refs:[id]})
+ const packet={period:{start:date,end:date},evidence_ledger:facts.map(([,topic,id])=>({id,topic,date,system:'western',scope:'daily_actual_aspect_house'}))}
+ doc.editorial_focus={section_key:'relationship.summary',evidence_refs:['social']}
+ doc.overall.evidence_refs=['social']
+ assert.ok(inspectDailyProviderDocument(doc,'day',packet).issues.includes('daily_overview_missing_second_subject'))
+ doc.overall.evidence_refs=['social','money']
+ assert.ok(!inspectDailyProviderDocument(doc,'day',packet).issues.some(code=>code.startsWith('daily_overview_evidence')||code.includes('missing_second_subject')))
+ doc.overall.evidence_refs.push('uncited')
+ assert.ok(inspectDailyProviderDocument(doc,'day',packet).issues.includes('daily_overview_evidence_outside_selected_question'))
+})

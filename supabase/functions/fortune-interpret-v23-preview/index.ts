@@ -1,3 +1,4 @@
+import { validSystemFieldReadings } from "./systemFieldReadings.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { MODELS, FALLBACK_MODEL, TOPICS, compactCalculation, payloadHash, SCHEMA, validateOutput, txt } from "../fortune-interpret-v6-preview/integratedInterpretationV2.ts";
 import { QUALITY_VERSION, inspectInterpretationQuality, strictQualityRetryInstruction } from "../fortune-interpret-v6-preview/qualityV2.ts";
@@ -18,7 +19,7 @@ import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.
 import { attachPrecisionPacketMetadata, precisionGateFromPayload } from "../fortune-interpret-v22-preview/precisionV2.ts";
 import { attachAuthoredDayTimingEvidence } from "./dayTimingEvidenceV23.ts";
 
-const VERSION="supabase-ai-v23.26-question-evidence";
+const VERSION="supabase-ai-v23.27-field-readings";
 const STRUCTURE_VERSION="fortune-provider-structure-v1";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
@@ -55,7 +56,7 @@ function structureReport(value:any){
   return {version:STRUCTURE_VERSION,passed:false,issues,topic_count:topicKeys.length,cluster_section_count:clusterSections.length};
 }
 function structureFailure(result:any,value:any){const report=structureReport(value);if(!report.issues.length)report.issues.push("validator_rejected_normalized_core");return {...result,ok:false,error:"provider 구조화 응답 검증 실패",structure_guard_failed:true,structure_report:report,candidate_data:result?.data,validation:undefined};}
-function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- period_section_not_plain_language 또는 period_hero_not_plain_language가 있으면 headline·overall·각 conclusion/action/applies_when/evidence_meaning/real_scene 첫 문장에서 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용을 모두 빼고 생활 장면부터 써.\n- 각 fields에 정확한 날짜나 기간을 쓰려면 그 fields의 evidence_refs가 그 날짜 또는 구간을 직접 포함해야 해. 아니면 날짜를 삭제하고 장면만 설명해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
+function strictStructureRetryInstruction(report:any){return `\n\n[STRUCTURE RETRY · REQUIRED]\n- 이전 응답은 서버 구조 검증을 통과하지 못했다: ${(report?.issues??[]).join(",")||"validator_rejected_normalized_core"}.\n- responseSchema의 required 필드를 빠짐없이 반환하고, clusters key는 중복 없이 sparse 배열로 작성해.\n- period_section_not_plain_language 또는 period_hero_not_plain_language가 있으면 headline·overall·각 conclusion/action/applies_when/evidence_meaning/real_scene 첫 문장에서 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용을 모두 빼고 생활 장면부터 써.\n- daily_overview_missing_second_subject이면 주제별 원고 중 초점과 독립된 근거가 있는 기본 분야를 하나 더 골라 overall.summary에서 두 장면의 차이를 설명하고, overall.evidence_refs에 두 원고가 인용한 출처를 연결해.\n- 각 fields에 정확한 날짜나 기간을 쓰려면 그 fields의 evidence_refs가 그 날짜 또는 구간을 직접 포함해야 해. 아니면 날짜를 삭제하고 장면만 설명해.\n- 원고를 축약해도 JSON 필드 이름·자료형·enum은 바꾸지 마. 이 규칙을 어기면 응답 전체가 폐기된다.`;}
 
 
 
@@ -68,7 +69,7 @@ function coreInstruction(periodKind:unknown,compact=false){const kind=String(per
 - systems에는 독립된 전문 근거와 한계를 짧게 쓸 수 있어. 반면 headline/overall.summary/clusters.real_scene은 전문용어를 먼저 나열하지 말고 사람이 이해하는 생활 장면으로 써.
 - 종합에서 특정 역할을 나열하지 마. 애정은 만남·호감의 상호성·관계 속도를 다루고 연락 조언으로만 채우지 마. 현실 사건·증상·학습 효과를 관측한 것처럼 단정하지 마.
 - change_condition은 이 질문의 인용 근거가 판단을 바꾸는 조건을 설명할 때만 작성하고, 없으면 빈 문자열로 둬. 안전이나 성공을 보장하는 예외를 만들지 마.
-- 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘 대신 선택 운세일이라고 써.
+- 근거 ID는 PROMPT_DATA.evidence_ledger에 전달된 것만 써. 근거 없는 분야는 명시적으로 insufficient로 두고 문장을 만들지 마. 실제 기준일을 모르면 오늘이라는 표현을 피하고 필요한 경우 정확한 날짜를 써. decisions.timing에는 당일 안에서 달라지는 실제 적용 조건이 있을 때만 쓰고, 단독 날짜·선택 운세일로 채우지 마.
 `;return "";}
 
 type CallTrace={call:number;model:string;kind:"initial"|"semantic_rewrite"|"structure_rewrite"|"fallback";prompt_bytes:number;elapsed_ms:number;http_status:number;usage:any;max_output_tokens:number;finish_reason?:string;error?:string};
@@ -134,6 +135,7 @@ function finalizeCandidate(core:any,payload:any,writerPacket:any,model:string,u:
   }
   const dailyEditorial=inspectDailyEditorial(validated,payload);
   const data={...attachAuthoredDayTimingEvidence(normalizeDirectionalWindows(validated,payload),payload),editorial_delivery:core.editorial_delivery,
+    system_field_readings:validSystemFieldReadings(core.system_field_readings,writerPacket.system_field_sources??[]),
     contact_evidence_refs:core.contact_evidence_refs,...(core.editorial_focus?{editorial_focus:core.editorial_focus}:{})};
   const guard=inspectThaiOutputSafety(data,thaiOutputGuardRequired(payload));
   if(!guard.safe){

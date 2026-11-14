@@ -485,6 +485,7 @@ export type AiInterpretationResponse = {
     relationship_reading?: { context: string; flow: string; focus_timing: string; watch: string; avoid: string; evidence_refs?: string[] }
     contact_flow?: { incoming?: string; outgoing?: string; reconnection?: string }
     investment_reading?: { psychology?: string; realization?: string; entry?: string; risk?: string }
+    system_field_readings?: Array<{system:'saju'|'thai';topic:string;reading:string;evidence_refs:string[]}>
     systems: { western: string; saju: string; thai: string }
     priorities: string[]
     topic_analysis: Record<string, AiTopicInterpretation>

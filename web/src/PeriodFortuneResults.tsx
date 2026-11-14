@@ -5,15 +5,13 @@ import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { SystemReadingViews } from './SystemReadingViews'
 import type { ExternalCopyMode } from './lib/compactDeepPrompt'
 import { CheckCircle2 } from 'lucide-react'
-import type { AiInterpretationResponse, FortunePoint, FortuneStat, IntegratedApiResponse, PeriodKey } from './appTypes'
+import type { AiInterpretationResponse, IntegratedApiResponse, PeriodKey } from './appTypes'
 import { ContactOutcomeReading } from './ContactOutcomeReading'
 import { DailyOutcomeCard, type DailyOutcomeRecord, type OutcomeCalibration } from './DailyOutcomeCard'
 import { PeriodAiInterpretationPanel } from './PeriodAiInterpretationPanel'
 import { PeriodFortuneNarrativeV2, verifiedFortuneNarrative } from './PeriodFortuneNarrativeV2'
 import './reading-image-export.css'
 
-type TopicRow = { topic: string; stat: FortuneStat }
-type HighlightPoint = FortunePoint & { topic: string }
 type ActiveDayun = NonNullable<IntegratedApiResponse['saju']['dayun']>[number]
 
 type PeriodFortuneResultsProps = {
@@ -28,17 +26,11 @@ type PeriodFortuneResultsProps = {
   aiLoading: boolean
   aiError: string
   aiCacheSource: 'local' | 'server' | 'fresh' | ''
-  topTopics: TopicRow[]
-  cautionTopics: TopicRow[]
-  bestDays: HighlightPoint[]
-  cautionDays: HighlightPoint[]
   activeDayun: ActiveDayun | null
   outcomeRecords?: DailyOutcomeRecord[]
   outcomeDraft: DailyOutcomeRecord
   outcomeSaved: boolean
   outcomeCalibration: OutcomeCalibration
-  topicDisplay: (topic: string) => string
-  humanizeEvidence: (value: string) => string
   onRetryAi: (refreshIncomplete?:boolean) => void
   onCopyAiPrompt: (mode?: ExternalCopyMode, field?: FortuneField, observed?:string) => void
   onCancelAi: () => void
@@ -64,17 +56,11 @@ export function PeriodFortuneResults({
   aiLoading,
   aiError,
   aiCacheSource,
-  topTopics,
-  cautionTopics,
-  bestDays,
-  cautionDays,
   activeDayun,
   outcomeRecords,
   outcomeDraft,
   outcomeSaved,
   outcomeCalibration,
-  topicDisplay,
-  humanizeEvidence,
   onRetryAi,
   onCopyAiPrompt,
   onCancelAi,
@@ -84,25 +70,6 @@ export function PeriodFortuneResults({
 }: PeriodFortuneResultsProps) {
   const field = fortuneField(fieldId)
   const technicalDetails = <>
-    <section className="result-card">
-      <div className="result-card-title"><span>CORE FLOW</span><strong>계산 점수 한눈에 보기</strong></div>
-      <div className="integrated-topic-grid">
-        {topTopics.slice(0,3).map(({topic,stat})=><div className="integrated-topic" key={`period-top-${topic}`}><span>{topicDisplay(topic)}</span><strong>{stat.average.toFixed(1)}</strong><small>{stat.band}</small></div>)}
-      </div>
-      {cautionTopics.length>0 && <div className="best-window caution-window"><span>상대적 주의 흐름</span><strong>{cautionTopics.map((row)=>`${topicDisplay(row.topic)} ${row.stat.average.toFixed(1)}`).join(' · ')}</strong></div>}
-      <p className="result-note">선택한 기간의 분야별 계산값이야.</p>
-    </section>
-
-    {(bestDays.length>0 || cautionDays.length>0) && <details className="result-card period-date-highlights period-date-source">
-      <summary><span>TIMING RAW DATA</span><strong>날짜 점수 원자료 보기</strong><small>상·하위 날짜와 계산 점수를 직접 확인</small></summary>
-      <div className="period-date-source-body">
-        {bestDays.map((point)=><div className="tight-row" key={`period-best-${point.date}-${point.topic}`}><span>✨ {point.date} · {topicDisplay(point.topic)} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-        {cautionDays.map((point)=><div className="tight-row" key={`period-caution-${point.date}-${point.topic}`}><span>⚠️ {point.date} · {topicDisplay(point.topic)} · {point.label}</span><b>{point.score.toFixed(1)}</b></div>)}
-        <p className="result-note">기간 안의 상대 활성도 비교야. 특정 사건 발생 확률은 아니야.</p>
-      </div>
-    </details>}
-
-    {result.western.detail_days?.length ? <details className="result-card integrated-time-evidence period-time-evidence"><summary>시간대별 계산 근거 펼치기</summary><div className="time-detail-list">{result.western.detail_days.map((day)=><details key={`period-day-${day.date}`} open={result.period.day_count===1}><summary>{day.date}{day.market_open ? ' · KRX 거래일' : ''}</summary><div className="time-topic-list">{Object.entries(day.topics).map(([topic,detail])=><div className="time-topic" key={`period-${day.date}-${topic}`}><strong className="time-topic-name">{topicDisplay(topic)}</strong>{detail.best_window && <div className="time-window time-window-good"><b>좋은 구간</b><span>{detail.best_window.start}~{detail.best_window.end}</span><em>{detail.best_window.score}</em></div>}{detail.caution_window && <div className="time-window time-window-caution"><b>주의 구간</b><span>{detail.caution_window.start}~{detail.caution_window.end}</span><em>{detail.caution_window.score}</em></div>}{detail.evidence?.length ? <div className="time-evidence"><span className="time-evidence-label">계산 근거</span>{detail.evidence.slice(0,3).map((item,index)=><em key={`period-${day.date}-${topic}-ev-${index}`}>{humanizeEvidence(item)}</em>)}</div> : null}</div>)}</div></details>)}</div></details> : null}
 
     <section className="result-card">
       <div className="result-card-title"><span>SYSTEMS</span><strong>체계별 보조 흐름</strong></div>
@@ -118,13 +85,14 @@ export function PeriodFortuneResults({
   const hasNaturalReading = verifiedFortuneNarrative(aiInterpretation)
   return <div data-reading-export-root="period-fortune" className={`fortune-experience period-${period}`}>
     <div className="result-headline" data-reading-export-tone="date"><CheckCircle2 size={16}/><div><strong>{periodLabel} 운세</strong><span>{result.period.start}{result.period.start !== result.period.end ? ` — ${result.period.end}` : ''}</span></div></div>
+    {hasNaturalReading && aiLoading && <p className="result-note" role="status">기존 해설을 보면서 새 Gemini 해설을 기다릴 수 있어.</p>}
     {hasNaturalReading && aiError && <p className="result-note" role="alert">{aiError}</p>}
     <SystemReadingViews outcomeRecords={outcomeRecords} initialSystem={initialSystem} periodKey={period} loveStatus={field?.id==='love'?loveStatus:undefined} key={`${fieldId}-${initialSystem}`} calculation={result} interpretation={aiInterpretation} onGenerate={()=>onRetryAi(hasNaturalReading)} generating={aiLoading} generationError={aiError} field={field}><>
       {hasNaturalReading && aiInterpretation ? <PeriodFortuneNarrativeV2 loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} technicalDetails={technicalDetails} onRetry={aiLoading?undefined:onRetryAi}/> : <PeriodAiInterpretationPanel loveStatus={loveStatus} field={field} period={period} calculation={result} result={aiInterpretation} loading={aiLoading} error={aiError} cacheSource={aiCacheSource} onRetry={onRetryAi} onCopyPrompt={onCopyAiPrompt} onCancel={onCancelAi} canCancel={aiCanCancel} technicalDetails={technicalDetails}/>}
       {hasNaturalReading && <SavedReadingPromptCopy onCopy={onCopyAiPrompt}/>}
       {outcomeRecords && <ContactOutcomeReading calculation={result} localRecords={outcomeRecords}/>}
     </></SystemReadingViews>
-    <p className="reading-safety-note">점수는 흐름의 강도야. 사건이 일어날 확률은 아니야.</p>
+    <p className="reading-safety-note">점수는 차트에서 계산한 0~100의 비교 지표야.</p>
     {period==='today' && <div className="reading-outcome"><DailyOutcomeCard
       draft={outcomeDraft}
       saved={outcomeSaved}

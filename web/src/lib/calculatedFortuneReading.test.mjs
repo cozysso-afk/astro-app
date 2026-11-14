@@ -25,11 +25,15 @@ for(const period of ['today','week','month','year']) {
     const render=extra=>renderToStaticMarkup(h(Panel,{period,calculation,field:field('study'),result:null,loading:false,error:'',canCancel:true,onCancel:noCall,onRetry:noCall,onCopyPrompt:noCall,...extra}))
     for(const extra of [{},{result:fake},{error:'사용 한도 도달'},{loading:true}]){
       const html=render(extra)
-      assert.match(html,/학업 · 47\.5점 · 활성도 75 · 유리도 39/)
-      assert.match(html,/Mercury · square · Saturn/)
+      assert.match(html,/학업 · 47\.5점/)
+      assert.match(html,/<details><summary>활성도와 유리도는 어떻게 달라[?]<\/summary>/)
+      assert.match(html,/학업 · 활성도 75 · 유리도 39/)
+      assert.equal((html.match(/data-score-topic="학업"/g)??[]).length,1)
+      if(period==='today')assert.doesNotMatch(html,/분야별 기간 평균|점수가 높은 날과 낮은 날/)
+      assert.match(html,/수성 · 사분위 · 토성/)
       assert.match(html,/학업 기여도 4 · 방향 -0\.8/)
       assert.ok(html.includes(date))
-      assert.doesNotMatch(html,/Pluto|UNVERIFIED|핵심 이미지 저장|계산값으로 읽는|data-reading-section=/)
+      assert.doesNotMatch(html,/명왕성|UNVERIFIED|핵심 이미지 저장|계산값으로 읽는|data-reading-section=/)
       assert.ok(html.includes(extra.loading?'생성 취소':extra.error?'해설 다시 확인':'해설 생성'))
     }
     assert.equal(JSON.stringify(calculation),before)
@@ -40,6 +44,25 @@ for(const period of ['today','week','month','year']) {
     assert.doesNotMatch(legacy,/유리도|학업 기여도/)
   })
 }
+
+test('one-day score report merges repeat measurements and keeps topic-specific hourly evidence',()=>{
+  const {calculation}=fortuneFixture('today')
+  const date=calculation.period.start
+  calculation.western.daily_scores=[{date,scores:{학업:30,수신신호:30},score_components:{학업:{activation:23.56,favorability:36.03}}}]
+  calculation.western.overall={학업:{average:30,band:'약함',best_days:[{date,score:30}],caution_days:[{date,score:30}]}}
+  calculation.western.relationship_signals={수신신호:{average:30}}
+  calculation.western.detail_days=[{date,topics:{학업:{evidence:['학업 원자료']},금전:{evidence:['금전 원자료']}}}]
+  const render=field=>renderToStaticMarkup(h(Panel,{period:'today',calculation,field,result:null,loading:false,error:'',onRetry:noCall,onCopyPrompt:noCall}))
+  const overall=render()
+  assert.equal(overall.split('학업 · 30점').length-1,1)
+  assert.equal(overall.split('외부 연락 반응 신호 · 30점').length-1,1)
+  assert.doesNotMatch(overall,/분야별 기간 평균|상대적 주의 흐름|높은 날/)
+  assert.match(overall,/활성도 23.56 · 유리도 36.03/)
+  assert.match(overall,/높을수록 도움 쪽/)
+  const study=render(field('study'))
+  assert.match(study,/학업 원자료/)
+  assert.doesNotMatch(study,/금전 원자료|외부 연락 반응 신호/)
+})
 
 test('image export rejects earlier calculated advice even if it has a headline and block IDs',()=>{
   const core=[{id:'week:dates',label:'학업',text:'로컬 조언'}]

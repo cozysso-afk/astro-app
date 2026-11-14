@@ -85,8 +85,19 @@ export function inspectDailyProviderDocument(core:any, kind:unknown, payload?:an
     const refs=new Set(Array.isArray(selected?.evidence_refs)?selected.evidence_refs:[])
     const cited=Array.isArray(focus.evidence_refs)?focus.evidence_refs:[]
     const overall=Array.isArray(core.overall?.evidence_refs)?core.overall.evidence_refs:[]
-    if (!cited.length || cited.some((ref:string)=>!refs.has(ref)) || !overall.length || overall.some((ref:string)=>!cited.includes(ref))) {
+    const primaryRefs = rows
+      .filter((row:any) => row.applicability !== 'insufficient' && (DAILY_PRIMARY_KEYS as readonly string[]).includes(row.key))
+      .map((row:any) => new Set<string>(row.evidence_refs ?? []))
+    const accepted = new Set([...cited, ...primaryRefs.flatMap((ids:Set<string>) => [...ids])])
+    if (!cited.length || cited.some((ref:string)=>!refs.has(ref)) || !overall.some((ref:string)=>cited.includes(ref)) || overall.some((ref:string)=>!accepted.has(ref))) {
       issues.push('daily_overview_evidence_outside_selected_question')
+    } else {
+      // A shared multi-topic event alone cannot demonstrate that two independent
+      // readings were synthesized. Require another citation only if one exists.
+      const otherRefs = new Set(primaryRefs.flatMap((ids:Set<string>) => [...ids].filter(id => !refs.has(id))))
+      if (otherRefs.size && !overall.some((id:string) => otherRefs.has(id))) {
+        issues.push('daily_overview_missing_second_subject')
+      }
     }
   }
   const authored=rows.filter((r:any)=>allowed.has(r?.key) && r.applicability!=='insufficient')
