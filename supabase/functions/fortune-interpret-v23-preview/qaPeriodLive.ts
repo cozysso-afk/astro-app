@@ -355,6 +355,19 @@ async function qaBudget(orchestratorId:string){
   return {ok:pb.ok,kind:payload?.period_kind,bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_job_krw:pb.max_job_krw,ledger_rows:(payload?.evidence_ledger??[]).length,packet_rows:(pb.packet?.evidence_ledger??[]).length};
 }
 
+
+async function qaRefs(orchestratorId:string,ids:string[]){
+  const a=admin();
+  const {data:orch}=await a.from("ai_interpret_jobs").select("result_json").eq("id",orchestratorId).eq("user_id",QA_USER_ID).maybeSingle();
+  const calculation=orch?.result_json?.calculation;
+  if(!calculation)return {ok:false,error:"missing_input"};
+  const payload=compactCalculation(calculation);
+  const map=new Map((payload?.evidence_ledger??[]).map((r:any)=>[r.id,r]));
+  const pb:any=buildV23PromptBudget(precisionGateFromPayload(calculation).ok?attachPrecisionPacketMetadata(payload,calculation):payload);
+  return {ok:true,love_evidence_refs:pb.packet?.period_reading?.love_situations?.love_evidence_refs??null,
+    rows:ids.map(id=>{const r:any=map.get(id);return r?{id,system:r.system,scope:r.scope,date:r.date,topic:r.topic,source_topics:r.source_topics}:{id,missing:true}})};
+}
+
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
 
 async function job(id:string,payload:any,model:string,key:string){
@@ -387,9 +400,10 @@ Deno.serve(async(req)=>{
   let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
   if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,structure_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
-  if(b?.action==="qa_calc"||b?.action==="qa_start_both"||b?.action==="qa_replay"||b?.action==="qa_budget"){
+  if(b?.action==="qa_calc"||b?.action==="qa_start_both"||b?.action==="qa_replay"||b?.action==="qa_budget"||b?.action==="qa_refs"){
     if(!(await qaTokenOk(req)))return res(publicFortuneError("AUTH_REQUIRED"),401);
     if(b.action==="qa_calc"){const d=/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))?String(b.date):"2026-11-15";const e=/^\d{4}-\d{2}-\d{2}$/.test(String(b.end))?String(b.end):d;return res(await qaOrchestrator(d,e));}
+    if(b.action==="qa_refs")return res(await qaRefs(txt(b.orchestrator_id,100),Array.isArray(b.ids)?b.ids.slice(0,40).map((x:any)=>txt(x,80)):[]));
     if(b.action==="qa_budget")return res(await qaBudget(txt(b.orchestrator_id,100)));
     if(b.action==="qa_replay")return res(await qaReplay(txt(b.orchestrator_id,100),txt(b.job_id,100),Number(b.index??0)));
     if(!key)return res({ok:false,error:"no_gemini_key"},503);
