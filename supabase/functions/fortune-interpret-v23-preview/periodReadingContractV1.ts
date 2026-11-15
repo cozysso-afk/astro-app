@@ -153,10 +153,12 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 [칸마다 맡는 일과 분량]
 - conclusion: 판정 한 문장(30~70자). 별 이름 없이 생활 언어로.
 - applies_when: 이 판정이 어떤 상황에 해당하는지 한 문장. "~할 때 해당돼."처럼 조건을 말하고 문장을 끝까지 마쳐. 별 이름 없이.
-- evidence_meaning: 화면의 "이렇게 읽는 이유"야. 기본 여섯 분야는 생활 장면 한두 문장 뒤에 별 이유 한두 문장을 붙여 세 문장에서 네 문장(150~320자)으로 써. 예: "하늘을 지나는 금성이 네 출생차트의 토성과 부딪히는 기간이라, 사고 싶은 마음과 아껴야 한다는 생각이 같이 올라와." 세부항목은 한두 문장이면 돼.
+- evidence_meaning: 화면의 "이렇게 읽는 이유"야. 기본 여섯 분야(${PERIOD_PRIMARY_KEYS.join(', ')})만 생활 장면 한 문장 뒤에 별 이유 한두 문장을 붙여 두세 문장(120~220자)으로 써. 예: "하늘을 지나는 금성이 네 출생차트의 토성과 부딪히는 기간이라, 사고 싶은 마음과 아껴야 한다는 생각이 같이 올라와." 그 밖의 모든 항목(연애 상황별, 연락, 재회, 시험, 이직, 소식, 투자 등)은 applies_when과 evidence_meaning을 각각 짧은 한 문장(60자 안팎)으로 끝내. 전체 원고가 길어지면 응답이 잘려서 통째로 버려져.
 - action: 판정에서 바로 나오는 선택 하나(40~120자). 수월한 분야라면 무엇을 해 보면 좋은지 권해. 별 이름 없이.
 - overall.dominant_pattern: 첫 화면의 "이렇게 읽는 이유"야. 반드시 작성해. 이 기간의 핵심 판단을 만든 배치를 위 방법으로 풀어 두세 문장(120~260자)으로 써. summary 문장을 되풀이하지 말고, '공존', '긴장', '압박' 같은 낱말로 문장을 끝내지 마.
-- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 네다섯 문장, saju는 제공된 월운·세운·일진 범위에서 두세 문장, thai는 제공된 탁사 자리의 전통적 뜻을 두세 문장으로 써. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
+- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 세 문장, saju는 제공된 월운·세운·일진 범위에서 두 문장, thai는 제공된 탁사 자리의 전통적 뜻을 두 문장으로 써. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
+
+- domain_answers는 질문마다 한 문장으로 답해. 모든 문장은 ~해, ~야, ~어로 끝나는 반말이야. "~다."로 끝내지 마.
 
 [검수에서 바로 탈락하는 표현 · 한 번도 쓰지 마]
 - headline·overall.summary·best_phase·caution_phase: 별 이름, 업무·실무·직장·학업·시험·공부·이직·출근·퇴근.
@@ -319,7 +321,7 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
     if((m=/^priorities\.(\d+)$/.exec(path))){dropPriorities.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^decisions\.(\d+)\./.exec(path))){dropDecisions.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^domain_answers\.(\d+)\./.exec(path))){dropAnswers.add(Number(m[1]));isolated.push(path);continue}
-    if((m=/^(investment_reading|contact_flow|relationship_reading)\.([a-z_]+)$/.exec(path))&&typeof next?.[m[1]]?.[m[2]]==='string'){next[m[1]][m[2]]='';isolated.push(path);continue}
+    if((m=/^(investment_reading|contact_flow|relationship_reading|systems)\.([a-z_]+)$/.exec(path))&&typeof next?.[m[1]]?.[m[2]]==='string'){next[m[1]][m[2]]='';isolated.push(path);continue}
     if((m=/^clusters\.(\d+)\./.exec(path))){
       const row=next.clusters?.[Number(m[1])]
       const key=String(row?.key??'')
