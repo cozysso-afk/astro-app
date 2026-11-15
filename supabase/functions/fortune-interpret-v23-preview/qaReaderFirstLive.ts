@@ -257,7 +257,7 @@ async function checkRollingJobBudget(a:any,userId:string){
 const QA_USER_ID="478b7fcb-0153-44de-acd4-5f54b80c0ee0";
 const QA_EMAIL="qa-fortune-v23@astro-app.test";
 const QA_TOKEN_SHA256="b8481696e9279003ef0e8458c04e61148999542dc6592ee5a62a4cd2244df676";
-const QA_MAX_ORCHESTRATIONS=3;
+const QA_MAX_ORCHESTRATIONS=4;
 const QA_CALC_URL="https://astro-app-api-f7fn.onrender.com/v1/fortune/integrated";
 const QA_PROD_URL=SUPABASE_URL+"/functions/v1/fortune-interpret-v23-preview";
 async function qaTokenOk(req:Request){
