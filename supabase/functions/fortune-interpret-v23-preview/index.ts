@@ -7,7 +7,7 @@ import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-previe
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { SYSTEM, buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
-import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields } from "./periodReadingContractV1.ts";
+import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields, isolateOptionalPeriodViolations } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction, normalizeUserContext } from "./dailyEditorialV1.ts";
@@ -83,8 +83,8 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const callNo=++budget.used;
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
-  // Reader-first daily copy is longer; Gemini 3.7 took 52-68s for it in live QA.
-  const timeout=Math.min(compact?46000:(fullPayload?.period_kind==="day"?85000:54000),remain);
+  // Reader-first copy is longer; Gemini 3.7 took 52-68s for a daily reading in live QA.
+  const timeout=Math.min(compact?46000:85000,remain);
   const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
@@ -160,7 +160,7 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):{core:core.partial,isolated:[]};
+  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):isExtendedPeriod(payload?.period_kind)?isolateOptionalPeriodViolations(core.partial,payload?.period_kind,pb.packet):{core:core.partial,isolated:[]};
   const providerCore=isolation.core;
   const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
@@ -191,7 +191,8 @@ async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:strin
     const editedFields=applyDailyRewrite(first.partial,request,result.partial);
     const packet=buildV23PromptBudget(payload).packet;
     const kind=payload?.period_kind;
-    const patched=isExtendedPeriod(kind)?retainValidPeriodFields(first.partial,editedFields,kind,packet):editedFields;
+    const retained=isExtendedPeriod(kind)?retainValidPeriodFields(first.partial,editedFields,kind,packet):editedFields;
+    const patched=isExtendedPeriod(kind)?isolateOptionalPeriodViolations(retained,kind,packet).core:kind==="day"?isolateForeignDetailEvidence(retained,packet).core:retained;
     const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
     if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
     const normalized=normalizeProviderCore(patched);
@@ -205,9 +206,14 @@ async function rewritePeriodCandidate(first:any,payload:any,model:string,key:str
   const result=await generateCore(payload,{},model,key,budget,"semantic_rewrite",true,"",request);
   if(!result.ok)return result;
   try{
-    const patched=applyDailyRewrite(first.candidate_data,request,result.partial);
-    const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
+    const rewritten=applyDailyRewrite(first.candidate_data,request,result.partial);
     const packet=buildV23PromptBudget(payload).packet;
+    const asRows=Object.entries(rewritten.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
+    const isolated=isolateOptionalPeriodViolations({...rewritten,clusters:asRows},payload?.period_kind,packet).core;
+    const rows=isolated.clusters;
+    const clusters:any={};
+    for(const {key,...section} of rows){const [group,name]=String(key).split(".");(clusters[group]??={})[name]=section;}
+    const patched={...isolated,clusters};
     const structure=inspectPeriodProviderDocument({...patched,clusters:rows},payload?.period_kind,packet);
     if(!structure.passed)return {ok:false,error:"기간 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>`${issue.path}: ${issue.code}`)}};
     const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});

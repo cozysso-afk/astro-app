@@ -198,7 +198,8 @@ test('period application failures target the exact scene and preserve the condit
   ]})
   assert.ok(request.paths.includes('clusters.0.real_scene'))
   assert.ok(request.paths.includes('clusters.0.action'))
-  assert.ok(request.prompt.includes("반드시 '만약"))
+  assert.ok(request.prompt.includes("'~할 때 해당돼.' 한 문장으로 적용 상황"))
+  assert.ok(!request.prompt.includes("반드시 '만약"))
 })
 
 test('mixed daily failures repair only the affected copy and retain evidence',()=>{
@@ -218,4 +219,17 @@ test('an incoming-contact initiator prediction is patched in place instead of re
   assert.ok(!req.paths.includes('contact_flow.outgoing'))
   assert.match(req.prompt,/먼저 연락하거나 말을 건넨다는 예측을 빼고/)
   assert.equal(buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'day'},{issues:['daily_incoming_initiator_prediction','daily_evidence_outside_question:relationship.love_general']}),null)
+})
+
+test('a period card with a technical detail reason and a health word in best_phase is patched in place',()=>{
+  const candidate={headline:'사람과 말을 나누기 수월한 주야',overall:{summary:'대화는 편해. 큰 약속은 나눠서 정해.',best_phase:'휴식이 부족해도 말이 잘 통하는 때',caution_phase:'큰 약속을 정할 때',dominant_pattern:'금성이 수성과 맞물려.'},
+    clusters:[{key:'relationship.love_single',applicability:'conditional',conclusion:'새 만남은 가볍게 시작돼.',applies_when:'새 사람을 만날 때 해당돼.',evidence_meaning:'금성 삼분위.',action:'가볍게 인사해.',evidence_refs:['x']}]}
+  const report={issues:['overall.best_phase: period_unobserved_health_claim','clusters.0.evidence_meaning: period_evidence_not_plain_language','headline: period_hero_role_assumption']}
+  const req=buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'}},report)
+  assert.ok(req)
+  assert.ok(req.paths.includes('clusters.0.evidence_meaning'))
+  assert.ok(req.paths.includes('overall.best_phase'))
+  assert.match(req.prompt,/한국어 별 이름 바로 뒤에 그 뜻을/)
+  assert.equal(buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'week'},{issues:['clusters.relationship.love_crush: monthly_love_requires_conditional_topic_evidence']}),null)
+  assert.equal(buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'day'},{issues:['clusters.0.evidence_meaning: period_evidence_not_plain_language']}),null)
 })

@@ -4,7 +4,9 @@ const LIMITS: Record<V23PeriodKind, { full: number; compact: number }> = {
   // A compact retry reduces the requested structures, not the completion ceiling.
   // Lowering both at once reproduced MAX_TOKENS twice and consumed the paid-call budget.
   day: { full: 10000, compact: 10000 },
-  week: { full: 9000, compact: 9000 },
+  week: { full: 10000, compact: 10000 },
+  // The monthly cost guard prices this ceiling twice; 10,000 pushed a real
+  // monthly packet over the 300 KRW job cap and blocked the reading.
   month: { full: 8000, compact: 8000 },
   annual: { full: 10000, compact: 10000 },
 }

@@ -226,3 +226,106 @@ test('a bad optional priority cannot hide six independently valid period section
  assert.deepEqual(recovered.clusters,original.clusters)
  assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
 })
+
+test('a period reason may name a planet in Korean when it explains the meaning, and everyday objects are allowed',()=>{
+  const data=provider()
+  const row=data.clusters.find(r=>r.key==='money_news.money')
+  Object.assign(row,{applicability:'direct',evidence_refs:['x'],conclusion:'쓰고 싶은 마음이 커지는 기간이야.',action:'장바구니에 담아 둔 물건을 하루 묵혀 봐.',
+    applies_when:'사고 싶은 물건이 생겼을 때 해당돼.',
+    evidence_meaning:'마음에 드는 물건 앞에서 지갑이 쉽게 열리기 쉬워. 하늘을 지나는 금성이 네 출생차트의 목성과 맞물려 즐거움에 쓰는 돈의 기준이 느슨해지는 기간이라 그래.'})
+  const index=data.clusters.indexOf(row)
+  const issues=inspectPeriodProviderDocument(data,'month').issues.filter(i=>i.path.startsWith(`clusters.${index}.`))
+  assert.deepEqual(issues,[])
+  row.evidence_meaning='Venus trine Jupiter 배치가 지출 기준을 느슨하게 만드는 기간이라 마음에 드는 물건 앞에서 지갑이 쉽게 열리기 쉬워서 그래.'
+  assert.ok(inspectPeriodProviderDocument(data,'month').issues.some(i=>i.path===`clusters.${index}.evidence_meaning`))
+})
+
+test('a defect in an optional period field is isolated without touching the primary sections',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const data=provider()
+  data.priorities=['비용을 비교해.','내일 저녁에 대면 약속을 잡아.']
+  data.investment_reading={psychology:'차익 실현을 서둘러.',realization:'',entry:'',risk:''}
+  const before=inspectPeriodProviderDocument(data,'month')
+  assert.equal(before.passed,false)
+  const {core,isolated}=isolateOptionalPeriodViolations(data,'month',undefined)
+  assert.ok(isolated.includes('priorities.1'))
+  assert.deepEqual(core.priorities,['비용을 비교해.'])
+  assert.equal(core.investment_reading.psychology,'')
+  assert.deepEqual(core.clusters,data.clusters)
+  assert.equal(inspectPeriodProviderDocument(core,'month').passed,true)
+  const primary=provider();primary.clusters[0].action='내일 저녁에 만나.'
+  assert.deepEqual(isolateOptionalPeriodViolations(primary,'month',undefined).isolated,[])
+})
+
+test('a love situation citing a non-love row is marked insufficient instead of failing the reading',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const payload={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:love',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-17',topic:'연애',source_topics:['연애']},
+    {id:'W:work',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-18',topic:'직장',source_topics:['직장']}]}
+  const core=provider()
+  for(const key of ['relationship.love_single','relationship.love_crush','relationship.love_flirting','relationship.love_ambiguous','relationship.love_couple'])
+    core.clusters.push({key,conclusion:'c',applies_when:'만날 때 해당돼.',evidence_meaning:'만남이 편해지는 때야. 조금 더 길게 쓴 이유 문장이야.',action:'a',change_condition:'',evidence_refs:[key.endsWith('crush')?'W:work':'W:love'],applicability:'conditional'})
+  const before=inspectPeriodProviderDocument(core,'week',payload)
+  assert.ok(before.issues.some(i=>i.code==='monthly_love_requires_conditional_topic_evidence'&&i.path==='clusters.relationship.love_crush'))
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',payload)
+  assert.ok(isolated.includes('clusters.relationship.love_crush'))
+  assert.equal(out.clusters.find(r=>r.key==='relationship.love_crush').applicability,'insufficient')
+  assert.ok(!inspectPeriodProviderDocument(out,'week',payload).issues.some(i=>i.code==='monthly_love_requires_conditional_topic_evidence'))
+})
+
+test('a relationship card without a direction axis is cleared before the quality gate',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:a',system:'western',date:'2026-11-18',topic:'연애'},{id:'W:b',system:'western',date:'2026-11-18',topic:'대인관계'},
+    {id:'W:overall:수신신호',system:'western',start:'2026-11-16',end:'2026-11-22',topic:'수신신호'}]}
+  const core=provider()
+  core.relationship_reading={flow:'호감은 쉽게 오가.',context:'',focus_timing:'',watch:'',avoid:'',evidence_refs:['W:a','W:b']}
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('relationship_reading'))
+  assert.equal(out.relationship_reading.flow,'')
+  assert.deepEqual(out.relationship_reading.evidence_refs,[])
+  core.relationship_reading.evidence_refs=['W:a','W:overall:수신신호']
+  assert.ok(!isolateOptionalPeriodViolations(core,'week',packet).isolated.includes('relationship_reading'))
+})
+
+test('an optional question answer with mismatched evidence is dropped, the rest is kept',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:money',system:'western',date:'2026-11-18',topic:'금전',source_topics:['금전']}]}
+  const core=provider()
+  core.domain_answers=[{topic:'금전',question_key:'money.spending',answer:'지출을 나눠.',status:'direct',evidence_refs:['W:missing']}]
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('domain_answers[0]'))
+  assert.deepEqual(out.domain_answers,[])
+  assert.deepEqual(out.clusters,core.clusters)
+})
+
+test('a contact axis with references but no text is cleared with its references',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:overall:수신신호',system:'western',start:'2026-11-16',end:'2026-11-22',topic:'수신신호',scope:'relationship_average'}]}
+  const core=provider()
+  core.contact_flow={incoming:'',outgoing:'',reconnection:''}
+  core.contact_evidence_refs={incoming:['W:overall:수신신호'],outgoing:[],reconnection:[]}
+  const before=inspectPeriodProviderDocument(core,'week',packet)
+  assert.ok(before.issues.some(i=>i.code==='empty_contact_axis_with_references'))
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('contact_flow.incoming'))
+  assert.deepEqual(out.contact_evidence_refs.incoming,[])
+  assert.ok(!inspectPeriodProviderDocument(out,'week',packet).issues.some(i=>i.path.startsWith('contact_flow.')))
+})
+
+test('an off-topic citation next to an on-topic one is trimmed; a scene described as a situation counts as conditional',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:c',system:'western',date:'2026-11-18',topic:'컨디션',source_topics:['컨디션']},
+    {id:'W:m',system:'western',date:'2026-11-18',topic:'금전',source_topics:['금전']}]}
+  const core=provider()
+  const row=core.clusters.find(r=>r.key==='condition.condition')
+  Object.assign(row,{applicability:'direct',evidence_refs:['W:c','W:m'],applies_when:'일정을 새로 채우려는 상황에 해당돼.'})
+  const {core:out}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.deepEqual(out.clusters.find(r=>r.key==='condition.condition').evidence_refs,['W:c'])
+  assert.ok(!inspectPeriodProviderDocument(out,'week',packet).issues.some(i=>i.code==='period_real_scene_not_conditional'&&i.path===`clusters.${core.clusters.indexOf(row)}.applies_when`))
+  row.evidence_refs=['W:m']
+  assert.deepEqual(isolateOptionalPeriodViolations(core,'week',packet).core.clusters.find(r=>r.key==='condition.condition').evidence_refs,['W:m'])
+})

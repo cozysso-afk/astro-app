@@ -123,10 +123,10 @@ export function buildPeriodStructureRewriteRequest(candidate:any,payload:any,rep
   return {paths:selected,allowEmptyPaths,targets,schema:{type:'OBJECT',properties:{patches:{type:'ARRAY',items:{type:'OBJECT',properties:{path:{type:'STRING'},text:{type:'STRING'}},required:['path','text']}}},required:['patches']},
     prompt:`[PERIOD BOUNDED PROSE EDIT]
 전체 해설을 다시 쓰지 말고 TARGETS의 문장만 편집해. patches에 각 path를 정확히 한 번씩 반환하고 다른 경로는 만들지 마.
-모든 target은 행성명·각 이름·영문 전문어·사주 용어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
+모든 target은 영문 전문어·기류·에너지·작용 없이 실제 생활 언어로 시작해. 제목·요약·결론·applies_when·action에는 별 이름·각 이름도 쓰지 마. 결론은 무엇이 수월하거나 까다로운지 바로 답하고, action은 확인해·신중해 같은 빈말 대신 구체적인 선택 하나를 써.
 hero=true인 제목·요약에서는 사용자의 직장·업무·학업·시험·이직 상태를 가정하거나 분야명을 나열하지 마. 공통으로 드러나는 약속·요청·지출·휴식·대화·선택 기준 중 실제 원고에 있는 대상 하나로 종합해.
 날짜가 든 target은 이미 근거 범위 검증 대상이야. 편집 결과에서 2026-10-05 같은 숫자 날짜, 10월 5일 같은 날짜, 주차·분기·상반기·하반기를 모두 제거해. 다른 날짜나 지속 구간을 만들지 마.
-기존 판단의 방향과 제한은 유지하되, applies_when은 사용자의 현재 사실을 말하지 말고 반드시 '만약 …라면/…할 때/…경우' 중 하나로 적용 상황을 밝히고 '그럴 때 해당돼.'처럼 완결된 문장으로 마쳐. 조건절에서 끊지 마. evidence_meaning에는 행성명이나 배치 용어를 빼고 판단 이유를 생활어로 쓰고 특정 직장·학습도구·결제수단·시간대를 지어내지 마. 사건·성과·상대 행동을 새로 만들지 마. 연락 직접 근거가 없는 관계 문장에서는 연락·답장·선연락을 쓰지 마. 모든 target에서 오답 노트·상급자·기획안·회비·생활비 계좌·집으로·오전·오후·저녁·새벽·답장 간격·대면 약속을 입력된 일정처럼 덧붙이지 마. action은 결제 전 합계를 확인하거나 두 선택의 비용을 비교하는 식으로, 계산 주제 안에서 사용자가 직접 할 수 있는 행동만 써. 컨디션과 총평에서는 피로·체력·기력·수면·열감·개운함·과로·과부하·생활 리듬·집중력·감정 급변 같은 증상이나 상태를 예측하지 마. 몸 상태를 관측한 것처럼 쓰지 말고 일정 밀도·활동량·휴식 간격을 보수적으로 정하는 선택만 설명해. period_unsupported_detail_prose 실패 target은 근거 없는 세부 해설이므로 text를 빈 문자열로 반환해. 그 외 target은 비우지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
+기존 판단의 방향과 제한은 유지하되, applies_when은 사용자의 현재 사실을 말하지 말고 '지출 목록을 확정할 때 해당돼.'처럼 '~할 때 해당돼.' 한 문장으로 적용 상황을 밝혀. '만약 …라면 그럴 때 해당돼'처럼 조건을 두 번 겹치지 마. evidence_meaning은 화면의 '이렇게 읽는 이유'야. 기존 문장에 하늘의 별이 출생차트의 무엇에 닿았다는 이유가 있으면 한국어 별 이름과 그 뜻을 유지하고(영어 금지), 생활 장면과 별 이유를 함께 두세 문장으로 써. 별 이름만 나열하지 말고 뜻을 바로 붙여. 이유 문장에서도 특정 직장·학습도구·결제수단·시간대를 지어내지 마. 사건·성과·상대 행동을 새로 만들지 마. 연락 직접 근거가 없는 관계 문장에서는 연락·답장·선연락을 쓰지 마. 모든 target에서 오답 노트·상급자·기획안·회비·생활비 계좌·집으로·오전·오후·저녁·새벽·답장 간격·대면 약속을 입력된 일정처럼 덧붙이지 마. action은 결제 전 합계를 확인하거나 두 선택의 비용을 비교하는 식으로, 계산 주제 안에서 사용자가 직접 할 수 있는 행동만 써. 컨디션과 총평에서는 피로·체력·기력·수면·열감·개운함·과로·과부하·생활 리듬·집중력·감정 급변 같은 증상이나 상태를 예측하지 마. 몸 상태를 관측한 것처럼 쓰지 말고 일정 밀도·활동량·휴식 간격을 보수적으로 정하는 선택만 설명해. period_unsupported_detail_prose 실패 target은 근거 없는 세부 해설이므로 text를 빈 문자열로 반환해. 그 외 target은 비우지 마. 조율·흐름·압박·정돈·신중·현실적 같은 말을 반복해 문장을 채우지 말고, 분야마다 서로 다른 대상과 판단 기준을 써. 자연스러운 한국어 반말로 써.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 TARGETS=${JSON.stringify(targets)}`}
 }
@@ -146,9 +146,34 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
   if (abstractDetails) allowed.add('daily_detail_abstract_repetition')
   const incomingInitiator = payload?.period_kind === 'day' && parsed.some((issue:any)=>issue.code === 'daily_incoming_initiator_prediction')
   if (incomingInitiator) allowed.add('daily_incoming_initiator_prediction')
+  // Period cards: a plain-language or health/role slip in one field is fixed in
+  // that field only. Paths must point at a single existing string.
+  const extended = ['week','month','annual'].includes(String(payload?.period_kind??''))
+  const periodFieldPaths:string[] = []
+  if (extended) {
+    for (const issue of parsed) {
+      const ok =
+        (issue.code==='period_evidence_not_plain_language' && /^clusters\.\d+\.evidence_meaning$/.test(issue.path)) ||
+        (issue.code==='period_specific_life_detail' && /^clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion)$/.test(issue.path)) ||
+        (issue.code==='period_real_scene_not_conditional' && /^clusters\.\d+\.applies_when$/.test(issue.path)) ||
+        (issue.code==='period_unobserved_health_claim' && /^(?:overall\.(?:summary|best_phase|caution_phase|dominant_pattern)|clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion))$/.test(issue.path)) ||
+        (issue.code==='weekly_date_without_cited_observation' && /^overall\.(?:summary|best_phase|caution_phase|dominant_pattern)$/.test(issue.path)) ||
+        (issue.code==='weekly_summary_needs_explanation' && issue.path==='overall.summary') ||
+        (issue.code==='weekly_reason_needs_interpretation' && issue.path==='overall.dominant_pattern') ||
+        (issue.code==='period_unobserved_event_or_span' && /^(?:overall\.(?:summary|best_phase|caution_phase|dominant_pattern)|clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion)|systems\.(?:western|saju|thai))$/.test(issue.path))
+      if (!ok) continue
+      allowed.add(issue.code)
+      if (!periodFieldPaths.includes(issue.path)) periodFieldPaths.push(issue.path)
+    }
+  }
   if(!['day','week','month','annual'].includes(String(payload?.period_kind??''))||!parsed.length||parsed.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=['headline','overall.summary','overall.best_phase','overall.caution_phase'].filter(path=>typeof get(candidate,path)==='string'&&get(candidate,path).trim())
   if(!paths.includes('headline')||!paths.includes('overall.summary'))return null
+  for (const path of periodFieldPaths) {
+    if (typeof get(candidate,path)!=='string'||!get(candidate,path).trim()) return null
+    if (!paths.includes(path)) paths.push(path)
+  }
+  if (paths.length > 32) return null
   if (incomingInitiator) {
     if (typeof get(candidate,'contact_flow.incoming')!=='string'||!get(candidate,'contact_flow.incoming').trim()) return null
     paths.push('contact_flow.incoming')
@@ -173,7 +198,7 @@ headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.su
 첫 화면 네 문장에는 직장·업무·실무·학업·공부·시험·이직·투자·매수·매도·연애·재회·금전·컨디션이라는 분야명을 넣지 마. 기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}
-${incomingInitiator?'contact_flow.incoming이 TARGETS에 있으면 상대나 누군가가 먼저 연락하거나 말을 건넨다는 예측을 빼고, 연락이 들어올 흐름의 강약과 들어온다면 어떤 성격의 연락일지만 기존 근거 범위에서 두세 문장으로 다시 써.\n':''}FIELD_CONCLUSIONS=${JSON.stringify(rows)}
+${periodFieldPaths.length?'기간 해설의 상세 칸이 TARGETS에 있으면: evidence_meaning은 영어 용어 없이 쓰고, 별 이름을 쓰려면 한국어 별 이름 바로 뒤에 그 뜻을 생활 언어로 붙여 한 문장 이상으로 풀어. applies_when은 "~할 때 해당돼."처럼 조건을 끝까지 말해. 피로·체력·수면·집중력·휴식 부족 같은 몸 상태, 퇴근·출근·오전·저녁·내일·월초·상반기 같은 역할·시각·구간 표현, 청구·결제 예측은 빼고 근거가 뜻하는 선택 장면으로 다시 써. dominant_pattern은 별 이름과 뜻을 유지해도 돼. overall 칸의 YYYY-MM-DD는 PREVIOUS_HERO.overall.evidence_refs에 그 날짜 근거가 없으면 빼. overall.summary는 서로 다른 두 문장으로, dominant_pattern은 왜 그렇게 읽는지 완결된 문장으로 써.\n':''}${incomingInitiator?'contact_flow.incoming이 TARGETS에 있으면 상대나 누군가가 먼저 연락하거나 말을 건넨다는 예측을 빼고, 연락이 들어올 흐름의 강약과 들어온다면 어떤 성격의 연락일지만 기존 근거 범위에서 두세 문장으로 다시 써.\n':''}FIELD_CONCLUSIONS=${JSON.stringify(rows)}
 TARGETS=${JSON.stringify(paths.map(path=>({path,previous_text:get(candidate,path)})))}`}
 }
 

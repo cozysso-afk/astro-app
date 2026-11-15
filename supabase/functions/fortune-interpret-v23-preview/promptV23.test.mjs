@@ -40,7 +40,7 @@ function payload(kind='week') {
 
 test('V23 prompt carries phenomenon-first contract instead of topic-first narration', () => {
   const out = buildV23CorePrompt(payload('week'))
-  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.19-system-pages')
+  assert.equal(out.packet.packet_version, 'fortune-ai-prompt-v23.20-period-reader-first')
   assert.equal(out.packet.period_narrative.kind, 'week')
   assert.match(out.text, /현상 묶음부터 시작/)
   assert.match(out.text, /같은 현상이 여러 topic에 걸쳐 있으면 한 번 설명/)
@@ -204,4 +204,31 @@ test('actual writer input preserves measured zero, per-topic signs and independe
   assert.equal(old.daily_score_components,undefined)
   assert.equal(old.evidence_ledger.find(row=>row.id===observed.id).topic_contributions,undefined)
   assert.equal(buildV23CorePrompt(payload('week')).packet.deterministic_topic_summary,undefined)
+})
+
+test('a busy month is fitted under the prompt byte guard without dropping a question topic',()=>{
+  const ledger=[]
+  for(let d=1;d<=28;d++)for(let i=0;i<12;i++){
+    const date=`2026-12-${String(d).padStart(2,'0')}`
+    ledger.push({id:`W:daily:${date}:${i}`,system:'western',scope:'daily_actual_aspect_house',date,direction:i%2?'supportive':'caution',score:i,
+      topic:['연애','대인관계','학업','직장','금전','컨디션'][i%6],source_topics:['연애','대인관계','학업','직장','금전','컨디션'].slice(0,(i%6)+1),
+      text:'하늘을 지나는 별이 출생차트의 별과 각을 맺는 관측 '.repeat(12),observation:{transit:'Venus',target:'Mercury',aspect:'trine',orb:1.2,whole_house:5,quadrant_house:5,motion:'applying',filler:'x'.repeat(300)}})
+  }
+  const payload={period_kind:'month',period:{start:'2026-12-01',end:'2026-12-31',day_count:31},evidence_ledger:ledger,western:{},saju:{},thai:{},time_context:{}}
+  const budget=buildV23PromptBudget(payload)
+  assert.ok(budget.bytes<=180000,`bytes ${budget.bytes}`)
+  const topics=new Set(budget.packet.evidence_ledger.flatMap(r=>[r.topic,...(r.source_topics??[])]))
+  for(const t of ['연애','대인관계','학업','직장','금전','컨디션'])assert.ok(topics.has(t),t)
+})
+
+test('a busy year is fitted under the prompt byte guard too',()=>{
+  const ledger=[]
+  for(let m=1;m<=12;m++)for(let d=1;d<=4;d++)for(let i=0;i<12;i++){
+    const date=`2027-${String(m).padStart(2,'0')}-${String(d*7).padStart(2,'0')}`
+    ledger.push({id:`W:daily:${date}:${i}`,system:'western',scope:'daily_actual_aspect_house',date,direction:'context',score:i,
+      topic:['연애','대인관계','학업','직장','금전','컨디션'][i%6],source_topics:['연애','대인관계','학업','직장','금전','컨디션'].slice(0,(i%6)+1),
+      text:'하늘을 지나는 별이 출생차트의 별과 각을 맺는 관측 '.repeat(12),observation:{transit:'Venus',target:'Mercury',aspect:'trine',filler:'x'.repeat(300)}})
+  }
+  const budget=buildV23PromptBudget({period_kind:'annual',period:{start:'2027-01-01',end:'2027-12-31',day_count:365},evidence_ledger:ledger,western:{},saju:{},thai:{},time_context:{}})
+  assert.ok(budget.bytes<=180000,`bytes ${budget.bytes}`)
 })
