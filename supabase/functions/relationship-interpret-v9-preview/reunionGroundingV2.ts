@@ -196,3 +196,18 @@ export function validateReunionGroundingV2(data: any, payload: any): ReunionGrou
   if (/끊어지지 않는 인연|끊을 수 없는 인연|카르마적 인연|운명적 인연|운명적으로 다시 만난다|천생연분|서로를 지울 수 없다|반드시 연락한다|상대가 아직 사랑한다|(?:연락|만남|재회)\s*확률\s*\d+(?:\.\d+)?\s*%/.test(JSON.stringify(data))) return {ok: false, data, reason: 'unsupported_deterministic_claim'}
   return {ok: true, data}
 }
+
+// Gemini rejects (HTTP 400 INVALID_ARGUMENT) a response schema whose arrays
+// combine enum items with minItems/maxItems once the schema grows. Keep the
+// enums, which restrict citations and dates; counts are checked after the reply.
+export function geminiSafeSchema(schema: any): any {
+  const hasEnum = (v: any): boolean => Array.isArray(v) ? v.some(hasEnum) : Boolean(v && typeof v === 'object' && (Array.isArray(v.enum) || Object.values(v).some(hasEnum)))
+  const walk = (v: any): any => {
+    if (Array.isArray(v)) return v.map(walk)
+    if (!v || typeof v !== 'object') return v
+    const out: any = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]))
+    if (out.type === 'ARRAY' && hasEnum(out.items) && !(out.maxItems === 0)) { delete out.minItems; delete out.maxItems }
+    return out
+  }
+  return walk(schema)
+}
