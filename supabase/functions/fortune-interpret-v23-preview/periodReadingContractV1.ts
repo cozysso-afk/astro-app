@@ -182,6 +182,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
 - headline·overall.summary·best_phase·caution_phase·각 분야 conclusion/action/applies_when은 별 이름·각 이름·영문 전문어·사주 용어 없이 생활 언어로 써.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
+- relationship_reading을 쓰려면 evidence_refs에 근거 두 개 이상, 그중 하나는 topic이 수신신호·발신적합·과거인연접점인 행(contact_axes)이어야 해. 그런 행이 없으면 relationship_reading 칸은 모두 빈 문자열로 둬.
 - domain_answers와 relationship_reading/contact_flow/investment_reading은 기존 기능이야. 해당 질문에 답할 근거가 있으면 유지해. 근거가 없으면 생략하고, 관계 전체의 점수만으로 선연락·재회 결과·상대 마음을 채우지 마. 질문 계약별 지원 범위를 따라.
 - 연애·대인·학업·직업·금전·컨디션을 서로 다른 질문으로 다뤄. 총평을 복사하거나 학업을 직업으로 바꿔 붙이지 마. 총평에서 독자의 직업·학생 여부·관계 상태를 가정하지 마. 퇴근·출근·수면 부족·체력 저하·상대의 답신 같은 현실 사건은 입력 기록 없이 있었다거나 생긴다고 쓰지 마.
 - Western·사주·Thai는 독립 근거야. 같은 기간이라고 합산해 확신을 키우지 마. 원시 Thai 위치를 기간의 길흉·사건·상대 마음으로 바꾸지 마. 점수는 확률이 아니고 높은 활성도는 유리하다는 뜻도 아니야.
@@ -312,6 +313,19 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
  * written here. Primary sections and hero fields are never touched. */
 export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any){
   if(!isExtendedPeriod(kind)||!core||typeof core!=='object')return {core,isolated:[] as string[]}
+  // The quality gate requires a relationship_reading to cite a direction axis
+  // (incoming / outgoing / past-contact). Without one, the optional card is cleared.
+  const ledger=new Map<string,any>((packet?.evidence_ledger??[]).map((row:any)=>[row?.id,row]))
+  const rr=core?.relationship_reading
+  if(packet&&rr&&typeof rr==='object'&&Object.values(rr).some((v:any)=>typeof v==='string'&&v.trim())){
+    const axes=new Set(['수신신호','발신적합','과거인연접점'])
+    const cited=(Array.isArray(rr.evidence_refs)?rr.evidence_refs:[]).map((id:string)=>ledger.get(id)).filter(Boolean)
+    if(cited.length<2||!cited.some((row:any)=>axes.has(text(row?.topic)))){
+      const cleared=Object.fromEntries(Object.entries(rr).map(([k,v])=>[k,k==='evidence_refs'?[]:typeof v==='string'?'':v]))
+      const next=isolateOptionalPeriodViolations({...core,relationship_reading:cleared},kind,packet)
+      return {core:next.core,isolated:['relationship_reading',...next.isolated]}
+    }
+  }
   const report=inspectPeriodProviderDocument(core,kind,packet)
   if(report.passed)return {core,isolated:[] as string[]}
   const required=new Set<string>(packet?requiredKeys(packet):PERIOD_PRIMARY_KEYS)
