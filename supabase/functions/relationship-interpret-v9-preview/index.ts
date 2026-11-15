@@ -8,14 +8,14 @@ import { validateReunionGroundingV2, questionCitationSchema } from "./reunionGro
 import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relationshipCopyRepair.ts";
 import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
-const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.7-grounded-question-reading-contract";
-const REUNION_VERSION="relationship-v14.11-observed-fact-reading-contract";
+const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.8-reader-first-direction";
+const REUNION_VERSION="relationship-v14.12-reader-first-direction";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL,"gemini-3.7-flash"]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").trim();
 const SERVICE=(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"").trim();
-const MAX_GEMINI_CALLS=2,MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=40000,MAX_AI_JOB_ESTIMATED_KRW=300;
+const MAX_GEMINI_CALLS=3,MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=40000,MAX_AI_JOB_ESTIMATED_KRW=300;
 // Keep the hard cost guard; compress reunion evidence toward 40KB before generation.
 const GEMINI_USD_KRW_ESTIMATE=1384,GEMINI_INTRO_END=Date.parse("2026-12-31T23:59:59Z");
 const MAX_USER_NEW_JOBS_10M=6,MAX_USER_NEW_JOBS_24H=20,MAX_GLOBAL_NEW_JOBS_10M=18,MAX_GLOBAL_NEW_JOBS_24H=60;
@@ -114,7 +114,7 @@ function compact(calc:any,ctx:any,purpose:Purpose,level=0){
    analysis_mode:r?.analysis_mode??null,period:calc?.period,relationship_status:calc?.relationship_status,
    timing_contract:{timing_timezone_policy:r?.timing_timezone_policy??null,secondary_key:r?.secondary_key??null,tertiary_key:r?.tertiary_key??null,orb_policy:r?.orb_policy??null,interpretation_policy:r?.interpretation_policy??null},
    precision:{partner_time_available:available,partner_time_exact:exact,birth_time_reliability:r?.birth_time_reliability??null,sensitivity_scan:sensitivityPacket(r?.sensitivity_scan),removed_time_sensitive_count:(Array.isArray(n?.aspects)?n.aspects.length:0)-aspects.length},
-   static:{aspects:aspects.slice(0,L.static),strongest:aspects.slice(0,Math.min(14,L.static))},
+   static:{direction:"a=사용자(너)의 출생 행성, b=상대의 출생 행성",aspects:aspects.slice(0,L.static),strongest:aspects.slice(0,Math.min(14,L.static))},
    focus:focusPacket(focus,L.focus),
    house_overlays:housePacket(r?.house_overlays,L.house),
    saju_relationship:sajuPacket(r?.saju_relationship,L.cross),
@@ -328,7 +328,7 @@ function promptText(payload:any,purpose:Purpose,compactMode=false,repairHint="")
  return `PURPOSE=${purpose}\n${modeInstruction(purpose)}\n${EDITORIAL_INSTRUCTION}\n${retry}${repair}${reunion}CALCULATED_DATA=${JSON.stringify(payload)}`;
 }
 function relationshipOutputTokens(purpose:Purpose,compactMode:boolean){if(purpose==="reunion")return compactMode?6500:8500;return compactMode?12000:16000;}
-function relationshipEstimatedJobKrw(inputTokens:number,purpose:Purpose){const intro=Date.now()<=GEMINI_INTRO_END,inputRate=intro ? .75 : 1.5,outputRate=intro ? 3.75 : 7.5,thoughtReserve=3000;const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;return one(relationshipOutputTokens(purpose,false))+one(relationshipOutputTokens(purpose,true));}
+function relationshipEstimatedJobKrw(inputTokens:number,purpose:Purpose){const intro=Date.now()<=GEMINI_INTRO_END,inputRate=intro ? .75 : 1.5,outputRate=intro ? 3.75 : 7.5,thoughtReserve=3000;const one=(output:number)=>((inputTokens/1_000_000)*inputRate+((output+thoughtReserve)/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;const patch=((12000/1_000_000)*inputRate+(6000/1_000_000)*outputRate)*GEMINI_USD_KRW_ESTIMATE;return one(relationshipOutputTokens(purpose,false))+one(relationshipOutputTokens(purpose,true))+patch;}
 function promptBudget(payload:any,purpose:Purpose){const bytes=enc.encode(SYSTEM+promptText(payload,purpose,false)).length,targetBytes=purpose==="reunion"?REUNION_PROMPT_TARGET_BYTES:MAX_PROMPT_BYTES,estimated_input_tokens=Math.ceil(bytes/2.6),estimated_max_job_krw=relationshipEstimatedJobKrw(estimated_input_tokens,purpose),ok=bytes<=MAX_PROMPT_BYTES&&estimated_max_job_krw<=MAX_AI_JOB_ESTIMATED_KRW;return {bytes,max_bytes:MAX_PROMPT_BYTES,target_bytes:targetBytes,target_ok:bytes<=targetBytes,estimated_input_tokens,estimated_max_job_krw,max_job_krw:MAX_AI_JOB_ESTIMATED_KRW,ok};}
 function addUsage(a:any,b:any){const trace=[...(Array.isArray(a?.call_trace)?a.call_trace:[]),...(Array.isArray(b?.call_trace)?b.call_trace:[])].slice(0,MAX_GEMINI_CALLS).map((row:any,index:number)=>({...row,call:index+1}));return {prompt_tokens:Number(a?.prompt_tokens??0)+Number(b?.prompt_tokens??0),candidate_tokens:Number(a?.candidate_tokens??0)+Number(b?.candidate_tokens??0),thought_tokens:Number(a?.thought_tokens??0)+Number(b?.thought_tokens??0),total_tokens:Number(a?.total_tokens??0)+Number(b?.total_tokens??0),call_trace:trace};}
 function validationFailure(model:string,usageValue:any,stage:string,reason:string){
@@ -338,7 +338,9 @@ function validationFailure(model:string,usageValue:any,stage:string,reason:strin
 async function sha(value:string){const digest=await crypto.subtle.digest("SHA-256",enc.encode(value));return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return `[${v.map(stable).join(",")}]`;return `{${Object.keys(v).sort().map(k=>`${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`;}
 
-async function generate(payload:any,purpose:Purpose,model:string,key:string,compactMode=false,repairHint="",copyRepair:any=null){
+async function generate(payload:any,purpose:Purpose,model:string,key:string,compactMode=false,repairHint="",copyRepair:any=null,patchRound=0){
+ // One further bounded patch may follow the first rewrite; it only edits the sentences still failing.
+ const canPlan=patchRound===0;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),115000),kind=compactMode?"semantic_rewrite":"initial";
  try{
   const prompt=copyRepair
@@ -359,7 +361,7 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
    const editorial=validateRelationshipEditorial(data,purpose);
    if(!editorial.ok){
     const failure=validationFailure(model,u,"relationship_editorial",String(editorial.reason));
-    if (!compactMode) {
+    if (canPlan) {
       const grounding = purpose === "reunion" ? validateReunionGroundingV2(data,payload) : null;
       if (!grounding || grounding.ok || ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(String(grounding.reason))) {
         return {...failure,copyRepair:planRelationshipCopyRepair(authored,payload,purpose)};
@@ -369,15 +371,16 @@ async function generate(payload:any,purpose:Purpose,model:string,key:string,comp
    }
    if(purpose==="reunion"){
     const validation=validateReunionGroundingV2(data,payload);
-    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:!compactMode && ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
+    if(!validation.ok){const reason=String(validation.reason??"unknown");console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"reunion_grounding",reason,purpose,model,compactMode}));return {...validationFailure(model,u,"reunion_grounding",reason),copyRepair:canPlan && ["invalid_question_evidence_refs","insufficient_grounded_content","unsupported_initiative_direction"].includes(reason) ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
    }
-   if(!grounded(data,payload,purpose,compactMode)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"grounded",purpose,model,compactMode}));return {...validationFailure(model,u,"grounded","insufficient_grounded_content"),copyRepair:compactMode ? null : planRelationshipCopyRepair(authored,payload,purpose)};}
+   if(!grounded(data,payload,purpose,compactMode)){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"grounded",purpose,model,compactMode}));return {...validationFailure(model,u,"grounded","insufficient_grounded_content"),copyRepair:canPlan ? planRelationshipCopyRepair(authored,payload,purpose) : null};}
    return {ok:true,data,model,interpreter_version:versionForPurpose(purpose),usage:u};
   }catch(e){console.warn(JSON.stringify({event:"relationship_validation_failed",stage:"parse_or_validation_exception",purpose,model,compactMode,name:e instanceof Error?e.name:"unknown"}));return validationFailure(model,u,"parse_or_validation_exception","invalid_inner_json");}
  }catch(e){const outcome=e instanceof DOMException&&e.name==="AbortError"?"timeout":"failed";return publicRelationshipError(outcome==="timeout"?"REL_GENERATION_TIMEOUT":"REL_GENERATION_FAILED",{model,usage:{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0,call_trace:[{call:1,model,kind,http_status:0,finish_reason:"",outcome}]}});}
  finally{clearTimeout(timer);}
 }
-async function calculate(payload:any,purpose:Purpose,preferred:string,key:string){let calls=0;const version=versionForPurpose(purpose);const first:any=await generate(payload,purpose,preferred,key,false);calls+=1;const firstUsage=first.usage??{};if(first.ok)return {...first,origin:"gemini",provenance_verified:true,usage:{...firstUsage,attempt_count:calls,generation_version:version}};if(calls>=MAX_GEMINI_CALLS||firstUsage.call_trace?.some((row:any)=>row.http_status===402))return {...first,usage:{...firstUsage,attempt_count:calls,generation_version:version}};const retryModel=preferred===DEFAULT_MODEL?FALLBACK_MODEL:preferred;const second:any=await generate(payload,purpose,retryModel,key,true,String(first.validation_hint??""),first.copyRepair??null);calls+=1;const total=addUsage(firstUsage,second.usage??{});if(second.ok)return {...second,origin:"gemini",provenance_verified:true,usage:{...total,attempt_count:calls,generation_version:version},...(retryModel!==preferred?{fallback_from:preferred}:{})};return publicRelationshipError(second.error_code??"REL_GENERATION_FAILED",{model:preferred,interpreter_version:version,usage:{...total,attempt_count:calls,generation_version:version}});}
+async function calculate(payload:any,purpose:Purpose,preferred:string,key:string){let calls=0;const version=versionForPurpose(purpose);const first:any=await generate(payload,purpose,preferred,key,false);calls+=1;const firstUsage=first.usage??{};if(first.ok)return {...first,origin:"gemini",provenance_verified:true,usage:{...firstUsage,attempt_count:calls,generation_version:version}};if(calls>=MAX_GEMINI_CALLS||firstUsage.call_trace?.some((row:any)=>row.http_status===402))return {...first,usage:{...firstUsage,attempt_count:calls,generation_version:version}};const retryModel=preferred===DEFAULT_MODEL?FALLBACK_MODEL:preferred;const second:any=await generate(payload,purpose,retryModel,key,true,String(first.validation_hint??""),first.copyRepair??null);calls+=1;const total=addUsage(firstUsage,second.usage??{});if(second.ok)return {...second,origin:"gemini",provenance_verified:true,usage:{...total,attempt_count:calls,generation_version:version},...(retryModel!==preferred?{fallback_from:preferred}:{})};if(second.copyRepair&&calls<MAX_GEMINI_CALLS&&!(second.usage?.call_trace??[]).some((row:any)=>row.http_status===402)){const third:any=await generate(payload,purpose,retryModel,key,true,String(second.validation_hint??""),second.copyRepair,1);calls+=1;const all=addUsage(total,third.usage??{});if(third.ok)return {...third,origin:"gemini",provenance_verified:true,usage:{...all,attempt_count:calls,generation_version:version},...(retryModel!==preferred?{fallback_from:preferred}:{})};return publicRelationshipError(third.error_code??"REL_GENERATION_FAILED",{model:preferred,interpreter_version:version,usage:{...all,attempt_count:calls,generation_version:version}});}
+ return publicRelationshipError(second.error_code??"REL_GENERATION_FAILED",{model:preferred,interpreter_version:version,usage:{...total,attempt_count:calls,generation_version:version}});}
 
 async function countJobs(admin:any,userId:string|null,since:string){let q=admin.from("ai_interpret_jobs").select("id",{count:"exact",head:true}).like("kind","supabase-relationship-v11%").gte("created_at",since);if(userId)q=q.eq("user_id",userId);const {count,error}=await q;if(error)throw error;return Number(count??0);}
 async function rollingGuard(admin:any,userId:string){const now=Date.now();const u10=await countJobs(admin,userId,new Date(now-10*60*1000).toISOString()),u24=await countJobs(admin,userId,new Date(now-24*60*60*1000).toISOString()),g10=await countJobs(admin,null,new Date(now-10*60*1000).toISOString()),g24=await countJobs(admin,null,new Date(now-24*60*60*1000).toISOString());if(u10>=MAX_USER_NEW_JOBS_10M)return `내 계정에서 10분 동안 새 관계 해설 ${MAX_USER_NEW_JOBS_10M}건 한도에 도달했어.`;if(u24>=MAX_USER_NEW_JOBS_24H)return `내 계정에서 24시간 새 관계 해설 ${MAX_USER_NEW_JOBS_24H}건 한도에 도달했어.`;if(g10>=MAX_GLOBAL_NEW_JOBS_10M)return `전체 10분 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_10M}건 안전 한도에 도달했어.`;if(g24>=MAX_GLOBAL_NEW_JOBS_24H)return `전체 24시간 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_24H}건 안전 한도에 도달했어.`;return "";}

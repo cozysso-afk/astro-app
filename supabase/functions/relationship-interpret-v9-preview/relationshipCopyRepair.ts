@@ -1,4 +1,4 @@
-import { unsupportedSajuTerm, copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, unobservedMind } from './relationshipEditorialV1.ts'
+import { unsupportedSajuTerm, copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, claimsUnobservedMind } from './relationshipEditorialV1.ts'
 import { hasUnsupportedInitiativeDirection } from './reunionGroundingV2.ts'
 
 type Target = { id: string; path: string[]; previous: string | string[]; issues: string[]; evidence?: {id:string;facts:unknown}[] }
@@ -21,7 +21,7 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
       if (hasInventedDuration(value)) issues.push('근거 없는 대기 시간·행동 기간을 삭제')
       if (reportStyle.test(value)) issues.push('내용은 유지하고 보고서체 종결을 자연스러운 반말로 바꿔')
       if (copyTypo.test(value)) issues.push('잘못된 한국어 표현을 바로잡아')
-      if (unobservedMind.test(value)) issues.push('현재 속마음이나 의지를 단정하지 말고 확인 가능한 조건을 설명')
+      if (claimsUnobservedMind(value)) issues.push('현재 속마음이나 의지를 단정하지 말고 확인 가능한 조건을 설명')
       if (purpose === 'reunion' && !payload?.reunion_evidence_v2?.initiative_gate?.available &&
           hasUnsupportedInitiativeDirection(value,payload?.reunion_observation)) issues.push('미래 선연락 주체는 알 수 없다고 설명')
       if (issues.length) targets.push({id:'field_'+targets.length,path,previous:value,issues})
