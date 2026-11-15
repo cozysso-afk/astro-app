@@ -112,7 +112,9 @@ export function attachPeriodReadingContext(packet:any,fullPayload:any=packet){
     temporal_policy:'dated_samples_do_not_establish_continuous_change',
     required_primary_keys:PERIOD_PRIMARY_KEYS,required_section_keys:requiredKeys({...packet,evidence_ledger}),
     ...(loveEvidence({...packet,evidence_ledger}).length
-      ? {love_situations:{questions:loveSituationQuestions, shared_evidence_question:'relationship.love_general'}} : {}),
+      ? {love_situations:{questions:loveSituationQuestions, shared_evidence_question:'relationship.love_general',
+          // Each situation must cite at least one of these rows (topic 연애).
+          love_evidence_refs:loveEvidence({...packet,evidence_ledger}).map((row:any)=>row.id).slice(0,12)}} : {}),
     included_ids:[...selectedIds],omitted_ids:omitted.map((r:any)=>r.id),
     omission_reason:omitted.length?'bounded_prompt_selection':null,
     questions:Object.entries(QUESTION_TOPICS).map(([key,topics])=>{
@@ -168,7 +170,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - 연락 세부항목(relationship.contact_activation, relationship.contact_continuity)을 쓰지 않았다면 애정·대인 원고와 relationship_reading에 연락·답장·선연락·안부라는 말을 쓰지 마. 투자 세부항목을 쓰지 않았다면 investment_reading 네 칸은 빈 문자열로 둬.
 
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해. ${periodQuestion}${weekly}
-- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. period_reading.required_section_keys에 있는 모든 질문을 각각 한 번 작성해. 애정 상황은 love_situations.questions의 서로 다른 질문에 연애 근거를 조건부로 적용하고 applicability=conditional로 둬. 재회 질문은 “${reunionSituationQuestion}”이며 재회·과거인연접점 근거로만 답해. 서로 다른 여섯 원고를 모두 다음 약속 확인으로 끝내지 마. 사용자 관계 상태나 상대 마음을 정해 놓지 마.
+- clusters는 key를 가진 배열이야. ${PERIOD_PRIMARY_KEYS.join(', ')} 여섯 key를 각각 반드시 한 번 포함해. 생성 누락은 근거 부족과 다르니 생략하지 마. 연락·재회·시험·이직·소식·투자 등 기존 세부항목은 근거가 그 질문에 직접 답할 때만 선택해서 작성해. 기간 표본에 관련 topic이 있다는 이유만으로 세부항목 전부를 강제로 만들지 마. period_reading.required_section_keys에 있는 모든 질문을 각각 한 번 작성해. 애정 상황(솔로·짝사랑·썸·애매한 관계·연애 중)은 love_situations.questions의 서로 다른 질문에 연애 근거를 조건부로 적용하고 applicability=conditional로 둬. 각 상황의 evidence_refs에는 love_situations.love_evidence_refs 중 하나 이상을 반드시 넣어. 연애 topic이 아닌 날의 근거만 인용하면 탈락이야. 재회 질문은 “${reunionSituationQuestion}”이며 재회·과거인연접점 근거로만 답해. 서로 다른 여섯 원고를 모두 다음 약속 확인으로 끝내지 마. 사용자 관계 상태나 상대 마음을 정해 놓지 마.
 - 각 항목은 conclusion/applies_when/evidence_meaning/action/change_condition/evidence_refs/applicability를 포함해. conclusion은 그 분야의 판단 하나야. applies_when은 사용자에게 실제로 일어난 일을 예측하지 말고 해당 조건을 독립된 문장으로 마쳐. 예를 들어 '두 약속 중 하나를 골라야 할 때 해당돼.'처럼 상황만 설명해. '경우라면'에서 끊지 마. evidence_meaning은 위 분량대로 장면과 별 이유를 쓰되 사용자 사건·증상·상대 행동을 만들지 마. action은 그 조건에서 고를 선택 하나야. 자연스러운 반말로 써.
 - 근거가 없으면 applicability=insufficient와 빈 원고·빈 evidence_refs로 명시해. conditional은 근거가 있는 조건부 해석이며 근거 없는 일반론을 뜻하지 않아. 직접 답할 수 없는 부분을 예언으로 채우지 마.
 - change_condition은 선택항목이야. 판단을 바꾸는 예외를 뒷받침할 근거가 없으면 빈 문자열로 둬. 본문에 이미 있는 필수 조건과 제한은 그대로 보존해.
@@ -176,6 +178,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - 초·중·후반이나 네 분기를 의무적으로 채우지 마. 표본 날짜가 여러 개라는 이유만으로 중간이 계속 좋았거나 달라졌다고 말하지 마. 관측이 같은 경우 유지되는 맥락을 설명할 수 있지만, 날짜 사이의 미계산 변화를 확정하지 마.
 - period_reading.questions는 전달된 분야별 근거와 표본 범위야. all_supplied_rows도 전체 기간의 모든 날이 계산됐다는 뜻은 아니야. omitted_ids의 근거는 인용하지 마. 일부 날짜 근거만 있으면 그 날짜의 관측과 기간 전체의 제한을 분리해.
 - key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 evidence_meaning과 action${kind==='week'?' 또는 overall이 직접 인용한 관측을 설명하는 문장':''}에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
+- overall.summary·best_phase·caution_phase·dominant_pattern에 YYYY-MM-DD를 쓰려면 그 날짜의 근거가 overall.evidence_refs에 들어 있어야 해. 없으면 날짜를 빼고 장면만 말해.
 - 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
 - headline·overall.summary·best_phase·caution_phase·각 분야 conclusion/action/applies_when은 별 이름·각 이름·영문 전문어·사주 용어 없이 생활 언어로 써.
 - decisions/priorities도 근거가 있는 항목만 작성해. 날짜 근거가 없으면 시각·날짜 없는 행동으로 써도 돼. 핵심 행동은 여섯 분야의 action에 이미 있으니 총평에서 억지로 별도 행동을 추가할 필요는 없어.
@@ -242,7 +245,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
       issues.push({code:'period_real_scene_not_conditional', path:`clusters.${index}.applies_when`})
     }
     // A planet name needs its meaning next to it; a bare placement label is not a reason.
-    if (!meaning || untranslated.test(meaning) || (technical.test(meaning) && meaning.length<60) || /행성\s*(?:구조|배치)|상대지수|배경\s*배치|표본일/.test(meaning)) {
+    if (!meaning || untranslated.test(meaning) || (technical.test(meaning) && meaning.length<40) || /행성\s*(?:구조|배치)|상대지수|배경\s*배치|표본일/.test(meaning)) {
       issues.push({code:'period_evidence_not_plain_language', path:`clusters.${index}.evidence_meaning`})
     }
   }
@@ -284,7 +287,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
     const found=rows.filter((r:any)=>r?.key===key)
     if(found.length!==1){issues.push({code:'primary_missing_or_duplicate',path:`clusters.${key}`});continue}
     const row=found[0]
-    if (loveKeys.includes(key)) {
+    if (loveKeys.includes(key) && row.applicability!=='insufficient') {
       if (row.applicability!=='conditional' || !row.evidence_refs?.some((ref:string)=>loveEvidenceIds.has(ref))) {
         issues.push({code:'monthly_love_requires_conditional_topic_evidence',path:`clusters.${key}`})
       }
@@ -322,6 +325,13 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
     if((m=/^decisions\.(\d+)\./.exec(path))){dropDecisions.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^domain_answers\.(\d+)\./.exec(path))){dropAnswers.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^(investment_reading|contact_flow|relationship_reading|systems)\.([a-z_]+)$/.exec(path))&&typeof next?.[m[1]]?.[m[2]]==='string'){next[m[1]][m[2]]='';isolated.push(path);continue}
+    // A love situation that cites no love evidence becomes an explicit
+    // insufficient state for that situation only.
+    if(issue.code==='monthly_love_requires_conditional_topic_evidence'&&(m=/^clusters\.(relationship\.love_[a-z_]+)$/.exec(path))){
+      const index=(next.clusters??[]).findIndex((row:any)=>row?.key===m![1])
+      if(index>=0){next.clusters[index]={key:m[1],conclusion:'',applies_when:'',evidence_meaning:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'};isolated.push(path)}
+      continue
+    }
     if((m=/^clusters\.(\d+)\./.exec(path))){
       const row=next.clusters?.[Number(m[1])]
       const key=String(row?.key??'')

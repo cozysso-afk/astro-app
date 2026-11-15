@@ -256,3 +256,19 @@ test('a defect in an optional period field is isolated without touching the prim
   const primary=provider();primary.clusters[0].action='내일 저녁에 만나.'
   assert.deepEqual(isolateOptionalPeriodViolations(primary,'month',undefined).isolated,[])
 })
+
+test('a love situation citing a non-love row is marked insufficient instead of failing the reading',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const payload={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:love',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-17',topic:'연애',source_topics:['연애']},
+    {id:'W:work',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-18',topic:'직장',source_topics:['직장']}]}
+  const core=provider()
+  for(const key of ['relationship.love_single','relationship.love_crush','relationship.love_flirting','relationship.love_ambiguous','relationship.love_couple'])
+    core.clusters.push({key,conclusion:'c',applies_when:'만날 때 해당돼.',evidence_meaning:'만남이 편해지는 때야. 조금 더 길게 쓴 이유 문장이야.',action:'a',change_condition:'',evidence_refs:[key.endsWith('crush')?'W:work':'W:love'],applicability:'conditional'})
+  const before=inspectPeriodProviderDocument(core,'week',payload)
+  assert.ok(before.issues.some(i=>i.code==='monthly_love_requires_conditional_topic_evidence'&&i.path==='clusters.relationship.love_crush'))
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',payload)
+  assert.ok(isolated.includes('clusters.relationship.love_crush'))
+  assert.equal(out.clusters.find(r=>r.key==='relationship.love_crush').applicability,'insufficient')
+  assert.ok(!inspectPeriodProviderDocument(out,'week',payload).issues.some(i=>i.code==='monthly_love_requires_conditional_topic_evidence'))
+})

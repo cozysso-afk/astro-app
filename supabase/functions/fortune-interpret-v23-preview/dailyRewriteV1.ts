@@ -157,6 +157,9 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
         (issue.code==='period_specific_life_detail' && /^clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion)$/.test(issue.path)) ||
         (issue.code==='period_real_scene_not_conditional' && /^clusters\.\d+\.applies_when$/.test(issue.path)) ||
         (issue.code==='period_unobserved_health_claim' && /^(?:overall\.(?:summary|best_phase|caution_phase|dominant_pattern)|clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion))$/.test(issue.path)) ||
+        (issue.code==='weekly_date_without_cited_observation' && /^overall\.(?:summary|best_phase|caution_phase|dominant_pattern)$/.test(issue.path)) ||
+        (issue.code==='weekly_summary_needs_explanation' && issue.path==='overall.summary') ||
+        (issue.code==='weekly_reason_needs_interpretation' && issue.path==='overall.dominant_pattern') ||
         (issue.code==='period_unobserved_event_or_span' && /^(?:overall\.(?:summary|best_phase|caution_phase|dominant_pattern)|clusters\.\d+\.(?:applies_when|action|evidence_meaning|conclusion)|systems\.(?:western|saju|thai))$/.test(issue.path))
       if (!ok) continue
       allowed.add(issue.code)
@@ -195,7 +198,7 @@ headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.su
 첫 화면 네 문장에는 직장·업무·실무·학업·공부·시험·이직·투자·매수·매도·연애·재회·금전·컨디션이라는 분야명을 넣지 마. 기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}
-${periodFieldPaths.length?'기간 해설의 상세 칸이 TARGETS에 있으면: evidence_meaning은 영어 용어 없이 쓰고, 별 이름을 쓰려면 한국어 별 이름 바로 뒤에 그 뜻을 생활 언어로 붙여 한 문장 이상으로 풀어. applies_when은 "~할 때 해당돼."처럼 조건을 끝까지 말해. 피로·체력·수면·집중력·휴식 부족 같은 몸 상태, 퇴근·출근·오전·저녁·내일·월초·상반기 같은 역할·시각·구간 표현, 청구·결제 예측은 빼고 근거가 뜻하는 선택 장면으로 다시 써. dominant_pattern은 별 이름과 뜻을 유지해도 돼.\n':''}${incomingInitiator?'contact_flow.incoming이 TARGETS에 있으면 상대나 누군가가 먼저 연락하거나 말을 건넨다는 예측을 빼고, 연락이 들어올 흐름의 강약과 들어온다면 어떤 성격의 연락일지만 기존 근거 범위에서 두세 문장으로 다시 써.\n':''}FIELD_CONCLUSIONS=${JSON.stringify(rows)}
+${periodFieldPaths.length?'기간 해설의 상세 칸이 TARGETS에 있으면: evidence_meaning은 영어 용어 없이 쓰고, 별 이름을 쓰려면 한국어 별 이름 바로 뒤에 그 뜻을 생활 언어로 붙여 한 문장 이상으로 풀어. applies_when은 "~할 때 해당돼."처럼 조건을 끝까지 말해. 피로·체력·수면·집중력·휴식 부족 같은 몸 상태, 퇴근·출근·오전·저녁·내일·월초·상반기 같은 역할·시각·구간 표현, 청구·결제 예측은 빼고 근거가 뜻하는 선택 장면으로 다시 써. dominant_pattern은 별 이름과 뜻을 유지해도 돼. overall 칸의 YYYY-MM-DD는 PREVIOUS_HERO.overall.evidence_refs에 그 날짜 근거가 없으면 빼. overall.summary는 서로 다른 두 문장으로, dominant_pattern은 왜 그렇게 읽는지 완결된 문장으로 써.\n':''}${incomingInitiator?'contact_flow.incoming이 TARGETS에 있으면 상대나 누군가가 먼저 연락하거나 말을 건넨다는 예측을 빼고, 연락이 들어올 흐름의 강약과 들어온다면 어떤 성격의 연락일지만 기존 근거 범위에서 두세 문장으로 다시 써.\n':''}FIELD_CONCLUSIONS=${JSON.stringify(rows)}
 TARGETS=${JSON.stringify(paths.map(path=>({path,previous_text:get(candidate,path)})))}`}
 }
 

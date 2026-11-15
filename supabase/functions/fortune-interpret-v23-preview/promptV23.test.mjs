@@ -205,3 +205,18 @@ test('actual writer input preserves measured zero, per-topic signs and independe
   assert.equal(old.evidence_ledger.find(row=>row.id===observed.id).topic_contributions,undefined)
   assert.equal(buildV23CorePrompt(payload('week')).packet.deterministic_topic_summary,undefined)
 })
+
+test('a busy month is fitted under the prompt byte guard without dropping a question topic',()=>{
+  const ledger=[]
+  for(let d=1;d<=28;d++)for(let i=0;i<12;i++){
+    const date=`2026-12-${String(d).padStart(2,'0')}`
+    ledger.push({id:`W:daily:${date}:${i}`,system:'western',scope:'daily_actual_aspect_house',date,direction:i%2?'supportive':'caution',score:i,
+      topic:['연애','대인관계','학업','직장','금전','컨디션'][i%6],source_topics:['연애','대인관계','학업','직장','금전','컨디션'].slice(0,(i%6)+1),
+      text:'하늘을 지나는 별이 출생차트의 별과 각을 맺는 관측 '.repeat(12),observation:{transit:'Venus',target:'Mercury',aspect:'trine',orb:1.2,whole_house:5,quadrant_house:5,motion:'applying',filler:'x'.repeat(300)}})
+  }
+  const payload={period_kind:'month',period:{start:'2026-12-01',end:'2026-12-31',day_count:31},evidence_ledger:ledger,western:{},saju:{},thai:{},time_context:{}}
+  const budget=buildV23PromptBudget(payload)
+  assert.ok(budget.bytes<=180000,`bytes ${budget.bytes}`)
+  const topics=new Set(budget.packet.evidence_ledger.flatMap(r=>[r.topic,...(r.source_topics??[])]))
+  for(const t of ['연애','대인관계','학업','직장','금전','컨디션'])assert.ok(topics.has(t),t)
+})
