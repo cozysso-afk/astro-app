@@ -182,8 +182,54 @@ export function buildV23PromptPacket(payload:any) {
       delete packet.period_narrative.interpretation_policy
     }
   }
+  if(packet.period_kind==='month')fitMonthlyPacket(packet)
   if(packet.period_kind==='day')packet.daily_editorial_brief=dailyEditorialBrief(packet)
   return packet
+}
+
+// A busy month (many transits) produced a 197 KB writer packet and every
+// monthly request for it was refused by the 180 KB guard. Shrink in the same
+// order the annual packet already does, then drop optional score samples,
+// then drop evidence rows that are not the last row for any question topic.
+const MONTHLY_PACKET_TARGET_BYTES=172000
+function monthlyBytes(packet:any){return enc.encode(JSON.stringify(monthlyWriterPacket(packet))).byteLength}
+function fitMonthlyPacket(packet:any){
+  if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)return
+  delete packet.domain_answer_contracts
+  if(packet.period_narrative){
+    delete packet.period_narrative.required_sequence
+    delete packet.period_narrative.evidence_priority
+    delete packet.period_narrative.forbidden_patterns
+    delete packet.period_narrative.distinctive_requirements
+    delete packet.period_narrative.interpretation_policy
+  }
+  if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)return
+  if(packet.western?.daily_score_components)packet.western={...packet.western,daily_score_components:[]}
+  if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)return
+  const topicsOf=(row:any)=>[row?.topic,...(Array.isArray(row?.source_topics)?row.source_topics:[])].filter(Boolean).map(String)
+  const protectedIds=new Set<string>([
+    ...((packet.contact_axes&&typeof packet.contact_axes==='object')?Object.values(packet.contact_axes).flatMap((v:any)=>Array.isArray(v)?v:[v?.id??v?.evidence_id]).filter(Boolean).map(String):[]),
+    ...((packet.system_field_sources??[]) as any[]).flatMap((x:any)=>x?.evidence_refs??[]).map(String),
+  ])
+  // Daily western rows are the most numerous; drop the weakest first.
+  const candidates=[...(packet.evidence_ledger??[])]
+    .filter((row:any)=>row?.system==='western'&&row?.scope==='daily_actual_aspect_house'&&!protectedIds.has(String(row.id)))
+    .sort((a:any,b:any)=>Math.abs(Number(a?.score??a?.strength??0))-Math.abs(Number(b?.score??b?.strength??0)))
+  const removed=new Set<string>()
+  for(const row of candidates){
+    if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)break
+    const remaining=packet.evidence_ledger.filter((r:any)=>r.id!==row.id)
+    if(topicsOf(row).some(topic=>!remaining.some((r:any)=>topicsOf(r).includes(topic))))continue
+    packet.evidence_ledger=remaining
+    removed.add(String(row.id))
+  }
+  if(removed.size&&packet.period_reading){
+    const pr=packet.period_reading
+    pr.included_ids=(pr.included_ids??[]).filter((id:string)=>!removed.has(id))
+    pr.omitted_ids=[...(pr.omitted_ids??[]),...removed]
+    pr.omission_reason='bounded_prompt_selection'
+    pr.questions=(pr.questions??[]).map((q:any)=>({...q,evidence_refs:(q.evidence_refs??[]).filter((id:string)=>!removed.has(id))}))
+  }
 }
 
 // The server keeps the complete selection audit. Every included row already
