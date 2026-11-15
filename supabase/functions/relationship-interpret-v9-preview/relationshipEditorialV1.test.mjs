@@ -118,3 +118,8 @@ test('feelings framed as tendencies or things to confirm are allowed; flat claim
  const flat=core();flat.chemistry='서로를 강하게 원하는 사이야.'
  assert.equal(validateRelationshipEditorial(flat,'compatibility').reason,'unobserved_mind_claim')
 })
+
+test('a prescribed wait before talking again is an invented duration',()=>{
+ const d=core();d.conflict_pattern='감정이 격해지면 말을 멈추고 30분 뒤에 다시 이야기하는 규칙을 세워.'
+ assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration')
+})
