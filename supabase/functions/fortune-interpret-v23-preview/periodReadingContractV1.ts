@@ -236,7 +236,7 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   for(const [index,row] of (core?.domain_answers??[]).entries())if(row?.topic==='컨디션')addHealth(row?.answer,`domain_answers.${index}.answer`)
   for(const field of ['verdict','reason','action','avoid','timing'])addHealth(core?.topic_analysis?.['컨디션']?.[field],`topic_analysis.컨디션.${field}`)
   for(const [index,row] of (core?.decisions??[]).entries())for(const field of ['reason','watch','action','avoid'])addHealth(row?.[field],`decisions.${index}.${field}`)
-  const conditionalScene=/(?:만약|실제로|라면|한다면|경우|[가-힣]\s?때(?:\s|는|에|마다|라|면|$))/
+  const conditionalScene=/(?:만약|실제로|라면|한다면|경우|[가-힣]\s?때(?:\s|는|에|마다|라|면|$)|(?:상황|순간|자리|시기)(?:에|이라면|일\s?때|에서))/
   for(const [index,row] of rows.entries())if(row?.applicability!=='insufficient'){const applies=text(row?.applies_when)||text(row?.real_scene).split(/[.!?。]/)[0];if(applies&&!conditionalScene.test(applies))issues.push({code:'period_real_scene_not_conditional',path:`clusters.${index}.${typeof row?.applies_when==='string'?'applies_when':'real_scene'}`})}
   for (const [index, row] of rows.entries()) {
     if (row?.applicability === 'insufficient' || typeof row?.applies_when !== 'string') continue
@@ -338,6 +338,26 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
       const drop=new Set(answerIssues)
       const next=isolateOptionalPeriodViolations({...core,domain_answers:core.domain_answers.filter((_:unknown,i:number)=>!drop.has(i))},kind,packet)
       return {core:next.core,isolated:[...[...drop].map(i=>`domain_answers[${i}]`),...next.isolated]}
+    }
+  }
+  // A section may cite one off-topic row next to on-topic rows; the final check
+  // needs every cited row to match. Keep the on-topic rows only when at least
+  // one remains. Rows outside the writer packet are left untouched.
+  if(packet?.period&&Array.isArray(core?.clusters)){
+    const scoped:Record<string,string[]>={...DAILY_SECTION_TOPICS,...QUESTION_TOPICS,...loveTopics}
+    let trimmed=false
+    const clusters=core.clusters.map((row:any)=>{
+      const topics=scoped[String(row?.key??'')]
+      if(!topics||row?.applicability==='insufficient'||!Array.isArray(row?.evidence_refs))return row
+      const fits=(id:string)=>{const r=ledger.get(id);return !r||(r.system!=='thai'&&intersects(r,packet.period)&&topicsOf(r).some(t=>topics.includes(t)))}
+      const keep=row.evidence_refs.filter(fits)
+      if(keep.length===row.evidence_refs.length||!keep.some((id:string)=>ledger.has(id)))return row
+      trimmed=true
+      return {...row,evidence_refs:keep}
+    })
+    if(trimmed){
+      const next=isolateOptionalPeriodViolations({...core,clusters},kind,packet)
+      return {core:next.core,isolated:['evidence_refs_trimmed',...next.isolated]}
     }
   }
   const report=inspectPeriodProviderDocument(core,kind,packet)

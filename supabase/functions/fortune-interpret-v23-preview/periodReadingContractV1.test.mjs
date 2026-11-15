@@ -314,3 +314,18 @@ test('a contact axis with references but no text is cleared with its references'
   assert.deepEqual(out.contact_evidence_refs.incoming,[])
   assert.ok(!inspectPeriodProviderDocument(out,'week',packet).issues.some(i=>i.path.startsWith('contact_flow.')))
 })
+
+test('an off-topic citation next to an on-topic one is trimmed; a scene described as a situation counts as conditional',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:c',system:'western',date:'2026-11-18',topic:'컨디션',source_topics:['컨디션']},
+    {id:'W:m',system:'western',date:'2026-11-18',topic:'금전',source_topics:['금전']}]}
+  const core=provider()
+  const row=core.clusters.find(r=>r.key==='condition.condition')
+  Object.assign(row,{applicability:'direct',evidence_refs:['W:c','W:m'],applies_when:'일정을 새로 채우려는 상황에 해당돼.'})
+  const {core:out}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.deepEqual(out.clusters.find(r=>r.key==='condition.condition').evidence_refs,['W:c'])
+  assert.ok(!inspectPeriodProviderDocument(out,'week',packet).issues.some(i=>i.code==='period_real_scene_not_conditional'&&i.path===`clusters.${core.clusters.indexOf(row)}.applies_when`))
+  row.evidence_refs=['W:m']
+  assert.deepEqual(isolateOptionalPeriodViolations(core,'week',packet).core.clusters.find(r=>r.key==='condition.condition').evidence_refs,['W:m'])
+})
