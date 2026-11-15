@@ -352,6 +352,13 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
     if((m=/^priorities\.(\d+)$/.exec(path))){dropPriorities.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^decisions\.(\d+)\./.exec(path))){dropDecisions.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^domain_answers\.(\d+)\./.exec(path))){dropAnswers.add(Number(m[1]));isolated.push(path);continue}
+    // A contact axis with references but no text, or text without its own
+    // evidence, is cleared together with its references.
+    if((issue.code==='empty_contact_axis_with_references'||issue.code==='contact_axis_without_own_period_evidence')&&(m=/^contact_flow\.([a-z_]+)$/.exec(path))){
+      if(next.contact_flow&&typeof next.contact_flow==='object')next.contact_flow[m[1]]=''
+      if(next.contact_evidence_refs&&Array.isArray(next.contact_evidence_refs[m[1]]))next.contact_evidence_refs[m[1]]=[]
+      isolated.push(path);continue
+    }
     if((m=/^(investment_reading|contact_flow|relationship_reading|systems)\.([a-z_]+)$/.exec(path))&&typeof next?.[m[1]]?.[m[2]]==='string'){next[m[1]][m[2]]='';isolated.push(path);continue}
     // A love situation that cites no love evidence becomes an explicit
     // insufficient state for that situation only.
