@@ -209,3 +209,13 @@ test('mixed daily failures repair only the affected copy and retain evidence',()
  assert.deepEqual(req.paths,['headline','overall.summary','clusters.0.conclusion'])
  assert.deepEqual(applyDailyRewrite(candidate,req,{patches:req.paths.map(path=>({path,text:'편집한 문장'}))}).clusters[0].evidence_refs,['W:contact'])
 })
+
+test('an incoming-contact initiator prediction is patched in place instead of regenerating the whole reading',()=>{
+  const candidate={headline:'사람과 나누는 대화는 편안해',overall:{summary:'요약 문장이야. 이유 문장이야.',best_phase:'',caution_phase:''},clusters:[],contact_flow:{incoming:'상대가 먼저 연락을 건네올 거야.',outgoing:'가볍게 안부를 보내 봐.'}}
+  const req=buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'day',period:{start:'2026-11-15',end:'2026-11-15'}},{issues:['daily_incoming_initiator_prediction']})
+  assert.ok(req)
+  assert.ok(req.paths.includes('contact_flow.incoming'))
+  assert.ok(!req.paths.includes('contact_flow.outgoing'))
+  assert.match(req.prompt,/먼저 연락하거나 말을 건넨다는 예측을 빼고/)
+  assert.equal(buildRoleNeutralHeroRewriteRequest(candidate,{period_kind:'day'},{issues:['daily_incoming_initiator_prediction','daily_evidence_outside_question:relationship.love_general']}),null)
+})

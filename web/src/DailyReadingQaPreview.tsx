@@ -15,7 +15,7 @@ export const dailyQaData = {
     condition:{condition:section('쉬는 시간을 남는 시간에 맡기지 말고 일정에 넣어둬.','긴 일정 사이에 쉴 틈이 없으면 뒤의 계획까지 무리하게 이어갈 수 있어.','일정 하나를 마칠 때 잠깐 멈출 시간을 확보해.','불편함이 계속되면 일정 강도를 낮추고 실제 상태를 먼저 확인해.')},
   },
   decisions:[{action:'중요한 대화와 혼자 처리할 일의 시간을 나눠 잡아.',timing:'예정된 약속과 이동 시간을 먼저 확인한 뒤 적용해.',watch:'새 요청이 들어오면 남은 시간을 다시 계산해.',avoid:'다른 사람의 일정까지 확인하지 않고 약속하지 마.',reason:'같은 시간에 여러 일을 겹쳐 잡지 않기 위한 확인이야.',evidence_refs:['W:qa-only']}],
-  systems:{western:'',saju:'',thai:''},priorities:[],topic_analysis:{},limits:'이 문장은 화면 검수용 예시야. 실제 계산 결과나 개인의 운세가 아니야.',
+  systems:{western:'화면 검수용 서양점성술 본문이야. 하늘을 지나는 금성이 출생차트의 수성과 부드럽게 맞물리는 배치를 예시로 풀어 써.',saju:'',thai:''},priorities:[],topic_analysis:{},limits:'이 문장은 화면 검수용 예시야. 실제 계산 결과나 개인의 운세가 아니야.',
 } as unknown as NonNullable<AiInterpretationResponse['data']>
 const calculation={period:{start:'2026-11-04',end:'2026-11-04',day_count:1},western:{overall:{},relationship_signals:{}},saju:{ok:false},thai:{ok:false}} as unknown as IntegratedApiResponse
 
