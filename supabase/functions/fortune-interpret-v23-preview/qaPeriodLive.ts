@@ -374,6 +374,37 @@ async function qaRefs(orchestratorId:string,ids:string[]){
     rows:ids.map(id=>{const r:any=map.get(id);return r?{id,system:r.system,scope:r.scope,date:r.date,topic:r.topic,source_topics:r.source_topics}:{id,missing:true}})};
 }
 
+
+// Long periods: the synchronous calc endpoint times out. Start an async calc job
+// and poll it in separate short calls.
+async function qaCalcAsyncStart(date:string,end:string){
+  const a=admin();
+  const {count}=await a.from("ai_interpret_jobs").select("id",{count:"exact",head:true}).eq("user_id",QA_USER_ID).eq("kind","qa-reader-first-orchestrator");
+  if((count??0)>=QA_MAX_ORCHESTRATIONS)return {ok:false,error:"qa_cap_reached"};
+  const token=await qaSession();
+  const profile={name:"synthetic-qa-only",birth_date:"1991-02-20",birth_time:"13:15:00",time_known:true,time_source:"official_record",time_confidence:"exact",latitude:35.1796,longitude:129.0756,utc_offset_hours:9,gender:"male"};
+  const r=await fetch(QA_CALC_URL+"/start",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({profile,start_date:date,end_date:end}),signal:AbortSignal.timeout(30000)});
+  const body:any=await r.json().catch(()=>null);
+  if(!r.ok||!body?.job_id)return {ok:false,error:"calc_start_failed",status:r.status};
+  const {data}=await a.from("ai_interpret_jobs").insert({user_id:QA_USER_ID,kind:"qa-reader-first-orchestrator",status:"running",model:"none",period_start:date,period_end:end,result_json:{date,end,calc_job_id:body.job_id,steps:["async_start"]}}).select("id").single();
+  return {ok:true,orchestrator_id:data?.id,calc_job_id:body.job_id};
+}
+async function qaCalcAsyncPoll(orchestratorId:string){
+  const a=admin();
+  const {data:row}=await a.from("ai_interpret_jobs").select("result_json,status").eq("id",orchestratorId).eq("user_id",QA_USER_ID).maybeSingle();
+  const jobId=row?.result_json?.calc_job_id;
+  if(!jobId)return {ok:false,error:"no_calc_job"};
+  if(row.status==="done")return {ok:true,status:"done"};
+  const token=await qaSession();
+  const r=await fetch(QA_CALC_URL+"/jobs/"+encodeURIComponent(jobId),{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(30000)});
+  const job:any=await r.json().catch(()=>null);
+  if(job?.status==="done"&&job?.result?.period){
+    await a.from("ai_interpret_jobs").update({status:"done",result_json:{...row.result_json,calculation:job.result,steps:["async_start","calculation"]},completed_at:new Date().toISOString()}).eq("id",orchestratorId);
+    return {ok:true,status:"done"};
+  }
+  return {ok:true,status:job?.status??("http_"+r.status),progress:job?.progress??null,error:job?.error??null};
+}
+
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
 
 async function job(id:string,payload:any,model:string,key:string){
@@ -406,9 +437,11 @@ Deno.serve(async(req)=>{
   let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
   if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,structure_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
-  if(b?.action==="qa_calc"||b?.action==="qa_start_both"||b?.action==="qa_replay"||b?.action==="qa_budget"||b?.action==="qa_refs"){
+  if(b?.action==="qa_calc"||b?.action==="qa_start_both"||b?.action==="qa_replay"||b?.action==="qa_budget"||b?.action==="qa_refs"||b?.action==="qa_calc_async"||b?.action==="qa_poll"){
     if(!(await qaTokenOk(req)))return res(publicFortuneError("AUTH_REQUIRED"),401);
     if(b.action==="qa_calc"){const d=/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))?String(b.date):"2026-11-15";const e=/^\d{4}-\d{2}-\d{2}$/.test(String(b.end))?String(b.end):d;return res(await qaOrchestrator(d,e));}
+    if(b.action==="qa_calc_async")return res(await qaCalcAsyncStart(String(b.date),String(b.end)));
+    if(b.action==="qa_poll")return res(await qaCalcAsyncPoll(txt(b.orchestrator_id,100)));
     if(b.action==="qa_refs")return res(await qaRefs(txt(b.orchestrator_id,100),Array.isArray(b.ids)?b.ids.slice(0,40).map((x:any)=>txt(x,80)):[]));
     if(b.action==="qa_budget")return res(await qaBudget(txt(b.orchestrator_id,100)));
     if(b.action==="qa_replay")return res(await qaReplay(txt(b.orchestrator_id,100),txt(b.job_id,100),Number(b.index??0)));
