@@ -10,7 +10,7 @@ import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
 import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
-import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
+import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction, normalizeUserContext } from "./dailyEditorialV1.ts";
 import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildPeriodStructureRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
 import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, isolateForeignDetailEvidence } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
@@ -306,7 +306,9 @@ Deno.serve(async(req)=>{
   const compacted=compactCalculation(b.calculation);
   const preferred=MODELS[b.model]?b.model:compacted.period_kind==="day"?"gemini-3.7-flash":V23_DEFAULT_MODEL;
   const precisionGate=precisionGateFromPayload(b.calculation);
-  const payload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,b.calculation):compacted;
+  const basePayload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,b.calculation):compacted;
+  const userContext=normalizeUserContext(b?.user_context);
+  const payload=userContext?{...basePayload,user_context:userContext}:basePayload;
   const pb=buildV23PromptBudget(payload);
   if(b?.action==="inspect")return res({ok:true,interpreter_version:VERSION,full_payload_bytes:enc.encode(JSON.stringify(payload)).byteLength,prompt_payload_bytes:pb.bytes,prompt_budget_bytes:pb.max_bytes,prompt_budget_ok:pb.ok,estimated_input_tokens:pb.estimated_input_tokens,estimated_max_job_krw:pb.estimated_max_job_krw,max_gemini_calls_per_job:MAX_GEMINI_CALLS,deterministic_topics:buildDeterministicTopicAnalysis(payload).length,key_dates:payload?.key_dates?.length??0,evidence_ledger:payload?.evidence_ledger?.length??0,prompt_evidence_ledger:pb.packet?.evidence_ledger?.length??0,narrative_phenomena:pb.packet?.period_narrative?.phenomena?.length??0,narrative_kind:pb.packet?.period_narrative?.kind??null,provider_schema_bytes:enc.encode(JSON.stringify(buildProviderCoreSchema(SCHEMA,payload?.period_kind))).byteLength,provider_editorial_sections:EDITORIAL_SECTION_KEYS.length});
   if(b?.action==="prompt"){const p=buildV23CorePrompt(payload);return res({ok:true,interpreter_version:VERSION,prompt:p.text,prompt_bytes:enc.encode(p.text).byteLength,estimated_input_tokens:Math.ceil(enc.encode(p.text).byteLength/2.6),prompt_budget_bytes:pb.max_bytes,narrative_version:p.narrative_version});}

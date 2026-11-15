@@ -5,6 +5,7 @@ import { useObservedPassage } from './ContactObservationScope'
 import { buildDailyReadingDocument, type DailyReadingDocument } from './lib/dailyReadingDocument'
 import { periodAiCostPreview } from './lib/aiCostPreview'
 import { exportDailyReadingImages } from './lib/readingImageExport'
+import { LOVE_STATUS_EVENT, LOVE_STATUS_OPTIONS, readLoveStatus, writeLoveStatus, type LoveStatus } from './lib/loveStatus'
 import './daily-reading.css'
 import '@fontsource/nanum-myeongjo/korean-400.css'
 import '@fontsource/nanum-myeongjo/korean-700.css'
@@ -25,6 +26,12 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
   const exportJob = useRef<AbortController | null>(null)
   const [saving,setSaving] = useState(false)
   const [notice,setNotice] = useState('')
+  const [loveStatus,setLoveStatus] = useState<LoveStatus|null>(()=>readLoveStatus())
+  useEffect(()=>{
+    const sync=()=>setLoveStatus(readLoveStatus())
+    window.addEventListener(LOVE_STATUS_EVENT,sync)
+    return ()=>window.removeEventListener(LOVE_STATUS_EVENT,sync)
+  },[])
   useEffect(()=>{
     setSaving(false); setNotice('')
     return ()=>{exportJob.current?.abort();exportJob.current=null}
@@ -59,6 +66,9 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
     return {key,id,label,slot,blocks}
   }).filter(row=>row.slot || row.blocks.length) : []
   const scenarioIds = new Set(scenarios.flatMap(row=>row.blocks.map(block=>block.id)))
+  const mySection = LOVE_STATUS_OPTIONS.find(option=>option.id===loveStatus)?.section
+  const myScenario = scenarios.find(row=>row.id===mySection)
+  const otherScenarios = scenarios.filter(row=>row!==myScenario)
   const otherDetails = doc.details.filter(block => !scenarioIds.has(block.id) && !block.id.startsWith('direction:') && !featuredIds.has(block.id.split(':')[0]))
   return <section className="daily-reading" data-daily-scope={doc.scope} data-daily-state={doc.state}>
     <header className="daily-reading-heading"><span>{doc.title}</span><time dateTime={date}>{date}</time></header>
@@ -87,8 +97,18 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
         )}
       </details>
     })}
-    {scenarios.length>0 && <section className="daily-reading-block"><h4>내 상황에 맞춰 보기</h4>
-      {scenarios.map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
+    {doc.scope==='love' && doc.state!=='unverified' && <section className="daily-reading-block daily-love-status" aria-label="내 연애 상황">
+      <h4>내 연애 상황</h4>
+      <div className="daily-love-status-options" role="radiogroup" aria-label="내 연애 상황 고르기">
+        {LOVE_STATUS_OPTIONS.map(option=><button type="button" key={option.id} role="radio" aria-checked={loveStatus===option.id} className={loveStatus===option.id?'is-selected':''} onClick={()=>{writeLoveStatus(option.id);setLoveStatus(option.id)}}>{option.label}</button>)}
+      </div>
+      <p className="daily-love-status-note">{loveStatus ? '이 기기에 저장돼. 다음에 해설을 새로 만들 때부터 이 상황을 기준으로 깊게 써.' : '상황을 고르면 그 상황 해설을 먼저 보여주고, 다음 해설부터 그 상황에 맞춰 써.'}</p>
+    </section>}
+    {myScenario && <section className="daily-reading-block daily-love-mine" data-daily-slot={myScenario.id}><h4>내 상황 · {myScenario.label}</h4>
+      {myScenario.blocks.length ? myScenario.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{myScenario.slot?.state==='insufficient' ? '이 상황을 판단할 근거가 부족해.' : '이 상황 해설이 아직 없어. 해설을 다시 생성하면 이 상황 기준으로 써.'}</p>}
+    </section>}
+    {otherScenarios.length>0 && <section className="daily-reading-block"><h4>{myScenario ? '다른 상황이라면' : '내 상황에 맞춰 보기'}</h4>
+      {otherScenarios.map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
         <summary>{row.label}</summary>
         {row.blocks.length ? row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{row.slot?.state==='insufficient' ? '이 상황을 판단할 근거가 부족해.' : '이 상황의 해설은 아직 작성되지 않았어.'}</p>}
       </details>)}
