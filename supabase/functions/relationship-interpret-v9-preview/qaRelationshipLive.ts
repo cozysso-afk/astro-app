@@ -397,6 +397,8 @@ async function qaRelationship(req:Request){
  const purpose=String(b.purpose??"compatibility") as Purpose;const status=String(b.relationship_status??"dating");
  const {data:row,error}=await admin.from("ai_interpret_jobs").insert({user_id:QA_USER,kind:"qa-relationship-live",status:"running",model:"gemini-3.7-flash",result_json:{purpose,status}}).select("id").single();
  if(error)return new Response(JSON.stringify({ok:false,error:error.message}),{status:200});
+ const geminiErrors:string[]=[];const realFetch=globalThis.fetch;
+ globalThis.fetch=(async(input:any,init?:any)=>{const res=await realFetch(input,init);if(String(input).includes("generativelanguage")&&!res.ok){try{geminiErrors.push((await res.clone().text()).slice(0,1500))}catch{}}return res}) as any;
  const work=(async()=>{try{
   const body={as_of_date:"2026-11-16",query_utc_offset_hours:9,user:{name:"나",birth_date:"1994-03-12",birth_time:"14:30",time_known:true,time_source:"official_record",time_confidence:"exact",latitude:37.5665,longitude:126.978,utc_offset_hours:9},counterpart:{name:"상대",birth_date:"1992-08-25",birth_time:"09:10",time_known:true,time_source:"official_record",time_confidence:"exact",latitude:35.1595,longitude:126.8526,utc_offset_hours:9},start_date:"2026-11-16",end_date:"2027-05-16",relationship_status:status,analysis_mode:purpose};
   const link:any=await admin.auth.admin.generateLink({type:"magiclink",email:"qa-fortune-v23@astro-app.test"});const anon=createClient(SUPABASE_URL!,(Deno.env.get("SUPABASE_ANON_KEY")??"").trim(),{auth:{persistSession:false,autoRefreshToken:false}});const verified:any=await anon.auth.verifyOtp({type:"magiclink",token_hash:link?.data?.properties?.hashed_token});const access=verified?.data?.session?.access_token;if(!access)throw new Error("qa session "+JSON.stringify(verified?.error??link?.error??null).slice(0,200));
@@ -405,7 +407,7 @@ async function qaRelationship(req:Request){
   const ctx=purpose==="reunion"?(calc?.result?.reunion_transits?.directional_context??null):null;
   const sel=selectPromptPacket(calc,ctx,purpose);
   const out:any=await calculate(sel.payload,purpose,"gemini-3.7-flash",Deno.env.get("GEMINI_API_KEY")!);
-  await admin.from("ai_interpret_jobs").update({status:out.ok?"done":"failed",result_json:{purpose,status,budget:sel.budget,out:out.ok?out.data:null,error:out.ok?null:out.error_code},usage_json:out.usage??null,updated_at:new Date().toISOString()}).eq("id",row.id);
+  await admin.from("ai_interpret_jobs").update({status:out.ok?"done":"failed",result_json:{purpose,status,budget:sel.budget,out:out.ok?out.data:null,error:out.ok?null:out.error_code,gemini_errors:geminiErrors},usage_json:out.usage??null,updated_at:new Date().toISOString()}).eq("id",row.id);
  }catch(e){await admin.from("ai_interpret_jobs").update({status:"failed",error:String(e).slice(0,500),updated_at:new Date().toISOString()}).eq("id",row.id);}})();
  // @ts-ignore EdgeRuntime exists on Supabase
  EdgeRuntime.waitUntil(work);
