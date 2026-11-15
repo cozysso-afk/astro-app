@@ -7,7 +7,7 @@ import { buildDeterministicTopicAnalysis } from "../fortune-interpret-v21-previe
 import { publicCallTrace, publicFailedUsage, publicFortuneError, publicFortuneFailureFields, publicJobUsage, storedFortuneJobError, storedFortuneJobErrorCode } from "../_shared/fortuneAiPublicError.ts";
 import { SYSTEM, buildV23CorePrompt, buildV23CorePromptFromPacket, buildV23PromptBudget, V23_PROMPT_VERSION } from "./promptV23.ts";
 import { PERIOD_NARRATIVE_VERSION } from "./periodNarrativeV23.ts";
-import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields } from "./periodReadingContractV1.ts";
+import { isExtendedPeriod, inspectPeriodProviderDocument, inspectPeriodReading, applyPeriodReadingGate, retainValidPeriodFields, isolateOptionalPeriodViolations } from "./periodReadingContractV1.ts";
 import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction, normalizeUserContext } from "./dailyEditorialV1.ts";
@@ -83,8 +83,8 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const callNo=++budget.used;
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
-  // Reader-first daily copy is longer; Gemini 3.7 took 52-68s for it in live QA.
-  const timeout=Math.min(compact?46000:(fullPayload?.period_kind==="day"?85000:54000),remain);
+  // Reader-first copy is longer; Gemini 3.7 took 52-68s for a daily reading in live QA.
+  const timeout=Math.min(compact?46000:85000,remain);
   const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
@@ -160,7 +160,7 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):{core:core.partial,isolated:[]};
+  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):isExtendedPeriod(payload?.period_kind)?isolateOptionalPeriodViolations(core.partial,payload?.period_kind,pb.packet):{core:core.partial,isolated:[]};
   const providerCore=isolation.core;
   const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};

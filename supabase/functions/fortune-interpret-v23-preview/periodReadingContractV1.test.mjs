@@ -226,3 +226,33 @@ test('a bad optional priority cannot hide six independently valid period section
  assert.deepEqual(recovered.clusters,original.clusters)
  assert.equal(inspectPeriodProviderDocument(recovered,'month').passed,true)
 })
+
+test('a period reason may name a planet in Korean when it explains the meaning, and everyday objects are allowed',()=>{
+  const data=provider()
+  const row=data.clusters.find(r=>r.key==='money_news.money')
+  Object.assign(row,{applicability:'direct',evidence_refs:['x'],conclusion:'쓰고 싶은 마음이 커지는 기간이야.',action:'장바구니에 담아 둔 물건을 하루 묵혀 봐.',
+    applies_when:'사고 싶은 물건이 생겼을 때 해당돼.',
+    evidence_meaning:'마음에 드는 물건 앞에서 지갑이 쉽게 열리기 쉬워. 하늘을 지나는 금성이 네 출생차트의 목성과 맞물려 즐거움에 쓰는 돈의 기준이 느슨해지는 기간이라 그래.'})
+  const index=data.clusters.indexOf(row)
+  const issues=inspectPeriodProviderDocument(data,'month').issues.filter(i=>i.path.startsWith(`clusters.${index}.`))
+  assert.deepEqual(issues,[])
+  row.evidence_meaning='Venus trine Jupiter 배치가 지출 기준을 느슨하게 만드는 기간이라 마음에 드는 물건 앞에서 지갑이 쉽게 열리기 쉬워서 그래.'
+  assert.ok(inspectPeriodProviderDocument(data,'month').issues.some(i=>i.path===`clusters.${index}.evidence_meaning`))
+})
+
+test('a defect in an optional period field is isolated without touching the primary sections',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const data=provider()
+  data.priorities=['비용을 비교해.','내일 저녁에 대면 약속을 잡아.']
+  data.investment_reading={psychology:'차익 실현을 서둘러.',realization:'',entry:'',risk:''}
+  const before=inspectPeriodProviderDocument(data,'month')
+  assert.equal(before.passed,false)
+  const {core,isolated}=isolateOptionalPeriodViolations(data,'month',undefined)
+  assert.ok(isolated.includes('priorities.1'))
+  assert.deepEqual(core.priorities,['비용을 비교해.'])
+  assert.equal(core.investment_reading.psychology,'')
+  assert.deepEqual(core.clusters,data.clusters)
+  assert.equal(inspectPeriodProviderDocument(core,'month').passed,true)
+  const primary=provider();primary.clusters[0].action='내일 저녁에 만나.'
+  assert.deepEqual(isolateOptionalPeriodViolations(primary,'month',undefined).isolated,[])
+})

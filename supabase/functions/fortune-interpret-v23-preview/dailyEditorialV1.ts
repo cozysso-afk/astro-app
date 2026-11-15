@@ -80,6 +80,12 @@ export function loveStatusInstruction(context:any){
   return `\n\n[독자의 연애 상황]\n독자는 스스로 "${LOVE_STATUS_LABEL[status]}"이라고 골랐어. 이건 독자가 알려준 상황이지 상대에 대한 관측이 아니야.\n- relationship.love_general은 이 상황인 사람에게 이날이 어떤지로 써. 다른 상황의 가정형을 섞지 마.\n- ${key}는 기본 여섯 분야와 같은 분량(real_scene 180~380자)으로 판정·장면·이유를 깊게 써. 근거가 없으면 insufficient로 둬.\n- 다른 연애 상황 key는 근거가 있어도 짧게 쓰거나 생략해.\n- contact_flow.incoming과 outgoing은 이 상황에 맞춰 써.`
 }
 
+export function periodLoveStatusInstruction(context:any){
+  const status=normalizeUserContext(context)?.relationship_status
+  if(!status)return ''
+  return `\n- 독자는 자신의 연애 상황을 "${LOVE_STATUS_LABEL[status]}"이라고 골랐어. 상대에 대한 관측이 아니라 독자가 알려준 상황이야. relationship.love_general은 이 상황인 사람 기준으로 쓰고, ${LOVE_STATUS_SECTION[status]}를 쓸 근거가 있으면 다른 상황보다 깊게(evidence_meaning 150~320자) 써. applicability 규칙은 그대로 따라.`
+}
+
 const TOPIC_BY_SECTION = DAILY_SECTION_TOPICS
 const READER_QUESTIONS:Record<string,string>={
   'relationship.love_general':'이날 사람을 만나거나 마음을 주고받는 일은 수월한 편일까 까다로운 편일까? 어떤 장면에서 그렇게 느껴질까?',

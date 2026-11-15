@@ -6,10 +6,10 @@ import { buildProviderCoreSchema } from './providerSchemaV23.ts'
 import { SCHEMA } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { estimatedGeminiJobKrw, buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
-import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket, loveStatusInstruction, normalizeUserContext } from './dailyEditorialV1.ts'
+import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket, loveStatusInstruction, normalizeUserContext, periodLoveStatusInstruction } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.19-system-pages'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.20-period-reader-first'
 const enc = new TextEncoder()
 
 export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
@@ -253,7 +253,7 @@ export function buildV23CorePromptFromPacket(packet:any) {
     version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,
     text:`${DAILY_EDITORIAL_INSTRUCTION}${loveStatusInstruction(packet?.user_context)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
   }
-  const text = `${buildPeriodNarrativeInstruction(writerPacket,false)}\n\n${buildPeriodReadingInstruction(packet.period_kind)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
+  const text = `${buildPeriodNarrativeInstruction(writerPacket,false)}\n\n${buildPeriodReadingInstruction(packet.period_kind)}${periodLoveStatusInstruction(packet?.user_context)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
   return {version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,text}
 }
 
