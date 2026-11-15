@@ -326,6 +326,17 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
       return {core:next.core,isolated:['relationship_reading',...next.isolated]}
     }
   }
+  // An optional question answer whose cited rows do not match its topic would
+  // fail the final period check; drop that answer only.
+  if(packet?.period&&Array.isArray(core?.domain_answers)&&core.domain_answers.length){
+    const answerIssues=inspectPeriodReading({domain_answers:core.domain_answers},{...packet,period_kind:kind}).issues
+      .map(issue=>/^domain_answers\[(\d+)\]$/.exec(issue.path)).filter(Boolean).map(m=>Number(m![1]))
+    if(answerIssues.length){
+      const drop=new Set(answerIssues)
+      const next=isolateOptionalPeriodViolations({...core,domain_answers:core.domain_answers.filter((_:unknown,i:number)=>!drop.has(i))},kind,packet)
+      return {core:next.core,isolated:[...[...drop].map(i=>`domain_answers[${i}]`),...next.isolated]}
+    }
+  }
   const report=inspectPeriodProviderDocument(core,kind,packet)
   if(report.passed)return {core,isolated:[] as string[]}
   const required=new Set<string>(packet?requiredKeys(packet):PERIOD_PRIMARY_KEYS)
