@@ -399,7 +399,8 @@ async function qaRelationship(req:Request){
  if(error)return new Response(JSON.stringify({ok:false,error:error.message}),{status:200});
  const work=(async()=>{try{
   const body={as_of_date:"2026-11-16",query_utc_offset_hours:9,user:{name:"나",birth_date:"1994-03-12",birth_time:"14:30",time_known:true,time_source:"official_record",time_confidence:"exact",latitude:37.5665,longitude:126.978,utc_offset_hours:9},counterpart:{name:"상대",birth_date:"1992-08-25",birth_time:"09:10",time_known:true,time_source:"official_record",time_confidence:"exact",latitude:35.1595,longitude:126.8526,utc_offset_hours:9},start_date:"2026-11-16",end_date:"2027-05-16",relationship_status:status,analysis_mode:purpose};
-  const r=await fetch("https://astro-app-api-f7fn.onrender.com/v1/relationship/western",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const link:any=await admin.auth.admin.generateLink({type:"magiclink",email:"qa-fortune-v23@astro-app.test"});const anon=createClient(SUPABASE_URL!,(Deno.env.get("SUPABASE_ANON_KEY")??"").trim(),{auth:{persistSession:false,autoRefreshToken:false}});const verified:any=await anon.auth.verifyOtp({type:"magiclink",token_hash:link?.data?.properties?.hashed_token});const access=verified?.data?.session?.access_token;if(!access)throw new Error("qa session "+JSON.stringify(verified?.error??link?.error??null).slice(0,200));
+  const r=await fetch("https://astro-app-api-f7fn.onrender.com/v1/relationship/western",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+access},body:JSON.stringify(body)});
   const calc=await r.json();if(!r.ok)throw new Error("calc "+r.status+" "+JSON.stringify(calc).slice(0,300));
   const ctx=purpose==="reunion"?(calc?.result?.reunion_transits?.directional_context??null):null;
   const sel=selectPromptPacket(calc,ctx,purpose);
