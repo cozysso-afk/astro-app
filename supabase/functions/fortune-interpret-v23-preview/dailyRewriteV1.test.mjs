@@ -198,7 +198,8 @@ test('period application failures target the exact scene and preserve the condit
   ]})
   assert.ok(request.paths.includes('clusters.0.real_scene'))
   assert.ok(request.paths.includes('clusters.0.action'))
-  assert.ok(request.prompt.includes("반드시 '만약"))
+  assert.ok(request.prompt.includes("'~할 때 해당돼.' 한 문장으로 적용 상황"))
+  assert.ok(!request.prompt.includes("반드시 '만약"))
 })
 
 test('mixed daily failures repair only the affected copy and retain evidence',()=>{

@@ -287,3 +287,15 @@ test('a relationship card without a direction axis is cleared before the quality
   core.relationship_reading.evidence_refs=['W:a','W:overall:수신신호']
   assert.ok(!isolateOptionalPeriodViolations(core,'week',packet).isolated.includes('relationship_reading'))
 })
+
+test('an optional question answer with mismatched evidence is dropped, the rest is kept',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:money',system:'western',date:'2026-11-18',topic:'금전',source_topics:['금전']}]}
+  const core=provider()
+  core.domain_answers=[{topic:'금전',question_key:'money.spending',answer:'지출을 나눠.',status:'direct',evidence_refs:['W:missing']}]
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('domain_answers[0]'))
+  assert.deepEqual(out.domain_answers,[])
+  assert.deepEqual(out.clusters,core.clusters)
+})
