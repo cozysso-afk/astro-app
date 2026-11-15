@@ -45,7 +45,12 @@ test('system subjects route by authorship and evidence, including sparse archive
     const money=renderSystem('western',{calculation,interpretation,field:'money'})
     assert.match(money,/금전 결론/);assert.doesNotMatch(money,/학업 결론|혼합 근거|전체 서양 원고/)
     const overall=renderSystem('western',{calculation,interpretation})
-    for(const s of ['전체 서양 원고','학업 결론','금전 결론'])assert.ok(overall.includes(s))
+    // The system overview shows that system's own reading; integrated field
+    // conclusions live on the integrated page and are not repeated here.
+    assert.ok(overall.includes('전체 서양 원고'))
+    for(const s of ['학업 결론','금전 결론'])assert.ok(!overall.includes(s))
+    const thaiOverall=renderSystem('thai',{calculation,interpretation})
+    for(const s of ['전체 태국 원고','태국 학업 원고'])assert.ok(thaiOverall.includes(s))
     const older=renderSystem('western',{calculation,field:'money',interpretation:{...interpretation,interpreter_version:'supabase-ai-v23.25-period-split-evidence-v1'}})
     assert.match(older,/data-reading-state="missing"/);assert.doesNotMatch(older,/금전 결론|혼합 근거/)
   }

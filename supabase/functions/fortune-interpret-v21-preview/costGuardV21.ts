@@ -323,6 +323,7 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   }
   for(const day of payload?.saju?.daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
   for(const day of payload?.thai?.suriyayat_daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
+  if(payload?.thai?.daily_taksa?.evidence_id)allowed.add(String(payload.thai.daily_taksa.evidence_id));
   const rows=(Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).filter((row:any)=>allowed.has(String(row?.id??"")));
   const ordered=[...rows].sort((a:any,b:any)=>{
     const p=(row:any)=>String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
@@ -336,7 +337,7 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   // rows would otherwise crowd the other system out of the prompt ledger.
   const keyDateSet=new Set(keyDates.map((x:any)=>String(x?.date??"")));
   const priority=(row:any)=>keyDateSet.has(String(row?.date??""))?0:
-    row?.scope==="daily_pillar"||row?.scope==="suriyayat_daily_position_facts"?1:2;
+    row?.scope==="thai_daily_taksa"?0:row?.scope==="daily_pillar"||row?.scope==="suriyayat_daily_position_facts"?1:2;
   const bySystem=["saju","thai"].map(system=>context.filter((r:any)=>r?.system===system)
     .sort((a:any,b:any)=>priority(a)-priority(b)));
   const selected:any[]=[];
