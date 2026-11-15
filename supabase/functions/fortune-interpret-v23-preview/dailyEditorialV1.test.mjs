@@ -174,6 +174,7 @@ test('reader-first daily contract asks for verdict, scene and chart reason, and 
   assert.match(DAILY_EDITORIAL_INSTRUCTION,/overall\.dominant_pattern: 첫 화면의 "이렇게 읽는 이유"야\. 반드시 작성해/)
   assert.match(DAILY_EDITORIAL_INSTRUCTION,/450자를 넘기지 마/)
   assert.doesNotMatch(DAILY_EDITORIAL_INSTRUCTION,/dominant_pattern은 새 설명이 없으면 빈 문자열/)
+  assert.match(DAILY_EDITORIAL_INSTRUCTION,/네 칸 모두 반드시 쓰되/)
   const example=(label)=>DAILY_EDITORIAL_INSTRUCTION.match(new RegExp(label+' 예: "([^"]+)"'))?.[1]??''
   const section={conclusion:example('conclusion'),real_scene:example('real_scene'),action:example('action'),change_condition:'',evidence_refs:['W:daily:2026-11-04:1'],applicability:'direct'}
   assert.ok(section.real_scene.length>=180&&section.real_scene.length<=450)
