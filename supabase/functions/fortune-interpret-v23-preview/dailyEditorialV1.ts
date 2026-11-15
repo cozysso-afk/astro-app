@@ -50,6 +50,9 @@ action 예: "도움이 필요한 일이 있다면 무엇을 언제까지 해 주
 [해석 범위]
 - 직장인·학생·수험생·구직자·투자자·연애 중이라고 가정하지 마. 직장과 학업처럼 서로 다른 역할을 동시에 나열하지 마. 해당 분야에서만 조건부로 다뤄. headline·overall.summary·priorities는 입력에 없는 생활 역할을 단정하지 말고, 분야별 차이를 지출·집중·대화·휴식처럼 누구에게나 있는 장면으로 설명해.
 - headline·overall.summary·priorities에는 각 이름(삼분위·사분위 등)과 천왕성·해왕성·명왕성·일진 같은 전문용어를 쓰지 마. 그 설명은 dominant_pattern, 각 분야의 real_scene, systems에서 해.
+- headline·overall.summary·overall.best_phase·overall.caution_phase에는 분야 이름과 역할 단어(학업·공부·시험·직장·업무·실무·이직·투자·매수·매도·연애·재회·금전·컨디션)를 한 번도 쓰지 마. 대신 "돈을 쓰는 일", "사람을 만나는 자리", "몸을 움직이는 일", "배운 것을 정리하는 일"처럼 누구에게나 있는 장면으로 말해. 분야 이름은 clusters 안에서만 써.
+- 각 key의 evidence_refs와 이유 문장에는 daily_editorial_brief.questions에서 그 key의 fact_refs에 있는 근거만 써. 짝사랑·썸·연락처럼 비슷해 보이는 분야라도 다른 key의 근거를 빌려 오지 마. fact_refs가 비어 있으면 insufficient로 둬.
+- contact_flow.incoming에는 상대나 누군가가 먼저 연락하거나 말을 건넨다고 쓰지 마. 연락이 오갈 흐름의 강약만 말해.
 - 점수가 낮거나 band가 약하다는 이유만으로 그 분야를 하루의 주의 핵심으로 올리지 마. 낮은 활성도는 그 분야가 조용하다는 뜻일 수 있어. supportive/caution/context는 구분하고, context는 긍정이나 부정의 판정이 아니야.
 - 근거는 해석의 자료야. 상대 마음·호감의 존재·선연락·실제 제안·수익·결과·측정된 체력·증상·학습 효과를 사실로 만들지 마. 조건부 사례에도 근거와 무관한 신체 부위·물의 온도·횟수를 붙이지 마.
 - 연애와 연락은 같은 분야가 아니야. 연애 해설을 답장과 연락 여부만으로 채우지 마.

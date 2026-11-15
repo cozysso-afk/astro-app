@@ -83,7 +83,8 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const callNo=++budget.used;
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
-  const timeout=Math.min(compact?46000:54000,remain);
+  // Reader-first daily copy is longer; Gemini 3.7 needed more than 54s for it in live QA.
+  const timeout=Math.min(compact?46000:(fullPayload?.period_kind==="day"?68000:54000),remain);
   const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
