@@ -83,7 +83,8 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const callNo=++budget.used;
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
-  const timeout=Math.min(compact?46000:54000,remain);
+  // Reader-first daily copy is longer; Gemini 3.7 needed more than 54s for it in live QA.
+  const timeout=Math.min(compact?46000:(fullPayload?.period_kind==="day"?68000:54000),remain);
   const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
@@ -237,7 +238,7 @@ async function calculate(payload:any,preferred:string,key:string,shouldContinue:
   else return {...first,attempt_count:budget.used,call_trace:budget.calls};
   const combined=addGeminiUsage(first.usage,second?.usage);
   if(second?.ok)return {...second,usage:{...combined,quality_validation:qualitySummary(second.validation)},attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,first_structure_report:first?.structure_report??null,...(preferred===second.model?{}:{fallback_from:preferred})};
-  return {ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
+  return {qa_drafts:[first?.partial??first?.candidate_data??null,second?.partial??second?.candidate_data??null],ok:false,error:`V23 AI 해설이 검증을 완료하지 못했어. 1차=${first.error}; 2차=${second?.error??"중단"}`,model:preferred,usage:combined,attempt_count:budget.used,call_trace:budget.calls,first_quality_report:first?.quality_report??null,quality_report:second?.quality_report??first?.quality_report,first_structure_report:first?.structure_report??null,structure_report:second?.structure_report??first?.structure_report??null};
 }
 
 function admin(){return createClient(SUPABASE_URL,SERVICE,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -298,14 +299,14 @@ async function qaOrchestrator(date:string){
   (globalThis as any).EdgeRuntime?.waitUntil?.(task);
   return {ok:true,orchestrator_id:id};
 }
-async function qaStartBoth(orchestratorId:string,key:string){
+async function qaStartBoth(orchestratorId:string,key:string,newOnly=false){
   const a=admin();
   const {data:row}=await a.from("ai_interpret_jobs").select("id,status,result_json").eq("id",orchestratorId).eq("user_id",QA_USER_ID).eq("kind","qa-reader-first-orchestrator").maybeSingle();
   const calculation=row?.result_json?.calculation;
   if(row?.status!=="done"||!calculation)return {ok:false,error:"calculation_not_ready"};
   if(row.result_json?.started)return {ok:false,error:"already_started",started:row.result_json.started};
   const token=await qaSession();
-  const prod=await fetch(QA_PROD_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,apikey:ANON},body:JSON.stringify({action:"start",calculation,model:"gemini-3.7-flash",refresh:true})});
+  const prod=newOnly?{status:0,json:async()=>null} as any:await fetch(QA_PROD_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,apikey:ANON},body:JSON.stringify({action:"start",calculation,model:"gemini-3.7-flash",refresh:true})});
   const prodBody=await prod.json().catch(()=>null);
   const compacted=compactCalculation(calculation);
   const precisionGate=precisionGateFromPayload(calculation);
@@ -318,8 +319,7 @@ async function qaStartBoth(orchestratorId:string,key:string){
   const started={prod_job_id:prodBody?.job_id??null,prod_status:prod.status,new_job_id:data.id,new_estimated_input_tokens:pb.estimated_input_tokens,new_estimated_max_job_krw:pb.estimated_max_job_krw};
   await a.from("ai_interpret_jobs").update({result_json:{...row.result_json,started}}).eq("id",orchestratorId);
   const task=job(data.id,payload,"gemini-3.7-flash",key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);
-  return {ok:true,...started};
-}
+  return {ok:true,...started}
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
 
 async function job(id:string,payload:any,model:string,key:string){
@@ -327,7 +327,7 @@ async function job(id:string,payload:any,model:string,key:string){
   try{
     const r:any=await calculate(payload,model,key,()=>jobActive(id));
     const callTrace=publicCallTrace(r.call_trace);
-    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.ok?"gemini":null,local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,first_structure_report:r.first_structure_report??null,structure_report:r.structure_report??null,editorial_trace:r.editorial_trace??null};
+    const usageJson={...(r.usage??{prompt_tokens:0,candidate_tokens:0,thought_tokens:0,total_tokens:0}),attempt_count:r.attempt_count??0,call_trace:callTrace,gemini_paid_call:callTrace.length>0,prompt_budget:r.prompt_budget??null,quality_validation:qualitySummary(r.validation)??r.usage?.quality_validation??null,cost_guard_version:VERSION,generation_version:VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,prompt_version:V23_PROMPT_VERSION,origin:r.ok?"gemini":null,local_thai_scrub:false,degraded_quality:false,local_quality_fallback:false,quality_warning:null,first_quality_report:r.first_quality_report??null,quality_report:r.quality_report??null,first_structure_report:r.first_structure_report??null,structure_report:r.structure_report??null,editorial_trace:r.editorial_trace??null,qa_drafts:r.qa_drafts??null};
     if(!(await jobActive(id))){await a.from("ai_interpret_jobs").update({usage_json:usageJson,updated_at:new Date().toISOString()}).eq("id",id);return;}
     const done={status:"done",model:r.model,fallback_from:r.fallback_from??null,result_json:r.data,usage_json:usageJson,error:null,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
     const failed={status:"failed",model,error:storedFortuneJobError("JOB_GENERATION_FAILED"),usage_json:usageJson,updated_at:new Date().toISOString(),completed_at:new Date().toISOString()};
@@ -356,7 +356,7 @@ Deno.serve(async(req)=>{
     if(!(await qaTokenOk(req)))return res(publicFortuneError("AUTH_REQUIRED"),401);
     if(b.action==="qa_calc")return res(await qaOrchestrator(/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))?String(b.date):"2026-11-15"));
     if(!key)return res({ok:false,error:"no_gemini_key"},503);
-    return res(await qaStartBoth(txt(b.orchestrator_id,100),key));
+    return res(await qaStartBoth(txt(b.orchestrator_id,100),key,b.new_only===true));
   }
   if(b?.action!=="status")return res({ok:false,error:"qa_function_status_only"},400);
   const u=await user(req);if(!u)return res(publicFortuneError("AUTH_REQUIRED"),401);
