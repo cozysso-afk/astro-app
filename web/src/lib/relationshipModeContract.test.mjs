@@ -150,9 +150,10 @@ test('relationship modes never render deterministic prose as the authored readin
 })
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
-  assert.match(relationshipFn, /MAX_GEMINI_CALLS=2/)
+  assert.match(relationshipFn, /MAX_GEMINI_CALLS=3/)
   assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=40000,MAX_AI_JOB_ESTIMATED_KRW=300/)
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
+  assert.match(relationshipFn, /addUsage\(total,third\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)
   assert.match(readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts', import.meta.url),'utf8'), /server_cache:true/)
