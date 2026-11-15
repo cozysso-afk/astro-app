@@ -272,3 +272,18 @@ test('a love situation citing a non-love row is marked insufficient instead of f
   assert.equal(out.clusters.find(r=>r.key==='relationship.love_crush').applicability,'insufficient')
   assert.ok(!inspectPeriodProviderDocument(out,'week',payload).issues.some(i=>i.code==='monthly_love_requires_conditional_topic_evidence'))
 })
+
+test('a relationship card without a direction axis is cleared before the quality gate',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:a',system:'western',date:'2026-11-18',topic:'연애'},{id:'W:b',system:'western',date:'2026-11-18',topic:'대인관계'},
+    {id:'W:overall:수신신호',system:'western',start:'2026-11-16',end:'2026-11-22',topic:'수신신호'}]}
+  const core=provider()
+  core.relationship_reading={flow:'호감은 쉽게 오가.',context:'',focus_timing:'',watch:'',avoid:'',evidence_refs:['W:a','W:b']}
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('relationship_reading'))
+  assert.equal(out.relationship_reading.flow,'')
+  assert.deepEqual(out.relationship_reading.evidence_refs,[])
+  core.relationship_reading.evidence_refs=['W:a','W:overall:수신신호']
+  assert.ok(!isolateOptionalPeriodViolations(core,'week',packet).isolated.includes('relationship_reading'))
+})
