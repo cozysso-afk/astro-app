@@ -67,6 +67,7 @@ test('non-today packets hard-ban today wording across every user-facing field', 
     },
   })
   assert.match(instruction, /모든 사용자 문장 필드/)
+  assert.match(instruction, /contact_flow를 포함한/)
   assert.match(instruction, /단어 "오늘"/)
   assert.match(instruction, /2026-10-26/)
   assert.match(instruction, /선택한 날 \/ 그날 \/ 해당 날짜/)
