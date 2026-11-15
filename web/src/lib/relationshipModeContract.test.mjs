@@ -150,17 +150,18 @@ test('relationship modes never render deterministic prose as the authored readin
 })
 
 test('relationship AI has bounded paid calls cumulative usage server cache and rolling breaker', () => {
-  assert.match(relationshipFn, /MAX_GEMINI_CALLS=2/)
+  assert.match(relationshipFn, /MAX_GEMINI_CALLS=3/)
   assert.match(relationshipFn, /MAX_PROMPT_BYTES=180000,REUNION_PROMPT_TARGET_BYTES=40000,MAX_AI_JOB_ESTIMATED_KRW=300/)
   assert.match(relationshipFn, /addUsage\(firstUsage,second\.usage/)
+  assert.match(relationshipFn, /addUsage\(total,third\.usage/)
   assert.match(relationshipFn, /attempt_count:calls/)
   assert.match(relationshipFn, /supabase-relationship-v11/)
   assert.match(readFileSync(new URL('../../../supabase/functions/relationship-interpret-v9-preview/publicError.ts', import.meta.url),'utf8'), /server_cache:true/)
   assert.match(relationshipFn, /rolling_job_guard:true/)
   assert.match(relationshipFn, /cost_guard_blocked:true/)
   assert.match(relationshipFn, /ai_interpret_jobs/)
-  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.7-grounded-question-reading-contract'/)
-  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.11-observed-fact-reading-contract'/)
+  assert.match(cache, /RELATIONSHIP_AI_CACHE_CONTRACT = 'relationship-v12\.8-reader-first-direction'/)
+  assert.match(cache, /RELATIONSHIP_REUNION_AI_CACHE_CONTRACT = 'relationship-v14\.12-reader-first-direction'/)
   assert.match(cache, /purpose === 'reunion' \? RELATIONSHIP_REUNION_AI_CACHE_CONTRACT : RELATIONSHIP_AI_CACHE_CONTRACT/)
 })
 

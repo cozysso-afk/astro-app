@@ -4,9 +4,9 @@ export const relationshipProvider = {
   origin: 'gemini',
   provenance_verified: true,
   model: 'gemini-3.6-flash',
-  interpreter_version: 'relationship-v12.7-grounded-question-reading-contract',
+  interpreter_version: 'relationship-v12.8-reader-first-direction',
   usage: {
-    generation_version: 'relationship-v12.7-grounded-question-reading-contract',
+    generation_version: 'relationship-v12.8-reader-first-direction',
     call_trace: [{call: 1, model: 'gemini-3.6-flash', kind: 'initial', http_status: 200, outcome: 'success'}],
   },
 }

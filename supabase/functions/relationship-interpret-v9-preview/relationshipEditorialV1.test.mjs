@@ -109,3 +109,17 @@ test('reunion timing ranges with dates do not prescribe a contact duration',()=>
  data.core_action='답장을 30분 뒤에 해.'
  assert.equal(validateRelationshipEditorial(data,'reunion').reason,'invented_exact_behavior_duration')
 })
+
+test('feelings framed as tendencies or things to confirm are allowed; flat claims are not',()=>{
+ const ok=core();ok.chemistry='네 금성과 상대 화성이 맞물려 처음 만났을 때 서로에게 끌리기 쉬운 조건이야. 예를 들어 첫 약속 뒤에 바로 다음 약속을 잡게 되기 쉬워.'
+ assert.equal(validateRelationshipEditorial(ok,'compatibility').ok,true)
+ const ask=core();ask.communication='상대가 아직 서로를 원하는지는 직접 물어봐야 알 수 있어.'
+ assert.notEqual(validateRelationshipEditorial(ask,'compatibility').reason,'unobserved_mind_claim')
+ const flat=core();flat.chemistry='서로를 강하게 원하는 사이야.'
+ assert.equal(validateRelationshipEditorial(flat,'compatibility').reason,'unobserved_mind_claim')
+})
+
+test('a prescribed wait before talking again is an invented duration',()=>{
+ const d=core();d.conflict_pattern='감정이 격해지면 말을 멈추고 30분 뒤에 다시 이야기하는 규칙을 세워.'
+ assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration')
+})

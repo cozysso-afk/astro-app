@@ -115,7 +115,7 @@ export function publicRelationshipResult(value:unknown,usageValue?:unknown) {
   if(!r || !hasRelationshipProvenance(r,usageValue))return null;
   const safeUsage=publicUsage(usageValue === undefined ? r.usage : usageValue);
   const data=publicInterpretation(r.data);if(!data)return null;
-  if(/question-reading-contract$/.test(r.interpreter_version)&&typeof data.core_summary!=='string')return null;
+  if(/(?:question-reading-contract|reader-first-direction)$/.test(r.interpreter_version)&&typeof data.core_summary!=='string')return null;
   return {ok:true,data,...metadata(r),usage:safeUsage};
 }
 export function publicCachedResult(value:unknown,usageValue?:unknown) {
