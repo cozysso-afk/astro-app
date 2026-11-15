@@ -1,4 +1,5 @@
 import { LOVE_SCENARIOS_PROMPT, type LoveStatus } from './lib/loveReadingContext'
+import { loveStatusUserContext } from './lib/loveStatus'
 import { SystemReadingViews } from './SystemReadingViews'
 import { fortuneField, type FortuneField } from './lib/fortuneFields'
 import { THREE_SYSTEM_INSTRUCTIONS } from './lib/systemReading'
@@ -815,7 +816,7 @@ export default function AppNext() {
       }
       await ensureSupabaseSession()
       const { data, error } = await supabase.functions.invoke(FORTUNE_AI_FUNCTION, {
-        body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', ...(refreshReading ? {refresh:true} : {}), calculation: calculationForInterpretation, model: aiModel },
+        body: { narrative_engine: FORTUNE_AI_NARRATIVE_ENGINE, action: 'start', ...(refreshReading ? {refresh:true} : {}), ...(loveStatusUserContext() ? {user_context: loveStatusUserContext()} : {}), calculation: calculationForInterpretation, model: aiModel },
       })
       startPayload = data
       if (error) throw error

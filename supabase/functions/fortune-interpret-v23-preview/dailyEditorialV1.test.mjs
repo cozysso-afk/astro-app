@@ -183,3 +183,18 @@ test('reader-first daily contract asks for verdict, scene and chart reason, and 
   const report=inspectDailyEditorial({headline:'',overall:{},clusters:{relationship:{summary:section}}},payload)
   assert.deepEqual(report.issues,[])
 })
+
+test('reader-chosen love status is validated and turns the matching scenario into a full reading',async()=>{
+  const {normalizeUserContext,loveStatusInstruction,LOVE_STATUS_SECTION}=await import('./dailyEditorialV1.ts')
+  assert.deepEqual(normalizeUserContext({relationship_status:'flirting'}),{relationship_status:'flirting'})
+  assert.equal(normalizeUserContext({relationship_status:'married-to-celebrity'}),null)
+  assert.equal(normalizeUserContext(undefined),null)
+  assert.equal(loveStatusInstruction(null),'')
+  const text=loveStatusInstruction({relationship_status:'flirting'})
+  assert.match(text,/썸 타는 중/)
+  assert.match(text,new RegExp(LOVE_STATUS_SECTION.flirting.replace('.','\\.')+'는 기본 여섯 분야와 같은 분량'))
+  assert.match(text,/상대에 대한 관측이 아니야/)
+  const packet=dailyReaderPacket({packet_version:'x',period:{start:'2026-11-15',end:'2026-11-15'},evidence_ledger:[],user_context:{relationship_status:'couple'}})
+  assert.equal(packet.user_context.relationship_status,'couple')
+  assert.equal(dailyReaderPacket({period:{start:'2026-11-15',end:'2026-11-15'},evidence_ledger:[]}).user_context.relationship_status,'unknown')
+})

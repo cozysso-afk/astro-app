@@ -6,10 +6,10 @@ import { buildProviderCoreSchema } from './providerSchemaV23.ts'
 import { SCHEMA } from '../fortune-interpret-v6-preview/integratedInterpretationV2.ts'
 import { estimatedGeminiJobKrw, buildPromptPacket, promptBudget } from '../fortune-interpret-v21-preview/costGuardV21.ts'
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
-import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket } from './dailyEditorialV1.ts'
+import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket, loveStatusInstruction, normalizeUserContext } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
 
-export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.17-reader-first'
+export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.18-love-status'
 const enc = new TextEncoder()
 
 export const SYSTEM=`너는 '별빛의 운명'의 맞춤형 해설가다. 계산은 이미 서버가 끝냈다. 너의 역할은 근거를 사람이 이해할 수 있는 기간별 서사로 종합하는 것이다.
@@ -160,6 +160,7 @@ export function buildV23PromptPacket(payload:any) {
   const packet:any = {
     ...base,
     time_context:payload?.time_context,
+    ...(normalizeUserContext(payload?.user_context)?{user_context:normalizeUserContext(payload?.user_context)}:{}),
     packet_version: V23_PROMPT_VERSION,
     period_narrative: narrative,
     contact_axes:contactAxisEvidence(base),
@@ -239,7 +240,7 @@ export function buildTemporalWordingInstruction(packet:any) {
     : []
   return `[DATE WORDING · HARD GATE]
 - 선택 기간=${selected || '날짜 미상'}, 실제 기준일=${String(context?.current_date ?? '미상')}이며 같은 날로 검증되지 않았다.
-- 출력 JSON의 모든 사용자 문장 필드에서 단어 "오늘"과 "오늘은/오늘의/오늘도/오늘에/오늘을/오늘이/오늘로"를 한 번도 쓰지 마. limits, systems, decisions, clusters, domain_answers를 포함한 모든 문자열에 적용한다.
+- 출력 JSON의 모든 사용자 문장 필드에서 단어 "오늘"과 "오늘은/오늘의/오늘도/오늘에/오늘을/오늘이/오늘로"를 한 번도 쓰지 마. limits, systems, decisions, clusters, domain_answers, contact_flow를 포함한 모든 문자열에 적용한다.
 - 날짜를 가리켜야 하면 ${permitted.length ? permitted.join(' / ') : '선택 운세일 / 해당 날짜'} 중 하나 또는 계산 근거에 있는 정확한 날짜를 사용해.
 - 이 규칙을 어기면 응답 전체가 폐기된다.`
 }
@@ -250,7 +251,7 @@ export function buildV23CorePromptFromPacket(packet:any) {
   // several contrasting themes and a timeline, which dilutes a one-day answer.
   if(packet?.period_kind==='day')return {
     version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,
-    text:`${DAILY_EDITORIAL_INSTRUCTION}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
+    text:`${DAILY_EDITORIAL_INSTRUCTION}${loveStatusInstruction(packet?.user_context)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`,
   }
   const text = `${buildPeriodNarrativeInstruction(writerPacket,false)}\n\n${buildPeriodReadingInstruction(packet.period_kind)}\n\n${buildTemporalWordingInstruction(packet)}\n\nPROMPT_DATA=${JSON.stringify(writerPacket)}`
   return {version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,packet,text}

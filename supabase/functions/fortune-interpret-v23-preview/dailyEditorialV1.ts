@@ -2,7 +2,7 @@ import { contactAxisEvidence } from './contactAxesV1.ts'
 import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
 import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, dailySectionFacts } from './dailyReadingContractV1.ts'
 
-export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v4-reader-first'
+export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v5-love-status'
 
 export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY EDITOR: 선택한 운세일 안에서 읽는 해설]
 이번 요청은 종합과 기본 여섯 분야, 그리고 근거가 제공된 기존 세부항목의 일일 원고야. 기본 여섯 분야는 첫 화면의 순서이지 지원 항목의 제한이 아니야. 계산은 끝났어. 너는 계산 결과를 줄여 적는 검수자가 아니라, 이 사람의 출생차트를 펼쳐 놓고 그날을 읽어 주는 점성가야.
@@ -36,6 +36,7 @@ evidence_ledger 각 행의 observation이 그날 실제로 계산된 배치야. 
 - decisions: 행동은 하나면 충분해. action 한 문장, reason은 그 행동이 왜 이날에 맞는지 근거의 뜻으로 한 문장, watch는 이 행동이 맞게 가고 있는지 알아볼 현실 신호 하나, avoid는 이날 피할 구체적 선택 하나야. 네 칸 모두 반드시 쓰되 서로 다른 정보를 담아. action을 부정형으로 뒤집어 avoid에 쓰거나 조건형으로 바꿔 watch에 쓰지 마. decisions.timing은 날짜 안에서 달라지는 구체적 조건이 있을 때만 작성하고, 날짜나 "선택 운세일"만 반복할 경우 빈 문자열로 둬.
 - 세부항목(required_detail)은 짧게 유지해. conclusion 약 35자, real_scene 약 80~120자, action 약 35자야. real_scene 한두 문장 안에 장면과 이유를 함께 담아. conditional_optional은 실제 관계 상태가 입력되지 않은 상황별 적용이므로 기본 원고와 다른 답을 근거 안에서 줄 수 있을 때만 추가하고, 생략한 항목을 근거 부족이라고 꾸미지 마. 분량은 기본 여섯 분야에 먼저 쓰고, 선택적인 상황별 설명은 남은 한도 안에서만 추가해.
 - 컨디션은 활동량과 쉬는 정도만 말해. 어깨·관절·두통 같은 신체 부위나 증상, 씻기·물·음식·스트레칭 같은 처치를 쓰지 마. 계산은 몸 상태를 재지 않았어.
+- contact_flow는 화면에서 "연락을 받을 흐름"과 "내가 먼저 연락할 조건"으로 따로 보여. incoming은 연락이 들어올 흐름이 강한지 약한지, 들어온다면 어떤 성격의 연락(가벼운 안부, 용건, 길게 이어지는 대화 등)이 되기 쉬운지, 왜 그렇게 읽는지를 두세 문장으로 써. outgoing은 내가 먼저 연락한다면 어떤 내용과 방식이 이날에 맞고 무엇은 피할지, 왜 그런지를 두세 문장으로 써. 둘을 같은 말로 채우지 마.
 - 연락 활성은 대화·연락이 오갈 흐름, 연락 지속은 대화를 이어갈 조건을 답해. 둘을 같은 문장으로 채우지 마. 연애·소식으로 대체하지 마. 선연락 주체와 실제 답장 여부는 예측하지 마.
 - 재회 관심은 이전 인연과 다시 접촉하는 문제만 다뤄. 일일 재회 분야 근거를 별도 재회 분석의 연락→만남→재결합 관문으로 승격하거나 상대 속마음으로 바꾸지 마. 단계별 결론을 낼 자료가 없으면 그 범위를 밝혀.
 - 시험은 준비·수행, 이직은 탐색·제안 조건, 소식은 통보·회신을 구분해. 투자심리는 판단 태도, 수익실현은 이미 가진 자산을 정리할 때 검토할 조건, 신규진입은 새 위험을 감수하기 전 검토할 조건을 답해. 매수·매도 지시, 가격 방향, 수익·합격·채용·회신 발생을 만들지 마.
@@ -60,6 +61,24 @@ action 예: "도움이 필요한 일이 있다면 무엇을 언제까지 해 주
 - 시각과 시간대(아침·오전·오후·저녁·새벽·밤, 몇 시)는 이번 원고 범위가 아니야. 쓰지 마. 다른 분야의 시간 근거를 옮기지 마.
 - 각 분야에 전달된 근거를 함께 읽고, 제외된 분야의 근거를 임의로 인용하지 마.
 - 근거가 없으면 insufficient와 빈 원고로 남겨. 고정 조언으로 메우지 마. 모든 문장에서 날짜 표현은 time_context를 따라. limits에는 해석의 한계를 한 문장으로 짧게 담아.`
+
+// The reader's own relationship situation, chosen in the app. It is context for
+// which love scenario to write in depth, never an observed fact about another person.
+export const LOVE_STATUS_SECTION:Record<string,string>={
+  single:'relationship.love_single',crush:'relationship.love_crush',flirting:'relationship.love_flirting',
+  ambiguous:'relationship.love_ambiguous',couple:'relationship.love_couple',reunion:'relationship.love_reunion_interest',
+}
+const LOVE_STATUS_LABEL:Record<string,string>={single:'솔로·새 인연을 찾는 중',crush:'짝사랑 중',flirting:'썸 타는 중',ambiguous:'관계가 애매한 상태',couple:'연애 중',reunion:'이전 인연과 재회를 바라는 중'}
+export function normalizeUserContext(value:any){
+  const status=typeof value?.relationship_status==='string'?value.relationship_status.trim():''
+  return LOVE_STATUS_SECTION[status]?{relationship_status:status}:null
+}
+export function loveStatusInstruction(context:any){
+  const status=normalizeUserContext(context)?.relationship_status
+  if(!status)return ''
+  const key=LOVE_STATUS_SECTION[status]
+  return `\n\n[독자의 연애 상황]\n독자는 스스로 "${LOVE_STATUS_LABEL[status]}"이라고 골랐어. 이건 독자가 알려준 상황이지 상대에 대한 관측이 아니야.\n- relationship.love_general은 이 상황인 사람에게 이날이 어떤지로 써. 다른 상황의 가정형을 섞지 마.\n- ${key}는 기본 여섯 분야와 같은 분량(real_scene 180~380자)으로 판정·장면·이유를 깊게 써. 근거가 없으면 insufficient로 둬.\n- 다른 연애 상황 key는 근거가 있어도 짧게 쓰거나 생략해.\n- contact_flow.incoming과 outgoing은 이 상황에 맞춰 써.`
+}
 
 const TOPIC_BY_SECTION = DAILY_SECTION_TOPICS
 const READER_QUESTIONS:Record<string,string>={
@@ -130,7 +149,7 @@ export function dailyReaderPacket(packet:any) {
   for(const row of source)if(axisIds.has(row.id))chosen.set(row.id,row)
   const evidence_ledger=[...chosen.values()]
   return {packet_version:packet.packet_version,period_kind:'day',period:packet.period,time_context:packet.time_context,
-    user_context:{life_role:'unknown',relationship_status:'unknown',activity_hours:'unknown',observed_events:[]},
+    user_context:{life_role:'unknown',relationship_status:normalizeUserContext(packet?.user_context)?.relationship_status??'unknown',activity_hours:'unknown',observed_events:[]},
     relationship_scores:Object.fromEntries(Object.entries(packet?.western?.relationship_signals??{}).flatMap(([key,value]:[string,any])=>
       value && Number.isFinite(value.average) ? [[key,{average:value.average,band:value.band}]] : [])),
     ...(packet?.western?.daily_score_components?.length?{daily_score_components:packet.western.daily_score_components}:{}),
