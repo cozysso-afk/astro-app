@@ -210,6 +210,8 @@ function fitMonthlyPacket(packet:any){
   const protectedIds=new Set<string>([
     ...((packet.contact_axes&&typeof packet.contact_axes==='object')?Object.values(packet.contact_axes).flatMap((v:any)=>Array.isArray(v)?v:[v?.id??v?.evidence_id]).filter(Boolean).map(String):[]),
     ...((packet.system_field_sources??[]) as any[]).flatMap((x:any)=>x?.evidence_refs??[]).map(String),
+    // Love situations are told to cite one of these rows; keep them all.
+    ...((packet.period_reading?.love_situations?.love_evidence_refs??[]) as any[]).map(String),
   ])
   // Daily western rows are the most numerous; drop the weakest first.
   const candidates=[...(packet.evidence_ledger??[])]

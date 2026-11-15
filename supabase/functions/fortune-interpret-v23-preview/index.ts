@@ -191,7 +191,8 @@ async function rewriteRoleNeutralHeroCandidate(first:any,payload:any,model:strin
     const editedFields=applyDailyRewrite(first.partial,request,result.partial);
     const packet=buildV23PromptBudget(payload).packet;
     const kind=payload?.period_kind;
-    const patched=isExtendedPeriod(kind)?retainValidPeriodFields(first.partial,editedFields,kind,packet):editedFields;
+    const retained=isExtendedPeriod(kind)?retainValidPeriodFields(first.partial,editedFields,kind,packet):editedFields;
+    const patched=isExtendedPeriod(kind)?isolateOptionalPeriodViolations(retained,kind,packet).core:kind==="day"?isolateForeignDetailEvidence(retained,packet).core:retained;
     const structure=isExtendedPeriod(kind)?inspectPeriodProviderDocument(patched,kind,packet):inspectDailyProviderDocument(patched,kind,packet);
     if(!structure.passed)return {ok:false,error:"첫 화면 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
     const normalized=normalizeProviderCore(patched);
@@ -205,9 +206,14 @@ async function rewritePeriodCandidate(first:any,payload:any,model:string,key:str
   const result=await generateCore(payload,{},model,key,budget,"semantic_rewrite",true,"",request);
   if(!result.ok)return result;
   try{
-    const patched=applyDailyRewrite(first.candidate_data,request,result.partial);
-    const rows=Object.entries(patched.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
+    const rewritten=applyDailyRewrite(first.candidate_data,request,result.partial);
     const packet=buildV23PromptBudget(payload).packet;
+    const asRows=Object.entries(rewritten.clusters??{}).flatMap(([group,sections]:any)=>Object.entries(sections).map(([name,section]:any)=>({key:`${group}.${name}`,...section})));
+    const isolated=isolateOptionalPeriodViolations({...rewritten,clusters:asRows},payload?.period_kind,packet).core;
+    const rows=isolated.clusters;
+    const clusters:any={};
+    for(const {key,...section} of rows){const [group,name]=String(key).split(".");(clusters[group]??={})[name]=section;}
+    const patched={...isolated,clusters};
     const structure=inspectPeriodProviderDocument({...patched,clusters:rows},payload?.period_kind,packet);
     if(!structure.passed)return {ok:false,error:"기간 수정 원고 구조 검증 실패",model,usage:result.usage,structure_guard_failed:true,structure_report:{...structure,issues:structure.issues.map((issue:any)=>`${issue.path}: ${issue.code}`)}};
     const edited=finalizeCandidate(patched,payload,packet,model,result.usage,{targeted_period_rewrite:true,editorial_trace_origin:"gemini",editorial_trace_seed:[captureEditorialStage("provider_original_candidate",first.candidate_data),captureEditorialStage("provider_period_patch_applied",patched)]});
