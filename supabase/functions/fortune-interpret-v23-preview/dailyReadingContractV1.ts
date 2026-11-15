@@ -24,6 +24,24 @@ export function dailySectionFacts(payload:any,key:string) {
     (topics.includes(String(r?.topic??'')) || (Array.isArray(r?.source_topics)&&r.source_topics.some((t:string)=>topics.includes(t)))))
 }
 
+// A detail section that cites evidence from another field cannot be shown, but
+// it must not discard the six primary readings and the other valid details.
+// The row becomes an explicit insufficient state; no server prose is written.
+export function isolateForeignDetailEvidence(core:any,payload:any){
+  if(!core||!Array.isArray(core.clusters)||!payload?.period?.start)return {core,isolated:[] as string[]}
+  const isolated:string[]=[]
+  const clusters=core.clusters.map((row:any)=>{
+    const key=String(row?.key??'')
+    if(!(DAILY_DETAIL_KEYS as readonly string[]).includes(key)||row?.applicability==='insufficient')return row
+    const allowed=new Set(dailySectionFacts(payload,key).map((fact:any)=>fact.id))
+    const refs=Array.isArray(row?.evidence_refs)?row.evidence_refs:[]
+    if(refs.length&&refs.every((id:string)=>allowed.has(id)))return row
+    isolated.push(key)
+    return {key,conclusion:'',real_scene:'',action:'',change_condition:'',evidence_refs:[],applicability:'insufficient'}
+  })
+  return {core:isolated.length?{...core,clusters}:core,isolated}
+}
+
 const text = (v:unknown) => typeof v === 'string' ? v.trim() : ''
 const fingerprint = (v:unknown) => text(v).replace(/[\s.,!?·]/g,'')
 
