@@ -5,15 +5,15 @@ import { publicCallTrace } from '../_shared/fortuneAiPublicError.ts'
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from './runtimeBudgetV23.ts'
 
 test('V23 structured output has completion headroom for every period', () => {
-  assert.equal(v23OutputTokenLimit('day', false), 8200)
-  assert.equal(v23OutputTokenLimit('day', true), 8200)
+  assert.equal(v23OutputTokenLimit('day', false), 10000)
+  assert.equal(v23OutputTokenLimit('day', true), 10000)
   assert.equal(v23OutputTokenLimit('week', false), 9000)
   assert.equal(v23OutputTokenLimit('week', true), 9000)
   assert.equal(v23OutputTokenLimit('month', false), 8000)
   assert.equal(v23OutputTokenLimit('month', true), 8000)
   assert.equal(v23OutputTokenLimit('annual', false), 10000)
   assert.equal(v23OutputTokenLimit('annual', true), 10000)
-  assert.equal(v23OutputTokenLimit('today', false), 8200)
+  assert.equal(v23OutputTokenLimit('today', false), 10000)
   assert.equal(v23OutputTokenLimit('weekly', false), 9000)
 })
 
