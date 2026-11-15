@@ -182,18 +182,19 @@ export function buildV23PromptPacket(payload:any) {
       delete packet.period_narrative.interpretation_policy
     }
   }
-  if(packet.period_kind==='month')fitMonthlyPacket(packet)
+  if(packet.period_kind==='month'||packet.period_kind==='annual')fitPeriodPacket(packet)
   if(packet.period_kind==='day')packet.daily_editorial_brief=dailyEditorialBrief(packet)
   return packet
 }
 
-// A busy month (many transits) produced a 197 KB writer packet and every
-// monthly request for it was refused by the 180 KB guard. Shrink in the same
+// A busy month (197 KB) and year (228 KB) were refused outright by the 180 KB
+// guard in production. Shrink in the same
 // order the annual packet already does, then drop optional score samples,
 // then drop evidence rows that are not the last row for any question topic.
 const MONTHLY_PACKET_TARGET_BYTES=172000
-function monthlyBytes(packet:any){return enc.encode(JSON.stringify(monthlyWriterPacket(packet))).byteLength}
-function fitMonthlyPacket(packet:any){
+// The budget measures the monthly writer packet and the full annual packet.
+function monthlyBytes(packet:any){return enc.encode(JSON.stringify(packet.period_kind==='month'?monthlyWriterPacket(packet):packet)).byteLength}
+function fitPeriodPacket(packet:any){
   if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)return
   delete packet.domain_answer_contracts
   if(packet.period_narrative){
