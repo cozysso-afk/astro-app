@@ -240,7 +240,7 @@ export function buildTemporalWordingInstruction(packet:any) {
     : []
   return `[DATE WORDING · HARD GATE]
 - 선택 기간=${selected || '날짜 미상'}, 실제 기준일=${String(context?.current_date ?? '미상')}이며 같은 날로 검증되지 않았다.
-- 출력 JSON의 모든 사용자 문장 필드에서 단어 "오늘"과 "오늘은/오늘의/오늘도/오늘에/오늘을/오늘이/오늘로"를 한 번도 쓰지 마. limits, systems, decisions, clusters, domain_answers를 포함한 모든 문자열에 적용한다.
+- 출력 JSON의 모든 사용자 문장 필드에서 단어 "오늘"과 "오늘은/오늘의/오늘도/오늘에/오늘을/오늘이/오늘로"를 한 번도 쓰지 마. limits, systems, decisions, clusters, domain_answers, contact_flow를 포함한 모든 문자열에 적용한다.
 - 날짜를 가리켜야 하면 ${permitted.length ? permitted.join(' / ') : '선택 운세일 / 해당 날짜'} 중 하나 또는 계산 근거에 있는 정확한 날짜를 사용해.
 - 이 규칙을 어기면 응답 전체가 폐기된다.`
 }
