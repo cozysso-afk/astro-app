@@ -320,7 +320,8 @@ async function qaStartBoth(orchestratorId:string,key:string,newOnly=false){
   const started={prod_job_id:prodBody?.job_id??null,prod_status:prod.status,new_job_id:data.id,new_estimated_input_tokens:pb.estimated_input_tokens,new_estimated_max_job_krw:pb.estimated_max_job_krw};
   await a.from("ai_interpret_jobs").update({result_json:{...row.result_json,started}}).eq("id",orchestratorId);
   const task=job(data.id,payload,"gemini-3.7-flash",key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);
-  return {ok:true,...started}
+  return {ok:true,...started};
+}
 async function qaReplay(orchestratorId:string,jobId:string,index:number){
   const a=admin();
   const {data:orch}=await a.from("ai_interpret_jobs").select("result_json").eq("id",orchestratorId).eq("user_id",QA_USER_ID).maybeSingle();
