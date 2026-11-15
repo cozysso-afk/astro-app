@@ -3,7 +3,7 @@ export type V23PeriodKind = 'day' | 'week' | 'month' | 'annual'
 const LIMITS: Record<V23PeriodKind, { full: number; compact: number }> = {
   // A compact retry reduces the requested structures, not the completion ceiling.
   // Lowering both at once reproduced MAX_TOKENS twice and consumed the paid-call budget.
-  day: { full: 8200, compact: 8200 },
+  day: { full: 10000, compact: 10000 },
   week: { full: 9000, compact: 9000 },
   month: { full: 8000, compact: 8000 },
   annual: { full: 10000, compact: 10000 },

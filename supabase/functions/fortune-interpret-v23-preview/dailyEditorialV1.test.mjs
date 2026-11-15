@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialBrief, dailyEditorialRetryInstruction, dailyReaderPacket} from './dailyEditorialV1.ts'
+import {DAILY_EDITORIAL_INSTRUCTION, inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialBrief, dailyEditorialRetryInstruction, dailyReaderPacket} from './dailyEditorialV1.ts'
 import {inspectInterpretationQuality} from '../fortune-interpret-v6-preview/qualityV2.ts'
 const payload=()=>({period_kind:'day',evidence_ledger:[
   {id:'W:career',system:'western',topic:'이직',scope:'intraday_window',window:'01:00~02:30',direction:'supportive'},
@@ -167,4 +167,19 @@ test('another date cannot activate a required daily contact section or enter its
  const q=dailyEditorialBrief(p).questions.find(q=>q.section==='relationship.contact_activation')
  assert.deepEqual(q.fact_refs,[])
  assert.notEqual(q.generation_policy,'required_detail')
+})
+
+test('reader-first daily contract asks for verdict, scene and chart reason, and its own example passes the daily gate',()=>{
+  assert.match(DAILY_EDITORIAL_INSTRUCTION,/판정:.*\n2\. 장면:.*\n3\. 이유:/)
+  assert.match(DAILY_EDITORIAL_INSTRUCTION,/overall\.dominant_pattern: 첫 화면의 "이렇게 읽는 이유"야\. 반드시 작성해/)
+  assert.match(DAILY_EDITORIAL_INSTRUCTION,/450자를 넘기지 마/)
+  assert.doesNotMatch(DAILY_EDITORIAL_INSTRUCTION,/dominant_pattern은 새 설명이 없으면 빈 문자열/)
+  assert.match(DAILY_EDITORIAL_INSTRUCTION,/네 칸 모두 반드시 쓰되/)
+  const example=(label)=>DAILY_EDITORIAL_INSTRUCTION.match(new RegExp(label+' 예: "([^"]+)"'))?.[1]??''
+  const section={conclusion:example('conclusion'),real_scene:example('real_scene'),action:example('action'),change_condition:'',evidence_refs:['W:daily:2026-11-04:1'],applicability:'direct'}
+  assert.ok(section.real_scene.length>=180&&section.real_scene.length<=450)
+  assert.ok(section.conclusion.length<=70&&section.action.length<=120)
+  const payload={period_kind:'day',evidence_ledger:[{id:'W:daily:2026-11-04:1',system:'western',scope:'daily_actual_aspect_house',source_topics:['대인관계'],direction:'context',date:'2026-11-04'}]}
+  const report=inspectDailyEditorial({headline:'',overall:{},clusters:{relationship:{summary:section}}},payload)
+  assert.deepEqual(report.issues,[])
 })

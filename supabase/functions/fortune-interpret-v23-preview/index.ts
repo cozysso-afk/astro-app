@@ -12,7 +12,7 @@ import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
 import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildPeriodStructureRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
-import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
+import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, isolateForeignDetailEvidence } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
@@ -83,7 +83,8 @@ async function generateCore(fullPayload:any,promptPayload:any,model:string,key:s
   const callNo=++budget.used;
   const started=Date.now();
   const remain=Math.max(1000,budget.deadline-Date.now());
-  const timeout=Math.min(compact?46000:54000,remain);
+  // Reader-first daily copy is longer; Gemini 3.7 needed more than 54s for it in live QA.
+  const timeout=Math.min(compact?46000:(fullPayload?.period_kind==="day"?68000:54000),remain);
   const maxOutputTokens=v23OutputTokenLimit(String(fullPayload?.period_kind??"annual"),compact);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
@@ -159,7 +160,8 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  const providerCore=core.partial;
+  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):{core:core.partial,isolated:[]};
+  const providerCore=isolation.core;
   const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
   const normalizedCore=normalizeProviderCore(providerCore);
