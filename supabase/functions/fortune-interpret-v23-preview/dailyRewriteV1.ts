@@ -144,9 +144,15 @@ export function buildRoleNeutralHeroRewriteRequest(candidate:any,payload:any,rep
   const allowed=new Set(['daily_overview_role_specific','daily_overview_abstract_or_typo','period_hero_not_plain_language','period_hero_role_assumption'])
   const abstractDetails = payload?.period_kind === 'day' && parsed.some((issue:any)=>issue.code === 'daily_detail_abstract_repetition')
   if (abstractDetails) allowed.add('daily_detail_abstract_repetition')
+  const incomingInitiator = payload?.period_kind === 'day' && parsed.some((issue:any)=>issue.code === 'daily_incoming_initiator_prediction')
+  if (incomingInitiator) allowed.add('daily_incoming_initiator_prediction')
   if(!['day','week','month','annual'].includes(String(payload?.period_kind??''))||!parsed.length||parsed.some((issue:any)=>!allowed.has(issue.code)))return null
   const paths=['headline','overall.summary','overall.best_phase','overall.caution_phase'].filter(path=>typeof get(candidate,path)==='string'&&get(candidate,path).trim())
   if(!paths.includes('headline')||!paths.includes('overall.summary'))return null
+  if (incomingInitiator) {
+    if (typeof get(candidate,'contact_flow.incoming')!=='string'||!get(candidate,'contact_flow.incoming').trim()) return null
+    paths.push('contact_flow.incoming')
+  }
   if (abstractDetails) {
     for (const [i,row] of (candidate.clusters ?? []).entries()) {
       if (row.applicability === 'insufficient') continue
@@ -167,7 +173,7 @@ headline은 핵심 판단 한 문장으로 25~60자를 목표로 해. overall.su
 첫 화면 네 문장에는 직장·업무·실무·학업·공부·시험·이직·투자·매수·매도·연애·재회·금전·컨디션이라는 분야명을 넣지 마. 기존의 지원/주의 방향과 제한은 유지해. 자연스러운 한국어 반말로 쓰고, 매 문장을 확인해·미뤄·조심해 같은 명령으로 끝내지 마.
 PERIOD=${JSON.stringify({kind:payload?.period_kind,period:payload?.period})}
 PREVIOUS_HERO=${JSON.stringify({headline:candidate?.headline,overall:candidate?.overall})}
-FIELD_CONCLUSIONS=${JSON.stringify(rows)}
+${incomingInitiator?'contact_flow.incoming이 TARGETS에 있으면 상대나 누군가가 먼저 연락하거나 말을 건넨다는 예측을 빼고, 연락이 들어올 흐름의 강약과 들어온다면 어떤 성격의 연락일지만 기존 근거 범위에서 두세 문장으로 다시 써.\n':''}FIELD_CONCLUSIONS=${JSON.stringify(rows)}
 TARGETS=${JSON.stringify(paths.map(path=>({path,previous_text:get(candidate,path)})))}`}
 }
 
