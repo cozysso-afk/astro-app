@@ -145,3 +145,19 @@ test('daily overview can cite another authored field and must use independent ev
  doc.overall.evidence_refs.push('uncited')
  assert.ok(inspectDailyProviderDocument(doc,'day',packet).issues.includes('daily_overview_evidence_outside_selected_question'))
 })
+
+test('a detail section citing another field is isolated instead of failing the whole daily document',async()=>{
+  const {isolateForeignDetailEvidence}=await import('./dailyReadingContractV1.ts')
+  const payload={period:{start:'2026-11-15',end:'2026-11-15'},evidence_ledger:[
+    {id:'W:love',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-15',source_topics:['연애']},
+    {id:'W:contact',system:'western',scope:'daily_actual_aspect_house',date:'2026-11-15',source_topics:['연락']},
+  ]}
+  const row=(key,refs)=>({key,conclusion:'c',real_scene:'s',action:'a',change_condition:'',evidence_refs:refs,applicability:'direct'})
+  const core={clusters:[row('relationship.love_general',['W:contact']),row('relationship.love_flirting',['W:contact']),row('relationship.contact_activation',['W:contact'])]}
+  const {core:out,isolated}=isolateForeignDetailEvidence(core,payload)
+  assert.deepEqual(isolated,['relationship.love_flirting'])
+  assert.equal(out.clusters[0].conclusion,'c')
+  assert.equal(out.clusters[1].applicability,'insufficient')
+  assert.equal(out.clusters[1].real_scene,'')
+  assert.deepEqual(out.clusters[2],core.clusters[2])
+})
