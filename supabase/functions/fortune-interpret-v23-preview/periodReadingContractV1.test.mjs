@@ -299,3 +299,18 @@ test('an optional question answer with mismatched evidence is dropped, the rest 
   assert.deepEqual(out.domain_answers,[])
   assert.deepEqual(out.clusters,core.clusters)
 })
+
+test('a contact axis with references but no text is cleared with its references',async()=>{
+  const {isolateOptionalPeriodViolations}=await import('./periodReadingContractV1.ts')
+  const packet={period_kind:'week',period:{start:'2026-11-16',end:'2026-11-22'},evidence_ledger:[
+    {id:'W:overall:수신신호',system:'western',start:'2026-11-16',end:'2026-11-22',topic:'수신신호',scope:'relationship_average'}]}
+  const core=provider()
+  core.contact_flow={incoming:'',outgoing:'',reconnection:''}
+  core.contact_evidence_refs={incoming:['W:overall:수신신호'],outgoing:[],reconnection:[]}
+  const before=inspectPeriodProviderDocument(core,'week',packet)
+  assert.ok(before.issues.some(i=>i.code==='empty_contact_axis_with_references'))
+  const {core:out,isolated}=isolateOptionalPeriodViolations(core,'week',packet)
+  assert.ok(isolated.includes('contact_flow.incoming'))
+  assert.deepEqual(out.contact_evidence_refs.incoming,[])
+  assert.ok(!inspectPeriodProviderDocument(out,'week',packet).issues.some(i=>i.path.startsWith('contact_flow.')))
+})
