@@ -166,7 +166,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - headline·overall.summary·best_phase·caution_phase: 별 이름, 업무·실무·직장·학업·시험·공부·이직·출근·퇴근.
 - 원고 전체: 기류·에너지·작용, 퇴근·출근·상급자·협업자·기획안·집으로, 내일·지난주·이틀 뒤·오전·오후·저녁·새벽, 상반기·하반기·주 초반·주 후반·월초·월중순·월말·중반 이후, 연락이 올 가능성·상대가 먼저·답신이 늦·상호 호감을 확인·감정적 조급함·차익 실현·매수 적기·매도 적기.
 - 컨디션 분야와 overall·decisions: 피로·체력·기력·수면·열감·개운·과로·과부하·반응 속도·생활 리듬·집중력·쉬는 시간·휴식 부족. 계산은 몸 상태를 재지 않았으니 컨디션은 "일정을 얼마나 채울지, 움직임을 늘릴지 줄일지"로만 말해.
-- 조율·흐름·압박·정돈·신중·현실적은 원고 전체에서 각각 두 번까지만 써.
+- 조율·흐름·압박·정돈·신중·현실적은 원고 전체에서 각각 두세 번까지만 써. 같은 뜻이면 구체적인 장면으로 바꿔 말해.
 - 연락 세부항목(relationship.contact_activation, relationship.contact_continuity)을 쓰지 않았다면 애정·대인 원고와 relationship_reading에 연락·답장·선연락·안부라는 말을 쓰지 마. 투자 세부항목을 쓰지 않았다면 investment_reading 네 칸은 빈 문자열로 둬.
 
 - 이번 요청은 ${word} 전체와 기본 여섯 분야의 첫 화면이야. 기간의 핵심과 판단 이유를 구분해. 분야를 먼저 쓰고 overall.summary와 headline을 마지막에 작성해. ${periodQuestion}${weekly}
@@ -275,7 +275,10 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   if(!payload?.period?.start && !contactSupported)for(const [field,value] of Object.entries(core?.contact_flow??{}))if(text(value))issues.push({code:'period_unsupported_detail_prose',path:`contact_flow.${field}`})
   const readerCopy=[core?.headline,core?.overall?.summary,...rows.filter((row:any)=>row?.applicability!=='insufficient').flatMap((row:any)=>[row?.conclusion,row?.applies_when,row?.evidence_meaning,row?.real_scene,row?.action])].map(text).join(' ')
   const repeatedTerms=['조율','흐름','압박','정돈','신중','현실적']
-  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>3))issues.push({code:'period_generic_repetition',path:'root'})
+  // Reader-first cards are two to three times longer; scale the allowance
+  // (about one use per 700 characters, never fewer than three).
+  const repetitionLimit=Math.max(3,Math.floor(readerCopy.length/700))
+  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>repetitionLimit))issues.push({code:'period_generic_repetition',path:'root'})
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.applies_when)||sceneText(row).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
