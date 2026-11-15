@@ -12,7 +12,7 @@ import { exactV23JobKind } from "./cacheIdentityV23.ts";
 import { EDITORIAL_SECTION_KEYS, buildProviderCoreSchema, normalizeProviderCore } from "./providerSchemaV23.ts";
 import { inspectDailyEditorial, applyDailyEditorialGate, dailyEditorialRetryInstruction } from "./dailyEditorialV1.ts";
 import { buildDailyClarityRequest, buildPeriodQualityRewriteRequest, buildPeriodStructureRewriteRequest, buildRoleNeutralHeroRewriteRequest, applyDailyRewrite } from "./dailyRewriteV1.ts";
-import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument } from "./dailyReadingContractV1.ts";
+import { DAILY_PRIMARY_KEYS, inspectDailyProviderDocument, isolateForeignDetailEvidence } from "./dailyReadingContractV1.ts";
 import { v23FinishReason, v23OutputTokenLimit, v23ThinkingLevel } from "./runtimeBudgetV23.ts";
 import { buildAuthoredTopicAnalysisOnly } from "./editorialPolishV23.ts";
 import { buildEditorialTrace, captureEditorialStage } from "./editorialTraceV23.ts";
@@ -160,7 +160,8 @@ async function generate(payload:any,model:string,key:string,budget:Budget,kind:"
   const core=await generateCore(payload,pb.packet,model,key,budget,kind,compact,qualityRetry);
   if(!core.ok)return {...core,prompt_budget:{bytes:pb.bytes,max_bytes:pb.max_bytes,estimated_input_tokens:pb.estimated_input_tokens}};
   const rawTrace=captureEditorialStage("provider_raw",core.partial);
-  const providerCore=core.partial;
+  const isolation=payload?.period_kind==="day"?isolateForeignDetailEvidence(core.partial,pb.packet):{core:core.partial,isolated:[]};
+  const providerCore=isolation.core;
   const dailyReport=isExtendedPeriod(payload?.period_kind)?inspectPeriodProviderDocument(providerCore,payload?.period_kind,pb.packet):inspectDailyProviderDocument(providerCore,payload?.period_kind,pb.packet);
   if(!dailyReport.passed)return {...core,ok:false,error:"해설 분야 검증 실패",structure_guard_failed:true,structure_report:{...dailyReport,issues:dailyReport.issues.map((issue:any)=>typeof issue==="string"?issue:`${issue.path}: ${issue.code}`)}};
   const normalizedCore=normalizeProviderCore(providerCore);
@@ -319,8 +320,25 @@ async function qaStartBoth(orchestratorId:string,key:string,newOnly=false){
   const started={prod_job_id:prodBody?.job_id??null,prod_status:prod.status,new_job_id:data.id,new_estimated_input_tokens:pb.estimated_input_tokens,new_estimated_max_job_krw:pb.estimated_max_job_krw};
   await a.from("ai_interpret_jobs").update({result_json:{...row.result_json,started}}).eq("id",orchestratorId);
   const task=job(data.id,payload,"gemini-3.7-flash",key);(globalThis as any).EdgeRuntime?.waitUntil?.(task);
-  return {ok:true,...started};
+  return {ok:true,...started}
+async function qaReplay(orchestratorId:string,jobId:string,index:number){
+  const a=admin();
+  const {data:orch}=await a.from("ai_interpret_jobs").select("result_json").eq("id",orchestratorId).eq("user_id",QA_USER_ID).maybeSingle();
+  const {data:j}=await a.from("ai_interpret_jobs").select("usage_json").eq("id",jobId).eq("user_id",QA_USER_ID).maybeSingle();
+  const calculation=orch?.result_json?.calculation;const draft=j?.usage_json?.qa_drafts?.[index];
+  if(!calculation||!draft)return {ok:false,error:"missing_input"};
+  const compacted=compactCalculation(calculation);
+  const precisionGate=precisionGateFromPayload(calculation);
+  const payload=precisionGate.ok?attachPrecisionPacketMetadata(compacted,calculation):compacted;
+  const pb=buildV23PromptBudget(payload);
+  const isolation=isolateForeignDetailEvidence(draft,pb.packet);
+  const structure=inspectDailyProviderDocument(isolation.core,payload?.period_kind,pb.packet);
+  if(!structure.passed)return {ok:false,stage:"structure",isolated:isolation.isolated,structure};
+  const fin:any=finalizeCandidate(normalizeProviderCore(isolation.core),payload,pb.packet,"replay",{},{});
+  const failedStages=(fin?.quality_report?.stages??[]).filter((s:any)=>!s.passed).map((s:any)=>({stage:s.stage,name:s.name,issues:(s.issues??s.failures??s.details??null)}));
+  return {ok:Boolean(fin?.ok),stage:"final",isolated:isolation.isolated,error:fin?.error??null,guard:fin?.guard_violations??null,failed_stages:failedStages,daily_editorial:fin?.quality_report?.daily_editorial??null,structure_report:fin?.structure_report??null};
 }
+
 async function jobActive(id:string){const {data}=await admin().from("ai_interpret_jobs").select("status,error").eq("id",id).maybeSingle();return data?.status==="queued"||data?.status==="running";}
 
 async function job(id:string,payload:any,model:string,key:string){
@@ -353,9 +371,10 @@ Deno.serve(async(req)=>{
   let b:any;try{b=await req.json();}catch{return res(publicFortuneError("INVALID_JSON"),400);}
   const key=(Deno.env.get("GEMINI_API_KEY")??"").trim();
   if(b?.action==="meta")return res({configured:Boolean(key),interpreter_version:VERSION,packet_version:V23_PROMPT_VERSION,narrative_version:PERIOD_NARRATIVE_VERSION,quality_version:QUALITY_VERSION,models:MODELS,background_jobs:true,payload_hash_cache:true,inflight_dedupe:true,quality_v6_validation:true,semantic_rewrite:true,structure_rewrite:true,single_core_generation:true,deterministic_topic_analysis:true,provider_compact_schema:true,max_gemini_calls_per_job:MAX_GEMINI_CALLS,max_job_ms:MAX_JOB_MS,rolling_job_guard:true,prompt_budget_guard:true,prompt_copy:true,phenomenon_first:true,period_specific_narrative:true,thai_contract:THAI_CONTRACT_VERSION});
-  if(b?.action==="qa_calc"||b?.action==="qa_start_both"){
+  if(b?.action==="qa_calc"||b?.action==="qa_start_both"||b?.action==="qa_replay"){
     if(!(await qaTokenOk(req)))return res(publicFortuneError("AUTH_REQUIRED"),401);
     if(b.action==="qa_calc")return res(await qaOrchestrator(/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))?String(b.date):"2026-11-15"));
+    if(b.action==="qa_replay")return res(await qaReplay(txt(b.orchestrator_id,100),txt(b.job_id,100),Number(b.index??0)));
     if(!key)return res({ok:false,error:"no_gemini_key"},503);
     return res(await qaStartBoth(txt(b.orchestrator_id,100),key,b.new_only===true));
   }
