@@ -416,3 +416,16 @@ test("month prompt retains both Saju and Thai daily evidence under the context c
   assert.ok(context.filter(x=>x.system==="thai").length>=4);
   assert.equal(prompt.integration_policy.score_merging,false);
 });
+
+test('a single-day calculation gets the traditional Thai weekday taksa row from the birth weekday',()=>{
+  const calc={period:{start:'2026-11-15',end:'2026-11-15',day_count:1},thai:{thai_day:'수요일 낮',birth_planet:{key:'mercury'}}}
+  const out=compactCalculation(calc)
+  // 2026-11-15 is a Sunday. From Mercury: mercury,saturn,jupiter,rahu,venus,sun → sun is the 6th role, utsaha.
+  assert.equal(out.thai.daily_taksa.day_planet,'sun')
+  assert.equal(out.thai.daily_taksa.role,'utsaha')
+  const row=out.evidence_ledger.find(r=>r.id==='T:daily_taksa:2026-11-15')
+  assert.equal(row.scope,'thai_daily_taksa')
+  assert.equal(row.direction,'context')
+  assert.doesNotMatch(row.text,/길하|흉하|점수\s*\d/)
+  assert.equal(compactCalculation({...calc,period:{start:'2026-11-15',end:'2026-11-21',day_count:7}}).thai.daily_taksa,undefined)
+})

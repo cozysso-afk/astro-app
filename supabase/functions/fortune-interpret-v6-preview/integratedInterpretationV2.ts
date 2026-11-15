@@ -325,6 +325,26 @@ export function compactCalculation(calc:any){
     return {date,representative_local_time:"12:00",positions,evidence_id:id};
   }).filter(Boolean);
   const takSegments=(Array.isArray(th?.taksajorn?.segments)?th.taksajorn.segments.slice(0,8):[]).map((x:any,index:number)=>{const id=`T:taksajorn:${index+1}:${isoDate(x?.start)}`;addEvidence({id,system:"thai",scope:"taksajorn_context",direction:"context",start:x?.start,end:x?.end,text:`Taksajorn(탁사쫀) 구간 · 연간 보리완 ${x?.annual_boriwan?.label??x?.annual_boriwan?.key??""} · 중심궁 도달 ${Boolean(x?.landed_center)?"있음":"없음"}`});return {start:x?.start,end:x?.end,age_in_progress:x?.age_in_progress,annual_boriwan:x?.annual_boriwan?{key:x.annual_boriwan.key,label:x.annual_boriwan.label,thai_name:x.annual_boriwan.thai_name}:null,landed_center:Boolean(x?.landed_center),wheel:wheel(x?.wheel),evidence_id:id};});
+  // Traditional Thai daily rule: the selected date's weekday planet read on the
+  // reader's birth-weekday taksa wheel. It is a calendar relation, not Suriyayat geometry.
+  const dailyTaksa=(()=>{
+    const date=isoDate(calculationPeriod?.start);
+    if(!date||date!==isoDate(calculationPeriod?.end))return null;
+    const birth=String(th?.birth_planet?.key??"");
+    const order=["sun","moon","mars","mercury","saturn","jupiter","rahu","venus"];
+    if(!order.includes(birth))return null;
+    const weekday=new Date(date+"T12:00:00Z").getUTCDay();
+    const dayPlanet=["sun","moon","mars","mercury","jupiter","venus","saturn"][weekday];
+    const roles:[string,string,string][]=[["boriwan","보리완","주변 사람·관계망"],["ayu","아유","생활력·몸의 리듬"],["det","뎃","권한·추진력"],["sri","시","재물·호감·좋은 평판"],["mula","물라","기반·모아 두는 힘"],["utsaha","웃사하","노력·일의 부담"],["montri","몬뜨리","도와주는 사람·윗사람"],["kalakini","깔라끼니","걸림돌·피할 것"]];
+    const [role,roleKo,meaning]=roles[(order.indexOf(dayPlanet)-order.indexOf(birth)+8)%8];
+    const planetKo:Record<string,string>={sun:"태양",moon:"달",mars:"화성",mercury:"수성",jupiter:"목성",venus:"금성",saturn:"토성"};
+    const weekdayKo=["일","월","화","수","목","금","토"][weekday];
+    const id=`T:daily_taksa:${date}`;
+    const direction=role==="kalakini"?"caution":role==="utsaha"?"context":"supportive";
+    addEvidence({id,system:"thai",scope:"thai_daily_taksa",direction,date,
+      text:`태국 요일 탁사 ${date} · ${weekdayKo}요일의 행성 ${planetKo[dayPlanet]}이 출생 요일(${String(th?.thai_day??"")}) 기준 탁사 여덟 자리 중 ${roleKo}(${meaning}) 자리 · 요일과 출생 요일의 관계로 보는 전통 일일 기준이며 사건 확정이나 점수 아님`});
+    return {date,day_planet:dayPlanet,role,role_label:`${roleKo}(${meaning})`,evidence_id:id};
+  })();
   if(th?.mahathaksa?.available){addEvidence({id:"T:mahathaksa:natal",system:"thai",scope:"mahathaksa_baseline",direction:"context",text:`Mahathaksa(마하탁사) 출생 기본 8궁 배치 · 방법 ${th?.mahathaksa?.method??""}`});}
 
   const crossSystemTimeline=keyDates.map((k)=>{
@@ -357,7 +377,7 @@ export function compactCalculation(calc:any){
     key_dates:keyDates,
     cross_system_timeline:crossSystemTimeline,
     saju:{engine:s?.engine,pillars:s?.pillars??null,day_master:s?.day_master??null,elements:s?.elements??null,true_solar:s?.true_solar??null,dayun:Array.isArray(s?.dayun)?s.dayun.slice(0,5):[],annual:sajuAnnual,monthly:sajuMonthly,daily:sajuDaily,daily_coverage:{computed_days:sajuDailyRaw.length,selected_days:sajuDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},daily_policy:s?.daily_policy??null,not_calculated:Array.isArray(s?.not_calculated)?s.not_calculated:[]},
-    thai:{engine:th?.engine,thai_day:th?.thai_day,birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel),evidence_id:th?.mahathaksa?.available?"T:mahathaksa:natal":null}:null,taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,suriyayat:compactThaiProductSuriyayat(sy),suriyayat_daily:thaiDaily,suriyayat_daily_coverage:{computed_days:thaiDailyRaw.length,selected_days:thaiDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},suriyayat_daily_policy:th?.suriyayat_daily_policy??null,predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
+    thai:{engine:th?.engine,thai_day:th?.thai_day,...(dailyTaksa?{daily_taksa:dailyTaksa}:{}),birth_planet:th?.birth_planet??null,ruler:th?.ruler,rule:th?.rule,mahathaksa:th?.mahathaksa?{available:Boolean(th.mahathaksa.available),method:th.mahathaksa.method,wheel:wheel(th.mahathaksa.wheel),evidence_id:th?.mahathaksa?.available?"T:mahathaksa:natal":null}:null,taksajorn:th?.taksajorn?{available:Boolean(th.taksajorn.available),method:th.taksajorn.method,method_variance_note:th.taksajorn.method_variance_note,segments:takSegments}:null,suriyayat:compactThaiProductSuriyayat(sy),suriyayat_daily:thaiDaily,suriyayat_daily_coverage:{computed_days:thaiDailyRaw.length,selected_days:thaiDaily.length,selection:calculationPeriodKind==="annual"?"key_dates":"all_period_days"},suriyayat_daily_policy:th?.suriyayat_daily_policy??null,predictive_status:th?.predictive_status,consensus_policy:th?.consensus_policy,reliability:th?.reliability??null,not_calculated:Array.isArray(th?.not_calculated)?th.not_calculated:[]},
     evidence_ledger:evidence,
   };
   return deep(packet);

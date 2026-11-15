@@ -34,6 +34,8 @@ export function buildSystemFieldSources(payload:any,packet:any):SystemFieldSourc
     const god=Object.keys(SAJU_TOPICS).find(name=>String(row.stem_ten_god??'').includes(name))
     if(god && row.ganzhi)add('saju',SAJU_TOPICS[god],`${row.date??row.segment_start} ${row.ganzhi} · ${row.stem_ten_god}`,row.evidence_id)
   }
+  const daily=payload.thai?.daily_taksa
+  if(daily?.date && daily.date>=from && daily.date<=to && THAI_TOPICS[daily.role])add('thai',THAI_TOPICS[daily.role],`${daily.date} 요일 탁사 · ${daily.role_label}(${daily.role}) · 이날 요일 행성 ${daily.day_planet}`,daily.evidence_id)
   for(const segment of payload.thai?.taksajorn?.segments??[]){
     if(!(segment.start<=to && segment.end>=from))continue
     for(const place of segment.wheel??[]){

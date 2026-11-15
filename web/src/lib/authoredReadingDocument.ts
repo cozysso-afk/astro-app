@@ -128,8 +128,10 @@ export function buildSystemReadingDocument(system:ReadingSystem,data:FortuneData
     doc.core=block('systems.'+system,'기간 전체 해설',data.systems?.[system])
     for (const lens of ['애정','대인','학업','직업','금전','컨디션'] as const) {
       const group=fortuneGroup(lens)!
-      const [first]=systemFieldSections(system,data,group,version)
-      if(first)doc.core.push({...first.blocks[0],label:lens})
+      // Only readings written for this system belong here. Integrated field
+      // conclusions already appear on the overall page and would be repeated.
+      const own=systemFieldSections(system,data,group,version).find(section=>section.id.startsWith('system-field:'))
+      if(own)doc.core.push({...own.blocks[0],label:lens})
     }
   }
   return finish(doc,doc.core.length>0,version)

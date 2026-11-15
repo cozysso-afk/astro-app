@@ -2,7 +2,7 @@ import { contactAxisEvidence } from './contactAxesV1.ts'
 import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQuestions.ts'
 import { DAILY_PRIMARY_KEYS, DAILY_DETAIL_KEYS, DAILY_SECTION_TOPICS, dailySectionFacts } from './dailyReadingContractV1.ts'
 
-export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v5-love-status'
+export const DAILY_EDITORIAL_VERSION = 'daily-editorial-v6-system-pages'
 
 export const DAILY_EDITORIAL_INSTRUCTION = `[DAILY EDITOR: 선택한 운세일 안에서 읽는 해설]
 이번 요청은 종합과 기본 여섯 분야, 그리고 근거가 제공된 기존 세부항목의 일일 원고야. 기본 여섯 분야는 첫 화면의 순서이지 지원 항목의 제한이 아니야. 계산은 끝났어. 너는 계산 결과를 줄여 적는 검수자가 아니라, 이 사람의 출생차트를 펼쳐 놓고 그날을 읽어 주는 점성가야.
@@ -22,7 +22,7 @@ evidence_ledger 각 행의 observation이 그날 실제로 계산된 배치야. 
 이유 문장은 "하늘을 지나는 금성이 네 출생차트의 토성과 부딪히는 날이라, 사고 싶은 마음과 아껴야 한다는 생각이 같이 올라와"처럼 별 이름은 쓰되 뜻을 바로 붙여. 별 이름과 각 이름만 나열하고 끝내면 실패야. 사주와 태국 근거는 해당 행의 설명과 system_field_sources가 허용하는 만큼만 읽어. 태국 행성 위치만으로 일정·관계가 순조롭다고 예측하지 마. 세 체계를 합산해 확신을 키우지 말고 각각 독립적으로 설명해.
 
 [작성 순서]
-애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. contact_flow에서는 이 강약을 설명해. contact_flow.incoming은 수신신호, outgoing은 발신적합, reconnection은 과거인연접점의 값이 제공될 때만 작성해. 해당 값이 없으면 그 필드는 빈 문자열로 둬. contact_evidence_refs의 같은 필드에 contact_axes가 허용한 근거만 넣어. 근거가 없으면 해당 필드와 참조 배열을 비워. 총점이나 다른 축으로 추정하지 마. 각 상황별 원고는 reader_question에서 물은 선택과 근거를 다루고, 모든 행동을 다음 약속 확인으로 끝내지 마. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. systems는 체계마다 실제로 계산한 근거 하나와 그 뜻을 쉬운 말로 설명해. 행성 위치만 계산한 경우에는 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
+애정 원고는 새 인연·짝사랑·썸·관계 미정·연애 중을 각각 가정형으로 답해. 솔로는 첫 만남에서 다시 만나고 싶은 계기, 짝사랑은 일방적인 표현과 실제 상호 반응, 썸은 다음 약속을 둘이 잡는 과정, 관계 미정은 각자가 원하는 관계, 연애 중은 함께 보내는 시간이나 다툰 뒤의 대화를 다뤄. 같은 날의 연애 근거가 각 상황에서 어떤 선택으로 이어지는지 설명하고, 상대방의 호감을 이미 확인한 것처럼 쓰지 마. relationship_scores의 수신신호와 발신적합은 각각 독립된 기준이다. contact_flow에서는 이 강약을 설명해. contact_flow.incoming은 수신신호, outgoing은 발신적합, reconnection은 과거인연접점의 값이 제공될 때만 작성해. 해당 값이 없으면 그 필드는 빈 문자열로 둬. contact_evidence_refs의 같은 필드에 contact_axes가 허용한 근거만 넣어. 근거가 없으면 해당 필드와 참조 배열을 비워. 총점이나 다른 축으로 추정하지 마. 각 상황별 원고는 reader_question에서 물은 선택과 근거를 다루고, 모든 행동을 다음 약속 확인으로 끝내지 마. 수신과 발신 계산이 약하면 연락이 올 듯한 표현을 쓰지 마. systems는 앱의 서양점성술·사주·태국점성술 화면에서 각각 본문으로 보여. 종합 분야 결론을 되풀이하지 말고 그 체계만의 읽기를 써. western은 evidence_ledger에서 그날 가장 뚜렷한 배치 두세 개를 골라, 각각 하늘의 어느 별이 네 출생차트의 무엇과 어떤 각을 맺고 어느 생활 영역(하우스)을 지나는지, 그게 생활에서 어떤 뜻인지 풀어 네다섯 문장으로 써. saju는 제공된 그날의 일진과 십성이 원국에 어떤 뜻인지 두세 문장으로 써. 계산되지 않은 신강약·용신은 말하지 마. thai는 thai_daily_taksa 근거가 있으면 이날 요일의 행성이 출생 요일 기준 탁사 여덟 자리 중 어느 자리인지, 그 자리가 전통적으로 무엇을 뜻하는지, 이날 무엇에 쓰거나 조심하면 좋은지를 두세 문장으로 써. '길하다', '흉하다', 점수, 사건 확정 표현은 쓰지 마. Suriyayat 행성 위치값은 각도 숫자를 나열하거나 길흉으로 해석하지 마. thai_daily_taksa 근거가 없으면 위치 자료가 허용하는 해석 범위를 한 문장으로 밝혀.
 1. daily_editorial_brief.questions의 질문에 맞춰 clusters 여섯 분야를 먼저 작성한 뒤 required_detail 항목도 작성해. required_primary와 required_detail은 key를 각각 한 번 반드시 포함해. 근거 ID를 고르고 해당 질문에 적용할 판단을 써. 근거로 해당 질문에 답할 수 없으면 applicability=insufficient, 빈 원고와 빈 refs로 명시해. 다른 분야나 종합 요약으로 대체되는 결과는 실패야. 계산된 연락·재회·시험·이직·투자·소식 항목을 조용히 생략해도 실패야.
 2. editorial_focus에 전체 첫 화면에서 답할 질문 하나, 판단 하나, 적용 상황, 그 판단의 해석상 이유, section_key 하나와 해당 분야 원고가 직접 인용한 근거 ID를 정리해. 여섯 분야 가운데 근거가 가장 뚜렷한 분야를 골라. 조심할 분야만 고르지 말고, 가장 잘 풀리는 분야가 더 뚜렷하면 그 분야를 골라. 종합 요약은 그 분야의 조언을 반복하지 마. 다른 기본 분야에 독립된 근거가 있으면 무엇이 다른지 실제 장면 두 가지로 설명해. overall.evidence_refs에는 focus에서 쓴 근거와 비교한 기본 분야의 원고가 직접 인용한 근거를 함께 넣어. 다른 분야의 독립 근거가 없으면 초점 분야의 범위만 설명해.
 3. 그 내용을 읽고 headline을 마지막에 써. 독자가 한 번 읽고 이날이 어떤 날인지 말할 수 있어야 해. 제목은 무엇이 수월하거나 까다로운지 읽어주는 짧은 한 문장(25~60자), overall.summary는 적용 상황과 이유를 설명하는 짧은 두 문장(80~180자 목표)이야. 문장 수를 맞추려고 조건을 삭제하지 마. 제목에 이유·행동·제한까지 전부 압축하지 마. 본문을 줄여 붙인 제목도 안 돼.
@@ -142,7 +142,9 @@ export function dailyReaderPacket(packet:any) {
     for(const row of dailySectionFacts(packet,section))chosen.set(row.id,row)
   }
   for(const system of ['saju','thai']){
-    for(const row of source.filter((r:any)=>r.system===system&&/daily/.test(str(r.scope))).slice(0,2))chosen.set(row.id,row)
+    const rows=source.filter((r:any)=>r.system===system&&/daily/.test(str(r.scope)))
+    rows.sort((a:any,b:any)=>Number(b.scope==='thai_daily_taksa')-Number(a.scope==='thai_daily_taksa'))
+    for(const row of rows.slice(0,2))chosen.set(row.id,row)
   }
   const contact_axes=contactAxisEvidence(packet)
   const axisIds=new Set(Object.values(contact_axes).flatMap(axis=>axis.refs))
