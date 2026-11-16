@@ -6,7 +6,7 @@ import {loveSituationQuestions,reunionSituationQuestion} from './loveSituationQu
 // Period reading is a bounded first-screen bundle. It is not a capability
 // certification: available rows describe the evidence, not permission to
 // predict events or to infer unobserved changes between sampled dates.
-export const PERIOD_READING_VERSION = 'period-reading-v1.3-reader-first'
+export const PERIOD_READING_VERSION='period-reading-v1.4-thai-anchor'
 export const PERIOD_PRIMARY_TOPICS:Record<string,string[]> = {
   'relationship.love_general':['연애'], 'relationship.summary':['대인관계'],
   'work_study.study':['학업'], 'work_study.work':['직장'],
@@ -158,7 +158,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - evidence_meaning: 화면의 "이렇게 읽는 이유"야. 기본 여섯 분야(${PERIOD_PRIMARY_KEYS.join(', ')})만 생활 장면 한 문장 뒤에 별 이유 한두 문장을 붙여 두세 문장(120~220자)으로 써. 예: "하늘을 지나는 금성이 네 출생차트의 토성과 부딪히는 기간이라, 사고 싶은 마음과 아껴야 한다는 생각이 같이 올라와." 그 밖의 모든 항목(연애 상황별, 연락, 재회, 시험, 이직, 소식, 투자 등)은 applies_when과 evidence_meaning을 각각 짧은 한 문장(60자 안팎)으로 끝내고, 이 짧은 evidence_meaning에는 별 이름·각 이름을 쓰지 말고 생활 언어로만 이유를 말해. 전체 원고가 길어지면 응답이 잘려서 통째로 버려져.
 - action: 판정에서 바로 나오는 선택 하나(40~120자). 수월한 분야라면 무엇을 해 보면 좋은지 권해. 별 이름 없이.
 - overall.dominant_pattern: 첫 화면의 "이렇게 읽는 이유"야. 반드시 작성해. 이 기간의 핵심 판단을 만든 배치를 위 방법으로 풀어 두세 문장(120~260자)으로 써. summary 문장을 되풀이하지 말고, '공존', '긴장', '압박' 같은 낱말로 문장을 끝내지 마.
-- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 세 문장, saju는 제공된 월운·세운·일진 범위에서 두 문장, thai는 제공된 탁사 자리의 전통적 뜻을 두 문장으로 써. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
+- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 세 문장, saju는 제공된 월운·세운·일진 범위에서 두 문장, thai는 제공된 탁사 자리의 전통적 뜻을 두 문장으로 써. thai 첫 문장에는 system_field_sources 중 system이 thai인 행의 자리 이름과 행성을 그대로 넣고 그 자리가 무엇을 맡는지 쉬운 말로 붙여(예: '탁사조른에서 브리완, 곧 주변 사람과 아랫사람을 맡는 자리에 화성이 들어와 있어.'). '탁사 기간의 흐름', '태국 점성술의 기운'처럼 자리와 행성을 빼고 뭉뚱그리지 마. 연간이라도 같아. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
 
 - domain_answers는 질문마다 한 문장으로 답해. 모든 문장은 ~해, ~야, ~어로 끝나는 반말이야. "~다."로 끝내지 마.
 
