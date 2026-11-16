@@ -188,3 +188,11 @@ test('confirmed relationship agreement, previous states, and later conversations
     assert.equal(validateReunionGroundingV2(data,{...payload,reunion_observation:facts}).ok,true,claim)
   }
 })
+
+test('enum arrays lose count limits before they reach Gemini; other limits stay',async()=>{
+  const {geminiSafeSchema}=await import('./reunionGroundingV2.ts')
+  const out=geminiSafeSchema({type:'OBJECT',properties:{refs:{type:'ARRAY',items:{type:'STRING',enum:['a','b']},minItems:1,maxItems:2},windows:{type:'ARRAY',maxItems:4,items:{type:'OBJECT',properties:{period:{type:'STRING',enum:['2026-12-01']}}}},none:{type:'ARRAY',maxItems:0,items:{type:'STRING'}},free:{type:'ARRAY',items:{type:'STRING'},maxItems:4}}})
+  assert.equal(out.properties.refs.minItems,undefined);assert.equal(out.properties.refs.maxItems,undefined);assert.deepEqual(out.properties.refs.items.enum,['a','b'])
+  assert.equal(out.properties.windows.maxItems,undefined)
+  assert.equal(out.properties.none.maxItems,0);assert.equal(out.properties.free.maxItems,4)
+})

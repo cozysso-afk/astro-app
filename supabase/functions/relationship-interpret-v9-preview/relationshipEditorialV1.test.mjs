@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {normalizeReunionObservation, validateRelationshipEditorial} from './relationshipEditorialV1.ts'
+import {normalizeReunionObservation, validateRelationshipEditorial, hasInventedDuration} from './relationshipEditorialV1.ts'
 
 // Contract fixtures, not purported real model output or proof of reading quality.
 const core=()=>({headline:'서로에게 끌리는 지점과 대화의 차이',core_summary:'핵심 답변',core_reason:'해당 판단을 만든 실제 근거',core_action:'확인할 구체적인 생활 장면',core_conditions:['생시가 없어서 하우스는 판단하지 못함'],reunion_context:''})
@@ -108,4 +108,26 @@ test('reunion timing ranges with dates do not prescribe a contact duration',()=>
  assert.equal(validateRelationshipEditorial(data,'reunion').ok,true)
  data.core_action='답장을 30분 뒤에 해.'
  assert.equal(validateRelationshipEditorial(data,'reunion').reason,'invented_exact_behavior_duration')
+})
+
+test('feelings framed as tendencies or things to confirm are allowed; flat claims are not',()=>{
+ const ok=core();ok.chemistry='네 금성과 상대 화성이 맞물려 처음 만났을 때 서로에게 끌리기 쉬운 조건이야. 예를 들어 첫 약속 뒤에 바로 다음 약속을 잡게 되기 쉬워.'
+ assert.equal(validateRelationshipEditorial(ok,'compatibility').ok,true)
+ const ask=core();ask.communication='상대가 아직 서로를 원하는지는 직접 물어봐야 알 수 있어.'
+ assert.notEqual(validateRelationshipEditorial(ask,'compatibility').reason,'unobserved_mind_claim')
+ const flat=core();flat.chemistry='서로를 강하게 원하는 사이야.'
+ assert.equal(validateRelationshipEditorial(flat,'compatibility').reason,'unobserved_mind_claim')
+})
+
+test('a prescribed wait before talking again is an invented duration',()=>{
+ const d=core();d.conflict_pattern='감정이 격해지면 말을 멈추고 30분 뒤에 다시 이야기하는 규칙을 세워.'
+ assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration')
+})
+
+test('spelled-out and minimum waits are invented durations too; evidence dates are not',()=>{
+ for (const line of ['각자 혼자 쉬는 시간을 30분이라도 보장해줘.','일단 대화를 멈추고 감정이 가라앉은 다음 날 다시 이야기하는 게 안전해.','하루 정도 연락을 쉬어 봐.']) {
+  const d=core();d.conflict_pattern=line
+  assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration',line)
+ }
+ assert.equal(hasInventedDuration('2027년 2월 3일 전후로 대화가 다시 열리기 쉬워.'),false)
 })

@@ -17,12 +17,29 @@ core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), 
 궁합은 chemistry=끌림, emotional_dynamic=정서 리듬, communication=대화, conflict_pattern=갈등 수습, power_boundaries=결정권·경계, long_term=지속 조건으로 질문을 분리한다. 상시 관계 특성과 선택 기간의 변화(timing)를 섞지 않는다. felt_scenarios는 근거가 허용하는 생활 장면 1~3개이며 실제 사건처럼 쓰지 않는다. reunion_context는 궁합·결혼 모드에서 빈 문자열로 둔다.
 결혼 모드에서는 marriage_reading.mode를 PURPOSE와 정확히 같게 쓴다. bottom_line=생활 궁합의 중심 답, bond=결속, emotional_home=정서적 편안함, daily_life=역할·생활, intimacy_resources=친밀감·공유자원, conflict_repair=갈등 수습, commitment_or_current_cycle=미혼의 합의 조건 또는 기혼의 현재 협력, timing=계산된 기간 변화, caution=판단을 바꿀 조건으로 각각 새 정보만 쓴다. 중복되는 최상위 chemistry/emotional_dynamic/communication/conflict_pattern/power_boundaries/long_term/timing 및 felt_scenarios는 각각 빈 문자열/빈 배열로 둔다. 미혼은 생활가치·역할·현실조건을 답하고 결혼 성립 날짜나 프러포즈 사건을 창작하지 않는다. 기혼은 현재 협력·갈등·회복을 답하고 결혼 성사 예측을 하지 않는다.
 각 상세 필드는 결론과 쉬운 이유를 2~4문장으로 설명하되 근거가 없으면 무엇이 없어 해당 질문을 판단하지 못하는지 한 문장으로 답한다. 길이를 채우는 것이 품질이 아니다. 기술 이름과 오브의 자세한 해설은 top_aspects에, 생활 예시는 felt_scenarios 또는 해당 질문 해설에 분리한다.
+[읽는 사람 기준 · 최우선]
+- 이 글은 차트를 모르는 사람이 읽어. 각 상세 필드(chemistry·emotional_dynamic·communication·conflict_pattern·power_boundaries·long_term, marriage_reading 각 항목, 재회 각 해석)는 이 순서로 써: ① 이 질문의 답 한 문장 → ② 왜 그런지: 근거 하나를 "네 금성(호감 표현)과 상대 화성(다가가는 힘)이 맞물려"처럼 누구의 무엇인지와 쉬운 뜻으로 → ③ 실제로 보이는 장면 하나: "예를 들어 ~할 때 ~하기 쉬워" → ④ 그래서 무엇을 확인하거나 조절하면 되는지.
+- static.aspects와 strongest에서 a는 사용자(너)의 출생 행성, b는 상대의 출생 행성이야. 문장에서 '한쪽', '다른 한쪽', '누군가'로 흐리지 말고 '너는', '상대는'으로 방향을 밝혀. 방향이 데이터에 없는 근거(composite·davison 등 관계 자체 차트)는 '이 관계는'으로 써.
+- '정서적 무게감', '에너지', '기류', '구도', '조율', '호흡 조절', '균형', '현실적인 구조' 같은 말로 문장을 끝내지 마. 무엇이 어떻게 보이는지 행동·말·상황으로 바꿔 써.
+- "서로를 존중하고 솔직하게 대화해", "꾸준히 노력해야 해" 같은 누구에게나 맞는 조언은 쓰지 마. 조언은 그 필드의 근거에서 나온 구체 행동 하나만.
+- core_reason 첫 문장 예시: "처음엔 쉽게 가까워지는데, 서운할 때 너는 말로 풀고 싶고 상대는 혼자 정리하고 싶어 해서 엇갈리기 쉬워." (행성·각 이름은 둘째 문장부터)
+- relationship_status가 있으면 그 상황(썸·연애 중·짝사랑·헤어짐 등)에 맞는 장면과 행동으로 써. 연애 중인 관계에 '고백해 봐'를, 썸에 '동거·생활비'를 쓰지 마.
+- 연락이 장면에 나오면 누가 보내고 누가 받는 쪽인지 근거가 허용하는 범위에서 구분해. 근거가 없으면 방향을 지어내지 말고 '연락이 오가는 중에'처럼 써.
+
 재회 core_summary/current_stage는 사용자 관측과 계산상 다음 후보를 구분한다. 관측 state가 없으면 현실 단계는 미확인이라고 명시한다. 있으면 입력 기록임을 밝히고 그 기록의 시점(as_of)이 없으면 현재까지 유지된다고 단정하지 않는다. 후보 없음은 실제 사건이 없었다는 뜻이 아니다. observed initiator는 기록된 과거 행동일 뿐 다음 선연락 주체 근거가 아니다.
 `
 
 export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
 
 export const unobservedMind=/(?:깊은 애정[^.]{0,18}(?:명확히 )?존재|두 사람 모두 관계를 지키려는 의지가 강|상대가 아직 사랑|서로에 대한 (?:강한|깊은) 애정|가정을 지키려는 책임감|(?:깊은|강한) (?:끌림|애정)[^.]{0,24}(?:결속|존재|이어져|있어)|서로(?:를|에게|의)?[^.]{0,24}(?:여기|느끼|원하|바라)|함께 미래를 설계하려|책임감(?:을)? (?:갖|지니)|책임감[^.]{0,24}(?:갖춰|단단|결속|크게 작용)|결속력[^.]{0,24}(?:돋보|단단|높아|갖추)|첫눈에[^.]{0,18}강한 호감|호감을 금방 쌓|끌리는 마음은 확실|서로에게 정서적인 안정감을 주|관계를 오래 유지하려는[^.]{0,18}책임감|서로를[^.]{0,18}안전지대로 인식|함께할 때[^.]{0,24}(?:체감|느껴))/
+
+// A sentence that frames a feeling as a tendency, a condition or something to
+// confirm is what the contract asks for; only flat claims about the other
+// person's present mind are rejected.
+const hedged=/(?:쉬운|쉬워|쉽고|쉽게|수 있|수도|가능성|조건|[가-힣]면(?:\s|,|$)|라면|인지|는지|지 않|않도록|확인|살펴|물어)/
+export function claimsUnobservedMind(value: string) {
+  return String(value??'').split(/(?<=[.!?。])\s+|\n/).some(sentence=>unobservedMind.test(sentence)&&!hedged.test(sentence))
+}
 
 export const reportStyle = /(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./
 export const copyTypo = /(?:생활 가관|북수조점|예작|무필요)/
@@ -44,9 +61,11 @@ export function hasInventedDuration(value: string) {
     .replace(/\d{4}[-./]\d{1,2}[-./]\d{1,2}(?:일)?/g,'')
     .replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}(?:일)?(?:\s*[~–-]\s*(?:\d{1,2}월\s*)?\d{1,2})?일?/g,'')
     .replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
+  const behavior=/기다[려리]|기다린|생각할 시간|(?:다시 )?(?:이야기|얘기|말)(?:하|해|를)|시간을 (?:가져|두|보장)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고|는)|혼자|보장|떨어져|멈추|미뤄|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/
+  // Spelled-out spans ("다음 날", "하루 뒤", "한 시간") prescribe a duration as much as digits do.
+  const spelled=/(?:다음\s?날|이튿날|하루(?:\s?(?:뒤|이틀|정도|쯤|만))|며칠\s?(?:뒤|후|동안)|일주일\s?(?:뒤|후|동안|정도)|(?:한|두|세)\s?시간|반나절)/
   return prose.split(/[.!?。\n]/).some(sentence =>
-    /\d+\s*(?:분|시간|일)(?:간|씩|\s*(?:정도|동안|후에|뒤에))?/.test(sentence) &&
-    /기다[려리]|기다린|생각할 시간|시간을 (?:가져|두)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고)|미뤄|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/.test(sentence))
+    (/\d+\s*(?:분|시간|일)(?:간|씩|\s*(?:정도|동안|후에|뒤에))?/.test(sentence)||spelled.test(sentence)) && behavior.test(sentence))
 
 }
 
@@ -79,7 +98,7 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   if(styleFields.some(value=>copyTypo.test(text(value)))) return fail('korean_copy_error')
   const fieldsOfProse=proseFields(data)
   const allProse=fieldsOfProse.join('. ')
-  if(fieldsOfProse.some(value=>unobservedMind.test(value))) return fail('unobserved_mind_claim')
+  if(fieldsOfProse.some(claimsUnobservedMind)) return fail('unobserved_mind_claim')
   if(fieldsOfProse.some(hasInventedDuration))return fail('invented_exact_behavior_duration')
   if(/(?:대립각\([^)]*\bsquare\b|사각각\([^)]*\bopposition\b|삼각각\([^)]*\bsextile\b|육십분위\([^)]*\btrine\b)/i.test(allProse))return fail('aspect_translation_mismatch')
   const fields = [data.core_summary, data.core_reason, data.core_action, ...conditions].map(canonical)
