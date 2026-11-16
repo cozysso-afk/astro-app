@@ -144,3 +144,9 @@ test('reunion readings from the app screenshot: pipeline words, orbs, adjustment
   const data={core_summary:'이미 한 번 만났고 봄에 다시 마주칠 때가 와. 그때 예전 문제를 꺼낼 수 있는지가 관건이야.',overview:'이미 한 번 만났고 봄에 다시 마주칠 때가 와서 그때 예전 문제를 꺼낼 수 있는지가 관건이야.',reunion_synthesis_v2:{summary:'네 화성과 상대 수성이 부딪혀서 말다툼이 쉽게 커지니, 다음 만남에서 말투부터 확인해.'}}
   assert.deepEqual(repeatedReunionFields(data),['overview'])
 })
+
+test('live reunion draft wording: activation and candidate words are pipeline language',async()=>{
+  const {systemJargon}=await import('./relationshipEditorialV1.ts')
+  for (const line of ['감정 활성과 만남 창은 열려 있어.','연락 재접촉의 단독 미래 후보는 잡히지 않아.','연락 단계의 미래 후보는 비어 있어.','실제 만남의 창문들이 차례로 열려.','상대 진행 흐름이 네 영역을 두드리는 지표가 있어.'])
+    assert.ok(systemJargon.test(line),line)
+})

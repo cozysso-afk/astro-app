@@ -27,13 +27,17 @@ export function hasUnsupportedInitiativeDirection(value: unknown, observation?: 
     // metric, or the question "who first?" alone does not attribute an action.
     if (laterRecordedContact(sentence)) return false
     if (!actor.test(sentence) || !action.test(sentence) || uncertainty.test(sentence)) return false
+    // Denying that a direction follows ("뜻은 아니야", "보장하지 않아", "근거가 되지 않아") is not a prediction.
+    if (/(?:뜻은|뜻이|의미는|보장(?:해\s*주|하)지는?|근거가|근거는|근거로)\s*(?:아니|않|되지\s*않|없|못)/.test(sentence)) return false
+    // A hypothetical ("상대가 먼저 다가오더라도", "먼저 연락한다면") describes a condition, not a forecast.
+    if (/먼저[^.!?]{0,14}(?:더라도|다면|라면|오면|하면|해도)/.test(sentence)) return false
     const adviceOrQuestion = /(?:기대(?:하며)?\s*기다리기보다|예단하지|기대하지|보내지 마|연락하지 마|고민(?:할|하는|한다)|여부를 확인|인지 확인|정할 필요|결정할 때)/.test(sentence)
     const prediction = /(?:가능성이 (?:높|커)|먼저 (?:움직이는 흐름|움직일 거|연락할 거)|앞서는 것으로)/.test(sentence)
     if (adviceOrQuestion && !prediction) return false
     const counterpart = /상대(?:방)?(?:이|가|은|는|측|\s*쪽)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
     const user = /(?:내가|제가|저는|사용자(?:가|는)|본인(?:이|은)|내\s*쪽|나는)[^.!?]{0,20}(?:먼저|연락|메시지)/.test(sentence)
     const matchesRecordedInitiator = observation?.initiator === 'counterpart' ? counterpart && !user : observation?.initiator === 'user' ? user && !counterpart : observation?.initiator === 'mutual' && /서로|양쪽|둘 다/.test(sentence)
-    const pastRecord = matchesRecordedInitiator && /입력|기록|알려준|관측/.test(sentence) && /했|왔|보냈|이었|걸었/.test(sentence) && !/앞으로|다음|예정|가능성|전망/.test(sentence)
+    const pastRecord = matchesRecordedInitiator && (/입력|기록|알려준|관측/.test(sentence) || /지난번|지난\s|과거에|예전에|그때|이전에/.test(sentence)) && /했|왔|보냈|이었|걸었|연락해|다가와|만난|닿았|닿은/.test(sentence) && !/앞으로|다음(?!\s*단계)|예정|가능성|전망/.test(sentence)
     const conditionalCheck = /(?:연락|메시지)(?:을|를)?\s*(?:하면|한다면|했다면|했을 때|하는지 확인)|먼저\s*연락(?:할|하는)\s*경우/.test(sentence)
     return !pastRecord && !conditionalCheck
   })
