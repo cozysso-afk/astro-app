@@ -148,3 +148,7 @@ test('live reunion draft wording: activation and candidate words are pipeline la
   for (const line of ['감정 활성과 만남 창은 열려 있어.','연락 재접촉의 단독 미래 후보는 잡히지 않아.','연락 단계의 미래 후보는 비어 있어.','실제 만남의 창문들이 차례로 열려.','상대 진행 흐름이 네 영역을 두드리는 지표가 있어.'])
     assert.ok(systemJargon.test(line),line)
 })
+
+test('a spelled-out allowance before replying is an invented duration',()=>{
+  assert.equal(hasInventedDuration('하루 이틀 정도의 여유를 두더라도 성의 있게 답변하는 태도가 유지되어야 해.'),true)
+})
