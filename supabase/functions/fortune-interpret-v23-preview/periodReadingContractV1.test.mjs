@@ -329,3 +329,10 @@ test('an off-topic citation next to an on-topic one is trimmed; a scene describe
   row.evidence_refs=['W:m']
   assert.deepEqual(isolateOptionalPeriodViolations(core,'week',packet).core.clusters.find(r=>r.key==='condition.condition').evidence_refs,['W:m'])
 })
+
+test('period thai system page must name the provided taksa place and planet',async()=>{
+  const {buildPeriodReadingInstruction}=await import('./periodReadingContractV1.ts')
+  const PERIOD_READING_HEADER=buildPeriodReadingInstruction('annual')
+  assert.match(PERIOD_READING_HEADER,/thai 첫 문장에는 system_field_sources 중 system이 thai인 행의 자리 이름과 행성/)
+  assert.match(PERIOD_READING_HEADER,/연간이라도 같아/)
+})
