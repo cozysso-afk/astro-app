@@ -21,7 +21,7 @@ test('recorded facts and calculated dates precede technical progression evidence
     reunionV2:{summary:'실제 상황부터 확인해요.',why_reconnect:{conclusion:'연락을 다시 한 이유를 확인해요.'},
     rebuild:{conclusion:'다음 대화를 함께 정해요.'},repeat_risks:{conclusion:'예전 갈등이 반복되는지 봐요.'},
     consultation_answer:{next_stage_up_conditions:['둘이 약속을 정하는지 봐요.']}},sustainabilityText:'만남 뒤에도 약속을 지키는지 봐요.'})
-  const headings=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','계산 근거와 점수 보기']
+  const headings=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계가 열리기 쉬운 때','연락 흐름 (참고)','계산 근거와 점수 보기']
   assert.doesNotMatch(html,/만남 뒤에도 약속을 지키는지 봐요|다음 대화를 함께 정해요/)
   let cursor=-1
   for(const heading of headings){const next=html.indexOf(heading);assert.ok(next>cursor,heading);cursor=next}

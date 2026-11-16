@@ -9,7 +9,7 @@ import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relat
 import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
 const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.8-reader-first-direction";
-const REUNION_VERSION="relationship-v14.12-reader-first-direction";
+const REUNION_VERSION="relationship-v14.13-reunion-plain-language";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL,"gemini-3.7-flash"]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};

@@ -1,4 +1,4 @@
-import { unsupportedSajuTerm, copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, claimsUnobservedMind } from './relationshipEditorialV1.ts'
+import { unsupportedSajuTerm, copyTypo, reportStyle, hasCondition, hasInventedDuration, technical, claimsUnobservedMind, systemJargon, orbNumber, abstractEnding, repeatedReunionFields, REUNION_ROLE_FIELDS } from './relationshipEditorialV1.ts'
 import { hasUnsupportedInitiativeDirection } from './reunionGroundingV2.ts'
 
 type Target = { id: string; path: string[]; previous: string | string[]; issues: string[]; evidence?: {id:string;facts:unknown}[] }
@@ -8,6 +8,7 @@ type Target = { id: string; path: string[]; previous: string | string[]; issues:
 export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string) {
   const targets: Target[] = []
   const source=JSON.stringify(payload)
+  const repeatedFields:string[]=purpose==='reunion'?repeatedReunionFields(draft):[]
   function visit(value:any,path:string[]) {
     if (typeof value === 'string') {
       const key = path.join('.')
@@ -21,6 +22,10 @@ export function planRelationshipCopyRepair(draft:any,payload:any,purpose:string)
       if (hasInventedDuration(value)) issues.push('근거 없는 대기 시간·행동 기간을 삭제')
       if (reportStyle.test(value)) issues.push('내용은 유지하고 보고서체 종결을 자연스러운 반말로 바꿔')
       if (copyTypo.test(value)) issues.push('잘못된 한국어 표현을 바로잡아')
+      if (!/^top_aspects\.\d+\.label$/.test(key) && orbNumber.test(value)) issues.push('각도 숫자와 오차(150도각, 0.27°)를 지우고 누구의 무엇인지와 뜻만 남겨')
+      if (systemJargon.test(value)) issues.push("계산 과정의 말('입력된 현실 상태', '계산상', '기록상', '관문', '독립 후보', '활성도' 등)을 '네가 알려준 대로', '이 기간에는'처럼 생활 언어로 바꿔")
+      if (abstractEnding.test(value)) issues.push("'현실 조율', '관계 조율' 대신 무엇을 어떻게 확인할지 행동이나 대화 한 장면으로 써")
+      if (repeatedFields.includes(key)) issues.push(`앞 칸과 같은 말을 되풀이하지 말고 이 칸의 역할만 써: ${REUNION_ROLE_FIELDS.find(([p])=>p===key)?.[1]??''}`)
       if (claimsUnobservedMind(value)) issues.push('현재 속마음이나 의지를 단정하지 말고 확인 가능한 조건을 설명')
       if (purpose === 'reunion' && !payload?.reunion_evidence_v2?.initiative_gate?.available &&
           hasUnsupportedInitiativeDirection(value,payload?.reunion_observation)) issues.push('미래 선연락 주체는 알 수 없다고 설명')

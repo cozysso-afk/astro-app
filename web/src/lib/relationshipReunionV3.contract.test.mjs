@@ -18,7 +18,7 @@ const groundingSource=readFileSync(new URL('../../../supabase/functions/relation
 const panel=readFileSync(new URL('../RelationshipInterpretationPanel.tsx',import.meta.url),'utf8')
 const wrapper=readFileSync(new URL('../ReunionHierarchyPanel.tsx',import.meta.url),'utf8')
 test('calculation and AI grounding contracts remain intact',()=>{
- for(const marker of ['relationship-v14.12-reader-first-direction','buildReunionEvidenceV2','validateReunionGroundingV2','reunion_synthesis_v2:reunionSchema']) assert.ok(serverSource.includes(marker),marker)
+ for(const marker of ['relationship-v14.13-reunion-plain-language','buildReunionEvidenceV2','validateReunionGroundingV2','reunion_synthesis_v2:reunionSchema']) assert.ok(serverSource.includes(marker),marker)
  assert.match(groundingSource,/validateRefs\(value, valid\)/)
 })
 test('reunion keeps authored synthesis separate from calculated hierarchy without losing either',()=>{
@@ -33,7 +33,7 @@ test('reunion keeps authored synthesis separate from calculated hierarchy withou
 })
 test('six relationship axes remain visible and evidence stays collapsed',()=>{
  const html=render()
- for(const label of ['정서 재활성 지표','연락이 닿음','대화가 이어짐','실제 만남','다시 교제하기로 합의','관계 유지']) assert.ok(html.includes(label),label)
+ for(const label of ['마음이 다시 움직임','연락이 닿음','대화가 이어짐','실제 만남','다시 교제하기로 합의','관계 유지']) assert.ok(html.includes(label),label)
  assert.equal((html.match(/data-stage-state=/g) || []).length,6)
  assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
  assert.doesNotMatch(html,/<details[^>]*\bopen/)
