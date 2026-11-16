@@ -196,3 +196,12 @@ test('enum arrays lose count limits before they reach Gemini; other limits stay'
   assert.equal(out.properties.windows.maxItems,undefined)
   assert.equal(out.properties.none.maxItems,0);assert.equal(out.properties.free.maxItems,4)
 })
+
+test('past initiator facts, denials and hypotheticals are not forecasts; forecasts still are',async()=>{
+  const {hasUnsupportedInitiativeDirection}=await import('./reunionGroundingV2.ts')
+  const obs={initiator:'counterpart',state:'met'}
+  for (const ok of ['네가 알려준 대로 지난번에 상대가 먼저 연락해 이미 만난 상태지만, 앞으로 누가 먼저 연락할지는 알 수 없어.','이것이 다음에도 상대가 먼저 움직인다는 뜻은 아니야.','과거에 상대가 먼저 다가왔던 사실이 앞으로의 선연락 방향까지 보장해주지는 않아.','만약 지난번처럼 상대가 먼저 다가오더라도 대화가 겉돌면 거리가 벌어질 수 있어.'])
+    assert.equal(hasUnsupportedInitiativeDirection(ok,obs),false,ok)
+  for (const bad of ['앞으로 상대가 먼저 연락할 가능성이 높아.','다음 달에는 상대가 먼저 연락해 올 거야.','내가 먼저 연락하는 흐름이 우세해.'])
+    assert.equal(hasUnsupportedInitiativeDirection(bad,obs),true,bad)
+})
