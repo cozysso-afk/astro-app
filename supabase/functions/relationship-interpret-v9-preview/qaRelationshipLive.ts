@@ -386,7 +386,7 @@ async function countJobs(admin:any,userId:string|null,since:string){let q=admin.
 async function rollingGuard(admin:any,userId:string){const now=Date.now();const u10=await countJobs(admin,userId,new Date(now-10*60*1000).toISOString()),u24=await countJobs(admin,userId,new Date(now-24*60*60*1000).toISOString()),g10=await countJobs(admin,null,new Date(now-10*60*1000).toISOString()),g24=await countJobs(admin,null,new Date(now-24*60*60*1000).toISOString());if(u10>=MAX_USER_NEW_JOBS_10M)return `내 계정에서 10분 동안 새 관계 해설 ${MAX_USER_NEW_JOBS_10M}건 한도에 도달했어.`;if(u24>=MAX_USER_NEW_JOBS_24H)return `내 계정에서 24시간 새 관계 해설 ${MAX_USER_NEW_JOBS_24H}건 한도에 도달했어.`;if(g10>=MAX_GLOBAL_NEW_JOBS_10M)return `전체 10분 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_10M}건 안전 한도에 도달했어.`;if(g24>=MAX_GLOBAL_NEW_JOBS_24H)return `전체 24시간 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_24H}건 안전 한도에 도달했어.`;return "";}
 
 // QA ONLY. Accepts nothing but the QA action, guarded by a token hash and a run cap.
-const QA_TOKEN_SHA256="b8481696e9279003ef0e8458c04e61148999542dc6592ee5a62a4cd2244df676",QA_USER="478b7fcb-0153-44de-acd4-5f54b80c0ee0",QA_MAX_RUNS=10;
+const QA_TOKEN_SHA256="b8481696e9279003ef0e8458c04e61148999542dc6592ee5a62a4cd2244df676",QA_USER="478b7fcb-0153-44de-acd4-5f54b80c0ee0",QA_MAX_RUNS=14;
 async function qaRelationship(req:Request){
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  const token=req.headers.get("x-qa-token")??"";if(!token||await sha(token)!==QA_TOKEN_SHA256)return new Response("forbidden",{status:403});
