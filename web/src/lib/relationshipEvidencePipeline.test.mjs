@@ -46,8 +46,8 @@ test('calculation evidence survives API to internal Gemini and external-AI promp
 })
 
 test('new question contracts invalidate old cache while retaining mode and observation identity', () => {
-  const current=cacheApi(cache),legacy=cacheApi(cache.replaceAll('relationship-v12.8-reader-first-direction','relationship-v12.0-gemini-single-author').replaceAll('relationship-v14.12-reader-first-direction','relationship-v14.10-grounded-stage-question-reading-contract'))
-  const versions={compatibility:'relationship-v12.8-reader-first-direction',reunion:'relationship-v14.12-reader-first-direction'}
+  const current=cacheApi(cache),legacy=cacheApi(cache.replaceAll('relationship-v12.8-reader-first-direction','relationship-v12.0-gemini-single-author').replaceAll('relationship-v14.13-reunion-plain-language','relationship-v14.10-grounded-stage-question-reading-contract'))
+  const versions={compatibility:'relationship-v12.8-reader-first-direction',reunion:'relationship-v14.13-reunion-plain-language'}
   for(const [purpose,version] of Object.entries(versions)){
     assert.ok(edge.includes(`="${version}"`),`${purpose}: server contract`)
     assert.ok(cache.includes(`= '${version}'`),`${purpose}: browser contract`)

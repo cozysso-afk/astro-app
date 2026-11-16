@@ -11,7 +11,7 @@ export const EDITORIAL_INSTRUCTION = `
 headline은 핵심 판단 한 문장(25~60자 목표, 180자 이내)이야. 긴 본문을 제목에 붙이지 마.
 headline·core_summary·overview는 천체명·각 이름·영문 전문어 없이 사람말로 먼저 답해. 전문 근거는 core_reason과 top_aspects 뒤쪽에만 두고, core_reason도 쉬운 뜻부터 쓴 뒤 근거를 최대 두 묶음만 덧붙여.
 모든 사용자 문장은 일관되게 자연스러운 ~해/~야체로 써. ~한다/~이다 보고서체를 섞지 마. '기류·에너지·조율·구조' 같은 추상어만으로 문장을 완성하지 마.
-사용자가 입력하지 않은 현재 감정·의지·실제 행동은 단정하지 마. 계산상의 끌림·긴장·책임감·결속 가능성은 '그렇게 느끼거나 행동하기 쉬운 조건'으로 표현하고, 실제로 사랑한다·가정을 지키려 한다·책임감이 갖춰졌다·이미 강하게 결속됐다는 관측으로 바꾸지 마.
+사용자가 입력하지 않은 현재 감정·의지·실제 행동은 단정하지 마. 차트에 나타난 끌림·긴장·책임감·결속 가능성은 '그렇게 느끼거나 행동하기 쉬운 조건'으로 표현하고, 실제로 사랑한다·가정을 지키려 한다·책임감이 갖춰졌다·이미 강하게 결속됐다는 관측으로 바꾸지 마.
 core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), core_reason은 그 판단을 만든 실제 근거와 쉬운 뜻(360자 이내), core_action은 그 근거와 연결된 현실 확인 또는 행동 하나(240자 이내), core_conditions는 판단을 바꿀 실제 제약·조건 0~4개(각 240자 이내)다. core_conditions의 각 항목은 반드시 '~하면', '~할 때', '~인 경우' 중 하나가 드러나는 조건문으로 쓰고 행동 지시만 단독으로 넣지 않는다. 결론에 이미 사용된 필수 조건은 반드시 보존하고, 그런 조건이 없으면 빈 배열로 둔다. 빈칸을 채우려고 새로운 예외나 일반 주의문을 만들지 않는다. 조건을 요약에서 빠뜨리면 결론이 바뀌는 경우 요약에도 조건을 붙인다. 제한문구만으로 요약을 채우지 않는다.
 이 네 필드는 서로 다른 역할이다. 같은 문장 복사·단순 바꿔쓰기나 타 모드 내용을 채우지 않는다. 글자 수를 채우려고 새 사실을 만들지 않는다. overview는 상세 안내 2~4문장이고 핵심 요약과 별개다. 이유는 실제 근거, 생활 장면은 조건부 예시, 관측 사실은 사용자가 입력한 기록으로 구분한다. 구체적인 냉각 시간·연락 횟수·상대 심리·결혼 날짜를 근거 없이 만들지 않는다.
 궁합은 chemistry=끌림, emotional_dynamic=정서 리듬, communication=대화, conflict_pattern=갈등 수습, power_boundaries=결정권·경계, long_term=지속 조건으로 질문을 분리한다. 상시 관계 특성과 선택 기간의 변화(timing)를 섞지 않는다. felt_scenarios는 근거가 허용하는 생활 장면 1~3개이며 실제 사건처럼 쓰지 않는다. reunion_context는 궁합·결혼 모드에서 빈 문자열로 둔다.
@@ -26,7 +26,15 @@ core_summary는 선택 모드의 가장 중요한 답 1~2문장(180자 이내), 
 - relationship_status가 있으면 그 상황(썸·연애 중·짝사랑·헤어짐 등)에 맞는 장면과 행동으로 써. 연애 중인 관계에 '고백해 봐'를, 썸에 '동거·생활비'를 쓰지 마.
 - 연락이 장면에 나오면 누가 보내고 누가 받는 쪽인지 근거가 허용하는 범위에서 구분해. 근거가 없으면 방향을 지어내지 말고 '연락이 오가는 중에'처럼 써.
 
-재회 core_summary/current_stage는 사용자 관측과 계산상 다음 후보를 구분한다. 관측 state가 없으면 현실 단계는 미확인이라고 명시한다. 있으면 입력 기록임을 밝히고 그 기록의 시점(as_of)이 없으면 현재까지 유지된다고 단정하지 않는다. 후보 없음은 실제 사건이 없었다는 뜻이 아니다. observed initiator는 기록된 과거 행동일 뿐 다음 선연락 주체 근거가 아니다.
+[재회 · 읽는 사람 기준 · 최우선]
+- 재회 칸에는 계산 과정의 말을 쓰지 마: '입력된 현실 상태', '현실 상태', '계산상', '기록상', '사용자 입력', '입력되지 않음', '독립 후보', '관문', '활성 지표', '활성도', '기준 시점', '트랜짓', '회귀 차트', '접점 신호', '기류', '역학', '감정 활성', '미래 후보', '단독 후보', '후보가 없다/비어 있다', '창문', '지표'. 대신 '네가 알려준 대로 이미 한 번 만났으니', '이 기간에는', '이때'처럼 말해.
+- 각도 숫자와 오차(150도각, 0.27°, 0.40도)는 어떤 칸에도 쓰지 마. '네 화성과 상대 명왕성이 엇갈려'처럼 누구의 무엇인지와 뜻만 써.
+- '현실 조율', '관계 조율', '조율이 필요해'로 끝내지 마. 무엇을 어떻게 확인할지 행동이나 대화 한 장면으로 써.
+- 칸마다 역할이 달라. 같은 사실(이미 만났다, 봄에 만날 때가 온다)을 두 칸 이상에서 되풀이하지 마: core_summary=다시 이어질지 한 문장 답 / overview=이 기간 안에서 무엇이 어떤 순서로 열리는지 / reunion_context=지난 연락·만남이 이번 해석에서 무엇을 바꾸는지(바꾸는 게 없으면 빈 문자열) / reunion_synthesis_v2.summary=판단 근거와 다음 단계 / current_stage=지금 단계 한 문장.
+- 날짜를 여러 개 쓸 때는 이른 날짜부터 순서대로 써.
+- 사용자가 이미 만났다고 알려준 경우 meeting_gate는 '처음 만나는 조건'이 아니라 '다음 만남이 잡히기 쉬운 때와 그 만남에서 확인할 것'으로 써.
+
+재회 core_summary/current_stage는 사용자가 알려준 실제 단계와 앞으로 열리기 쉬운 다음 단계를 구분한다. 알려준 단계가 없으면 '지금 관계가 어디까지 왔는지는 아직 알 수 없어'처럼 쓴다. 있으면 '네가 알려준 대로'라고 밝히고 그 단계를 넘겨 짐작하지 않는다. 이 기간에 열리는 때가 없다는 것은 실제로 아무 일도 없었다는 뜻이 아니다. 지난번 누가 먼저 연락했는지는 지나간 사실일 뿐, 다음에 누가 먼저 연락할지의 근거가 아니다.
 `
 
 export const technical=/(?:Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|ASC|DSC|MC|IC|conjunction|sextile|square|trine|opposition|태양|달(?:과|의|이|은)\s*|수성|금성|화성|목성|토성|천왕성|해왕성|명왕성|삼각각|사각각|대립각|육십분위|사주|시너스트리|트랜짓)/i
@@ -43,6 +51,26 @@ export function claimsUnobservedMind(value: string) {
 
 export const reportStyle = /(?:한다|이다|된다|필요하다|요구된다|가능하다|뜻한다|보여준다)\./
 export const copyTypo = /(?:생활 가관|북수조점|예작|무필요)/
+// Words that belong to the calculation pipeline, not to a reading.
+export const systemJargon=/(?:입력된\s*(?:현실\s*)?(?:상태|기록)|현실\s*상태|계산상|사용자\s*입력|입력\s*기록|기록상|입력되지\s*않|독립(?:적인)?\s*(?:후보|관문)|관문|활성\s*지표|활성도|기류|역학|기준\s*시점|트랜짓|회귀\s*차트|접점\s*신호|후보\s*(?:시기|일|구간)|(?:감정|정서)\s*활성|(?:미래|단독|독립|다음)\s*후보|후보(?:가|는|도)?\s*(?:없|비어|잡히|열리|나타)|창문|지표)/
+export const orbNumber=/\d+(?:\.\d+)?\s*°|\d+\s*도각|\d+(?:\.\d+)?\s*도의\s*(?:정밀|좁은)/
+export const abstractEnding=/(?:현실(?:적인?)?\s*조율|관계\s*조율|조율이\s*(?:필요|뒷받침|가능)|현실\s*조율)/
+const bigrams=(v:string)=>{const t=v.replace(/[\s.,!?·()「」'"]+/g,'');const set=new Set<string>();for(let i=0;i<t.length-1;i++)set.add(t.slice(i,i+2));return set}
+export function overlap(a:string,b:string){const x=bigrams(a),y=bigrams(b);if(!x.size||!y.size)return 0;let n=0;for(const g of x)if(y.has(g))n++;return n/Math.min(x.size,y.size)}
+// Reunion fields that each carry one role; a later field may not restate an earlier one.
+export const REUNION_ROLE_FIELDS:[string,string][]=[
+  ['core_summary','다시 이어질지에 대한 한 문장 답'],
+  ['overview','앞으로 기간 안에서 무엇이 어떤 순서로 열리는지'],
+  ['reunion_context','지난 연락·만남 기록이 이번 해석에서 무엇을 바꾸는지'],
+  ['reunion_synthesis_v2.summary','재회 판단의 근거와 다음 단계'],
+  ['reunion_synthesis_v2.consultation_answer.current_stage','지금 어느 단계인지 한 문장'],
+]
+const at=(data:any,path:string)=>path.split('.').reduce((v:any,k)=>v?.[k],data)
+export function repeatedReunionFields(data:any){
+  const seen:string[]=[];const repeated:string[]=[]
+  for(const [path] of REUNION_ROLE_FIELDS){const v=text(at(data,path)).trim();if(!v)continue;if(seen.some(prev=>overlap(prev,v)>=0.5))repeated.push(path);seen.push(v)}
+  return repeated
+}
 
 const sajuTerms = ["갑기합","을경합","병신합","정임합","무계합","신강","신약","용신","희신","기신","배우자성","합혼점수"]
 export function unsupportedSajuTerm(value: string, source: string) {
@@ -61,7 +89,7 @@ export function hasInventedDuration(value: string) {
     .replace(/\d{4}[-./]\d{1,2}[-./]\d{1,2}(?:일)?/g,'')
     .replace(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}(?:일)?(?:\s*[~–-]\s*(?:\d{1,2}월\s*)?\d{1,2})?일?/g,'')
     .replace(/\d+(?:\.\d+)?도\s*\d+(?:\.\d+)?분/g,'')
-  const behavior=/기다[려리]|기다린|생각할 시간|(?:다시 )?(?:이야기|얘기|말)(?:하|해|를)|시간을 (?:가져|두|보장)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고|는)|혼자|보장|떨어져|멈추|미뤄|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/
+  const behavior=/기다[려리]|기다린|생각할 시간|(?:다시 )?(?:이야기|얘기|말)(?:하|해|를)|시간을 (?:가져|두|보장)|연락(?:을|하지|해|하라)|답장(?:을|해|하라)|대화(?:를|해|하라)|쉬(?:어|고|는)|혼자|보장|떨어져|멈추|미뤄|여유를\s*(?:두|가지)|답(?:변|장)하|진정(?:해|한 뒤)|거리를 (?:둬|두)|냉각/
   // Spelled-out spans ("다음 날", "하루 뒤", "한 시간") prescribe a duration as much as digits do.
   const spelled=/(?:다음\s?날|이튿날|하루(?:\s?(?:뒤|이틀|정도|쯤|만))|며칠\s?(?:뒤|후|동안)|일주일\s?(?:뒤|후|동안|정도)|(?:한|두|세)\s?시간|반나절)/
   return prose.split(/[.!?。\n]/).some(sentence =>
@@ -98,6 +126,11 @@ export function validateRelationshipEditorial(data: any, purpose: RelationshipPu
   if(styleFields.some(value=>copyTypo.test(text(value)))) return fail('korean_copy_error')
   const fieldsOfProse=proseFields(data)
   const allProse=fieldsOfProse.join('. ')
+  const readerProse=proseFields({...data,top_aspects:(data?.top_aspects??[]).map((row:any)=>row?.meaning)})
+  if(readerProse.some(v=>orbNumber.test(v)))return fail('orb_number_in_prose')
+  if(readerProse.some(v=>systemJargon.test(v)))return fail('system_jargon_in_reading')
+  if(readerProse.some(v=>abstractEnding.test(v)))return fail('abstract_adjustment_phrase')
+  if(purpose==='reunion'&&repeatedReunionFields(data).length)return fail('duplicated_reunion_message')
   if(fieldsOfProse.some(claimsUnobservedMind)) return fail('unobserved_mind_claim')
   if(fieldsOfProse.some(hasInventedDuration))return fail('invented_exact_behavior_duration')
   if(/(?:대립각\([^)]*\bsquare\b|사각각\([^)]*\bopposition\b|삼각각\([^)]*\bsextile\b|육십분위\([^)]*\btrine\b)/i.test(allProse))return fail('aspect_translation_mismatch')

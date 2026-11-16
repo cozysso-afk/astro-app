@@ -62,7 +62,7 @@ test('web routes reunion v2 into the single-author hierarchy view',()=>{
 test('reunion reading breaks long prose and exposes calculated day highlights',()=>{
   const evidence={...hierarchy,top_periods:[candidate('2027-01-09')]}
   const html=renderReunion({hierarchy:evidence})
-  assert.match(html,/다음 단계의 계산상 참고 시기[\s\S]*2027-01-09[\s\S]*만남을 살펴볼 시기/)
+  assert.match(html,/다음 단계가 열리기 쉬운 때[\s\S]*2027-01-09[\s\S]*만남을 살펴볼 시기/)
   assert.match(html,/수신 · 상대 → 나[\s\S]*발신 · 나 → 상대/)
   assert.match(html,/<details[^>]*><summary>계산 근거와 점수 보기/)
   assert.match(html,/점수는 계산 신호의 상대적 강도이며 연락·만남·재회 확률이 아니에요/)
@@ -76,7 +76,7 @@ test('reunion reading breaks long prose and exposes calculated day highlights',(
 
 test('reunion calculations show recorded status, dates and scores with technical details collapsed',()=>{
   const html=renderHierarchy({hierarchyData:{...hierarchy,top_periods:[candidate('2027-01-09')]},reunionV2:{summary:'저장한 실제 관계 상태를 먼저 살펴봐요.',consultation_answer:{next_stage_up_conditions:['만날 날짜를 약속했는지 살펴봐요.']}}})
-  const headingMarkup=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
+  const headingMarkup=['입력한 관계 기록','관계가 어디까지 왔는지','다음 단계가 열리기 쉬운 때','연락 흐름 (참고)','<summary>지난 시기와 실제 기록 비교</summary>','<summary>계산 근거와 점수 보기</summary>']
   let cursor=-1
   for(const markup of headingMarkup) {
     const next=html.indexOf(markup)
@@ -91,7 +91,7 @@ test('reunion calculations show recorded status, dates and scores with technical
   assert.match(panel,/이전 계산 저장본/)
   const legacy=renderReunion({hierarchy:null})
   assert.match(legacy,/과거 날짜를 현재나 미래의 추천 시기로 읽지 마/)
-  assert.doesNotMatch(legacy,/다음 단계의 계산상 참고 시기/)
+  assert.doesNotMatch(legacy,/다음 단계가 열리기 쉬운 때/)
   const oldDate='2023-01-01',when='2027-01-09'
   const combined=renderReunion({hierarchy:{...hierarchy,top_periods:[candidate(oldDate),candidate(when)]},
     historyHierarchy:{...hierarchy,past_windows:[candidate(oldDate)]},historyCalculated:true})
@@ -137,8 +137,8 @@ test('reunion grounding validates Gemini prose without composing or rewriting it
 })
 
 test('calculated direction axes never become a first-contact prediction',()=>{
-  assert.match(reunionReadingV4,/상대 쪽 차트의 기간 평균 활성도예요/)
-  assert.match(reunionReadingV4,/내 쪽 차트의 기간 평균 활성도예요/)
+  assert.match(reunionReadingV4,/상대 쪽에서 연락 쪽으로 움직이는 흐름의 세기예요/)
+  assert.match(reunionReadingV4,/내 쪽에서 연락 쪽으로 움직이는 흐름의 세기예요/)
   assert.match(hierarchyPanel,/실제 첫 연락자는 별도 기록으로 확인해요/)
   for(const legacy of ['상대가 먼저 연락할 흐름은 약한 편이야','내가 먼저 짧게 말을 꺼내기 좋은 편이야','재접촉의 움직임은 살아 있어','다시 대화할 여지는 열려 있지만']) {
     assert.equal(hierarchyPanel.includes(legacy),false,`legacy directional copy must stay removed: ${legacy}`)
@@ -151,7 +151,7 @@ test('all relationship modes keep distinct decision questions instead of one swa
     compatibility:['궁합 해설','서로 끌리는 지점','호감이 오가는 표현'],
     marriage_unmarried:['결혼궁합 해설','약속과 결혼의 조건','둘이 합의한 생활 조건'],
     marriage_married:['결혼생활 해설','현재 관계의 과제','둘이 합의한 생활 조건'],
-    reunion:['재회 해설','만남으로 넘어갈 조건','다음 약속의 조건'],
+    reunion:['재회 해설','다음 만남이 잡힐 때','다음 약속의 조건'],
   }
   for(const [mode,[title,label,body]] of Object.entries(expected)) {
     const doc=buildRelationshipReadingDocument(ai,mode,'')

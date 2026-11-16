@@ -16,7 +16,7 @@ function show(more={}) {
 }
 test('confirmed meeting, next-stage timing and first contact remain distinct in the reading',()=>{
   const html=show()
-  const headings=['두 사람이 실제로 다시 만났어요','관계가 어디까지 왔는지','다음 단계의 계산상 참고 시기','연락 방향 참고값','지난 시기와 실제 기록 비교']
+  const headings=['두 사람이 실제로 다시 만났어요','관계가 어디까지 왔는지','다음 단계가 열리기 쉬운 때','연락 흐름 (참고)','지난 시기와 실제 기록 비교']
   const positions=headings.map(heading=>html.indexOf(heading))
   assert.ok(positions.every((offset,i)=>offset>=0 && (!i || offset>positions[i-1])))
   assert.match(html,/실제 첫 연락<\/b> · 내가 먼저/)

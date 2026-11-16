@@ -14,7 +14,7 @@ test('calculated future windows do not copy awkward engine prose into the displa
 test('a repeated candidate range takes one slot and a distinct next date remains visible',()=>{
   const first=candidate('2027-01-12'), next=candidate('2027-01-14')
   const html=renderReunion({hierarchy:{...hierarchy,top_periods:[first,{...first},next]}})
-  const timeline=html.split('다음 단계의 계산상 참고 시기')[1].split('연락 방향 참고값')[0]
+  const timeline=html.split('다음 단계가 열리기 쉬운 때')[1].split('연락 흐름 (참고)')[0]
   assert.equal((timeline.match(/만남을 살펴볼 시기/g)||[]).length,2)
   assert.match(timeline,/2027-01-12/)
   assert.match(timeline,/2027-01-14/)

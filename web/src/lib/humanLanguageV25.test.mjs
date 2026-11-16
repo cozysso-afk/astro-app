@@ -29,7 +29,7 @@ test('hierarchy reunion shows a full human story before technical evidence',()=>
   const [story,evidence]=renderReunion({ai}).split('계산 근거와 점수 보기')
   assert.ok(evidence?.includes('연락·대화: 42'))
   for(const value of [ai.data.headline,ai.data.core_summary,ai.data.core_reason,ai.data.core_action,...Object.values(sections).map(s=>s.conclusion)]) assert.ok(story.includes(value),value)
-  assert.match(story,/연락 방향 참고값/)
+  assert.match(story,/연락 흐름 \(참고\)/)
 
 })
 
@@ -62,13 +62,13 @@ test('reunion dates are framed as candidate windows and QA labels stay minimal',
     window('in_person_meeting','2026-09-19'),
   ]}
   const html=renderReunion({hierarchy:candidateHierarchy})
-  const timeline=html.split('다음 단계의 계산상 참고 시기')[1]?.split('</section>')[0]
+  const timeline=html.split('다음 단계가 열리기 쉬운 때')[1]?.split('</section>')[0]
   assert.match(timeline,/만남을 살펴볼 시기/)
   assert.match(timeline,/2026-09-12~2026-09-16/)
   assert.match(timeline,/2026-09-17/)
   assert.match(timeline,/2026-09-18/)
   assert.doesNotMatch(timeline,/2026-09-10|2026-09-19|다시 의식하는 배경|핵심 날짜/)
-  assert.doesNotMatch(renderReunion({hierarchy:candidateHierarchy,observation:{state:'reunited',events:[]}}),/다음 단계의 계산상 참고 시기/)
+  assert.doesNotMatch(renderReunion({hierarchy:candidateHierarchy,observation:{state:'reunited',events:[]}}),/다음 단계가 열리기 쉬운 때/)
 
 })
 
