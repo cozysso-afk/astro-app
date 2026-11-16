@@ -9,7 +9,7 @@ import { planRelationshipCopyRepair, applyRelationshipCopyRepair } from "./relat
 import { unsupportedSajuTerm, CORE_KEYS, CORE_SCHEMA, EDITORIAL_INSTRUCTION, normalizeReunionObservation, validateRelationshipEditorial } from "./relationshipEditorialV1.ts";
 
 const DEFAULT_MODEL="gemini-3.6-flash",FALLBACK_MODEL="gemini-3.6-flash",VERSION="relationship-v12.8-reader-first-direction";
-const REUNION_VERSION="relationship-v14.12-reader-first-direction";
+const REUNION_VERSION="relationship-v14.13-reunion-plain-language";
 const versionForPurpose=(purpose:Purpose)=>purpose==="reunion"?REUNION_VERSION:VERSION;
 const MODELS=new Set([DEFAULT_MODEL,FALLBACK_MODEL,"gemini-3.7-flash"]);
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8"};
@@ -386,7 +386,7 @@ async function countJobs(admin:any,userId:string|null,since:string){let q=admin.
 async function rollingGuard(admin:any,userId:string){const now=Date.now();const u10=await countJobs(admin,userId,new Date(now-10*60*1000).toISOString()),u24=await countJobs(admin,userId,new Date(now-24*60*60*1000).toISOString()),g10=await countJobs(admin,null,new Date(now-10*60*1000).toISOString()),g24=await countJobs(admin,null,new Date(now-24*60*60*1000).toISOString());if(u10>=MAX_USER_NEW_JOBS_10M)return `내 계정에서 10분 동안 새 관계 해설 ${MAX_USER_NEW_JOBS_10M}건 한도에 도달했어.`;if(u24>=MAX_USER_NEW_JOBS_24H)return `내 계정에서 24시간 새 관계 해설 ${MAX_USER_NEW_JOBS_24H}건 한도에 도달했어.`;if(g10>=MAX_GLOBAL_NEW_JOBS_10M)return `전체 10분 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_10M}건 안전 한도에 도달했어.`;if(g24>=MAX_GLOBAL_NEW_JOBS_24H)return `전체 24시간 새 관계 해설 ${MAX_GLOBAL_NEW_JOBS_24H}건 안전 한도에 도달했어.`;return "";}
 
 // QA ONLY. Accepts nothing but the QA action, guarded by a token hash and a run cap.
-const QA_TOKEN_SHA256="b8481696e9279003ef0e8458c04e61148999542dc6592ee5a62a4cd2244df676",QA_USER="478b7fcb-0153-44de-acd4-5f54b80c0ee0",QA_MAX_RUNS=14;
+const QA_TOKEN_SHA256="b8481696e9279003ef0e8458c04e61148999542dc6592ee5a62a4cd2244df676",QA_USER="478b7fcb-0153-44de-acd4-5f54b80c0ee0",QA_MAX_RUNS=18;
 async function qaRelationship(req:Request){
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  const token=req.headers.get("x-qa-token")??"";if(!token||await sha(token)!==QA_TOKEN_SHA256)return new Response("forbidden",{status:403});
@@ -411,7 +411,7 @@ async function qaRelationship(req:Request){
   const link:any=await admin.auth.admin.generateLink({type:"magiclink",email:"qa-fortune-v23@astro-app.test"});const anon=createClient(SUPABASE_URL!,(Deno.env.get("SUPABASE_ANON_KEY")??"").trim(),{auth:{persistSession:false,autoRefreshToken:false}});const verified:any=await anon.auth.verifyOtp({type:"magiclink",token_hash:link?.data?.properties?.hashed_token});const access=verified?.data?.session?.access_token;if(!access)throw new Error("qa session "+JSON.stringify(verified?.error??link?.error??null).slice(0,200));
   const r=await fetch("https://astro-app-api-f7fn.onrender.com/v1/relationship/western",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+access},body:JSON.stringify(body)});
   const calc=await r.json();if(!r.ok)throw new Error("calc "+r.status+" "+JSON.stringify(calc).slice(0,300));
-  const ctx=purpose==="reunion"?(calc?.result?.reunion_transits?.directional_context??null):null;
+  const ctx=purpose==="reunion"?{...(calc?.result?.reunion_transits?.directional_context??{}),reunion_observation:b.reunion_observation??null}:null;
   const sel=selectPromptPacket(calc,ctx,purpose);
   const out:any=await calculate(sel.payload,purpose,"gemini-3.7-flash",Deno.env.get("GEMINI_API_KEY")!);
   await admin.from("ai_interpret_jobs").update({status:out.ok?"done":"failed",result_json:{purpose,status,budget:sel.budget,out:out.ok?out.data:null,error:out.ok?null:out.error_code,gemini_errors:geminiErrors},usage_json:out.usage??null,updated_at:new Date().toISOString()}).eq("id",row.id);
