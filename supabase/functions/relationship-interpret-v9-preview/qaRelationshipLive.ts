@@ -402,7 +402,7 @@ async function qaRelationship(req:Request){
  const {data:row,error}=await admin.from("ai_interpret_jobs").insert({user_id:QA_USER,kind:"qa-relationship-live",status:"running",model:"gemini-3.7-flash",result_json:{purpose,status}}).select("id").single();
  if(error)return new Response(JSON.stringify({ok:false,error:error.message}),{status:200});
  const geminiErrors:string[]=[];const realFetch=globalThis.fetch;
- globalThis.fetch=(async(input:any,init?:any)=>{const res=await realFetch(input,init);if(String(input).includes("generativelanguage")&&!res.ok&&geminiErrors.length===0){try{geminiErrors.push((await res.clone().text()).slice(0,300));
+ const drafts:string[]=[];globalThis.fetch=(async(input:any,init?:any)=>{const res=await realFetch(input,init);if(String(input).includes("generativelanguage")&&res.ok){try{const j=await res.clone().json();drafts.push(String(j?.candidates?.[0]?.content?.parts?.map((p:any)=>p.text??"").join("")??"").slice(0,30000))}catch{}}if(String(input).includes("generativelanguage")&&!res.ok&&geminiErrors.length===0){try{geminiErrors.push((await res.clone().text()).slice(0,300));
    const req=JSON.parse(String(init?.body??"{}"));const gc=req.generationConfig??{};
    const strip=(v:any,key:string):any=>Array.isArray(v)?v.map(x=>strip(x,key)):v&&typeof v==="object"?Object.fromEntries(Object.entries(v).filter(([k])=>k!==key).map(([k,x])=>[k,strip(x,key)])):v;
    const enums:string[]=[];const walk=(v:any,path:string)=>{if(Array.isArray(v))v.forEach((x,i)=>walk(x,path+"."+i));else if(v&&typeof v==="object"){if(Array.isArray(v.enum)){const set=new Set(v.enum);enums.push(path+" n="+v.enum.length+" dup="+(set.size!==v.enum.length)+" empty="+v.enum.some((x:any)=>!String(x).length)+" minItems?")}for(const [k,x] of Object.entries(v))walk(x,path+"."+k)}};walk(gc.responseSchema,"schema");
@@ -419,7 +419,7 @@ async function qaRelationship(req:Request){
   const ctx=purpose==="reunion"?{...(calc?.result?.reunion_transits?.directional_context??{}),reunion_observation:b.reunion_observation??null}:null;
   const sel=selectPromptPacket(calc,ctx,purpose);
   const out:any=await calculate(sel.payload,purpose,"gemini-3.7-flash",Deno.env.get("GEMINI_API_KEY")!,Math.min(135000,140000-(Date.now()-qaStarted)));
-  await admin.from("ai_interpret_jobs").update({status:out.ok?"done":"failed",result_json:{purpose,status,budget:sel.budget,out:out.ok?out.data:null,error:out.ok?null:out.error_code,gemini_errors:geminiErrors},usage_json:out.usage??null,updated_at:new Date().toISOString()}).eq("id",row.id);
+  await admin.from("ai_interpret_jobs").update({status:out.ok?"done":"failed",result_json:{purpose,status,budget:sel.budget,out:out.ok?out.data:null,error:out.ok?null:out.error_code,gemini_errors:geminiErrors,drafts:out.ok?[]:drafts},usage_json:out.usage??null,updated_at:new Date().toISOString()}).eq("id",row.id);
  }catch(e){await admin.from("ai_interpret_jobs").update({status:"failed",error:String(e).slice(0,500),updated_at:new Date().toISOString()}).eq("id",row.id);}})();
  // @ts-ignore EdgeRuntime exists on Supabase
  EdgeRuntime.waitUntil(work);
