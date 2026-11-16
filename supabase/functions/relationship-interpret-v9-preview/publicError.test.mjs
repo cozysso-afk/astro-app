@@ -151,3 +151,10 @@ test('new cached readings require complete core roles; old readings are preserve
   const legacy=await h.run();assert.equal(legacy.body.ok,true);assert.equal(legacy.body.data.core_summary,undefined);
   assert.equal(legacy.body.data.overview,fixture.overview);assert.equal(h.requests.length,1);
 });
+
+test('relationship generation stays inside the edge wall-time budget',()=>{
+  assert.match(source,/RELATIONSHIP_BUDGET_MS=135000,MIN_PATCH_MS=30000/)
+  assert.match(source,/Math\.max\(5000,Math\.min\(115000,budgetMs\)\)/)
+  assert.match(source,/remain\(\)<MIN_PATCH_MS/)
+  assert.match(source,/second\.copyRepair&&calls<MAX_GEMINI_CALLS&&remain\(\)>=MIN_PATCH_MS/)
+})
