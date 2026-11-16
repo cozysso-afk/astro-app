@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {normalizeReunionObservation, validateRelationshipEditorial} from './relationshipEditorialV1.ts'
+import {normalizeReunionObservation, validateRelationshipEditorial, hasInventedDuration} from './relationshipEditorialV1.ts'
 
 // Contract fixtures, not purported real model output or proof of reading quality.
 const core=()=>({headline:'서로에게 끌리는 지점과 대화의 차이',core_summary:'핵심 답변',core_reason:'해당 판단을 만든 실제 근거',core_action:'확인할 구체적인 생활 장면',core_conditions:['생시가 없어서 하우스는 판단하지 못함'],reunion_context:''})
@@ -122,4 +122,12 @@ test('feelings framed as tendencies or things to confirm are allowed; flat claim
 test('a prescribed wait before talking again is an invented duration',()=>{
  const d=core();d.conflict_pattern='감정이 격해지면 말을 멈추고 30분 뒤에 다시 이야기하는 규칙을 세워.'
  assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration')
+})
+
+test('spelled-out and minimum waits are invented durations too; evidence dates are not',()=>{
+ for (const line of ['각자 혼자 쉬는 시간을 30분이라도 보장해줘.','일단 대화를 멈추고 감정이 가라앉은 다음 날 다시 이야기하는 게 안전해.','하루 정도 연락을 쉬어 봐.']) {
+  const d=core();d.conflict_pattern=line
+  assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration',line)
+ }
+ assert.equal(hasInventedDuration('2027년 2월 3일 전후로 대화가 다시 열리기 쉬워.'),false)
 })
