@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {normalizeReunionObservation, validateRelationshipEditorial} from './relationshipEditorialV1.ts'
+import {normalizeReunionObservation, validateRelationshipEditorial, hasInventedDuration} from './relationshipEditorialV1.ts'
 
 // Contract fixtures, not purported real model output or proof of reading quality.
 const core=()=>({headline:'서로에게 끌리는 지점과 대화의 차이',core_summary:'핵심 답변',core_reason:'해당 판단을 만든 실제 근거',core_action:'확인할 구체적인 생활 장면',core_conditions:['생시가 없어서 하우스는 판단하지 못함'],reunion_context:''})
@@ -125,4 +125,22 @@ test('a prescribed wait before talking again is an invented duration',()=>{
  const d=core();d.conflict_pattern='감정이 격해지면 말을 멈추고 30분 뒤에 다시 이야기하는 규칙을 세워.'
  assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration')
 })
->>>>>>> origin/main
+
+test('spelled-out and minimum waits are invented durations too; evidence dates are not',()=>{
+ for (const line of ['각자 혼자 쉬는 시간을 30분이라도 보장해줘.','일단 대화를 멈추고 감정이 가라앉은 다음 날 다시 이야기하는 게 안전해.','하루 정도 연락을 쉬어 봐.']) {
+  const d=core();d.conflict_pattern=line
+  assert.equal(validateRelationshipEditorial(d,'compatibility').reason,'invented_exact_behavior_duration',line)
+ }
+ assert.equal(hasInventedDuration('2027년 2월 3일 전후로 대화가 다시 열리기 쉬워.'),false)
+})
+
+test('reunion readings from the app screenshot: pipeline words, orbs, adjustment phrases and repeated roles are caught',async()=>{
+  const {systemJargon,orbNumber,abstractEnding,repeatedReunionFields}=await import('./relationshipEditorialV1.ts')
+  for (const line of ['입력된 현실 상태는 이미 실제로 대면 만남을 가졌던 단계야.','현재 연락·재접촉 자체의 독립 후보는 없어.','실제 만남을 촉발하는 유의미한 중장기 및 일별 접점 관문이 열려 있어.','사용자 입력 기록상 실제로 만난 상태이나 기준 시점은 입력되지 않음으로 확인돼.','수신과 발신 측면의 활성 지표는 모두 매우 약해.'])
+    assert.ok(systemJargon.test(line),line)
+  assert.ok(orbNumber.test('너의 출생 화성과 상대 명왕성이 150도각(0.27°)으로 긴장 관계를 형성해.'))
+  assert.ok(abstractEnding.test('긴장이 올라올 수 있어 지속적인 현실 조율이 뒷받침되어야 해.'))
+  assert.equal(systemJargon.test('네가 알려준 대로 이미 한 번 만났으니, 이번엔 그때 피했던 얘기를 꺼낼 수 있는지가 관건이야.'),false)
+  const data={core_summary:'이미 한 번 만났고 봄에 다시 마주칠 때가 와. 그때 예전 문제를 꺼낼 수 있는지가 관건이야.',overview:'이미 한 번 만났고 봄에 다시 마주칠 때가 와서 그때 예전 문제를 꺼낼 수 있는지가 관건이야.',reunion_synthesis_v2:{summary:'네 화성과 상대 수성이 부딪혀서 말다툼이 쉽게 커지니, 다음 만남에서 말투부터 확인해.'}}
+  assert.deepEqual(repeatedReunionFields(data),['overview'])
+})

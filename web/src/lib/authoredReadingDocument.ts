@@ -32,6 +32,21 @@ const sectionMap: Record<string,Array<[string,string,string,string]>> = {
   condition:[['condition','condition','컨디션','컨디션']],
 }
 // Create only the questions this calculation can address. This path never receives provider data.
+// Reunion readings carry several fields that the writer sometimes fills with
+// the same message. Show a message once: a later section whose text mostly
+// repeats an earlier block (core answer included) is left out.
+function bigramSet(value:string){const t=value.replace(/[\s.,!?·()'"]+/g,'');const set=new Set<string>();for(let i=0;i<t.length-1;i++)set.add(t.slice(i,i+2));return set}
+export function textOverlap(a:string,b:string){const x=bigramSet(a),y=bigramSet(b);if(!x.size||!y.size)return 0;let n=0;for(const g of x)if(y.has(g))n++;return n/Math.min(x.size,y.size)}
+function dropRepeatedSections(doc:AuthoredReadingDocument){
+  const seen:string[]=doc.core.map(block=>block.text)
+  doc.sections=doc.sections.filter(section=>{
+    const body=section.blocks.map(block=>block.text).join(' ').trim()
+    if(!body)return true
+    if(body.length>=40&&seen.some(prev=>textOverlap(prev,body)>=0.6))return false
+    seen.push(body);return true
+  })
+}
+
 export function calculatedPeriodQuestions(period:'week'|'month', start:string, end:string, field?:FortuneField):AuthoredReadingDocument {
   const rows=field ? (sectionMap[field.id] ?? []).filter(([, , ,topic])=>field.topics.includes(topic))
     : ['love','social','study','work','money','condition'].flatMap(key=>sectionMap[key])
@@ -212,15 +227,15 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
     const reunion=data.reunion_synthesis_v2
     if(reunion) {
       add('reunion:summary','재회 해설',reunion.summary)
-      for(const [key,label] of [['current_stage','실제 관계 상태를 바탕으로 보면'],['contact_type_if_any','연락이 있다면 그 성격'],['initiative','연락의 방향'],['continuity','대화의 지속'],['meeting_gate','만남으로 넘어갈 조건'],['rebuild_gate','관계를 다시 만들 조건'],['behavior_change_evidence','달라진 행동의 확인']] as const)add(`consultation:${key}`,label,reunion.consultation_answer?.[key])
+      for(const [key,label] of [['current_stage','실제 관계 상태를 바탕으로 보면'],['contact_type_if_any','연락이 있다면 그 성격'],['initiative','연락의 방향'],['continuity','대화의 지속'],['meeting_gate','다음 만남이 잡힐 때'],['rebuild_gate','관계를 다시 만들 조건'],['behavior_change_evidence','달라진 행동의 확인']] as const)add(`consultation:${key}`,label,reunion.consultation_answer?.[key])
       for(const [key,label] of [['complete_cutoff','완전히 단절된 경우'],['no_contact','연락이 없는 경우'],['occasional_contact','가끔 연락하는 경우'],['meeting_again','다시 만나고 있는 경우'],['ambiguous_relationship','관계가 아직 정해지지 않은 경우']] as const) {
         const application = reunion.consultation_answer?.contextual_application?.[key]
         if(text(application)) add(`consultation:context:${key}`,label,application)
       }
       for(const [key,label] of [['next_stage_up_conditions','다음 단계의 확인점'],['down_conditions','멈추거나 다시 볼 조건'],['repeat_risks','반복 위험']] as const)(reunion.consultation_answer?.[key]??[]).forEach((value,i)=>add(`consultation:${key}:${i}`,label,value))
-      for(const [key,label] of [['why_reconnect','다시 연결될 여지'],['initiative','양쪽 차트의 활성']] as const){add(`${key}:conclusion`,label,reunion[key]?.conclusion);add(`${key}:interpretation`,`${label}의 이유`,reunion[key]?.interpretation)}
-      add('timing:conclusion','계산상 시기',reunion.timing?.conclusion)
-      ;(reunion.timing?.windows??[]).forEach((w,i)=>add(`timing:${i}`,w.period,w.meaning))
+      for(const [key,label] of [['why_reconnect','다시 연결될 여지'],['initiative','누가 먼저 움직일지']] as const){add(`${key}:conclusion`,label,reunion[key]?.conclusion);add(`${key}:interpretation`,`${label}의 이유`,reunion[key]?.interpretation)}
+      add('timing:conclusion','시기',reunion.timing?.conclusion)
+      ;[...(reunion.timing?.windows??[])].sort((a,b)=>String(a.period).localeCompare(String(b.period))).forEach((w,i)=>add(`timing:${i}`,w.period,w.meaning))
       add('rebuild:conclusion','다시 이어갈 때의 관계',reunion.rebuild?.conclusion)
       ;(reunion.rebuild?.conditions??[]).forEach((value,i)=>add(`rebuild:condition:${i}`,'관계 재구축 조건',value))
       add('repeat_risks:conclusion','반복 위험',reunion.repeat_risks?.conclusion)
@@ -231,6 +246,7 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
       for(const [key,label] of [['bottom_line','이전 저장본 핵심'],['contact_recontact','재접촉'],['emotional_reactivation','정서 재활성'],['relationship_rebuilding','관계 재구축'],['incoming_contact','상대 차트 쪽 활성'],['outgoing_contact','내 차트 쪽 활성'],['reconnection_windows','이전 저장본 시기'],['low_windows','주의 구간'],['relationship_filter','관계 유지 조건'],['precision_note','정밀도와 한계']] as const)add(`legacy:${key}`,label,data.reunion_reading?.[key])
     }
   } else for(const [key,label] of [['chemistry','서로 끌리는 지점'],['emotional_dynamic','감정을 주고받는 방식'],['communication','소통 방식'],['conflict_pattern','반복 갈등'],['power_boundaries','관계의 경계'],['long_term','오래 이어가는 조건'],['stability','관계의 안정'],['tensions','긴장과 차이'],['timing','선택 기간의 시기']] as const)add(key,label,data[key])
+  if(mode==='reunion')dropRepeatedSections(doc)
   ;(data.practical_advice??[]).forEach((value,i)=>add(`advice:${i}`,'현실에서 확인할 점',value))
   ;(data.felt_scenarios??[]).forEach((value,i)=>add(`scene:${i}`,'생활 장면',value))
   ;(data.top_aspects??[]).forEach((value,i)=>add(`aspect:${i}`,value.label,value.meaning))

@@ -17,7 +17,7 @@ test('three future contact candidates remain accessible and past dates are limit
     historyCalculated:true,
     observation:{state:'disconnected', initiator:'', events:[]},
   })
-  const dates = html.match(/다음 단계의 계산상 참고 시기([\s\S]*?)<\/section>/)?.[1]
+  const dates = html.match(/다음 단계가 열리기 쉬운 때([\s\S]*?)<\/section>/)?.[1]
   assert.ok(dates)
   for (const date of future) assert.ok(dates.includes(date), date)
   assert.doesNotMatch(dates,/2026-09-03/)

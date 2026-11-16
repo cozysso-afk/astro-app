@@ -107,11 +107,11 @@ export function ReunionHierarchyPanel({ hierarchyData, historyHierarchyData, his
         </ol>
       </section>
       {readingV4.futureWindows.length > 0 ? <section className="reunion-v5-section reunion-v4-future-windows">
-        <h4>다음 단계의 계산상 참고 시기</h4>
+        <h4>다음 단계가 열리기 쉬운 때</h4>
         <ReadingTimeline events={readingV4.futureWindows.map(row=>({date:row.date,kind:row.stage==='relationship_rebuilding'?'rebuilding':row.stage==='contact_recontact'?'incoming':'reconnection',label:row.label,status:'주목'}))} context={{now:new Date(hierarchyData.as_of_date+'T12:00:00+09:00')}}/>
       </section> : null}
       <section className="reunion-v5-section reunion-v4-directions-section">
-        <h4>연락 방향 참고값</h4>
+        <h4>연락 흐름 (참고)</h4>
         <div className="reunion-v5-directions">
           {readingV4.directions.map(row=><article key={row.key}><div className="reunion-v4-direction-head"><b>{row.label}</b><strong>{row.metric}{row.score != null ? ` · ${row.score}점` : ''}</strong></div><p>{row.meaning}</p></article>)}
         </div>

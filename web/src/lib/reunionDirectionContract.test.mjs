@@ -5,7 +5,7 @@ import { timing } from './readingExperience.fixtures.mjs'
 
 test('direction scores remain visible and independent of the contact-stage score',()=>{
   const html=renderReunion()
-  const section=html.split('<h4>연락 방향 참고값</h4>')[1].split('</section>')[0]
+  const section=html.split('<h4>연락 흐름 (참고)</h4>')[1].split('</section>')[0]
   assert.match(section,/수신 · 상대 → 나<\/b><strong>약함 · 30점/)
   assert.match(section,/발신 · 나 → 상대<\/b><strong>강함 · 70점/)
   assert.match(html,/연락·대화: 42/)

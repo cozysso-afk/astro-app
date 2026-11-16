@@ -35,7 +35,7 @@ test('contact, meeting and agreement each confirm only their supplied facts; the
     assert.ok(hasState(html,axis,'observed'))
     assert.equal((html.match(/data-stage-state="observed"/g)??[]).length,1)
     assert.equal(hasState(html,'과거 관계가 다시 떠오름','observed'),false)
-    if(window) assert.ok(html.includes(window));else assert.ok(!html.includes('다음 단계의 계산상 참고 시기'))
+    if(window) assert.ok(html.includes(window));else assert.ok(!html.includes('다음 단계가 열리기 쉬운 때'))
   }
 })
 test('a calculated timing signal does not assert a contact event or event probability',()=>{
@@ -46,7 +46,7 @@ test('a calculated timing signal does not assert a contact event or event probab
   assert.match(html,/다시 연락할 여건/)
   const undated=render('',[],{hierarchy:{...hierarchy,top_periods:[]}})
   assert.ok(hasState(undated,'연락이 닿음','undated_signal'))
-  assert.doesNotMatch(undated,/다음 단계의 계산상 참고 시기/)
+  assert.doesNotMatch(undated,/다음 단계가 열리기 쉬운 때/)
 })
 test('dated history, future plans and the current relationship remain distinct even without an AI manuscript',()=>{
   const events=[dateEvent('meeting','2025-11-08'),dateEvent('rebuilding','2099-12-25'),dateEvent('recontact','2025-02-30')]
