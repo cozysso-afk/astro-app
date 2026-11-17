@@ -116,7 +116,7 @@ function systemFieldSections(system:ReadingSystem,data:FortuneData,field:Fortune
   }
   // v23.26 introduced the provider-only projection. Older topic_analysis can
   // contain locally written defaults even when the job itself used Gemini.
-  if (/^supabase-ai-v23\.(?:26-question-evidence|27-field-readings|28-period-scope)$/.test(version)) {
+  if (/^supabase-ai-v23\.(?:26-question-evidence|27-field-readings|28-period-scope|29-period-scope)$/.test(version)) {
     for(const topic of field.topics) {
       const row=data.topic_analysis?.[topic]
       if(!row || !ownRefs(row.evidence_refs) || !text(row.verdict) || sections.some(s=>s.blocks.some(b=>b.text===text(row.verdict))))continue
