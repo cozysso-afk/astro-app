@@ -158,7 +158,7 @@ test('period provider rejects role-specific hero, invented symptoms, and generic
   const report=inspectPeriodProviderDocument(base,'month',{})
   assert.ok(report.issues.some(issue=>issue.code==='period_hero_role_assumption'))
   assert.ok(report.issues.some(issue=>issue.code==='period_unobserved_event_or_span'&&issue.path==='clusters.0.real_scene'))
-  assert.ok(report.issues.some(issue=>issue.code==='period_generic_repetition'))
+  assert.ok(!report.issues.some(issue=>issue.code==='period_generic_repetition'),'word counts are audited, not blocking')
 })
 
 

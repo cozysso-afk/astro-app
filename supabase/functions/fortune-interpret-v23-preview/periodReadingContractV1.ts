@@ -281,7 +281,9 @@ export function inspectPeriodProviderDocument(core:any,kind:unknown,payload?:any
   // Reader-first cards are two to three times longer; scale the allowance
   // (about one use per 700 characters, never fewer than three).
   const repetitionLimit=Math.max(3,Math.floor(readerCopy.length/700))
-  if(repeatedTerms.some(term=>(readerCopy.match(new RegExp(term,'g'))??[] ).length>repetitionLimit))issues.push({code:'period_generic_repetition',path:'root'})
+  // Word counts are reported by the reader audit; they no longer fail a reading
+  // the reader would otherwise not receive at all.
+  void repeatedTerms; void repetitionLimit
   for(const row of rows.filter((value:any)=>value?.applicability!=='insufficient')){
     const readerLead=[row?.conclusion,row?.action,text(row?.applies_when)||sceneText(row).split(/[.!?。]/)[0]].map(text).join(' ')
     if(technical.test(readerLead))issues.push({code:'period_section_not_plain_language',path:`clusters.${String(row?.key??'unknown')}`})
@@ -368,13 +370,17 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
   const required=new Set<string>(packet?requiredKeys(packet):PERIOD_PRIMARY_KEYS)
   const next=structuredClone(core)
   const isolated:string[]=[]
-  const dropPriorities=new Set<number>(),dropDecisions=new Set<number>(),dropAnswers=new Set<number>()
+  const dropPriorities=new Set<number>(),dropDecisions=new Set<number>(),dropAnswers=new Set<number>(),dropFields=new Set<number>(),dropPhases=new Set<number>()
   for(const issue of report.issues){
     const path=String(issue.path??'')
     let m:RegExpExecArray|null
     if((m=/^priorities\.(\d+)$/.exec(path))){dropPriorities.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^decisions\.(\d+)\./.exec(path))){dropDecisions.add(Number(m[1]));isolated.push(path);continue}
     if((m=/^domain_answers\.(\d+)\./.exec(path))){dropAnswers.add(Number(m[1]));isolated.push(path);continue}
+    // System field readings and annual phases are optional cards: one card that
+    // breaks a rule is dropped instead of failing the whole reading.
+    if((m=/^system_field_readings\.(\d+)\./.exec(path))){dropFields.add(Number(m[1]));isolated.push(path);continue}
+    if((m=/^year_phases[.\[](\d+)/.exec(path))){dropPhases.add(Number(m[1]));isolated.push(path);continue}
     // A contact axis with references but no text, or text without its own
     // evidence, is cleared together with its references.
     if((issue.code==='empty_contact_axis_with_references'||issue.code==='contact_axis_without_own_period_evidence')&&(m=/^contact_flow\.([a-z_]+)$/.exec(path))){
@@ -403,6 +409,8 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
   if(Array.isArray(next.priorities))next.priorities=next.priorities.filter((_:unknown,i:number)=>!dropPriorities.has(i))
   if(Array.isArray(next.decisions))next.decisions=next.decisions.filter((_:unknown,i:number)=>!dropDecisions.has(i))
   if(Array.isArray(next.domain_answers))next.domain_answers=next.domain_answers.filter((_:unknown,i:number)=>!dropAnswers.has(i))
+  if(Array.isArray(next.system_field_readings))next.system_field_readings=next.system_field_readings.filter((_:unknown,i:number)=>!dropFields.has(i))
+  if(Array.isArray(next.year_phases))next.year_phases=next.year_phases.filter((_:unknown,i:number)=>!dropPhases.has(i))
   return {core:next,isolated:[...new Set(isolated)]}
 }
 

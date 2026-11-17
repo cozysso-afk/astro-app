@@ -82,7 +82,7 @@ export function validSystemFieldReadings(value:any,sources:SystemFieldSource[]){
     const matches=value.filter(row=>row?.system===source.system && row?.topic===source.topic)
     if(matches.length!==1)continue
     const row=matches[0],reading=typeof row.reading==='string'?row.reading.trim():''
-    if(!reading || reading.length>600 || isDefinitionOnlyReading(reading) || !Array.isArray(row.evidence_refs) || row.evidence_refs.length!==1 || row.evidence_refs[0]!==source.evidence_ref)continue
+    if(!reading || reading.length>600 || isDefinitionOnlyReading(reading) || /표본|근거가 부족|근거 부족|데이터|보장하지|계산되지|evidence/i.test(reading) || !Array.isArray(row.evidence_refs) || row.evidence_refs.length!==1 || row.evidence_refs[0]!==source.evidence_ref)continue
     if(source.system==='thai' && !inspectThaiOutputSafety({systems:{thai:reading}},true).safe)continue
     if(value.some(other=>other!==row && other?.reading?.trim?.()===reading))continue
     result.push({system:source.system,topic:source.topic,reading,evidence_refs:[source.evidence_ref]})
