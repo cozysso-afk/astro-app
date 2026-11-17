@@ -21,13 +21,15 @@ const narrativeSource=readFileSync(new URL('../../../web/src/PeriodFortuneNarrat
 test('C1 domain answer contracts cover distinct user questions instead of one generic editorial slot',()=>{
   assert.equal(DOMAIN_ANSWER_CONTRACT_VERSION,'domain-answer-contracts-v1')
   assert.deepEqual(DOMAIN_ANSWER_CONTRACTS.map(row=>row.topic),[
-    '직장','이직','학업','시험','금전','소식','연애','연락','재회','컨디션',
+    '직장','이직','학업','시험','금전','금전','대인관계','소식','연애','연락','재회','컨디션',
   ])
-  assert.equal(DOMAIN_ANSWER_KEYS.length,30)
-  assert.equal(new Set(DOMAIN_ANSWER_KEYS.map(row=>`${row.topic}::${row.question_key}`)).size,30)
+  // 금전 and 대인관계 are split by the reader's real situations.
+  assert.deepEqual(DOMAIN_ANSWER_KEYS.filter(row=>row.topic==='금전').map(row=>row.label),['급여 · 고정 수입','창작 · 부수입','지출','계약 · 회수','시기','투자 · 심리'])
+  assert.deepEqual(DOMAIN_ANSWER_KEYS.filter(row=>row.topic==='대인관계').map(row=>row.label),['상사 · 윗사람','동료','친구 · 지인','가족 · 가까운 사람','시기'])
+  assert.equal(new Set(DOMAIN_ANSWER_KEYS.map(row=>`${row.topic}::${row.question_key}`)).size,DOMAIN_ANSWER_KEYS.length)
   for(const contract of DOMAIN_ANSWER_CONTRACTS){
-    assert.equal(contract.questions.length,3,contract.topic)
-    assert.equal(new Set(contract.questions.map(row=>row.key)).size,3,contract.topic)
+    assert.ok(contract.questions.length>=1,contract.topic)
+    assert.equal(new Set(contract.questions.map(row=>row.key)).size,contract.questions.length,contract.topic)
   }
 })
 
@@ -51,7 +53,7 @@ test('C3 provider normalization preserves grounded answers and fills missing que
       {topic:'시험',question_key:'performance_error',label:'수행',answer:'근거가 없지만 답함',status:'not_calculated',evidence_refs:['W:exam']},
     ],
   })
-  assert.equal(normalized.domain_answers.length,30)
+  assert.equal(normalized.domain_answers.length,DOMAIN_ANSWER_KEYS.length)
   const work=normalized.domain_answers.find(row=>row.topic==='직장'&&row.question_key==='progress')
   assert.equal(work.label,'업무 진행')
   assert.equal(work.answer,'마감 전 처리 속도가 상대적으로 살아 있어.')
@@ -68,11 +70,11 @@ test('C4 malformed authored answer is isolated to its question instead of poison
   const normalized=normalizeProviderCore({
     clusters:[],
     domain_answers:[
-      {topic:'금전',question_key:'inflow_outflow',label:'유입 · 유출',answer:'',status:'direct',evidence_refs:['W:money']},
+      {topic:'금전',question_key:'spending',label:'유입 · 유출',answer:'',status:'direct',evidence_refs:['W:money']},
       {topic:'금전',question_key:'timing',label:'시기',answer:'월말 쪽 변동이 상대적으로 커.',status:'partial',evidence_refs:['W:money:date']},
     ],
   })
-  const bad=normalized.domain_answers.find(row=>row.topic==='금전'&&row.question_key==='inflow_outflow')
+  const bad=normalized.domain_answers.find(row=>row.topic==='금전'&&row.question_key==='spending')
   const good=normalized.domain_answers.find(row=>row.topic==='금전'&&row.question_key==='timing')
   assert.equal(bad.status,'not_calculated')
   assert.equal(good.status,'partial')

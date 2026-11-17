@@ -48,9 +48,28 @@ export const DOMAIN_ANSWER_CONTRACTS: DomainAnswerContract[] = [
   {
     topic:'금전', section_key:'money_news.money',
     questions:[
-      {key:'inflow_outflow',label:'유입 · 유출',scope:'돈의 유입과 지출 압력을 구분할 직접 근거가 있을 때만 답한다. 수익을 만들어내지 않는다.'},
+      {key:'salary_fixed',label:'급여 · 고정 수입',scope:'월급·고정 수입·정기 지출처럼 매달 반복되는 돈의 안정성. 인상·보너스를 만들어내지 않는다.'},
+      {key:'side_income',label:'창작 · 부수입',scope:'본업 밖의 활동(창작·부업·판매)으로 들어오는 돈과 그 시도의 흐름. 수익 금액을 만들지 않는다.'},
+      {key:'spending',label:'지출',scope:'쓰고 싶은 마음과 실제 지출 압력을 구분한다. 청구서·사건을 만들지 않는다.'},
       {key:'contract_recovery',label:'계약 · 회수',scope:'계약·정산·회수에 직접 연결되는 근거가 없으면 미계산으로 둔다.'},
       {key:'timing',label:'시기',scope:'금전 관련 변화가 상대적으로 두드러지는 시기만 말한다.'},
+    ],
+  },
+  {
+    // Shown on the 금전 screen; answered only from investment evidence.
+    topic:'금전', section_key:'investment.psychology',
+    questions:[
+      {key:'investment_mind',label:'투자 · 심리',scope:'투자 판단을 흔드는 조급함·확신·두려움 같은 마음의 흐름. 종목·수익·매수매도 시점을 지시하지 않는다.'},
+    ],
+  },
+  {
+    topic:'대인관계', section_key:'relationship.summary',
+    questions:[
+      {key:'superiors',label:'상사 · 윗사람',scope:'평가·지시·기준을 가진 윗사람과의 관계에서 수월한 점과 부딪히는 점. 특정 인물·사건을 만들지 않는다.'},
+      {key:'peers',label:'동료',scope:'비슷한 위치에서 일을 나누는 사람과의 협력·경쟁. 직장을 가정하지 말고 함께 일하는 사람으로 말한다.'},
+      {key:'friends',label:'친구 · 지인',scope:'사적인 모임·약속·연락에서의 분위기와 거리감.'},
+      {key:'family',label:'가족 · 가까운 사람',scope:'집과 가족, 오래된 가까운 사람과의 기대와 책임. 가족 구성을 가정하지 않는다.'},
+      {key:'timing',label:'시기',scope:'대인관계 근거가 상대적으로 두드러지는 기간만 말한다.'},
     ],
   },
   {
