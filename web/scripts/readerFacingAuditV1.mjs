@@ -63,7 +63,10 @@ export function auditReaderFacing(data, { kind } = {}) {
   for (const system of ['saju', 'thai']) {
     const own = fields.filter(row => row?.system === system)
     const missing = FIELD_TOPICS.filter(topic => !own.some(row => row?.topic === topic && text(row?.reading)))
-    if (missing.length) add('SYSTEM_FIELD_MISSING', 'error', { system, topics: missing })
+    // A single day's Thai reading has one active place (the weekday taksa);
+    // the screen says so for the other fields.
+    const dayThai = kind === 'day' && system === 'thai'
+    if (dayThai ? !own.length : missing.length) add('SYSTEM_FIELD_MISSING', 'error', { system, topics: missing })
     own.forEach(row => { if (isDefinitionOnly(row.reading)) add('SYSTEM_FIELD_DEFINITION_ONLY', 'error', { system, topic: row.topic }) })
     if ((kind === 'month' || kind === 'annual') && own.some(row => (row?.evidence_refs ?? []).some(ref => /^S:daily:/.test(ref))))
       add('LONG_PERIOD_FROM_ONE_DAY_PILLAR', 'error', { system })
@@ -78,12 +81,13 @@ export function auditReaderFacing(data, { kind } = {}) {
   }
   if (kind === 'month' && /(?:일진|경진|기묘|임오|갑신)\s*일진/.test(text(data.systems?.saju))) add('MONTH_FROM_ONE_DAY_PILLAR', 'error')
 
-  // Unanswered questions are hidden from the reader, but a long reading that
-  // answers almost none of them is empty in practice.
+  // Unanswered questions are hidden from the reader. What matters is that each
+  // reader field gets at least one answered question in a month or a year.
   const answers = Array.isArray(data.domain_answers) ? data.domain_answers : []
   if ((kind === 'month' || kind === 'annual') && answers.length) {
-    const open = answers.filter(row => row?.status === 'not_calculated' || !text(row?.answer)).length
-    if (open / answers.length > 0.5) add('QUESTIONS_MOSTLY_UNANSWERED', 'error', { unanswered: open, total: answers.length })
+    const answered = new Set(answers.filter(row => row?.status !== 'not_calculated' && text(row?.answer)).map(row => row.topic))
+    const empty = FIELD_TOPICS.filter(topic => answers.some(row => row?.topic === topic) && !answered.has(topic))
+    if (empty.length) add('FIELD_QUESTIONS_UNANSWERED', 'error', { topics: empty })
   }
   const investment = data.investment_reading
   if (investment && typeof investment === 'object' && !Object.values(investment).some(text)) add('INVESTMENT_EMPTY', 'warning')

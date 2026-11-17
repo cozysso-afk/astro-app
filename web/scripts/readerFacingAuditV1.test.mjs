@@ -19,7 +19,7 @@ test('the 2026-11-17 annual reading fails for the reasons the reader saw', () =>
   }
   const found = codes(data, 'annual')
   for (const code of ['READER_INTERNAL_WORDING', 'SYSTEM_FIELD_MISSING', 'SYSTEM_FIELD_DEFINITION_ONLY', 'LONG_PERIOD_FROM_ONE_DAY_PILLAR',
-    'ANNUAL_FROM_FAST_PLANET', 'ANNUAL_WITHOUT_PHASES', 'QUESTIONS_MOSTLY_UNANSWERED', 'INVESTMENT_EMPTY']) assert.ok(found.includes(code), code)
+    'ANNUAL_FROM_FAST_PLANET', 'ANNUAL_WITHOUT_PHASES', 'FIELD_QUESTIONS_UNANSWERED', 'INVESTMENT_EMPTY']) assert.ok(found.includes(code), code)
 })
 
 test('a period-sized, written reading passes', () => {

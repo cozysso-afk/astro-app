@@ -328,7 +328,10 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   // averages, 세운/월운 and the Taksajorn wheel. Daily samples come after.
   const longPeriod=payload?.period_kind==="annual"||payload?.period_kind==="month";
   const periodScopes=new Set(["slow_transit_span","annual_segment","monthly_segment","taksajorn_context","month_average"]);
-  if(longPeriod)for(const row of payload?.evidence_ledger??[])if(periodScopes.has(String(row?.scope)))allowed.add(String(row?.id??""));
+  // Month averages: only the six reader fields (12 months x 14 topics would
+  // crowd every other row out of the prompt ledger).
+  const readerFields=new Set(["연애","대인관계","학업","직장","금전","컨디션"]);
+  if(longPeriod)for(const row of payload?.evidence_ledger??[])if(periodScopes.has(String(row?.scope))&&(row?.scope!=="month_average"||readerFields.has(String(row?.topic))))allowed.add(String(row?.id??""));
   const rows=(Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).filter((row:any)=>allowed.has(String(row?.id??"")));
   const ordered=[...rows].sort((a:any,b:any)=>{
     const p=(row:any)=>longPeriod&&(row?.scope==="slow_transit_span"||row?.scope==="month_average")?-1:String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
