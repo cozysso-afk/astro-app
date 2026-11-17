@@ -8,6 +8,7 @@ import { estimatedGeminiJobKrw, buildPromptPacket, promptBudget } from '../fortu
 import { buildPeriodNarrativeContext, buildPeriodNarrativeInstruction, PERIOD_NARRATIVE_VERSION } from './periodNarrativeV23.ts'
 import { DAILY_EDITORIAL_INSTRUCTION, dailyEditorialBrief, dailyReaderPacket, loveStatusInstruction, normalizeUserContext, periodLoveStatusInstruction } from './dailyEditorialV1.ts'
 import { DOMAIN_ANSWER_CONTRACTS, DOMAIN_ANSWER_CONTRACT_VERSION } from './domainAnswerContractsV1.ts'
+const compactDomainAnswerContracts=()=>DOMAIN_ANSWER_CONTRACTS.map(c=>({topic:c.topic,section_key:c.section_key,questions:c.questions.map(q=>({key:q.key,label:q.label}))}))
 
 export const V23_PROMPT_VERSION = 'fortune-ai-prompt-v23.20-period-reader-first'
 const enc = new TextEncoder()
@@ -171,9 +172,9 @@ export function buildV23PromptPacket(payload:any) {
   if(systemSources.length)packet.system_field_sources=systemSources
   packet.narrative_plan=buildNarrativePlan(packet)
   if(packet.period_kind==='annual'){
-    // Annual inputs are the largest. The instruction already carries these
-    // policies, so omit duplicated contract prose rather than dropping facts.
-    delete packet.domain_answer_contracts
+    // Annual inputs are the largest. Keep the question list in its short form
+    // (topic, key, label) so the reader's question cards can still be answered.
+    packet.domain_answer_contracts=compactDomainAnswerContracts()
     if(packet.period_narrative){
       delete packet.period_narrative.required_sequence
       delete packet.period_narrative.evidence_priority
@@ -234,7 +235,7 @@ function fitPeriodPacket(packet:any){
     pr.omission_reason='bounded_prompt_selection'
     pr.questions=(pr.questions??[]).map((q:any)=>({...q,evidence_refs:(q.evidence_refs??[]).filter((id:string)=>!removed.has(id))}))
   }
-  if(monthlyBytes(packet)>MONTHLY_PACKET_TARGET_BYTES)delete packet.domain_answer_contracts
+  if(monthlyBytes(packet)>MONTHLY_PACKET_TARGET_BYTES)packet.domain_answer_contracts=compactDomainAnswerContracts()
 }
 
 // The server keeps the complete selection audit. Every included row already

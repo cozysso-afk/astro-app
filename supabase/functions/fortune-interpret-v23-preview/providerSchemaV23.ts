@@ -178,6 +178,9 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       item.required=["key","conclusion","applies_when","evidence_meaning","action","change_condition","evidence_refs","applicability"];
       const {clusters,headline,overall,...rest}=core.properties;
       core.properties={clusters,overall,headline,...rest};
+      // The two most frequent reasons a whole reading is thrown away: a headline
+      // that names planets, and one that assumes the reader's job or studies.
+      core.properties.headline={...core.properties.headline,description:"분야를 다 쓴 뒤 마지막에 쓰는 한 문장(25~60자). 생활 장면만 써: 사람·돈·말·약속·일정. 금지: 별·행성·각 이름(목성, 토성, 수성, 달 등), 기류·에너지·작용, 업무·실무·직장·학업·시험·공부·이직·출근·퇴근. 금지어가 하나라도 있으면 전체 해설이 버려져."};
       core.propertyOrdering=Object.keys(core.properties);
     }
     if(kind==="day"){
@@ -192,7 +195,7 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       core.properties={clusters,editorial_focus:focus,overall,headline,...rest};
       core.required=[...core.required,"editorial_focus"];
       core.propertyOrdering=Object.keys(core.properties);
-      core.properties.headline.description="분야별 해석과 editorial_focus를 작성한 뒤, 구체적 대상에 대한 판단 하나를 짧은 한국어 한 문장으로 써. 이유·행동·제한을 전부 압축하지 마.";
+      core.properties.headline.description="분야별 해석과 editorial_focus를 작성한 뒤, 구체적 대상에 대한 판단 하나를 짧은 한국어 한 문장으로 써. 이유·행동·제한을 전부 압축하지 마. 분야 이름(학업·공부·시험·직장·업무·실무·이직·투자·매수·매도·연애·재회·금전·컨디션)과 별 이름은 쓰지 마. 누구에게나 해당하는 말·사람·돈·일정의 장면으로 써.";
       core.properties.overall.properties.summary.description="focus를 먼저 설명하고 근거가 다른 기본 분야가 있으면 그 분야와 무엇이 다른지 두 문장으로 설명해. 각 판단은 해당 분야 원고에서 직접 인용한 근거를 overall.evidence_refs에 담아.";
     }
   }
@@ -203,7 +206,7 @@ export function normalizeProviderCore(core:any){
   if(!core||typeof core!=="object"||Array.isArray(core))return core;
   // "함께 알아둘 점" is shown to the reader. A disclaimer about samples, data
   // or guarantees is internal bookkeeping, so it is left out rather than shown.
-  if(typeof core.limits==="string"&&/표본|근거|데이터|계산|보장|제공된|바탕으로|경향|대신하지|참고용|evidence/i.test(core.limits))core={...core,limits:""};
+  if(typeof core.limits==="string"&&/표본|근거|데이터|계산|보장|제공된|바탕으로|경향|대신하지|참고|측정|일부\s*시점|단정|확정|evidence/i.test(core.limits))core={...core,limits:""};
   const rows=Array.isArray(core.clusters)?core.clusters:[];
   const groups:any={relationship:{},work_study:{},money_news:{},investment:{},condition:{}};
   const seen=new Set<string>();
