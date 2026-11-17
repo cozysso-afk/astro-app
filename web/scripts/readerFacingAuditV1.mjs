@@ -74,7 +74,7 @@ export function auditReaderFacing(data, { kind } = {}) {
     const reasons = [data.systems?.western, data.overall?.dominant_pattern,
       ...Object.values(data.clusters ?? {}).flatMap(group => Object.values(group ?? {}).map(section => section?.evidence_meaning))].map(text).filter(Boolean)
     if (reasons.some(reason => FAST.test(reason) && !SLOW.test(reason))) add('ANNUAL_FROM_FAST_PLANET', 'error')
-    if (!Array.isArray(data.year_phases) || data.year_phases.length < 3) add('ANNUAL_WITHOUT_PHASES', 'error')
+    if (!Array.isArray(data.year_phases) || data.year_phases.length < 2) add('ANNUAL_WITHOUT_PHASES', 'error')
   }
   if (kind === 'month' && /(?:일진|경진|기묘|임오|갑신)\s*일진/.test(text(data.systems?.saju))) add('MONTH_FROM_ONE_DAY_PILLAR', 'error')
 

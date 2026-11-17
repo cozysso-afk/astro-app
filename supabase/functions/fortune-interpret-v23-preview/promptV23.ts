@@ -196,7 +196,8 @@ const MONTHLY_PACKET_TARGET_BYTES=172000
 function monthlyBytes(packet:any){return enc.encode(JSON.stringify(packet.period_kind==='month'?monthlyWriterPacket(packet):packet)).byteLength}
 function fitPeriodPacket(packet:any){
   if(monthlyBytes(packet)<=MONTHLY_PACKET_TARGET_BYTES)return
-  delete packet.domain_answer_contracts
+  // The question list is what the reader's question cards are answered from;
+  // it is the last thing to go, after narrative policy and daily rows.
   if(packet.period_narrative){
     delete packet.period_narrative.required_sequence
     delete packet.period_narrative.evidence_priority
@@ -233,6 +234,7 @@ function fitPeriodPacket(packet:any){
     pr.omission_reason='bounded_prompt_selection'
     pr.questions=(pr.questions??[]).map((q:any)=>({...q,evidence_refs:(q.evidence_refs??[]).filter((id:string)=>!removed.has(id))}))
   }
+  if(monthlyBytes(packet)>MONTHLY_PACKET_TARGET_BYTES)delete packet.domain_answer_contracts
 }
 
 // The server keeps the complete selection audit. Every included row already

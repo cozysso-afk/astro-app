@@ -152,7 +152,7 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       reconnection:structuredClone(section.properties.evidence_refs),
     },required:["incoming","outgoing","reconnection"]};
     core.required.push("contact_evidence_refs");
-    core.properties.system_field_readings={type:"ARRAY",description:"system_field_sources의 모든 행(system/topic)마다 하나씩 써. 앱의 사주·태국점성술 분야 화면 본문이야. 두세 문장(90~220자) 반말: ① 이 기간에 들어온 근거를 이름과 쉬운 뜻으로(예: '올해 세운에 편관이 들어와서', '탁사쫀에서 금전을 맡는 시리 자리에 목성이 있어서') ② 그것이 그 topic의 생활에서 어떻게 드러나는지 구체적 장면 하나 ③ 그래서 해 볼 것이나 조심할 것 하나. 사전 정의만 쓰고 '~를 뜻해/상징해/나타내/의미해'로 끝내면 탈락이야. 같은 근거가 여러 topic에 쓰여도 topic마다 다른 장면을 써. fact가 월운·세운이면 하루 일진 이야기를 하지 말고 그 기간 전체로 말해. 시기를 말할 땐 '3~5월'처럼 달 이름만 쓰고 상반기·하반기·월초·월말·주 초반 같은 말은 쓰지 마. 출근·퇴근·저녁·답장처럼 기록에 없는 생활 사건도 만들지 마. 해당 행의 evidence_ref 하나만 인용해. 사건 확정·점수·확률로 바꾸지 마. sources가 없으면 빈 배열.",items:{type:"OBJECT",properties:{
+    core.properties.system_field_readings={type:"ARRAY",description:"system_field_sources의 모든 행(system/topic)마다 하나씩 써. 앱의 사주·태국점성술 분야 화면 본문이야. 두세 문장(90~220자) 반말: ① 이 기간에 들어온 근거를 이름과 쉬운 뜻으로(예: '올해 세운에 편관이 들어와서', '탁사쫀에서 금전을 맡는 시리 자리에 목성이 있어서') ② 그것이 그 topic의 생활에서 어떻게 드러나는지 구체적 장면 하나 ③ 그래서 해 볼 것이나 조심할 것 하나. 사전 정의만 쓰고 '~를 뜻해/상징해/나타내/의미해'로 끝내면 탈락이야. 같은 근거가 여러 topic에 쓰여도 topic마다 다른 장면을 써. fact가 월운·세운이면 하루 일진 이야기를 하지 말고 그 기간 전체로 말해. 시기를 말할 땐 fact에 적힌 실제 기간 안의 달 이름만 쓰고(기간을 모르면 시기를 빼), 상반기·하반기·월초·월말·주 초반 같은 말은 쓰지 마. 출근·퇴근·저녁·답장처럼 기록에 없는 생활 사건도 만들지 마. 해당 행의 evidence_ref 하나만 인용해. 사건 확정·점수·확률로 바꾸지 마. sources가 없으면 빈 배열.",items:{type:"OBJECT",properties:{
       system:{type:"STRING",enum:["saju","thai"]},topic:{type:"STRING"},reading:{type:"STRING"},evidence_refs:structuredClone(section.properties.evidence_refs),
     },required:["system","topic","reading","evidence_refs"]}};
     core.required.push("system_field_readings");
@@ -203,7 +203,7 @@ export function normalizeProviderCore(core:any){
   if(!core||typeof core!=="object"||Array.isArray(core))return core;
   // "함께 알아둘 점" is shown to the reader. A disclaimer about samples, data
   // or guarantees is internal bookkeeping, so it is left out rather than shown.
-  if(typeof core.limits==="string"&&/표본|근거|데이터|계산|보장하지|evidence/i.test(core.limits))core={...core,limits:""};
+  if(typeof core.limits==="string"&&/표본|근거|데이터|계산|보장|제공된|바탕으로|경향|대신하지|참고용|evidence/i.test(core.limits))core={...core,limits:""};
   const rows=Array.isArray(core.clusters)?core.clusters:[];
   const groups:any={relationship:{},work_study:{},money_news:{},investment:{},condition:{}};
   const seen=new Set<string>();
