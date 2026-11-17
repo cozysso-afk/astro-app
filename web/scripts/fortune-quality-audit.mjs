@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inspectInterpretationQuality } from '../../supabase/functions/fortune-interpret-v6-preview/qualityV2.ts'
+import { auditReaderFacing } from './readerFacingAuditV1.mjs'
 
 /**
  * QA-only evaluation. Never creates, repairs, or replaces user-facing prose.
@@ -193,6 +194,7 @@ function evaluateOne(row, mode) {
     }
   }
   if (mode === 'live' && data && typeof data === 'object') {
+    for (const finding of auditReaderFacing(data, { kind: period })) problems.push(finding)
     try {
       const report = inspectInterpretationQuality(data, payload, { requireDailyTimedDecision: false, allowEmptyDailyChangeCondition: true, periodReadingContract: ['week','month','annual'].includes(period) })
       for (const stage of report?.stages ?? []) {

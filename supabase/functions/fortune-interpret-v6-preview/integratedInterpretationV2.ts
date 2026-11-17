@@ -163,6 +163,46 @@ function trajectoryDigest(rows:any[],topic:string){
   return {days:values.length,mean:Math.round(mean*10)/10,min:[...values].sort((a,b)=>a.score-b.score)[0],max:[...values].sort((a,b)=>b.score-a.score)[0],volatility:Math.round(Math.sqrt(variance)*10)/10,peak_7d:peak7,low_7d:low7,largest_7d_rise:rise,largest_7d_fall:fall};
 }
 
+
+const SLOW_TRANSITS=new Set(["Jupiter","Saturn","Uranus","Neptune","Pluto"]);
+const SLOW_KO:Record<string,string>={Jupiter:"목성",Saturn:"토성",Uranus:"천왕성",Neptune:"해왕성",Pluto:"명왕성",Sun:"태양",Moon:"달",Mercury:"수성",Venus:"금성",Mars:"화성",ASC:"상승점",MC:"천정"};
+const ASPECT_KO:Record<string,string>={conjunction:"합",sextile:"육분",square:"사분",trine:"삼분",opposition:"대립"};
+export function buildSlowTransitSpans(dailyRaw:any[],kind:string):Evidence[]{
+  const byKey=new Map<string,{transit:string;aspect:string;target:string;dates:string[];weight:number;topics:Set<string>}>();
+  for(const day of dailyRaw){
+    const date=isoDate(day?.date); if(!date)continue;
+    for(const ev of Array.isArray(day?.evidence)?day.evidence:[]){
+      if(ev?.kind!=="aspect"||!SLOW_TRANSITS.has(String(ev?.transit))||!ev?.target||!ev?.aspect)continue;
+      const key=`${ev.transit}|${ev.aspect}|${ev.target}`;
+      const row=byKey.get(key)??{transit:String(ev.transit),aspect:String(ev.aspect),target:String(ev.target),dates:[],weight:0,topics:new Set<string>()};
+      if(row.dates.at(-1)!==date)row.dates.push(date);
+      row.weight+=Math.abs(num(ev?.contribution));
+      for(const t of Array.isArray(ev?.source_topics)?ev.source_topics:[])if(typeof t==="string")row.topics.add(t);
+      byKey.set(key,row);
+    }
+  }
+  const dayMs=86400000, out:Array<Evidence&{weight:number}>=[];
+  const minDays=kind==="annual"?7:3;
+  for(const row of byKey.values()){
+    let start=row.dates[0],prev=row.dates[0],count=1;
+    const flush=(end:string)=>{
+      if(count<minDays)return;
+      const t=SLOW_KO[row.transit]??row.transit,g=SLOW_KO[row.target]??row.target,a=ASPECT_KO[row.aspect]??row.aspect;
+      out.push({id:`W:span:${row.transit}-${row.aspect}-${row.target}:${start}`,system:"western",scope:"slow_transit_span",
+        source_topics:[...row.topics].sort(),direction:"context",start,end,weight:row.weight,
+        observation:{transit:row.transit,target:row.target,aspect:row.aspect},
+        text:`${start}~${end} 하늘의 ${t}이(가) 출생 ${g}과(와) ${a}각 · 느린 행성의 장기 배치 · 관련분야 ${[...row.topics].join(", ")}`} as any);
+    };
+    for(const date of row.dates.slice(1)){
+      if(Date.parse(date)-Date.parse(prev)<=5*dayMs){prev=date;count+=1;continue;}
+      flush(prev);start=date;prev=date;count=1;
+    }
+    if(start)flush(prev);
+  }
+  return out.sort((a,b)=>b.weight-a.weight).slice(0,kind==="annual"?12:6).map(({weight,...row})=>row as Evidence)
+    .sort((a:any,b:any)=>String(a.start).localeCompare(String(b.start)));
+}
+
 export function compactCalculation(calc:any){
   const w=calc?.western??{}, overall:Record<string,any>={}, rel:Record<string,any>={};
   for(const k of TOPICS){const s=compactStat(w?.overall?.[k],3);if(s)overall[k]=s;}
@@ -260,6 +300,12 @@ export function compactCalculation(calc:any){
       for(const item of [samples[0],samples.at(-1)])if(item)addDailyEvidence(item.date,item.ev,item.index);
     }
   }
+
+  // Long periods are read from slow planets. A year described by one Moon or
+  // Mercury contact is wrong in kind, so annual and monthly packets carry the
+  // dated spans in which each slow transit is actually in orb.
+  const slowSpans=calculationPeriodKind==="annual"||calculationPeriodKind==="month"?buildSlowTransitSpans(dailyRaw,calculationPeriodKind):[];
+  for(const span of slowSpans)addEvidence(span);
 
   const detailRaw=Array.isArray(w?.detail_days)?w.detail_days:[];
   const detail=detailRaw.slice(0,18).map((d:any)=>({date:d?.date,market_status:d?.market_open?"KRX(한국거래소) 거래일":"KRX(한국거래소) 휴장일",topics:Object.fromEntries(Object.entries(d?.topics??{}).map(([k,x]:any)=>[k,{best_window:x?.best_window??null,caution_window:x?.caution_window??null,evidence:Array.isArray(x?.evidence)?x.evidence.slice(0,6):[]}]))}));

@@ -133,15 +133,13 @@ test('a verified single system passage exports once while unverified and calcula
   assert.deepEqual(exporter.authoredReadingExportModel(doc).sections[0].cards.map(c=>c.body),[block.text])
   for(const state of ['calculated','unverified','missing','partial'])assert.throws(()=>exporter.authoredReadingExportModel({...doc,state}))
 })
-test('missing questions keep all labels in one collapsed list after available authored details',()=>{
+test('unwritten and weak questions are not listed to the reader',()=>{
   const data=fixture();delete data.clusters.relationship.contact_activation
   data.domain_answers.push({topic:'소식',question_key:'time',label:'시기',answer:'',status:'not_calculated',evidence_refs:[]},{topic:'연락',question_key:'time',label:'시기',answer:'',status:'not_calculated',evidence_refs:[]})
   const doc=documents.buildPeriodReadingDocument(data,'month','a','b',fields.fortuneField('contact'),true)
   const html=renderToStaticMarkup(createElement(Panel,{doc}))
-  assert.match(html,/<details class="authored-reading-coverage"><summary>아직 작성되지 않은 항목 1개/)
-  assert.match(html,/<details class="authored-reading-coverage"><summary>근거가 부족한 항목 2개/)
-  assert.ok(html.includes('소식 · 시기'));assert.ok(html.includes('연락 · 시기'));assert.ok(html.includes('연락 흐름'))
-  assert.ok(html.indexOf('data-reading-section="relationship.contact_continuity"')<html.indexOf('authored-reading-coverage'))
+  assert.doesNotMatch(html,/authored-reading-coverage|아직 작성되지 않은 항목|근거가 부족한 항목|이 저장본에는/)
+  assert.ok(html.includes('data-reading-section="relationship.contact_continuity"'))
   assert.doesNotMatch(html,/이 질문의 해설은 아직 작성되지 않았어/)
 })
 
@@ -155,8 +153,8 @@ test('daily love exposes contact and reunion without opening generic details', a
     data, date:'2026-11-04', field:fields.fortuneGroup('애정'), verified:true,
   }))
   assert.match(html, /data-daily-slot="relationship.contact_activation" data-slot-state="ready"><summary>연락운<\/summary>/)
-  assert.match(html, /data-daily-slot="relationship.contact_continuity" data-slot-state="missing"/)
-  assert.match(html, /data-daily-slot="relationship.love_reunion_interest" data-slot-state="insufficient"><summary>재회<\/summary><p>이 상황을 판단할 근거가 부족해/)
+  assert.doesNotMatch(html, /data-daily-slot="relationship.contact_continuity" data-slot-state="missing"/)
+  assert.doesNotMatch(html, /판단할 근거가 부족해|아직 작성되지 않았어|이 항목의 해설이 없어/)
   assert.equal(html.split('data-daily-detail="relationship.contact_activation:conclusion"').length, 2)
 })
 

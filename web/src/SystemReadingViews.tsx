@@ -90,7 +90,7 @@ export function SystemReadingViews({calculation:c,periodKey,interpretation,child
         <div data-system-manuscript={system} data-reading-field={focusedField?.id ?? 'overall'} data-reading-state={authored?.state ?? 'missing'}>
         {authored?.state==='ready' ? <AuthoredReadingPanel doc={authored}/> :
           <section className="result-card system-generation-card"><h3>{authored?.title ?? (systemTitle+' Gemini 해설')}</h3>
-            <p role="status">{generating?'Gemini 해설을 생성하고 있어.':generationError || (verified && focusedField ? `이 저장본에는 ${systemTitle} 근거로 작성한 ${focusedField.label} 해설이 없어.` : '이 기간에 저장된 체계별 Gemini 원고가 없어.')}</p>
+            <p role="status">{generating?'Gemini 해설을 생성하고 있어.':generationError || (verified && focusedField ? `${systemTitle} ${focusedField.label} 해설을 아직 만들지 않았어. 아래 버튼으로 만들 수 있어.` : `${systemTitle} 해설을 아직 만들지 않았어.`)}</p>
             {onGenerate && <button type="button" className="period-ai-generate" disabled={generating} onClick={onGenerate}>{generationError || verified ? '해설 다시 생성' : '해설 생성'}</button>}
           </section>}</div>
         {system==='western' && <>

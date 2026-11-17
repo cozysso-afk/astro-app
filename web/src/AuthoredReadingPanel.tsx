@@ -44,14 +44,11 @@ export function AuthoredReadingPanel({doc,technicalDetails,period,onRefresh}:Pro
   const trusted = doc.state !== 'unverified' && doc.state !== 'calculated'
   const coreIds = new Set(doc.core.map(b=>b.id))
   const written = doc.sections.filter(s=>s.state==='ready' && s.blocks.some(b=>!coreIds.has(b.id)))
-  const missing = doc.sections.filter(s=>s.state==='missing')
-  const insufficient = doc.sections.filter(s=>s.state==='insufficient')
   const periodLabel = period==='week'?'주간':period==='month'?'월간':period==='year'?'연간':''
   return <section className="authored-reading" data-authored-scope={doc.scope} data-authored-state={doc.state} data-authored-revision={doc.revision}>
     <header><span>{doc.title}</span>{doc.date && <time>{doc.date}</time>}</header>
     {trusted ? <>
       {doc.headline && <h3 className="authored-reading-headline">{doc.headline}</h3>}
-      {doc.state!=='ready' && <p className="authored-reading-state">이 저장본에는 이 질문의 핵심 해설이 없어.</p>}
       <div className="authored-reading-core"><Blocks blocks={doc.core}/></div>
       {canSave && <button className="authored-reading-save" type="button" onClick={save} disabled={saving}>{saving?'이미지 만드는 중…':`${doc.title} 핵심 이미지 저장`}</button>}
       {notice && <p className="authored-reading-notice" role="status">{notice}</p>}
@@ -59,10 +56,7 @@ export function AuthoredReadingPanel({doc,technicalDetails,period,onRefresh}:Pro
         <summary>질문별 상세 해설</summary>
         {written.map(s=><section className="authored-reading-section" key={s.id} data-reading-section={s.id}><h3>{s.label}</h3><Blocks blocks={s.blocks.filter(b=>!coreIds.has(b.id))}/></section>)}
       </details>}
-      {[{sections:missing,label:'아직 작성되지 않은 항목'},{sections:insufficient,label:'근거가 부족한 항목'}].map(({sections,label})=>sections.length>0 && <details className="authored-reading-coverage" key={label}>
-        <summary>{label} {sections.length}개</summary>
-        <ul>{sections.map(s=><li key={s.id} data-reading-section={s.id} data-section-state={s.state}>{s.label}</li>)}</ul>
-      </details>)}
+      {/* Unwritten and weak sections are not listed to the reader. */}
     </> : <p className="authored-reading-state">작성자가 확인된 Gemini 해설이 없어.</p>}
     {observed && <aside className="authored-reading-block" aria-label="내가 기록한 연락"><h4>내가 기록한 연락</h4><p>{observed.fact}</p></aside>}
     {onRefresh && <button className="authored-reading-save" type="button" onClick={onRefresh}>{periodLabel} AI 해설 다시 작성</button>}

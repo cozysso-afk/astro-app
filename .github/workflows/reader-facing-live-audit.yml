@@ -1,0 +1,63 @@
+name: Reader-facing live audit
+
+# Generates day/week/month/annual readings for the synthetic QA profile through
+# a QA function slot and audits every reader-visible field. Runs only on an
+# explicit tag so it never spends Gemini calls by accident.
+on:
+  push:
+    branches:
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reader-facing-live-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[reader-audit]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Generate and audit all periods
+        continue-on-error: true
+        env:
+          QA_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          QA_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_ANON_KEY }}
+          QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
+          QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
+          QA_CALC_API_URL: ${{ secrets.QA_CALC_API_URL }}
+          QA_FORTUNE_FUNCTION_SLUG: fortune-daily-reader-first-qa
+          QA_LIVE_APPROVED: "YES"
+          QA_FORTUNE_MODEL: gemini-3.8-flash
+        run: >-
+          node --experimental-strip-types scripts/fortune-live-qa.mjs
+          --max-jobs 4
+          --period-kinds day,week,month,annual
+          --out reader-audit
+      - name: Print issue codes
+        if: always()
+        run: |
+          node -e '
+          const r=JSON.parse(require("fs").readFileSync("reader-audit/report.json","utf8"));
+          for(const c of r.cases??[]){console.log(`${c.period_kind} ${c.status} runner=${c.runner_error_code||"-"}`);
+            for(const i of c.issues??[])console.log(`  ${i.severity} ${i.code} ${JSON.stringify({...i,code:undefined,severity:undefined})}`)}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reader-audit-${{ github.sha }}
+          path: web/reader-audit/
+          retention-days: 7

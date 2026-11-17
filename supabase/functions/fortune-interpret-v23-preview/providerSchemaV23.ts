@@ -152,7 +152,7 @@ export function buildProviderCoreSchema(fullSchema:any,periodKind?:unknown){
       reconnection:structuredClone(section.properties.evidence_refs),
     },required:["incoming","outgoing","reconnection"]};
     core.required.push("contact_evidence_refs");
-    core.properties.system_field_readings={type:"ARRAY",description:"system_field_sources 각 행의 system/topic에 한해 해당 fact의 명칭과 그 분야에서의 뜻을 독립된 한국어 한두 문장으로 풀어 써. 해당 행의 evidence_ref 하나만 인용해. 점수·시기·사건 예측으로 바꾸지 마. 뜻을 뒷받침할 수 없으면 그 행은 생략해. sources가 없으면 빈 배열.",items:{type:"OBJECT",properties:{
+    core.properties.system_field_readings={type:"ARRAY",description:"system_field_sources의 모든 행(system/topic)마다 하나씩 써. 앱의 사주·태국점성술 분야 화면 본문이야. 두세 문장(90~220자) 반말: ① 이 기간에 들어온 근거를 이름과 쉬운 뜻으로(예: '올해 세운에 편관이 들어와서', '탁사쫀에서 금전을 맡는 시리 자리에 목성이 있어서') ② 그것이 그 topic의 생활에서 어떻게 드러나는지 구체적 장면 하나 ③ 그래서 해 볼 것이나 조심할 것 하나. 사전 정의만 쓰고 '~를 뜻해/상징해/나타내/의미해'로 끝내면 탈락이야. 같은 근거가 여러 topic에 쓰여도 topic마다 다른 장면을 써. fact가 월운·세운이면 하루 일진 이야기를 하지 말고 그 기간 전체로 말해. 해당 행의 evidence_ref 하나만 인용해. 사건 확정·점수·확률로 바꾸지 마. sources가 없으면 빈 배열.",items:{type:"OBJECT",properties:{
       system:{type:"STRING",enum:["saju","thai"]},topic:{type:"STRING"},reading:{type:"STRING"},evidence_refs:structuredClone(section.properties.evidence_refs),
     },required:["system","topic","reading","evidence_refs"]}};
     core.required.push("system_field_readings");

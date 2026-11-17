@@ -83,11 +83,8 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
     </section>)}
     {featured.map(slot => {
       const label = relationshipLabels[slot.id]
-      if (slot.state !== 'ready') {
-        return <p className="daily-reading-state" key={slot.id} data-daily-slot={slot.id} data-slot-state={slot.state}>
-          <strong>{label}</strong> · {slot.state === 'insufficient' ? '판단할 근거가 부족해.' : '이 항목의 해설이 없어.'}
-        </p>
-      }
+      // An unwritten slot is internal bookkeeping, not something to read.
+      if (slot.state !== 'ready') return null
       return <details className="daily-reading-details" key={slot.id} data-daily-slot={slot.id} data-slot-state="ready">
         <summary>{label}</summary>
         {doc.details.filter(block => block.id.startsWith(slot.id + ':')).map(block =>
@@ -105,16 +102,16 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
       <p className="daily-love-status-note">{loveStatus ? '이 기기에 저장돼. 다음에 해설을 새로 만들 때부터 이 상황을 기준으로 깊게 써.' : '상황을 고르면 그 상황 해설을 먼저 보여주고, 다음 해설부터 그 상황에 맞춰 써.'}</p>
     </section>}
     {myScenario && <section className="daily-reading-block daily-love-mine" data-daily-slot={myScenario.id}><h4>내 상황 · {myScenario.label}</h4>
-      {myScenario.blocks.length ? myScenario.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{myScenario.slot?.state==='insufficient' ? '이 상황을 판단할 근거가 부족해.' : '이 상황 해설이 아직 없어. 해설을 다시 생성하면 이 상황 기준으로 써.'}</p>}
+      {myScenario.blocks.length ? myScenario.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{myScenario.slot?.state==='insufficient' ? '이번 운세에는 이 상황만 따로 짚을 배치가 없어. 위 애정 해설을 기준으로 봐.' : '이 상황 해설이 아직 없어. 해설을 다시 생성하면 이 상황 기준으로 써.'}</p>}
     </section>}
-    {otherScenarios.length>0 && <section className="daily-reading-block"><h4>{myScenario ? '다른 상황이라면' : '내 상황에 맞춰 보기'}</h4>
-      {otherScenarios.map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
+    {otherScenarios.some(row=>row.blocks.length) && <section className="daily-reading-block"><h4>{myScenario ? '다른 상황이라면' : '내 상황에 맞춰 보기'}</h4>
+      {otherScenarios.filter(row=>row.blocks.length).map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
         <summary>{row.label}</summary>
-        {row.blocks.length ? row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>) : <p>{row.slot?.state==='insufficient' ? '이 상황을 판단할 근거가 부족해.' : '이 상황의 해설은 아직 작성되지 않았어.'}</p>}
+        {row.blocks.length ? row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>)}
       </details>)}
     </section>}
     {!!otherDetails.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{otherDetails.map(b=><section className="daily-reading-block" key={b.id} data-daily-detail={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
-    {(['missing','insufficient'] as const).map(state=>{const slots=doc.slots?.filter(slot=>slot.state===state && !featuredIds.has(slot.id) && !scenarios.some(row=>row.id===slot.id))??[];return slots.length?<details className="daily-reading-coverage" key={state}><summary>{state==='missing'?'아직 작성되지 않은 항목':'근거가 부족한 항목'} {slots.length}개</summary><ul>{slots.map(slot=><li key={slot.id} data-daily-slot={slot.id} data-slot-state={state}>{slot.label}</li>)}</ul></details>:null})}
+    {/* Coverage lists of unwritten slots stay out of the reading. */}
 
     {doc.state==='ready' && <>      <button className="daily-reading-save" type="button" disabled={saving} onClick={save}>{saving?'이미지 만드는 중…':'핵심 해설 이미지 저장'}</button>
       {notice&&<p className="daily-reading-notice" role="status">{notice}</p>}

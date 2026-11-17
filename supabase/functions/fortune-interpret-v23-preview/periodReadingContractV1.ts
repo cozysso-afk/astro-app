@@ -158,7 +158,10 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - evidence_meaning: 화면의 "이렇게 읽는 이유"야. 기본 여섯 분야(${PERIOD_PRIMARY_KEYS.join(', ')})만 생활 장면 한 문장 뒤에 별 이유 한두 문장을 붙여 두세 문장(120~220자)으로 써. 예: "하늘을 지나는 금성이 네 출생차트의 토성과 부딪히는 기간이라, 사고 싶은 마음과 아껴야 한다는 생각이 같이 올라와." 그 밖의 모든 항목(연애 상황별, 연락, 재회, 시험, 이직, 소식, 투자 등)은 applies_when과 evidence_meaning을 각각 짧은 한 문장(60자 안팎)으로 끝내고, 이 짧은 evidence_meaning에는 별 이름·각 이름을 쓰지 말고 생활 언어로만 이유를 말해. 전체 원고가 길어지면 응답이 잘려서 통째로 버려져.
 - action: 판정에서 바로 나오는 선택 하나(40~120자). 수월한 분야라면 무엇을 해 보면 좋은지 권해. 별 이름 없이.
 - overall.dominant_pattern: 첫 화면의 "이렇게 읽는 이유"야. 반드시 작성해. 이 기간의 핵심 판단을 만든 배치를 위 방법으로 풀어 두세 문장(120~260자)으로 써. summary 문장을 되풀이하지 말고, '공존', '긴장', '압박' 같은 낱말로 문장을 끝내지 마.
-- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 세 문장, saju는 제공된 월운·세운·일진 범위에서 두 문장, thai는 제공된 탁사 자리의 전통적 뜻을 두 문장으로 써. thai 첫 문장에는 system_field_sources 중 system이 thai인 행의 자리 이름과 행성을 그대로 넣고 그 자리가 무엇을 맡는지 쉬운 말로 붙여(예: '탁사조른에서 브리완, 곧 주변 사람과 아랫사람을 맡는 자리에 화성이 들어와 있어.'). '탁사 기간의 흐름', '태국 점성술의 기운'처럼 자리와 행성을 빼고 뭉뚱그리지 마. 연간이라도 같아. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
+- systems: 앱의 서양점성술·사주·태국점성술 화면 본문이야. western은 이 기간에 가장 뚜렷한 배치 두세 개를 풀어 세 문장, saju는 ${kind==='annual'?'세운을 중심으로 월운이 바뀌며 달라지는 점까지':kind==='month'?'이 달의 월운을 중심으로':'제공된 월운·일진 범위에서'} 세 문장, thai는 제공된 탁사 자리와 행성이 이 기간 생활에서 어떻게 드러나는지 세 문장으로 써. 자리 이름의 사전 정의만 쓰면 탈락이야.
+- 기간과 근거의 크기를 맞춰. ${kind==='annual'?'한 해는 W:span(느린 행성의 장기 배치)·W:month·세운·월운·탁사쫀으로만 읽어. 달·수성·금성·화성·태양이 하루 이틀 만든 각을 한 해의 이유로 쓰지 마. S:daily 일진을 한 해의 근거로 인용하지 마.':kind==='month'?'한 달은 W:span·W:month·월운·탁사쫀을 먼저 써. 달이 하루 만든 각이나 S:daily 일진 하나로 한 달 전체를 설명하지 마.':'짧은 기간도 하루 일진 하나를 기간 전체의 성격으로 늘리지 마.'}
+- 같은 근거 하나를 여러 분야의 이유로 반복하지 마. 분야마다 그 분야 source_topics에 맞는 다른 근거를 골라.
+- limits는 화면의 "함께 알아둘 점"이야. 사용자가 읽는 한 문장으로 쓰고 표본·계산·근거·데이터·보장 같은 내부 용어를 쓰지 마. 쓸 말이 없으면 빈 문자열로 둬. thai 첫 문장에는 system_field_sources 중 system이 thai인 행의 자리 이름과 행성을 그대로 넣고 그 자리가 무엇을 맡는지 쉬운 말로 붙여(예: '탁사조른에서 브리완, 곧 주변 사람과 아랫사람을 맡는 자리에 화성이 들어와 있어.'). '탁사 기간의 흐름', '태국 점성술의 기운'처럼 자리와 행성을 빼고 뭉뚱그리지 마. 연간이라도 같아. 각도 숫자를 나열하지 말고 '길하다', '흉하다'라고 쓰지 마.
 
 - domain_answers는 질문마다 한 문장으로 답해. 모든 문장은 ~해, ~야, ~어로 끝나는 반말이야. "~다."로 끝내지 마.
 
@@ -177,7 +180,7 @@ evidence_ledger 각 행의 observation에서 transit은 지금 하늘을 지나�
 - headline은 한 문장(25~60자 목표), overall.summary는 적용 상황과 이유를 설명하는 80~180자 목표야. 중요한 제한을 글자 수 때문에 삭제하지 마. 180자 넘는 제목이나 360자 넘는 요약은 실패야. 상세 설명은 evidence_meaning에 둬.
 - 초·중·후반이나 네 분기를 의무적으로 채우지 마. 표본 날짜가 여러 개라는 이유만으로 중간이 계속 좋았거나 달라졌다고 말하지 마. 관측이 같은 경우 유지되는 맥락을 설명할 수 있지만, 날짜 사이의 미계산 변화를 확정하지 마.
 - period_reading.questions는 전달된 분야별 근거와 표본 범위야. all_supplied_rows도 전체 기간의 모든 날이 계산됐다는 뜻은 아니야. omitted_ids의 근거는 인용하지 마. 일부 날짜 근거만 있으면 그 날짜의 관측과 기간 전체의 제한을 분리해.
-- key_windows/year_phases/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야. 정확한 날짜 근거는 각 분야 evidence_meaning과 action${kind==='week'?' 또는 overall이 직접 인용한 관측을 설명하는 문장':''}에서만 설명하고, 날짜 사이가 이어졌다고 추정하지 마.
+- key_windows/cross_checks는 이번 계약에서 반드시 빈 배열로 써. 표본 날짜를 연속 구간으로 늘리는 오류를 막기 위한 제한이야.${kind==='annual'?' year_phases는 연간에만 3~4개(대략 분기) 써. 각 phase의 start/end는 인용한 W:month·W:span·S:month 행들이 빈틈 없이 덮는 범위여야 해. label은 "1~3월"처럼 달 이름, theme은 그 시기 생활에서 달라지는 점 두 문장, change는 다음 phase로 넘어갈 때 바뀌는 점 한 문장. 하루짜리 날짜 근거로 phase를 만들지 마.':' year_phases도 빈 배열로 써.'}
 - overall.summary·best_phase·caution_phase·dominant_pattern에 YYYY-MM-DD를 쓰려면 그 날짜의 근거가 overall.evidence_refs에 들어 있어야 해. 없으면 날짜를 빼고 장면만 말해.
 - 각 fields의 날짜·기간 표현은 그 fields의 evidence_refs가 바로 그 날짜 또는 전체 구간을 직접 포함할 때만 써. 다른 분야 근거의 날짜를 빌리지 마. 직접 포함하지 않으면 날짜를 빼고 실제 생활 장면만 설명해.
 - headline·overall.summary·best_phase·caution_phase·각 분야 conclusion/action/applies_when은 별 이름·각 이름·영문 전문어·사주 용어 없이 생활 언어로 써.
@@ -454,6 +457,20 @@ function rowCoversSpan(row:any,start:string,end:string){
   const from=date(row?.start),to=evidenceEnd(row)
   return Boolean(from&&to&&from<=start&&end<=to)
 }
+// An annual phase (e.g. one quarter) is covered when the cited month, 월운 or
+// slow-transit rows together span it without a gap. Single dated samples never
+// stretch into a phase.
+function unionCoversSpan(rows:any[],start:string,end:string){
+  const spans=rows.filter((r:any)=>!date(r?.date)&&date(r?.start)&&evidenceEnd(r)).map((r:any)=>[date(r.start),evidenceEnd(r)] as [string,string]).sort((a,b)=>a[0].localeCompare(b[0]))
+  let reach=''
+  for(const [from,to] of spans){
+    if(!reach){ if(from>start)return false; reach=to; continue }
+    const next=new Date(Date.parse(reach+'T00:00:00Z')+86400000).toISOString().slice(0,10)
+    if(from>next)break
+    if(to>reach)reach=to
+  }
+  return Boolean(reach&&reach>=end)
+}
 export function inspectPeriodReading(data:any,payload:any){
   const issues:Issue[]=[]
   if(!isExtendedPeriod(payload?.period_kind))return {version:PERIOD_READING_VERSION,passed:true,issues}
@@ -515,7 +532,8 @@ export function inspectPeriodReading(data:any,payload:any){
     for(const [i,item] of (data?.[field]??[]).entries()){
       const start=date(item.start),end=date(item.end)
       const refs=(item.evidence_refs??[]).map((id:string)=>ledger.get(id)).filter(Boolean)
-      if(!start||!end||start>end||start<date(payload?.period?.start)||end>date(payload?.period?.end)||!refs.some((r:any)=>rowCoversSpan(r,start,end)))add('unsupported_period_span',`${field}[${i}]`)
+      const covered=field==='year_phases'?unionCoversSpan(refs,start,end):refs.some((r:any)=>rowCoversSpan(r,start,end))
+      if(!start||!end||start>end||start<date(payload?.period?.start)||end>date(payload?.period?.end)||!covered)add('unsupported_period_span',`${field}[${i}]`)
       const signature=JSON.stringify([start,end,[...(item.topics??[])].sort(),[...(item.evidence_refs??[])].sort()])
       if(seen.has(signature))add('duplicate_period_window',`${field}[${i}]`)
       seen.add(signature)

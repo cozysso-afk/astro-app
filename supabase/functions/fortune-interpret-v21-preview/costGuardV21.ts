@@ -324,9 +324,14 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   for(const day of payload?.saju?.daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
   for(const day of payload?.thai?.suriyayat_daily??[])if(day?.evidence_id)allowed.add(String(day.evidence_id));
   if(payload?.thai?.daily_taksa?.evidence_id)allowed.add(String(payload.thai.daily_taksa.evidence_id));
+  // Long periods are read from their own scope: slow-planet spans, month
+  // averages, 세운/월운 and the Taksajorn wheel. Daily samples come after.
+  const longPeriod=payload?.period_kind==="annual"||payload?.period_kind==="month";
+  const periodScopes=new Set(["slow_transit_span","annual_segment","monthly_segment","taksajorn_context","month_average"]);
+  if(longPeriod)for(const row of payload?.evidence_ledger??[])if(periodScopes.has(String(row?.scope)))allowed.add(String(row?.id??""));
   const rows=(Array.isArray(payload?.evidence_ledger)?payload.evidence_ledger:[]).filter((row:any)=>allowed.has(String(row?.id??"")));
   const ordered=[...rows].sort((a:any,b:any)=>{
-    const p=(row:any)=>String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
+    const p=(row:any)=>longPeriod&&(row?.scope==="slow_transit_span"||row?.scope==="month_average")?-1:String(row?.id??"").startsWith("W:daily:")?0:String(row?.id??"").startsWith("W:detail:")?1:String(row?.id??"").startsWith("W:window:")?2:String(row?.id??"").startsWith("W:date:")?3:String(row?.id??"").startsWith("W:month:")?4:String(row?.id??"").startsWith("W:overall:")?5:6;
     return p(a)-p(b);
   });
   const limit=payload?.period_kind==="annual"?110:80;
@@ -337,6 +342,7 @@ function promptEvidence(payload:any,topics:string[],keyDates:any[]){
   // rows would otherwise crowd the other system out of the prompt ledger.
   const keyDateSet=new Set(keyDates.map((x:any)=>String(x?.date??"")));
   const priority=(row:any)=>keyDateSet.has(String(row?.date??""))?0:
+    longPeriod&&(row?.scope==="annual_segment"||row?.scope==="monthly_segment"||row?.scope==="taksajorn_context")?-1:
     row?.scope==="thai_daily_taksa"?0:row?.scope==="daily_pillar"||row?.scope==="suriyayat_daily_position_facts"?1:2;
   const bySystem=["saju","thai"].map(system=>context.filter((r:any)=>r?.system===system)
     .sort((a:any,b:any)=>priority(a)-priority(b)));
