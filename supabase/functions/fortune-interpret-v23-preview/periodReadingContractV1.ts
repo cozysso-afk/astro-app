@@ -346,6 +346,16 @@ export function isolateOptionalPeriodViolations(core:any,kind:unknown,packet:any
       return {core:next.core,isolated:[...[...drop].map(i=>`domain_answers[${i}]`),...next.isolated]}
     }
   }
+  // An annual phase whose cited rows do not cover it is dropped; the other
+  // phases and the reading stay.
+  if(packet?.period&&Array.isArray(core?.year_phases)&&core.year_phases.length){
+    const bad=new Set(inspectPeriodReading({year_phases:core.year_phases},{...packet,period_kind:kind}).issues
+      .map(issue=>/^year_phases\[(\d+)\]$/.exec(issue.path)).filter(Boolean).map(m=>Number(m![1])))
+    if(bad.size){
+      const next=isolateOptionalPeriodViolations({...core,year_phases:core.year_phases.filter((_:unknown,i:number)=>!bad.has(i))},kind,packet)
+      return {core:next.core,isolated:[...[...bad].map(i=>`year_phases[${i}]`),...next.isolated]}
+    }
+  }
   // A section may cite one off-topic row next to on-topic rows; the final check
   // needs every cited row to match. Keep the on-topic rows only when at least
   // one remains. Rows outside the writer packet are left untouched.
