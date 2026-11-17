@@ -107,7 +107,7 @@ export function DailyReadingDocumentView({original,technicalDetails,onRetry}:{or
     {otherScenarios.some(row=>row.blocks.length) && <section className="daily-reading-block"><h4>{myScenario ? '다른 상황이라면' : '내 상황에 맞춰 보기'}</h4>
       {otherScenarios.filter(row=>row.blocks.length).map(row=><details className="daily-reading-details" key={row.key} data-daily-slot={row.id} data-slot-state={row.slot?.state ?? 'ready'}>
         <summary>{row.label}</summary>
-        {row.blocks.length ? row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>)}
+        {row.blocks.map(block=><section className="daily-reading-block" key={block.id}><h4>{block.label}</h4><p>{block.text}</p></section>)}
       </details>)}
     </section>}
     {!!otherDetails.length&&<details className="daily-reading-details"><summary>상세 해설</summary>{otherDetails.map(b=><section className="daily-reading-block" key={b.id} data-daily-detail={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</details>}
