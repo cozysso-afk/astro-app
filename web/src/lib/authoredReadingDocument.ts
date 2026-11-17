@@ -206,6 +206,14 @@ export function buildPeriodReadingDocument(data:NonNullable<AiInterpretationResp
   return completed
 }
 
+const SITUATION_BY_STATE:Record<string,string[]>={disconnected:['complete_cutoff','no_contact'],recontacted:['occasional_contact'],messaging:['occasional_contact'],met:['meeting_again'],reunited:['meeting_again'],intimate_undefined:['ambiguous_relationship']}
+function situationApplies(key:string,observation?:ReunionObservationContext){
+  const state=observation?.state??''
+  const met=observation?.events?.some(event=>event.kind==='meeting'||event.kind==='rebuilding')
+  const allowed=SITUATION_BY_STATE[state]??(met?SITUATION_BY_STATE.met:undefined)
+  return !allowed||allowed.includes(key)
+}
+
 export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,mode:RelationshipAnalysisMode,date:string,observation?:ReunionObservationContext):AuthoredReadingDocument {
   const labels:Record<string,string>={compatibility:'궁합',reunion:'재회',marriage_unmarried:'결혼궁합',marriage_married:'결혼생활'}
   const verified=hasRelationshipProvenance(ai) && ai?.data
@@ -216,8 +224,10 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
   const originalBlock = (id: string, label: string, value: unknown): AuthoredBlock[] =>
     typeof value === 'string' && value.trim() ? [{id, label, text: value}] : []
   doc.headline = data.headline ?? ''
-  doc.core=[...originalBlock('core:summary','핵심 요약',core.core_summary),...originalBlock('core:reason','이렇게 읽는 이유',core.core_reason),...originalBlock('core:action','할 일 · 확인할 점',core.core_action),...(core.core_conditions??[]).flatMap((value,i)=>originalBlock(`core:condition:${i}`,'함께 알아둘 조건',value)),...originalBlock('limits','해석의 범위',data.limits)]
-  const add=(id:string,label:string,value:unknown)=>doc.sections.push({id,label,state:text(value)?'ready':'missing',blocks:originalBlock(`${id}:text`,'해설',value)})
+  doc.core=[...originalBlock('core:summary','핵심 요약',core.core_summary),...originalBlock('core:reason','이렇게 읽는 이유',core.core_reason),...originalBlock('core:action','할 일 · 확인할 점',core.core_action),...(core.core_conditions??[]).flatMap((value,i)=>originalBlock(`core:condition:${i}`,i===0?'함께 알아둘 조건':'',value)),...originalBlock('limits','해석의 범위',data.limits)]
+  // The section heading already names the passage; a second '해설' label under
+  // every heading is noise.
+  const add=(id:string,label:string,value:unknown)=>doc.sections.push({id,label,state:text(value)?'ready':'missing',blocks:originalBlock(`${id}:text`,'',value)})
   add('overview','전체 상세 해설',data.overview)
   if(mode.startsWith('marriage_')) {
     const marriage=data.marriage_reading
@@ -230,10 +240,16 @@ export function buildRelationshipReadingDocument(ai:RelationshipAiResponse|null,
       for(const [key,label] of [['current_stage','실제 관계 상태를 바탕으로 보면'],['contact_type_if_any','연락이 있다면 그 성격'],['initiative','연락의 방향'],['continuity','대화의 지속'],['meeting_gate','다음 만남이 잡힐 때'],['rebuild_gate','관계를 다시 만들 조건'],['behavior_change_evidence','달라진 행동의 확인']] as const)add(`consultation:${key}`,label,reunion.consultation_answer?.[key])
       for(const [key,label] of [['complete_cutoff','완전히 단절된 경우'],['no_contact','연락이 없는 경우'],['occasional_contact','가끔 연락하는 경우'],['meeting_again','다시 만나고 있는 경우'],['ambiguous_relationship','관계가 아직 정해지지 않은 경우']] as const) {
         const application = reunion.consultation_answer?.contextual_application?.[key]
-        if(text(application)) add(`consultation:context:${key}`,label,application)
+        // When the user recorded where the relationship stands, the other
+        // situations ("완전히 단절된 경우" after a meeting) do not apply.
+        if(text(application) && situationApplies(key,observation)) add(`consultation:context:${key}`,label,application)
       }
       for(const [key,label] of [['next_stage_up_conditions','다음 단계의 확인점'],['down_conditions','멈추거나 다시 볼 조건'],['repeat_risks','반복 위험']] as const)(reunion.consultation_answer?.[key]??[]).forEach((value,i)=>add(`consultation:${key}:${i}`,label,value))
-      for(const [key,label] of [['why_reconnect','다시 연결될 여지'],['initiative','누가 먼저 움직일지']] as const){add(`${key}:conclusion`,label,reunion[key]?.conclusion);add(`${key}:interpretation`,`${label}의 이유`,reunion[key]?.interpretation)}
+      // Conclusion and reason are one passage under one heading.
+      for(const [key,label] of [['why_reconnect','다시 연결될 여지'],['initiative','누가 먼저 움직일지']] as const){
+        const blocks=[...originalBlock(`${key}:conclusion:text`,'',reunion[key]?.conclusion),...originalBlock(`${key}:interpretation:text`,'',reunion[key]?.interpretation)]
+        if(blocks.length)doc.sections.push({id:key,label,state:'ready',blocks})
+      }
       add('timing:conclusion','시기',reunion.timing?.conclusion)
       ;[...(reunion.timing?.windows??[])].sort((a,b)=>String(a.period).localeCompare(String(b.period))).forEach((w,i)=>add(`timing:${i}`,w.period,w.meaning))
       add('rebuild:conclusion','다시 이어갈 때의 관계',reunion.rebuild?.conclusion)

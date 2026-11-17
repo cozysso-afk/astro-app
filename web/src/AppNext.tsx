@@ -1,4 +1,6 @@
 import { LOVE_SCENARIOS_PROMPT, type LoveStatus } from './lib/loveReadingContext'
+import { SavedCounterparts } from './SavedCounterparts'
+import { saveCounterpart } from './lib/savedCounterparts'
 import { loveStatusUserContext } from './lib/loveStatus'
 import { SystemReadingViews } from './SystemReadingViews'
 import { fortuneField, type FortuneField } from './lib/fortuneFields'
@@ -1124,6 +1126,8 @@ export default function AppNext() {
     const counterpartLatitude = parseOptionalNumber(counterpart.latitude)
     const counterpartLongitude = parseOptionalNumber(counterpart.longitude)
     if (counterpart.timeKnown && (counterpartLatitude === null || counterpartLongitude === null)) { setRelationshipError('상대 출생시간을 안다면 출생지역도 선택해줘. 모르면 “출생시간 모름”을 체크해줘.'); return }
+    // Anyone the user actually reads with is kept for next time.
+    saveCounterpart(counterpart)
     const body = {
       as_of_date: new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
       query_utc_offset_hours: -new Date().getTimezoneOffset()/60,
@@ -1841,6 +1845,7 @@ export default function AppNext() {
             {needsCounterpart&&<>
             <div className="subsection-title" id="counterpart-birth-title">상대 출생정보</div>
             <div className="field-grid counterpart-birth-form" role="group" aria-labelledby="counterpart-birth-title">
+              <SavedCounterparts value={counterpart} onPick={setCounterpart}/>
               <label className="field field-wide"><span>상대 이름 또는 별명</span><input value={counterpart.name} onChange={(e)=>setCounterpart({...counterpart,name:e.target.value})} placeholder="예: 연우"/></label>
               <label className="field birth-date-field"><span>생년월일</span><input type="date" value={counterpart.birthDate} onChange={(e)=>setCounterpart({...counterpart,birthDate:e.target.value})}/></label>
               <div className="field-wide counterpart-time-entry">

@@ -11,7 +11,7 @@ import '@fontsource/noto-sans-kr/korean-400.css'
 import '@fontsource/noto-sans-kr/korean-700.css'
 
 function Blocks({blocks}:{blocks:AuthoredBlock[]}) {
-  return <>{blocks.map(b=><section className="authored-reading-block" data-reading-block={b.id} key={b.id}><h4>{b.label}</h4><p>{b.text}</p></section>)}</>
+  return <>{blocks.map(b=><section className="authored-reading-block" data-reading-block={b.id} key={b.id}>{b.label&&<h4>{b.label}</h4>}<p>{b.text}</p></section>)}</>
 }
 
 type Props = {doc:AuthoredReadingDocument; technicalDetails?:ReactNode; period?:string; onRefresh?:()=>void}

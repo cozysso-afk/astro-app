@@ -96,7 +96,7 @@ test('reunion calculations do not write a narrative and every sentence of verifi
   const original='첫 문장. Mercury · 庚申 · 오브 1.2°가 포함된 문장. 세 번째. 네 번째. 다섯 번째.'
   const data={headline:'재회',reunion_synthesis_v2:{why_reconnect:{interpretation:original}}}
   const verified=buildRelationshipReadingDocument({...relationshipProvider,data},'reunion','2026-11-13')
-  assert.equal(verified.sections.find(section=>section.id==='why_reconnect:interpretation').blocks[0].text,original)
+  assert.equal(verified.sections.find(section=>section.id==='why_reconnect').blocks.find(block=>block.id==='why_reconnect:interpretation:text').text,original)
   const unknown=buildRelationshipReadingDocument({ok:true,data},'reunion','2026-11-13')
   assert.deepEqual(unknown.sections,[])
   assert.doesNotMatch(panel,/readerSentences|whyFallback|sustainabilityNarrative/)
