@@ -115,38 +115,25 @@ def _app_is_unlocked(page):
     return False
 
 
-def dump_diagnostics(page, reason: str):
-    print(f"HEADLESS_DIAGNOSTICS reason={reason}", file=sys.stderr)
-    try:
-        print(f"url={page.url}", file=sys.stderr)
-    except Exception:
-        pass
-    try:
-        print(f"title={page.title(timeout=3000)!r}", file=sys.stderr)
-    except Exception as exc:
-        print(f"title_error={type(exc).__name__}: {exc}", file=sys.stderr)
+SAFE_DIAGNOSTIC_REASONS = frozenset({
+    "waiting_for_login",
+    "login_timeout",
+    "report_timeout_daily",
+    "report_timeout_weekly",
+    "report_timeout_monthly",
+})
 
-    for index, scope in enumerate(all_scopes(page)):
-        try:
-            scope_url = getattr(scope, "url", "")
-        except Exception:
-            scope_url = ""
-        text = body_text(scope, timeout=2500)
-        print(f"scope[{index}] url={scope_url!r}", file=sys.stderr)
-        print(f"scope[{index}] body={text[:1800]!r}", file=sys.stderr)
-        try:
-            inputs = scope.locator("input")
-            meta = []
-            for i in range(min(inputs.count(), 8)):
-                node = inputs.nth(i)
-                meta.append({
-                    "type": node.get_attribute("type"),
-                    "placeholder": node.get_attribute("placeholder"),
-                    "aria": node.get_attribute("aria-label"),
-                })
-            print(f"scope[{index}] inputs={meta!r}", file=sys.stderr)
-        except Exception:
-            pass
+
+def dump_diagnostics(_page, reason: str):
+    # Do not inspect or log authenticated page content, URLs, or metadata.
+    safe_reason = reason if type(reason) is str and reason in SAFE_DIAGNOSTIC_REASONS else "unknown"
+    print(f"HEADLESS_DIAGNOSTICS reason={safe_reason}", file=sys.stderr)
+
+
+def log_failure(kind: str, error_code: str):
+    safe_kind = kind if type(kind) is str and kind in VALID_KINDS else "unknown"
+    safe_code = "browser_timeout" if type(error_code) is str and error_code == "browser_timeout" else "worker_failed"
+    print(f"PREWARM_FAILED kind={safe_kind} code={safe_code}", file=sys.stderr)
 
 
 def login_if_needed(page, pin: str):
@@ -265,11 +252,11 @@ def main():
             print(f"Pre-generation completed for {kind}; server-side cache should now be warm.")
             context.close()
             browser.close()
-    except PlaywrightTimeoutError as exc:
-        print(f"Playwright timeout during {kind} pre-generation: {exc}", file=sys.stderr)
+    except PlaywrightTimeoutError:
+        log_failure(kind, "browser_timeout")
         return 1
-    except Exception as exc:
-        print(f"Pre-generation failed for {kind}: {type(exc).__name__}: {exc}", file=sys.stderr)
+    except Exception:
+        log_failure(kind, "worker_failed")
         return 1
     return 0
 
